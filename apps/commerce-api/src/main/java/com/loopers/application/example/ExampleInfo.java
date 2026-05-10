@@ -11,4 +11,3 @@ public record ExampleInfo(Long id, String name, String description) {
         );
     }
 }
-
