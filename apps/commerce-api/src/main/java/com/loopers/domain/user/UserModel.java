@@ -4,9 +4,13 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
 import com.loopers.domain.value.PasswordVO;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "users")
 public class UserModel extends BaseEntity {
@@ -14,29 +18,30 @@ public class UserModel extends BaseEntity {
     private String loginId;
     private String name;
     private BirthVO birth;
-    private PasswordVO passwordVO;
-    private EmailVO emailVO;
+    private PasswordVO password;
+    private EmailVO email;
 
-    protected UserModel() {
-    }
-
-    private UserModel(String loginId, String name, BirthVO birth, PasswordVO passwordVO, EmailVO emailVO) {
-        if (passwordVO.value().contains(String.valueOf(birth.toInt()))) {
+    public static UserModel of(String loginId, String name, BirthVO birth, PasswordVO password, EmailVO email) {
+        if (password.password().contains(String.valueOf(birth.toInt()))) {
             throw new IllegalArgumentException("비밀번호 생성 규칙 위반 : 생년월일은 비밀번호 내에 포함할 수 없습니다.");
         }
 
-        this.loginId = loginId;
-        this.name = name;
-        this.birth = birth;
-        this.passwordVO = passwordVO;
-        this.emailVO = emailVO;
-    }
-
-    public static UserModel of(String loginId, String name, BirthVO birth, PasswordVO passwordVO, EmailVO email) {
-        return new UserModel(loginId, name, birth, passwordVO, email);
+        return new UserModel(loginId, name, birth, password, email);
     }
 
     public String getLoginId() {
         return loginId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public BirthVO getBirth() {
+        return birth;
+    }
+
+    public EmailVO getEmailVO() {
+        return email;
     }
 }
