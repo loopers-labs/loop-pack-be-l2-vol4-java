@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 
@@ -42,7 +41,7 @@ public class MemberModelTest {
         void createUserModel_whenValidInfoProvided() {
             // arrange
             // act
-            be-MemberModel memberModel = new MemberModel(loginId, loginPassword, name, birthday, email);
+            MemberModel memberModel = new MemberModel(loginId, loginPassword, name, birthday, email);
 
             // assert
             assertAll(
@@ -128,7 +127,7 @@ public class MemberModelTest {
 
         @DisplayName("이메일이 ***@***.*** 형식이 아니면 BAD_REQUEST 예외가 발생한다")
         @ParameterizedTest
-        @ValueSource(strings = {"email@", "@email.com", "email@email"})
+        @ValueSource(strings = {"email@", "@email.com", "email@email", "@@@", "a!@abc.com", "aaaaa", "A@aaa"})
         void throwsBadRequestException_whenEmailIsInvalid(String invalidEmail) {
             // arrange
 
