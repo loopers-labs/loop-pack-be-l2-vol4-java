@@ -38,6 +38,5 @@ public class UserService {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
         user.changePassword(rawCurrentPassword, rawNewPassword);
-        userRepository.save(user);
     }
 }
