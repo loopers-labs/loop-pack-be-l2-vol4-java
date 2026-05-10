@@ -1,0 +1,39 @@
+package com.loopers.domain.user;
+
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+
+@RequiredArgsConstructor
+@Component
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    @Transactional
+    public UserModel registerUser(String id, String password, String name, LocalDate birthDate, String email) {
+        UserModel user = new UserModel(id, password, name, birthDate, email);
+        return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserModel getUser(String userId, String password) {
+        UserModel user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND, "[userId = " + userId + "] 사용자를 찾을 수 없습니다."));
+        user.verifyPassword(password);
+        return user;
+    }
+
+    @Transactional
+    public UserModel changePassword(String userId, String currentPassword, String newPassword) {
+        UserModel user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND, "[userId = " + userId + "] 사용자를 찾을 수 없습니다."));
+        user.changePassword(currentPassword, newPassword);
+        return user;
+    }
+
+}
