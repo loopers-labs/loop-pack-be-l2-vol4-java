@@ -16,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class MemberModelTest {
-    String loginId;
-    String loginPassword;
-    String name ;
-    LocalDate birthday;
-    String email;
+    public String loginId;
+    public String loginPassword;
+    public String name ;
+    public LocalDate birthday;
+    public String email;
 
 
     @BeforeEach
@@ -113,9 +113,9 @@ public class MemberModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("이름에 한글, 영문 외 숫자나 특수문자가 있으면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("이름에 한글, 영문 외 숫자나 특수문자가 있으면 BAD_REQUEST 예외가 발생한다. 또한 연속 공백을 차단한다.")
         @ParameterizedTest
-        @ValueSource(strings = {"루퍼스!", "루퍼스123", "loopers♥"})
+        @ValueSource(strings = {"루퍼스!", "루퍼스123", "loopers♥", "루    퍼스"})
         void throwsBadRequestException_whenNameIsInvalid(String invalidName) {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -127,7 +127,7 @@ public class MemberModelTest {
 
         @DisplayName("이메일이 ***@***.*** 형식이 아니면 BAD_REQUEST 예외가 발생한다")
         @ParameterizedTest
-        @ValueSource(strings = {"email@", "@email.com", "email@email", "@@@", "a!@abc.com", "aaaaa", "A@aaa"})
+        @ValueSource(strings = {"email@", "@email.com", "email@email", "@@@", "a!@abc.com", "aaaaa", "A@aaa", "a @acds.com", "가나다라@가나다라.com"})
         void throwsBadRequestException_whenEmailIsInvalid(String invalidEmail) {
             // arrange
 
