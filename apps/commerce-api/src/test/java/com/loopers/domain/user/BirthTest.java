@@ -67,18 +67,13 @@ class BirthTest {
         }
     }
 
-    @DisplayName("생년월일 변환은, ")
-    @Nested
-    class Format {
+    @DisplayName("asCompact 는 yyyyMMdd 형식 문자열을 반환한다.")
+    @Test
+    void asCompact_returnsYyyyMmDd() {
+        // arrange
+        Birth birth = new Birth(LocalDate.of(1990, 1, 1));
 
-        @DisplayName("asCompact 는 yyyyMMdd 문자열을 반환한다.")
-        @Test
-        void asCompact_returnsYyyyMmDd() {
-            // arrange
-            Birth birth = new Birth(LocalDate.of(1990, 1, 1));
-
-            // assert
-            assertThat(birth.asCompact()).isEqualTo("19900101");
-        }
+        // assert
+        assertThat(birth.asCompact()).isEqualTo("19900101");
     }
 }
