@@ -42,14 +42,21 @@ public class MemberModel extends BaseEntity {
     }
 
     private void validateLoginPassword() {
-        if (!this.loginPassword.matches("^\\p{ASCII}&&\\S{8,16}$")) {
+        if (this.loginPassword == null || !this.loginPassword.matches("^\\p{ASCII}&&\\S{8,16}$")) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 패스워드는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
         }
     }
 
     private void validateEmail(){
-        if(!this.email.matches("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$")){
+        if(this.email == null || !this.email.matches("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$")){
             throw new CoreException(ErrorType.BAD_REQUEST, "올바른 형식의 이메일을 입력하세요.");
         }
     }
+
+    private void validBirthday(){
+        if(this.birthday == null || !this.birthday.isBefore(LocalDate.now())){
+            throw new CoreException(ErrorType.BAD_REQUEST, "올바른 형식의 생일을 입력하세요.");
+        }
+    }
+
 }

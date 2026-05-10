@@ -139,6 +139,19 @@ public class MemberModelTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("생년월일이 미래이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenBirthdayIsFuture(){
+            // arrange
+            LocalDate futureBirthday = LocalDate.now().plusDays(1);
+
+            CoreException result = assertThrows(CoreException.class, () -> {
+                new MemberModel(loginId, loginPassword, name, futureBirthday, email);
+            });
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
     }
 
 }
