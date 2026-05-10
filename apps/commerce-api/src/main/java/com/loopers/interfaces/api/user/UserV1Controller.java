@@ -23,7 +23,7 @@ public class UserV1Controller {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserV1Dto.UserResponse> register(
+    public ApiResponse<UserV1Dto.UserResponse> signUp(
         @RequestBody UserV1Dto.RegisterRequest request
     ) {
         UserInfo info = userFacade.signUp(
@@ -36,8 +36,8 @@ public class UserV1Controller {
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 
-    @GetMapping("/me")
-    public ApiResponse<UserV1Dto.UserResponse> getMe(
+    @GetMapping("/profile")
+    public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
         @RequestHeader("X-Loopers-LoginId") String loginId,
         @RequestHeader("X-Loopers-LoginPw") String loginPw
     ) {
@@ -45,8 +45,8 @@ public class UserV1Controller {
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 
-    @PatchMapping("/me/password")
-    public ApiResponse<Void> changePassword(
+    @PatchMapping("/profile/password")
+    public ApiResponse<Void> updatePassword(
         @RequestHeader("X-Loopers-LoginId") String loginId,
         @RequestHeader("X-Loopers-LoginPw") String loginPw,
         @RequestBody UserV1Dto.ChangePasswordRequest request
