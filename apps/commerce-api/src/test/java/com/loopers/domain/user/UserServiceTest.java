@@ -8,6 +8,8 @@ import org.junit.jupiter.api.*;
 import java.time.LocalDate;
 import java.time.Month;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 class UserServiceTest {
 
     private final InMemoryUserRepository inMemoryUserRepository = new InMemoryUserRepository();
@@ -72,6 +74,54 @@ class UserServiceTest {
 
             // then
             Assertions.assertFalse(result);
+        }
+    }
+
+    @DisplayName("유저의 id로 유저를 조회할 때")
+    @Nested
+    class ReadSingular {
+
+        private long existSequence = 0L;
+        private UserModel userModel = null;
+
+        @BeforeEach
+        public void init() {
+            String loginId = "saved";
+            String name = "tester";
+            BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
+            PasswordVO password = new PasswordVO("test_1234");
+            EmailVO email = new EmailVO("test@tester.com");
+
+            UserModel userModel = inMemoryUserRepository.save(UserModel.of(loginId, name, localDate, password, email));
+
+            this.userModel = userModel;
+            this.existSequence = userModel.getId();
+        }
+
+        @DisplayName("존재하지 않는 ID의 경우에 실패한다.")
+        @Test
+        public void getUserFailureTest() {
+            // given
+            Long userSequenceId = 2L;
+
+            // when then
+            assertThatThrownBy(() -> userService.getUserModel(userSequenceId))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("유저의 아이디가 존재하지 않습니다.");
+        }
+
+        @DisplayName("존재하는 유저의 ID의 경우에는 유저를 반환한다")
+        @Test
+        public void getUserSuccessTest() {
+            // given
+            Long userSequenceId = existSequence;
+
+            // when
+            UserModel userModel = userService.getUserModel(userSequenceId);
+
+            // then
+            Assertions.assertNotNull(userModel);
+            Assertions.assertEquals(existSequence, userModel.getId());
         }
     }
 }

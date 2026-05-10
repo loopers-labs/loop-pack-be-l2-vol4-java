@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Transactional
@@ -23,8 +22,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserModel getUserModel(Long id) {
-        Optional<UserModel> userModel = userRepository.findById(id);
-        return userModel.get();
+        return userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("유저의 아이디가 존재하지 않습니다."));
     }
 
     @Transactional(readOnly = true)
