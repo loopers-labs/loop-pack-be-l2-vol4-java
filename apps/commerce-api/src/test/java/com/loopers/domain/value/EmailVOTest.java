@@ -1,7 +1,5 @@
 package com.loopers.domain.value;
 
-import jakarta.validation.constraints.Email;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -45,7 +43,7 @@ public class EmailVOTest {
                     EmailVO emailVO = new EmailVO(valid);
 
                     // then
-                    assertThat(emailVO.value()).isEqualTo(valid);
+                    assertThat(emailVO.email()).isEqualTo(valid);
                 })
         );
     }

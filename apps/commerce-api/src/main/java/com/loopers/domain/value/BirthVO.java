@@ -4,9 +4,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 public record BirthVO(
-        LocalDate localDate
+        LocalDate birth
 ) {
     public int toInt() {
-        return Integer.parseInt(this.localDate.format(DateTimeFormatter.BASIC_ISO_DATE));
+        return Integer.parseInt(this.birth.format(DateTimeFormatter.BASIC_ISO_DATE));
     }
 }

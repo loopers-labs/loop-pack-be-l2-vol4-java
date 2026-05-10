@@ -51,7 +51,7 @@ public class PasswordVOTest {
                     PasswordVO valid = new PasswordVO(password);
 
                     // then
-                    assertThat(valid.value()).isEqualTo(password);
+                    assertThat(valid.password()).isEqualTo(password);
                 })
         );
     }
