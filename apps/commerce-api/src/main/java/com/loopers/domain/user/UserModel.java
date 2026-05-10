@@ -41,10 +41,10 @@ public class UserModel extends BaseEntity {
 
     public UserModel(String loginId, String rawPassword, String name, LocalDate birthDate, String email) {
         validateLoginId(loginId);
-        validatePassword(rawPassword, birthDate);
         validateName(name);
         validateBirthDate(birthDate);
         validateEmail(email);
+        validatePassword(rawPassword, birthDate);
 
         this.loginId = loginId;
         this.password = PASSWORD_ENCODER.encode(rawPassword);
@@ -104,9 +104,7 @@ public class UserModel extends BaseEntity {
         if (!PASSWORD_PATTERN.matcher(rawPassword).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 사용할 수 있습니다.");
         }
-        if (birthDate != null) {
-            validatePasswordNotContainsBirthDate(rawPassword, birthDate);
-        }
+        validatePasswordNotContainsBirthDate(rawPassword, birthDate);
     }
 
     private static void validatePasswordNotContainsBirthDate(String rawPassword, LocalDate birthDate) {
