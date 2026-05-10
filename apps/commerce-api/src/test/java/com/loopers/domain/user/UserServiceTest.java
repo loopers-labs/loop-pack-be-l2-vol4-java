@@ -1,64 +1,77 @@
 package com.loopers.domain.user;
 
-import com.loopers.support.error.ErrorType;
+import com.loopers.domain.value.BirthVO;
+import com.loopers.domain.value.EmailVO;
+import com.loopers.domain.value.PasswordVO;
 import org.junit.jupiter.api.*;
 
 import java.time.LocalDate;
 import java.time.Month;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserServiceTest {
 
     private final InMemoryUserRepository inMemoryUserRepository = new InMemoryUserRepository();
     private final UserService userService = new UserService(inMemoryUserRepository);
 
-    @DisplayName("유저를 생성할 때")
+    @DisplayName("유저의 정보를 받아서 유저를 저장한다.")
+    @Test
+    public void saveSuccess() {
+        // given
+        String loginId = "test";
+        String name = "tester";
+        BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
+        PasswordVO password = new PasswordVO("test_1234");
+        EmailVO email = new EmailVO("test@tester.com");
+
+        // when
+        var result = userService.createUserModel(loginId, name, localDate, password, email);
+
+        // then
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(loginId, result.getLoginId());
+    }
+
+    @DisplayName("유저의 중복체크를 할 때")
     @Nested
-    public class Create {
+    class Duplicate {
+
         @BeforeEach
         public void init() {
             String loginId = "duplicate";
             String name = "tester";
-            LocalDate localDate = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
+            BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
+            PasswordVO password = new PasswordVO("test_1234");
+            EmailVO email = new EmailVO("test@tester.com");
 
-            userService.createUserModel(loginId, name, localDate, password, email);
+            UserModel userModel = UserModel.of(loginId, name, localDate, password, email);
+
+            inMemoryUserRepository.save(userModel);
         }
 
-        @DisplayName("중복되지 않은 유저라면 저장에 성공한다.")
+        @DisplayName("중복된 유저는 True를 반환한다.")
         @Test
-        public void saveSuccess() {
-            // given
-            String loginId = "test";
-            String name = "tester";
-            LocalDate localDate = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
-
-            // when
-            var result = userService.createUserModel(loginId, name, localDate, password, email);
-
-            // then
-            Assertions.assertNotNull(result);
-            Assertions.assertEquals(loginId, result.getLoginId());
-        }
-
-        @DisplayName("중복된 유저는 저장에 실패한다.")
-        @Test
-        public void saveFailure() {
+        public void duplicate() {
             // given
             String loginId = "duplicate";
-            String name = "tester";
-            LocalDate localDate = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
 
-            // when then
-            assertThatThrownBy(() -> userService.createUserModel(loginId, name, localDate, password, email))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage(ErrorType.CONFLICT.getMessage());
+            // when
+            boolean result = userService.checkLoginIdDuplication(loginId);
+
+            // then
+            Assertions.assertTrue(result);
+        }
+
+        @DisplayName("중복 되지 않은 유저는 false를 반환한다.")
+        @Test
+        public void notDuplicate() {
+            // given
+            String loginId = "tester_new";
+
+            // when
+            boolean result = userService.checkLoginIdDuplication(loginId);
+
+            // then
+            Assertions.assertFalse(result);
         }
     }
 }

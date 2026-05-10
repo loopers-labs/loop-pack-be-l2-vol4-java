@@ -19,4 +19,15 @@ public class InMemoryUserRepository implements UserRepository {
                 .filter(userModel -> userModel.getLoginId().equals(loginId))
                 .findFirst();
     }
+
+    @Override
+    public Optional<UserModel> findById(Long id) {
+        return Optional.ofNullable(data.get(id));
+    }
+
+    @Override
+    public boolean existsByLoginId(String loginId) {
+        return data.values().stream()
+                .anyMatch(userModel -> userModel.getLoginId().equals(loginId));
+    }
 }
