@@ -26,7 +26,7 @@ public class UserV1Controller {
     public ApiResponse<UserV1Dto.UserResponse> register(
         @RequestBody UserV1Dto.RegisterRequest request
     ) {
-        UserInfo info = userFacade.register(
+        UserInfo info = userFacade.signUp(
             request.loginId(),
             request.password(),
             request.name(),
@@ -41,7 +41,7 @@ public class UserV1Controller {
         @RequestHeader("X-Loopers-LoginId") String loginId,
         @RequestHeader("X-Loopers-LoginPw") String loginPw
     ) {
-        UserInfo info = userFacade.getMe(loginId, loginPw);
+        UserInfo info = userFacade.getUser(loginId, loginPw);
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 
@@ -51,7 +51,7 @@ public class UserV1Controller {
         @RequestHeader("X-Loopers-LoginPw") String loginPw,
         @RequestBody UserV1Dto.ChangePasswordRequest request
     ) {
-        userFacade.changePassword(loginId, request.currentPassword(), request.newPassword());
+        userFacade.updatePassword(loginId, request.currentPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 }

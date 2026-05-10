@@ -13,17 +13,17 @@ public class UserFacade {
 
     private final UserService userService;
 
-    public UserInfo register(String loginId, String rawPassword, String name, LocalDate birthDate, String email) {
+    public UserInfo signUp(String loginId, String rawPassword, String name, LocalDate birthDate, String email) {
         UserModel user = userService.register(loginId, rawPassword, name, birthDate, email);
         return UserInfo.ofRegister(user);
     }
 
-    public UserInfo getMe(String loginId, String rawPassword) {
+    public UserInfo getUser(String loginId, String rawPassword) {
         UserModel user = userService.getUser(loginId, rawPassword);
         return UserInfo.from(user);
     }
 
-    public void changePassword(String loginId, String rawCurrentPassword, String rawNewPassword) {
+    public void updatePassword(String loginId, String rawCurrentPassword, String rawNewPassword) {
         userService.changePassword(loginId, rawCurrentPassword, rawNewPassword);
     }
 }
