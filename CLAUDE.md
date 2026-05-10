@@ -209,11 +209,104 @@ docker-compose -f docker/monitoring-compose.yml up -d
 
 ---
 
-## 현재 과제 (.codeguide/loopers-1-week.md)
+## 개발 규칙
+### 진행 Workflow - 증강 코딩
+- **대원칙** : 방향성 및 주요 의사 결정은 개발자에게 제안만 할 수 있으며, 최종 승인된 사항을 기반으로 작업을 수행.
+- **중간 결과 보고** : AI 가 반복적인 동작을 하거나, 요청하지 않은 기능을 구현, 테스트 삭제를 임의로 진행할 경우 개발자가 개입.
+- **설계 주도권 유지** : AI 가 임의판단을 하지 않고, 방향성에 대한 제안 등을 진행할 수 있으나 개발자의 승인을 받은 후 수행.
+
+### 개발 Workflow - TDD (Red > Green > Refactor)
+- 모든 테스트는 3A 원칙으로 작성할 것 (Arrange - Act - Assert)
+- 기존 작성되어 있는 코드 style 및 패턴을 분석하여 일관성을 유지한다.
+
+#### 1. Red Phase : 실패하는 테스트 먼저 작성
+- 요구사항을 만족하는 기능 테스트 케이스 작성
+- 기존 테스트와의 충돌/중복을 사전에 확인한다.
+- 각 테스트는 독립적으로 실행 가능해야 한다 (테스트 간 의존 금지).
+
+#### 2. Green Phase : 테스트를 통과하는 코드 작성
+- Red Phase 의 테스트가 모두 통과할 수 있는 코드 작성
+- 최소 구현 원칙 (Minimum Viable Implementation) 적용 (오버 엔지니어링 금지)
+- 새 코드가 기존 테스트를 깨뜨리지 않도록 한다.
+
+#### 3. Refactor Phase : 불필요한 코드 제거 및 품질 개선
+- 불필요한 private 함수 지양, 객체지향적 코드 작성
+- unused import 제거
+- 성능 최적화
+- 모든 테스트 케이스가 통과해야 함
+
+#### 4. Review Phase : 코드 리뷰 및 피드백 반영
+- 작성된 코드에 대한 리뷰 진행
+- 코드를 수정하지 않는다. 이슈와 개선안만 보고한다.
+- 프로젝트의 실제 코드, 정책, 아키텍처를 근거로 판단한다.
+
+## 주의사항
+### 1. Never Do
+- 실제 동작하지 않는 코드, 불필요한 Mock 데이터를 이요한 구현을 하지 말 것
+- null-safety 하지 않게 코드 작성하지 말 것 (Java 의 경우, Optional 을 활용할 것)
+- println 코드 남기지 말 것
+
+### 2. Recommendation
+- 실제 API 를 호출해 확인하는 E2E 테스트 코드 작성
+- 재사용 가능한 객체 설계
+- 성능 최적화에 대한 대안 및 제안
+- 개발 완료된 API 의 경우, `.http/**.http` 에 분류해 작성
+
+### 3. Priority
+1. 실제 동작하는 해결책만 고려
+2. null-safety, thread-safety 고려
+3. 테스트 가능한 구조로 설계
+4. 기존 코드 패턴 분석 후 일관성 유지
+
+## 현재 과제(Volume-1)
 
 회원 도메인(`User`) 구현:
-- **회원 가입**: ID(영문+숫자 10자 이내), 이메일(`xx@yy.zz`), 생년월일(`yyyy-MM-dd`) 형식 검증
-- **내 정보 조회**: `X-USER-ID` 헤더 기반 조회
-- **포인트 조회**: 보유 포인트 반환
+### Users Table 정보
+CREATE TABLE users
+```
+(
+id         BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'PK',
+login_id   VARCHAR(20)  NOT NULL COMMENT '로그인 ID (영문+숫자)',
+password   VARCHAR(255) NOT NULL COMMENT '암호화된 비밀번호 (BCrypt)',
+name       VARCHAR(50)  NOT NULL COMMENT '회원 이름',
+birth_date DATE         NOT NULL COMMENT '생년월일 (yyyy-MM-dd)',
+email      VARCHAR(255) NOT NULL COMMENT '이메일',
+created_at DATETIME     NOT NULL COMMENT '생성 일시 (UTC)',
+updated_at DATETIME     NOT NULL COMMENT '수정 일시 (UTC)',
+deleted_at DATETIME              COMMENT '삭제 일시 (UTC) - Soft Delete',
 
-각 기능에 대해 단위/통합/E2E 테스트 케이스 구현 필요.
+      PRIMARY KEY (id),
+      UNIQUE INDEX uq_users_login_id (login_id),
+      INDEX idx_users_deleted_at (deleted_at)
+)
+```
+
+### 기능 구현
+#### 회원가입
+**필요 정보 : { 로그인 ID, 비밀번호, 이름, 생년월일, 이메일 }**
+이미 가입된 로그인 ID 로는 가입이 불가능함
+각 정보는 포맷에 맞는 검증 필요 (이름, 이메일, 생년월일)
+비밀번호는 암호화해 저장하며, 아래와 같은 규칙을 따름
+1. 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.
+2. 생년월일은 비밀번호 내에 포함될 수 없습니다.
+
+이후, 유저 정보가 필요한 모든 요청은 아래 헤더를 통해 요청
+* X-Loopers-LoginId : 로그인 ID
+* X-Loopers-LoginPw : 비밀번호
+
+#### 내 정보 조회
+**반환 정보 : { 로그인 ID, 이름, 생년월일, 이메일 }**
+- 로그인 ID 는 영문과 숫자만 허용
+- 이름은 마지막 글자를 마스킹해 반환 (마스킹 문자는 * 로 통일)
+
+#### 비밀번호 수정
+  **필요 정보 : { 기존 비밀번호, 새 비밀번호 }**
+- 비밀 번호 RULE 을 따르되, 현재 비밀번호는 사용할 수 없습니다.
+
+비밀번호 RULE
+* 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.
+* 생년월일 사용 불가
+
+### 각 기능에 대해 단위/통합/E2E 테스트 케이스 구현 필요.
+
+
