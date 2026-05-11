@@ -5,6 +5,7 @@ public class MemberDto {
             String userId,
             String password,
             String email,
-            String username
+            String username,
+            String birthDate
     ){}
 }
