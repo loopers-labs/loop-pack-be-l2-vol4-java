@@ -2,11 +2,8 @@ package com.loopers.domain.user;
 
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
-import com.loopers.domain.value.PasswordVO;
+import fixture.UserModelFixture;
 import org.junit.jupiter.api.*;
-
-import java.time.LocalDate;
-import java.time.Month;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -19,34 +16,28 @@ class UserServiceTest {
     @Test
     public void saveSuccess() {
         // given
-        String loginId = "test";
-        String name = "tester";
-        BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-        String password = "test_1234";
-        EmailVO email = new EmailVO("test@tester.com");
+        UserModelFixture defaults = UserModelFixture.defaults();
 
         // when
-        var result = userService.createUserModel(loginId, name, password, localDate, email);
+        var result = userService.createUserModel(defaults.loginId(), defaults.name(), defaults.password(), new BirthVO(defaults.birth()), new EmailVO(defaults.email()));
 
         // then
         Assertions.assertNotNull(result);
-        Assertions.assertEquals(loginId, result.getLoginId());
+        Assertions.assertEquals(defaults.loginId(), result.getLoginId());
     }
 
     @DisplayName("유저의 중복체크를 할 때")
     @Nested
     class Duplicate {
 
+        private String expectedId = null;
+
         @BeforeEach
         public void init() {
-            String loginId = "duplicate";
-            String name = "tester";
-            BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            String password = "test_1234";
-            EmailVO email = new EmailVO("test@tester.com");
+            UserModelFixture duplicate = UserModelFixture.duplicate();
+            UserModel userModel = UserModel.of(duplicate.loginId(), duplicate.name(), duplicate.password(), new BirthVO(duplicate.birth()), new EmailVO(duplicate.email()));
 
-            UserModel userModel = UserModel.of(loginId, name, password, localDate, email);
-
+            expectedId = duplicate.loginId();
             inMemoryUserRepository.save(userModel);
         }
 
@@ -54,7 +45,7 @@ class UserServiceTest {
         @Test
         public void duplicate() {
             // given
-            String loginId = "duplicate";
+            String loginId = expectedId;
 
             // when
             boolean result = userService.checkLoginIdDuplication(loginId);
@@ -86,13 +77,10 @@ class UserServiceTest {
 
         @BeforeEach
         public void init() {
-            String loginId = "saved";
-            String name = "tester";
-            BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            String password = "test_1234";
-            EmailVO email = new EmailVO("test@tester.com");
-
-            UserModel userModel = inMemoryUserRepository.save(UserModel.of(loginId, name, password, localDate, email));
+            UserModelFixture defaults = UserModelFixture.defaults();
+            UserModel userModel = inMemoryUserRepository.save(
+                UserModel.of(defaults.loginId(), defaults.name(), defaults.password(), new BirthVO(defaults.birth()), new EmailVO(defaults.email()))
+            );
 
             this.userModel = userModel;
             this.existSequence = userModel.getId();

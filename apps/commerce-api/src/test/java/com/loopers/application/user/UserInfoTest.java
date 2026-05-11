@@ -3,12 +3,9 @@ package com.loopers.application.user;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
-import com.loopers.domain.value.PasswordVO;
+import fixture.UserModelFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDate;
-import java.time.Month;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -19,19 +16,14 @@ class UserInfoTest {
     @Test
     public void userInfoTest() {
         // given
-        String loginId = "test";
-        String name = "테스터";
-        LocalDate localDate = LocalDate.of(1993, Month.MARCH, 16);
-        String password = "test_1234";
-        String email = "test@tester.com";
-
-        UserModel userModel = UserModel.of(loginId, name, password, new BirthVO(localDate), new EmailVO(email));
+        UserModelFixture defaults = UserModelFixture.defaults();
+        UserModel userModel = UserModel.of(defaults.loginId(), defaults.name(), defaults.password(), new BirthVO(defaults.birth()), new EmailVO(defaults.email()));
 
         // when
         UserInfo userInfo = UserInfo.from(userModel);
 
         // then
-        assertNotEquals(name, userInfo.name());
+        assertNotEquals(defaults.name(), userInfo.name());
         assertEquals("테스*", userInfo.name());
     }
 }

@@ -7,14 +7,13 @@ import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import fixture.UserModelFixture;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import java.time.LocalDate;
-import java.time.Month;
 import java.util.Collection;
 import java.util.List;
 
@@ -52,13 +51,8 @@ class UserFacadeIntegrateTest {
 
         @BeforeEach
         public void init() {
-            String loginId = "duplicate";
-            String name = "tester";
-            BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            String password = "test_1234";
-            EmailVO email = new EmailVO("test@tester.com");
-
-            UserModel userModel = UserModel.of(loginId, name, password, localDate, email);
+            UserModelFixture duplicate = UserModelFixture.duplicate();
+            UserModel userModel = duplicate.toModel();
 
             userRepository.save(userModel);
         }
@@ -67,32 +61,30 @@ class UserFacadeIntegrateTest {
         @Test
         public void userCreateSuccessTest() {
             // given
-            String loginId = "test";
-            String name = "테스터";
-            LocalDate birth = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
+            UserModelFixture userModelFixture = UserModelFixture.defaults();
 
             // when
-            var result = userFacade.createUser(loginId, name, birth, password, email);
+            var result = userFacade.createUser(
+                userModelFixture.loginId(),
+                userModelFixture.name(),
+                userModelFixture.birth(),
+                userModelFixture.password(),
+                userModelFixture.email()
+            );
             
             // then
             assertNotNull(result);
-            assertEquals(email, result.emailVO().email());
+            assertEquals(userModelFixture.email(), result.emailVO().email());
         }
         
         @DisplayName("중복인 userId가 있는 경우 실패한다")
         @Test
         public void userCreateFailureTest() {
             // given
-            String loginId = "duplicate";
-            String name = "테스터";
-            LocalDate birth = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
+            UserModelFixture duplicate = UserModelFixture.duplicate();
             
             // when then
-            assertThatThrownBy(() -> userFacade.createUser(loginId, name, birth, password, email))
+            assertThatThrownBy(() -> userFacade.createUser(duplicate.loginId(), duplicate.name(), duplicate.birth(), duplicate.password(), duplicate.email()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage(ErrorType.CONFLICT.getMessage());
         }
@@ -101,18 +93,20 @@ class UserFacadeIntegrateTest {
         @Test
         public void passwordEncryptSuccessTest() {
             // given
-            String loginId = "encrypted";
-            String name = "테스터";
-            LocalDate birth = LocalDate.of(1993, Month.MARCH, 16);
-            String password = "test_1234";
-            String email = "test@tester.com";
+            UserModelFixture userModelFixture = UserModelFixture.defaults();
 
             // when
-            userFacade.createUser(loginId, name, birth, password, email);
+            userFacade.createUser(
+                userModelFixture.loginId(),
+                userModelFixture.name(),
+                userModelFixture.birth(),
+                userModelFixture.password(),
+                userModelFixture.email()
+            );
             
             // then
-            UserModel saved = userRepository.findByLoginId(loginId).get();
-            assertThat(bCryptPasswordEncoder.matches(password, saved.getPassword())).isTrue();
+            UserModel saved = userRepository.findByLoginId(userModelFixture.loginId()).get();
+            assertThat(bCryptPasswordEncoder.matches(userModelFixture.password(), saved.getPassword())).isTrue();
         }
     }
 
@@ -121,24 +115,22 @@ class UserFacadeIntegrateTest {
     class Read {
 
         private long expectedId = 0L;
+        private String expectedLoginId = null;
 
         @BeforeEach
         public void init() {
-            String loginId = "encrypted";
-            String name = "테스터";
-            String password = "test_1234";
-            LocalDate birth = LocalDate.of(1993, Month.MARCH, 16);
-            String email = "test@tester.com";
+            UserModelFixture defaults = UserModelFixture.defaults();
+            UserModel savedUser = userRepository.save(defaults.toModel());
 
-            UserModel savedUser = userRepository.save(UserModel.of(loginId, name, password, new BirthVO(birth), new EmailVO(email)));
             expectedId = savedUser.getId();
+            expectedLoginId = defaults.loginId();
         }
 
         @DisplayName("유효한 id로 유저를 조회하면 UserInfo를 반환한다")
         @Test
         public void getUserInfoSuccessTest() {
             // given
-            String expected = "encrypted";
+            String expected = expectedLoginId;
 
             // when
             UserInfo userInfo = userFacade.getUserInfo(expectedId);
@@ -170,15 +162,14 @@ class UserFacadeIntegrateTest {
 
         @BeforeEach
         public void init() {
-            String loginId = "encrypted";
-            String name = "테스터";
-            String password = "test_1234";
-            LocalDate birth = LocalDate.of(1993, Month.MARCH, 16);
-            String email = "test@tester.com";
+            UserModelFixture defaults = UserModelFixture.defaults();
+            String encrypted = bCryptPasswordEncoder.encode(defaults.password());
+            UserModel savedUser = userRepository.save(
+                    UserModel.of(defaults.loginId(), defaults.name(), encrypted, new BirthVO(defaults.birth()), new EmailVO(defaults.email()))
+            );
 
-            UserModel savedUser = userRepository.save(UserModel.of(loginId, name, bCryptPasswordEncoder.encode("test_1234"), new BirthVO(birth), new EmailVO(email)));
             expectedId = savedUser.getId();
-            currentPassword = password;
+            currentPassword = defaults.password();
         }
 
         @DisplayName("현재비밀번호와 변경하려는 비밀번호를 받아서 변경시킨다")
