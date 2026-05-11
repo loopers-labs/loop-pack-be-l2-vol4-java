@@ -63,7 +63,7 @@ docker-compose -f ./docker/monitoring-compose.yml up   # prometheus, grafana (ht
 
 ## 모듈 구조와 의존 규칙
 
-```
+```text
 apps/        # 실행 가능한 SpringBootApplication (BootJar)
   commerce-api       # REST API (Web MVC)
   commerce-streamer  # Kafka Consumer (Web MVC + Kafka)
@@ -80,7 +80,7 @@ supports/    # logging/monitoring/jackson 같은 add-on (도메인 무관)
 
 ## commerce-api 아키텍처 (레이어드)
 
-```
+```text
 interfaces.api.<domain>      # @RestController + V1Dto (record). API 진입점만 담당.
    ↓
 application.<domain>         # XxxFacade (@Component) + XxxInfo (record DTO). 유스케이스 조립 + 변환 책임.
@@ -161,7 +161,7 @@ JPA 설정 (`modules/jpa/src/main/resources/jpa.yml`):
 
 ## 주의사항
 ### 1. Never Do
-- 실제 동작하지 않는 코드, 불필요한 Mock 데이터를 이요한 구현을 하지 말 것
+- 실제 동작하지 않는 코드, 불필요한 Mock 데이터를 이용한 구현을 하지 말 것
 - null-safety 하지 않게 코드 작성하지 말 것 (Java 의 경우, Optional 을 활용할 것)
 - println 코드 남기지 말 것
 
