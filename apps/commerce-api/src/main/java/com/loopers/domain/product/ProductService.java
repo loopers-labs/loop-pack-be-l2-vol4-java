@@ -16,7 +16,12 @@ public class ProductService {
 
     @Transactional
     public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+        ProductModel product = ProductModel.builder()
+            .name(name)
+            .description(description)
+            .price(price)
+            .stock(stock)
+            .build();
         return productRepository.save(product);
     }
 

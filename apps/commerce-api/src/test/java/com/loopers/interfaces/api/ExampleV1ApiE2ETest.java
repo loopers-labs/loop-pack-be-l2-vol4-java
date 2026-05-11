@@ -56,7 +56,7 @@ class ExampleV1ApiE2ETest {
         void returnsExampleInfo_whenValidIdIsProvided() {
             // arrange
             ExampleModel exampleModel = exampleJpaRepository.save(
-                new ExampleModel("예시 제목", "예시 설명")
+                ExampleModel.builder().name("예시 제목").description("예시 설명").build()
             );
             String requestUrl = ENDPOINT_GET.apply(exampleModel.getId());
 

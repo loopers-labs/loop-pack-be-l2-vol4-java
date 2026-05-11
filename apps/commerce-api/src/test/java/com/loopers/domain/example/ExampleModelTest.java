@@ -22,7 +22,10 @@ class ExampleModelTest {
             String description = "설명";
 
             // act
-            ExampleModel exampleModel = new ExampleModel(name, description);
+            ExampleModel exampleModel = ExampleModel.builder()
+                .name(name)
+                .description(description)
+                .build();
 
             // assert
             assertAll(
@@ -40,7 +43,7 @@ class ExampleModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ExampleModel(name, "설명");
+                ExampleModel.builder().name(name).description("설명").build();
             });
 
             // assert
@@ -55,7 +58,7 @@ class ExampleModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ExampleModel("제목", description);
+                ExampleModel.builder().name("제목").description(description).build();
             });
 
             // assert
