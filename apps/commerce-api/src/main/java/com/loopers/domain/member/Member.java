@@ -17,14 +17,14 @@ import java.time.format.DateTimeFormatter;
 @Table(name="member")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemberModel extends BaseEntity {
+public class Member extends BaseEntity {
     private String loginId;
     private String loginPassword;
     private String name ;
     private LocalDate birthday;
     private String email;
 
-    public MemberModel(String loginId, String loginPassword, String name, LocalDate birthday, String email) {
+    public Member(String loginId, String loginPassword, String name, LocalDate birthday, String email) {
         validateLoginId(loginId);
         validateLoginPassword(loginPassword, birthday);
         validateName(name);

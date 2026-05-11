@@ -38,18 +38,18 @@ public class MemberModelTest {
     class Create {
         @DisplayName("회원 정보가 모두 주어지면, 정상적으로 생성된다.")
         @Test
-        void createUserModel_whenValidInfoProvided() {
+        void createMemberModel_whenValidInfoProvided() {
             // arrange
             // act
-            MemberModel memberModel = new MemberModel(loginId, loginPassword, name, birthday, email);
+            Member member = new Member(loginId, loginPassword, name, birthday, email);
 
             // assert
             assertAll(
-                    () -> assertThat(memberModel.getLoginId()).isEqualTo(loginId),
-                    () -> assertThat(memberModel.getLoginPassword()).isEqualTo(loginPassword),
-                    () -> assertThat(memberModel.getName()).isEqualTo(name),
-                    () -> assertThat(memberModel.getBirthday()).isEqualTo(birthday),
-                    () -> assertThat(memberModel.getEmail()).isEqualTo(email)
+                    () -> assertThat(member.getLoginId()).isEqualTo(loginId),
+                    () -> assertThat(member.getLoginPassword()).isEqualTo(loginPassword),
+                    () -> assertThat(member.getName()).isEqualTo(name),
+                    () -> assertThat(member.getBirthday()).isEqualTo(birthday),
+                    () -> assertThat(member.getEmail()).isEqualTo(email)
             );
         }
 
@@ -61,7 +61,7 @@ public class MemberModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(blankLoginId, loginPassword, name, birthday, email);
+                new Member(blankLoginId, loginPassword, name, birthday, email);
             });
 
             // assert
@@ -76,7 +76,7 @@ public class MemberModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, invalidLoginPassword, name, birthday, email);
+                new Member(loginId, invalidLoginPassword, name, birthday, email);
             });
 
             // assert
@@ -91,7 +91,7 @@ public class MemberModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, loginPasswordWithBirthday, name, birthday, email);
+                new Member(loginId, loginPasswordWithBirthday, name, birthday, email);
             });
 
             // assert
@@ -106,7 +106,7 @@ public class MemberModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, loginPassword, blankName, birthday, email);
+                new Member(loginId, loginPassword, blankName, birthday, email);
             });
 
             // assert
@@ -119,7 +119,7 @@ public class MemberModelTest {
         void throwsBadRequestException_whenNameIsInvalid(String invalidName) {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, loginPassword, invalidName, birthday, email);
+                new Member(loginId, loginPassword, invalidName, birthday, email);
             });
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -133,7 +133,7 @@ public class MemberModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, loginPassword, name, birthday, invalidEmail);
+                new Member(loginId, loginPassword, name, birthday, invalidEmail);
             });
 
             // assert
@@ -147,7 +147,7 @@ public class MemberModelTest {
             LocalDate futureBirthday = LocalDate.now().plusDays(1);
 
             CoreException result = assertThrows(CoreException.class, () -> {
-                new MemberModel(loginId, loginPassword, name, futureBirthday, email);
+                new Member(loginId, loginPassword, name, futureBirthday, email);
             });
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
