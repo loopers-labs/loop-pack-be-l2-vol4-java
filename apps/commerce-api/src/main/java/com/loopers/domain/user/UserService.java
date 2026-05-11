@@ -29,4 +29,9 @@ public class UserService {
     public boolean checkLoginIdDuplication(String loginId) {
         return userRepository.existsByLoginId(loginId);
     }
+
+    public void changePassword(UserModel userModel, String encrypted) {
+        userModel.changePassword(encrypted);
+        userRepository.save(userModel);
+    }
 }

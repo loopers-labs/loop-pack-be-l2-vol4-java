@@ -3,7 +3,7 @@ package com.loopers.domain.value;
 import java.util.regex.Pattern;
 
 public record PasswordVO(
-        String password
+    String password
 ){
     private static final Pattern PATTERN =
             Pattern.compile("^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]{8,16}$");

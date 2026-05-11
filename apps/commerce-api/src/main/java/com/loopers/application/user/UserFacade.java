@@ -40,4 +40,18 @@ public class UserFacade {
         UserModel userModel = userService.getUserModel(id);
         return UserInfo.from(userModel);
     }
+
+    public void changePassword(Long id, String oldPassword, String targetPassword) {
+        UserModel userModel = userService.getUserModel(id);
+
+        if (!bCryptPasswordEncoder.matches(oldPassword, userModel.getPassword())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+        if (bCryptPasswordEncoder.matches(targetPassword, userModel.getPassword())) {
+            throw new IllegalArgumentException("현재 비밀번호는 사용할 수 없습니다.");
+        }
+        String encrypted = bCryptPasswordEncoder.encode(targetPassword);
+
+        userService.changePassword(userModel, encrypted);
+    }
 }

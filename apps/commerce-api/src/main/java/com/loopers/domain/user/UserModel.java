@@ -50,4 +50,8 @@ public class UserModel extends BaseEntity {
     public String getPassword() {
         return password;
     }
+
+    public void changePassword(String encrypted) {
+        this.password = encrypted;
+    }
 }

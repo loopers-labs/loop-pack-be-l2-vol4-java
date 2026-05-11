@@ -14,7 +14,7 @@ public class EmailVOTest {
 
     @DisplayName("이메일 유효성 테스트 시나리오")
     @TestFactory
-    Collection<DynamicTest> emailDynamicTest() {
+    public Collection<DynamicTest> emailDynamicTest() {
         return List.of(
                 DynamicTest.dynamicTest("올바르지 않은 이메일 유형의 경우에는 Exception이 발생한다.", () -> {
                     // given
