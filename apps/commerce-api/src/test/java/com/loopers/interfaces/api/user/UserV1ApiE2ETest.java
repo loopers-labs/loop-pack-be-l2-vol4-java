@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
+    private static final String ENDPOINT_ME = "/api/v1/users/me";
+    private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
+    private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
     private final TestRestTemplate testRestTemplate;
     private final DatabaseCleanUp databaseCleanUp;
@@ -106,5 +110,86 @@ class UserV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMe {
+
+        @DisplayName("유효한 인증 헤더면, 200 OK 와 이름 마지막 글자가 마스킹된 회원 정보를 반환한다.")
+        @Test
+        void returnsMyInfo_whenValidAuthHeadersAreProvided() {
+            // arrange
+            signUpUser("loopers01", "Loopers!2026");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = getMe("loopers01", "Loopers!2026");
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("loopers01"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("김성*"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo(LocalDate.of(1993, 11, 3)),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("loopers@example.com")
+            );
+        }
+
+        @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenAuthHeadersAreMissing() {
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = getMe();
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("비밀번호가 일치하지 않으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenPasswordDoesNotMatch() {
+            // arrange
+            signUpUser("loopers01", "Loopers!2026");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = getMe("loopers01", "Wrong!9999");
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("존재하지 않는 로그인 ID 면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenLoginIdDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = getMe("ghost", "AnyPassword!1");
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private void signUpUser(String loginId, String rawPassword) {
+        UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            loginId, rawPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+        );
+        testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, new HttpEntity<>(request),
+            new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {});
+    }
+
+    private ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> getMe(String loginId, String password) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HEADER_LOGIN_ID, loginId);
+        headers.set(HEADER_LOGIN_PW, password);
+        return exchangeGetMe(new HttpEntity<>(headers));
+    }
+
+    private ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> getMe() {
+        return exchangeGetMe(HttpEntity.EMPTY);
+    }
+
+    private ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> exchangeGetMe(HttpEntity<?> entity) {
+        return testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET, entity,
+            new ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>>() {});
     }
 }

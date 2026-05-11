@@ -79,4 +79,38 @@ class UserServiceIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
+
+    @DisplayName("ID 로 회원을 조회할 때, ")
+    @Nested
+    class GetById {
+
+        @DisplayName("존재하는 ID 면, 해당 회원을 반환한다.")
+        @Test
+        void returnsUser_whenIdExists() {
+            // arrange
+            UserModel saved = userService.signUp(
+                "loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            );
+
+            // act
+            UserModel found = userService.getById(saved.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(found.getId()).isEqualTo(saved.getId()),
+                () -> assertThat(found.getLoginId()).isEqualTo("loopers01"),
+                () -> assertThat(found.getName()).isEqualTo("김성호")
+            );
+        }
+
+        @DisplayName("존재하지 않는 ID 면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenIdDoesNotExist() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> userService.getById(999_999L));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }

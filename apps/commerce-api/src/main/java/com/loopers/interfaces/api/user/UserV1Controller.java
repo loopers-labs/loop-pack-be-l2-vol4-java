@@ -5,6 +5,8 @@ import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,5 +28,13 @@ public class UserV1Controller {
         UserInfo info = userFacade.signUp(request.toCommand());
         UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(info);
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(
+        @AuthenticationPrincipal Long userId
+    ) {
+        UserInfo info = userFacade.getMyInfo(userId);
+        return ApiResponse.success(UserV1Dto.MyInfoResponse.from(info));
     }
 }

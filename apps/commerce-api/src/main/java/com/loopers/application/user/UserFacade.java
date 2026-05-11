@@ -21,4 +21,9 @@ public class UserFacade {
         );
         return UserInfo.from(user);
     }
+
+    public UserInfo getMyInfo(Long userId) {
+        UserModel user = userService.getById(userId);
+        return UserInfo.from(user);
+    }
 }
