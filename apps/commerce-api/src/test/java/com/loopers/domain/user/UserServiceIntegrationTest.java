@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -30,6 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     }
 )
 class UserServiceIntegrationTest {
+
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 1, 1);
+    private static final String RAW_PASSWORD = "Password1!";
+    private static final String NEW_PASSWORD = "Password2!";
 
     @Autowired
     private UserService userService;
@@ -49,7 +53,7 @@ class UserServiceIntegrationTest {
     @Nested
     class RegisterUser {
 
-        @DisplayName("사용자 정보가 유효하면, DB에 저장하고 사용자를 반환한다.")
+        @DisplayName("사용자 정보가 유효하면, DB에 사용자를 저장한다.")
         @Test
         void registersUser_whenUserInfoIsValid() {
             // arrange
@@ -57,67 +61,83 @@ class UserServiceIntegrationTest {
 
             // act
             UserModel result = userService.registerUser(
-                    userId,
-                    "Password1!",
-                    "홍길동",
-                    LocalDate.of(1990, 1, 1),
-                    "user1@example.com"
+                userId,
+                RAW_PASSWORD,
+                "홍길동",
+                BIRTH_DATE,
+                "user1@example.com"
             );
 
             // assert
-            Optional<UserModel> savedUser = userJpaRepository.findByUserId(userId);
+            UserModel savedUser = userJpaRepository.findByUserId(userId).orElseThrow();
             assertAll(
-                    () -> assertThat(result.getUserId()).isEqualTo(userId),
-                    () -> assertThat(result.getBirthDate()).isEqualTo(LocalDate.of(1990, 1, 1)),
-                    () -> assertThat(result.getEmail()).isEqualTo("user1@example.com"),
-                    () -> assertThat(savedUser).isPresent(),
-                    () -> assertThat(savedUser.map(UserModel::getUserId)).contains(userId),
-                    () -> assertThat(savedUser.map(UserModel::getEmail)).contains("user1@example.com")
-            );
-        }
-    }
-
-    @DisplayName("사용자를 조회할 때,")
-    @Nested
-    class GetUser {
-
-        @DisplayName("존재하는 로그인 ID와 비밀번호를 주면, 해당 사용자를 반환한다.")
-        @Test
-        void returnsUser_whenUserIdAndPasswordAreValid() {
-            // arrange
-            UserModel user = userJpaRepository.save(createUser());
-
-            // act
-            UserModel result = userService.getUser("user1", "Password1!");
-
-            // assert
-            assertAll(
-                    () -> assertThat(result.getUserId()).isEqualTo(user.getUserId()),
-                    () -> assertThat(result.getBirthDate()).isEqualTo(user.getBirthDate()),
-                    () -> assertThat(result.getEmail()).isEqualTo(user.getEmail())
+                () -> assertThat(result.getUserId()).isEqualTo(userId),
+                () -> assertThat(savedUser.getUserId()).isEqualTo(userId),
+                () -> assertThat(savedUser.getBirthDate()).isEqualTo(BIRTH_DATE),
+                () -> assertThat(savedUser.getEmail()).isEqualTo("user1@example.com")
             );
         }
 
-        @DisplayName("존재하지 않는 로그인 ID를 주면, USER_NOT_FOUND 예외가 발생한다.")
+        @DisplayName("이미 가입된 로그인 ID로 가입하면, USER_ALREADY_EXISTS 예외가 발생한다.")
         @Test
-        void throwsUserNotFound_whenUserIdDoesNotExist() {
+        void throwsAlreadyExists_whenLoginIdAlreadyExists() {
             // arrange
-            String userId = "unknown";
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.getUser(userId, "Password1!");
+                userService.registerUser("user1", NEW_PASSWORD, "김루프", BIRTH_DATE, "user2@example.com");
             });
 
             // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_ALREADY_EXISTS);
+        }
+
+        @DisplayName("로그인 ID 중복은 DB 제약으로도 방어된다.")
+        @Test
+        void throwsDataIntegrityViolation_whenDuplicateLoginIdIsSavedDirectly() {
+            // arrange
+            UserModel firstUser = new UserModel("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+            UserModel secondUser = new UserModel("user1", NEW_PASSWORD, "김루프", BIRTH_DATE, "user2@example.com");
+            userJpaRepository.saveAndFlush(firstUser);
+
+            // act
+            DataIntegrityViolationException exception = assertThrows(DataIntegrityViolationException.class, () -> {
+                userJpaRepository.saveAndFlush(secondUser);
+            });
+
+            // assert
+            assertThat(exception).isNotNull();
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때,")
+    @Nested
+    class GetUser {
+
+        @DisplayName("로그인 ID와 비밀번호가 일치하면, 내 정보를 반환한다.")
+        @Test
+        void returnsMyInfo_whenLoginHeadersAreValid() {
+            // arrange
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            UserModel result = userService.getUser("user1", RAW_PASSWORD);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getUserId()).isEqualTo("user1"),
+                () -> assertThat(result.getMaskedName()).isEqualTo("홍길*"),
+                () -> assertThat(result.getBirthDate()).isEqualTo(BIRTH_DATE),
+                () -> assertThat(result.getEmail()).isEqualTo("user1@example.com")
+            );
         }
 
         @DisplayName("비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
         @Test
-        void throwsPasswordMismatch_whenPasswordDoesNotMatch() {
+        void throwsAuthenticationFailed_whenPasswordDoesNotMatch() {
             // arrange
-            userJpaRepository.save(createUser());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -129,70 +149,32 @@ class UserServiceIntegrationTest {
         }
     }
 
-    @DisplayName("비밀번호를 변경할 때,")
+    @DisplayName("비밀번호를 수정할 때,")
     @Nested
     class ChangePassword {
 
-        @DisplayName("현재 비밀번호와 새 비밀번호가 유효하면, 비밀번호가 변경된다.")
+        @DisplayName("기존 비밀번호가 일치하고 새 비밀번호가 유효하면, 비밀번호를 변경한다.")
         @Test
-        void changesPassword_whenPasswordsAreValid() {
+        void changesPassword_whenCurrentPasswordAndNewPasswordAreValid() {
             // arrange
-            userJpaRepository.save(createUser());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
-            UserModel result = userService.changePassword("user1", "Password1!", "Password2!");
+            UserModel result = userService.changePassword("user1", RAW_PASSWORD, NEW_PASSWORD);
 
             // assert
+            UserModel savedUser = userJpaRepository.findByUserId("user1").orElseThrow();
             assertAll(
-                    () -> assertThat(result.getUserId()).isEqualTo("user1"),
-                    () -> assertDoesNotThrow(() -> userService.getUser("user1", "Password2!")),
-                    () -> {
-                        CoreException exception = assertThrows(CoreException.class, () -> {
-                            userService.getUser("user1", "Password1!");
-                        });
-                        assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
-                    }
+                () -> assertThat(result.getUserId()).isEqualTo("user1"),
+                () -> assertThat(savedUser).isNotNull(),
+                () -> assertDoesNotThrow(() -> userService.getUser("user1", NEW_PASSWORD)),
+                () -> {
+                    CoreException exception = assertThrows(CoreException.class, () -> {
+                        userService.getUser("user1", RAW_PASSWORD);
+                    });
+                    assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
+                }
             );
         }
-
-        @DisplayName("존재하지 않는 로그인 ID를 주면, USER_NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsUserNotFound_whenUserIdDoesNotExist() {
-            // arrange
-            String userId = "unknown";
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.changePassword(userId, "Password1!", "Password2!");
-            });
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
-        }
-
-        @DisplayName("현재 비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
-        @Test
-        void throwsPasswordMismatch_whenCurrentPasswordDoesNotMatch() {
-            // arrange
-            userJpaRepository.save(createUser());
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1", "Wrong1!", "Password2!");
-            });
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
-        }
-    }
-
-    private static UserModel createUser() {
-        return new UserModel(
-                "user1",
-                "Password1!",
-                "홍길동",
-                LocalDate.of(1990, 1, 1),
-                "user1@example.com"
-        );
     }
 }

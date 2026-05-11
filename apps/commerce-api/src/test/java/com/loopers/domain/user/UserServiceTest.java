@@ -18,6 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserServiceTest {
 
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 1, 1);
+    private static final String RAW_PASSWORD = "Password1!";
+    private static final String NEW_PASSWORD = "Password2!";
+
     @DisplayName("사용자를 등록할 때,")
     @Nested
     class RegisterUser {
@@ -31,67 +35,277 @@ class UserServiceTest {
 
             // act
             UserModel result = userService.registerUser(
-                    "user1",
-                    "Password1!",
-                    "홍길동",
-                    LocalDate.of(1990, 1, 1),
-                    "user1@example.com"
+                "user1",
+                RAW_PASSWORD,
+                "홍길동",
+                BIRTH_DATE,
+                "user1@example.com"
             );
 
             // assert
             assertAll(
-                    () -> assertThat(result.getUserId()).isEqualTo("user1"),
-                    () -> assertThat(result.getBirthDate()).isEqualTo(LocalDate.of(1990, 1, 1)),
-                    () -> assertThat(result.getEmail()).isEqualTo("user1@example.com"),
-                    () -> assertThat(userRepository.findByUserId("user1")).containsSame(result)
+                () -> assertThat(result.getUserId()).isEqualTo("user1"),
+                () -> assertThat(result.getBirthDate()).isEqualTo(BIRTH_DATE),
+                () -> assertThat(result.getEmail()).isEqualTo("user1@example.com"),
+                () -> assertThat(userRepository.findByUserId("user1")).containsSame(result)
             );
         }
-    }
 
-    @DisplayName("사용자를 조회할 때,")
-    @Nested
-    class GetUser {
-
-        @DisplayName("존재하는 로그인 ID를 주면, 해당 유저를 반환한다.")
+        @DisplayName("이미 가입된 로그인 ID로 가입하면, USER_ALREADY_EXISTS 예외가 발생한다.")
         @Test
-        void returnsUser_whenUserIdExists() {
+        void throwsAlreadyExists_whenLoginIdAlreadyExists() {
             // arrange
-            UserModel user = createUser();
             FakeUserRepository userRepository = new FakeUserRepository();
-            userRepository.save(user);
             UserService userService = new UserService(userRepository);
-
-            // act
-            UserModel result = userService.getUser("user1", "Password1!");
-
-            // assert
-            assertThat(result).isSameAs(user);
-        }
-
-        @DisplayName("존재하지 않는 로그인 ID를 주면, USER_NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsUserNotFound_whenUserIdDoesNotExist() {
-            // arrange
-            UserRepository userRepository = new FakeUserRepository();
-            UserService userService = new UserService(userRepository);
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.getUser("unknown", "Password1!");
+                userService.registerUser("user1", NEW_PASSWORD, "김루프", BIRTH_DATE, "user2@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_ALREADY_EXISTS);
+        }
+
+        @DisplayName("로그인 ID가 영문과 숫자 외 문자를 포함하면, USER_ID_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidLoginId_whenLoginIdContainsInvalidCharacters() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user-1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_ID_INVALID_FORMAT);
+        }
+
+        @DisplayName("비밀번호가 8자 미만이면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenPasswordLengthIsTooShort() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", "Aa1!", "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("비밀번호가 16자를 초과하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenPasswordLengthIsTooLong() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", "Password123456789!", "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("비밀번호가 허용되지 않은 문자를 포함하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenPasswordContainsUnsupportedCharacter() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", "Password1 ", "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("비밀번호가 허용되지 않은 특수문자를 포함하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenPasswordContainsUnsupportedSpecialCharacter() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", "Password1_", "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("비밀번호가 생년월일을 포함하면, PASSWORD_CONTAINS_BIRTH_DATE 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenPasswordContainsBirthDate() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", "Abcd19900101!", "홍길동", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_CONTAINS_BIRTH_DATE);
+        }
+
+        @DisplayName("이름이 null이면, USER_NAME_REQUIRED 예외가 발생한다.")
+        @Test
+        void throwsUserNameRequired_whenNameIsNull() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, null, BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NAME_REQUIRED);
+        }
+
+        @DisplayName("이름이 blank이면, USER_NAME_REQUIRED 예외가 발생한다.")
+        @Test
+        void throwsUserNameRequired_whenNameIsBlank() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, "   ", BIRTH_DATE, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NAME_REQUIRED);
+        }
+
+        @DisplayName("생년월일이 null이면, BIRTH_DATE_REQUIRED 예외가 발생한다.")
+        @Test
+        void throwsBirthDateRequired_whenBirthDateIsNull() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, "홍길동", null, "user1@example.com");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BIRTH_DATE_REQUIRED);
+        }
+
+        @DisplayName("이메일이 null이면, EMAIL_REQUIRED 예외가 발생한다.")
+        @Test
+        void throwsEmailRequired_whenEmailIsNull() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, null);
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.EMAIL_REQUIRED);
+        }
+
+        @DisplayName("이메일이 blank이면, EMAIL_REQUIRED 예외가 발생한다.")
+        @Test
+        void throwsEmailRequired_whenEmailIsBlank() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "   ");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.EMAIL_REQUIRED);
+        }
+
+        @DisplayName("이메일이 일반적인 이메일 형식이 아니면, EMAIL_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidEmail_whenEmailFormatIsInvalid() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@email");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.EMAIL_INVALID_FORMAT);
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때,")
+    @Nested
+    class GetUser {
+
+        @DisplayName("로그인 ID와 비밀번호가 일치하면, 내 정보를 반환한다.")
+        @Test
+        void returnsMyInfo_whenLoginHeadersAreValid() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            UserModel result = userService.getUser("user1", RAW_PASSWORD);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getUserId()).isEqualTo("user1"),
+                () -> assertThat(result.getBirthDate()).isEqualTo(BIRTH_DATE),
+                () -> assertThat(result.getEmail()).isEqualTo("user1@example.com")
+            );
+        }
+
+        @DisplayName("내 정보 조회 결과의 이름은 마지막 글자가 마스킹된다.")
+        @Test
+        void returnsMaskedName_whenMyInfoIsReturned() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            UserModel result = userService.getUser("user1", RAW_PASSWORD);
+
+            // assert
+            assertThat(result.getMaskedName()).isEqualTo("홍길*");
+        }
+
+        @DisplayName("가입되지 않은 로그인 ID로 조회하면, USER_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdDoesNotExist() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.getUser("unknown", RAW_PASSWORD);
             });
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
         }
 
-        @DisplayName("현재 비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
+        @DisplayName("비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
         @Test
-        void throwsPasswordMismatch_whenPasswordDoesNotMatch() {
+        void throwsAuthenticationFailed_whenPasswordDoesNotMatch() {
             // arrange
-            UserModel user = createUser();
-            FakeUserRepository userRepository = new FakeUserRepository();
-            userRepository.save(user);
-            UserService userService = new UserService(userRepository);
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -103,57 +317,58 @@ class UserServiceTest {
         }
     }
 
-    @DisplayName("비밀번호를 변경할 때,")
+    @DisplayName("비밀번호를 수정할 때,")
     @Nested
     class ChangePassword {
 
-        @DisplayName("현재 비밀번호와 새 비밀번호가 유효하면, 비밀번호가 변경된다.")
+        @DisplayName("기존 비밀번호가 일치하고 새 비밀번호가 유효하면, 비밀번호를 변경한다.")
         @Test
-        void changesPassword_whenPasswordsAreValid() {
+        void changesPassword_whenCurrentPasswordAndNewPasswordAreValid() {
             // arrange
-            UserModel user = createUser();
-            FakeUserRepository userRepository = new FakeUserRepository();
-            userRepository.save(user);
-            UserService userService = new UserService(userRepository);
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
-            UserModel result = userService.changePassword("user1", "Password1!", "Password2!");
+            UserModel result = userService.changePassword("user1", RAW_PASSWORD, NEW_PASSWORD);
 
             // assert
             assertAll(
-                    () -> assertThat(result).isSameAs(user),
-                    () -> assertDoesNotThrow(() -> result.verifyPassword("Password2!"))
+                () -> assertThat(result.getUserId()).isEqualTo("user1"),
+                () -> assertDoesNotThrow(() -> userService.getUser("user1", NEW_PASSWORD)),
+                () -> {
+                    CoreException exception = assertThrows(CoreException.class, () -> {
+                        userService.getUser("user1", RAW_PASSWORD);
+                    });
+                    assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
+                }
             );
         }
 
-        @DisplayName("존재하지 않는 로그인 ID를 주면, USER_NOT_FOUND 예외가 발생한다.")
+        @DisplayName("가입되지 않은 로그인 ID로 비밀번호를 수정하면, USER_NOT_FOUND 예외가 발생한다.")
         @Test
-        void throwsUserNotFound_whenUserIdDoesNotExist() {
+        void throwsNotFound_whenChangingPasswordForUnknownLoginId() {
             // arrange
-            UserRepository userRepository = new FakeUserRepository();
-            UserService userService = new UserService(userRepository);
+            UserService userService = new UserService(new FakeUserRepository());
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.changePassword("unknown", "Password1!", "Password2!");
+                userService.changePassword("unknown", RAW_PASSWORD, NEW_PASSWORD);
             });
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
         }
 
-        @DisplayName("현재 비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
+        @DisplayName("기존 비밀번호가 일치하지 않으면, PASSWORD_MISMATCH 예외가 발생한다.")
         @Test
-        void throwsPasswordMismatch_whenCurrentPasswordDoesNotMatch() {
+        void throwsAuthenticationFailed_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel user = createUser();
-            FakeUserRepository userRepository = new FakeUserRepository();
-            userRepository.save(user);
-            UserService userService = new UserService(userRepository);
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1", "Wrong1!", "Password2!");
+                userService.changePassword("user1", "Wrong1!", NEW_PASSWORD);
             });
 
             // assert
@@ -162,31 +377,99 @@ class UserServiceTest {
 
         @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, PASSWORD_SAME_AS_CURRENT 예외가 발생한다.")
         @Test
-        void throwsPasswordSameAsCurrent_whenNewPasswordIsSameAsCurrentPassword() {
+        void throwsSamePassword_whenNewPasswordIsSameAsCurrentPassword() {
             // arrange
-            UserModel user = createUser();
-            FakeUserRepository userRepository = new FakeUserRepository();
-            userRepository.save(user);
-            UserService userService = new UserService(userRepository);
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1", "Password1!", "Password1!");
+                userService.changePassword("user1", RAW_PASSWORD, RAW_PASSWORD);
             });
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_SAME_AS_CURRENT);
         }
-    }
 
-    private static UserModel createUser() {
-        return new UserModel(
-                "user1",
-                "Password1!",
-                "홍길동",
-                LocalDate.of(1990, 1, 1),
-                "user1@example.com"
-        );
+        @DisplayName("새 비밀번호가 8자 미만이면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenNewPasswordLengthIsTooShort() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.changePassword("user1", RAW_PASSWORD, "Aa1!");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("새 비밀번호가 16자를 초과하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenNewPasswordLengthIsTooLong() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.changePassword("user1", RAW_PASSWORD, "Password123456789!");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("새 비밀번호가 허용되지 않은 문자를 포함하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenNewPasswordContainsUnsupportedCharacter() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.changePassword("user1", RAW_PASSWORD, "Password1 ");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("새 비밀번호가 허용되지 않은 특수문자를 포함하면, PASSWORD_INVALID_FORMAT 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenNewPasswordContainsUnsupportedSpecialCharacter() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.changePassword("user1", RAW_PASSWORD, "Password1_");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_INVALID_FORMAT);
+        }
+
+        @DisplayName("새 비밀번호가 생년월일을 포함하면, PASSWORD_CONTAINS_BIRTH_DATE 예외가 발생한다.")
+        @Test
+        void throwsInvalidPassword_whenNewPasswordContainsBirthDate() {
+            // arrange
+            UserService userService = new UserService(new FakeUserRepository());
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userService.changePassword("user1", RAW_PASSWORD, "Abcd19900101!");
+            });
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_CONTAINS_BIRTH_DATE);
+        }
     }
 
     private static class FakeUserRepository implements UserRepository {
@@ -203,5 +486,4 @@ class UserServiceTest {
             return Optional.ofNullable(users.get(userId));
         }
     }
-
 }

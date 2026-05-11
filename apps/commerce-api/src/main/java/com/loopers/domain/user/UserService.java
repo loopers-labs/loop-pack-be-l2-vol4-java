@@ -16,6 +16,10 @@ public class UserService {
 
     @Transactional
     public UserModel registerUser(String id, String password, String name, LocalDate birthDate, String email) {
+        if (userRepository.findByUserId(id).isPresent()) {
+            throw new CoreException(ErrorType.USER_ALREADY_EXISTS, "[userId = " + id + "] 이미 가입된 로그인 ID 입니다.");
+        }
+
         UserModel user = new UserModel(id, password, name, birthDate, email);
         return userRepository.save(user);
     }

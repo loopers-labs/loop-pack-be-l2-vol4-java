@@ -14,6 +14,7 @@ public enum ErrorType {
     CONFLICT(HttpStatus.CONFLICT, HttpStatus.CONFLICT.getReasonPhrase(), "이미 존재하는 리소스입니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
+    USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER_ALREADY_EXISTS", "이미 가입된 로그인 ID 입니다."),
     USER_ID_REQUIRED(HttpStatus.BAD_REQUEST, "USER_ID_REQUIRED", "로그인 ID는 필수입니다."),
     USER_ID_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "USER_ID_INVALID_FORMAT", "로그인 ID는 영문과 숫자만 가능합니다."),
     PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED", "비밀번호는 필수입니다."),
