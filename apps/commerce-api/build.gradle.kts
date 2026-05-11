@@ -11,8 +11,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
-    // security (PasswordEncoder)
-    implementation("org.springframework.security:spring-security-crypto")
+    // security
+    implementation("org.springframework.boot:spring-boot-starter-security")
 
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
