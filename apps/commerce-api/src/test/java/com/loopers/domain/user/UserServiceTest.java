@@ -149,6 +149,40 @@ class UserServiceTest {
         }
     }
 
+    @DisplayName("ID로 조회 시")
+    @Nested
+    class GetById {
+
+        @DisplayName("존재하는 ID면 유저를 반환한다")
+        @Test
+        void returnsUser_whenIdExists() {
+            // given
+            Long userId = 1L;
+            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+            // when
+            UserModel result = userService.getById(userId);
+
+            // then
+            assertThat(result).isSameAs(user);
+        }
+
+        @DisplayName("존재하지 않는 ID로 조회하면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            // given
+            Long userId = 999L;
+            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> userService.getById(userId));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("비밀번호 변경 시")
     @Nested
     class ChangePassword {
@@ -157,31 +191,51 @@ class UserServiceTest {
         @Test
         void changesPassword_whenCurrentAndNewPasswordsAreValid() {
             // given
+            Long userId = 1L;
             UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             String currentPassword = "Current1!";
             String newPassword = "NewPass1@";
             String newEncoded = "$2a$10$newEncodedHash";
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
             when(passwordEncoder.matches(newPassword, ENCODED_PASSWORD)).thenReturn(false);
             when(passwordEncoder.encode(newPassword)).thenReturn(newEncoded);
 
             // when
-            userService.changePassword(user, currentPassword, newPassword);
+            userService.changePassword(userId, currentPassword, newPassword);
 
             // then
             assertThat(user.getEncodedPassword()).isEqualTo(newEncoded);
+        }
+
+        @DisplayName("존재하지 않는 유저 ID로 변경 시도하면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenUserDoesNotExist() {
+            // given
+            Long userId = 999L;
+            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, "Current1!", "NewPass1@")
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
         @DisplayName("현재 비밀번호가 일치하지 않으면 UNAUTHORIZED 예외가 발생한다")
         @Test
         void throwsUnauthorized_whenCurrentPasswordDoesNotMatch() {
             // given
+            Long userId = 1L;
             UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.changePassword(user, "wrong!Pw1", "NewPass1@")
+                userService.changePassword(userId, "wrong!Pw1", "NewPass1@")
             );
 
             // then
@@ -192,13 +246,15 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordEqualsCurrentPassword() {
             // given
+            Long userId = 1L;
             UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             String samePassword = "SamePass1!";
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(samePassword, ENCODED_PASSWORD)).thenReturn(true);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.changePassword(user, samePassword, samePassword)
+                userService.changePassword(userId, samePassword, samePassword)
             );
 
             // then
@@ -209,14 +265,16 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordContainsBirthDate() {
             // given
+            Long userId = 1L;
             UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             String currentPassword = "Current1!";
             String newPasswordWithBirthYear = "Aa!2002xy";
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.changePassword(user, currentPassword, newPasswordWithBirthYear)
+                userService.changePassword(userId, currentPassword, newPasswordWithBirthYear)
             );
 
             // then

@@ -36,8 +36,16 @@ public class UserService {
         return user;
     }
 
+    @Transactional(readOnly = true)
+    public UserModel getById(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다."));
+    }
+
     @Transactional
-    public void changePassword(UserModel user, String currentRawPassword, String newRawPassword) {
+    public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
+        UserModel user = userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다."));
         if (!passwordEncoder.matches(currentRawPassword, user.getEncodedPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
