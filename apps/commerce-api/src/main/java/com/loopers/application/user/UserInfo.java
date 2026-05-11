@@ -4,7 +4,7 @@ import com.loopers.domain.user.UserModel;
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
 
-record UserInfo(
+public record UserInfo(
     String loginId,
     String name,
     BirthVO birthVO,

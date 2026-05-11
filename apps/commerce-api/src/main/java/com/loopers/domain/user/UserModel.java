@@ -17,16 +17,18 @@ public class UserModel extends BaseEntity {
 
     private String loginId;
     private String name;
+    private String password;
+    @Embedded
     private BirthVO birth;
-    private PasswordVO password;
+    @Embedded
     private EmailVO email;
 
-    public static UserModel of(String loginId, String name, BirthVO birth, PasswordVO password, EmailVO email) {
-        if (password.password().contains(String.valueOf(birth.toInt()))) {
+    public static UserModel of(String loginId, String name, String password, BirthVO birth, EmailVO email) {
+        if (password.contains(String.valueOf(birth.toInt()))) {
             throw new IllegalArgumentException("비밀번호 생성 규칙 위반 : 생년월일은 비밀번호 내에 포함할 수 없습니다.");
         }
 
-        return new UserModel(loginId, name, birth, password, email);
+        return new UserModel(loginId, name, password, birth, email);
     }
 
     public String getLoginId() {
@@ -43,5 +45,9 @@ public class UserModel extends BaseEntity {
 
     public EmailVO getEmailVO() {
         return email;
+    }
+
+    public String getPassword() {
+        return password;
     }
 }

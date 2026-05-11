@@ -2,7 +2,6 @@ package com.loopers.domain.user;
 
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
-import com.loopers.domain.value.PasswordVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,8 +14,8 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public UserModel createUserModel(String loginId, String name, BirthVO birthVO, PasswordVO passwordVO, EmailVO emailVO) {
-        UserModel userModel = UserModel.of(loginId, name, birthVO, passwordVO, emailVO);
+    public UserModel createUserModel(String loginId, String name, String password, BirthVO birthVO, EmailVO emailVO) {
+        UserModel userModel = UserModel.of(loginId, name, password, birthVO, emailVO);
         return userRepository.save(userModel);
     }
 

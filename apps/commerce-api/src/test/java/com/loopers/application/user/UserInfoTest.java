@@ -25,7 +25,7 @@ class UserInfoTest {
         String password = "test_1234";
         String email = "test@tester.com";
 
-        UserModel userModel = UserModel.of(loginId, name, new BirthVO(localDate), new PasswordVO(password), new EmailVO(email));
+        UserModel userModel = UserModel.of(loginId, name, password, new BirthVO(localDate), new EmailVO(email));
 
         // when
         UserInfo userInfo = UserInfo.from(userModel);

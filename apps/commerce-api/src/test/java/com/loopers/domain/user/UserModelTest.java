@@ -31,11 +31,10 @@ public class UserModelTest {
             String loginId = "tester";
             String name = "tester";
             BirthVO birth = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            PasswordVO passwordVO = new PasswordVO(password);
             EmailVO emailVO = new EmailVO(email);
 
             // when
-            UserModel userModel = UserModel.of(loginId, name, birth, passwordVO, emailVO);
+            UserModel userModel = UserModel.of(loginId, name, password, birth, emailVO);
 
             // then
             Assertions.assertEquals(loginId, userModel.getLoginId());
@@ -56,11 +55,11 @@ public class UserModelTest {
             String loginId = "tester";
             String name = "tester";
             BirthVO birth = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            PasswordVO passwordVO = new PasswordVO("19930316_pwd");
+            String password = "19930316_pwd";
             EmailVO emailVO = new EmailVO("test@test.com");
 
             // when then
-            assertThatThrownBy(() -> UserModel.of(loginId, name, birth, passwordVO, emailVO))
+            assertThatThrownBy(() -> UserModel.of(loginId, name, password, birth, emailVO))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("비밀번호 생성 규칙 위반 : 생년월일은 비밀번호 내에 포함할 수 없습니다.");
         }

@@ -3,7 +3,7 @@ package com.loopers.domain.value;
 import java.util.regex.Pattern;
 
 public record EmailVO(
-        String email
+    String email
 ) {
     private static final Pattern PATTERN =
             Pattern.compile("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$");

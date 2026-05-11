@@ -22,11 +22,11 @@ class UserServiceTest {
         String loginId = "test";
         String name = "tester";
         BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-        PasswordVO password = new PasswordVO("test_1234");
+        String password = "test_1234";
         EmailVO email = new EmailVO("test@tester.com");
 
         // when
-        var result = userService.createUserModel(loginId, name, localDate, password, email);
+        var result = userService.createUserModel(loginId, name, password, localDate, email);
 
         // then
         Assertions.assertNotNull(result);
@@ -42,10 +42,10 @@ class UserServiceTest {
             String loginId = "duplicate";
             String name = "tester";
             BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            PasswordVO password = new PasswordVO("test_1234");
+            String password = "test_1234";
             EmailVO email = new EmailVO("test@tester.com");
 
-            UserModel userModel = UserModel.of(loginId, name, localDate, password, email);
+            UserModel userModel = UserModel.of(loginId, name, password, localDate, email);
 
             inMemoryUserRepository.save(userModel);
         }
@@ -89,10 +89,10 @@ class UserServiceTest {
             String loginId = "saved";
             String name = "tester";
             BirthVO localDate = new BirthVO(LocalDate.of(1993, Month.MARCH, 16));
-            PasswordVO password = new PasswordVO("test_1234");
+            String password = "test_1234";
             EmailVO email = new EmailVO("test@tester.com");
 
-            UserModel userModel = inMemoryUserRepository.save(UserModel.of(loginId, name, localDate, password, email));
+            UserModel userModel = inMemoryUserRepository.save(UserModel.of(loginId, name, password, localDate, email));
 
             this.userModel = userModel;
             this.existSequence = userModel.getId();
