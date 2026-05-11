@@ -2,7 +2,10 @@ package com.loopers.infrastructure.user;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -15,7 +18,11 @@ public class UserRepositoryImpl implements UserRepository {
 
     @Override
     public UserModel save(UserModel user) {
-        return userJpaRepository.save(user);
+        try {
+            return userJpaRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.USER_ALREADY_EXISTS);
+        }
     }
 
     @Override

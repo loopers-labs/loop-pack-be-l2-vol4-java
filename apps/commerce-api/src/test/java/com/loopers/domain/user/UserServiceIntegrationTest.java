@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 
@@ -40,6 +39,9 @@ class UserServiceIntegrationTest {
 
     @Autowired
     private UserJpaRepository userJpaRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -93,21 +95,21 @@ class UserServiceIntegrationTest {
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_ALREADY_EXISTS);
         }
 
-        @DisplayName("로그인 ID 중복은 DB 제약으로도 방어된다.")
+        @DisplayName("로그인 ID 중복이 DB 제약에서 발생해도, USER_ALREADY_EXISTS 예외로 변환된다.")
         @Test
-        void throwsDataIntegrityViolation_whenDuplicateLoginIdIsSavedDirectly() {
+        void throwsAlreadyExists_whenDuplicateLoginIdViolatesDatabaseConstraint() {
             // arrange
             UserModel firstUser = new UserModel("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
             UserModel secondUser = new UserModel("user1", NEW_PASSWORD, "김루프", BIRTH_DATE, "user2@example.com");
-            userJpaRepository.saveAndFlush(firstUser);
+            userRepository.save(firstUser);
 
             // act
-            DataIntegrityViolationException exception = assertThrows(DataIntegrityViolationException.class, () -> {
-                userJpaRepository.saveAndFlush(secondUser);
+            CoreException exception = assertThrows(CoreException.class, () -> {
+                userRepository.save(secondUser);
             });
 
             // assert
-            assertThat(exception).isNotNull();
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_ALREADY_EXISTS);
         }
     }
 
