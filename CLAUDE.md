@@ -164,6 +164,25 @@ infrastructure          JpaRepository, RepositoryImpl (도메인 인터페이스
 4. unused import 제거.
 5. 모든 테스트 케이스가 통과해야 머지 가능하다.
 
+### 커밋 컨벤션
+
+**작업 단위마다 커밋한다.** 구현과 테스트를 한 번에 커밋하지 않는다.
+
+예시 흐름:
+```
+feat: 유저 도메인 설계        ← UserModel, UserService, UserRepository
+test: 유저 도메인 단위 테스트  ← UserModelTest
+feat: 유저 회원가입 API 구현   ← Controller, Facade, RepositoryImpl
+test: 유저 회원가입 E2E 테스트 ← UserApiE2ETest
+```
+
+커밋 메시지 prefix:
+- `feat` : 기능 구현
+- `test` : 테스트 추가
+- `fix`  : 버그 수정
+- `docs` : 문서 변경
+- `refactor` : 리팩토링 (기능 변경 없음)
+
 ### 테스트 전략
 
 | 종류 | 인프라 | 목적 |
