@@ -26,7 +26,6 @@ public class Member extends BaseEntity {
 
     public Member(String loginId, String loginPassword, String name, LocalDate birthday, String email) {
         validateLoginId(loginId);
-        validateLoginPassword(loginPassword, birthday);
         validateName(name);
         validateEmail(email);
         validBirthday(birthday);
@@ -41,19 +40,6 @@ public class Member extends BaseEntity {
     private void validateLoginId(String loginId) {
         if (StringUtils.isBlank(loginId)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 아이디는 비어있을 수 없습니다.");
-        }
-    }
-
-    private void validateLoginPassword(String loginPassword, LocalDate birthday) {
-        if (loginPassword == null || !loginPassword.matches("^[a-zA-Z0-9\\p{Punct}]{8,16}$")) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 패스워드는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
-        }
-
-        String yyyyMMdd = birthday.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String MMdd = birthday.format(DateTimeFormatter.ofPattern("MMdd"));
-
-        if (StringUtils.containsAny(loginPassword, MMdd, yyyyMMdd)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 패스워드에 생년월일을 포함할 수 없습니다.");
         }
     }
 

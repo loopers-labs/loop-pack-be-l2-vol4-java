@@ -68,36 +68,6 @@ public class MemberModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("로그인 패스워드는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능하다.")
-        @ParameterizedTest
-        @ValueSource(strings = {"       ", "1234", "안녕하세요반갑습니다", "abcdefghijklmnopqrstuvwxyz"})
-        void throwsBadRequestException_whenLoginPasswordIdIsInvalid(String invalidLoginPassword) {
-            // arrange
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new Member(loginId, invalidLoginPassword, name, birthday, email);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("로그인 패스워드에 생년월일이 포함되어 있으면, BAD_REQUEST 예외가 발생한다.")
-        @ParameterizedTest
-        @ValueSource(strings = {"Pass!20000101", "Pass!0101"})
-        void throwsBadRequestException_whenLoginPasswordContainsBirthday(String loginPasswordWithBirthday) {
-            // arrange
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new Member(loginId, loginPasswordWithBirthday, name, birthday, email);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
         @DisplayName("이름이 빈칸으로만 이루어져 있으면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequestException_whenNameIsBlank() {

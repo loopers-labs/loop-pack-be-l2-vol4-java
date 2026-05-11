@@ -19,6 +19,8 @@ public class MemberService {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용중인 로그인 아이디입니다.");
         }
 
+        PasswordValidator.validate(loginPassword, birthday);
+
         Member member = new Member(loginId, loginPassword, name, birthday, email);
         return memberRepository.save(member);
     }
