@@ -2,7 +2,7 @@
 name: "⚔️ Tech Note — Challenge Story 스타일"
 about: "'도전 → 해결 → 통찰' 압축 서사. 짧고 강력하게 본인 역량을 보여주고 싶을 때."
 title: "[Tech Note][Challenge Story] "
-labels: ["tech-note", "rt", "format:challenge-story"]
+labels: ["tech-note", "format:challenge-story"]
 ---
 
 > **언제 고르나** — 과제에서 가장 어려웠던 도전 하나에 집중해 서사로 풀고 싶을 때. 짧고 임팩트 있게.

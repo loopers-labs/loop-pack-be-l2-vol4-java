@@ -2,7 +2,7 @@
 name: "📊 Tech Note — Benchmark Report 스타일"
 about: "두 구현/기술의 직접 측정 비교. 수치 기반으로 선택 근거를 증명하고 싶을 때."
 title: "[Tech Note][Benchmark] "
-labels: ["tech-note", "rt", "format:benchmark"]
+labels: ["tech-note", "format:benchmark"]
 ---
 
 > **언제 고르나** — 후보 기술 A vs B(vs C)를 본인이 직접 측정해 선택한 경우. 가장 강력한 자기 증명 자료가 된다.

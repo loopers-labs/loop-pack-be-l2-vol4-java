@@ -2,7 +2,7 @@
 name: "🪞 Tech Note — Retrospective 스타일"
 about: "과제 회고 중심. 기술 결정 + 트러블슈팅 + 배운 점을 정리."
 title: "[Tech Note][Retrospective] "
-labels: ["tech-note", "rt", "format:retrospective"]
+labels: ["tech-note", "format:retrospective"]
 ---
 
 > **언제 고르나** — 과제를 끝낸 직후, 결정 과정과 배운 점을 회고하고 싶을 때. 가장 진입장벽이 낮은 포맷.

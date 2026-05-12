@@ -2,7 +2,7 @@
 name: "📐 Tech Note — Design Doc 스타일"
 about: "설계 의사결정 중심. '왜 이 구조인가'를 풀어쓰는 포맷."
 title: "[Tech Note][Design Doc] "
-labels: ["tech-note", "rt", "format:design-doc"]
+labels: ["tech-note", "format:design-doc"]
 ---
 
 > **언제 고르나** — 새 시스템·모듈을 설계했고, 구조와 의사결정을 면접관/시니어 리뷰어에게 설명하고 싶을 때.
