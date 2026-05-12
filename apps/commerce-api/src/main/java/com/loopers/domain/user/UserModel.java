@@ -33,6 +33,9 @@ public class UserModel {
         } catch (DateTimeParseException e) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식이어야 합니다.");
         }
+        if (!this.birthDate.isBefore(LocalDate.now())) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 오늘 이전이어야 합니다.");
+        }
 
         this.loginId = loginId;
         this.password = password;
