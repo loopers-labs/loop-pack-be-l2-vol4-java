@@ -1,6 +1,5 @@
 package com.loopers.domain.user;
 
-import com.loopers.domain.user.exception.UserAlreadyExistsException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -68,16 +67,19 @@ class UserServiceTest {
             verify(userRepository, times(1)).save(any(UserModel.class));
         }
 
-        @DisplayName("이미 존재하는 로그인 ID로 가입하면 UserAlreadyExistsException이 발생한다")
+        @DisplayName("이미 존재하는 로그인 ID로 가입하면 CONFLICT 예외가 발생한다")
         @Test
-        void throwsUserAlreadyExists_whenLoginIdAlreadyExists() {
+        void throwsConflict_whenLoginIdAlreadyExists() {
             // given
             when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(true);
 
-            // when & then
-            assertThrows(UserAlreadyExistsException.class, () ->
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
                 userService.signUp(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
             );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
             verify(userRepository, never()).save(any(UserModel.class));
         }
 

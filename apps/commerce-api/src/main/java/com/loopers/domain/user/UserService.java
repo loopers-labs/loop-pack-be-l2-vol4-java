@@ -1,6 +1,5 @@
 package com.loopers.domain.user;
 
-import com.loopers.domain.user.exception.UserAlreadyExistsException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ public class UserService {
     @Transactional
     public UserModel signUp(String loginId, String rawPassword, String name, LocalDate birthDate, String email) {
         if (userRepository.existsByLoginId(loginId)) {
-            throw new UserAlreadyExistsException(loginId);
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.");
         }
         passwordPolicy.validate(rawPassword, birthDate);
         String encoded = passwordEncoder.encode(rawPassword);
