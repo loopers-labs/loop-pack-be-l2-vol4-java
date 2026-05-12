@@ -1,7 +1,7 @@
 ---
 name: "📊 Tech Note — Benchmark Report 스타일"
 about: "두 구현/기술의 직접 측정 비교. 수치 기반으로 선택 근거를 증명하고 싶을 때."
-title: "[Tech Note][Benchmark] "
+title: "[Benchmark] 키워드 (N주차 · K팀 · 이름)"
 labels: ["tech-note", "format:benchmark"]
 ---
 

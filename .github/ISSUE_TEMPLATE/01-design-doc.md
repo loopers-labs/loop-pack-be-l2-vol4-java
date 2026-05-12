@@ -1,7 +1,7 @@
 ---
 name: "📐 Tech Note — Design Doc 스타일"
 about: "설계 의사결정 중심. '왜 이 구조인가'를 풀어쓰는 포맷."
-title: "[Tech Note][Design Doc] "
+title: "[Design Doc] 키워드 (N주차 · K팀 · 이름)"
 labels: ["tech-note", "format:design-doc"]
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: "🪞 Tech Note — Retrospective 스타일"
 about: "과제 회고 중심. 기술 결정 + 트러블슈팅 + 배운 점을 정리."
-title: "[Tech Note][Retrospective] "
+title: "[Retrospective] 키워드 (N주차 · K팀 · 이름)"
 labels: ["tech-note", "format:retrospective"]
 ---
 

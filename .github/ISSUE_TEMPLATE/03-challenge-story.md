@@ -1,7 +1,7 @@
 ---
 name: "⚔️ Tech Note — Challenge Story 스타일"
 about: "'도전 → 해결 → 통찰' 압축 서사. 짧고 강력하게 본인 역량을 보여주고 싶을 때."
-title: "[Tech Note][Challenge Story] "
+title: "[Challenge Story] 키워드 (N주차 · K팀 · 이름)"
 labels: ["tech-note", "format:challenge-story"]
 ---
 
