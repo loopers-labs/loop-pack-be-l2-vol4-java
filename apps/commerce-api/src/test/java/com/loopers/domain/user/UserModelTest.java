@@ -6,7 +6,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
@@ -28,6 +32,33 @@ class UserModelTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("loginId가 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenLoginIdIsEmpty() {
+            // arrange
+            String loginId = "";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(loginId, "pass1234", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("loginId가 정확히 10자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenLoginIdIsExactlyTenCharacters() {
+            // arrange
+            String loginId = "abcde12345";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel(loginId, "pass1234", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
         }
 
         @DisplayName("loginId가 10자를 초과하면, BAD_REQUEST 예외가 발생한다.")
@@ -60,13 +91,87 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("이메일에 도메인 확장자가 없으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEmailHasNoDomainExtension() {
+            // arrange
+            String email = "user@example";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", "홍길동", email, "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일이 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEmailIsEmpty() {
+            // arrange
+            String email = "";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", "홍길동", email, "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("생년월일이 yyyy-MM-dd 형식이 아니면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenBirthDateFormatIsInvalid() {
             // arrange
             String birthDate = "20000101";
 
-            
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", "홍길동", "test@example.com", birthDate, Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("생년월일이 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBirthDateIsEmpty() {
+            // arrange
+            String birthDate = "";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", "홍길동", "test@example.com", birthDate, Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("생년월일이 존재하지 않는 날짜이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBirthDateIsInvalidDate() {
+            // arrange
+            String birthDate = "2000-02-30";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", "홍길동", "test@example.com", birthDate, Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("생년월일이 미래 날짜이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBirthDateIsInFuture() {
+            // arrange
+            String birthDate = LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 new UserModel("user1", "pass1234", "홍길동", "test@example.com", birthDate, Gender.MALE)
