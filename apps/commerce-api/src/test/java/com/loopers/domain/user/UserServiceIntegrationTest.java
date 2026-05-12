@@ -80,6 +80,88 @@ class UserServiceIntegrationTest {
         }
     }
 
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("현재/새 비밀번호가 유효하면, 새 비밀번호가 인코딩되어 저장된다.")
+        @Test
+        void savesEncodedNewPassword_whenInputsAreValid() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            String newPassword = "NewLoopers!9999";
+            UserModel saved = userService.signUp(
+                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            );
+
+            // act
+            userService.changePassword(saved.getId(), currentPassword, newPassword);
+
+            // assert
+            UserModel reloaded = userService.getById(saved.getId());
+            assertAll(
+                () -> assertThat(passwordEncoder.matches(newPassword, reloaded.getPassword())).isTrue(),
+                () -> assertThat(passwordEncoder.matches(currentPassword, reloaded.getPassword())).isFalse()
+            );
+        }
+
+        @DisplayName("현재 비밀번호가 저장된 값과 일치하지 않으면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorizedException_whenCurrentPasswordDoesNotMatch() {
+            // arrange
+            UserModel saved = userService.signUp(
+                "loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            );
+            String wrongCurrentPassword = "Wrong!9999";
+            String newPassword = "NewLoopers!9999";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                userService.changePassword(saved.getId(), wrongCurrentPassword, newPassword);
+            });
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 정책에 어긋나면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenNewPasswordViolatesPolicy() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            UserModel saved = userService.signUp(
+                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            );
+            String tooShortNewPassword = "Aa1!56";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                userService.changePassword(saved.getId(), currentPassword, tooShortNewPassword);
+            });
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            UserModel saved = userService.signUp(
+                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            );
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                userService.changePassword(saved.getId(), currentPassword, currentPassword);
+            });
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
     @DisplayName("ID 로 회원을 조회할 때, ")
     @Nested
     class GetById {

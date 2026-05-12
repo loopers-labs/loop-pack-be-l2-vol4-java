@@ -76,4 +76,9 @@ public class UserModel extends BaseEntity {
         }
     }
 
+    public void changePassword(String newEncodedPassword) {
+        validateEncodedPassword(newEncodedPassword);
+        this.password = newEncodedPassword;
+    }
+
 }

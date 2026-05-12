@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -36,5 +37,14 @@ public class UserV1Controller {
     ) {
         UserInfo info = userFacade.getMyInfo(userId);
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(info));
+    }
+
+    @PutMapping("/me/password")
+    public ApiResponse<Object> changePassword(
+        @AuthenticationPrincipal Long userId,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(userId, request.currentPassword(), request.newPassword());
+        return ApiResponse.success();
     }
 }

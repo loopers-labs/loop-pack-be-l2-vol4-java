@@ -38,4 +38,19 @@ public class UserService {
         return userRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
     }
+
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        UserModel user = userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
+        }
+        UserPasswordPolicy.validate(newPassword, user.getBirthDate());
+        String encodedNewPassword = passwordEncoder.encode(newPassword);
+        user.changePassword(encodedNewPassword);
+    }
 }

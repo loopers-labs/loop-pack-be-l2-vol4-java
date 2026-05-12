@@ -19,6 +19,11 @@ public class UserV1Dto {
         }
     }
 
+    public record ChangePasswordRequest(
+        String currentPassword,
+        String newPassword
+    ) {}
+
     public record UserResponse(
         Long id,
         String loginId,

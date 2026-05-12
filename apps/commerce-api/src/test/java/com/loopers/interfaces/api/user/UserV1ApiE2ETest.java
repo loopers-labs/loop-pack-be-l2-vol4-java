@@ -26,6 +26,7 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
     private static final String ENDPOINT_ME = "/api/v1/users/me";
+    private static final String ENDPOINT_ME_PASSWORD = "/api/v1/users/me/password";
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
@@ -167,6 +168,104 @@ class UserV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    @DisplayName("PUT /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("유효한 인증 헤더와 현재/새 비밀번호를 보내면, 200 OK 응답을 받고 새 비밀번호로 로그인된다.")
+        @Test
+        void returnsOk_andEnablesLoginWithNewPassword_whenRequestIsValid() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            String newPassword = "NewLoopers!9999";
+            signUpUser("loopers01", currentPassword);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(currentPassword, newPassword);
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = changePassword("loopers01", currentPassword, request);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getMe("loopers01", newPassword).getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getMe("loopers01", currentPassword).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
+            );
+        }
+
+        @DisplayName("바디의 현재 비밀번호가 저장된 값과 일치하지 않으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenBodyCurrentPasswordDoesNotMatch() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            signUpUser("loopers01", currentPassword);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Wrong!9999", "NewLoopers!9999");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = changePassword("loopers01", currentPassword, request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 정책에 어긋나면, 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordViolatesPolicy() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            signUpUser("loopers01", currentPassword);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(currentPassword, "short");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = changePassword("loopers01", currentPassword, request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            String currentPassword = "Loopers!2026";
+            signUpUser("loopers01", currentPassword);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(currentPassword, currentPassword);
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = changePassword("loopers01", currentPassword, request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenAuthHeadersAreMissing() {
+            // arrange
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Loopers!2026", "NewLoopers!9999");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT_ME_PASSWORD, HttpMethod.PUT, new HttpEntity<>(request),
+                new ParameterizedTypeReference<ApiResponse<Object>>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private ResponseEntity<ApiResponse<Object>> changePassword(
+        String loginId, String authPassword, UserV1Dto.ChangePasswordRequest body
+    ) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HEADER_LOGIN_ID, loginId);
+        headers.set(HEADER_LOGIN_PW, authPassword);
+        return testRestTemplate.exchange(
+            ENDPOINT_ME_PASSWORD, HttpMethod.PUT, new HttpEntity<>(body, headers),
+            new ParameterizedTypeReference<ApiResponse<Object>>() {}
+        );
     }
 
     private void signUpUser(String loginId, String rawPassword) {

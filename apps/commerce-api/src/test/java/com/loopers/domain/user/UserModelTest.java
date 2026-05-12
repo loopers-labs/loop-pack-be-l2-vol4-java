@@ -132,4 +132,49 @@ class UserModelTest {
         }
 
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("유효한 인코딩 비밀번호를 주면, password 필드가 새 값으로 갱신된다.")
+        @Test
+        void changesPassword_whenValidEncodedPasswordIsProvided() {
+            // arrange
+            UserModel user = UserModel.builder()
+                .loginId("loopers01")
+                .encodedPassword("encoded-old-password")
+                .name("김성호")
+                .birthDate(LocalDate.of(1993, 11, 3))
+                .email("loopers@example.com")
+                .build();
+            String newEncodedPassword = "encoded-new-password";
+
+            // act
+            user.changePassword(newEncodedPassword);
+
+            // assert
+            assertThat(user.getPassword()).isEqualTo(newEncodedPassword);
+        }
+
+        @DisplayName("새 인코딩 비밀번호가 비어있으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenNewEncodedPasswordIsBlank() {
+            // arrange
+            UserModel user = UserModel.builder()
+                .loginId("loopers01")
+                .encodedPassword("encoded-old-password")
+                .name("김성호")
+                .birthDate(LocalDate.of(1993, 11, 3))
+                .email("loopers@example.com")
+                .build();
+            String blankPassword = "   ";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> user.changePassword(blankPassword));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }
