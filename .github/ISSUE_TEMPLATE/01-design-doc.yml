@@ -9,7 +9,8 @@ body:
         > **언제 고르나** — 새 시스템·모듈을 설계했고, 구조와 의사결정을 면접관/시니어 리뷰어에게 설명하고 싶을 때.
         > **AI 채점 PR과 별개** — 본 이슈는 피드백용입니다.
         >
-        > 제목의 `키워드`, `N`, `K`, `이름` 부분을 본인 내용으로 바꿔주세요. 각 필드 안에서는 마크다운을 자유롭게 쓸 수 있습니다.
+        > 제목의 `키워드`, `N`, `K`, `이름` 부분을 본인 내용으로 바꿔주세요.
+        > 본문 골격은 가이드입니다. **안 쓰는 섹션은 통째로 지워도 됩니다.**
 
   - type: input
     id: tldr
@@ -20,83 +21,41 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: audience
-    attributes:
-      label: "대상 독자"
-      description: "누구를 떠올리며 쓰는가?"
-      placeholder: "면접관 / 시니어 리뷰어 / 동료 / 미래의 본인"
-    validations:
-      required: true
-
-  - type: input
-    id: related-pr
-    attributes:
-      label: "관련 PR"
-      description: "본 과제 PR 번호 또는 링크."
-      placeholder: "#123 또는 https://github.com/.../pull/123"
-    validations:
-      required: true
-
   - type: textarea
-    id: reference
+    id: body
     attributes:
-      label: "Reference"
-      description: "참고한 공식 문서, 인용한 글, 영상 등."
-      placeholder: |
-        - Redis 공식 문서: ...
-        - 참고 블로그: ...
-    validations:
-      required: false
-
-  - type: textarea
-    id: intro-goals
-    attributes:
-      label: "Introduction & Goals"
+      label: "본문"
       description: |
+        아래 골격은 가이드입니다. 본인의 강조점에 맞춰 자유롭게 변형하세요.
+
+        **작성 팁**
+        - 수치로 증명하라 — "잘 됐다"가 아니라 "p99 200ms → 25ms".
+        - 왜 그 선택을 했는가를 함께 적으라 — 기술 나열은 약하다.
+        - 솔직한 한계도 적으라 — "이건 못 풀었다"가 시니어 시그널이다.
+      value: |
+        ## Introduction & Goals
+
         - **Context / Background**: 이 시스템이 왜 필요한가? 비즈니스 요구사항이나 기존 시스템의 한계.
         - **Goals**: 달성하고자 하는 구체적 목표를 *측정 가능하게* 적는다. (예: 읽기 레이턴시 p99 50ms 이하)
         - **Non-goals**: 이번 설계에서 다루지 *않는* 것. 범위를 명확히 하는 것도 시니어 시그널.
-      value: |
-        ### Context / Background
 
+        ## Detailed Design
 
-        ### Goals
-        -
-
-        ### Non-goals
-        -
-    validations:
-      required: true
-
-  - type: textarea
-    id: detailed-design
-    attributes:
-      label: "Detailed Design"
-      description: |
         면접관이 "이 사람 어떻게 설계했지?"를 빠르게 파악할 수 있게 핵심 컴포넌트와 데이터 흐름을 설명한다.
         구조도는 텍스트 트리, mermaid, 표 모두 OK.
-      value: |
-        ### System Architecture
 
+        ### System Architecture
 
         ### Data Models
 
-
         ### API Design
 
-
         ### Constraints
-    validations:
-      required: true
 
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: "Alternatives Considered"
-      description: |
+        ## Alternatives Considered
+
         "왜 이 방법인가"에 답하는 섹션. 시니어 리뷰는 여기서 갈린다.
-      value: |
+
         | 옵션 | Pros | Cons |
         |------|------|------|
         | A    |      |      |
@@ -104,29 +63,19 @@ body:
         | **선택: C** |      |      |
 
         **선택 근거:**
-    validations:
-      required: true
 
-  - type: textarea
-    id: verification
-    attributes:
-      label: "Verification"
-      description: |
+        ## Verification
+
         설계가 의도대로 동작하는지 어떻게 확인했나? **수치로 증명한다.** Before → After 비교를 권장.
-      placeholder: |
-        - 측정: k6로 RPS 1,000, 동시 사용자 100명, 5분간
-        - 결과: p99 200ms → 25ms, 에러율 0%
-        - Goals 충족 여부:
-    validations:
-      required: true
 
-  - type: textarea
-    id: risks
-    attributes:
-      label: "Risks & Open Questions"
-      description: |
+        - 측정:
+        - 결과:
+        - Goals 충족 여부:
+
+        ## Risks & Open Questions
+
         설계의 약점과 미해결 과제. **솔직히 적는 게 시니어 시그널이다.**
-      value: |
+
         - **남은 리스크:**
         - **트레이드오프로 받아들인 것:**
         - **다음에 풀고 싶은 것:**
@@ -136,13 +85,24 @@ body:
   - type: textarea
     id: cross-cutting
     attributes:
-      label: "Cross-cutting Concerns (Optional)"
-      description: |
-        해당되는 항목만 작성한다. 전부 채울 필요는 없다.
+      label: "Cross-cutting Concerns"
+      description: "비기능적 요구사항. 해당되는 항목만 적으면 됩니다. 비워둬도 OK."
       placeholder: |
-        - **Scalability**: 트래픽 증가 시 대응
-        - **Latency**: 응답 속도 영향
-        - **Security & Privacy**: PII, 권한, 암호화
-        - **Observability**: 로깅·메트릭·알람 계획
+        - Scalability: 트래픽 증가 시 어떻게 대응할 것인가?
+        - Latency: 응답 속도에 미치는 영향은?
+        - Security & Privacy: PII, 권한 제어, 암호화
+        - Observability: 로깅·메트릭·알람 계획
+    validations:
+      required: false
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: "Reference"
+      description: "참고한 공식 문서, 인용한 글, 영상, 본인 코드 블록 링크 등을 자유롭게 정리하세요."
+      placeholder: |
+        - Redis 공식 문서: ...
+        - 참고 블로그: ...
+        - 본인 코드: https://github.com/.../blob/...
     validations:
       required: false
