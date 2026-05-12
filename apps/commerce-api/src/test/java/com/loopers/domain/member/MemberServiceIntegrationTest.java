@@ -130,4 +130,104 @@ public class MemberServiceIntegrationTest {
         }
     }
 
+    @DisplayName("회원 정보 조회를 할 때,")
+    @Nested
+    class GetMember {
+        @DisplayName("올바른 로그인 ID와 비밀번호가 주어지면, 유저를 반환한다.")
+        @Test
+        void getMember_whenValidInfoProvided(){
+            // arrange
+            memberService.join(loginId, loginPassword, name, birthday, email);
+
+            // act
+            Member member = memberService.getMember(loginId, loginPassword);
+
+            // assert
+            assertAll(
+                    () -> assertThat(member.getLoginId()).isEqualTo(loginId),
+                    () -> assertThat(member.getName()).isEqualTo(name),
+                    () -> assertThat(member.getBirthday()).isEqualTo(birthday),
+                    () -> assertThat(member.getEmail()).isEqualTo(email)
+            );
+        }
+
+        @DisplayName("존재하지 않는 로그인 ID면, UNAUTHORIZED 에러를 반환한다.")
+        @Test
+        void throwUnauthorizedException_whenLoginIdDoesNotExist(){
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> { memberService.getMember(loginId, loginPassword);});
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("비밀번호가 올바르지 않으면, UNAUTHORIZED 에러를 반환한다.")
+        @Test
+        void throwUnauthorizedException_whenLoginPasswordDoesNotMatch(){
+            // arrange
+            memberService.join(loginId, loginPassword, name, birthday, email);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                memberService.getMember(loginId, "myPassWord1234");
+            });
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("비밀번호 수정을 할 때,")
+    @Nested
+    class UpdatePassword {
+        @DisplayName("비밀번호 규칙을 따르고, 변경하려는 비밀번호가 현재 비밀번호와 다른 경우 정상적으로 변경이 된다.")
+        @Test
+        void updatePassword_whenValidInfoProvided(){
+            // arrange
+            Member member = memberService.join(loginId, loginPassword, name, birthday, email);
+
+            String newPassword = "pAssWord2!";
+
+            // act
+            memberService.changePassword(member, loginPassword, newPassword);
+
+            // assert
+            Member updatedMember = memberService.getMember(loginId, newPassword);
+
+            assertAll(
+                    () -> assertThat(updatedMember.getLoginId()).isEqualTo(loginId),
+                    () -> assertThat(updatedMember.getName()).isEqualTo(name),
+                    () -> assertThat(updatedMember.getBirthday()).isEqualTo(birthday),
+                    () -> assertThat(updatedMember.getEmail()).isEqualTo(email)
+            );
+
+        }
+
+        @DisplayName("변경하려는 비밀번호가 현재 비밀번호가 같은 경우 BAD_REQUEST 에러를 반환한다.")
+        @Test
+        void throwBadRequestException_whenNewPasswordEqualsToCurrentPassword(){
+            // arrange
+            Member member = memberService.join(loginId, loginPassword, name, birthday, email);
+
+            CoreException result = assertThrows(CoreException.class, () -> {
+                memberService.changePassword(member, loginPassword, loginPassword);
+            });
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("변경하려는 비밀번호가 비밀번호 규칙을 따르지 않는 경우 BAD_REQUEST 에러를 반환한다.")
+        @ParameterizedTest
+        @ValueSource(strings = {"       ", "1234", "안녕하세요반갑습니다", "abcdefghijklmnopqrstuvwxyz", "Pass!20000101", "Pass!0101"})
+        void throwBadRequestException_whenNewPasswordDoesNotMatch(String wrongPassword){
+            Member member = memberService.join(loginId, loginPassword, name, birthday, email);
+
+            CoreException result = assertThrows(CoreException.class, () -> {
+                memberService.changePassword(member, loginPassword, wrongPassword);
+            });
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
 }
