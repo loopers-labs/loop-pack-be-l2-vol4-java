@@ -1,9 +1,10 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.exception.UserAlreadyExistsException;
 import com.loopers.infrastructure.user.UserJpaRepository;
-import com.loopers.support.IntegrationTest;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.IntegrationTest;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,19 +63,16 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("이미 존재하는 로그인 ID로 가입하면 CONFLICT 예외가 발생한다")
+        @DisplayName("이미 존재하는 로그인 ID로 가입하면 UserAlreadyExistsException이 발생한다")
         @Test
-        void throwsConflict_whenLoginIdAlreadyExists() {
+        void throwsUserAlreadyExists_whenLoginIdAlreadyExists() {
             // given
             userService.signUp("loopers01", "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
 
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
+            // when & then
+            assertThrows(UserAlreadyExistsException.class, () ->
                 userService.signUp("loopers01", "Other9876@", "김철수", LocalDate.of(1990, 1, 1), "other@loopers.com")
             );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 
