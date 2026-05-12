@@ -83,26 +83,67 @@ Root  (rootProject.name = "loopers-java-spring-template")
 - `commerce-streamer` → `modules:jpa`, `modules:redis`, `modules:kafka`, `supports:*` (+ `spring-boot-starter-web`)
 - 테스트에서는 각 모듈의 `testFixtures` (DatabaseCleanUp / RedisCleanUp / Testcontainers 설정 등) 를 가져다 씁니다.
 
-## 패키지 레이어링 (`commerce-api` 기준)
+## 패키지 레이어링
 
 `com.loopers` 하위는 레이어드 + 도메인 패키지 구조로 정리되어 있으며, **DDD 스타일의 패키지 분리** 와 **Facade 패턴** 을 채택하고 있습니다.
+
+### commerce-api
 
 ```
 com.loopers
 ├── CommerceApiApplication                # 부트 엔트리, 타임존 고정
-├── interfaces.api                        # 표현 계층 (Controller, DTO, Swagger ApiSpec)
-│   ├── ApiResponse / ApiControllerAdvice # 응답 래퍼 + 전역 예외 매핑
-│   └── api/<domain>/<Domain>V1Controller, V1Dto, V1ApiSpec
-├── application.<domain>.<Domain>Facade   # 유스케이스 조립 (Service 호출 + Info 변환)
-│                       .<Domain>Info     # Application 계층 DTO (도메인 → application)
-├── domain.<domain>                       # 핵심 도메인
-│   ├── <Domain>Model       (Entity)      # 불변 조건 가드, 도메인 행위 메서드
-│   ├── <Domain>Service     (@Component, @Transactional)
-│   └── <Domain>Repository  (interface, port)
-├── infrastructure.<domain>               # 영속성 어댑터
-│   ├── <Domain>JpaRepository  (Spring Data JPA)
-│   └── <Domain>RepositoryImpl (domain.Repository 구현)
-└── support.error                         # CoreException + ErrorType (HttpStatus 매핑)
+├── interfaces
+│   └── api                               # 표현 계층 (Controller, DTO, Swagger ApiSpec)
+│       ├── ApiResponse                   # 공통 응답 래퍼
+│       ├── ApiControllerAdvice           # 전역 예외 매핑 (@RestControllerAdvice)
+│       └── <domain>
+│           ├── <Domain>V1Controller      # REST 엔드포인트
+│           ├── <Domain>V1Dto             # 요청/응답 DTO (record)
+│           └── <Domain>V1ApiSpec         # Swagger 어노테이션 분리 인터페이스 (선택)
+├── application
+│   └── <domain>
+│       ├── <Domain>Facade                # 유스케이스 조립 (Service 호출 + Info 변환)
+│       └── <Domain>Info                  # Application 계층 DTO (도메인 → Facade 반환값)
+├── domain
+│   └── <domain>
+│       ├── <Domain>Model                 # Entity (불변 조건 가드, 도메인 행위 메서드)
+│       ├── <Domain>Service               # 도메인 서비스 (@Component, @Transactional)
+│       └── <Domain>Repository            # 리포지토리 포트 (interface)
+├── infrastructure
+│   └── <domain>
+│       ├── <Domain>JpaRepository         # Spring Data JPA Repository
+│       └── <Domain>RepositoryImpl        # <Domain>Repository 구현체 (어댑터)
+└── support
+    └── error
+        ├── CoreException                 # 도메인/애플리케이션 예외
+        └── ErrorType                     # HTTP 상태 코드 매핑 enum
+```
+
+### commerce-batch
+
+```
+com.loopers
+├── CommerceBatchApplication
+└── batch
+    ├── job
+    │   └── <jobName>
+    │       ├── <JobName>JobConfig        # Job/Step 빈 정의
+    │       └── step
+    │           └── <JobName>Tasklet      # Tasklet 구현
+    └── listener
+        ├── JobListener                   # Job 시작/종료 이벤트
+        ├── StepMonitorListener           # Step 모니터링
+        └── ChunkListener                 # Chunk 단위 이벤트
+```
+
+### commerce-streamer
+
+```
+com.loopers
+├── CommerceStreamerApplication
+└── interfaces
+    └── consumer
+        └── <Topic>KafkaConsumer          # @KafkaListener 컨슈머
 ```
 
 공통 엔티티는 `modules/jpa` 의 `com.loopers.domain.BaseEntity` 에서 제공되며, `createdAt / updatedAt / deletedAt` 자동 관리 + 멱등한 `delete()` / `restore()` 를 포함합니다.
