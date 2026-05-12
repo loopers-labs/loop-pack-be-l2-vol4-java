@@ -23,7 +23,7 @@
 | Field | Type | Required | 제약 |
 |---|---|---|---|
 | `loginId` | `string` | ✓ | 영문 대소문자·숫자, 4~20자 |
-| `password` | `string` | ✓ | 8~16자, 영문/숫자/특수문자, 카테고리 ≥ 2, `birthDate` 포함 불가 |
+| `password` | `string` | ✓ | 8~16자, 영문/숫자/특수문자, `birthDate` 포함 불가 |
 | `name` | `string` | ✓ | 한글 완성형 2~20자 |
 | `birthDate` | `string` (`YYYY-MM-DD`) | ✓ | 유효 달력 일자, 미래 불가 |
 | `email` | `string` | ✓ | RFC 5322 호환, 최대 254자 |
@@ -71,7 +71,7 @@
 |---|---|---|---|
 | 필수 필드 누락 | `400` | `Bad Request` | `"loginId는 필수입니다."` |
 | `loginId` 패턴·길이 위반 | `400` | `Bad Request` | `"로그인 ID는 영문/숫자 4~20자만 허용됩니다."` |
-| `password` 포맷·길이·카테고리 위반 | `400` | `Bad Request` | `"비밀번호는 8~16자의 영문·숫자·특수문자 중 2개 이상의 조합이어야 합니다."` |
+| `password` 포맷·길이 위반 | `400` | `Bad Request` | `"비밀번호는 8~16자의 영문·숫자·특수문자만 허용됩니다."` |
 | `password`에 `birthDate` 포함 | `400` | `Bad Request` | `"비밀번호에 생년월일을 포함할 수 없습니다."` |
 | `name` 위반 | `400` | `Bad Request` | `"이름은 한글 2~20자만 허용됩니다."` |
 | `birthDate` 위반 | `400` | `Bad Request` | `"생년월일은 유효한 날짜여야 하며 미래일 수 없습니다."` |
