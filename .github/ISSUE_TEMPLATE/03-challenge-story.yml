@@ -58,16 +58,23 @@ body:
         - **추론 및 검증**:
         - **최종 해결**:
 
-        ## Verification & Insight (검증 및 통찰)
+        ## Verification (검증)
 
         ### 결과 지표
         - 예) p99 200ms → 25ms, 에러율 3% → 0.01%
-
-        ### Lessons Learned
-        1.
-        2.
     validations:
       required: true
+
+  - type: textarea
+    id: lessons-learned
+    attributes:
+      label: "Lessons Learned"
+      description: "이 과정에서 얻은 아키텍처적 교훈 1~3가지. 비워둬도 OK."
+      placeholder: |
+        1. 이벤트 기반 시스템에선 idempotency가 기본 가정이어야 한다.
+        2. 컨슈머 리밸런싱 동작을 모르면 유실의 원인을 디버깅 못한다.
+    validations:
+      required: false
 
   - type: textarea
     id: reference

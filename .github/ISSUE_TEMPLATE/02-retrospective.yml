@@ -64,13 +64,6 @@ body:
         |------|--------|-------|
         |      |        |       |
 
-        ## Deep Dive
-
-        새롭게 알게 된 원리. **위키 복붙이 아니라, 본인 과제에 어떻게 적용했는지** 까지 연결한다.
-
-        - **개념/원리**:
-        - **본인 과제에 어떻게 작용했나**:
-
         ## 회고 (Retrospective)
 
         - **Keep**:
@@ -79,6 +72,17 @@ body:
         - **트레이드오프 회고**: (내가 택한 선택의 "비용"은 무엇이었나?)
     validations:
       required: true
+
+  - type: textarea
+    id: deep-dive
+    attributes:
+      label: "Deep Dive"
+      description: "새롭게 알게 된 원리를 본인 과제에 어떻게 적용했는지까지 연결. 위키 복붙은 지양. 비워둬도 OK."
+      placeholder: |
+        - 개념/원리: 예) Redis 싱글 스레드 아키텍처와 원자적 연산
+        - 본인 과제에 어떻게 작용했나: 예) 그래서 INCR/ZADD가 race condition 없이 동작
+    validations:
+      required: false
 
   - type: textarea
     id: reference

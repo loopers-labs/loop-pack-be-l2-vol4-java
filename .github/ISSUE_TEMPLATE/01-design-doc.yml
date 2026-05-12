@@ -79,17 +79,21 @@ body:
         - **남은 리스크:**
         - **트레이드오프로 받아들인 것:**
         - **다음에 풀고 싶은 것:**
-
-        ## (Optional) Cross-cutting Concerns
-
-        해당되는 항목만. 전부 채울 필요는 없다.
-
-        - **Scalability**:
-        - **Latency**:
-        - **Security & Privacy**:
-        - **Observability**:
     validations:
       required: true
+
+  - type: textarea
+    id: cross-cutting
+    attributes:
+      label: "Cross-cutting Concerns"
+      description: "비기능적 요구사항. 해당되는 항목만 적으면 됩니다. 비워둬도 OK."
+      placeholder: |
+        - Scalability: 트래픽 증가 시 어떻게 대응할 것인가?
+        - Latency: 응답 속도에 미치는 영향은?
+        - Security & Privacy: PII, 권한 제어, 암호화
+        - Observability: 로깅·메트릭·알람 계획
+    validations:
+      required: false
 
   - type: textarea
     id: reference

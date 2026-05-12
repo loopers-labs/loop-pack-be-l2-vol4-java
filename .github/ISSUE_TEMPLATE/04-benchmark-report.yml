@@ -71,9 +71,20 @@ body:
         - **선택**:
         - **선택 이유**: (성능 외 운영 복잡도·의존성·학습 곡선 등 종합)
         - **포기한 것**:
-        - **재평가 시점**:
     validations:
       required: true
+
+  - type: textarea
+    id: future-work
+    attributes:
+      label: "Future Work"
+      description: "운영 도입 시 고려사항, 추가 측정 계획, 재평가 시점 등. 비워둬도 OK."
+      placeholder: |
+        - 운영 도입 시: 모니터링/롤백 전략은 어떻게 설계할 것인가
+        - 추가 측정: 부하 패턴이 X로 바뀌면 재측정 필요
+        - 재평가 시점: RPS가 10배 증가하면 다시 비교
+    validations:
+      required: false
 
   - type: textarea
     id: reference
