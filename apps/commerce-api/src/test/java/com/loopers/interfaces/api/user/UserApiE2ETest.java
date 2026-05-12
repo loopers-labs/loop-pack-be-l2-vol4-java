@@ -2,6 +2,9 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.user.dto.ChangePasswordV1Request;
+import com.loopers.interfaces.api.user.dto.MyInfoV1Response;
+import com.loopers.interfaces.api.user.dto.SignUpV1Request;
 import com.loopers.support.E2ETest;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -64,7 +67,7 @@ class UserApiE2ETest {
         @Test
         void returns200_whenInputIsValid() {
             // given
-            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
+            SignUpV1Request request = new SignUpV1Request(
                 VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
             );
 
@@ -85,7 +88,7 @@ class UserApiE2ETest {
         void returns409_whenLoginIdAlreadyExists() {
             // given
             userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
-            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
+            SignUpV1Request request = new SignUpV1Request(
                 VALID_LOGIN_ID, "Other9876@", "김철수", LocalDate.of(2000, 3, 3), "other@loopers.com"
             );
 
@@ -105,7 +108,7 @@ class UserApiE2ETest {
         @Test
         void returns400_whenPasswordViolatesRule() {
             // given - 7자(8자 미만)
-            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
+            SignUpV1Request request = new SignUpV1Request(
                 VALID_LOGIN_ID, "Short1!", VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
             );
 
@@ -133,7 +136,7 @@ class UserApiE2ETest {
             userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL);
 
             // when
-            ResponseEntity<ApiResponse<UserDto.MeResponse>> response = restTemplate.exchange(
+            ResponseEntity<ApiResponse<MyInfoV1Response>> response = restTemplate.exchange(
                 ENDPOINT_ME,
                 HttpMethod.GET,
                 new HttpEntity<>(authHeaders(VALID_LOGIN_ID, VALID_PASSWORD)),
@@ -156,7 +159,7 @@ class UserApiE2ETest {
             // given - 헤더 없음
 
             // when
-            ResponseEntity<ApiResponse<UserDto.MeResponse>> response = restTemplate.exchange(
+            ResponseEntity<ApiResponse<MyInfoV1Response>> response = restTemplate.exchange(
                 ENDPOINT_ME,
                 HttpMethod.GET,
                 new HttpEntity<>(new HttpHeaders()),
@@ -174,7 +177,7 @@ class UserApiE2ETest {
             userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
 
             // when
-            ResponseEntity<ApiResponse<UserDto.MeResponse>> response = restTemplate.exchange(
+            ResponseEntity<ApiResponse<MyInfoV1Response>> response = restTemplate.exchange(
                 ENDPOINT_ME,
                 HttpMethod.GET,
                 new HttpEntity<>(authHeaders(VALID_LOGIN_ID, "Wrong9999@")),
@@ -197,7 +200,7 @@ class UserApiE2ETest {
             String newPassword = "NewPw9876@";
             userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             HttpHeaders headers = authHeaders(VALID_LOGIN_ID, VALID_PASSWORD);
-            UserDto.ChangePasswordRequest request = new UserDto.ChangePasswordRequest(VALID_PASSWORD, newPassword);
+            ChangePasswordV1Request request = new ChangePasswordV1Request(VALID_PASSWORD, newPassword);
 
             // when
             ResponseEntity<ApiResponse<Void>> changeResponse = restTemplate.exchange(
@@ -206,13 +209,13 @@ class UserApiE2ETest {
                 new HttpEntity<>(request, headers),
                 new ParameterizedTypeReference<>() {}
             );
-            ResponseEntity<ApiResponse<UserDto.MeResponse>> newAuthResponse = restTemplate.exchange(
+            ResponseEntity<ApiResponse<MyInfoV1Response>> newAuthResponse = restTemplate.exchange(
                 ENDPOINT_ME,
                 HttpMethod.GET,
                 new HttpEntity<>(authHeaders(VALID_LOGIN_ID, newPassword)),
                 new ParameterizedTypeReference<>() {}
             );
-            ResponseEntity<ApiResponse<UserDto.MeResponse>> oldAuthResponse = restTemplate.exchange(
+            ResponseEntity<ApiResponse<MyInfoV1Response>> oldAuthResponse = restTemplate.exchange(
                 ENDPOINT_ME,
                 HttpMethod.GET,
                 new HttpEntity<>(authHeaders(VALID_LOGIN_ID, VALID_PASSWORD)),
@@ -233,7 +236,7 @@ class UserApiE2ETest {
             // given
             userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             HttpHeaders headers = authHeaders(VALID_LOGIN_ID, VALID_PASSWORD);
-            UserDto.ChangePasswordRequest request = new UserDto.ChangePasswordRequest("Wrong9999@", "NewPw9876@");
+            ChangePasswordV1Request request = new ChangePasswordV1Request("Wrong9999@", "NewPw9876@");
 
             // when
             ResponseEntity<ApiResponse<Void>> response = restTemplate.exchange(
