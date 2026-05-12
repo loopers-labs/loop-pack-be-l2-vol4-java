@@ -31,7 +31,6 @@ body:
 
         **작성 팁**
         - 기술을 나열하지 말고, *도전 과제와 묶어* 서술하라.
-        - 다른 길도 봤음을 한 줄이라도 보여주라.
         - 결과는 숫자로. "잘 됐다"가 아니라 "p99 200ms → 25ms".
       value: |
         ## Context (배경 및 목표)
@@ -41,15 +40,7 @@ body:
 
         ## Design & Implementation (설계 및 구현)
 
-        - **핵심 기술 선택**: 도전 과제와 묶어 서술한다.
-          - *Bad*: "Kafka와 Redis를 사용했다."
-          - *Good*: "이벤트 유실 방지를 위해 Kafka, 응답 속도를 위해 Redis 캐싱을 도입했다."
-        - **Alternatives**: 다른 길도 봤음을 한 줄이라도. (예: "RabbitMQ도 후보였으나 처리량 측면에서 Kafka 우위")
-        - **Logic Flow**: 시퀀스/mermaid/**텍스트 순서도** 모두 OK.
-
         ### 핵심 기술 선택
-
-        ### Alternatives
 
         ### Logic Flow
 
@@ -59,10 +50,9 @@ body:
         - **추론 및 검증**:
         - **최종 해결**:
 
-        ## Verification (검증)
+        ## Verification & Insight (검증)
 
-        ### 결과 지표
-        - 예) p99 200ms → 25ms, 에러율 3% → 0.01%
+        - 결과 지표 (예: p99 200ms → 25ms, 에러율 3% → 0.01%):
     validations:
       required: true
 
