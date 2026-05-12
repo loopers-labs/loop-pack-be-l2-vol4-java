@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +22,9 @@ class UserServiceIntegrationTest {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @SpyBean
     private UserRepository userRepository;
@@ -48,6 +52,20 @@ class UserServiceIntegrationTest {
 
             // assert
             verify(userRepository).save(any(UserModel.class));
+        }
+
+        @DisplayName("회원 가입 시, 비밀번호가 암호화되어 저장된다.")
+        @Test
+        void savesEncryptedPassword_whenSignUpIsRequested() {
+            // arrange
+            String rawPassword = "Pass123!";
+            UserModel user = new UserModel("user1", rawPassword, "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+
+            // act
+            UserModel saved = userService.signUp(user);
+
+            // assert
+            assertThat(passwordEncoder.matches(rawPassword, saved.getPassword())).isTrue();
         }
 
         @DisplayName("이미 가입된 ID로 회원가입 시도 시, 실패한다.")
