@@ -12,6 +12,7 @@ import java.time.LocalDate;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final PasswordEncryptor passwordEncryptor;
 
     public Member join(String loginId, String loginPassword, String name, LocalDate birthday, String email){
 
@@ -21,7 +22,7 @@ public class MemberService {
 
         PasswordValidator.validate(loginPassword, birthday);
 
-        Member member = new Member(loginId, loginPassword, name, birthday, email);
+        Member member = new Member(loginId, passwordEncryptor.encrypt(loginPassword), name, birthday, email);
         return memberRepository.save(member);
     }
 

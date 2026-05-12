@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-public class MemberServiceTest {
+public class MemberServiceIntegrationTest {
     @Autowired
     private MemberService memberService;
 
@@ -26,6 +26,9 @@ public class MemberServiceTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private PasswordEncryptor passwordEncryptor;
 
     public String loginId;
     public String loginPassword;
@@ -62,10 +65,24 @@ public class MemberServiceTest {
             // assert
             assertAll(
                     () -> assertThat(member.getLoginId()).isEqualTo(loginId),
-                    () -> assertThat(member.getLoginPassword()).isEqualTo(loginPassword),
                     () -> assertThat(member.getName()).isEqualTo(name),
                     () -> assertThat(member.getBirthday()).isEqualTo(birthday),
                     () -> assertThat(member.getEmail()).isEqualTo(email)
+            );
+        }
+
+        @DisplayName("회원가입 성공 시, 비밀번호는 암호화되어 저장된다.")
+        @Test
+        void saveEncryptedPassword_whenJoinSucceeds() {
+            // arrange
+
+            // act
+            Member member = memberService.join(loginId, loginPassword, name, birthday, email);
+
+            // assert
+            assertAll(
+                    () -> assertThat(member.getLoginPassword()).isNotEqualTo(loginPassword),
+                    () -> assertThat(passwordEncryptor.matches(loginPassword, member.getLoginPassword())).isTrue()
             );
         }
 
