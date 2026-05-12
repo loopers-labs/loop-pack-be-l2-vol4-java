@@ -12,6 +12,10 @@ public record LoginId(String value) {
     private static final int MAX_LENGTH = 20;
 
     public LoginId {
+        validate(value);
+    }
+
+    private static void validate(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
         }

@@ -12,6 +12,10 @@ public record Name(String value) {
     private static final char MASK = '*';
 
     public Name {
+        validate(value);
+    }
+
+    private static void validate(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }

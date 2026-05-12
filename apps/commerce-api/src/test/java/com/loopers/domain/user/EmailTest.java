@@ -79,5 +79,18 @@ class EmailTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("대문자가 포함된 이메일은 lowercase 로 정규화되어 저장된다.")
+        @Test
+        void normalizesToLowercase_whenContainsUppercase() {
+            // arrange
+            String input = "Foo@BAR.com";
+
+            // act
+            Email email = new Email(input);
+
+            // assert
+            assertThat(email.value()).isEqualTo("foo@bar.com");
+        }
     }
 }

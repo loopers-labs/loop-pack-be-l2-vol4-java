@@ -12,6 +12,15 @@ public record Email(String value) {
     private static final int MAX_LENGTH = 254;
 
     public Email {
+        value = normalize(value);
+        validate(value);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.toLowerCase();
+    }
+
+    private static void validate(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.");
         }

@@ -12,6 +12,18 @@ public record Password(String value) {
     private static final int MAX_LENGTH = 16;
 
     public Password {
+        validate(value);
+    }
+
+    public static Password of(String raw, Birth birth) {
+        Password password = new Password(raw);
+        if (birth != null && raw.contains(birth.asCompact())) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
+        return password;
+    }
+
+    private static void validate(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
         }
@@ -22,13 +34,5 @@ public record Password(String value) {
         if (!ALLOWED.matcher(value).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문/숫자/특수문자만 허용됩니다.");
         }
-    }
-
-    public static Password of(String raw, Birth birth) {
-        Password password = new Password(raw);
-        if (birth != null && raw.contains(birth.asCompact())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
-        }
-        return password;
     }
 }

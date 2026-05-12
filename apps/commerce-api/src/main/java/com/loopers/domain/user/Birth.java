@@ -11,6 +11,10 @@ public record Birth(LocalDate value) {
     private static final DateTimeFormatter COMPACT_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public Birth {
+        validate(value);
+    }
+
+    private static void validate(LocalDate value) {
         if (value == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비어있을 수 없습니다.");
         }
