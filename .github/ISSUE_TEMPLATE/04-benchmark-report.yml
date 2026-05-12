@@ -1,0 +1,120 @@
+name: "📊 Tech Note — Benchmark Report 스타일"
+description: "두 구현/기술의 직접 측정 비교. 수치 기반으로 선택 근거를 증명하고 싶을 때."
+title: "[Benchmark] 키워드 (N주차 · K팀 · 이름)"
+labels: ["tech-note", "format:benchmark"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **언제 고르나** — 후보 기술 A vs B(vs C)를 본인이 직접 측정해 선택한 경우. 가장 강력한 자기 증명 자료가 된다.
+        > **AI 채점 PR과 별개** — 본 이슈는 피드백용입니다.
+        >
+        > 제목의 `키워드`, `N`, `K`, `이름` 부분을 본인 내용으로 바꿔주세요.
+
+  - type: input
+    id: tldr
+    attributes:
+      label: "TL;DR"
+      description: "1~2줄로 핵심을 전한다."
+      placeholder: "예) Redisson과 Lettuce 분산 락을 직접 측정한 결과 Redisson이 p99 3배 빠름. 운영 복잡도까지 고려해 Redisson 채택."
+    validations:
+      required: true
+
+  - type: input
+    id: audience
+    attributes:
+      label: "대상 독자"
+      description: "누구를 떠올리며 쓰는가?"
+      placeholder: "면접관 / 시니어 리뷰어 / 동료"
+    validations:
+      required: true
+
+  - type: input
+    id: related-pr
+    attributes:
+      label: "관련 PR / 벤치마크 코드"
+      description: "본 과제 PR 번호와 벤치마크 코드 링크."
+      placeholder: "#123, https://github.com/.../benchmark"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: "Reference"
+      description: "참고한 공식 문서, 인용한 글, 영상 등."
+      placeholder: |
+        - Redisson vs Lettuce 비교 글: ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "Question (무엇을 비교하는가)"
+      description: |
+        - **결정해야 했던 것**: (예: 분산 락 라이브러리 선택)
+        - **후보**: A vs B (vs C)
+        - **선정 기준**: (예: p99 레이턴시, 운영 복잡도, 의존성 크기, 학습 곡선)
+      value: |
+        - **결정해야 했던 것**:
+        - **후보**:
+        - **선정 기준**:
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: "Setup (측정 환경)"
+      description: |
+        재현 가능하게 적는다. **이 섹션이 약하면 결과의 신뢰도가 떨어진다.**
+      value: |
+        - **하드웨어/환경**: (CPU, 메모리, 컨테이너 구성)
+        - **부하 도구**: (k6 / JMeter / Locust / 자체 스크립트)
+        - **시나리오**: RPS, 동시 사용자 수, 데이터 규모, 워밍업 시간
+        - **측정 항목**: Latency (p50/p95/p99), Throughput, 에러율, CPU·메모리
+    validations:
+      required: true
+
+  - type: textarea
+    id: results
+    attributes:
+      label: "Results (측정 결과)"
+      description: |
+        표로 정리. 가능하면 그래프 이미지나 raw 데이터 링크도 첨부.
+      value: |
+        | 항목 | A | B |
+        |------|---|---|
+        | p50 레이턴시 |  |  |
+        | p99 레이턴시 |  |  |
+        | Throughput (RPS) |  |  |
+        | 에러율 |  |  |
+        | CPU 사용률 |  |  |
+    validations:
+      required: true
+
+  - type: textarea
+    id: analysis
+    attributes:
+      label: "Analysis (해석)"
+      description: |
+        숫자만으로는 부족하다. **왜 이런 결과가 나왔는가** 를 설명한다.
+      placeholder: |
+        예) A가 빠른 이유는 Pub/Sub 기반으로 락 해제 시 폴링 오버헤드가 없기 때문.
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: "Decision & Trade-offs"
+      description: |
+        성능 외에 운영 복잡도·의존성·학습 곡선까지 종합 고려.
+      value: |
+        - **선택**:
+        - **선택 이유**:
+        - **포기한 것**:
+        - **재평가 시점**:
+    validations:
+      required: true
