@@ -59,6 +59,11 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
         }
 
+        // [fix] gender null 검증 누락으로 성별 없는 요청이 200을 반환하던 버그 수정
+        if (gender == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "성별은 비어있을 수 없습니다.");
+        }
+
         this.loginId = loginId;
         this.password = password;
         this.name = name;
