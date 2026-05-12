@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class MemberModelTest {
+class MemberTest {
 
     @DisplayName("회원을 생성할 때, ")
     @Nested
@@ -26,7 +26,7 @@ class MemberModelTest {
             String email = "test@example.com";
 
             // Act
-            MemberModel member = new MemberModel(loginId, password, name, birthDate, email);
+            Member member = new Member(loginId, password, name, birthDate, email);
 
             // Assert
             assertThat(member.getLoginId()).isEqualTo(loginId);
@@ -40,7 +40,7 @@ class MemberModelTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                    new MemberModel("testUser1", shortPassword, "홍길동", "19900101", "test@example.com")
+                    new Member("testUser1", shortPassword, "홍길동", "19900101", "test@example.com")
             );
 
             // Assert
@@ -56,7 +56,7 @@ class MemberModelTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                    new MemberModel("testUser1", passwordWithBirth, "홍길동", birthDate, "test@example.com")
+                    new Member("testUser1", passwordWithBirth, "홍길동", birthDate, "test@example.com")
             );
 
             // Assert
@@ -72,7 +72,7 @@ class MemberModelTest {
         @Test
         void masksLastCharacter() {
             // Arrange
-            MemberModel member = new MemberModel("testUser1", "Password1!", "홍길동", "19900101", "test@example.com");
+            Member member = new Member("testUser1", "Password1!", "홍길동", "19900101", "test@example.com");
 
             // Act
             String masked = member.getMaskedName();
