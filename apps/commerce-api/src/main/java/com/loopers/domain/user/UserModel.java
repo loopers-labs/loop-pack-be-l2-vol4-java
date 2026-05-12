@@ -66,6 +66,10 @@ public class UserModel extends BaseEntity {
         this.gender = gender;
     }
 
+    public void encodePassword(PasswordEncryptor encryptor) {
+        this.password = encryptor.encrypt(this.password);
+    }
+
     public String getLoginId() { return loginId; }
     public String getPassword() { return password; }
     public String getName() { return name; }
