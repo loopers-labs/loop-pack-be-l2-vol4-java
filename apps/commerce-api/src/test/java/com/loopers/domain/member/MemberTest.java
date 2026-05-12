@@ -22,7 +22,7 @@ class MemberTest {
             String loginId = "testUser1";
             String password = "Password1!";
             String name = "홍길동";
-            String birthDate = "19900101";
+            String birthDate = "1990-01-01";
             String email = "test@example.com";
 
             // Act
@@ -40,7 +40,7 @@ class MemberTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                    new Member("testUser1", shortPassword, "홍길동", "19900101", "test@example.com")
+                    new Member("testUser1", shortPassword, "홍길동", "1990-01-01", "test@example.com")
             );
 
             // Assert
@@ -51,13 +51,41 @@ class MemberTest {
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDate() {
             // Arrange
-            String birthDate = "19900101";
+            String birthDate = "1990-01-01";
             String passwordWithBirth = "19900101Ab!";
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
                     new Member("testUser1", passwordWithBirth, "홍길동", birthDate, "test@example.com")
             );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일 형식이 맞지 않는다면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEmaillFormFailed(){
+            // Arrays
+            String email = "test.com";
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    new Member("testUser1", "Password1", "홍길동", "1990-01-01", email));
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("생년월일 형식이 맞지 않는다면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadReqeuest_whenBirthdayFormFailed(){
+            // Arrays
+            String birth = "19990101";
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    new Member("testUser1", "Password1", "홍길동", birth, "test@example.com"));
 
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -72,7 +100,7 @@ class MemberTest {
         @Test
         void masksLastCharacter() {
             // Arrange
-            Member member = new Member("testUser1", "Password1!", "홍길동", "19900101", "test@example.com");
+            Member member = new Member("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com");
 
             // Act
             String masked = member.getMaskedName();
