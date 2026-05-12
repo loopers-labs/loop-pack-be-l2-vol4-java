@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,6 +32,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private PasswordPolicy passwordPolicy;
 
     @InjectMocks
     private UserService userService;
@@ -79,12 +83,14 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(UserModel.class));
         }
 
-        @DisplayName("비밀번호에 생년월일이 포함되면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("비밀번호 정책 검증에 실패하면 BAD_REQUEST 예외가 발생하고 저장되지 않는다")
         @Test
-        void throwsBadRequest_whenPasswordContainsBirthDate() {
+        void throwsBadRequest_whenPasswordPolicyRejects() {
             // given
             when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(false);
             String passwordWithBirthYear = "Aa!2002xy";
+            doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
+                .when(passwordPolicy).validate(passwordWithBirthYear, VALID_BIRTH_DATE);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
@@ -261,9 +267,9 @@ class UserServiceTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("새 비밀번호에 생년월일이 포함되면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("새 비밀번호가 정책 검증에 실패하면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
+        void throwsBadRequest_whenNewPasswordRejectedByPolicy() {
             // given
             Long userId = 1L;
             UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
@@ -271,6 +277,8 @@ class UserServiceTest {
             String newPasswordWithBirthYear = "Aa!2002xy";
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
+            doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
+                .when(passwordPolicy).validate(newPasswordWithBirthYear, VALID_BIRTH_DATE);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
