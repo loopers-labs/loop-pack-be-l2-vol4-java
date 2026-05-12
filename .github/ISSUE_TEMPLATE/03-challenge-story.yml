@@ -10,6 +10,7 @@ body:
         > **AI 채점 PR과 별개** — 본 이슈는 피드백용입니다.
         >
         > 제목의 `키워드`, `N`, `K`, `이름` 부분을 본인 내용으로 바꿔주세요.
+        > 본문 골격은 가이드입니다. **안 쓰는 섹션은 통째로 지워도 됩니다.**
 
   - type: input
     id: tldr
@@ -20,21 +21,51 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: audience
+  - type: textarea
+    id: body
     attributes:
-      label: "대상 독자"
-      description: "누구를 떠올리며 쓰는가?"
-      placeholder: "면접관 / 시니어 리뷰어 / 동료"
-    validations:
-      required: true
+      label: "본문"
+      description: |
+        아래 골격은 가이드입니다. 본인의 강조점에 맞춰 자유롭게 변형하세요.
 
-  - type: input
-    id: related-pr
-    attributes:
-      label: "관련 PR"
-      description: "본 과제 PR 번호 또는 링크."
-      placeholder: "#123"
+        **작성 팁**
+        - 기술을 나열하지 말고, *도전 과제와 묶어* 서술하라.
+        - 다른 길도 봤음을 한 줄이라도 보여주라.
+        - 결과는 숫자로. "잘 됐다"가 아니라 "p99 200ms → 25ms".
+      value: |
+        ## Context (배경 및 목표)
+
+        - **어떤 시스템을 만드는가?**:
+        - **가장 큰 기술적 도전 과제는?**:
+
+        ## Design & Implementation (설계 및 구현)
+
+        - **핵심 기술 선택**: 도전 과제와 묶어 서술한다.
+          - *Bad*: "Kafka와 Redis를 사용했다."
+          - *Good*: "이벤트 유실 방지를 위해 Kafka, 응답 속도를 위해 Redis 캐싱을 도입했다."
+        - **Alternatives**: 다른 길도 봤음을 한 줄이라도. (예: "RabbitMQ도 후보였으나 처리량 측면에서 Kafka 우위")
+        - **Logic Flow**: 시퀀스/mermaid/**텍스트 순서도** 모두 OK.
+
+        ### 핵심 기술 선택
+
+        ### Alternatives
+
+        ### Logic Flow
+
+        ## Engineering Challenges (트러블슈팅 및 최적화)
+
+        - **예상치 못한 현상**:
+        - **추론 및 검증**:
+        - **최종 해결**:
+
+        ## Verification & Insight (검증 및 통찰)
+
+        ### 결과 지표
+        - 예) p99 200ms → 25ms, 에러율 3% → 0.01%
+
+        ### Lessons Learned
+        1.
+        2.
     validations:
       required: true
 
@@ -42,73 +73,9 @@ body:
     id: reference
     attributes:
       label: "Reference"
-      description: "참고한 공식 문서, 인용한 글, 영상 등."
+      description: "참고한 공식 문서, 인용한 글, 영상, 본인 코드 블록 링크 등을 자유롭게 정리하세요."
       placeholder: |
         - Kafka 공식 문서: ...
+        - 본인 코드: https://github.com/.../blob/...
     validations:
       required: false
-
-  - type: textarea
-    id: context
-    attributes:
-      label: "Context (배경 및 목표)"
-      description: |
-        - **어떤 시스템을 만드는가?** (예: 초당 1,000건의 주문을 처리하는 결제 시스템)
-        - **가장 큰 기술적 도전 과제는?** (예: 분산 환경에서의 데이터 일관성)
-      value: |
-        - **어떤 시스템을 만드는가?**:
-        - **가장 큰 기술적 도전 과제는?**:
-    validations:
-      required: true
-
-  - type: textarea
-    id: design-implementation
-    attributes:
-      label: "Design & Implementation (설계 및 구현)"
-      description: |
-        - **핵심 기술 선택**: 기술 나열이 아니라 **도전 과제와 묶어** 서술한다.
-          - *Bad*: "Kafka와 Redis를 사용했다."
-          - *Good*: "이벤트 유실 방지를 위해 Kafka, 응답 속도를 위해 Redis 캐싱을 도입했다."
-        - **간단한 대안 비교**: 다른 길도 봤음을 보여준다. 한 줄이라도 OK.
-        - **Logic Flow**: 핵심 흐름 시각화. 시퀀스/mermaid/**텍스트 순서도** 모두 OK.
-      value: |
-        ### 핵심 기술 선택
-
-
-        ### Alternatives
-
-
-        ### Logic Flow
-    validations:
-      required: true
-
-  - type: textarea
-    id: challenges
-    attributes:
-      label: "Engineering Challenges (트러블슈팅 및 최적화)"
-      description: |
-        앞선 '설계'가 실제 '구현' 단계에서 마주친 변수. **구현한 기능과 직접 연관된 문제** 에 집중한다.
-      value: |
-        - **예상치 못한 현상**:
-        - **추론 및 검증**:
-        - **최종 해결**:
-    validations:
-      required: true
-
-  - type: textarea
-    id: verification
-    attributes:
-      label: "Verification & Insight (검증 및 통찰)"
-      description: |
-        - **결과 지표**: Latency / Throughput / 정합성 등을 **숫자로** 증명한다.
-        - **Lessons Learned**: 이 과정에서 얻은 아키텍처적 교훈 1~3가지.
-      value: |
-        ### 결과 지표
-        - 예) p99 200ms → 25ms, 에러율 3% → 0.01%
-
-        ### Lessons Learned
-        1.
-        2.
-        3.
-    validations:
-      required: true
