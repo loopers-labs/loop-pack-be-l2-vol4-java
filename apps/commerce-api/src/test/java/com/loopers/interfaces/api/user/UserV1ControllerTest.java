@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,6 +51,8 @@ class UserV1ControllerTest {
             UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
                 VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
             );
+            given(userFacade.signUp(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
 
             // act & assert
             mockMvc.perform(post(SIGN_UP_ENDPOINT)
