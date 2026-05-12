@@ -36,14 +36,10 @@ body:
       value: |
         ## Introduction & Goals
 
-        - **Context / Background**: 이 시스템이 왜 필요한가? 비즈니스 요구사항이나 기존 시스템의 한계.
-        - **Goals**: 달성하고자 하는 구체적 목표를 *측정 가능하게* 적는다. (예: 읽기 레이턴시 p99 50ms 이하)
-        - **Non-goals**: 이번 설계에서 다루지 *않는* 것. 범위를 명확히 하는 것도 시니어 시그널.
+        - **Context / Background**:
+        - **Goals**:
 
         ## Detailed Design
-
-        면접관이 "이 사람 어떻게 설계했지?"를 빠르게 파악할 수 있게 핵심 컴포넌트와 데이터 흐름을 설명한다.
-        구조도는 텍스트 트리, mermaid, 표 모두 OK.
 
         ### System Architecture
 
@@ -55,8 +51,6 @@ body:
 
         ## Alternatives Considered
 
-        "왜 이 방법인가"에 답하는 섹션. 시니어 리뷰는 여기서 갈린다.
-
         | 옵션 | Pros | Cons |
         |------|------|------|
         | A    |      |      |
@@ -64,22 +58,6 @@ body:
         | **선택: C** |      |      |
 
         **선택 근거:**
-
-        ## Verification
-
-        설계가 의도대로 동작하는지 어떻게 확인했나? **수치로 증명한다.** Before → After 비교를 권장.
-
-        - 측정:
-        - 결과:
-        - Goals 충족 여부:
-
-        ## Risks & Open Questions
-
-        설계의 약점과 미해결 과제. **솔직히 적는 게 시니어 시그널이다.**
-
-        - **남은 리스크:**
-        - **트레이드오프로 받아들인 것:**
-        - **다음에 풀고 싶은 것:**
     validations:
       required: true
 
