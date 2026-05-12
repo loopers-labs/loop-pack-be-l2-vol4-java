@@ -90,6 +90,14 @@ com.loopers
 - E2E는 `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate` + `ParameterizedTypeReference<ApiResponse<...>>` 패턴 (`ExampleV1ApiE2ETest` 참조).
 - 테스트 클래스명 컨벤션: 단위 `*ModelTest` / `*ServiceTest`, 통합 `*IntegrationTest`, E2E `*ApiE2ETest`.
 
+**테스트 스타일 — JUnit5 + AssertJ.**
+
+- 단언은 AssertJ `assertThat(...)`을 기본으로 쓴다.
+- 예외 단언은 AssertJ `assertThatThrownBy(...).isInstanceOf(...).extracting("...").isEqualTo(...)` 체인을 쓴다. JUnit의 `assertThrows`는 기본적으로 쓰지 않는다.
+- 한 테스트에 단언이 여러 개면 JUnit `assertAll(() -> ..., () -> ...)`로 묶어 첫 실패에서 멈추지 않게 한다.
+- `@DisplayName`은 행동을 한국어 평서문으로 적어 케이스 의도를 명세에 묶는다. 데이터 옆 인라인 주석으로 의도를 반복 설명하지 않는다.
+- 기존 `ExampleModelTest`처럼 `assertThrows + assertThat`이 혼재된 코드는 본보기로 삼지 않는다.
+
 ---
 
 ## 자주 쓰는 명령어
@@ -189,6 +197,15 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Grafana(3000, admin/adm
 강한 성공 기준은 독립적인 루프를 가능하게 한다. 약한 기준("작동하게 만들어")은 끊임없는 질의응답을 부른다.
 
 **이 원칙들이 작동하고 있다는 신호:** diff에 불필요한 변경이 줄어든다 / 과설계로 인한 재작성이 줄어든다 / 실수 후가 아니라 구현 전에 명확화 질문이 나온다.
+
+### 5. 표현 스타일
+
+코드의 행위와 별개로, 다음 표현 규칙은 본 프로젝트에서 일관되게 따른다.
+
+- **매직넘버 상수화**: 도메인 규칙의 임계값(길이 상·하한, 카테고리 개수 등)은 `private static final` 상수로 추출한다. 사용자 노출 메시지 안의 숫자도 가능한 한 같은 상수를 결합해 표현한다. `0`, `1` 같은 트리비얼 케이스와 테스트 데이터는 강제하지 않는다.
+- **문자열 포매팅**: 변수가 들어가는 문자열은 `+` 결합 대신 `String.format("...%d~%d...", a, b)`로 작성한다. 예외 메시지·사용자 노출 텍스트가 대상. 로그 메시지의 SLF4J `{}` 플레이스홀더는 별개.
+- **에러 메시지는 사유별로 분리**: 한 검증에 사유가 둘 이상이면 통합 메시지보다 사유별 메시지가 사용자 친화적이다. 예: "로그인 ID는 4~20자만 허용됩니다." 와 "로그인 ID는 영문 및 숫자만 허용됩니다." 처럼 분리한다.
+- **장식적 주석 금지**: 데이터 옆 인라인 주석(`"abcd", // 4자 최소`), 표시용 어노테이션 옵션(`@ParameterizedTest(name = "...")`), 가독성 위한 잉여 빈 줄은 넣지 않는다. 의도는 `@DisplayName`·plan.md·채팅에 담는다.
 
 ---
 
