@@ -18,6 +18,9 @@ public class UserService {
         if (userRepository.existsByLoginId(loginId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }
+        if (userRepository.existsByEmail(email)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 등록된 이메일입니다.");
+        }
 
         Password password = Password.of(rawPassword, birth);
         String encodedPassword = passwordEncoder.encode(password.value());

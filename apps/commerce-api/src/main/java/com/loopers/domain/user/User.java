@@ -27,7 +27,7 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private LocalDate birth;
 
-    @Column(nullable = false, length = 254)
+    @Column(nullable = false, unique = true, length = 254)
     private String email;
 
     @Column(name = "encoded_password", nullable = false)

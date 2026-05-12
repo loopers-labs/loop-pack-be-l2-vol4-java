@@ -9,4 +9,6 @@ public interface UserRepository {
     Optional<User> findByLoginId(LoginId loginId);
 
     boolean existsByLoginId(LoginId loginId);
+
+    boolean existsByEmail(Email email);
 }

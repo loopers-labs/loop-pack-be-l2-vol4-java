@@ -138,5 +138,71 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(userJpaRepository.findByLoginId("loopers123")).isEmpty();
         }
+
+        @DisplayName("이미 등록된 email 로 회원가입 시, 409 CONFLICT 응답을 받는다.")
+        @Test
+        void throwsConflict_whenEmailAlreadyExists() {
+            // arrange
+            UserV1Dto.SignupRequest first = new UserV1Dto.SignupRequest(
+                "loopers123",
+                "Pass1234!",
+                "김민우",
+                LocalDate.of(1990, 1, 1),
+                "user@example.com"
+            );
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                new HttpEntity<>(first), responseType);
+
+            UserV1Dto.SignupRequest duplicated = new UserV1Dto.SignupRequest(
+                "loopers456",
+                "Pass5678!",
+                "이지은",
+                LocalDate.of(1995, 5, 5),
+                "user@example.com"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                    new HttpEntity<>(duplicated), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+
+        @DisplayName("대소문자만 다른 email 로 회원가입 시, 409 CONFLICT 응답을 받는다.")
+        @Test
+        void throwsConflict_whenEmailDiffersOnlyInCase() {
+            // arrange
+            UserV1Dto.SignupRequest first = new UserV1Dto.SignupRequest(
+                "loopers123",
+                "Pass1234!",
+                "김민우",
+                LocalDate.of(1990, 1, 1),
+                "user@example.com"
+            );
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                new HttpEntity<>(first), responseType);
+
+            UserV1Dto.SignupRequest duplicated = new UserV1Dto.SignupRequest(
+                "loopers456",
+                "Pass5678!",
+                "이지은",
+                LocalDate.of(1995, 5, 5),
+                "User@Example.COM"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                    new HttpEntity<>(duplicated), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
     }
 }
