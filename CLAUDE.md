@@ -206,6 +206,9 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Grafana(3000, admin/adm
 - **문자열 포매팅**: 변수가 들어가는 문자열은 `+` 결합 대신 `String.format("...%d~%d...", a, b)`로 작성한다. 예외 메시지·사용자 노출 텍스트가 대상. 로그 메시지의 SLF4J `{}` 플레이스홀더는 별개.
 - **에러 메시지는 사유별로 분리**: 한 검증에 사유가 둘 이상이면 통합 메시지보다 사유별 메시지가 사용자 친화적이다. 예: "로그인 ID는 4~20자만 허용됩니다." 와 "로그인 ID는 영문 및 숫자만 허용됩니다." 처럼 분리한다.
 - **장식적 주석 금지**: 데이터 옆 인라인 주석(`"abcd", // 4자 최소`), 표시용 어노테이션 옵션(`@ParameterizedTest(name = "...")`), 가독성 위한 잉여 빈 줄은 넣지 않는다. 의도는 `@DisplayName`·plan.md·채팅에 담는다.
+- **정적 팩토리 메서드 네이밍** (Effective Java 권고):
+  - 매개변수 **하나** → `from(X)`. 예: `LoginId.from("kyle123")`, `Email.from("kyle@example.com")`.
+  - 매개변수 **여러 개** → `of(X, Y, ...)`. 예: `UserModel.of(loginId, name, email, ...)`.
 
 ---
 

@@ -11,7 +11,7 @@ public record LoginId(String value) {
     private static final int MAX_LENGTH = 20;
     private static final Pattern ALLOWED_PATTERN = Pattern.compile("[A-Za-z0-9]+");
 
-    public static LoginId of(String value) {
+    public static LoginId from(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 필수입니다.");
         }

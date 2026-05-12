@@ -22,7 +22,7 @@ class LoginIdTest {
         @ValueSource(strings = {"abcd", "kyleKim123", "kyleKim2026Champion1"})
         void createsLoginId_whenValueIsAlphanumericWithinLengthBounds(String value) {
             // act
-            LoginId loginId = LoginId.of(value);
+            LoginId loginId = LoginId.from(value);
 
             // assert
             assertThat(loginId.value()).isEqualTo(value);
@@ -33,7 +33,7 @@ class LoginIdTest {
         @ValueSource(strings = {"a", "abc"})
         void throwsBadRequest_whenValueIsShorterThanMinLength(String value) {
             // act & assert
-            assertThatThrownBy(() -> LoginId.of(value))
+            assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -44,7 +44,7 @@ class LoginIdTest {
         @ValueSource(strings = {"abcdefghijklmnopqrstu", "abcdefghijklmnopqrstuvwxyz1234"})
         void throwsBadRequest_whenValueIsLongerThanMaxLength(String value) {
             // act & assert
-            assertThatThrownBy(() -> LoginId.of(value))
+            assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -55,7 +55,7 @@ class LoginIdTest {
         @ValueSource(strings = {"가나다라", "abc!def", "abc def"})
         void throwsBadRequest_whenValueContainsNonAlphanumericCharacters(String value) {
             // act & assert
-            assertThatThrownBy(() -> LoginId.of(value))
+            assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -67,7 +67,7 @@ class LoginIdTest {
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenValueIsNullOrBlank(String value) {
             // act & assert
-            assertThatThrownBy(() -> LoginId.of(value))
+            assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
