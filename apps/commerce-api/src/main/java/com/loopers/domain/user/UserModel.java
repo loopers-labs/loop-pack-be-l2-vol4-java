@@ -1,14 +1,21 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 
-public class UserModel {
+@Entity
+@Table(name = "users")
+public class UserModel extends BaseEntity {
 
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
 
@@ -17,7 +24,11 @@ public class UserModel {
     private String name;
     private String email;
     private LocalDate birthDate;
+
+    @Enumerated(EnumType.STRING)
     private Gender gender;
+
+    protected UserModel() {}
 
     public UserModel(String loginId, String password, String name, String email, String birthDate, Gender gender) {
         if (loginId == null || !loginId.matches("^[a-zA-Z0-9]{1,10}$")) {
