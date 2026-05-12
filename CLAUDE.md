@@ -54,7 +54,7 @@ supports/    ← 부가 기능 add-on
 
 ### 아키텍처 컨벤션 (`commerce-api`)
 
-패키지는 헥사고날 풍의 레이어로 나뉜다:
+패키지는 레이어로 나뉜다:
 
 ```
 com.loopers
@@ -94,7 +94,7 @@ com.loopers
 
 - 단언은 AssertJ `assertThat(...)`을 기본으로 쓴다.
 - 예외 단언은 AssertJ `assertThatThrownBy(...).isInstanceOf(...).extracting("...").isEqualTo(...)` 체인을 쓴다. JUnit의 `assertThrows`는 기본적으로 쓰지 않는다.
-- 한 테스트에 단언이 여러 개면 JUnit `assertAll(() -> ..., () -> ...)`로 묶어 첫 실패에서 멈추지 않게 한다.
+- 한 테스트에 단언이 여러 개면 JUnit `assertAll(() -> ..., () -> ...)`로 묶거나 AssertJ 체이닝(`assertThat(x).hasSize(60).startsWith("$2")`)으로 한 묶음으로 표현해 첫 실패에서 멈추지 않게 한다.
 - `@DisplayName`은 행동을 한국어 평서문으로 적어 케이스 의도를 명세에 묶는다. 데이터 옆 인라인 주석으로 의도를 반복 설명하지 않는다.
 - 기존 `ExampleModelTest`처럼 `assertThrows + assertThat`이 혼재된 코드는 본보기로 삼지 않는다.
 
@@ -209,6 +209,7 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Grafana(3000, admin/adm
 - **정적 팩토리 메서드 네이밍** (Effective Java 권고):
   - 매개변수 **하나** → `from(X)`. 예: `LoginId.from("kyle123")`, `Email.from("kyle@example.com")`.
   - 매개변수 **여러 개** → `of(X, Y, ...)`. 예: `UserModel.of(loginId, name, email, ...)`.
+- **변수명은 풀네임으로**: 축약형(`encoded`, `result`, `data`) 대신 의미를 담은 풀네임(`encryptedPassword`, `matchingResult`, `signUpRequest`)을 쓴다. 루프 변수 같은 짧은 스코프의 관행적 단일 문자(`i`, `e`)만 허용. `enc`, `pwd`, `usr` 같은 1~2글자 약어는 사용하지 않는다.
 
 ---
 
