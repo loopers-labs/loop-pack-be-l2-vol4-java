@@ -180,5 +180,134 @@ class UserModelTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("이름이 null이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsNull() {
+            // arrange
+            String name = null;
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsEmpty() {
+            // arrange
+            String name = "";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 공백만으로 이루어져 있으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsBlank() {
+            // arrange
+            String name = "   ";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "pass1234", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 8자 미만이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordIsTooShort() {
+            // arrange
+            String password = "Pass12!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 16자를 초과하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordIsTooLong() {
+            // arrange
+            String password = "Pass123!Pass12345";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호에 허용되지 않는 문자가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsInvalidCharacter() {
+            // arrange
+            String password = "pass한글12";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호에 생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsBirthDate() {
+            // arrange
+            String password = "pass20000101";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 정확히 8자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenPasswordIsExactlyEightCharacters() {
+            // arrange
+            String password = "Pass123!";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+        }
+
+        @DisplayName("비밀번호가 정확히 16자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenPasswordIsExactlySixteenCharacters() {
+            // arrange
+            String password = "Pass123!Pass123!";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+        }
     }
 }
