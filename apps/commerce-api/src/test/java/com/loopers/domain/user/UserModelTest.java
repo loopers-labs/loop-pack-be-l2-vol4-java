@@ -14,11 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
 
-    private static final String VALID_LOGIN_ID = "loopers01";
+    private static final LoginId VALID_LOGIN_ID = new LoginId("loopers01");
     private static final String VALID_ENCODED_PASSWORD = "$2a$10$encodedPasswordHash";
-    private static final String VALID_NAME = "홍길동";
+    private static final UserName VALID_NAME = new UserName("홍길동");
     private static final LocalDate VALID_BIRTH_DATE = LocalDate.of(2002, 5, 11);
-    private static final String VALID_EMAIL = "test@loopers.com";
+    private static final Email VALID_EMAIL = new Email("test@loopers.com");
 
     @DisplayName("유저 모델 생성 시")
     @Nested
@@ -41,105 +41,39 @@ class UserModelTest {
             );
         }
 
-        @DisplayName("로그인 ID가 8자 미만이면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("로그인 ID가 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenLoginIdIsShorterThanEightCharacters() {
+        void throwsBadRequest_whenLoginIdIsNull() {
             // given
-            String shortLoginId = "loop123";
-
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(shortLoginId, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
+                new UserModel(null, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
             );
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("로그인 ID가 16자를 초과하면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("이름이 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenLoginIdIsLongerThanSixteenCharacters() {
+        void throwsBadRequest_whenNameIsNull() {
             // given
-            String longLoginId = "abcdefghij1234567";
-
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(longLoginId, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
+                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, null, VALID_BIRTH_DATE, VALID_EMAIL)
             );
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("로그인 ID에 영문/숫자가 아닌 문자가 포함되면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("이메일이 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenLoginIdContainsNonAlphanumeric() {
+        void throwsBadRequest_whenEmailIsNull() {
             // given
-            String invalidLoginId = "loopers@01";
-
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(invalidLoginId, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이름에 숫자가 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenNameContainsDigit() {
-            // given
-            String invalidName = "홍길동1";
-
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, invalidName, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이름에 특수문자가 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenNameContainsSpecialCharacter() {
-            // given
-            String invalidName = "홍길동!";
-
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, invalidName, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이름이 21자를 초과하면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenNameIsLongerThanTwentyCharacters() {
-            // given
-            String longName = "가".repeat(21);
-
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, longName, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이메일 형식이 올바르지 않으면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenEmailFormatIsInvalid() {
-            // given
-            String invalidEmail = "loopers-without-at-sign";
-
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, invalidEmail)
+                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, null)
             );
 
             // then
@@ -179,30 +113,17 @@ class UserModelTest {
     @Nested
     class MaskName {
 
-        @DisplayName("이름이 두 글자 이상이면 마지막 글자가 *로 치환된다")
+        @DisplayName("이름 VO의 masked 결과를 반환한다")
         @Test
-        void masksLastCharacter_whenNameHasMultipleCharacters() {
+        void returnsMaskedNameFromValueObject() {
             // given
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, new UserName("홍길동"), VALID_BIRTH_DATE, VALID_EMAIL);
 
             // when
-            String masked = user.maskedName();
+            String masked = user.getMaskedName();
 
             // then
             assertThat(masked).isEqualTo("홍길*");
-        }
-
-        @DisplayName("이름이 한 글자면 *만 반환된다")
-        @Test
-        void returnsAsteriskOnly_whenNameIsSingleCharacter() {
-            // given
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, "김", VALID_BIRTH_DATE, VALID_EMAIL);
-
-            // when
-            String masked = user.maskedName();
-
-            // then
-            assertThat(masked).isEqualTo("*");
         }
     }
 

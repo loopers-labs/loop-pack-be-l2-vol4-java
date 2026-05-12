@@ -56,7 +56,7 @@ class UserServiceIntegrationTest {
             // then
             UserModel saved = userJpaRepository.findByLoginId(loginId).orElseThrow();
             assertAll(
-                () -> assertThat(saved.getLoginId()).isEqualTo(loginId),
+                () -> assertThat(saved.getLoginId().getValue()).isEqualTo(loginId),
                 () -> assertThat(saved.getEncodedPassword()).isNotEqualTo(rawPassword),
                 () -> assertThat(passwordEncoder.matches(rawPassword, saved.getEncodedPassword())).isTrue()
             );
@@ -94,7 +94,7 @@ class UserServiceIntegrationTest {
             UserModel user = userService.authenticate(loginId, rawPassword);
 
             // then
-            assertThat(user.getLoginId()).isEqualTo(loginId);
+            assertThat(user.getLoginId().getValue()).isEqualTo(loginId);
         }
 
         @DisplayName("틀린 비밀번호로 인증하면 UNAUTHORIZED 예외가 발생한다")

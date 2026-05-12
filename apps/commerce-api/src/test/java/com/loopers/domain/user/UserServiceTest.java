@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,9 +32,6 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @Mock
-    private PasswordPolicy passwordPolicy;
-
     @InjectMocks
     private UserService userService;
 
@@ -45,6 +41,16 @@ class UserServiceTest {
     private static final String VALID_NAME = "홍길동";
     private static final LocalDate VALID_BIRTH_DATE = LocalDate.of(2002, 5, 11);
     private static final String VALID_EMAIL = "test@loopers.com";
+
+    private UserModel validUser() {
+        return new UserModel(
+            new LoginId(VALID_LOGIN_ID),
+            ENCODED_PASSWORD,
+            new UserName(VALID_NAME),
+            VALID_BIRTH_DATE,
+            new Email(VALID_EMAIL)
+        );
+    }
 
     @DisplayName("회원가입 시")
     @Nested
@@ -62,7 +68,7 @@ class UserServiceTest {
             UserModel saved = userService.signUp(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
 
             // then
-            assertThat(saved.getLoginId()).isEqualTo(VALID_LOGIN_ID);
+            assertThat(saved.getLoginId().getValue()).isEqualTo(VALID_LOGIN_ID);
             assertThat(saved.getEncodedPassword()).isEqualTo(ENCODED_PASSWORD);
             verify(userRepository, times(1)).save(any(UserModel.class));
         }
@@ -83,14 +89,11 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(UserModel.class));
         }
 
-        @DisplayName("비밀번호 정책 검증에 실패하면 BAD_REQUEST 예외가 발생하고 저장되지 않는다")
+        @DisplayName("비밀번호 정책에 위반되는 입력이면 BAD_REQUEST 예외가 발생하고 저장되지 않는다")
         @Test
-        void throwsBadRequest_whenPasswordPolicyRejects() {
+        void throwsBadRequest_whenPasswordViolatesPolicy() {
             // given
-            when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(false);
             String passwordWithBirthYear = "Aa!2002xy";
-            doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
-                .when(passwordPolicy).validate(passwordWithBirthYear, VALID_BIRTH_DATE);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
@@ -111,7 +114,7 @@ class UserServiceTest {
         @Test
         void returnsUser_whenCredentialsMatch() {
             // given
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             when(userRepository.findByLoginId(VALID_LOGIN_ID)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(VALID_RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
 
@@ -141,7 +144,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // given
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             when(userRepository.findByLoginId(VALID_LOGIN_ID)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
@@ -164,7 +167,7 @@ class UserServiceTest {
         void returnsUser_whenIdExists() {
             // given
             Long userId = 1L;
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
             // when
@@ -198,7 +201,7 @@ class UserServiceTest {
         void changesPassword_whenCurrentAndNewPasswordsAreValid() {
             // given
             Long userId = 1L;
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             String currentPassword = "Current1!";
             String newPassword = "NewPass1@";
             String newEncoded = "$2a$10$newEncodedHash";
@@ -235,7 +238,7 @@ class UserServiceTest {
         void throwsUnauthorized_whenCurrentPasswordDoesNotMatch() {
             // given
             Long userId = 1L;
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
@@ -253,7 +256,7 @@ class UserServiceTest {
         void throwsBadRequest_whenNewPasswordEqualsCurrentPassword() {
             // given
             Long userId = 1L;
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             String samePassword = "SamePass1!";
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(samePassword, ENCODED_PASSWORD)).thenReturn(true);
@@ -267,18 +270,16 @@ class UserServiceTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("새 비밀번호가 정책 검증에 실패하면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("새 비밀번호가 정책에 위반되면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenNewPasswordRejectedByPolicy() {
+        void throwsBadRequest_whenNewPasswordViolatesPolicy() {
             // given
             Long userId = 1L;
-            UserModel user = new UserModel(VALID_LOGIN_ID, ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            UserModel user = validUser();
             String currentPassword = "Current1!";
             String newPasswordWithBirthYear = "Aa!2002xy";
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
-            doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
-                .when(passwordPolicy).validate(newPasswordWithBirthYear, VALID_BIRTH_DATE);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
