@@ -1,11 +1,11 @@
 ---
 name: tdd-helper
-description: loopers(Spring Boot 헥사고날) 프로젝트에서 TDD로 기능을 구현하거나 버그를 수정·리팩터링할 때 활성화된다. Red-Green-Refactor 사이클, Tidy First(구조 변경과 행위 변경 분리), plan.md + "go" 트리거 워크플로우, outside-in 레이어 순서(도메인 → 서비스 → 통합 → E2E)를 안내한다. 사용자가 "구현해줘", "만들어줘", "TDD로", "테스트 먼저", "기능 추가", "API 만들기", "회원가입/주문/상품 같은 도메인 작업", "버그 픽스", "결함 수정", "리팩터링" 같은 표현을 쓰거나, 새 도메인·유스케이스·컨트롤러·.http 파일을 작성할 때 사용한다. CoreException/BaseEntity/ApiResponse 등 프로젝트 컨벤션을 따르는 TDD 패턴과 Never Do 가드레일을 제공한다 (커밋 규율은 smart-commit 스킬이 담당).
+description: loopers(Spring Boot) 프로젝트에서 TDD로 기능을 구현하거나 버그를 수정·리팩터링할 때 활성화된다. Red-Green-Refactor 사이클, Tidy First(구조 변경과 행위 변경 분리), plan.md + "go" 트리거 워크플로우, outside-in 레이어 순서(도메인 → 서비스 → 통합 → E2E)를 안내한다. 사용자가 "구현해줘", "만들어줘", "TDD로", "테스트 먼저", "기능 추가", "API 만들기", "회원가입/주문/상품 같은 도메인 작업", "버그 픽스", "결함 수정", "리팩터링" 같은 표현을 쓰거나, 새 도메인·유스케이스·컨트롤러·.http 파일을 작성할 때 사용한다. CoreException/BaseEntity/ApiResponse 등 프로젝트 컨벤션을 따르는 TDD 패턴과 Never Do 가드레일을 제공한다 (커밋 규율은 smart-commit 스킬이 담당).
 ---
 
 # TDD Helper
 
-이 스킬은 loopers(Spring Boot 헥사고날) 프로젝트에서 새 기능 구현·버그 픽스·리팩터링 작업의 워크플로우와 규율을 안내한다.
+이 스킬은 loopers(Spring Boot) 프로젝트에서 새 기능 구현·버그 픽스·리팩터링 작업의 워크플로우와 규율을 안내한다.
 
 프로젝트 구조·기술 스택·명령어는 루트 `CLAUDE.md`를 참조한다. 이 스킬은 그 위에 얹히는 작업 절차다.
 
