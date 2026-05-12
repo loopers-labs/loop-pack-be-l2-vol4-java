@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -18,6 +19,29 @@ class UserModelTest {
     @DisplayName("User 객체를 생성할 때,")
     @Nested
     class Create {
+
+        @DisplayName("모든 필드가 유효하면, User 객체가 정상 생성된다.")
+        @Test
+        void createsUserModel_whenAllFieldsAreValid() {
+            // arrange
+            String loginId = "user1";
+            String password = "Pass123!";
+            String name = "홍길동";
+            String email = "test@example.com";
+            String birthDate = "2000-01-01";
+            Gender gender = Gender.MALE;
+
+            // act
+            UserModel user = new UserModel(loginId, password, name, email, birthDate, gender);
+
+            // assert
+            assertAll(
+                () -> assertThat(user.getLoginId()).isEqualTo(loginId),
+                () -> assertThat(user.getName()).isEqualTo(name),
+                () -> assertThat(user.getEmail()).isEqualTo(email),
+                () -> assertThat(user.getGender()).isEqualTo(gender)
+            );
+        }
 
         @DisplayName("loginId가 영문/숫자 외 문자를 포함하면, BAD_REQUEST 예외가 발생한다.")
         @Test
