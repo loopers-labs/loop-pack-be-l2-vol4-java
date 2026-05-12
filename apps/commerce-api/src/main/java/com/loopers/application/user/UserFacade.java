@@ -18,8 +18,8 @@ public class UserFacade {
     }
 
     public UserInfo getMyInfo(Long userId) {
-        UserModel user = userService.getById(userId);
-        return UserInfo.from(user);
+        UserModel userModel = userService.getById(userId);
+        return UserInfo.from(userModel);
     }
 
     public void changePassword(Long userId, String currentPassword, String newPassword) {

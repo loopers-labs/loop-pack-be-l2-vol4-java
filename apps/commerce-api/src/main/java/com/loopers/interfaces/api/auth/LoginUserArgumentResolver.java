@@ -35,10 +35,10 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
     ) {
         String loginId = webRequest.getHeader(HEADER_LOGIN_ID);
         String loginPw = webRequest.getHeader(HEADER_LOGIN_PW);
-        if (loginId == null || loginPw == null) {
+        if (loginId == null || loginId.isBlank() || loginPw == null || loginPw.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다.");
         }
         UserModel user = userService.authenticate(loginId, loginPw);
-        return new AuthUser(user.getId(), user.getLoginId());
+        return new AuthUser(user.getId(), user.getLoginId().getValue());
     }
 }

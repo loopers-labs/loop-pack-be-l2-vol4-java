@@ -15,15 +15,18 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final PasswordPolicy passwordPolicy;
 
     @Transactional
-    public UserModel signUp(String loginId, String rawPassword, String name, LocalDate birthDate, String email) {
-        if (userRepository.existsByLoginId(loginId)) {
+    public UserModel signUp(String rawLoginId, String rawPassword, String rawName, LocalDate birthDate, String rawEmail) {
+        LoginId loginId = new LoginId(rawLoginId);
+        if (userRepository.existsByLoginId(loginId.getValue())) {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.");
         }
-        passwordPolicy.validate(rawPassword, birthDate);
-        String encoded = passwordEncoder.encode(rawPassword);
+
+        UserName name = new UserName(rawName);
+        Email email = new Email(rawEmail);
+        Password password = Password.of(rawPassword, birthDate);
+        String encoded = passwordEncoder.encode(password.raw());
         return userRepository.save(new UserModel(loginId, encoded, name, birthDate, email));
     }
 
@@ -50,10 +53,12 @@ public class UserService {
         if (!passwordEncoder.matches(currentRawPassword, user.getEncodedPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
-        passwordPolicy.validate(newRawPassword, user.getBirthDate());
-        if (passwordEncoder.matches(newRawPassword, user.getEncodedPassword())) {
+
+        Password newPassword = Password.of(newRawPassword, user.getBirthDate());
+        if (passwordEncoder.matches(newPassword.raw(), user.getEncodedPassword())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
         }
-        user.changePassword(passwordEncoder.encode(newRawPassword));
+
+        user.changePassword(passwordEncoder.encode(newPassword.raw()));
     }
 }
