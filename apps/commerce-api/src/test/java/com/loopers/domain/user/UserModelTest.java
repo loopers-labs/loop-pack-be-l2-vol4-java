@@ -41,45 +41,6 @@ class UserModelTest {
             );
         }
 
-        @DisplayName("로그인 ID가 null이면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenLoginIdIsNull() {
-            // given
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(null, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이름이 null이면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenNameIsNull() {
-            // given
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, null, VALID_BIRTH_DATE, VALID_EMAIL)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이메일이 null이면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenEmailIsNull() {
-            // given
-            // when
-            CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, null)
-            );
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
         @DisplayName("생년월일이 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
         void throwsBadRequest_whenBirthDateIsNull() {

@@ -34,15 +34,6 @@ public class UserModel extends BaseEntity {
     protected UserModel() {}
 
     public UserModel(LoginId loginId, String encodedPassword, UserName name, LocalDate birthDate, Email email) {
-        if (loginId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
-        }
-        if (name == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
-        }
-        if (email == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.");
-        }
         if (birthDate == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비어있을 수 없습니다.");
         }
