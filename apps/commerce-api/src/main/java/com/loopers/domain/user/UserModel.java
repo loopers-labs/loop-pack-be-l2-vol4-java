@@ -36,6 +36,16 @@ public class UserModel {
         if (!this.birthDate.isBefore(LocalDate.now())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 오늘 이전이어야 합니다.");
         }
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
+        }
+        String birthDateNumeric = this.birthDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        if (password == null || !password.matches("^[\\x21-\\x7E]{8,16}$")) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
+        }
+        if (password.contains(birthDateNumeric)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
 
         this.loginId = loginId;
         this.password = password;
