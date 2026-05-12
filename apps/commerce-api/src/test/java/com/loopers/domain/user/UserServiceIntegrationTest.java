@@ -44,6 +44,9 @@ class UserServiceIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private PasswordEncryptor passwordEncryptor;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -75,6 +78,8 @@ class UserServiceIntegrationTest {
             assertAll(
                 () -> assertThat(result.getUserId()).isEqualTo(userId),
                 () -> assertThat(savedUser.getUserId()).isEqualTo(userId),
+                () -> assertThat(savedUser.getEncodedPassword()).isNotEqualTo(RAW_PASSWORD),
+                () -> assertThat(passwordEncryptor.matches(RAW_PASSWORD, savedUser.getEncodedPassword())).isTrue(),
                 () -> assertThat(savedUser.getBirthDate()).isEqualTo(BIRTH_DATE),
                 () -> assertThat(savedUser.getEmail()).isEqualTo("user1@example.com")
             );
@@ -99,8 +104,22 @@ class UserServiceIntegrationTest {
         @Test
         void throwsAlreadyExists_whenDuplicateLoginIdViolatesDatabaseConstraint() {
             // arrange
-            UserModel firstUser = new UserModel("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
-            UserModel secondUser = new UserModel("user1", NEW_PASSWORD, "김루프", BIRTH_DATE, "user2@example.com");
+            UserModel firstUser = UserModel.create(
+                "user1",
+                RAW_PASSWORD,
+                "홍길동",
+                BIRTH_DATE,
+                "user1@example.com",
+                passwordEncryptor
+            );
+            UserModel secondUser = UserModel.create(
+                "user1",
+                NEW_PASSWORD,
+                "김루프",
+                BIRTH_DATE,
+                "user2@example.com",
+                passwordEncryptor
+            );
             userRepository.save(firstUser);
 
             // act
@@ -160,6 +179,9 @@ class UserServiceIntegrationTest {
         void changesPassword_whenCurrentPasswordAndNewPasswordAreValid() {
             // arrange
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+            String previousEncodedPassword = userJpaRepository.findByUserId("user1")
+                .orElseThrow()
+                .getEncodedPassword();
 
             // act
             UserModel result = userService.changePassword("user1", RAW_PASSWORD, NEW_PASSWORD);
@@ -169,6 +191,9 @@ class UserServiceIntegrationTest {
             assertAll(
                 () -> assertThat(result.getUserId()).isEqualTo("user1"),
                 () -> assertThat(savedUser).isNotNull(),
+                () -> assertThat(savedUser.getEncodedPassword()).isNotEqualTo(previousEncodedPassword),
+                () -> assertThat(savedUser.getEncodedPassword()).isNotEqualTo(NEW_PASSWORD),
+                () -> assertThat(passwordEncryptor.matches(NEW_PASSWORD, savedUser.getEncodedPassword())).isTrue(),
                 () -> assertDoesNotThrow(() -> userService.getUser("user1", NEW_PASSWORD)),
                 () -> {
                     CoreException exception = assertThrows(CoreException.class, () -> {

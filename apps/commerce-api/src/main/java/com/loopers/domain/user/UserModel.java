@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Entity
@@ -37,36 +38,50 @@ public class UserModel extends BaseEntity {
 
     protected UserModel() {}
 
-    public UserModel(String userId, String password, String name, LocalDate birthDate, String email) {
+    public static UserModel create(
+            String userId,
+            String rawPassword,
+            String name,
+            LocalDate birthDate,
+            String email,
+            PasswordEncryptor passwordEncryptor
+    ) {
+        Objects.requireNonNull(passwordEncryptor, "passwordEncryptor must not be null");
         validateUserId(userId);
         validateBirthDate(birthDate);
-        validatePassword(password, birthDate);
+        validatePassword(rawPassword, birthDate);
         validateName(name);
         validateEmail(email);
 
+        return new UserModel(userId, passwordEncryptor.encode(rawPassword), name, birthDate, email);
+    }
+
+    private UserModel(String userId, String encodedPassword, String name, LocalDate birthDate, String email) {
         this.userId = userId;
-        this.password = password;
+        this.password = encodedPassword;
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
     }
 
-    public void changePassword(String currentPassword, String newPassword) {
-        verifyPassword(currentPassword);
-        if (currentPassword.equals(newPassword)) {
+    public void changePassword(String currentPassword, String newPassword, PasswordEncryptor passwordEncryptor) {
+        Objects.requireNonNull(passwordEncryptor, "passwordEncryptor must not be null");
+        verifyPassword(currentPassword, passwordEncryptor);
+        if (passwordEncryptor.matches(newPassword, this.password)) {
             throw new CoreException(ErrorType.PASSWORD_SAME_AS_CURRENT);
         }
         validatePassword(newPassword, this.birthDate);
-        this.password = newPassword;
+        this.password = passwordEncryptor.encode(newPassword);
     }
 
-    public void verifyPassword(String password) {
-        if (!this.password.equals(password)) {
+    public void verifyPassword(String rawPassword, PasswordEncryptor passwordEncryptor) {
+        Objects.requireNonNull(passwordEncryptor, "passwordEncryptor must not be null");
+        if (!passwordEncryptor.matches(rawPassword, this.password)) {
             throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
     }
 
-    private void validateUserId(String userId) {
+    private static void validateUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new CoreException(ErrorType.USER_ID_REQUIRED);
         }
@@ -75,7 +90,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private void validatePassword(String password, LocalDate birthDate) {
+    private static void validatePassword(String password, LocalDate birthDate) {
         if (password == null || password.isBlank()) {
             throw new CoreException(ErrorType.PASSWORD_REQUIRED);
         }
@@ -88,13 +103,13 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private void validateName(String name) {
+    private static void validateName(String name) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.USER_NAME_REQUIRED);
         }
     }
 
-    private void validateEmail(String email) {
+    private static void validateEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new CoreException(ErrorType.EMAIL_REQUIRED);
         }
@@ -103,7 +118,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private void validateBirthDate(LocalDate birthDate) {
+    private static void validateBirthDate(LocalDate birthDate) {
         if (birthDate == null) {
             throw new CoreException(ErrorType.BIRTH_DATE_REQUIRED);
         }
@@ -118,6 +133,10 @@ public class UserModel extends BaseEntity {
 
     public String getUserId() {
         return userId;
+    }
+
+    String getEncodedPassword() {
+        return password;
     }
 
     public LocalDate getBirthDate() {

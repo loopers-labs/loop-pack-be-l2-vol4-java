@@ -31,7 +31,7 @@ class UserServiceTest {
         void registersUser_whenUserInfoIsValid() {
             // arrange
             FakeUserRepository userRepository = new FakeUserRepository();
-            UserService userService = new UserService(userRepository);
+            UserService userService = createUserService(userRepository);
 
             // act
             UserModel result = userService.registerUser(
@@ -51,12 +51,31 @@ class UserServiceTest {
             );
         }
 
+        @DisplayName("사용자 정보가 유효하면, 비밀번호는 평문이 아닌 암호화된 값으로 저장한다.")
+        @Test
+        void storesEncodedPassword_whenUserInfoIsValid() {
+            // arrange
+            FakeUserRepository userRepository = new FakeUserRepository();
+            FakePasswordEncryptor passwordEncryptor = new FakePasswordEncryptor();
+            UserService userService = new UserService(userRepository, passwordEncryptor);
+
+            // act
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+
+            // assert
+            UserModel savedUser = userRepository.findByUserId("user1").orElseThrow();
+            assertAll(
+                () -> assertThat(savedUser.getEncodedPassword()).isNotEqualTo(RAW_PASSWORD),
+                () -> assertThat(passwordEncryptor.matches(RAW_PASSWORD, savedUser.getEncodedPassword())).isTrue()
+            );
+        }
+
         @DisplayName("이미 가입된 로그인 ID로 가입하면, USER_ALREADY_EXISTS 예외가 발생한다.")
         @Test
         void throwsAlreadyExists_whenLoginIdAlreadyExists() {
             // arrange
             FakeUserRepository userRepository = new FakeUserRepository();
-            UserService userService = new UserService(userRepository);
+            UserService userService = createUserService(userRepository);
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -72,7 +91,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidLoginId_whenLoginIdContainsInvalidCharacters() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -87,7 +106,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenPasswordLengthIsTooShort() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -102,7 +121,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenPasswordLengthIsTooLong() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -117,7 +136,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenPasswordContainsUnsupportedCharacter() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -132,7 +151,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenPasswordContainsUnsupportedSpecialCharacter() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -147,7 +166,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenPasswordContainsBirthDate() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -162,7 +181,7 @@ class UserServiceTest {
         @Test
         void throwsUserNameRequired_whenNameIsNull() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -177,7 +196,7 @@ class UserServiceTest {
         @Test
         void throwsUserNameRequired_whenNameIsBlank() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -192,7 +211,7 @@ class UserServiceTest {
         @Test
         void throwsBirthDateRequired_whenBirthDateIsNull() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -207,7 +226,7 @@ class UserServiceTest {
         @Test
         void throwsEmailRequired_whenEmailIsNull() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -222,7 +241,7 @@ class UserServiceTest {
         @Test
         void throwsEmailRequired_whenEmailIsBlank() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -237,7 +256,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidEmail_whenEmailFormatIsInvalid() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -257,7 +276,7 @@ class UserServiceTest {
         @Test
         void returnsMyInfo_whenLoginHeadersAreValid() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -275,7 +294,7 @@ class UserServiceTest {
         @Test
         void returnsMaskedName_whenMyInfoIsReturned() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -289,7 +308,7 @@ class UserServiceTest {
         @Test
         void throwsNotFound_whenLoginIdDoesNotExist() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -304,7 +323,7 @@ class UserServiceTest {
         @Test
         void throwsAuthenticationFailed_whenPasswordDoesNotMatch() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -325,7 +344,7 @@ class UserServiceTest {
         @Test
         void changesPassword_whenCurrentPasswordAndNewPasswordAreValid() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -344,11 +363,34 @@ class UserServiceTest {
             );
         }
 
+        @DisplayName("기존 비밀번호가 일치하고 새 비밀번호가 유효하면, 새 비밀번호도 암호화된 값으로 저장한다.")
+        @Test
+        void storesEncodedNewPassword_whenPasswordIsChanged() {
+            // arrange
+            FakeUserRepository userRepository = new FakeUserRepository();
+            FakePasswordEncryptor passwordEncryptor = new FakePasswordEncryptor();
+            UserService userService = new UserService(userRepository, passwordEncryptor);
+            userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
+            String previousEncodedPassword = userRepository.findByUserId("user1").orElseThrow().getEncodedPassword();
+
+            // act
+            userService.changePassword("user1", RAW_PASSWORD, NEW_PASSWORD);
+
+            // assert
+            String changedEncodedPassword = userRepository.findByUserId("user1").orElseThrow().getEncodedPassword();
+            assertAll(
+                () -> assertThat(changedEncodedPassword).isNotEqualTo(previousEncodedPassword),
+                () -> assertThat(changedEncodedPassword).isNotEqualTo(NEW_PASSWORD),
+                () -> assertThat(passwordEncryptor.matches(NEW_PASSWORD, changedEncodedPassword)).isTrue(),
+                () -> assertThat(passwordEncryptor.matches(RAW_PASSWORD, changedEncodedPassword)).isFalse()
+            );
+        }
+
         @DisplayName("가입되지 않은 로그인 ID로 비밀번호를 수정하면, USER_NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenChangingPasswordForUnknownLoginId() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {
@@ -363,7 +405,7 @@ class UserServiceTest {
         @Test
         void throwsAuthenticationFailed_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -379,7 +421,7 @@ class UserServiceTest {
         @Test
         void throwsSamePassword_whenNewPasswordIsSameAsCurrentPassword() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -395,7 +437,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenNewPasswordLengthIsTooShort() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -411,7 +453,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenNewPasswordLengthIsTooLong() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -427,7 +469,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenNewPasswordContainsUnsupportedCharacter() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -443,7 +485,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenNewPasswordContainsUnsupportedSpecialCharacter() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -459,7 +501,7 @@ class UserServiceTest {
         @Test
         void throwsInvalidPassword_whenNewPasswordContainsBirthDate() {
             // arrange
-            UserService userService = new UserService(new FakeUserRepository());
+            UserService userService = createUserService();
             userService.registerUser("user1", RAW_PASSWORD, "홍길동", BIRTH_DATE, "user1@example.com");
 
             // act
@@ -470,6 +512,14 @@ class UserServiceTest {
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_CONTAINS_BIRTH_DATE);
         }
+    }
+
+    private UserService createUserService() {
+        return createUserService(new FakeUserRepository());
+    }
+
+    private UserService createUserService(FakeUserRepository userRepository) {
+        return new UserService(userRepository, new FakePasswordEncryptor());
     }
 
     private static class FakeUserRepository implements UserRepository {
@@ -484,6 +534,23 @@ class UserServiceTest {
         @Override
         public Optional<UserModel> findByUserId(String userId) {
             return Optional.ofNullable(users.get(userId));
+        }
+    }
+
+    private static class FakePasswordEncryptor implements PasswordEncryptor {
+        private int sequence = 0;
+
+        @Override
+        public String encode(String rawPassword) {
+            sequence += 1;
+            return "encoded:" + sequence + ":" + rawPassword;
+        }
+
+        @Override
+        public boolean matches(String rawPassword, String encodedPassword) {
+            return rawPassword != null
+                && encodedPassword != null
+                && encodedPassword.endsWith(":" + rawPassword);
         }
     }
 }
