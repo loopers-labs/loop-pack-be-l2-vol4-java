@@ -1,10 +1,12 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.example.ExampleModel;
+import com.loopers.domain.user.UserService;
 import com.loopers.infrastructure.example.ExampleJpaRepository;
 import com.loopers.interfaces.api.example.ExampleV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,10 +15,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDate;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,25 +31,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ExampleV1ApiE2ETest {
 
     private static final Function<Long, String> ENDPOINT_GET = id -> "/api/v1/examples/" + id;
+    private static final String AUTH_LOGIN_ID = "loopers01";
+    private static final String AUTH_PASSWORD = "Loopers!2026";
 
     private final TestRestTemplate testRestTemplate;
     private final ExampleJpaRepository exampleJpaRepository;
+    private final UserService userService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     public ExampleV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         ExampleJpaRepository exampleJpaRepository,
+        UserService userService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.exampleJpaRepository = exampleJpaRepository;
+        this.userService = userService;
         this.databaseCleanUp = databaseCleanUp;
+    }
+
+    @BeforeEach
+    void setUp() {
+        userService.signUp(AUTH_LOGIN_ID, AUTH_PASSWORD, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com");
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    private HttpEntity<Void> authEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-LoginId", AUTH_LOGIN_ID);
+        headers.set("X-Loopers-LoginPw", AUTH_PASSWORD);
+        return new HttpEntity<>(headers);
     }
 
     @DisplayName("GET /api/v1/examples/{id}")
@@ -63,7 +84,7 @@ class ExampleV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<ExampleV1Dto.ExampleResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ExampleV1Dto.ExampleResponse>> response =
-                testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(null), responseType);
+                testRestTemplate.exchange(requestUrl, HttpMethod.GET, authEntity(), responseType);
 
             // assert
             assertAll(
@@ -83,7 +104,7 @@ class ExampleV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<ExampleV1Dto.ExampleResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ExampleV1Dto.ExampleResponse>> response =
-                testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(null), responseType);
+                testRestTemplate.exchange(requestUrl, HttpMethod.GET, authEntity(), responseType);
 
             // assert
             assertAll(
@@ -102,7 +123,7 @@ class ExampleV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<ExampleV1Dto.ExampleResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ExampleV1Dto.ExampleResponse>> response =
-                testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(null), responseType);
+                testRestTemplate.exchange(requestUrl, HttpMethod.GET, authEntity(), responseType);
 
             // assert
             assertAll(
