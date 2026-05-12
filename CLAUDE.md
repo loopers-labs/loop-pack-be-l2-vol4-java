@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Commands
 
 ### 인프라 실행 (테스트/로컬 실행 전 필수)
@@ -9,25 +7,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 docker-compose -f ./docker/infra-compose.yml up
 ```
 
-### 전체 빌드 및 테스트
+### 빌드 및 테스트
 ```shell
 ./gradlew build
 ./gradlew test
-```
 
-### 특정 모듈 테스트
-```shell
+# 특정 모듈
 ./gradlew :apps:commerce-api:test
 ./gradlew :apps:commerce-batch:test
-```
 
-### 단일 테스트 클래스 실행
-```shell
+# 단일 클래스 / 메서드
 ./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest"
-```
-
-### 단일 테스트 메서드 실행
-```shell
 ./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest.Create.createsExampleModel_whenNameAndDescriptionAreProvided"
 ```
 
@@ -35,6 +25,8 @@ docker-compose -f ./docker/infra-compose.yml up
 ```shell
 ./gradlew :apps:commerce-api:bootRun
 ```
+
+---
 
 ## 아키텍처
 
@@ -45,13 +37,11 @@ docker-compose -f ./docker/infra-compose.yml up
 
 ### `commerce-api` 레이어 구조
 
-4개 레이어가 엄격히 분리되어 있다:
-
 ```
-interfaces/api      → Controller, Dto, ApiSpec (Swagger)
-application         → Facade, Info (레이어 간 데이터 전달 record)
-domain              → Service, Model (Entity), Repository (인터페이스)
-infrastructure      → JpaRepository, RepositoryImpl
+interfaces/api  →  Controller, Dto, ApiSpec (Swagger)
+application     →  Facade, Info (레이어 간 데이터 전달 record)
+domain          →  Service, Model (Entity), Repository (인터페이스)
+infrastructure  →  JpaRepository, RepositoryImpl
 ```
 
 - **Controller**는 Facade만 호출한다. Service를 직접 호출하지 않는다.
@@ -59,6 +49,7 @@ infrastructure      → JpaRepository, RepositoryImpl
 - **Service**는 도메인 로직을 담당하며 `@Transactional`을 선언한다.
 - **Repository**는 도메인 레이어에 인터페이스로 정의되고, `infrastructure`에서 구현한다 (의존성 역전).
 - **Model**은 JPA Entity이자 도메인 객체다. 생성자에서 유효성 검증을 수행하며 유효하지 않으면 `CoreException`을 던진다.
+- **Controller**는 `implements XxxV1ApiSpec` 형태로 Swagger 어노테이션을 인터페이스에 분리한다. Controller 본문에는 `@Operation` 등을 작성하지 않는다.
 
 ### API 응답 형식
 모든 응답은 `ApiResponse<T>` record를 사용한다:
@@ -74,12 +65,11 @@ infrastructure      → JpaRepository, RepositoryImpl
 ### BaseEntity
 모든 Entity는 `modules/jpa`의 `BaseEntity`를 상속한다. `id`(AUTO_INCREMENT), `createdAt`, `updatedAt`, `deletedAt`을 자동 관리한다. 소프트 딜리트는 `delete()` / `restore()` 메서드로 처리하며 둘 다 멱등하게 동작한다.
 
-### API 스펙 분리
-Controller는 `implements XxxV1ApiSpec` 형태로 Swagger 어노테이션을 인터페이스에 분리한다. Controller 본문에는 `@Operation` 등 Swagger 어노테이션을 작성하지 않는다.
+---
 
 ## 테스트 관행
 
-테스트는 3단계로 구분된다:
+### 테스트 종류
 
 | 종류 | 위치 | 어노테이션 | 특징 |
 |------|------|-----------|------|
@@ -92,19 +82,29 @@ Controller는 `implements XxxV1ApiSpec` 형태로 Swagger 어노테이션을 인
 - 통합·E2E 테스트는 `@AfterEach`에서 `databaseCleanUp.truncateAllTables()`를 호출해 DB를 초기화한다
 - `@Nested` + `@DisplayName`으로 테스트를 그룹화한다
 
-### 개발 Workflow - TDD (Red > Green > Refactor)
-- 모든 테스트는 3A 원칙으로 작성할 것 (Arrange - Act - Assert)
-#### 1. Red Phase : 실패하는 테스트 먼저 작성
-- 요구사항을 만족하는 기능 테스트 케이스 작성
-- 테스트 예시
-#### 2. Green Phase : 테스트를 통과하는 코드 작성
-- Red Phase 의 테스트가 모두 통과할 수 있는 코드 작성
-- 오버엔지니어링 금지
-#### 3. Refactor Phase : 불필요한 코드 제거 및 품질 개선
-- 불필요한 private 함수 지양, 객체지향적 코드 작성
-- unused import 제거
-- 성능 최적화
-- 모든 테스트 케이스가 통과해야 함
+### TDD 워크플로 (Red → Green → Refactor)
+
+1. **Red** — 요구사항을 만족하는 실패하는 테스트 먼저 작성
+2. **Green** — 테스트가 통과할 수 있는 최소한의 코드 작성 (오버엔지니어링 금지)
+3. **Refactor** — 불필요한 코드 제거, unused import 제거, 객체지향적 코드로 개선. 모든 테스트가 통과해야 함
+
+### 테스트 실패로 인한 코드 수정 시 주석 규칙
+
+테스트 실패를 수정하거나 누락된 코드를 추가할 때는 해당 코드 바로 위에 한 줄 주석을 남긴다:
+
+```java
+// [fix] <실패 원인 한 줄 요약>
+```
+
+예시:
+```java
+// [fix] gender null 검증 누락으로 성별 없는 요청이 200을 반환하던 버그 수정
+if (gender == null) {
+    throw new CoreException(ErrorType.BAD_REQUEST, "성별은 비어있을 수 없습니다.");
+}
+```
+
+---
 
 ## 현재 구현 과제 (.codeguide/loopers-1-week.md)
 

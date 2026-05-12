@@ -83,8 +83,13 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        // [변경 전] Docker 관련 설정 없음 — 기본값(unix:///var/run/docker.sock)으로 동작
+        // [변경 후] Windows Docker Desktop에서 Testcontainers를 사용하기 위한 설정 추가
+        // named pipe 경로로 Docker 소켓을 지정 (Linux의 /var/run/docker.sock에 해당)
         environment("DOCKER_HOST", "npipe:////./pipe/dockerDesktopLinuxEngine")
         environment("DOCKER_API_VERSION", "1.40")
+        // Ryuk: 테스트 종료 후 컨테이너를 정리하는 Testcontainers 내부 컴포넌트
+        // Windows 환경에서 Ryuk 컨테이너 실행 시 권한 문제가 발생할 수 있어 비활성화
         environment("TESTCONTAINERS_RYUK_DISABLED", "true")
         systemProperty("docker.host", "npipe:////./pipe/dockerDesktopLinuxEngine")
         systemProperty("api.version", "1.40")
