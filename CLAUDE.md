@@ -189,3 +189,18 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Grafana(3000, admin/adm
 강한 성공 기준은 독립적인 루프를 가능하게 한다. 약한 기준("작동하게 만들어")은 끊임없는 질의응답을 부른다.
 
 **이 원칙들이 작동하고 있다는 신호:** diff에 불필요한 변경이 줄어든다 / 과설계로 인한 재작성이 줄어든다 / 실수 후가 아니라 구현 전에 명확화 질문이 나온다.
+
+---
+
+## 스킬 자동 트리거
+
+다음 작업은 `.claude/skills/tdd-helper/SKILL.md`가 자동으로 활성화된다:
+
+- 새 기능 구현 (도메인·유스케이스·API 추가)
+- 버그 픽스 / 결함 수정
+- 리팩터링 (Tidy First 적용)
+- 명시적 TDD 사이클 진행 (`plan.md` + "go")
+
+위 작업의 워크플로우(Red-Green-Refactor, 3A, outside-in 레이어 순서), Tidy First, Never Do, Priority는 모두 그 스킬에 있다. 이 문서는 프로젝트 컨벤션과 메타 작업 원칙만 다룬다.
+
+**커밋 작업은 항상 `smart-commit` 스킬을 거친다.** Claude는 `git commit`을 직접 호출하지 않는다 — 커밋 단위 분리, 메시지 작성, Tidy First 라벨, 커밋 전 게이트(테스트·경고 체크)는 모두 smart-commit이 담당한다.
