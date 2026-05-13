@@ -46,6 +46,62 @@ class UserV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    @DisplayName("PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("정상적으로 비밀번호를 변경할 경우, 200 응답을 반환한다.")
+        @Test
+        void returnsOk_whenPasswordChangedSuccessfully() {
+            // arrange
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new UserV1Dto.SignUpRequest("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "user1");
+            headers.set("X-Loopers-LoginPw", "Pass123!");
+
+            // act
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                ENDPOINT + "/me/password", HttpMethod.PATCH,
+                new HttpEntity<>(new UserV1Dto.ChangePasswordRequest("NewPass1!"), headers),
+                Void.class
+            );
+
+            // assert
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+        }
+
+        @DisplayName("비밀번호 변경 후, 새 비밀번호로 인증이 가능하다.")
+        @Test
+        void authenticatesSuccessfully_withNewPasswordAfterChange() {
+            // arrange
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new UserV1Dto.SignUpRequest("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)),
+                Void.class);
+
+            HttpHeaders oldHeaders = new HttpHeaders();
+            oldHeaders.set("X-Loopers-LoginId", "user1");
+            oldHeaders.set("X-Loopers-LoginPw", "Pass123!");
+            testRestTemplate.exchange(ENDPOINT + "/me/password", HttpMethod.PATCH,
+                new HttpEntity<>(new UserV1Dto.ChangePasswordRequest("NewPass1!"), oldHeaders),
+                Void.class);
+
+            HttpHeaders newHeaders = new HttpHeaders();
+            newHeaders.set("X-Loopers-LoginId", "user1");
+            newHeaders.set("X-Loopers-LoginPw", "NewPass1!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(newHeaders), responseType);
+
+            // assert
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+        }
+    }
+
     @DisplayName("GET /api/v1/users/me")
     @Nested
     class GetMyInfo {
