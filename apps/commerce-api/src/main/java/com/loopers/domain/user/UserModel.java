@@ -68,4 +68,8 @@ public class UserModel extends BaseEntity {
         return EncryptedPassword.encrypt(rawPassword, passwordEncrypter);
     }
 
+    public boolean authenticate(String rawPassword, PasswordEncrypter passwordEncrypter) {
+        return encryptedPassword.matches(rawPassword, passwordEncrypter);
+    }
+
 }

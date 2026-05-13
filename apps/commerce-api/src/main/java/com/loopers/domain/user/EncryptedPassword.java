@@ -33,4 +33,8 @@ public record EncryptedPassword(
 
         return new EncryptedPassword(passwordEncrypter.encrypt(rawPassword));
     }
+
+    public boolean matches(String rawPassword, PasswordEncrypter passwordEncrypter) {
+        return passwordEncrypter.matches(rawPassword, value);
+    }
 }

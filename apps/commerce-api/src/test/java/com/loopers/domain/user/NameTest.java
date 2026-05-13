@@ -4,7 +4,9 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -71,6 +73,43 @@ class NameTest {
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("이름을 마스킹할 때,")
+    @Nested
+    class Mask {
+
+        @DisplayName("마지막 1글자를 *로 치환한 문자열을 반환한다.")
+        @ParameterizedTest
+        @CsvSource({
+            "김카, 김*",
+            "김카일, 김카*",
+            "김카일김카일김카일김카일김카일김카일김카, 김카일김카일김카일김카일김카일김카일김*"
+        })
+        void returnsValueWithLastCharacterReplacedByAsterisk(String original, String expected) {
+            // arrange
+            Name name = Name.from(original);
+
+            // act
+            String maskedName = name.maskedValue();
+
+            // assert
+            assertThat(maskedName).isEqualTo(expected);
+        }
+
+        @DisplayName("호출해도 원본 Name의 value는 변경되지 않는다.")
+        @Test
+        void doesNotMutateOriginalValue() {
+            // arrange
+            String original = "김카일";
+            Name name = Name.from(original);
+
+            // act
+            name.maskedValue();
+
+            // assert
+            assertThat(name.value()).isEqualTo(original);
         }
     }
 }
