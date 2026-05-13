@@ -59,8 +59,8 @@ class UserServiceIntegrationTest {
                     () -> assertEquals(userId, userModel.getUserId()),
                     () -> assertEquals(name, userModel.getName()),
                     () -> assertEquals(birthDate, userModel.getBirthDate()),
-                    () -> assertEquals(email, userModel.getEmail())
-                    // () -> Assertions.assertNotEquals(password, userModel.getPassword())
+                    () -> assertEquals(email, userModel.getEmail()),
+                    () -> assertTrue(passwordEncoder.matches(password, userModel.getPassword()))
             );
         }
 
