@@ -70,18 +70,69 @@ commerce-streamer → modules/jpa, modules/redis, modules/kafka, supports/*
 ## 레이어드 아키텍처 (commerce-api 기준)
 
 ```
-interfaces.api          Controller, DTO, ApiSpec (OpenAPI 어노테이션 분리)
+interfaces.api          Controller, DTO, ApiSpec, ArgumentResolver
     ↓
-application             Facade, Info (유스케이스 조합)
+application             Facade, Info, Command  (1:1 위임 + DTO 변환)
     ↓
-domain                  Model (Entity), Service, Repository (인터페이스)
+domain                  Aggregate(Entity), VO, 기능별 Service, 도메인 컴포넌트,
+                        도메인 정책(static), Repository(인터페이스)
     ↓
-infrastructure          JpaRepository, RepositoryImpl (도메인 인터페이스 구현)
+infrastructure          JpaRepository, RepositoryImpl 등
 ```
 
 - `domain` 패키지는 인프라에 의존하지 않는다. Repository 인터페이스는 도메인에, 구현체는 infrastructure에 위치한다.
-- Controller는 Facade를 호출하며 Domain Service를 직접 호출하지 않는다.
+- Controller는 Facade만 호출한다. Domain Service를 직접 호출하지 않는다.
 - DTO(`*V1Dto`)는 interfaces 레이어에만 존재한다. Domain → Application 사이는 Info 객체로 전달한다.
+
+### 도메인 빌딩 블록
+
+`domain/<bounded-context>/` 안에는 서로 다른 종류의 객체가 공존한다. 폴더 위치가 같다고 *역할이 같지 않다*.
+
+| 종류 | 예시 | 특징 |
+|---|---|---|
+| **Aggregate Root / Entity** | `UserModel` | 식별자(id)가 있고 상태가 변한다. 불변식은 자기 메서드 안에서 강제. |
+| **Value Object (VO)** | `LoginId`, `UserName`, `Email`, `RawPassword` | 식별자 없음, 불변, 속성이 곧 정체성. 생성자 = 형식 검증. |
+| **Domain Policy** | `PasswordPolicy` (`static validate(...)`) | 여러 도메인 개념이 협력하는 *규칙*. 무상태. |
+| **Domain Component** | `PasswordEncryptor` | 도메인 부품(인프라 래퍼 등). 이름에 `Service`를 붙이지 않는다. **Service가 자유롭게 의존 가능**. |
+| **Service (기능별)** | `UserSignupService`, `UserAuthService`, `UserPasswordService` | 유스케이스 단위 도메인 흐름·검증·예외. Repository와 Domain Component에 의존. |
+| **Repository (인터페이스)** | `UserRepository` | 도메인이 소유. 구현은 infrastructure. |
+
+### Facade · Service · Component 책임 분담
+
+> 같은 도메인의 혼선을 줄이기 위한 *프로젝트 규약*. 반복 결정하지 말고 이 표를 따른다.
+
+| 레이어 | 책임 | 금지 |
+|---|---|---|
+| **Facade** (application) | ① 각 Service에 **1:1 위임** ② 도메인 모델 → DTO(`UserInfo`) 변환 | 흐름 분기·검증·예외 throw·트랜잭션 어노테이션 ❌ |
+| **Service** (domain, 기능별) | 자기 유스케이스의 흐름·검증·예외, 트랜잭션 경계 | **다른 Service 의존 ❌** (Service ↔ Service 금지) |
+| **Domain Component** (domain) | 재사용 가능한 도메인 부품 (인프라 래퍼·해시·암호화 등) | 비즈니스 흐름 ❌ |
+
+**Service 분할 원칙**: 유스케이스(기능) 단위로 잘게 쪼갠다. 한 Service가 *너무 많은 책임을 들고* 다른 Service를 호출하고 싶어지면, 거기서 분할 시그널을 읽는다.
+
+```
+✅ UserSignupService    → signup
+✅ UserAuthService      → authenticate, getById
+✅ UserPasswordService  → changePassword
+
+❌ UserService(범용)    → signup/authenticate/getById/changePassword 다 처리 (단일 책임 약함)
+❌ UserSignupService    → UserPasswordService 의존 (Service ↔ Service)
+```
+
+**Facade의 메서드는 한 줄~서너 줄이 정상**. 흐름 분기(if/else)가 들어가기 시작하면 *해당 흐름을 Service 안으로* 옮긴다.
+
+### 트랜잭션 규약
+
+- **위치**: Facade가 아니라 **Service의 메서드 레벨**에 `@Transactional`을 명시한다.
+  - 클래스 레벨은 readOnly/write 혼재 시 사고 위험 — 메서드 레벨이 의도가 코드에서 바로 보인다.
+- **읽기 전용 메서드**: `@Transactional(readOnly = true)`.
+- **Facade에 트랜잭션을 두지 않는 이유**: 외부 API 호출/비동기/단순 조회 조합 등 *트랜잭션 밖에서 처리해야 할 작업*이 합류할 자리를 비워둔다. *"같이 죽고 같이 사는 비즈니스 요구사항인가?"*에 Yes일 때만 더 큰 트랜잭션을 고려한다.
+- **`@TransactionalEventListener(phase = AFTER_COMMIT)`**: 커밋 후 부수 효과(알림, 카프카 발행) 발행에 사용.
+
+### 식별자 전달 규약
+
+- Facade·Service 사이는 **`Long userId`(또는 식별자 단위)**로 전달한다.
+- `ArgumentResolver`는 인증 후 식별자만 주입(`AuthUser`). Entity를 통째로 들고 다니지 않는다.
+- 이유: ArgumentResolver의 조회 트랜잭션과 Service 트랜잭션이 분리돼 *detached entity* 처리(merge/save 재호출 등)가 필요해지는 부작용을 막는다. Service 안에서 한 번 더 조회하는 비용은 1차 캐시/인덱스 조회 수준으로 미미하다.
 
 ### 공통 패턴
 
