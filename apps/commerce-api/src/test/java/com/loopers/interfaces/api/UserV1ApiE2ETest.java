@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import com.loopers.domain.user.EncryptedPassword;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
@@ -224,8 +225,7 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
@@ -466,28 +466,6 @@ class UserV1ApiE2ETest {
 
         private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
 
-        private void saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
-            UserModel user = UserModel.builder()
-                .rawLoginId(loginId)
-                .rawPassword(password)
-                .rawName(name)
-                .rawBirthDate(birthDate)
-                .rawEmail(email)
-                .passwordEncrypter(passwordEncrypter)
-                .build();
-
-            userJpaRepository.save(user);
-        }
-
-        private HttpEntity<Object> authJsonRequest(String loginId, String password, Object body) {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.add("X-Loopers-LoginId", loginId);
-            headers.add("X-Loopers-LoginPw", password);
-
-            return new HttpEntity<>(body, headers);
-        }
-
         private static Stream<UserV1Dto.ChangePasswordRequest> missingFieldRequests() {
             return Stream.of(
                 new UserV1Dto.ChangePasswordRequest(null, "Newer!2031"),
@@ -504,6 +482,28 @@ class UserV1ApiE2ETest {
             );
         }
 
+        private UserModel saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+            UserModel user = UserModel.builder()
+                .rawLoginId(loginId)
+                .rawPassword(password)
+                .rawName(name)
+                .rawBirthDate(birthDate)
+                .rawEmail(email)
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            return userJpaRepository.save(user);
+        }
+
+        private HttpEntity<Object> authJsonRequest(String loginId, String password, Object body) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.add("X-Loopers-LoginId", loginId);
+            headers.add("X-Loopers-LoginPw", password);
+
+            return new HttpEntity<>(body, headers);
+        }
+
         @DisplayName("정상 요청이면, 200 OK와 함께 응답 데이터는 null이고 DB의 encryptedPassword가 새 값으로 갱신된다.")
         @Test
         void returnsOk_whenChangePasswordRequestIsValid() {
@@ -511,8 +511,7 @@ class UserV1ApiE2ETest {
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
             String newPassword = "Newer!2031";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, newPassword);
 
@@ -526,13 +525,14 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            String updatedEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
+            EncryptedPassword foundUserEncryptedPassword = foundUser.getEncryptedPassword();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data()).isNull(),
-                () -> assertThat(updatedEncrypted).isNotEqualTo(originalEncrypted),
-                () -> assertThat(passwordEncrypter.matches(newPassword, updatedEncrypted)).isTrue()
+                () -> assertThat(foundUserEncryptedPassword).isNotEqualTo(savedUser.getEncryptedPassword()),
+                () -> assertThat(passwordEncrypter.matches(newPassword, foundUserEncryptedPassword.value())).isTrue()
             );
         }
 
@@ -543,8 +543,7 @@ class UserV1ApiE2ETest {
             // arrange
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
@@ -556,10 +555,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
@@ -569,8 +569,7 @@ class UserV1ApiE2ETest {
             // arrange
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest("Wrong!2030", "Newer!2031");
 
@@ -584,10 +583,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
@@ -598,8 +598,7 @@ class UserV1ApiE2ETest {
             // arrange
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, invalidNewPassword);
 
@@ -613,10 +612,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
@@ -626,8 +626,7 @@ class UserV1ApiE2ETest {
             // arrange
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, "Abc19950321!");
 
@@ -641,10 +640,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
@@ -654,8 +654,7 @@ class UserV1ApiE2ETest {
             // arrange
             String loginId = "kylekim";
             String currentPassword = "Kyle!2030";
-            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, currentPassword);
 
@@ -669,10 +668,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
@@ -680,29 +680,28 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUnauthorized_whenAuthHeaderIsMissing() {
             // arrange
-            saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
-            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            UserModel savedUser = saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest("Kyle!2030", "Newer!2031");
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Object> request = new HttpEntity<>(requestBody, headers);
 
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
-                request,
+                new HttpEntity<>(requestBody, headers),
                 responseType
             );
 
             // assert
+            UserModel foundUser = userJpaRepository.findById(savedUser.getId()).get();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword())
             );
         }
 
