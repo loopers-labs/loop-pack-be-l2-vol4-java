@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,56 @@ class UserV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("내 정보 조회에 성공할 경우, 마스킹된 이름을 포함한 유저 정보를 반환한다.")
+        @Test
+        void returnsUserInfo_whenAuthenticatedSuccessfully() {
+            // arrange
+            UserV1Dto.SignUpRequest signUpRequest = new UserV1Dto.SignUpRequest(
+                "user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE
+            );
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(signUpRequest), Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "user1");
+            headers.set("X-Loopers-LoginPw", "Pass123!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(headers), responseType);
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user1"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo("2000-01-01")
+            );
+        }
+
+        @DisplayName("존재하지 않는 ID로 요청할 경우, 404 Not Found 응답을 반환한다.")
+        @Test
+        void returnsNotFound_whenUserDoesNotExist() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "nonexistent");
+            headers.set("X-Loopers-LoginPw", "Pass123!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
     }
 
     @DisplayName("POST /api/v1/users")
