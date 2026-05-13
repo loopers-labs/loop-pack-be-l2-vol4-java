@@ -1,9 +1,12 @@
 package com.loopers.domain.user;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -13,8 +16,12 @@ public class UserService {
 
     public UserModel signup(String userId, String password, String name, LocalDate birthDate, String email) {
         // 1. 기존 user 확인
-        // 2. user 생성
-        // 3. return
+        Optional<UserModel> existUser = userRepository.findByUserId(userId);
+        if (existUser.isPresent()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이미 존재하는 사용자입니다.");
+        }
+        // 2. userModel 생성 및 저장
+        return userRepository.save(new UserModel(userId, password, name, birthDate, email));
     }
     public UserModel getUser(String userId, String password) {
         // 1. 기존 user 확인
