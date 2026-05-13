@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -35,6 +36,41 @@ class UserServiceIntegrationTest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    @DisplayName("내 정보 조회를 할 때,")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("해당 ID의 회원이 존재할 경우, 회원 정보가 반환된다.")
+        @Test
+        void returnsUserInfo_whenUserExists() {
+            // arrange
+            UserModel user = new UserModel("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+            userService.signUp(user);
+
+            // act
+            UserModel result = userService.findByLoginId("user1").orElse(null);
+
+            // assert
+            assertAll(
+                () -> assertThat(result).isNotNull(),
+                () -> assertThat(result.getLoginId()).isEqualTo("user1"),
+                () -> assertThat(result.getName()).isEqualTo("홍길동"),
+                () -> assertThat(result.getEmail()).isEqualTo("test@example.com"),
+                () -> assertThat(result.getBirthDate()).isNotNull()
+            );
+        }
+
+        @DisplayName("해당 ID의 회원이 존재하지 않을 경우, null이 반환된다.")
+        @Test
+        void returnsNull_whenUserNotFound() {
+            // act
+            UserModel result = userService.findByLoginId("nonexistent").orElse(null);
+
+            // assert
+            assertThat(result).isNull();
+        }
     }
 
     @DisplayName("회원 가입을 할 때,")

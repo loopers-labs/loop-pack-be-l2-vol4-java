@@ -334,4 +334,35 @@ class UserModelTest {
             );
         }
     }
+
+    @DisplayName("이름을 마스킹할 때,")
+    @Nested
+    class MaskName {
+
+        @DisplayName("이름이 두 글자 이상이면, 마지막 글자만 *로 마스킹된다.")
+        @Test
+        void masksLastCharacter_whenNameHasMultipleCharacters() {
+            // arrange
+            UserModel user = new UserModel("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+
+            // act
+            String masked = user.getMaskedName();
+
+            // assert
+            assertThat(masked).isEqualTo("홍길*");
+        }
+
+        @DisplayName("이름이 한 글자이면, * 하나만 반환된다.")
+        @Test
+        void returnsAsterisk_whenNameIsSingleCharacter() {
+            // arrange
+            UserModel user = new UserModel("user1", "Pass123!", "김", "test@example.com", "2000-01-01", Gender.MALE);
+
+            // act
+            String masked = user.getMaskedName();
+
+            // assert
+            assertThat(masked).isEqualTo("*");
+        }
+    }
 }

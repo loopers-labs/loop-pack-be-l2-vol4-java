@@ -78,6 +78,7 @@ public class UserModel extends BaseEntity {
     public String getLoginId() { return loginId; }
     public String getPassword() { return password; }
     public String getName() { return name; }
+    public String getMaskedName() { return name.substring(0, name.length() - 1) + "*"; }
     public String getEmail() { return email; }
     public LocalDate getBirthDate() { return birthDate; }
     public Gender getGender() { return gender; }
