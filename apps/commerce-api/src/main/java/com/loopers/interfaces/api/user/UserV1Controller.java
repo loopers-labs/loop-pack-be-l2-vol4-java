@@ -2,10 +2,6 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
-import com.loopers.domain.user.Birth;
-import com.loopers.domain.user.Email;
-import com.loopers.domain.user.LoginId;
-import com.loopers.domain.user.Name;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,11 +22,11 @@ public class UserV1Controller implements UserV1ApiSpec {
         @RequestBody UserV1Dto.SignupRequest request
     ) {
         UserInfo info = userFacade.register(
-            new LoginId(request.loginId()),
-            new Name(request.name()),
-            new Birth(request.birth()),
-            new Email(request.email()),
-            request.password()
+            request.loginId(),
+            request.password(),
+            request.name(),
+            request.birth(),
+            request.email()
         );
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }

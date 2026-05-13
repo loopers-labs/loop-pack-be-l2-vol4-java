@@ -43,11 +43,11 @@ class UserRegisterPersistenceTest {
 
         // act
         userService.register(
-            new LoginId("loopers123"),
-            new Name("김민우"),
-            new Birth(LocalDate.of(1990, 1, 1)),
-            new Email("user@example.com"),
-            rawPassword
+            "loopers123",
+            rawPassword,
+            "김민우",
+            LocalDate.of(1990, 1, 1),
+            "user@example.com"
         );
 
         // assert

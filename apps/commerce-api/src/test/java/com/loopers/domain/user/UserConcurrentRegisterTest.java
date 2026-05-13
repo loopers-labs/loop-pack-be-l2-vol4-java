@@ -62,11 +62,11 @@ class UserConcurrentRegisterTest {
                 try {
                     startLatch.await();
                     userService.register(
-                        new LoginId("loopers" + idx),
-                        new Name("김민우"),
-                        new Birth(LocalDate.of(1990, 1, 1)),
-                        new Email("same@example.com"),
-                        "Pass1234!"
+                        "loopers" + idx,
+                        "Pass1234!",
+                        "김민우",
+                        LocalDate.of(1990, 1, 1),
+                        "same@example.com"
                     );
                     successCount.incrementAndGet();
                 } catch (CoreException e) {
