@@ -20,8 +20,10 @@ class EmailTest {
         @DisplayName("null 이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenValueIsNull() {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new Email(null));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -29,8 +31,10 @@ class EmailTest {
         @ParameterizedTest
         @ValueSource(strings = {"", "   "})
         void throwsBadRequest_whenValueIsBlank(String value) {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new Email(value));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -38,8 +42,10 @@ class EmailTest {
         @ParameterizedTest
         @ValueSource(strings = {"abc", "abc@", "@a.com", "abc@a", "abc@.com", "abc@a.", "abc @a.com"})
         void throwsBadRequest_whenValueDoesNotMatchEmailFormat(String value) {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new Email(value));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -47,8 +53,10 @@ class EmailTest {
         @ParameterizedTest
         @ValueSource(strings = {"kim@loopers.com", "abc.def@sub.example.co.kr", "user+tag@example.io"})
         void createsEmail_whenValueIsValid(String value) {
+            // act
             Email email = new Email(value);
 
+            // assert
             assertThat(email.getValue()).isEqualTo(value);
         }
     }

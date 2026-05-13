@@ -20,8 +20,10 @@ class LoginIdTest {
         @DisplayName("null 이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenValueIsNull() {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new LoginId(null));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -29,8 +31,10 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"", "   "})
         void throwsBadRequest_whenValueIsBlank(String value) {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new LoginId(value));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -38,8 +42,10 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"kim_99", "kim-99", "김민수", "kim 99", "kim.99", "kim@99"})
         void throwsBadRequest_whenValueContainsInvalidCharacters(String value) {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new LoginId(value));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -47,8 +53,10 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"kim", "12345", "kim99", "KIM99", "abcXYZ123"})
         void createsLoginId_whenValueContainsOnlyAlphanumeric(String value) {
+            // act
             LoginId loginId = new LoginId(value);
 
+            // assert
             assertThat(loginId.getValue()).isEqualTo(value);
         }
     }

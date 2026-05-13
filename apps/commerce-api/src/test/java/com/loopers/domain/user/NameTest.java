@@ -21,8 +21,10 @@ class NameTest {
         @DisplayName("null 이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenValueIsNull() {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new Name(null));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -30,16 +32,20 @@ class NameTest {
         @ParameterizedTest
         @ValueSource(strings = {"", "   "})
         void throwsBadRequest_whenValueIsBlank(String value) {
+            // act
             CoreException result = assertThrows(CoreException.class, () -> new Name(value));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("값이 주어지면 정상적으로 생성된다.")
         @Test
         void createsName_whenValueIsProvided() {
+            // act
             Name name = new Name("홍길동");
 
+            // assert
             assertThat(name.getValue()).isEqualTo("홍길동");
         }
     }
@@ -56,9 +62,14 @@ class NameTest {
             "A, *"
         })
         void replacesLastCharacterWithAsterisk(String original, String expected) {
+            // arrange
             Name name = new Name(original);
 
-            assertThat(name.masked()).isEqualTo(expected);
+            // act
+            String masked = name.masked();
+
+            // assert
+            assertThat(masked).isEqualTo(expected);
         }
     }
 }

@@ -27,9 +27,11 @@ class PasswordPolicyTest {
         @NullSource
         @ValueSource(strings = {"", "Aa1!aa1", "Aa1!Aa1!Aa1!Aa1!A"})
         void throwsBadRequest_whenLengthIsOutOfRange(String rawPassword) {
+            // act
             CoreException result = assertThrows(CoreException.class,
                 () -> PasswordPolicy.validate(rawPassword, BIRTH_DATE));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -37,9 +39,11 @@ class PasswordPolicyTest {
         @ParameterizedTest
         @ValueSource(strings = {"Abcd123!한글", "Abcd 123!", "Abcd\t123!", "        "})
         void throwsBadRequest_whenContainsInvalidCharacters(String rawPassword) {
+            // act
             CoreException result = assertThrows(CoreException.class,
                 () -> PasswordPolicy.validate(rawPassword, BIRTH_DATE));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -56,9 +60,11 @@ class PasswordPolicyTest {
             "Aa1!1999.01.01"
         })
         void throwsBadRequest_whenContainsBirthDate(String rawPassword) {
+            // act
             CoreException result = assertThrows(CoreException.class,
                 () -> PasswordPolicy.validate(rawPassword, BIRTH_DATE));
 
+            // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -66,6 +72,7 @@ class PasswordPolicyTest {
         @ParameterizedTest
         @ValueSource(strings = {"Abcd123!", "Z!aB9@xY7#kL", "P@ssw0rdABCD1234"})
         void passes_whenValid(String rawPassword) {
+            // act & assert
             assertThatCode(() -> PasswordPolicy.validate(rawPassword, BIRTH_DATE))
                 .doesNotThrowAnyException();
         }
