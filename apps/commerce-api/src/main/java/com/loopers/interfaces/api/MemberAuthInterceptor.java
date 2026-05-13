@@ -25,7 +25,7 @@ public class MemberAuthInterceptor implements HandlerInterceptor {
         String loginPw = request.getHeader(HEADER_LOGIN_PW);
 
         if (StringUtils.isBlank(loginId) || StringUtils.isBlank(loginPw)) {
-            throw new CoreException(ErrorType.UNAUTHORIZED);
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 값이 누락되었습니다.");
         }
 
         return true;
