@@ -26,4 +26,14 @@ public class UserService {
         UserModel user = new UserModel(loginId, encoded, name, birthDate, email);
         return userRepository.save(user);
     }
+
+    @Transactional(readOnly = true)
+    public UserModel authenticate(String loginId, String rawPasswordValue) {
+        UserModel user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다."));
+        if (!passwordEncoder.matches(rawPasswordValue, user.getPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다.");
+        }
+        return user;
+    }
 }

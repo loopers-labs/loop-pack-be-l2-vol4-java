@@ -15,4 +15,9 @@ public class UserFacade {
         UserModel user = userService.signUp(loginId, password, name, birthDate, email);
         return UserInfo.from(user);
     }
+
+    public UserInfo authenticate(String loginId, String rawPassword) {
+        UserModel user = userService.authenticate(loginId, rawPassword);
+        return UserInfo.from(user);
+    }
 }

@@ -17,10 +17,22 @@ public class Sha256PasswordEncoder implements PasswordEncoder {
 
     @Override
     public EncodedPassword encode(RawPassword rawPassword) {
+        return new EncodedPassword(hash(rawPassword.value()));
+    }
+
+    @Override
+    public boolean matches(String rawValue, EncodedPassword encoded) {
+        if (rawValue == null || rawValue.isBlank() || encoded == null) {
+            return false;
+        }
+        return hash(rawValue).equals(encoded.value());
+    }
+
+    private String hash(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance(ALGORITHM);
-            byte[] hash = digest.digest(rawPassword.value().getBytes(StandardCharsets.UTF_8));
-            return new EncodedPassword(Base64.getEncoder().encodeToString(hash));
+            byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hashed);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
         }
