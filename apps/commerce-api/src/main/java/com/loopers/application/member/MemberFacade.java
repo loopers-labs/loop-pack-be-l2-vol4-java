@@ -20,4 +20,8 @@ public class MemberFacade {
         );
         return MemberInfo.from(member);
     }
+
+    public MemberInfo getMember(MemberCommand.GetMember command) {
+        return MemberInfo.fromWithMaskedName(memberService.getMember(command.loginId(), command.loginPassword()));
+    }
 }

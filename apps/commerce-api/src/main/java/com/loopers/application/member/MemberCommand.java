@@ -11,4 +11,9 @@ public class MemberCommand {
             LocalDate birthday,
             String email
     ) {}
+
+    public record GetMember(
+            String loginId,
+            String loginPassword
+    ) {}
 }

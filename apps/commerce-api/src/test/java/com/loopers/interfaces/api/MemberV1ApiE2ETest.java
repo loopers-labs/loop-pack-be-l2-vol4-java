@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -116,6 +117,102 @@ public class MemberV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+    }
+
+    @DisplayName("GET /api/v1/members/info")
+    @Nested
+    class GetMemberV1ApiE2E {
+
+        @DisplayName("올바른 헤더가 주어지면, 회원 정보를 반환한다.")
+        @Test
+        void returnMemberInfo_whenValidHeadersProvided() {
+            // arrange
+            testRestTemplate.exchange(MEMBER_V1_PATH, HttpMethod.POST,
+                    new HttpEntity<>(new MemberV1Dto.MemberJoinRequest(loginId, loginPassword, name, birthday, email)),
+                    new ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {});
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+            headers.set("X-Loopers-LoginPw", loginPassword);
+
+            // act
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                    MEMBER_V1_PATH + "/info", HttpMethod.GET, new HttpEntity<>(headers), new ParameterizedTypeReference<>() {});
+
+            // assert
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().loginId()).isEqualTo(loginId),
+                    () -> assertThat(response.getBody().data().email()).isEqualTo(email),
+                    () -> assertThat(response.getBody().data().birthday()).isEqualTo(birthday)
+            );
+        }
+
+        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 401을 반환한다.")
+        @Test
+        void returnUnauthorized_whenLoginIdHeaderIsMissing() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginPw", loginPassword);
+
+            // act
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                    MEMBER_V1_PATH + "/info", HttpMethod.GET, new HttpEntity<>(headers), new ParameterizedTypeReference<>() {});
+
+            // assert
+            assertThat(response.getStatusCode().value()).isEqualTo(401);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더가 없으면, 401을 반환한다.")
+        @Test
+        void returnUnauthorized_whenLoginPwHeaderIsMissing() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+
+            // act
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                    MEMBER_V1_PATH + "/info", HttpMethod.GET, new HttpEntity<>(headers), new ParameterizedTypeReference<>() {});
+
+            // assert
+            assertThat(response.getStatusCode().value()).isEqualTo(401);
+        }
+
+        @DisplayName("존재하지 않는 로그인 ID면, 401을 반환한다.")
+        @Test
+        void returnUnauthorized_whenLoginIdDoesNotExist() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+            headers.set("X-Loopers-LoginPw", loginPassword);
+
+            // act
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                    MEMBER_V1_PATH + "/info", HttpMethod.GET, new HttpEntity<>(headers), new ParameterizedTypeReference<>() {});
+
+            // assert
+            assertThat(response.getStatusCode().value()).isEqualTo(401);
+        }
+
+        @DisplayName("비밀번호가 올바르지 않으면, 401을 반환한다.")
+        @Test
+        void returnUnauthorized_whenLoginPasswordDoesNotMatch() {
+            // arrange
+            testRestTemplate.exchange(MEMBER_V1_PATH, HttpMethod.POST,
+                    new HttpEntity<>(new MemberV1Dto.MemberJoinRequest(loginId, loginPassword, name, birthday, email)),
+                    new ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {});
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+            headers.set("X-Loopers-LoginPw", "wrongPass1!");
+
+            // act
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                    MEMBER_V1_PATH + "/info", HttpMethod.GET, new HttpEntity<>(headers), new ParameterizedTypeReference<>() {});
+
+            // assert
+            assertThat(response.getStatusCode().value()).isEqualTo(401);
         }
     }
 
