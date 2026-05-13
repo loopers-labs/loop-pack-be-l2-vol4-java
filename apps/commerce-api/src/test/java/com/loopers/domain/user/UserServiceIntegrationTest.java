@@ -76,16 +76,14 @@ class UserServiceIntegrationTest {
             LocalDate birthDate = LocalDate.of(1995, 6, 10);
             String email = "test@naver.com";
 
-            userService.signup(userId, name, password, birthDate, email);
+            UserModel userModel = new UserModel(userId, password, name, birthDate, email);
+            userJpaRepository.save(userModel);
         }
 
         // happy path 우선 작성
         @DisplayName("존재하는 id 확인. 회원 정보 return")
         @Test
         void getUser_whenValidArgumentsAreProvided() {
-            // 1. user 정보 획득
-            // 2. 비밀번호 획인
-            // 3. 맞다면, 회원정보 return;
             // arrange
             // beforeEach로 항상 저장되어 있으므로 pass
 
@@ -115,7 +113,8 @@ class UserServiceIntegrationTest {
             LocalDate birthDate = LocalDate.of(1995, 6, 10);
             String email = "test@naver.com";
 
-            userService.signup(userId, name, password, birthDate, email);
+            UserModel userModel = new UserModel(userId, password, name, birthDate, email);
+            userJpaRepository.save(userModel);
         }
 
         @DisplayName("비밀번호 정상 수정 Case")
