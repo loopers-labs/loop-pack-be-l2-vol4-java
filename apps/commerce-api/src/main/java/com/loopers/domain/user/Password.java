@@ -14,12 +14,11 @@ public class Password {
     private static final int MAX_LENGTH = 16;
 
     /**
-     * ASCII printable 문자만 허용 (0x21 ~ 0x7E)
-     * - 0x21 = '!', 0x7E = '~'
-     * - 공백(0x20), 탭(0x09) 등 제외
-     * - 한글, 액센트 문자(ä 등) 등 비-ASCII 제외
+     * 영문 대소문자 / 숫자 / 일반적인 특수문자만 허용
+     * 허용 특수문자: ! @ # $ % ^ & * ( ) _ + - = [ ] { } | \ ; : ' " , . < > / ?
      */
-    private static final Pattern ALLOWED_CHARS = Pattern.compile("^[\\x21-\\x7E]+$");
+    private static final Pattern ALLOWED_CHARS =
+            Pattern.compile("^[A-Za-z0-9!@#$%^&*()_+\\-=\\[\\]{}|\\\\;:'\",.<>/?]+$");
 
     private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("yyMMdd");
