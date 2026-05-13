@@ -73,6 +73,18 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("loginId가 정확히 1자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenLoginIdIsExactlyOneCharacter() {
+            // arrange
+            String loginId = "a";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel(loginId, "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+        }
+
         @DisplayName("loginId가 정확히 10자이면, 예외가 발생하지 않는다.")
         @Test
         void doesNotThrow_whenLoginIdIsExactlyTenCharacters() {
@@ -98,6 +110,18 @@ class UserModelTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일에 유효한 특수문자(+)가 포함되어도, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenEmailContainsValidSpecialCharacter() {
+            // arrange
+            String email = "user+tag@example.com";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel("user1", "Pass123!", "홍길동", email, "2000-01-01", Gender.MALE)
+            );
         }
 
         @DisplayName("이메일이 올바른 형식이 아니면, BAD_REQUEST 예외가 발생한다.")
@@ -190,6 +214,21 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("생년월일이 오늘 날짜이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBirthDateIsToday() {
+            // arrange
+            String birthDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", "홍길동", "test@example.com", birthDate, Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("생년월일이 미래 날짜이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenBirthDateIsInFuture() {
@@ -270,6 +309,21 @@ class UserModelTest {
         void throwsBadRequest_whenPasswordIsTooLong() {
             // arrange
             String password = "Pass123!Pass12345";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", password, "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호에 공백이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsSpace() {
+            // arrange
+            String password = "Pass 123!";
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
