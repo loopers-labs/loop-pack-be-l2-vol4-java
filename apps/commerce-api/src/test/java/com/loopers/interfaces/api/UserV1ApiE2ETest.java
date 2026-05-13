@@ -459,4 +459,278 @@ class UserV1ApiE2ETest {
             );
         }
     }
+
+    @DisplayName("비밀번호 수정 - PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
+
+        private void saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+            UserModel user = UserModel.builder()
+                .rawLoginId(loginId)
+                .rawPassword(password)
+                .rawName(name)
+                .rawBirthDate(birthDate)
+                .rawEmail(email)
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            userJpaRepository.save(user);
+        }
+
+        private HttpEntity<Object> authJsonRequest(String loginId, String password, Object body) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.add("X-Loopers-LoginId", loginId);
+            headers.add("X-Loopers-LoginPw", password);
+
+            return new HttpEntity<>(body, headers);
+        }
+
+        private static Stream<UserV1Dto.ChangePasswordRequest> missingFieldRequests() {
+            return Stream.of(
+                new UserV1Dto.ChangePasswordRequest(null, "Newer!2031"),
+                new UserV1Dto.ChangePasswordRequest("Kyle!2030", null)
+            );
+        }
+
+        private static Stream<String> invalidNewPasswords() {
+            return Stream.of(
+                "Ab1!",
+                "Ab1!Ab1!Ab1!Ab1!A",
+                "Newer 2031",
+                "한글비번123!"
+            );
+        }
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 응답 데이터는 null이고 DB의 encryptedPassword가 새 값으로 갱신된다.")
+        @Test
+        void returnsOk_whenChangePasswordRequestIsValid() {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            String newPassword = "Newer!2031";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, newPassword);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            String updatedEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data()).isNull(),
+                () -> assertThat(updatedEncrypted).isNotEqualTo(originalEncrypted),
+                () -> assertThat(passwordEncrypter.matches(newPassword, updatedEncrypted)).isTrue()
+            );
+        }
+
+        @DisplayName("필수 필드가 누락되면, 400 Bad Request로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @ParameterizedTest
+        @MethodSource("missingFieldRequests")
+        void returnsBadRequest_whenRequiredFieldIsMissing(UserV1Dto.ChangePasswordRequest requestBody) {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("본문 currentPassword가 저장 비밀번호와 일치하지 않으면, 400 Bad Request로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @Test
+        void returnsBadRequest_whenCurrentPasswordDoesNotMatch() {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest("Wrong!2030", "Newer!2031");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("newPassword가 비밀번호 RULE을 위반하면, 400 Bad Request로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @ParameterizedTest
+        @MethodSource("invalidNewPasswords")
+        void returnsBadRequest_whenNewPasswordViolatesRule(String invalidNewPassword) {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, invalidNewPassword);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("newPassword에 birthDate가 포함되면, 400 Bad Request로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordContainsBirthDate() {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, "Abc19950321!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("newPassword가 currentPassword와 평문 동일하면, 400 Bad Request로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordEqualsCurrentPassword() {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, currentPassword);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("헤더 인증이 실패하면, 401 Unauthorized로 거절되고 DB의 encryptedPassword는 변하지 않는다.")
+        @Test
+        void returnsUnauthorized_whenAuthHeaderIsMissing() {
+            // arrange
+            saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            String originalEncrypted = userJpaRepository.findAll().get(0).getEncryptedPassword().value();
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest("Kyle!2030", "Newer!2031");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Object> request = new HttpEntity<>(requestBody, headers);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                request,
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
+                () -> assertThat(userJpaRepository.findAll().get(0).getEncryptedPassword().value()).isEqualTo(originalEncrypted)
+            );
+        }
+
+        @DisplayName("newPassword가 RULE을 위반해도, 응답 메시지에 평문 newPassword가 노출되지 않는다.")
+        @Test
+        void doesNotLeakRawNewPassword_whenNewPasswordPolicyIsViolated() {
+            // arrange
+            String loginId = "kylekim";
+            String currentPassword = "Kyle!2030";
+            String invalidNewPassword = "Ab1!";
+            saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+
+            UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, invalidNewPassword);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD,
+                HttpMethod.PATCH,
+                authJsonRequest(loginId, currentPassword, requestBody),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().message()).doesNotContain(invalidNewPassword)
+            );
+        }
+    }
 }

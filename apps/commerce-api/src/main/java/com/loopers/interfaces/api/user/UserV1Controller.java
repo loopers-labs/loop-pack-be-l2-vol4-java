@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,5 +46,16 @@ public class UserV1Controller implements UserV1ApiSpec {
         UserMyInfo userMyInfo = userFacade.readMyInfo(loginUser.userId());
 
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(userMyInfo));
+    }
+
+    @Override
+    @PatchMapping("/me/password")
+    public ApiResponse<Void> changePassword(
+        @LoginUser AuthenticatedUser loginUser,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(loginUser.userId(), request.currentPassword(), request.newPassword());
+
+        return ApiResponse.success(null);
     }
 }
