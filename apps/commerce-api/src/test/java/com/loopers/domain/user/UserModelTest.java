@@ -211,6 +211,136 @@ public class UserModelTest {
         }
     }
 
+    @DisplayName("비밀번호 변경 테스트")
+    @Nested
+    class ChangePassword {
+        UserModel userModel;
+        final String currentPassword = "abc123!@#";
+
+        @BeforeEach
+        void setup() {
+            userModel = new UserModel(
+                "usertest123", currentPassword, "홍길동",
+                LocalDate.of(1995, 6, 10), "test@naver.com"
+            );
+        }
+
+        @DisplayName("올바른 현재 비밀번호와 새 비밀번호가 주어지면, 비밀번호가 변경된다.")
+        @Test
+        void changesPassword_whenRequestIsValid() {
+            // arrange
+            String newPassword = "newPass1!@";
+
+            // act
+            userModel.changePassword(currentPassword, newPassword);
+
+            // assert
+            assertNotEquals(currentPassword, userModel.getPassword());
+        }
+
+        @DisplayName("현재 비밀번호가 일치하지 않는 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenCurrentPasswordNotMatches() {
+            // arrange
+            String wrongPassword = "wrongPass1!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(wrongPassword, "newPass1!@")
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일한 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordIsSameAsCurrent() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, currentPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호가 8자 미만인 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordIsTooShort() {
+            // arrange
+            String newPassword = "abc1!@#";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, newPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호가 16자 초과인 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordIsTooLong() {
+            // arrange
+            String newPassword = "abcABC123!@#$%^&*";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, newPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호에 생년월일 8자리(19950610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordContainsFullBirthDate() {
+            // arrange
+            String newPassword = "19950610!A";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, newPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호에 생년월일 6자리(950610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordContainsYearlessBirthDate() {
+            // arrange
+            String newPassword = "950610!@Ab";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, newPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호에 생년월일 4자리(0610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordContainsMonthDayBirthDate() {
+            // arrange
+            String newPassword = "0610!@Abcd";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, newPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+    }
+
     @DisplayName("이름 마스킹 테스트")
     @Nested
     class MaskName {
