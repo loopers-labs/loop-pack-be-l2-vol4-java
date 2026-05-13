@@ -28,8 +28,10 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public boolean checkLoginIdDuplication(String loginId) {
-        return userRepository.existsByLoginId(loginId);
+    public void checkLoginIdDuplication(String loginId) {
+        if (userRepository.existsByLoginId(loginId)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이미 존재하는 유저의 아이디입니다.");
+        }
     }
 
     public void changePassword(UserModel userModel, String encrypted) {

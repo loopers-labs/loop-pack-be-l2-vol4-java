@@ -3,6 +3,7 @@ package com.loopers.domain.user;
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
+import com.loopers.support.error.PasswordMatcher;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -54,5 +55,20 @@ public class UserModel extends BaseEntity {
 
     public void changePassword(String encrypted) {
         this.password = encrypted;
+    }
+
+    public void isPasswordValid(boolean isValid, String message) {
+        if (isValid) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    public void validPasswordChange(String oldPassword, String targetPassword, PasswordMatcher matcher) {
+        if (!matcher.matches(oldPassword, this.password)) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+        if (matcher.matches(targetPassword, this.password)) {
+            throw new IllegalArgumentException("현재 비밀번호는 사용할 수 없습니다.");
+        }
     }
 }
