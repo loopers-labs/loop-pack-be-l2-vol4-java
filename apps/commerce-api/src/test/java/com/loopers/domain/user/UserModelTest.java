@@ -32,9 +32,6 @@ public class UserModelTest {
         @DisplayName("정상적인 요청이 온 경우, 정상적으로 생성된다.")
         @Test
         void createsUserModel_whenRequestIsValid() {
-            // arrange = given
-            // each로 해결
-
             // act = when
             UserModel userModel = new UserModel(userId, password, name, birthDate, email);
 
@@ -43,54 +40,211 @@ public class UserModelTest {
                 () -> assertEquals(userId, userModel.getUserId()),
                 () -> assertEquals(name, userModel.getName()),
                 () -> assertEquals(birthDate, userModel.getBirthDate()),
-                () -> assertEquals(email, userModel.getEmail())
+                () -> assertEquals(email, userModel.getEmail()),
+                () -> assertNotEquals(password, userModel.getPassword())
             );
         }
 
-        @DisplayName("이름이 없는 경우, 예외가 발생한다.")
+        @DisplayName("userId 가 빈 값인 경우, 예외가 발생한다.")
         @Test
-        void throwsException_whenNameIsMissing() {
-            // arrange = given
-            // 이름이 없는 경우
+        void throwsException_whenUserIdIsBlank() {
+            // arrange
+            userId = "";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("userId 에 특수문자가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenUserIdIncludesSpecialCharacter() {
+            // arrange
+            userId = "abdf$2341!!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("이름이 빈 값인 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNameIsBlank() {
+            // arrange
             name = "";
 
-            // act = when
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(userId, password, name, birthDate, email);
-            });
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
 
-            // assert = then
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("이름에 특수문자가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNameIncludesSpecialCharacter() {
+            // arrange
+            name = "홍길!동";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("이름에 공백이 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNameIncludesSpace() {
+            // arrange
+            name = "홍 길동";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
             assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
         }
 
         @DisplayName("이메일 형식이 올바르지 않은 경우, 예외가 발생한다.")
         @Test
-        void throwsException_whenEmailIsWrong() {
-            // arrange = given
+        void throwsException_whenEmailFormatIsInvalid() {
+            // arrange
             email = "abdfsd";
 
-            // act = when
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(userId, password, name, birthDate, email);
-            });
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
 
-            // assert = then
+            // assert
             assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
         }
 
-        @DisplayName("userId에 특수 문자가 들어가 있는 경우, 예외가 발생한다.")
+        @DisplayName("비밀번호가 8자 미만인 경우, 예외가 발생한다.")
         @Test
-        void throwsException_whenUserIdIncludesSpecialCharacter() {
-            // arrange = given
-            userId = "abdf$2341!!";
+        void throwsException_whenPasswordIsTooShort() {
+            // arrange
+            password = "abc1!@#";
 
-            // act = when
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(userId, password, name, birthDate, email);
-            });
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
 
-            // assert = then
+            // assert
             assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("비밀번호가 16자 초과인 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenPasswordIsTooLong() {
+            // arrange
+            password = "abcABC123!@#$%^&*";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("비밀번호에 생년월일 8자리(19950610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenPasswordContainsFullBirthDate() {
+            // arrange
+            password = "19950610!A";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("비밀번호에 생년월일 6자리(950610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenPasswordContainsYearlessBirthDate() {
+            // arrange
+            password = "950610!@Ab";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("비밀번호에 생년월일 4자리(0610)가 포함된 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenPasswordContainsMonthDayBirthDate() {
+            // arrange
+            password = "0610!@Abcd";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(userId, password, name, birthDate, email)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+    }
+
+    @DisplayName("이름 마스킹 테스트")
+    @Nested
+    class MaskName {
+
+        @DisplayName("이름의 마지막 글자가 '*' 로 마스킹된다.")
+        @Test
+        void returnsMaskedName_whenNameHasThreeChars() {
+            // arrange
+            UserModel userModel = new UserModel(
+                "usertest123", "abc123!@#", "홍길동",
+                LocalDate.of(1995, 6, 10), "test@naver.com"
+            );
+
+            // act
+            String maskedName = userModel.getMaskedName();
+
+            // assert
+            assertEquals("홍길*", maskedName);
+        }
+
+        @DisplayName("두 글자 이름의 마지막 글자가 '*' 로 마스킹된다.")
+        @Test
+        void returnsMaskedName_whenNameHasTwoChars() {
+            // arrange
+            UserModel userModel = new UserModel(
+                "usertest123", "abc123!@#", "홍길",
+                LocalDate.of(1995, 6, 10), "test@naver.com"
+            );
+
+            // act
+            String maskedName = userModel.getMaskedName();
+
+            // assert
+            assertEquals("홍*", maskedName);
         }
     }
 }
