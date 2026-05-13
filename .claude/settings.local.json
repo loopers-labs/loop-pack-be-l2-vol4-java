@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.user.UserModelTest\")",
+      "Bash(./gradlew :apps:commerce-api:compileJava)",
+      "Bash(./gradlew :apps:commerce-api:test)"
+    ]
+  }
+}
