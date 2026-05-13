@@ -131,4 +131,39 @@ class UserRepositoryIntegrationTest {
             );
         }
     }
+
+    @DisplayName("로그인 ID로 회원을 조회할 때,")
+    @Nested
+    class FindByLoginId {
+
+        @DisplayName("저장된 로그인 ID면 해당 회원을 담은 Optional을 반환한다.")
+        @Test
+        void returnsUser_whenLoginIdIsSaved() {
+            // arrange
+            UserModel savedUser = createUser("kyleKim", "kyle@example.com");
+
+            // act
+            Optional<UserModel> foundUser = userRepository.findByLoginId("kyleKim");
+
+            // assert
+            assertAll(
+                () -> assertThat(foundUser).isPresent(),
+                () -> assertThat(foundUser.get().getId()).isEqualTo(savedUser.getId()),
+                () -> assertThat(foundUser.get().getLoginId()).isEqualTo(savedUser.getLoginId())
+            );
+        }
+
+        @DisplayName("저장되지 않은 로그인 ID면 비어 있는 Optional을 반환한다.")
+        @Test
+        void returnsEmpty_whenLoginIdIsNotSaved() {
+            // arrange
+            createUser("kyleKim", "kyle@example.com");
+
+            // act
+            Optional<UserModel> foundUser = userRepository.findByLoginId("unknown99");
+
+            // assert
+            assertThat(foundUser).isEmpty();
+        }
+    }
 }
