@@ -74,6 +74,8 @@ com.loopers
 - `ApiResponse<T>` (record): `meta(result, errorCode, message)` + `data`. 컨트롤러는 항상 이 래퍼로 응답한다.
 - `ExampleV1*`이 위 레이어/네이밍 규약의 정식 참조 구현이다 — 새 도메인을 추가할 때 이 패턴을 그대로 따른다.
 
+**검증 위치는 VO에 단일화한다.** 형식·길이·null 검증은 각 VO의 `from()` 정적 팩토리가 책임지며, 컨트롤러 DTO에는 Bean Validation 어노테이션(`@NotBlank`/`@Pattern`/`@Size`/`@Email`/`@Past` 등)을 도입하지 않는다. VO가 던지는 `CoreException(BAD_REQUEST)`이 `ApiControllerAdvice`에서 400으로 변환되므로 별도 Bean Validation 계층은 DRY 위반이 된다. 예외는 VO를 두지 않는 도메인 — 그 경우 DTO Bean Validation 단독 허용.
+
 ### 설정 / 프로파일
 
 `apps/commerce-api/src/main/resources/application.yml`이 모듈별 yml을 import한다 (`jpa.yml`, `redis.yml`, `logging.yml`, `monitoring.yml`). 프로파일: `local`(기본), `test`, `dev`, `qa`, `prd`.
@@ -96,7 +98,20 @@ com.loopers
 - 예외 단언은 AssertJ `assertThatThrownBy(...).isInstanceOf(...).extracting("...").isEqualTo(...)` 체인을 쓴다. JUnit의 `assertThrows`는 기본적으로 쓰지 않는다.
 - 한 테스트에 단언이 여러 개면 JUnit `assertAll(() -> ..., () -> ...)`로 묶거나 AssertJ 체이닝(`assertThat(x).hasSize(60).startsWith("$2")`)으로 한 묶음으로 표현해 첫 실패에서 멈추지 않게 한다.
 - `@DisplayName`은 행동을 한국어 평서문으로 적어 케이스 의도를 명세에 묶는다. 데이터 옆 인라인 주석으로 의도를 반복 설명하지 않는다.
+- `@DisplayName`은 **도메인 의미** 중심으로 적는다. 메서드명(`existsByLoginId를 호출할 때`)이나 구체 예외 클래스명(`DataIntegrityViolationException이 발생한다`) 같은 기술 용어는 디스플레이에 노출하지 않는다 — `로그인 ID가 존재하는지 조회할 때`, `예외가 발생한다`처럼 도메인 어휘로. 구체 예외/타입은 단언 코드(`isInstanceOf(...)`)가 검증한다.
+- 통합 테스트의 픽스처 헬퍼는 **객체 생성 + 저장**을 한 단위로 묶어 저장된 엔티티를 반환한다 (예: `createUser(loginId, email)` → save된 `UserModel`). "build + save" 두 줄 반복을 한 호출에 흡수해 테스트 본문이 도메인 시나리오만 드러내게 한다.
+- 통합 테스트에 `@Transactional`을 기본으로 붙이지 않는다. 모든 `save()`가 한 트랜잭션에서 1차 캐시에만 들어가 commit 시점에야 flush되므로, UNIQUE 제약 위반 같은 검증을 `assertThatThrownBy(() -> ...save(...))` 자리에서 자연스럽게 캐치하기 어렵다. 격리는 `@AfterEach DatabaseCleanUp.truncateAllTables()`로 충분.
 - 기존 `ExampleModelTest`처럼 `assertThrows + assertThat`이 혼재된 코드는 본보기로 삼지 않는다.
+
+**E2E TestRestTemplate 패턴.**
+
+- **요청 본문**: 프로덕션 DTO record(예: `SignUpRequest`). `Map<String, Object>` 사용 금지 — 컴파일 타임 안전·리팩터 안전·contract 결합을 위해.
+- **응답 본문**: 검증 목적에 맞춰 선택.
+  - 키 집합 자체가 contract이면(민감 정보 비노출 등) `Map<String, Object>` + AssertJ `containsOnlyKeys(...)`. typed response record로 받으면 Jackson이 잉여 키를 조용히 무시해 키 집합 검증이 무력화된다.
+  - 필드 값만 검증할 때는 typed response record가 더 명료.
+- **호출**: `testRestTemplate.exchange(URL, METHOD, HttpEntity, ParameterizedTypeReference<ApiResponse<...>>)`. `postForEntity`는 `Class<T>` 한계로 제네릭 보존 불가.
+- **Content-Type**: `jsonRequest(body)` 같은 헬퍼로 명시적 부착. 자동 추론 가능하지만 통합 테스트에선 의도를 못박는 게 안전.
+- **setup용 첫 호출**: 결과를 무시하려면 `Void.class`로 받는다.
 
 ---
 
