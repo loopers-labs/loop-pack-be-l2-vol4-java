@@ -64,6 +64,19 @@ class UserV1ApiE2ETest {
     @Nested
     class SignUp {
 
+        private UserModel saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+            UserModel user = UserModel.builder()
+                .rawLoginId(loginId)
+                .rawPassword(password)
+                .rawName(name)
+                .rawBirthDate(birthDate)
+                .rawEmail(email)
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            return userJpaRepository.save(user);
+        }
+
         private static Stream<UserV1Dto.SignUpRequest> missingFieldRequests() {
             String loginId = "kylekim";
             String password = "Kyle!2030";
@@ -207,14 +220,7 @@ class UserV1ApiE2ETest {
         void returnsConflict_whenLoginIdIsAlreadyUsed() {
             // arrange
             String loginId = "kylekim";
-            UserV1Dto.SignUpRequest firstRequest = new UserV1Dto.SignUpRequest(
-                loginId,
-                "Kyle!2030",
-                "김카일",
-                LocalDate.of(1995, 3, 21),
-                "kyle@example.com"
-            );
-            testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonRequest(firstRequest), Void.class);
+            saveUser(loginId, "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             UserV1Dto.SignUpRequest duplicateRequest = new UserV1Dto.SignUpRequest(
                 loginId,
@@ -246,14 +252,7 @@ class UserV1ApiE2ETest {
         void returnsConflict_whenEmailIsAlreadyUsed() {
             // arrange
             String email = "kyle@example.com";
-            UserV1Dto.SignUpRequest firstRequest = new UserV1Dto.SignUpRequest(
-                "kylekim",
-                "Kyle!2030",
-                "김카일",
-                LocalDate.of(1995, 3, 21),
-                email
-            );
-            testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonRequest(firstRequest), Void.class);
+            saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), email);
 
             UserV1Dto.SignUpRequest duplicateRequest = new UserV1Dto.SignUpRequest(
                 "parkruper",
