@@ -133,4 +133,42 @@ class UserServiceTest {
                 .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("저장된 회원이면 currentRawPassword와 newRawPassword를 그대로 위임한다.")
+        @Test
+        void delegatesToUser_whenUserIdIsRegistered() {
+            // arrange
+            Long userId = 1L;
+            String currentRawPassword = "Kyle!2030";
+            String newRawPassword = "Newer!2031";
+            UserModel user = mock(UserModel.class);
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+            // act
+            userService.changePassword(userId, currentRawPassword, newRawPassword);
+
+            // assert
+            verify(user).changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
+        }
+
+        @DisplayName("저장되지 않은 회원이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserIdIsNotRegistered() {
+            // arrange
+            Long userId = 999L;
+            String currentRawPassword = "Kyle!2030";
+            String newRawPassword = "Newer!2031";
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // act & assert
+            assertThatThrownBy(() -> userService.changePassword(userId, currentRawPassword, newRawPassword))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }
