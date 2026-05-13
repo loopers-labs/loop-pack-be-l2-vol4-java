@@ -77,5 +77,20 @@ public class UserModelTest {
             // assert = then
             assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
         }
+
+        @DisplayName("userId에 특수 문자가 들어가 있는 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenUserIdIncludesSpecialCharacter() {
+            // arrange = given
+            userId = 'abdf$2341!!';
+
+            // act = when
+            CoreException result = assertThrows(CoreException.class, () -> {
+                new UserModel(userId, password, name, birthDate, email);
+            });
+
+            // assert = then
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
     }
 }
