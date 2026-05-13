@@ -69,6 +69,17 @@ public class UserModel extends BaseEntity {
         return name.substring(0, name.length() - 1) + "*";
     }
 
+    public void changePassword(String currentPassword, String newPassword) {
+        if (!PASSWORD_ENCODER.matches(currentPassword, this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        if (PASSWORD_ENCODER.matches(newPassword, this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
+        }
+        validatePassword(newPassword, this.birthDate);
+        this.password = PASSWORD_ENCODER.encode(newPassword);
+    }
+
     private void validateUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
