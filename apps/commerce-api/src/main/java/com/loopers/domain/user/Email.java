@@ -3,9 +3,16 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
 import java.util.regex.Pattern;
 
-public record Email(String value) {
+@Embeddable
+public record Email(
+    @Column(name = "email", nullable = false, length = 254)
+    String value
+) {
 
     private static final int MAX_LENGTH = 254;
     private static final Pattern ALLOWED_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$");

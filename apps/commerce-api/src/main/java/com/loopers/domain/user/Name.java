@@ -3,9 +3,16 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
 import java.util.regex.Pattern;
 
-public record Name(String value) {
+@Embeddable
+public record Name(
+    @Column(name = "name", nullable = false, length = 20)
+    String value
+) {
 
     private static final int MIN_LENGTH = 2;
     private static final int MAX_LENGTH = 20;
