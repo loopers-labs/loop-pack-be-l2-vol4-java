@@ -69,7 +69,7 @@ public class UserModel extends BaseEntity {
         return name.substring(0, name.length() - 1) + "*";
     }
 
-    private static void validateUserId(String userId) {
+    private void validateUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
         }
@@ -78,7 +78,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private static void validateName(String name) {
+    private void validateName(String name) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }
@@ -87,7 +87,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private static void validateEmail(String email) {
+    private void validateEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.");
         }
@@ -96,7 +96,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private static void validatePassword(String password, LocalDate birthDate) {
+    private void validatePassword(String password, LocalDate birthDate) {
         if (password == null || password.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
         }
@@ -106,7 +106,7 @@ public class UserModel extends BaseEntity {
         validatePasswordNotContainsBirthDate(password, birthDate);
     }
 
-    private static void validatePasswordNotContainsBirthDate(String password, LocalDate birthDate) {
+    private void validatePasswordNotContainsBirthDate(String password, LocalDate birthDate) {
         String fullDate = birthDate.format(FULL_DATE_FORMAT);
         String yearlessDate = birthDate.format(YEARLESS_DATE_FORMAT);
         String monthDay = birthDate.format(MONTH_DAY_FORMAT);
