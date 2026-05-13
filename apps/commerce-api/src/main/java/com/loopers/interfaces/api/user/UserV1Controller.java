@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserMyInfo;
 import com.loopers.application.user.UserSignUpInfo;
-import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.AuthenticatedUser;
+import com.loopers.interfaces.api.auth.LoginUser;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,8 +41,8 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @Override
     @GetMapping("/me")
-    public ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(@AuthenticatedUser UserModel user) {
-        UserMyInfo userMyInfo = userFacade.readMyInfo(user);
+    public ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(@LoginUser AuthenticatedUser loginUser) {
+        UserMyInfo userMyInfo = userFacade.readMyInfo(loginUser.userId());
 
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(userMyInfo));
     }

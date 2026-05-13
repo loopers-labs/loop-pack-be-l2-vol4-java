@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.AuthenticatedUser;
+import com.loopers.interfaces.api.auth.LoginUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +22,6 @@ public interface UserV1ApiSpec {
         description = "본인 인증된 회원의 정보를 반환한다. 이름은 마지막 1글자가 *로 마스킹되어 반환된다."
     )
     ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(
-        @Parameter(hidden = true) @AuthenticatedUser UserModel authenticatedUser
+        @Parameter(hidden = true) @LoginUser AuthenticatedUser loginUser
     );
 }
