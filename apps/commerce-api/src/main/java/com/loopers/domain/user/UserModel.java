@@ -6,16 +6,23 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.regex.Pattern;
 
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 public class UserModel extends BaseEntity {
 
-    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
-    private static final DateTimeFormatter BIRTH_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
+    private static final Pattern USER_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[가-힣]+$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final DateTimeFormatter FULL_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter YEARLESS_DATE_FORMAT = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final DateTimeFormatter MONTH_DAY_FORMAT = DateTimeFormatter.ofPattern("MMdd");
 
     private String userId;
     private String name;
@@ -62,34 +69,34 @@ public class UserModel extends BaseEntity {
         return name.substring(0, name.length() - 1) + "*";
     }
 
-    private void validateUserId(String userId) {
+    private static void validateUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
         }
-        if (!userId.matches("^[a-zA-Z0-9]+$")) {
+        if (!USER_ID_PATTERN.matcher(userId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 영문과 숫자만 허용됩니다.");
         }
     }
 
-    private void validateName(String name) {
+    private static void validateName(String name) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }
-        if (!name.matches("^[가-힣]+$")) {
+        if (!NAME_PATTERN.matcher(name).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 한글만 허용되며 특수문자와 공백을 포함할 수 없습니다.");
         }
     }
 
-    private void validateEmail(String email) {
+    private static void validateEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.");
         }
-        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "올바른 이메일 형식이 아닙니다.");
         }
     }
 
-    private void validatePassword(String password, LocalDate birthDate) {
+    private static void validatePassword(String password, LocalDate birthDate) {
         if (password == null || password.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
         }
@@ -99,10 +106,10 @@ public class UserModel extends BaseEntity {
         validatePasswordNotContainsBirthDate(password, birthDate);
     }
 
-    private void validatePasswordNotContainsBirthDate(String password, LocalDate birthDate) {
-        String fullDate = birthDate.format(BIRTH_DATE_FORMAT);  // 19950610
-        String yearlessDate = fullDate.substring(2);             // 950610
-        String monthDay = fullDate.substring(4);                 // 0610
+    private static void validatePasswordNotContainsBirthDate(String password, LocalDate birthDate) {
+        String fullDate = birthDate.format(FULL_DATE_FORMAT);
+        String yearlessDate = birthDate.format(YEARLESS_DATE_FORMAT);
+        String monthDay = birthDate.format(MONTH_DAY_FORMAT);
 
         if (password.contains(fullDate) || password.contains(yearlessDate) || password.contains(monthDay)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
