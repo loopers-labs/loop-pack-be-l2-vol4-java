@@ -7,6 +7,10 @@ import java.time.format.DateTimeFormatter;
 
 public record UserInfo(Long id, String loginId, String name, String email, String birthDate, Gender gender) {
 
+    public String maskedName() {
+        return name.substring(0, name.length() - 1) + "*";
+    }
+
     public static UserInfo from(UserModel model) {
         return new UserInfo(
             model.getId(),
