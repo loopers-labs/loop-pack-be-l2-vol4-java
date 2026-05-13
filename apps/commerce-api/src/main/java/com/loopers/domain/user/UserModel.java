@@ -71,4 +71,19 @@ public class UserModel extends BaseEntity {
     public void encodePassword(PasswordEncoder encoder) {
         this.password = encoder.encode(this.password);
     }
+
+    /** 이름의 마지막 글자를 '*' 로 마스킹한다. (사이클 11 GREEN 에서 구현) */
+    public String getMaskedName() {
+        if (name == null || name.isEmpty()) return name;
+        return name.substring(0, name.length() - 1) + "*";
+    }
+
+    /** 비밀번호를 변경한다. 형식 위반·생년월일 포함·현재 비밀번호와 동일 시 BAD_REQUEST. */
+    public void changePassword(String newPassword, PasswordEncoder encoder) {
+        validatePass(newPassword, this.birth);
+        if (encoder.matches(newPassword, this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST);
+        }
+        this.password = encoder.encode(newPassword);
+    }
 }

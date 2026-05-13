@@ -16,13 +16,32 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import org.springframework.http.HttpHeaders;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserV1ApiE2ETest {
 
-    private static final String ENDPOINT_REGISTER = "/api/v1/users";
+    private static final String ENDPOINT_REGISTER    = "/api/v1/users";
+    private static final String ENDPOINT_MY_INFO     = "/api/v1/users/me";
+    private static final String ENDPOINT_CHANGE_PW   = "/api/v1/users/me/password";
+
+    private HttpHeaders authHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
+        headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
+        return headers;
+    }
+
+    private void registerDefaultUser() {
+        testRestTemplate.exchange(
+            ENDPOINT_REGISTER, HttpMethod.POST,
+            new HttpEntity<>(UserFixture.createRequest()),
+            new ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>>() {}
+        );
+    }
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -33,6 +52,149 @@ class UserV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("올바른 인증 헤더로 조회 시, 200 + 마스킹된 이름을 반환한다.")
+        @Test
+        void returnsMyInfo_whenValidRequest() {
+            // arrange
+            registerDefaultUser();
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(authHeaders()),
+                    responseType
+                );
+
+            // assert — 200 + 마스킹된 이름 "홍길*"
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*")
+            );
+        }
+
+        @DisplayName("loginId 헤더 누락 시, 400 을 반환한다.")
+        @Test
+        void throwsBadRequest_whenLoginIdHeaderMissing() {
+            // arrange — 헤더 없이 요청
+            registerDefaultUser();
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(new HttpHeaders()),
+                    responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 틀리면, 401 을 반환한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordIsWrong() {
+            // arrange
+            registerDefaultUser();
+
+            HttpHeaders wrongHeaders = new HttpHeaders();
+            wrongHeaders.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
+            wrongHeaders.set("X-Loopers-LoginPw", "WrongPass@1");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(wrongHeaders),
+                    responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("PUT /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 인증 헤더와 유효한 새 비밀번호로 변경 시, 200 을 반환한다.")
+        @Test
+        void returnsOk_whenValidRequest() {
+            // arrange
+            registerDefaultUser();
+            UserV1Dto.ChangePasswordRequest request =
+                new UserV1Dto.ChangePasswordRequest(UserFixture.PASSWORD, "NewPass@99");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_CHANGE_PW, HttpMethod.PUT,
+                    new HttpEntity<>(request, authHeaders()),
+                    responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @DisplayName("현재 비밀번호가 틀리면, 401 을 반환한다.")
+        @Test
+        void throwsUnauthorized_whenCurrentPasswordIsWrong() {
+            // arrange
+            registerDefaultUser();
+            UserV1Dto.ChangePasswordRequest request =
+                new UserV1Dto.ChangePasswordRequest("WrongPass@1", "NewPass@99");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_CHANGE_PW, HttpMethod.PUT,
+                    new HttpEntity<>(request, authHeaders()),
+                    responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 규칙에 맞지 않으면, 400 을 반환한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordViolatesRule() {
+            // arrange
+            registerDefaultUser();
+            UserV1Dto.ChangePasswordRequest request =
+                new UserV1Dto.ChangePasswordRequest(UserFixture.PASSWORD, "short");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_CHANGE_PW, HttpMethod.PUT,
+                    new HttpEntity<>(request, authHeaders()),
+                    responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("POST /api/v1/users")

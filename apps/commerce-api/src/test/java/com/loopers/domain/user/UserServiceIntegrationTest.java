@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -32,12 +33,16 @@ public class UserServiceIntegrationTest {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @MockitoSpyBean
     private UserRepository userRepository;
 
     @DisplayName("회원 가입할 때,")
     @Nested
     class RegisterUser {
+
         @DisplayName("register 호출 시, userRepository.save 가 호출된다.")
         @Test
         void callsSave_whenRegister() {
@@ -51,7 +56,6 @@ public class UserServiceIntegrationTest {
              *
              * 통합 테스트의 정석 (Classicist) 은 "진짜 DB 에 저장됐는지" 를 조회 결과로 검증하는 것:
              *
-             *     // (예시 — findByLoginId 가 사이클 12 에서 추가되면 가능)
              *     UserModel saved = userRepository.findByLoginId("testuser").orElseThrow();
              *     assertThat(saved.getLoginId()).isEqualTo("testuser");
              *     assertThat(saved.getEmail()).isEqualTo("test@loopers.com");
@@ -75,7 +79,6 @@ public class UserServiceIntegrationTest {
             verify(userRepository).save(any(UserModel.class));
         }
 
-
         @DisplayName("같은 loginId 로 가입 시도 시, CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
@@ -86,10 +89,10 @@ public class UserServiceIntegrationTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
-                    userService.register(second)
+                userService.register(second)
             );
 
-            //assert
+            // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
 
@@ -103,17 +106,82 @@ public class UserServiceIntegrationTest {
             UserModel saved = userService.register(user);
 
             // assert — 저장된 password 가 평문과 다름
-            // 약한 검증 : 알고리즘 유무 관계 없이 평문이 아닌지만 확인
             assertThat(saved.getPassword()).isNotEqualTo(UserFixture.PASSWORD);
-
-            // 강한 검증 : 실제 사용된 객체 변환 값의 알고리즘 확인
-            //assertThat(saved.getPassword()).isEqualTo("encoded:" + rawPassword);
         }
     }
 
+    @DisplayName("loginId 로 회원을 조회할 때,")
+    @Nested
+    class FindByLoginId {
 
+        @DisplayName("회원이 존재하면 UserModel 을 반환한다.")
+        @Test
+        void returnsUser_whenExists() {
+            // arrange
+            userService.register(UserFixture.createModel());
 
+            // act
+            UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
 
+            // assert
+            assertThat(found).isNotNull();
+            assertThat(found.getLoginId()).isEqualTo(UserFixture.LOGIN_ID);
+            assertThat(found.getEmail()).isEqualTo(UserFixture.EMAIL);
+        }
 
+        @DisplayName("회원이 존재하지 않으면 null 을 반환한다.")
+        @Test
+        void returnsNull_whenNotExists() {
+            // act
+            UserModel found = userService.findByLoginId("nonexistent");
 
+            // assert
+            assertThat(found).isNull();
+        }
+
+        @DisplayName("조회된 이름은 getMaskedName() 으로 마스킹이 적용된다.")
+        @Test
+        void returnsMaskedName_whenExists() {
+            // arrange
+            userService.register(UserFixture.createModel());
+
+            // act
+            UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
+
+            // assert
+            assertThat(found.getMaskedName()).isEqualTo("홍길*");
+        }
+    }
+
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("기존 비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenCurrentPasswordIsWrong() {
+            // arrange
+            userService.register(UserFixture.createModel());
+
+            // act & assert
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.changePassword(UserFixture.LOGIN_ID, "WrongPass@1", "NewPass@99")
+            );
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("정상 변경 시 DB 의 비밀번호가 새 값으로 암호화되어 갱신된다.")
+        @Test
+        void updatesEncodedPassword_whenValidChange() {
+            // arrange
+            userService.register(UserFixture.createModel());
+
+            // act
+            userService.changePassword(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "NewPass@99");
+
+            // assert — 새 비밀번호로 matches 통과 확인
+            UserModel updated = userService.findByLoginId(UserFixture.LOGIN_ID);
+            assertThat(passwordEncoder.matches("NewPass@99", updated.getPassword())).isTrue();
+        }
+    }
 }

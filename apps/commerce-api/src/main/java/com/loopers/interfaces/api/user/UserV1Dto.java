@@ -31,4 +31,29 @@ public class UserV1Dto {
             );
         }
     }
+
+    // 내정보 조회 응답 — name 은 마스킹된 값
+    public record MyInfoResponse(
+        Long id,
+        String loginId,
+        String name,
+        String birth,
+        String email
+    ) {
+        public static MyInfoResponse from(UserInfo info) {
+            return new MyInfoResponse(
+                info.id(),
+                info.loginId(),
+                info.maskedName(),
+                info.birth(),
+                info.email()
+            );
+        }
+    }
+
+    // 비밀번호 변경 요청
+    public record ChangePasswordRequest(
+        String currentPassword,
+        String newPassword
+    ) {}
 }

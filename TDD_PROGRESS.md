@@ -8,10 +8,9 @@
 ## 📍 현재 위치 (세션 재개용)
 
 - **마지막 작업일:** 2026-05-14
-- **현재 위치:** **회원가입 단위 5/5 + 통합 3/3 + E2E 2/2 완주 🎉**
-- **다음 사이클:** `사이클 11 — 이름의 마지막 글자를 * 로 마스킹` (🔴 RED 부터)
-- **다음 작업:** `UserModelTest` 에 `MaskedName` 중첩 클래스 추가 — `user.getMaskedName()` 호출 시 마지막 글자가 `*` 기대
-- **E2E 설계 교훈:** 다음 기능(내 정보 조회) E2E 진입 전, 모든 시나리오 RED 를 컨트롤러 추가 전에 먼저 작성할 것
+- **현재 위치:** **내 정보 조회 + 비밀번호 변경 단위/통합/E2E 전체 완주 🎉 (사이클 11~25)**
+- **다음 사이클:** 없음 — 회원 도메인 전체 완료
+- **탑다운 TDD 흐름:** E2E 테스트(GetMyInfo+ChangePassword) 먼저 작성 → 골격 코드 → 단위 → 통합 → Facade → Controller → E2E GREEN
 - **마지막 테스트 실행 결과:** 전체 테스트 → **BUILD SUCCESSFUL** ✅
 
 > 새 세션을 열면: 이 파일 + [`TEST_GUIDE.md`](./TEST_GUIDE.md) + [`.codeguide/loopers-1-week.md`](./.codeguide/loopers-1-week.md) 세 개를 먼저 읽고 이어간다.
@@ -144,47 +143,47 @@
 ### 🧱 단위 테스트 — `UserModelTest` 의 `MaskedName` 그룹
 
 #### 사이클 11 — 이름의 마지막 글자를 `*` 로 마스킹
-- [ ] 🔴 RED — `user.getMaskedName()` 호출 시 마지막 글자가 `*` 기대
-- [ ] 🟢 GREEN — `UserModel.getMaskedName()` 구현
-- [ ] 🔵 REFACTOR — 1글자/2글자 경계 처리 점검
+- [x] 🔴 RED — `user.getMaskedName()` 호출 시 마지막 글자가 `*` 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `UserModel.getMaskedName()` 구현 (`name.substring(0, n-1) + "*"`) _(2026-05-14)_
+- [x] 🔵 REFACTOR — null/empty 가드 포함, 단일 표현식으로 명확 _(2026-05-14)_
 
 ---
 
 ### 🔗 통합 테스트 — `UserServiceIntegrationTest` 의 `FindByLoginId` 그룹
 
 #### 사이클 12 — 회원 존재 시 정보 반환
-- [ ] 🔴 RED — 가입 후 `findByLoginId` 호출 → 회원 반환 기대
-- [ ] 🟢 GREEN — `UserService.findByLoginId` 구현
-- [ ] 🔵 REFACTOR — Repository 조회 시그니처 정리
+- [x] 🔴 RED — 가입 후 `findByLoginId` 호출 → 회원 반환 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `UserRepository.findByLoginId`, `UserJpaRepository` 파생 쿼리, `UserService.findByLoginId` 구현 _(2026-05-14)_
+- [x] 🔵 REFACTOR — Repository → JpaRepository → Impl 3단 위임 패턴 일관성 확보 _(2026-05-14)_
 
 #### 사이클 13 — 회원 부재 시 `null` 반환
-- [ ] 🔴 RED — 존재하지 않는 loginId 로 조회 → null 기대
-- [ ] 🟢 GREEN — `Optional.orElse(null)` 처리
-- [ ] 🔵 REFACTOR — null 반환 정책 명문화
+- [x] 🔴 RED — 존재하지 않는 loginId 로 조회 → null 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `Optional.orElse(null)` 처리 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 (한 줄, 의도 명확) _(2026-05-14)_
 
 #### 사이클 14 — 반환되는 이름이 마스킹되어 있음
-- [ ] 🔴 RED — 조회 후 `getMaskedName()` 결과 검증
-- [ ] 🟢 GREEN — (사이클 11 의 메서드로 이미 동작)
-- [ ] 🔵 REFACTOR — Info 객체에서 마스킹 적용 위치 결정
+- [x] 🔴 RED — 조회 후 `getMaskedName()` 결과 검증 _(2026-05-14)_
+- [x] 🟢 GREEN — 사이클 11 의 `getMaskedName()` 으로 자동 통과 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 마스킹 위치: UserModel (도메인 책임) + UserInfo.maskedName() (응용 계층 전달) _(2026-05-14)_
 
 ---
 
 ### 🌐 E2E 테스트 — `UserV1ApiE2ETest` 의 `GetMyInfo` 그룹
 
 #### 사이클 15 — 올바른 헤더로 조회 시 200 + 마스킹된 정보
-- [ ] 🔴 RED — `GET /api/v1/users/me` + 헤더 → 200 + 마스킹 이름 기대
-- [ ] 🟢 GREEN — Controller `@RequestHeader` + Facade 인증 분기
-- [ ] 🔵 REFACTOR — Facade 의 인증 책임 정리
+- [x] 🔴 RED — 컨트롤러 없는 상태에서 `GET /api/v1/users/me` 전체 시나리오 작성 → 404 RED 확인 _(2026-05-14, 탑다운: E2E 먼저 작성)_
+- [x] 🟢 GREEN — `@GetMapping("/me")` + `@RequestHeader` + `UserFacade.getMyInfo()` 구현 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 _(2026-05-14)_
 
 #### 사이클 16 — 필수 헤더 누락 시 400
-- [ ] 🔴 RED — 헤더 없이 요청 → 400 기대
-- [ ] 🟢 GREEN — `@RequestHeader(required = true)` 또는 Advice 매핑
-- [ ] 🔵 REFACTOR — 누락 vs 잘못된 값 분기 정리
+- [x] 🔴 RED — 헤더 없이 요청 → 404 RED (탑다운; 컨트롤러 없을 때 함께 작성) _(2026-05-14)_
+- [x] 🟢 GREEN — `@RequestHeader("X-Loopers-LoginId")` required=true(기본값) + `ApiControllerAdvice.MissingRequestHeaderException` → 400 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 _(2026-05-14)_
 
 #### 사이클 17 — 비밀번호 불일치 시 401
-- [ ] 🔴 RED — 잘못된 비밀번호로 조회 → 401 기대
-- [ ] 🟢 GREEN — Facade 에서 `passwordEncoder.matches` 실패 시 UNAUTHORIZED
-- [ ] 🔵 REFACTOR — 인증 로직 위치 (Facade vs Service) 점검
+- [x] 🔴 RED — 잘못된 비밀번호로 조회 → 404 RED (탑다운; 함께 작성) _(2026-05-14)_
+- [x] 🟢 GREEN — `Facade.getMyInfo` 에서 `passwordEncoder.matches` 실패 시 `CoreException(UNAUTHORIZED)` → 401 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 인증 책임: Facade (passwordEncoder 주입) + 조회: Service 로 분리 _(2026-05-14)_
 
 ---
 
@@ -197,52 +196,53 @@
 ### 🧱 단위 테스트 — `UserModelTest` 의 `ChangePassword` 그룹
 
 #### 사이클 18 — 새 비밀번호가 RULE 위반 시 BAD_REQUEST
-- [ ] 🔴 RED — 너무 짧은 새 비밀번호로 `changePassword` → BAD_REQUEST 기대
-- [ ] 🟢 GREEN — `UserModel.changePassword` 에서 정규식 검증
-- [ ] 🔵 REFACTOR — 생성자 검증과 패턴 공유
+- [x] 🔴 RED — 너무 짧은 새 비밀번호로 `changePassword` → BAD_REQUEST 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `UserModel.changePassword` 에서 `validatePass(newPassword, birth)` 재사용 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생성자 검증 메서드(`validatePass`)를 changePassword 에서 재사용 — 중복 제거 _(2026-05-14)_
 
 #### 사이클 19 — 새 비밀번호에 생년월일 포함 시 BAD_REQUEST
-- [ ] 🔴 RED — 생년월일 포함 새 비밀번호 → BAD_REQUEST 기대
-- [ ] 🟢 GREEN — `contains(birth)` 검증
-- [ ] 🔵 REFACTOR — 검증 로직 중복 제거
+- [x] 🔴 RED — 생년월일 포함 새 비밀번호 → BAD_REQUEST 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `validatePass` 내부 `password.contains(birth)` 검증으로 자동 통과 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 (사이클 18 REFACTOR 에서 이미 반영) _(2026-05-14)_
 
 #### 사이클 20 — 새 비밀번호가 현재 비밀번호와 동일 시 BAD_REQUEST
-- [ ] 🔴 RED — 같은 비밀번호로 변경 시도 → BAD_REQUEST 기대
-- [ ] 🟢 GREEN — `encoder.matches(new, this.password)` 비교
-- [ ] 🔵 REFACTOR — Fake PasswordEncoder 활용 점검
+- [x] 🔴 RED — 암호화 후 동일 평문으로 변경 시도 → BAD_REQUEST 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `encoder.matches(newPassword, this.password)` 가 true 이면 BAD_REQUEST _(2026-05-14)_
+- [x] 🔵 REFACTOR — FakePasswordEncoder 로 단위 테스트에서 결정적 검증 가능 확인 _(2026-05-14)_
 
 ---
 
 ### 🔗 통합 테스트 — `UserServiceIntegrationTest` 의 `ChangePassword` 그룹
 
 #### 사이클 21 — 기존 비밀번호 불일치 시 UNAUTHORIZED
-- [ ] 🔴 RED — 잘못된 기존 비밀번호로 변경 → UNAUTHORIZED 기대
-- [ ] 🟢 GREEN — `UserService.changePassword` 에서 matches 검증
-- [ ] 🔵 REFACTOR — 인증 실패 코드 일관성
+- [x] 🔴 RED — 잘못된 기존 비밀번호로 변경 → UNAUTHORIZED 기대 _(2026-05-14)_
+- [x] 🟢 GREEN — `UserService.changePassword` 에서 `passwordEncoder.matches` 실패 시 UNAUTHORIZED _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 _(2026-05-14)_
 
 #### 사이클 22 — 정상 변경 시 DB password 가 새 값으로 암호화되어 갱신
-- [ ] 🔴 RED — 변경 후 재조회, 비밀번호가 새 값과 matches 통과
-- [ ] 🟢 GREEN — `@Transactional` + `user.changePassword(newPw, encoder)`
-- [ ] 🔵 REFACTOR — dirty checking 흐름 점검
+- [x] 🔴 RED — 변경 후 재조회, 비밀번호가 새 값과 matches 통과 _(2026-05-14)_
+- [x] 🟢 GREEN — `@Transactional` + `user.changePassword(newPw, encoder)` → JPA dirty checking 으로 UPDATE _(2026-05-14)_
+- [x] 🔵 REFACTOR — explicit `save()` 없이 dirty checking 으로 갱신 — 의도 주석 추가 _(2026-05-14)_
 
 ---
 
 ### 🌐 E2E 테스트 — `UserV1ApiE2ETest` 의 `ChangePassword` 그룹
 
 #### 사이클 23 — 정상 변경 시 200
-- [ ] 🔴 RED — `PUT /api/v1/users/me/password` → 200 기대
-- [ ] 🟢 GREEN — Controller `@PutMapping` + Facade 연결
-- [ ] 🔵 REFACTOR — Request DTO 명확화
+- [x] 🔴 RED — 컨트롤러 없는 상태에서 `PUT /api/v1/users/me/password` 전체 시나리오 작성 → 404 RED _(2026-05-14, 탑다운)_
+- [x] 🟢 GREEN — `@PutMapping("/me/password")` + `UserFacade.changePassword` 연결 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 _(2026-05-14)_
+- _설계 결정: 현재 비밀번호는 요청 바디의 `currentPassword` 로 인증, `X-Loopers-LoginPw` 헤더는 이 엔드포인트에서 불필요_
 
 #### 사이클 24 — 기존 비밀번호 불일치 시 401
-- [ ] 🔴 RED — 잘못된 기존 비밀번호 요청 → 401 기대
-- [ ] 🟢 GREEN — UNAUTHORIZED → 401 매핑 확인
-- [ ] 🔵 REFACTOR — Advice 매핑 일관성
+- [x] 🔴 RED — 잘못된 `currentPassword` 요청 → 404 RED (탑다운; 함께 작성) _(2026-05-14)_
+- [x] 🟢 GREEN — `CoreException(UNAUTHORIZED)` → `ApiControllerAdvice` → 401 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략 _(2026-05-14)_
 
 #### 사이클 25 — 새 비밀번호 RULE 위반 시 400
-- [ ] 🔴 RED — RULE 위반 새 비밀번호 → 400 기대
-- [ ] 🟢 GREEN — BAD_REQUEST → 400 매핑 확인
-- [ ] 🔵 REFACTOR — 도메인 예외 ↔ HTTP 매핑 표 정리
+- [x] 🔴 RED — RULE 위반 `newPassword` → 404 RED (탑다운; 함께 작성) _(2026-05-14)_
+- [x] 🟢 GREEN — `UserModel.changePassword` 내 `validatePass` → `CoreException(BAD_REQUEST)` → 400 _(2026-05-14)_
+- [x] 🔵 REFACTOR — 도메인 예외 ↔ HTTP 매핑: BAD_REQUEST→400, UNAUTHORIZED→401, CONFLICT→409 확인 _(2026-05-14)_
 
 ---
 

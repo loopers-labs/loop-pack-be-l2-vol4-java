@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
@@ -85,6 +86,81 @@ class UserModelTest {
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
                     new UserModel(UserFixture.LOGIN_ID, passwordContainingBirth, UserFixture.NAME, UserFixture.BIRTH, UserFixture.EMAIL)
+            );
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("이름을 마스킹할 때,")
+    @Nested
+    class MaskedName {
+
+        @DisplayName("마지막 글자가 '*' 로 치환된 이름을 반환한다.")
+        @Test
+        void returnsMaskedName_whenCalled() {
+            // arrange
+            UserModel user = UserFixture.createModel(); // NAME = "홍길동"
+
+            // act & assert
+            assertAll(
+                () -> assertThat(user.getMaskedName()).isEqualTo("홍길*"),
+                () -> assertThat(user.getMaskedName()).endsWith("*"),
+                () -> assertThat(user.getMaskedName()).startsWith("홍길")
+            );
+        }
+    }
+
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("새 비밀번호가 형식 RULE 을 위반하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordViolatesFormat() {
+            // arrange
+            UserModel user = UserFixture.createModel();
+            FakePasswordEncoder encoder = new FakePasswordEncoder();
+            String tooShort = "abc1!";  // 5자 — 8자 미만
+
+            // act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                user.changePassword(tooShort, encoder)
+            );
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsBirth() {
+            // arrange
+            UserModel user = UserFixture.createModel();  // BIRTH = "1990-01-01"
+            FakePasswordEncoder encoder = new FakePasswordEncoder();
+            String passwordWithBirth = "ab1990-01-01";  // 형식은 통과, birth 포함
+
+            // act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                user.changePassword(passwordWithBirth, encoder)
+            );
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // arrange — 먼저 암호화 적용
+            UserModel user = UserFixture.createModel();
+            FakePasswordEncoder encoder = new FakePasswordEncoder();
+            user.encodePassword(encoder);  // password → "encoded:Password@1"
+
+            // act — 동일한 평문으로 변경 시도
+            CoreException ex = assertThrows(CoreException.class, () ->
+                user.changePassword(UserFixture.PASSWORD, encoder)
             );
 
             // assert
