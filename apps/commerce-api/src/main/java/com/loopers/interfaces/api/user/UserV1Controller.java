@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -40,5 +41,15 @@ public class UserV1Controller implements UserV1ApiSpec {
     @Override
     public ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(@LoginUser UserInfo loginUser) {
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(loginUser));
+    }
+
+    @PutMapping("/me/password")
+    @Override
+    public ApiResponse<Object> updatePassword(
+        @LoginUser UserInfo loginUser,
+        @RequestBody UserV1Dto.UpdatePasswordRequest request
+    ) {
+        userFacade.changePassword(loginUser.loginId(), request.oldPassword(), request.newPassword());
+        return ApiResponse.success();
     }
 }

@@ -36,4 +36,16 @@ public class UserService {
         }
         return user;
     }
+
+    @Transactional
+    public void changePassword(String loginId, String oldRawPasswordValue, String newRawPasswordValue) {
+        UserModel user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "기존 비밀번호가 일치하지 않습니다."));
+        if (!passwordEncoder.matches(oldRawPasswordValue, user.getPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "기존 비밀번호가 일치하지 않습니다.");
+        }
+        RawPassword newRawPassword = new RawPassword(newRawPasswordValue);
+        user.updatePassword(newRawPassword, passwordEncoder);
+        userRepository.save(user);
+    }
 }

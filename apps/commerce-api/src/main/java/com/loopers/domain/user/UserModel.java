@@ -73,4 +73,17 @@ public class UserModel extends BaseEntity {
         this.birthDate = birthDate;
         this.email = email;
     }
+
+    public void updatePassword(RawPassword newRawPassword, PasswordEncoder passwordEncoder) {
+        if (newRawPassword == null || passwordEncoder == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호 변경 요청이 올바르지 않습니다.");
+        }
+        if (passwordEncoder.matches(newRawPassword.value(), this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
+        }
+        if (newRawPassword.value().contains(this.birthDate.replace("-", ""))) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
+        this.password = passwordEncoder.encode(newRawPassword);
+    }
 }
