@@ -1,10 +1,10 @@
 package com.loopers.domain.user;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 
 public record BirthDate(LocalDate value) {
 
@@ -29,5 +29,13 @@ public record BirthDate(LocalDate value) {
 
     public String toShortCompact() {
         return value.format(SHORT_COMPACT_FORMATTER);
+    }
+
+    public boolean isContainedIn(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        return text.contains(toCompact()) || text.contains(toShortCompact());
     }
 }
