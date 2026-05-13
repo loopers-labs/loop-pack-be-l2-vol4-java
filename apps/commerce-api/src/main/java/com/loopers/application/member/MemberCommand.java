@@ -1,0 +1,14 @@
+package com.loopers.application.member;
+
+import java.time.LocalDate;
+
+public class MemberCommand {
+
+    public record Join(
+            String loginId,
+            String loginPassword,
+            String name,
+            LocalDate birthday,
+            String email
+    ) {}
+}
