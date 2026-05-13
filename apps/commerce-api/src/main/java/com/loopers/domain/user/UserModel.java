@@ -57,12 +57,6 @@ public class UserModel extends BaseEntity {
         this.password = encrypted;
     }
 
-    public void isPasswordValid(boolean isValid, String message) {
-        if (isValid) {
-            throw new IllegalArgumentException(message);
-        }
-    }
-
     public void validPasswordChange(String oldPassword, String targetPassword, PasswordMatcher matcher) {
         if (!matcher.matches(oldPassword, this.password)) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
