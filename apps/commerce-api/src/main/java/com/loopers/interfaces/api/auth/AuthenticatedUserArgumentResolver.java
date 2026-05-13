@@ -40,7 +40,7 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
         NativeWebRequest webRequest,
         WebDataBinderFactory binderFactory
     ) {
-        HttpServletRequest request = (HttpServletRequest) webRequest.getNativeRequest();
+        HttpServletRequest request = (HttpServletRequest)webRequest.getNativeRequest();
         String loginId = request.getHeader(LOGIN_ID_HEADER);
         String rawPassword = request.getHeader(LOGIN_PASSWORD_HEADER);
 

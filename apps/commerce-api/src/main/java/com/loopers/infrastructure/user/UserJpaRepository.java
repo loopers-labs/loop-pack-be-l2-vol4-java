@@ -2,8 +2,9 @@ package com.loopers.infrastructure.user;
 
 import java.util.Optional;
 
-import com.loopers.domain.user.UserModel;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.loopers.domain.user.UserModel;
 
 public interface UserJpaRepository extends JpaRepository<UserModel, Long> {
 
