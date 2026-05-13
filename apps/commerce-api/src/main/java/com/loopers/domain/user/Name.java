@@ -1,12 +1,12 @@
 package com.loopers.domain.user;
 
+import java.util.regex.Pattern;
+
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-
-import java.util.regex.Pattern;
 
 @Embeddable
 public record Name(
