@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api;
 
+import com.loopers.fixture.UserFixture;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -42,19 +43,14 @@ class UserV1ApiE2ETest {
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // arrange — 먼저 한 번 정상 가입
-            UserV1Dto.RegisterRequest first = new UserV1Dto.RegisterRequest(
-                "testuser", "Password@1", "홍길동", "1990-01-01", "first@loopers.com"
-            );
             testRestTemplate.exchange(
                 ENDPOINT_REGISTER, HttpMethod.POST,
-                new HttpEntity<>(first),
+                new HttpEntity<>(UserFixture.createRequest()),
                 new ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>>() {}
             );
 
-            // act — 같은 loginId 로 재시도
-            UserV1Dto.RegisterRequest second = new UserV1Dto.RegisterRequest(
-                "testuser", "Password@2!", "김철수", "1991-02-02", "second@loopers.com"
-            );
+            // act — 동일 loginId 로 재시도
+            UserV1Dto.RegisterRequest second = UserFixture.createRequest();
             ParameterizedTypeReference<ApiResponse<Void>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
@@ -71,9 +67,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsRegisteredUser_whenValidRequest() {
             // arrange
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
-                "testuser", "Password@1", "홍길동", "1990-01-01", "test@loopers.com"
-            );
+            UserV1Dto.RegisterRequest request = UserFixture.createRequest();
 
             // act
             ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>> responseType =

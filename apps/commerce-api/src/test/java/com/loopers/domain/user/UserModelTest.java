@@ -1,5 +1,6 @@
 package com.loopers.domain.user;
 
+import com.loopers.fixture.UserFixture;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -10,13 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
-
-    // 다음 케이스들에서도 재사용할 "유효한 기본값" — 한 필드만 깨뜨리는 패턴을 위함.
-    private static final String VALID_LOGIN_ID = "testuser";
-    private static final String VALID_PASSWORD = "Password@1";
-    private static final String VALID_NAME = "홍길동";
-    private static final String VALID_BIRTH = "1990-01-01";
-    private static final String VALID_EMAIL = "test@loopers.com";
 
     @DisplayName("유저 모델을 생성할 때, ")
     @Nested
@@ -30,7 +24,7 @@ class UserModelTest {
 
             // act — UserModel 생성 시 CoreException 이 던져질 것을 기대
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(invalidLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH, VALID_EMAIL)
+                new UserModel(invalidLoginId, UserFixture.PASSWORD, UserFixture.NAME, UserFixture.BIRTH, UserFixture.EMAIL)
             );
 
             // assert — ErrorType 이 BAD_REQUEST 인지
@@ -45,7 +39,7 @@ class UserModelTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH, invalidEmail)
+                new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, UserFixture.NAME, UserFixture.BIRTH, invalidEmail)
             );
 
             // assert
@@ -60,7 +54,7 @@ class UserModelTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirth, VALID_EMAIL)
+                new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, UserFixture.NAME, invalidBirth, UserFixture.EMAIL)
             );
 
             // assert
@@ -75,7 +69,7 @@ class UserModelTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
-                    new UserModel(VALID_LOGIN_ID, invalidPassword, VALID_NAME, VALID_BIRTH, VALID_EMAIL)
+                    new UserModel(UserFixture.LOGIN_ID, invalidPassword, UserFixture.NAME, UserFixture.BIRTH, UserFixture.EMAIL)
             );
 
             // assert
@@ -90,7 +84,7 @@ class UserModelTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class, () ->
-                    new UserModel(VALID_LOGIN_ID, passwordContainingBirth, VALID_NAME, VALID_BIRTH, VALID_EMAIL)
+                    new UserModel(UserFixture.LOGIN_ID, passwordContainingBirth, UserFixture.NAME, UserFixture.BIRTH, UserFixture.EMAIL)
             );
 
             // assert

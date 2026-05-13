@@ -1,6 +1,7 @@
 package com.loopers.domain.user;
 
 import com.loopers.config.TestPasswordEncoderConfig;
+import com.loopers.fixture.UserFixture;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -65,7 +66,7 @@ public class UserServiceIntegrationTest {
              */
 
             // arrange
-            UserModel userModel = new UserModel("testuser", "Password", "홍길동", "1990-01-01", "test@loopers.com");
+            UserModel userModel = UserFixture.createModel();
 
             // act
             userService.register(userModel);
@@ -78,9 +79,9 @@ public class UserServiceIntegrationTest {
         @DisplayName("같은 loginId 로 가입 시도 시, CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
-            // arrange — 사전 가입
-            UserModel first = new UserModel("testuser", "Password@1", "홍길동", "1990-01-01", "a@x.com");
-            UserModel second = new UserModel("testuser", "Password@2", "김철수", "1991-02-02", "b@x.com");
+            // arrange — 동일 loginId 로 두 번 시도
+            UserModel first  = UserFixture.createModel();
+            UserModel second = UserFixture.createModel();
             userService.register(first);
 
             // act
@@ -96,15 +97,14 @@ public class UserServiceIntegrationTest {
         @Test
         void passwordIsEncoded_whenRegister() {
             // arrange
-            String rawPassword = "Password@1";
-            UserModel user = new UserModel("testuser", rawPassword, "홍길동", "1990-01-01", "test@x.com");
+            UserModel user = UserFixture.createModel();
 
             // act
             UserModel saved = userService.register(user);
 
             // assert — 저장된 password 가 평문과 다름
             // 약한 검증 : 알고리즘 유무 관계 없이 평문이 아닌지만 확인
-            assertThat(saved.getPassword()).isNotEqualTo(rawPassword);
+            assertThat(saved.getPassword()).isNotEqualTo(UserFixture.PASSWORD);
 
             // 강한 검증 : 실제 사용된 객체 변환 값의 알고리즘 확인
             //assertThat(saved.getPassword()).isEqualTo("encoded:" + rawPassword);
