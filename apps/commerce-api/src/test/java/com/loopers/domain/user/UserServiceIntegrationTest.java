@@ -83,7 +83,7 @@ class UserServiceIntegrationTest {
 
     @DisplayName("회원 정보 조회")
     @Nested
-    class getUser {
+    class GetUser {
 
         @BeforeEach
         void setup() {
@@ -101,7 +101,8 @@ class UserServiceIntegrationTest {
                 () -> assertNotNull(userModel.getId()),
                 () -> assertEquals(DEFAULT_USER_ID, userModel.getUserId()),
                 () -> assertEquals(DEFAULT_NAME, userModel.getName()),
-                () -> assertEquals(DEFAULT_BIRTH_DATE, userModel.getBirthDate())
+                () -> assertEquals(DEFAULT_BIRTH_DATE, userModel.getBirthDate()),
+                () -> assertEquals(DEFAULT_EMAIL, userModel.getEmail())
             );
         }
 
@@ -138,7 +139,7 @@ class UserServiceIntegrationTest {
 
     @DisplayName("비밀번호 수정")
     @Nested
-    class changePassword {
+    class ChangePassword {
 
         @BeforeEach
         void setup() {
