@@ -21,7 +21,7 @@ public interface UserV1ApiSpec {
         summary = "내 정보 조회",
         description = "본인 인증된 회원의 정보를 반환한다. 이름은 마지막 1글자가 *로 마스킹되어 반환된다."
     )
-    ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(
+    ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(
         @Parameter(hidden = true) @AuthenticatedUser UserModel authenticatedUser
     );
 }

@@ -279,9 +279,10 @@ class UserV1ApiE2ETest {
 
     @DisplayName("내 정보 조회 - GET /api/v1/users/me")
     @Nested
-    class GetMyInfo {
+    class ReadMyInfo {
 
-        private static final String ENDPOINT_GET_MY_INFO = "/api/v1/users/me";
+        private static final String ENDPOINT_READ_MY_INFO = "/api/v1/users/me";
+        private static final String UNAUTHENTICATED_MESSAGE = "인증되지 않은 사용자입니다.";
 
         private void seedUser(String loginId, String password, String name, LocalDate birthDate, String email) {
             UserV1Dto.SignUpRequest signUpRequest = new UserV1Dto.SignUpRequest(loginId, password, name, birthDate, email);
@@ -295,12 +296,8 @@ class UserV1ApiE2ETest {
 
         private HttpEntity<Void> authHeaders(String loginId, String password) {
             HttpHeaders headers = new HttpHeaders();
-            if (loginId != null) {
-                headers.add("X-Loopers-LoginId", loginId);
-            }
-            if (password != null) {
-                headers.add("X-Loopers-LoginPw", password);
-            }
+            headers.add("X-Loopers-LoginId", loginId);
+            headers.add("X-Loopers-LoginPw", password);
             return new HttpEntity<>(headers);
         }
 
@@ -318,7 +315,7 @@ class UserV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders(loginId, password),
                 responseType
@@ -347,7 +344,7 @@ class UserV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders(loginId, password),
                 responseType
@@ -364,13 +361,15 @@ class UserV1ApiE2ETest {
         void returnsUnauthorized_whenLoginIdHeaderIsMissing() {
             // arrange
             seedUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("X-Loopers-LoginPw", "Kyle!2030");
 
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
-                authHeaders(null, "Kyle!2030"),
+                new HttpEntity<>(headers),
                 responseType
             );
 
@@ -379,7 +378,7 @@ class UserV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(response.getBody().meta().message()).isEqualTo("본인 인증에 실패했습니다."),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo(UNAUTHENTICATED_MESSAGE),
                 () -> assertThat(response.getBody().data()).isNull()
             );
         }
@@ -389,13 +388,15 @@ class UserV1ApiE2ETest {
         void returnsUnauthorized_whenLoginPasswordHeaderIsMissing() {
             // arrange
             seedUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("X-Loopers-LoginId", "kylekim");
 
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
-                authHeaders("kylekim", null),
+                new HttpEntity<>(headers),
                 responseType
             );
 
@@ -403,7 +404,7 @@ class UserV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(response.getBody().meta().message()).isEqualTo("본인 인증에 실패했습니다.")
+                () -> assertThat(response.getBody().meta().message()).isEqualTo(UNAUTHENTICATED_MESSAGE)
             );
         }
 
@@ -416,7 +417,7 @@ class UserV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("kyle!#", "Kyle!2030"),
                 responseType
@@ -426,7 +427,7 @@ class UserV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(response.getBody().meta().message()).isEqualTo("본인 인증에 실패했습니다.")
+                () -> assertThat(response.getBody().meta().message()).isEqualTo(UNAUTHENTICATED_MESSAGE)
             );
         }
 
@@ -439,7 +440,7 @@ class UserV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("unknown99", "Kyle!2030"),
                 responseType
@@ -449,7 +450,7 @@ class UserV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(response.getBody().meta().message()).isEqualTo("본인 인증에 실패했습니다.")
+                () -> assertThat(response.getBody().meta().message()).isEqualTo(UNAUTHENTICATED_MESSAGE)
             );
         }
 
@@ -462,7 +463,7 @@ class UserV1ApiE2ETest {
             // act
             ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_GET_MY_INFO,
+                ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("kylekim", "Wrong!2030"),
                 responseType
@@ -472,7 +473,7 @@ class UserV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("Unauthorized"),
-                () -> assertThat(response.getBody().meta().message()).isEqualTo("본인 인증에 실패했습니다.")
+                () -> assertThat(response.getBody().meta().message()).isEqualTo(UNAUTHENTICATED_MESSAGE)
             );
         }
     }

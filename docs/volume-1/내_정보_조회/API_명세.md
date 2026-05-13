@@ -65,13 +65,13 @@ X-Loopers-LoginPw: Kyle!2030
 
 | 상황 | HTTP | `errorCode` | `message` 예 |
 |---|---|---|---|
-| 본인 인증 실패 (헤더 누락 / 헤더 값 포맷 위반 / 회원 미존재 / 비밀번호 불일치) | `401` | `Unauthorized` | `"본인 인증에 실패했습니다."` |
+| 본인 인증 실패 (헤더 누락 / 헤더 값 포맷 위반 / 회원 미존재 / 비밀번호 불일치) | `401` | `Unauthorized` | `"인증되지 않은 사용자입니다."` |
 
 ### 5.2 예시
 
 ```json
 {
-  "meta": { "result": "FAIL", "errorCode": "Unauthorized", "message": "본인 인증에 실패했습니다." },
+  "meta": { "result": "FAIL", "errorCode": "Unauthorized", "message": "인증되지 않은 사용자입니다." },
   "data": null
 }
 ```

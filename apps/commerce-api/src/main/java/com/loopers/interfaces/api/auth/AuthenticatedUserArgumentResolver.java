@@ -23,8 +23,9 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PASSWORD_HEADER = "X-Loopers-LoginPw";
 
-    private final UserRepository userRepository;
     private final PasswordEncrypter passwordEncrypter;
+
+    private final UserRepository userRepository;
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
