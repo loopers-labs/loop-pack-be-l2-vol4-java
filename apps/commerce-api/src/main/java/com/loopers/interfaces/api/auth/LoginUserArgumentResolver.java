@@ -1,7 +1,6 @@
 package com.loopers.interfaces.api.auth;
 
-import com.loopers.domain.user.UserModel;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserFacade;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,7 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
     public static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     public static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
-    private final UserService userService;
+    private final UserFacade userFacade;
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
@@ -38,7 +37,7 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
         if (loginId == null || loginId.isBlank() || loginPw == null || loginPw.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다.");
         }
-        UserModel user = userService.authenticate(loginId, loginPw);
-        return new AuthUser(user.getId(), user.getLoginId().getValue());
+        Long userId = userFacade.authenticate(loginId, loginPw);
+        return new AuthUser(userId, loginId);
     }
 }

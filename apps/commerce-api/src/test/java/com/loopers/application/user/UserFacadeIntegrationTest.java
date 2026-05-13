@@ -1,5 +1,6 @@
-package com.loopers.domain.user;
+package com.loopers.application.user;
 
+import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.support.IntegrationTest;
 import com.loopers.support.error.CoreException;
@@ -20,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @IntegrationTest
-class UserServiceIntegrationTest {
+class UserFacadeIntegrationTest {
 
     @Autowired
-    private UserService userService;
+    private UserFacade userFacade;
 
     @Autowired
     private UserJpaRepository userJpaRepository;
@@ -51,7 +52,7 @@ class UserServiceIntegrationTest {
             String rawPassword = "Pass1234!";
 
             // when
-            userService.signUp(loginId, rawPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            userFacade.signUp(loginId, rawPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
 
             // then
             UserModel saved = userJpaRepository.findByLoginId(loginId).orElseThrow();
@@ -66,11 +67,11 @@ class UserServiceIntegrationTest {
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // given
-            userService.signUp("loopers01", "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            userFacade.signUp("loopers01", "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.signUp("loopers01", "Other9876@", "김철수", LocalDate.of(1990, 1, 1), "other@loopers.com")
+                userFacade.signUp("loopers01", "Other9876@", "김철수", LocalDate.of(1990, 1, 1), "other@loopers.com")
             );
 
             // then
@@ -82,19 +83,20 @@ class UserServiceIntegrationTest {
     @Nested
     class Authenticate {
 
-        @DisplayName("올바른 자격증명이면 유저를 반환한다")
+        @DisplayName("올바른 자격증명이면 userId를 반환한다")
         @Test
-        void returnsUser_whenCredentialsAreCorrect() {
+        void returnsUserId_whenCredentialsAreCorrect() {
             // given
             String loginId = "loopers01";
             String rawPassword = "Pass1234!";
-            userService.signUp(loginId, rawPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            userFacade.signUp(loginId, rawPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            Long expectedId = userJpaRepository.findByLoginId(loginId).orElseThrow().getId();
 
             // when
-            UserModel user = userService.authenticate(loginId, rawPassword);
+            Long userId = userFacade.authenticate(loginId, rawPassword);
 
             // then
-            assertThat(user.getLoginId().getValue()).isEqualTo(loginId);
+            assertThat(userId).isEqualTo(expectedId);
         }
 
         @DisplayName("틀린 비밀번호로 인증하면 UNAUTHORIZED 예외가 발생한다")
@@ -102,11 +104,11 @@ class UserServiceIntegrationTest {
         void throwsUnauthorized_whenPasswordIsWrong() {
             // given
             String loginId = "loopers01";
-            userService.signUp(loginId, "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            userFacade.signUp(loginId, "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.authenticate(loginId, "Wrong9999@")
+                userFacade.authenticate(loginId, "Wrong9876@")
             );
 
             // then
@@ -125,17 +127,17 @@ class UserServiceIntegrationTest {
             String loginId = "loopers01";
             String oldPassword = "Pass1234!";
             String newPassword = "NewPw9876@";
-            userService.signUp(loginId, oldPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
+            userFacade.signUp(loginId, oldPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
             Long userId = userJpaRepository.findByLoginId(loginId).orElseThrow().getId();
 
             // when
-            userService.changePassword(userId, oldPassword, newPassword);
+            userFacade.changePassword(userId, oldPassword, newPassword);
 
             // then
             assertAll(
-                () -> assertDoesNotThrow(() -> userService.authenticate(loginId, newPassword)),
+                () -> assertDoesNotThrow(() -> userFacade.authenticate(loginId, newPassword)),
                 () -> {
-                    CoreException ex = assertThrows(CoreException.class, () -> userService.authenticate(loginId, oldPassword));
+                    CoreException ex = assertThrows(CoreException.class, () -> userFacade.authenticate(loginId, oldPassword));
                     assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
                 }
             );

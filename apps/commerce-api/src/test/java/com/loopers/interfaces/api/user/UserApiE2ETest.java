@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.dto.ChangePasswordV1Request;
 import com.loopers.interfaces.api.user.dto.MyInfoV1Response;
@@ -42,7 +42,7 @@ class UserApiE2ETest {
     private TestRestTemplate restTemplate;
 
     @Autowired
-    private UserService userService;
+    private UserFacade userFacade;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -87,7 +87,7 @@ class UserApiE2ETest {
         @Test
         void returns409_whenLoginIdAlreadyExists() {
             // given
-            userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            userFacade.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             SignUpV1Request request = new SignUpV1Request(
                 VALID_LOGIN_ID, "Other9876@", "김철수", LocalDate.of(2000, 3, 3), "other@loopers.com"
             );
@@ -133,7 +133,7 @@ class UserApiE2ETest {
         @Test
         void returnsMaskedName_whenAuthenticated() {
             // given
-            userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL);
+            userFacade.signUp(VALID_LOGIN_ID, VALID_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL);
 
             // when
             ResponseEntity<ApiResponse<MyInfoV1Response>> response = restTemplate.exchange(
@@ -174,7 +174,7 @@ class UserApiE2ETest {
         @Test
         void returns401_whenPasswordIsWrong() {
             // given
-            userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            userFacade.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
 
             // when
             ResponseEntity<ApiResponse<MyInfoV1Response>> response = restTemplate.exchange(
@@ -198,7 +198,7 @@ class UserApiE2ETest {
         void newPasswordAuthenticates_andOldFails_afterChange() {
             // given
             String newPassword = "NewPw9876@";
-            userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            userFacade.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             HttpHeaders headers = authHeaders(VALID_LOGIN_ID, VALID_PASSWORD);
             ChangePasswordV1Request request = new ChangePasswordV1Request(VALID_PASSWORD, newPassword);
 
@@ -234,7 +234,7 @@ class UserApiE2ETest {
         @Test
         void returns401_whenCurrentPasswordIsWrong() {
             // given
-            userService.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            userFacade.signUp(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             HttpHeaders headers = authHeaders(VALID_LOGIN_ID, VALID_PASSWORD);
             ChangePasswordV1Request request = new ChangePasswordV1Request("Wrong9999@", "NewPw9876@");
 
