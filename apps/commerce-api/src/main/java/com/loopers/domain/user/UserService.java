@@ -2,6 +2,8 @@ package com.loopers.domain.user;
 
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +24,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserModel getUserModel(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("유저의 아이디가 존재하지 않습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "유저의 아이디가 존재하지 않습니다."));
     }
 
     @Transactional(readOnly = true)
