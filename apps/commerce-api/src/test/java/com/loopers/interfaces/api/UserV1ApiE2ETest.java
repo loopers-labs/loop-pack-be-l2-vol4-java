@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
+    private static final String ENDPOINT_ME = "/api/v1/users/me";
 
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
@@ -203,6 +205,67 @@ class UserV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class FindMyInfo {
+
+        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 401 응답을 받는다.")
+        @Test
+        void throwsUnauthorized_whenLoginIdHeaderIsMissing() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginPw", "Passw0rd!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET,
+                    new HttpEntity<>(headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("유효한 헤더로 요청하면, 200 과 마지막 글자가 마스킹된 사용자 정보를 반환한다.")
+        @Test
+        void returnsMyInfo_whenHeadersAreValid() {
+            // arrange — 회원가입
+            UserV1Dto.SignupRequest signup = new UserV1Dto.SignupRequest(
+                "minwoo01",
+                "Passw0rd!",
+                "김민우",
+                LocalDate.of(1990, 1, 1),
+                "minwoo@example.com"
+            );
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> signupResponseType =
+                new ParameterizedTypeReference<>() {};
+            testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                new HttpEntity<>(signup), signupResponseType);
+
+            // arrange — 헤더 셋업
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "minwoo01");
+            headers.set("X-Loopers-LoginPw", "Passw0rd!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET,
+                    new HttpEntity<>(headers), responseType);
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("minwoo01"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("김민*"),
+                () -> assertThat(response.getBody().data().birth()).isEqualTo(LocalDate.of(1990, 1, 1)),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("minwoo@example.com")
+            );
         }
     }
 }

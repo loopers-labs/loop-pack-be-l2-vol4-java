@@ -23,4 +23,14 @@ public class UserFacade {
         User user = userService.register(loginId, password, name, birth, email);
         return UserInfo.from(user);
     }
+
+    public UserInfo findMyInfo(User user) {
+        return new UserInfo(
+            user.getId(),
+            user.getLoginId(),
+            user.maskedName(),
+            user.getBirth(),
+            user.getEmail()
+        );
+    }
 }

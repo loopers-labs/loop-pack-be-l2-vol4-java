@@ -63,4 +63,8 @@ public class User extends BaseEntity {
         }
         this.encodedPassword = newEncodedPassword;
     }
+
+    public String maskedName() {
+        return new Name(this.name).masked();
+    }
 }
