@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UserModelTest {
 
     private static final String VALID_LOGIN_ID = "chanhee";
-    private static final String VALID_PASSWORD = "chan1234!";
+    private static final Password VALID_PASSWORD = new Password("chan1234!");
     private static final String VALID_NAME = "김찬희";
     private static final String VALID_BIRTH_DATE = "1995-05-10";
     private static final String VALID_EMAIL = "chan950510@gmail.com";
@@ -27,7 +27,7 @@ class UserModelTest {
         void createsUserModel_whenAllFieldsAreValid() {
             // arrange
             String loginId = VALID_LOGIN_ID;
-            String password = VALID_PASSWORD;
+            Password password = VALID_PASSWORD;
             String name = VALID_NAME;
             String birthDate = VALID_BIRTH_DATE;
             String email = VALID_EMAIL;
@@ -74,76 +74,12 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("비밀번호가 8자 미만이면 BAD_REQUEST 예외 발생")
+        @DisplayName("비밀번호가 null이면 BAD_REQUEST 예외 발생")
         @Test
-        void throwsBadRequest_whenPasswordIsShorterThanMin() {
-            // arrange
-            String shortPassword = "Ab12!";
-
+        void throwsBadRequest_whenPasswordIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, shortPassword, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("비밀번호가 16자 초과하면 BAD_REQUEST 예외 발생")
-        @Test
-        void throwsBadRequest_whenPasswordIsLongerThanMax() {
-            // arrange
-            String longPassword = "Password12345678!";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, longPassword, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("비밀번호에 영문 대소문자/숫자/특수문자 외 문자포함 시 BAD_REQUEST 예외 발생")
-        @Test
-        void throwsBadRequest_whenPasswordContainsDisallowedCharacter() {
-            // arrange
-            String invalidPassword = "Pass1234가!";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, invalidPassword, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("비밀번호에 생년월일 포함 시 BAD_REQUEST 예외 발생")
-        @Test
-        void throwsBadRequest_whenPasswordContainsBirthDate() {
-            // arrange
-            String birthDate = "1995-05-10";
-            String passwordContainingBirthDate = "Pass19950510!";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, passwordContainingBirthDate, VALID_NAME, birthDate, VALID_EMAIL);
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("비밀번호가 비어있으면 BAD_REQUEST 예외 발생")
-        @Test
-        void throwsBadRequest_whenPasswordIsBlank() {
-            // arrange
-            String blankPassword = "        ";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, blankPassword, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+                new UserModel(VALID_LOGIN_ID, null, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             });
 
             // assert

@@ -64,7 +64,7 @@ class UserServiceTest {
             UserModel saved = savedCaptor.getValue();
             assertAll(
                     () -> assertThat(saved.getLoginId()).isEqualTo(VALID_LOGIN_ID),
-                    () -> assertThat(saved.getPassword()).isEqualTo(ENCODED_PASSWORD),
+                    () -> assertThat(saved.getPassword().value()).isEqualTo(ENCODED_PASSWORD),
                     () -> assertThat(saved.getName()).isEqualTo(VALID_NAME),
                     () -> assertThat(saved.getBirthDate()).isEqualTo(VALID_BIRTH_DATE),
                     () -> assertThat(saved.getEmail()).isEqualTo(VALID_EMAIL)
@@ -85,6 +85,25 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
                     () -> verify(userRepository, times(1)).existsByLoginId(VALID_LOGIN_ID),
+                    () -> verify(passwordEncoder, never()).encode(anyString()),
+                    () -> verify(userRepository, never()).save(any(UserModel.class))
+            );
+        }
+
+        @DisplayName("raw 비밀번호에 생년월일이 포함되어 있으면 BAD_REQUEST 예외 발생")
+        @Test
+        void throwsBadRequest_whenRawPasswordContainsBirthDate() {
+            // arrange
+            String passwordContainingBirthDate = "Pass19950510!";
+            given(userRepository.existsByLoginId(VALID_LOGIN_ID)).willReturn(false);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.signUp(VALID_LOGIN_ID, passwordContainingBirthDate, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+
+            // assert
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                     () -> verify(passwordEncoder, never()).encode(anyString()),
                     () -> verify(userRepository, never()).save(any(UserModel.class))
             );

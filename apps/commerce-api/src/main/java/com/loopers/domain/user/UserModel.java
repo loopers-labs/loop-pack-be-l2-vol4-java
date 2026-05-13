@@ -14,24 +14,23 @@ import java.util.regex.Pattern;
 public class UserModel {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^[A-Za-z0-9\\p{Punct}]{8,16}$");
     private static final Pattern BIRTH_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
 
     private final String loginId;
-    private final String password;
+    private final Password password;
     private final String name;
     private final String birthDate;
     private final String email;
 
-    public UserModel(String loginId, String password, String name, String birthDate, String email) {
+    public UserModel(String loginId, Password password, String name, String birthDate, String email) {
         if (loginId == null || loginId.isBlank() || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 형식이 올바르지 않습니다.");
         }
-        if (password == null || password.isBlank() || !PASSWORD_PATTERN.matcher(password).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호 형식이 올바르지 않습니다.");
+        if (password == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
         }
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
@@ -43,9 +42,6 @@ public class UserModel {
             LocalDate.parse(birthDate, BIRTH_DATE_FORMATTER);
         } catch (DateTimeParseException e) {
             throw new CoreException(ErrorType.BAD_REQUEST, "존재하지 않는 날짜입니다.");
-        }
-        if (password.contains(birthDate.replace("-", ""))) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
         }
         if (email == null || email.isBlank() || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
