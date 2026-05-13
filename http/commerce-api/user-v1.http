@@ -1,0 +1,11 @@
+### 회원가입
+POST {{commerce-api}}/api/v1/users/signup
+Content-Type: application/json
+
+{
+  "loginId": "chanhee",
+  "password": "chan1234!",
+  "name": "김찬희",
+  "birthDate": "1995-05-10",
+  "email": "chan950510@gmail.com"
+}
