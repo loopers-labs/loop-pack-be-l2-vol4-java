@@ -40,4 +40,14 @@ public class UserService {
         User user = new User(loginIdValue, new Name(name), birthValue, emailValue, encodedPassword);
         return userRepository.save(user);
     }
+
+    @Transactional(readOnly = true)
+    public User authenticate(LoginId loginId, String password) {
+        User user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED));
+        if (!passwordEncoder.matches(password, user.getEncodedPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED);
+        }
+        return user;
+    }
 }
