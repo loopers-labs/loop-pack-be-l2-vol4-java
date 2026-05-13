@@ -20,4 +20,8 @@ public class UserFacade {
 
         return UserSignUpInfo.from(newUser);
     }
+
+    public UserMyInfo getMyInfo(UserModel authenticatedUser) {
+        return UserMyInfo.from(authenticatedUser);
+    }
 }
