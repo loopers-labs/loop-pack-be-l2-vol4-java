@@ -1,7 +1,13 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.BaseEntity;
+import com.loopers.infrastructure.user.EncodedPasswordConverter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Getter;
 
 import java.time.LocalDate;
@@ -11,7 +17,9 @@ import java.time.format.ResolverStyle;
 import java.util.regex.Pattern;
 
 @Getter
-public class UserModel {
+@Entity
+@Table(name = "users")
+public class UserModel extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
     private static final Pattern BIRTH_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
@@ -19,11 +27,23 @@ public class UserModel {
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
 
-    private final String loginId;
-    private final EncodedPassword password;
-    private final String name;
-    private final String birthDate;
-    private final String email;
+    @Column(name = "login_id", nullable = false, unique = true)
+    private String loginId;
+
+    @Convert(converter = EncodedPasswordConverter.class)
+    @Column(name = "password", nullable = false)
+    private EncodedPassword password;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(name = "birth_date", nullable = false)
+    private String birthDate;
+
+    @Column(nullable = false)
+    private String email;
+
+    protected UserModel() {}
 
     public UserModel(String loginId, EncodedPassword password, String name, String birthDate, String email) {
         if (loginId == null || loginId.isBlank() || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
