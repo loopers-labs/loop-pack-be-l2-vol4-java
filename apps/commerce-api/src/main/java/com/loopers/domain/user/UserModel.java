@@ -21,6 +21,7 @@ public class UserModel extends BaseEntity {
     private static final String LOGIN_ID_REGEX = "^[a-zA-Z0-9]{1,10}$";
     private static final String EMAIL_REGEX = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
     private static final String PASSWORD_REGEX = "^[\\x21-\\x7E]{8,16}$";
+    private static final String NAME_REGEX = "^[가-힣]{2,10}$";
 
     private String loginId;
     private String password;
@@ -51,8 +52,8 @@ public class UserModel extends BaseEntity {
         if (!this.birthDate.isBefore(LocalDate.now())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 오늘 이전이어야 합니다.");
         }
-        if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
+        if (name == null || !name.matches(NAME_REGEX)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
         }
         // [fix] gender null 검증 누락으로 성별 없는 요청이 200을 반환하던 버그 수정
         if (gender == null) {

@@ -289,6 +289,105 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("이름에 숫자가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameContainsNumber() {
+            // arrange
+            String name = "홍길1";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름에 영문이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameContainsEnglish() {
+            // arrange
+            String name = "홍Gil동";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름에 특수문자가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameContainsSpecialCharacter() {
+            // arrange
+            String name = "홍길!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 1자이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsTooShort() {
+            // arrange
+            String name = "홍";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 11자 이상이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsTooLong() {
+            // arrange
+            String name = "홍길동홍길동홍길동홍길"; // 11자
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 정확히 2자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenNameIsExactlyTwoCharacters() {
+            // arrange
+            String name = "홍길";
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+        }
+
+        @DisplayName("이름이 정확히 10자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenNameIsExactlyTenCharacters() {
+            // arrange
+            String name = "홍길동홍길동홍길동홍"; // 10자
+
+            // act & assert
+            assertDoesNotThrow(() ->
+                new UserModel("user1", "Pass123!", name, "test@example.com", "2000-01-01", Gender.MALE)
+            );
+        }
+
         @DisplayName("비밀번호가 8자 미만이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordIsTooShort() {
@@ -426,17 +525,17 @@ class UserModelTest {
             assertThat(masked).isEqualTo("홍길*");
         }
 
-        @DisplayName("이름이 한 글자이면, * 하나만 반환된다.")
+        @DisplayName("이름이 두 글자이면, 마지막 글자만 *로 마스킹된다.")
         @Test
-        void returnsAsterisk_whenNameIsSingleCharacter() {
+        void masksLastCharacter_whenNameIsTwoCharacters() {
             // arrange
-            UserModel user = new UserModel("user1", "Pass123!", "김", "test@example.com", "2000-01-01", Gender.MALE);
+            UserModel user = new UserModel("user1", "Pass123!", "홍길", "test@example.com", "2000-01-01", Gender.MALE);
 
             // act
             String masked = user.getMaskedName();
 
             // assert
-            assertThat(masked).isEqualTo("*");
+            assertThat(masked).isEqualTo("홍*");
         }
     }
 }
