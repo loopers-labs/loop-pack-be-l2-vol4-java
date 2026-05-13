@@ -18,6 +18,9 @@ import java.time.format.ResolverStyle;
 public class UserModel extends BaseEntity {
 
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
+    private static final String LOGIN_ID_REGEX = "^[a-zA-Z0-9]{1,10}$";
+    private static final String EMAIL_REGEX = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
+    private static final String PASSWORD_REGEX = "^[\\x21-\\x7E]{8,16}$";
 
     private String loginId;
     private String password;
@@ -31,10 +34,10 @@ public class UserModel extends BaseEntity {
     protected UserModel() {}
 
     public UserModel(String loginId, String password, String name, String email, String birthDate, Gender gender) {
-        if (loginId == null || !loginId.matches("^[a-zA-Z0-9]{1,10}$")) {
+        if (loginId == null || !loginId.matches(LOGIN_ID_REGEX)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "loginId는 영문 및 숫자 10자 이내여야 합니다.");
         }
-        if (email == null || !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+        if (email == null || !email.matches(EMAIL_REGEX)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
         }
         if (birthDate == null) {
@@ -81,7 +84,7 @@ public class UserModel extends BaseEntity {
     // 규칙이 변경될 경우 이 메서드 하나만 수정하면 두 흐름 모두 반영되어 유지보수 누락을 방지한다.
     private void validatePassword(String password) {
         String birthDateNumeric = this.birthDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        if (password == null || !password.matches("^[\\x21-\\x7E]{8,16}$")) {
+        if (password == null || !password.matches(PASSWORD_REGEX)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
         }
         if (password.contains(birthDateNumeric)) {
