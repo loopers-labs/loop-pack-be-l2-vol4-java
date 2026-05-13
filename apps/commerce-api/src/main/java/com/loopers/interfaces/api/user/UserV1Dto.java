@@ -28,4 +28,27 @@ public class UserV1Dto {
             );
         }
     }
+
+    public record MyInfoResponse(
+        String loginId,
+        String name,
+        String birthDate,
+        String email
+    ) {
+        public static MyInfoResponse from(UserInfo info) {
+            return new MyInfoResponse(
+                info.loginId(),
+                maskLastChar(info.name()),
+                info.birthDate(),
+                info.email()
+            );
+        }
+
+        private static String maskLastChar(String value) {
+            if (value == null || value.isEmpty()) {
+                return value;
+            }
+            return value.substring(0, value.length() - 1) + "*";
+        }
+    }
 }
