@@ -73,11 +73,26 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("loginId가 정확히 1자이면, 예외가 발생하지 않는다.")
+        @DisplayName("loginId가 1자이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void doesNotThrow_whenLoginIdIsExactlyOneCharacter() {
+        void throwsBadRequest_whenLoginIdIsTooShort() {
             // arrange
             String loginId = "a";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new UserModel(loginId, "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("loginId가 정확히 2자이면, 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenLoginIdIsExactlyTwoCharacters() {
+            // arrange
+            String loginId = "ab";
 
             // act & assert
             assertDoesNotThrow(() ->
