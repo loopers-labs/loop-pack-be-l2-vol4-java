@@ -153,8 +153,11 @@ description: 모호하게 적힌 백엔드 기능 요구사항을 받아 7단계
 | 도메인 서비스 | `{X}Service` |
 | 도메인 객체·값 객체 | `{X}Model / 값 객체` (또는 `Domain`) |
 | 영속화 | `{X}Repository` |
+| 인증 인자 해석기 | `AuthenticatedUserArgumentResolver` (인증이 필요한 엔드포인트에서 Controller 앞에 액터로 등장) |
 
 **추상 액터(`Client`, `API`, `DB`)는 쓰지 마라.** 외부 의존(캐시·결제 PG)이 있을 때만 `Cache`, `External as {이름}` 추가.
+
+**인증이 필요한 시나리오 패턴**: `사용자 → AuthenticatedUserArgumentResolver → Repository.findByLoginId → UserModel.matchesPassword`로 인증된 후, `Resolver → Controller: @LoginUser AuthenticatedUser(userId)`를 주입하고, Controller가 Facade·Service·Repository로 후속 조회를 진행. 인증 실패는 모두 `CoreException(UNAUTHENTICATED)` → 401 단일 응답으로 통합 (사용자 열거 방지).
 
 ### 예외 카테고리 강제 점검
 
@@ -192,6 +195,7 @@ description: 모호하게 적힌 백엔드 기능 요구사항을 받아 7단계
 - "단일 필드 값에 대한 검증을 값 객체로 캡슐화할 수 있나요?"
 - "여러 필드를 함께 검증해야 하는 경우(예: 비밀번호+생년월일) 어느 값 객체가 둘 다 받는 게 자연스러운가요?"
 - "민감 정보의 변환은 도메인의 책임인가요, 인프라 어댑터의 책임인가요?"
+- "이 메서드 이름의 어휘 강도가 도메인 모델의 책임과 맞나요?" — 행위 강도가 강한 동사(`authenticate`, `mask`)는 도메인 모델 메서드보다 인증 서비스(Resolver 등)의 책임처럼 읽힌다. boolean 반환은 `matches*`/`is*`/`has*` 같은 명사·상태 접두사, 값 반환은 `*Value` 같은 명사형 접미사가 도메인 모델에 자연스럽다.
 
 더 깊이: `references/domain-modeling-guide.md`
 

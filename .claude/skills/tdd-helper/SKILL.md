@@ -214,10 +214,23 @@ void 이메일에_at이_없으면_BAD_REQUEST를_던진다() {
 - `System.out.println` / 디버그 출력 잔존 금지 — 필요하면 `Logger` 사용
 - 테스트 임의 삭제·스킵·`@Disabled` 금지 (사용자 승인 시에만)
 - 도메인이 `jakarta.persistence.*`에 직접 의존하지 않게 — JPA는 `infrastructure`에서만
+- **Controller·Facade가 JPA 엔티티(`*Model`)를 파라미터로 직접 받지 않게** — 표현 계층은 경량 표현 타입(record)으로 분리. 인증된 회원이라면 `@LoginUser AuthenticatedUser(userId)` 시그니처로, 후속 조회는 Service에 위임.
 
 ---
 
-## 8. Priority — 충돌 시 기준
+## 8. E2E 설계 가드레일
+
+E2E(`*ApiE2ETest`)는 외부 표면 검증이라 단위 테스트와 다른 가드레일이 필요하다.
+
+- **HTTP 헤더 값은 ASCII 한정.** JDK HTTP 클라이언트가 non-ASCII 헤더 값을 `IllegalArgumentException: invalid header value`로 거부한다 (RFC 7230). "잘못된 헤더 값" 케이스는 ASCII 범위 내(특수문자·길이 위반 등)로 구성. 한글·이모지는 클라이언트 단에서 차단되어 서버 로직에 도달하지 못한다.
+- **fixture는 Repository.save 직접.** 다른 API를 거쳐 fixture를 만들면 (1) 그 API에 대한 간접 의존성 (2) HTTP 라운드트립 오버헤드 (3) fixture 데이터 정확한 제어 어려움 — 세 가지 모두 부담된다. fixture가 본 테스트의 검증 대상이 아니라면 `*JpaRepository.save`를 직접 호출.
+- **에러 응답 단언 = 컨트랙트만.** `statusCode` + `meta.result` + `errorCode`까지만 검증. `meta.message` 텍스트 단언은 도메인 단위 테스트의 책임이며, E2E에서 메시지 문구까지 잡으면 빡빡한 테스트가 된다.
+- **응답 키 집합 검증은 `Map<String, Object>` + `containsOnlyKeys`.** typed record로 받으면 Jackson이 잉여 키를 조용히 무시한다.
+- **인증 실패는 단일 응답.** 헤더 누락·헤더 포맷 위반·회원 미존재·비밀번호 불일치 모두 동일한 `401 / errorCode "Unauthorized"`로 검증. 사유 식별 신호가 응답 어디에도 노출되지 않는지 함께 확인 (사용자 열거 방지).
+
+---
+
+## 9. Priority — 충돌 시 기준
 
 설계가 충돌할 때 다음 순서로 결정한다.
 
@@ -228,14 +241,15 @@ void 이메일에_at이_없으면_BAD_REQUEST를_던진다() {
 
 ---
 
-## 9. 프로젝트 컨벤션 포인터
+## 10. 프로젝트 컨벤션 포인터
 
 새 도메인을 만들 때 다음 컴포넌트를 그대로 사용한다.
 
 - `BaseEntity` (`modules/jpa`): 모든 엔티티의 부모. `id`, `createdAt`, `updatedAt`, `deletedAt` 자동 관리. 검증은 `guard()` 오버라이드 (`@PrePersist`/`@PreUpdate`에서 호출됨).
-- `CoreException` + `ErrorType` (`BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`): 도메인·서비스에서 던지는 단일 예외.
+- `CoreException` + `ErrorType` (`BAD_REQUEST`, `UNAUTHENTICATED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`): 도메인·서비스에서 던지는 단일 예외. `UNAUTHENTICATED`는 enum name이 의미 정확("인증 실패"), status는 `HttpStatus.UNAUTHORIZED`(401), code는 reason phrase `"Unauthorized"`.
 - `ApiControllerAdvice`: `CoreException`을 `ApiResponse.fail(...)`로 변환.
 - `ApiResponse<T>` (record): 컨트롤러는 항상 이 래퍼로 응답.
+- 인증이 필요한 엔드포인트는 `@LoginUser AuthenticatedUser` 시그니처로 받는다 (`interfaces.api.auth` 패키지). 표현 계층이 도메인 엔티티(`*Model`)에 직접 의존하지 않게 분리하고, 인증 실패는 모두 `ErrorType.UNAUTHENTICATED` 단일 응답으로 통합한다 (사용자 열거 방지).
 
 레이어 호출 방향은 항상 `interfaces → application → domain → infrastructure`. 도메인이 JPA에 직접 의존하지 않는다 — `domain.Repository` 인터페이스와 `infrastructure.RepositoryImpl` 패턴을 따른다.
 
