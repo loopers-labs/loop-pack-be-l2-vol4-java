@@ -45,4 +45,11 @@ public class UserService {
         return userRepository.findById(userId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
     }
+
+    public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
+        UserModel user = userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
+
+        user.changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
+    }
 }
