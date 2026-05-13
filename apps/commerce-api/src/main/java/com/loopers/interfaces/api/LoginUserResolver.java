@@ -23,12 +23,14 @@ public class LoginUserResolver implements HandlerMethodArgumentResolver {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
 
+    // @CurrentUser LoginUser 조합인 파라미터에만 동작
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.hasParameterAnnotation(CurrentUser.class)
             && parameter.getParameterType().equals(LoginUser.class);
     }
 
+    // 헤더에서 loginId/pw를 꺼내 DB 조회 + 비밀번호 검증 후 LoginUser 반환
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
         NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {

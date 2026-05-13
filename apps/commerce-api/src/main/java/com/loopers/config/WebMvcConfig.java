@@ -14,6 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginUserResolver loginUserResolver;
 
+    // LoginUserResolver를 Spring MVC에 등록 — 없으면 @CurrentUser 어노테이션이 동작하지 않음
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(loginUserResolver);
