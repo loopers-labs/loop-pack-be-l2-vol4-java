@@ -8,9 +8,9 @@
 ## 📍 현재 위치 (세션 재개용)
 
 - **마지막 작업일:** 2026-05-14
-- **현재 위치:** **회원가입 단위 5/5 + 통합 3/3 + E2E 1/2 완주** ✅
-- **다음 사이클:** `사이클 10 — 필수 정보 누락 시 400 Bad Request` (🔴 RED 부터)
-- **다음 작업:** `UserV1ApiE2ETest.Register` 에 `throwsBadRequest_whenLoginIdIsMissing` 테스트 추가 — `loginId` 누락 요청 → 400 기대
+- **현재 위치:** **회원가입 단위 5/5 + 통합 3/3 + E2E 2/2 완주 🎉**
+- **다음 사이클:** `사이클 11 — 이름의 마지막 글자를 * 로 마스킹` (🔴 RED 부터)
+- **다음 작업:** `UserModelTest` 에 `MaskedName` 중첩 클래스 추가 — `user.getMaskedName()` 호출 시 마지막 글자가 `*` 기대
 - **마지막 테스트 실행 결과:** 전체 테스트 → **BUILD SUCCESSFUL** ✅
 
 > 새 세션을 열면: 이 파일 + [`TEST_GUIDE.md`](./TEST_GUIDE.md) + [`.codeguide/loopers-1-week.md`](./.codeguide/loopers-1-week.md) 세 개를 먼저 읽고 이어간다.
@@ -127,9 +127,10 @@
 - [x] 🔵 REFACTOR — 생략 (흐름 단순·명확, 새 기능 없음) _(2026-05-14)_
 
 #### 사이클 10 — 필수 정보 누락 시 400 Bad Request
-- [ ] 🔴 RED — `loginId` 누락 요청 → 400 기대
-- [ ] 🟢 GREEN — `@Valid` + `@NotBlank` / `@NotNull` 적용
-- [ ] 🔵 REFACTOR — `ApiControllerAdvice` 의 매핑 확인
+- [x] 🔴 RED — `loginId` 누락 요청 → 400 기대 _(2026-05-14, **"통과해버리는 RED"** — 도메인 생성자 검증이 이미 400 반환. @Valid 없이도 통과)_
+- [x] 🟢 GREEN — `@NotBlank` on RegisterRequest fields + `@Valid` on @RequestBody + `MethodArgumentNotValidException` 핸들러 추가 _(2026-05-14, @Valid 발동 시 ApiResponse 포맷으로 400 보장)_
+- [x] 🔵 REFACTOR — Advice 내 인라인 패키지 경로 → import 정리 _(2026-05-14)_
+- _학습 메모: 도메인 검증이 선행하면 HTTP 계층 RED 가 성립 안 됨. @Valid 의 가치는 "fail-fast (도메인 진입 전 차단)" + "필드 단위 메시지" + "계약 명시성"._
 
 ---
 

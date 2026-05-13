@@ -38,6 +38,27 @@ class UserV1ApiE2ETest {
     @Nested
     class Register {
 
+        @DisplayName("loginId 가 없으면, 400 Bad Request 를 반환한다.")
+        @Test
+        void throwsBadRequest_whenLoginIdIsMissing() {
+            // arrange — loginId 만 null, 나머지는 VALID
+            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
+                null, "Password@1", "홍길동", "1990-01-01", "test@loopers.com"
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_REGISTER, HttpMethod.POST,
+                    new HttpEntity<>(request), responseType
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
         @DisplayName("유효한 회원 정보로 가입 시, 200 + 유저 정보를 반환한다 (비밀번호 미포함).")
         @Test
         void returnsRegisteredUser_whenValidRequest() {
