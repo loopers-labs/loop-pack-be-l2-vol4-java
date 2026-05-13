@@ -24,6 +24,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import com.loopers.domain.user.PasswordEncrypter;
+import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -38,6 +40,9 @@ class UserV1ApiE2ETest {
 
     @Autowired
     private UserJpaRepository userJpaRepository;
+
+    @Autowired
+    private PasswordEncrypter passwordEncrypter;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -285,13 +290,15 @@ class UserV1ApiE2ETest {
         private static final String UNAUTHENTICATED_MESSAGE = "인증되지 않은 사용자입니다.";
 
         private void seedUser(String loginId, String password, String name, LocalDate birthDate, String email) {
-            UserV1Dto.SignUpRequest signUpRequest = new UserV1Dto.SignUpRequest(loginId, password, name, birthDate, email);
-            testRestTemplate.exchange(
-                ENDPOINT_SIGN_UP,
-                HttpMethod.POST,
-                jsonRequest(signUpRequest),
-                Void.class
-            );
+            UserModel user = UserModel.builder()
+                .rawLoginId(loginId)
+                .rawPassword(password)
+                .rawName(name)
+                .rawBirthDate(birthDate)
+                .rawEmail(email)
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+            userJpaRepository.save(user);
         }
 
         private HttpEntity<Void> authHeaders(String loginId, String password) {
