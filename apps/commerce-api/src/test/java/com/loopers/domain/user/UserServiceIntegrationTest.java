@@ -63,8 +63,39 @@ class UserServiceIntegrationTest {
     @Nested
     class getUser {
 
-        // happy path 우선 작성
+        @BeforeEach
+        void setup() {
+            // 회원 정보 생성
+            String userId = "usertest123";
+            String name = "홍길동";
+            String password = "abc123!@#";
+            LocalDate birthDate = LocalDate.of(1995, 6, 10);
+            String email = "test@naver.com";
 
+            userService.signup(userId, name, password, birthDate, email);
+        }
+
+        // happy path 우선 작성
+        @DisplayName("존재하는 id 확인. 회원 정보 return")
+        @Test
+        void getUser_whenValidArgumentsAreProvided() {
+            // 1. user 정보 획득
+            // 2. 비밀번호 획인
+            // 3. 맞다면, 회원정보 return;
+            // arrange
+            // beforeEach로 항상 저장되어 있으므로 pass
+
+            // act
+            UserModel userModel = userService.getUser("usertest123", "abc123!@#");
+
+            // assert
+            Assertions.assertAll(
+                () -> Assertions.assertNotNull(userModel.getId()),
+                () -> Assertions.assertEquals("usertest123", userModel.getUserId()),
+                () -> Assertions.assertEquals("홍길동", userModel.getName()),
+                () -> Assertions.assertEquals(LocalDate.of(1995, 6, 10), userModel.getBirthDate())
+            );
+        }
     }
 
     @DisplayName("비밀번호 수정")
