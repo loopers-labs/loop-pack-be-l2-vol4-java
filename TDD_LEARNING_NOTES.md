@@ -345,8 +345,36 @@ class UserServiceIntegrationTest {
 1. **JSON 직렬화/역직렬화** — 클라이언트가 `{ "loginId": "..." }` 로 보내는데 내부에서 `login_id` 로 받으면 E2E 만 깨진다
 2. **HTTP 상태 코드 매핑** — 서비스는 `CoreException(CONFLICT)` 을 던지지만 Advice 가 이걸 `409` 로 변환하는지는 E2E 만 검증
 3. **헤더 처리** — `X-Loopers-LoginId` 누락 시 400 보장은 E2E 만
-4. **요청 본문 validation** — `password` 가 null 일 때 400 BAD_REQUEST 가 나가는가
-5. **URL 경로/메서드 매핑** — `POST /api/v1/users` 가 정말 register 를 호출하는가
+4. **URL 경로/메서드 매핑** — `POST /api/v1/users` 가 정말 register 를 호출하는가
+
+### E2E 에서 다루면 안 되는 것 — 도메인 검증 중복
+
+> **주의**: 도메인이 이미 처리하는 케이스를 E2E 에서 재검증하면 "통과해버리는 RED" 함정에 빠진다.
+
+```
+❌ E2E 에서 다루면 RED 가 성립 안 되는 것:
+   "null loginId → 400"
+   → 도메인 생성자가 CoreException(BAD_REQUEST) 를 이미 던짐
+   → 컨트롤러 연결 전에도 400 이 나오면? (사실은 404 가 남)
+   → 컨트롤러 연결 후에는 이미 통과 → green-by-accident
+
+✅ E2E 고유 검증 대상:
+   "중복 loginId → 409"
+   → 통합은 CoreException(CONFLICT) 발생을 검증
+   → E2E 는 그것이 HTTP 409 로 변환되는지 검증 (다른 질문)
+   → 컨트롤러 없으면 404 → 진짜 RED 가능
+```
+
+**E2E RED 를 올바르게 쓰려면**: 컨트롤러를 추가하기 전에 모든 시나리오의 RED 를 먼저 작성한다.
+
+```
+[컨트롤러 없는 상태]
+  사이클 9 RED:  성공 → 200 기대  → 404 뜸 → FAIL ✅
+  사이클 10 RED: 충돌 → 409 기대  → 404 뜸 → FAIL ✅
+
+[컨트롤러 추가 후 — 한 번에 GREEN]
+  사이클 9 GREEN + 사이클 10 GREEN 동시에 통과 ✅
+```
 
 ### E2E 의 정체
 

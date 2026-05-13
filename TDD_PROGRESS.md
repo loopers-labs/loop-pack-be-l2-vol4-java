@@ -11,6 +11,7 @@
 - **현재 위치:** **회원가입 단위 5/5 + 통합 3/3 + E2E 2/2 완주 🎉**
 - **다음 사이클:** `사이클 11 — 이름의 마지막 글자를 * 로 마스킹` (🔴 RED 부터)
 - **다음 작업:** `UserModelTest` 에 `MaskedName` 중첩 클래스 추가 — `user.getMaskedName()` 호출 시 마지막 글자가 `*` 기대
+- **E2E 설계 교훈:** 다음 기능(내 정보 조회) E2E 진입 전, 모든 시나리오 RED 를 컨트롤러 추가 전에 먼저 작성할 것
 - **마지막 테스트 실행 결과:** 전체 테스트 → **BUILD SUCCESSFUL** ✅
 
 > 새 세션을 열면: 이 파일 + [`TEST_GUIDE.md`](./TEST_GUIDE.md) + [`.codeguide/loopers-1-week.md`](./.codeguide/loopers-1-week.md) 세 개를 먼저 읽고 이어간다.
@@ -126,11 +127,11 @@
 - [x] 🟢 GREEN — Controller → Facade → Service 연결, Response 에서 password 제외 _(2026-05-14, RegisterResponse 에 password 필드 없음 = 컴파일 수준 보장)_
 - [x] 🔵 REFACTOR — 생략 (흐름 단순·명확, 새 기능 없음) _(2026-05-14)_
 
-#### 사이클 10 — 필수 정보 누락 시 400 Bad Request
-- [x] 🔴 RED — `loginId` 누락 요청 → 400 기대 _(2026-05-14, **"통과해버리는 RED"** — 도메인 생성자 검증이 이미 400 반환. @Valid 없이도 통과)_
-- [x] 🟢 GREEN — `@NotBlank` on RegisterRequest fields + `@Valid` on @RequestBody + `MethodArgumentNotValidException` 핸들러 추가 _(2026-05-14, @Valid 발동 시 ApiResponse 포맷으로 400 보장)_
-- [x] 🔵 REFACTOR — Advice 내 인라인 패키지 경로 → import 정리 _(2026-05-14)_
-- _학습 메모: 도메인 검증이 선행하면 HTTP 계층 RED 가 성립 안 됨. @Valid 의 가치는 "fail-fast (도메인 진입 전 차단)" + "필드 단위 메시지" + "계약 명시성"._
+#### 사이클 10 — 중복 loginId 로 가입 시도 시 409 Conflict
+- [x] 🔴 RED — 같은 loginId 로 두 번 가입 시도, 409 기대 _(2026-05-14, **green-by-accident** — 사이클 9 에서 이미 Controller 연결됨. 올바른 순서는 사이클 9 RED 와 함께 작성 → 컨트롤러 없을 때 404 로 실패 확인이었어야 함)_
+- [x] 🟢 GREEN — 이미 통과 (Controller → Facade → Service → CoreException(CONFLICT) → ApiControllerAdvice → 409 매핑 정상) _(2026-05-14)_
+- [x] 🔵 REFACTOR — 생략
+- _학습 메모: E2E 고유 검증 대상은 "HTTP 상태코드 매핑 (CONFLICT → 409)". 도메인 검증(BAD_REQUEST)은 단위/통합이 이미 보장하므로 E2E 에서 재검증하면 "통과해버리는 RED" 발생. 여러 시나리오 RED 는 컨트롤러 추가 전에 한꺼번에 작성하는 것이 자연스러운 흐름._
 
 ---
 

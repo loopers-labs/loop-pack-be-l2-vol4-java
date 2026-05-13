@@ -38,25 +38,33 @@ class UserV1ApiE2ETest {
     @Nested
     class Register {
 
-        @DisplayName("loginId 가 없으면, 400 Bad Request 를 반환한다.")
+        @DisplayName("이미 존재하는 loginId 로 가입 시도 시, 409 Conflict 를 반환한다.")
         @Test
-        void throwsBadRequest_whenLoginIdIsMissing() {
-            // arrange — loginId 만 null, 나머지는 VALID
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
-                null, "Password@1", "홍길동", "1990-01-01", "test@loopers.com"
+        void throwsConflict_whenLoginIdAlreadyExists() {
+            // arrange — 먼저 한 번 정상 가입
+            UserV1Dto.RegisterRequest first = new UserV1Dto.RegisterRequest(
+                "testuser", "Password@1", "홍길동", "1990-01-01", "first@loopers.com"
+            );
+            testRestTemplate.exchange(
+                ENDPOINT_REGISTER, HttpMethod.POST,
+                new HttpEntity<>(first),
+                new ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>>() {}
             );
 
-            // act
+            // act — 같은 loginId 로 재시도
+            UserV1Dto.RegisterRequest second = new UserV1Dto.RegisterRequest(
+                "testuser", "Password@2!", "김철수", "1991-02-02", "second@loopers.com"
+            );
             ParameterizedTypeReference<ApiResponse<Void>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_REGISTER, HttpMethod.POST,
-                    new HttpEntity<>(request), responseType
+                    new HttpEntity<>(second), responseType
                 );
 
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            // assert — CoreException(CONFLICT) 가 HTTP 409 로 매핑되는지 검증
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
         @DisplayName("유효한 회원 정보로 가입 시, 200 + 유저 정보를 반환한다 (비밀번호 미포함).")
