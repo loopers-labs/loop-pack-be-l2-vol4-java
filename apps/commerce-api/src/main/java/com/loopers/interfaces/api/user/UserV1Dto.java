@@ -28,4 +28,7 @@ public class UserV1Dto {
             );
         }
     }
+
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {
+    }
 }

@@ -24,4 +24,13 @@ public interface UserV1ApiSpec {
     ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(
         @Parameter(hidden = true) @LoginUser AuthenticatedUser loginUser
     );
+
+    @Operation(
+        summary = "비밀번호 수정",
+        description = "본인 인증된 회원의 비밀번호를 새 값으로 교체한다. 본문 currentPassword로 변경 의도를 재확인하고, newPassword가 RULE(8~16자, 영문/숫자/특수문자, 생년월일 포함 불가)을 만족하면 BCrypt 해시로 갱신한다."
+    )
+    ApiResponse<Void> changePassword(
+        @Parameter(hidden = true) @LoginUser AuthenticatedUser loginUser,
+        UserV1Dto.ChangePasswordRequest request
+    );
 }
