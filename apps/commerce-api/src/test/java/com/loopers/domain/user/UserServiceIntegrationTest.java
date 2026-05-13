@@ -5,8 +5,12 @@ import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class UserServiceIntegrationTest {
@@ -19,6 +23,8 @@ class UserServiceIntegrationTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @AfterEach
     void tearDown() {
@@ -46,12 +52,12 @@ class UserServiceIntegrationTest {
 
             // assert
             // userModel이 정확히 생성되었는지 검증
-            Assertions.assertAll(
-                () -> Assertions.assertNotNull(userModel.getId()),
-                () -> Assertions.assertEquals(userId, userModel.getUserId()),
-                () -> Assertions.assertEquals(name, userModel.getName()),
-                () -> Assertions.assertEquals(birthDate, userModel.getBirthDate()),
-                () -> Assertions.assertEquals(email, userModel.getEmail())
+            assertAll(
+                () -> assertNotNull(userModel.getId()),
+                () -> assertEquals(userId, userModel.getUserId()),
+                () -> assertEquals(name, userModel.getName()),
+                () -> assertEquals(birthDate, userModel.getBirthDate()),
+                () -> assertEquals(email, userModel.getEmail())
                 // () -> Assertions.assertNotEquals(password, userModel.getPassword())
             );
         }
@@ -87,11 +93,11 @@ class UserServiceIntegrationTest {
             UserModel userModel = userService.getUser("usertest123", "abc123!@#");
 
             // assert
-            Assertions.assertAll(
-                () -> Assertions.assertNotNull(userModel.getId()),
-                () -> Assertions.assertEquals("usertest123", userModel.getUserId()),
-                () -> Assertions.assertEquals("홍길동", userModel.getName()),
-                () -> Assertions.assertEquals(LocalDate.of(1995, 6, 10), userModel.getBirthDate())
+            assertAll(
+                () -> assertNotNull(userModel.getId()),
+                () -> assertEquals("usertest123", userModel.getUserId()),
+                () -> assertEquals("홍길동", userModel.getName()),
+                () -> assertEquals(LocalDate.of(1995, 6, 10), userModel.getBirthDate())
             );
         }
     }
@@ -100,6 +106,30 @@ class UserServiceIntegrationTest {
     @Nested
     class changePassword {
         // happy path 작성
+        @BeforeEach
+        void setup() {
+            // 회원 정보 생성
+            String userId = "usertest123";
+            String name = "홍길동";
+            String password = "abc123!@#";
+            LocalDate birthDate = LocalDate.of(1995, 6, 10);
+            String email = "test@naver.com";
+
+            userService.signup(userId, name, password, birthDate, email);
+        }
+
+        @DisplayName("비밀번호 정상 수정 Case")
+        @Test()
+        void changePassword_whenValidArgumentsAreProvided() {
+            // arrange
+            String newPassword = "newpassword!@#";
+
+            // act
+            UserModel userModel = userService.changePassword("usertest123", "abc123!@#", newPassword);
+
+            // assert
+            assertTrue(passwordEncoder.matches(newPassword, userModel.getPassword()));
+        }
     }
 
 
