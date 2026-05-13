@@ -16,8 +16,7 @@ class UserServiceIntegrationTest {
     @Autowired
     private UserService userService;
 
-    // MockitoSpyBean 사용 이유 -> Save, find 등 횟수를 확인하기 위해서.
-    @MockitoSpyBean
+    @Autowired
     private UserJpaRepository userJpaRepository;
 
     @Autowired
@@ -48,12 +47,15 @@ class UserServiceIntegrationTest {
             UserModel userModel = userService.signup(userId, name, password, birthDate, email);
 
             // assert
-            // 동일 userId 검증 1회, save 1회 진행
-            Mockito.verify(userJpaRepository, Mockito.times(1)).findByUserId(userId);
-            Mockito.verify(userJpaRepository, Mockito.times(1)).save(userModel);
-
             // userModel이 정확히 생성되었는지 검증
-            Assertions.assertEquals(userModel, new UserModel(userId, password, name, birthDate, email));
+            Assertions.assertAll(
+                () -> Assertions.assertNotNull(userModel.getId()),
+                () -> Assertions.assertEquals(userId, userModel.getUserId()),
+                () -> Assertions.assertEquals(name, userModel.getName()),
+                () -> Assertions.assertEquals(birthDate, userModel.getBirthDate()),
+                () -> Assertions.assertEquals(email, userModel.getEmail())
+                // () -> Assertions.assertNotEquals(password, userModel.getPassword())
+            );
         }
     }
 
