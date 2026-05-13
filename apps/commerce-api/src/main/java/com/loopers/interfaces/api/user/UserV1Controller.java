@@ -50,12 +50,9 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @Override
     @PatchMapping("/me/password")
-    public ApiResponse<Void> changePassword(
-        @LoginUser AuthenticatedUser loginUser,
-        @RequestBody UserV1Dto.ChangePasswordRequest request
-    ) {
+    public ApiResponse<Void> changePassword(@LoginUser AuthenticatedUser loginUser, @RequestBody UserV1Dto.ChangePasswordRequest request) {
         userFacade.changePassword(loginUser.userId(), request.currentPassword(), request.newPassword());
 
-        return ApiResponse.success(null);
+        return ApiResponse.success();
     }
 }
