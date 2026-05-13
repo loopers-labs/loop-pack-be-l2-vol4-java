@@ -3,48 +3,43 @@
 ## 1. 도메인 모델
 
 ### 1-1. `LoginId`
-- [ ] null/blank → `BAD_REQUEST`
-- [ ] 영문/숫자 외 문자 포함 → `BAD_REQUEST`
-- [ ] 영문만 / 숫자만 / 영문+숫자 조합 → 허용
+- [x] null/blank → `BAD_REQUEST`
+- [x] 영문/숫자 외 문자 포함 → `BAD_REQUEST`
+- [x] 영문만 / 숫자만 / 영문+숫자 조합 → 허용
 
 ### 1-2. `Email`
-- [ ] null/blank → `BAD_REQUEST`
-- [ ] 포맷 위반 → `BAD_REQUEST`
-- [ ] 정상 포맷 → 허용
+- [x] null/blank → `BAD_REQUEST`
+- [x] 포맷 위반 → `BAD_REQUEST`
+- [x] 정상 포맷 → 허용
 
 ### 1-3. `BirthDate`
-- [ ] null → `BAD_REQUEST`
-- [ ] 파싱 불가한 문자열 → `BAD_REQUEST`
-- [ ] 미래 일자 → `BAD_REQUEST`
-- [ ] 정상 일자 → 허용
+- [x] null → `BAD_REQUEST`
+- [x] 미래 일자 → `BAD_REQUEST`
+- [x] 과거/오늘 일자 → 허용
 
 ### 1-4. `Name`
-- [ ] null/blank → `BAD_REQUEST`
-- [ ] `masked()` — 마지막 글자를 `*` 로 치환
-  - [ ] `홍길동` → `홍길*`
-  - [ ] `Kim` → `Ki*`
-  - [ ] `A` → `*`
+- [x] null/blank → `BAD_REQUEST`
+- [x] `masked()` — 마지막 글자를 `*` 로 치환
+  - [x] `홍길동` → `홍길*`
+  - [x] `Kim` → `Ki*`
+  - [x] `A` → `*`
 
 ### 1-5. `PasswordPolicy`
-- [ ] null/blank → `BAD_REQUEST`
-- [ ] 길이 7자 / 17자 → `BAD_REQUEST`
-- [ ] 허용 외 문자 포함(한글, 공백, 탭) → `BAD_REQUEST`
-- [ ] `BirthDate` 가 비밀번호 substring 으로 포함 → `BAD_REQUEST`
-  - [ ] `yyMMdd`
-  - [ ] `yyyyMMdd`
-  - [ ] `yy-MM-dd`, `yyyy-MM-dd`
-  - [ ] `yy/MM/dd`, `yyyy/MM/dd`
-  - [ ] `yy.MM.dd`, `yyyy.MM.dd`
-- [ ] 영문 대/소문자 + 숫자 + 특수문자 조합 8~16자 + 생년월일 substring 미포함 → 허용
+- [x] null/빈 값 / 길이 7자 / 17자 → `BAD_REQUEST`
+- [x] 허용 외 문자 포함(한글, 공백, 탭) → `BAD_REQUEST`
+- [x] `BirthDate` 가 비밀번호 substring 으로 포함 → `BAD_REQUEST`
+  - [x] `yyMMdd`
+  - [x] `yyyyMMdd`
+  - [x] `yy-MM-dd`, `yyyy-MM-dd`
+  - [x] `yy/MM/dd`, `yyyy/MM/dd`
+  - [x] `yy.MM.dd`, `yyyy.MM.dd`
+- [x] 영문 대/소문자 + 숫자 + 특수문자 조합 8~16자 + 생년월일 substring 미포함 → 허용
 
 ### 1-6. `UserModel`
-- [ ] 생성 시 값 객체 위임 검증 + `PasswordPolicy` 로 비밀번호 검증
-- [ ] 비밀번호는 해시된 값으로 저장
-- [ ] `verifyPassword` — 일치 여부 반환
-- [ ] `changePassword`
-  - [ ] 새 비밀번호가 `PasswordPolicy` 위반 → `BAD_REQUEST`
-  - [ ] 현재 비밀번호와 동일 → `BAD_REQUEST`
-  - [ ] 정상 변경 시 내부 해시값 갱신
+- [x] 생성 시 값 객체 위임 검증
+- [x] `encodedPassword` null/blank → `BAD_REQUEST`
+- [x] 비밀번호는 해시된 값으로 저장
+- [x] `changeEncodedPassword(newEncoded)` — 해시 교체 (null/blank 거부)
 
 ---
 
