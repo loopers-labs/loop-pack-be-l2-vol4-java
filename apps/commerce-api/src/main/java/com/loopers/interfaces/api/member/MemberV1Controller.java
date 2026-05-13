@@ -28,4 +28,14 @@ public class MemberV1Controller {
         MemberInfo memberInfo = memberFacade.getMember(new MemberCommand.GetMember(loginId, loginPassword));
         return ApiResponse.success(MemberV1Dto.MemberResponse.from(memberInfo));
     }
+
+    @PutMapping("/change-password")
+    public ApiResponse<Void> changePassword(
+            @RequestHeader("X-Loopers-LoginId") String loginId,
+            @RequestHeader("X-Loopers-LoginPw") String loginPassword,
+            @RequestBody MemberV1Dto.ChangePasswordRequest request
+    ) {
+        memberFacade.changePassword(new MemberCommand.ChangePassword(loginId, loginPassword, request.currentPassword(), request.newPassword()));
+        return ApiResponse.success(null);
+    }
 }

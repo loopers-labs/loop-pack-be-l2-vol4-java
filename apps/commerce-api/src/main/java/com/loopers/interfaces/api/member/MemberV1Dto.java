@@ -18,6 +18,8 @@ public class MemberV1Dto {
         }
     }
 
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
     public record MemberResponse(
             String loginId,
             String name,

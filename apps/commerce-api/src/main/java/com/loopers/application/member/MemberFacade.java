@@ -24,4 +24,9 @@ public class MemberFacade {
     public MemberInfo getMember(MemberCommand.GetMember command) {
         return MemberInfo.fromWithMaskedName(memberService.getMember(command.loginId(), command.loginPassword()));
     }
+
+    public void changePassword(MemberCommand.ChangePassword command) {
+        Member member = memberService.getMember(command.loginId(), command.loginPassword());
+        memberService.changePassword(member, command.currentPassword(), command.newPassword());
+    }
 }

@@ -16,4 +16,11 @@ public class MemberCommand {
             String loginId,
             String loginPassword
     ) {}
+
+    public record ChangePassword(
+            String loginId,
+            String loginPassword,
+            String currentPassword,
+            String newPassword
+    ) {}
 }
