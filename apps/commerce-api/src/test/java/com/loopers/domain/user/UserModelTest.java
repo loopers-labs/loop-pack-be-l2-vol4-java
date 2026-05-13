@@ -114,4 +114,60 @@ class UserModelTest {
                 .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("UserModel로 본인 인증할 때,")
+    @Nested
+    class Authenticate {
+
+        @DisplayName("rawPassword가 저장된 encryptedPassword와 일치하면 true를 반환한다.")
+        @Test
+        void returnsTrue_whenRawPasswordMatchesEncryptedPassword() {
+            // arrange
+            String rawPassword = "Kyle!2030";
+            String encryptedPasswordValue = "ENCRYPTED";
+            given(passwordEncrypter.encrypt(rawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(rawPassword, encryptedPasswordValue)).willReturn(true);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(rawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act
+            boolean authenticated = userModel.authenticate(rawPassword, passwordEncrypter);
+
+            // assert
+            assertThat(authenticated).isTrue();
+        }
+
+        @DisplayName("rawPassword가 저장된 encryptedPassword와 일치하지 않으면 false를 반환한다.")
+        @Test
+        void returnsFalse_whenRawPasswordDoesNotMatchEncryptedPassword() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String wrongRawPassword = "Wrong!2030";
+            String encryptedPasswordValue = "ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(wrongRawPassword, encryptedPasswordValue)).willReturn(false);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act
+            boolean authenticated = userModel.authenticate(wrongRawPassword, passwordEncrypter);
+
+            // assert
+            assertThat(authenticated).isFalse();
+        }
+    }
 }

@@ -17,6 +17,7 @@ public record Name(
     private static final int MIN_LENGTH = 2;
     private static final int MAX_LENGTH = 20;
     private static final Pattern ALLOWED_PATTERN = Pattern.compile("[가-힣]+");
+    private static final String MASK_CHARACTER = "*";
 
     public static Name from(String value) {
         if (value == null || value.isBlank()) {
@@ -32,5 +33,9 @@ public record Name(
         }
 
         return new Name(value);
+    }
+
+    public String maskedValue() {
+        return value.substring(0, value.length() - 1) + MASK_CHARACTER;
     }
 }
