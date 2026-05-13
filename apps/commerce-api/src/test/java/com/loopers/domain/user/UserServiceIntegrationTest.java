@@ -38,6 +38,57 @@ class UserServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("유효한 새 비밀번호로 변경 시, 암호화되어 저장된다.")
+        @Test
+        void savesEncryptedPassword_whenNewPasswordIsValid() {
+            // arrange
+            String rawPassword = "Pass123!";
+            String newPassword = "NewPass1!";
+            UserModel user = new UserModel("user1", rawPassword, "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+            userService.signUp(user);
+
+            // act
+            userService.changePassword("user1", newPassword);
+            UserModel updated = userService.findByLoginId("user1").orElseThrow();
+
+            // assert
+            assertThat(passwordEncoder.matches(newPassword, updated.getPassword())).isTrue();
+        }
+
+        @DisplayName("현재 비밀번호와 동일한 새 비밀번호로 변경 시, 실패한다.")
+        @Test
+        void throwsException_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            String rawPassword = "Pass123!";
+            UserModel user = new UserModel("user1", rawPassword, "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+            userService.signUp(user);
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword("user1", rawPassword)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("존재하지 않는 loginId로 변경 시도 시, 실패한다.")
+        @Test
+        void throwsException_whenUserNotFound() {
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword("nonexistent", "NewPass1!")
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("내 정보 조회를 할 때,")
     @Nested
     class GetMyInfo {
