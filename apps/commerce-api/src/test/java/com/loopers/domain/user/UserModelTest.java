@@ -38,7 +38,6 @@ class UserModelTest {
             LocalDate rawBirthDate = LocalDate.of(1995, 3, 21);
             String rawEmail = "kyle@example.com";
             String encryptedPasswordValue = "ENCRYPTED";
-
             given(passwordEncrypter.encrypt(rawPassword)).willReturn(encryptedPasswordValue);
 
             // act
@@ -168,6 +167,143 @@ class UserModelTest {
 
             // assert
             assertThat(matchingResult).isFalse();
+        }
+    }
+
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("본문 currentRawPassword가 저장된 encryptedPassword와 일치하지 않으면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentRawPasswordDoesNotMatch() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String wrongCurrentRawPassword = "Wrong!2030";
+            String newRawPassword = "Newer!2031";
+            String encryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(wrongCurrentRawPassword, encryptedPasswordValue)).willReturn(false);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act & assert
+            assertThatThrownBy(() -> userModel.changePassword(wrongCurrentRawPassword, newRawPassword, passwordEncrypter))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("newRawPassword가 currentRawPassword와 평문으로 동일하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewRawPasswordEqualsCurrentRawPassword() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String encryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(originalRawPassword, encryptedPasswordValue)).willReturn(true);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act & assert
+            assertThatThrownBy(() -> userModel.changePassword(originalRawPassword, originalRawPassword, passwordEncrypter))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("newRawPassword에 birthDate가 포함되면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewRawPasswordContainsBirthDate() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String newRawPasswordContainingBirthDate = "Abc19950321!";
+            String encryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(originalRawPassword, encryptedPasswordValue)).willReturn(true);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act & assert
+            assertThatThrownBy(() -> userModel.changePassword(originalRawPassword, newRawPasswordContainingBirthDate, passwordEncrypter))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("newRawPassword가 비밀번호 RULE을 위반하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewRawPasswordViolatesRule() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String tooShortNewRawPassword = "Ab1!";
+            String encryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+            given(passwordEncrypter.matches(originalRawPassword, encryptedPasswordValue)).willReturn(true);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act & assert
+            assertThatThrownBy(() -> userModel.changePassword(originalRawPassword, tooShortNewRawPassword, passwordEncrypter))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("모든 정책을 통과하면 encryptedPassword가 새 해시 값으로 갱신된다.")
+        @Test
+        void updatesEncryptedPassword_whenAllPolicyPasses() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String newRawPassword = "Newer!2031";
+            String originalEncryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            String newEncryptedPasswordValue = "NEW_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(originalEncryptedPasswordValue);
+            given(passwordEncrypter.matches(originalRawPassword, originalEncryptedPasswordValue)).willReturn(true);
+            given(passwordEncrypter.encrypt(newRawPassword)).willReturn(newEncryptedPasswordValue);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act
+            userModel.changePassword(originalRawPassword, newRawPassword, passwordEncrypter);
+
+            // assert
+            assertThat(userModel.getEncryptedPassword().value()).isEqualTo(newEncryptedPasswordValue);
         }
     }
 }
