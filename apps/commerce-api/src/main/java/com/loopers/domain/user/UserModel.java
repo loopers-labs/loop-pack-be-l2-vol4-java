@@ -74,6 +74,10 @@ public class UserModel extends BaseEntity {
     }
 
     public void changePassword(String currentRawPassword, String newRawPassword, PasswordEncrypter passwordEncrypter) {
+        if (currentRawPassword == null || currentRawPassword.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호는 필수입니다.");
+        }
+
         if (!matchesPassword(currentRawPassword, passwordEncrypter)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
         }

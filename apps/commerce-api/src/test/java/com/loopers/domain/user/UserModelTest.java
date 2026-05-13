@@ -174,6 +174,31 @@ class UserModelTest {
     @Nested
     class ChangePassword {
 
+        @DisplayName("currentRawPassword가 null이거나 빈 문자열이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentRawPasswordIsNull() {
+            // arrange
+            String originalRawPassword = "Kyle!2030";
+            String newRawPassword = "Newer!2031";
+            String encryptedPasswordValue = "ORIGINAL_ENCRYPTED";
+            given(passwordEncrypter.encrypt(originalRawPassword)).willReturn(encryptedPasswordValue);
+
+            UserModel userModel = UserModel.builder()
+                .rawLoginId("kyleKim")
+                .rawPassword(originalRawPassword)
+                .rawName("김카일")
+                .rawBirthDate(LocalDate.of(1995, 3, 21))
+                .rawEmail("kyle@example.com")
+                .passwordEncrypter(passwordEncrypter)
+                .build();
+
+            // act & assert
+            assertThatThrownBy(() -> userModel.changePassword(null, newRawPassword, passwordEncrypter))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("본문 currentRawPassword가 저장된 encryptedPassword와 일치하지 않으면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenCurrentRawPasswordDoesNotMatch() {
