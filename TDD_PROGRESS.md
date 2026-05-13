@@ -100,9 +100,9 @@
 - _학습 메모: Service 의 existsByLoginId 체크 + DB unique 제약 = 두 층의 방어. 현재는 Service 만. race condition 방어는 별도 학습으로._
 
 #### 사이클 8 — 비밀번호가 암호화되어 저장된다
-- [ ] 🔴 RED — 가입 후 저장된 비밀번호가 평문과 다른지 검증
-- [ ] 🟢 GREEN — `user.encodePassword(passwordEncoder)` 호출 후 저장
-- [ ] 🔵 REFACTOR — 인코더 주입 방식, 빈 위치 정리
+- [x] 🔴 RED — 가입 후 `saved.getPassword()` 가 평문과 다른지 검증 _(2026-05-13)_
+- [x] 🟢 GREEN — `user.encodePassword(passwordEncoder)` 호출 후 저장 _(2026-05-13)_
+- [x] 🔵 REFACTOR — 생략 (BCryptPasswordEncoderAdapter + FakePasswordEncoder 구조 명확) _(2026-05-13)_
 
 ---
 
