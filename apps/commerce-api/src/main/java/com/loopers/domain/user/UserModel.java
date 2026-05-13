@@ -1,19 +1,30 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.apache.catalina.User;
 
 @Entity
 @Table(name = "user")
-public class UserModel {
+public class UserModel extends BaseEntity {
     private static final String LOGIN_ID_PATTERN = "^[A-Za-z0-9]+$";
     private static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
     private static final int PW_LETTER_MAX_SIZE = 20;
     private static final int PW_LETTER_MIN_SIZE = 8;
     private static final String PASSWORD_PATTERN = "^[A-Za-z0-9!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/~`|\\\\]+$";
     private static final String BIRTH_DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";
+
+    private String loginId;
+    private String password;
+    private String name;
+    private String birthDate;
+    private String email;
+
+    protected UserModel(){};
+
     public UserModel(String loginId, String password, String name, String birthDate, String email) {
         if(!loginId.matches(LOGIN_ID_PATTERN)){
             throw new CoreException((ErrorType.BAD_REQUEST), "로그인 id는 영문과 숫자만 허용됩니다.");
@@ -33,5 +44,27 @@ public class UserModel {
         if(!birthDate.matches(BIRTH_DATE_PATTERN)){
             throw new CoreException((ErrorType.BAD_REQUEST),"생년월일 타입이 yyyy-mm-dd 형태가 아닙니다.");
         }
+        this.loginId = loginId;
+        this.password = password;
+        this.name = name;
+        this.birthDate = birthDate;
+        this.email = email;
     }
+
+    public String getLoginId() {
+        return loginId;
+    }
+    public String getPassword(){
+        return password;
+    }
+    public String getName(){
+        return name;
+    }
+    public String getBirthDate(){
+        return birthDate;
+    }
+    public String getEmail(){
+        return email;
+    }
+
 }
