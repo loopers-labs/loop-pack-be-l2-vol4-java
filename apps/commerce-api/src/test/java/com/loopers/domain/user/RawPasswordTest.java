@@ -9,20 +9,20 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class PasswordTest {
+class RawPasswordTest {
 
-    @DisplayName("비밀번호 생성 시")
+    @DisplayName("RawPassword 생성 시")
     @Nested
     class Create {
 
         @DisplayName("유효한 형식이면 생성 성공")
         @Test
-        void createsPassword_whenFormatIsValid() {
+        void createsRawPassword_whenFormatIsValid() {
             // arrange
             String validValue = "chan1234!";
 
             // act
-            Password password = new Password(validValue);
+            RawPassword password = new RawPassword(validValue);
 
             // assert
             assertThat(password.value()).isEqualTo(validValue);
@@ -32,7 +32,7 @@ class PasswordTest {
         @Test
         void throwsBadRequest_whenValueIsNull() {
             // act
-            CoreException result = assertThrows(CoreException.class, () -> new Password(null));
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(null));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -45,7 +45,7 @@ class PasswordTest {
             String blank = "        ";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> new Password(blank));
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(blank));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -58,7 +58,7 @@ class PasswordTest {
             String shortValue = "Ab12!";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> new Password(shortValue));
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(shortValue));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -71,7 +71,7 @@ class PasswordTest {
             String longValue = "Password12345678!";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> new Password(longValue));
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(longValue));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -84,7 +84,7 @@ class PasswordTest {
             String invalidValue = "Pass1234가!";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> new Password(invalidValue));
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(invalidValue));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

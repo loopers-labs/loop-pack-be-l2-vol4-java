@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UserModelTest {
 
     private static final String VALID_LOGIN_ID = "chanhee";
-    private static final Password VALID_PASSWORD = new Password("chan1234!");
+    private static final EncodedPassword VALID_PASSWORD = new EncodedPassword("chan1234!");
     private static final String VALID_NAME = "김찬희";
     private static final String VALID_BIRTH_DATE = "1995-05-10";
     private static final String VALID_EMAIL = "chan950510@gmail.com";
@@ -27,7 +27,7 @@ class UserModelTest {
         void createsUserModel_whenAllFieldsAreValid() {
             // arrange
             String loginId = VALID_LOGIN_ID;
-            Password password = VALID_PASSWORD;
+            EncodedPassword password = VALID_PASSWORD;
             String name = VALID_NAME;
             String birthDate = VALID_BIRTH_DATE;
             String email = VALID_EMAIL;

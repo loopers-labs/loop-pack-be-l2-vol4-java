@@ -15,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -26,7 +25,7 @@ class UserServiceTest {
 
     private static final String VALID_LOGIN_ID = "chanhee";
     private static final String VALID_RAW_PASSWORD = "chan1234!";
-    private static final String ENCODED_PASSWORD = "H@shed12";
+    private static final EncodedPassword ENCODED_PASSWORD = new EncodedPassword("Y2hhbjEyMzQhPGZha2UtaGFzaD4=");
     private static final String VALID_NAME = "김찬희";
     private static final String VALID_BIRTH_DATE = "1995-05-10";
     private static final String VALID_EMAIL = "chan950510@gmail.com";
@@ -49,7 +48,7 @@ class UserServiceTest {
         void savesUserOnce_whenRequestIsValid() {
             // arrange
             given(userRepository.existsByLoginId(VALID_LOGIN_ID)).willReturn(false);
-            given(passwordEncoder.encode(VALID_RAW_PASSWORD)).willReturn(ENCODED_PASSWORD);
+            given(passwordEncoder.encode(any(RawPassword.class))).willReturn(ENCODED_PASSWORD);
             given(userRepository.save(any(UserModel.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
@@ -58,13 +57,13 @@ class UserServiceTest {
             // assert
             ArgumentCaptor<UserModel> savedCaptor = ArgumentCaptor.forClass(UserModel.class);
             verify(userRepository, times(1)).existsByLoginId(VALID_LOGIN_ID);
-            verify(passwordEncoder, times(1)).encode(VALID_RAW_PASSWORD);
+            verify(passwordEncoder, times(1)).encode(new RawPassword(VALID_RAW_PASSWORD));
             verify(userRepository, times(1)).save(savedCaptor.capture());
 
             UserModel saved = savedCaptor.getValue();
             assertAll(
                     () -> assertThat(saved.getLoginId()).isEqualTo(VALID_LOGIN_ID),
-                    () -> assertThat(saved.getPassword().value()).isEqualTo(ENCODED_PASSWORD),
+                    () -> assertThat(saved.getPassword()).isEqualTo(ENCODED_PASSWORD),
                     () -> assertThat(saved.getName()).isEqualTo(VALID_NAME),
                     () -> assertThat(saved.getBirthDate()).isEqualTo(VALID_BIRTH_DATE),
                     () -> assertThat(saved.getEmail()).isEqualTo(VALID_EMAIL)
@@ -85,7 +84,7 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
                     () -> verify(userRepository, times(1)).existsByLoginId(VALID_LOGIN_ID),
-                    () -> verify(passwordEncoder, never()).encode(anyString()),
+                    () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
                     () -> verify(userRepository, never()).save(any(UserModel.class))
             );
         }
@@ -104,7 +103,7 @@ class UserServiceTest {
             // assert
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                    () -> verify(passwordEncoder, never()).encode(anyString()),
+                    () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
                     () -> verify(userRepository, never()).save(any(UserModel.class))
             );
         }

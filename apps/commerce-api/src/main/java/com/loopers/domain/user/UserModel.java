@@ -20,12 +20,12 @@ public class UserModel {
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
 
     private final String loginId;
-    private final Password password;
+    private final EncodedPassword password;
     private final String name;
     private final String birthDate;
     private final String email;
 
-    public UserModel(String loginId, Password password, String name, String birthDate, String email) {
+    public UserModel(String loginId, EncodedPassword password, String name, String birthDate, String email) {
         if (loginId == null || loginId.isBlank() || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 형식이 올바르지 않습니다.");
         }
