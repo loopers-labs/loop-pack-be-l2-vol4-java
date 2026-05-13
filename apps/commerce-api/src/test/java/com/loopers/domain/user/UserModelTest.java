@@ -335,6 +335,26 @@ class UserModelTest {
         }
     }
 
+    @DisplayName("비밀번호를 수정할 때,")
+    @Nested
+    class ChangePassword {
+
+        // 비밀번호 형식 규칙(길이, 허용 문자, 생년월일 포함 불가)은 회원가입과 동일한 validatePassword()를 사용하므로
+        // 규칙에 대한 상세 검증은 Create 테스트에서 담당한다. 여기서는 변경 자체가 정상 동작하는지만 확인한다.
+        @DisplayName("유효한 새 비밀번호이면, 비밀번호가 변경된다.")
+        @Test
+        void changesPassword_whenNewPasswordIsValid() {
+            // arrange
+            UserModel user = new UserModel("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE);
+
+            // act
+            user.changePassword("NewPass1!");
+
+            // assert
+            assertThat(user.getPassword()).isEqualTo("NewPass1!");
+        }
+    }
+
     @DisplayName("이름을 마스킹할 때,")
     @Nested
     class MaskName {
