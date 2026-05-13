@@ -73,6 +73,34 @@ class UserV1ApiE2ETest {
             assertTrue(response.getStatusCode().is2xxSuccessful());
         }
 
+        @DisplayName("비밀번호 변경 후, 이전 비밀번호로 인증 시도 시 400 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenOldPasswordUsedAfterChange() {
+            // arrange
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new UserV1Dto.SignUpRequest("user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE)),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "user1");
+            headers.set("X-Loopers-LoginPw", "Pass123!");
+            testRestTemplate.exchange(ENDPOINT + "/me/password", HttpMethod.PATCH,
+                new HttpEntity<>(new UserV1Dto.ChangePasswordRequest("NewPass1!"), headers),
+                Void.class);
+
+            HttpHeaders oldHeaders = new HttpHeaders();
+            oldHeaders.set("X-Loopers-LoginId", "user1");
+            oldHeaders.set("X-Loopers-LoginPw", "Pass123!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
+                testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(oldHeaders), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
         @DisplayName("비밀번호 변경 후, 새 비밀번호로 인증이 가능하다.")
         @Test
         void authenticatesSuccessfully_withNewPasswordAfterChange() {
