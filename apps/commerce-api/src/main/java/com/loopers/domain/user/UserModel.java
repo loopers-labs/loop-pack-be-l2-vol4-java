@@ -1,6 +1,7 @@
 package com.loopers.domain.user;
 
 import java.time.LocalDate;
+import java.util.Objects;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
@@ -70,6 +71,18 @@ public class UserModel extends BaseEntity {
 
     public boolean matchesPassword(String rawPassword, PasswordEncrypter passwordEncrypter) {
         return encryptedPassword.matches(rawPassword, passwordEncrypter);
+    }
+
+    public void changePassword(String currentRawPassword, String newRawPassword, PasswordEncrypter passwordEncrypter) {
+        if (!matchesPassword(currentRawPassword, passwordEncrypter)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
+        }
+
+        if (Objects.equals(currentRawPassword, newRawPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 기존 비밀번호와 동일할 수 없습니다.");
+        }
+
+        this.encryptedPassword = encryptRawPassword(newRawPassword, this.birthDate, passwordEncrypter);
     }
 
 }
