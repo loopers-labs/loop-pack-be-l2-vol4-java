@@ -6,7 +6,14 @@ import java.time.format.DateTimeFormatter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
-public record BirthDate(LocalDate value) {
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
+@Embeddable
+public record BirthDate(
+    @Column(name = "birth_date", nullable = false)
+    LocalDate value
+) {
 
     private static final DateTimeFormatter COMPACT_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter SHORT_COMPACT_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");

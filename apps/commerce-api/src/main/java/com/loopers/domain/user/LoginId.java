@@ -5,7 +5,14 @@ import java.util.regex.Pattern;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
-public record LoginId(String value) {
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
+@Embeddable
+public record LoginId(
+    @Column(name = "login_id", nullable = false, length = 20)
+    String value
+) {
 
     private static final int MIN_LENGTH = 4;
     private static final int MAX_LENGTH = 20;

@@ -5,7 +5,14 @@ import java.util.regex.Pattern;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
-public record EncryptedPassword(String value) {
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
+@Embeddable
+public record EncryptedPassword(
+    @Column(name = "encrypted_password", nullable = false, length = 60)
+    String value
+) {
 
     private static final int MIN_LENGTH = 8;
     private static final int MAX_LENGTH = 16;
