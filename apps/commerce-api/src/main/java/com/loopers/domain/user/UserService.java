@@ -39,4 +39,10 @@ public class UserService {
 
         return userRepository.save(newUser);
     }
+
+    @Transactional(readOnly = true)
+    public UserModel readMyInfo(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
+    }
 }

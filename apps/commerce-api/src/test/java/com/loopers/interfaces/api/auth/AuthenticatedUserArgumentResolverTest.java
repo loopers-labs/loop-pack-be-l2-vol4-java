@@ -3,8 +3,8 @@ package com.loopers.interfaces.api.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -50,34 +50,29 @@ class AuthenticatedUserArgumentResolverTest {
     @Nested
     class ResolveArgument {
 
-        @DisplayName("두 헤더가 모두 있고 회원이 존재하고 비밀번호가 일치하면 UserModel을 반환한다.")
+        @DisplayName("두 헤더가 모두 있고 회원이 존재하고 비밀번호가 일치하면 회원 식별자를 가진 AuthenticatedUser를 반환한다.")
         @Test
-        void returnsUserModel_whenHeadersValidAndAuthenticated() {
+        void returnsAuthenticatedUser_whenHeadersValidAndAuthenticated() {
             // arrange
             String rawLoginId = "kyleKim";
             String rawPassword = "Kyle!2030";
-            String encryptedValue = "ENCRYPTED";
+            Long userId = 1L;
             request.addHeader("X-Loopers-LoginId", rawLoginId);
             request.addHeader("X-Loopers-LoginPw", rawPassword);
 
-            given(passwordEncrypter.encrypt(rawPassword)).willReturn(encryptedValue);
-            given(passwordEncrypter.matches(rawPassword, encryptedValue)).willReturn(true);
-
-            UserModel authenticatedUser = UserModel.builder()
-                .rawLoginId(rawLoginId)
-                .rawPassword(rawPassword)
-                .rawName("김카일")
-                .rawBirthDate(LocalDate.of(1995, 3, 21))
-                .rawEmail("kyle@example.com")
-                .passwordEncrypter(passwordEncrypter)
-                .build();
-            given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(authenticatedUser));
+            UserModel storedUser = mock(UserModel.class);
+            given(storedUser.getId()).willReturn(userId);
+            given(storedUser.authenticate(rawPassword, passwordEncrypter)).willReturn(true);
+            given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act
             Object resolvedUser = resolver.resolveArgument(null, null, webRequest, null);
 
             // assert
-            assertThat(resolvedUser).isSameAs(authenticatedUser);
+            assertThat(resolvedUser)
+                .isInstanceOf(AuthenticatedUser.class)
+                .extracting("userId")
+                .isEqualTo(userId);
         }
 
         @DisplayName("X-Loopers-LoginId 헤더가 누락되면 UNAUTHENTICATED 예외가 발생한다.")
@@ -127,23 +122,12 @@ class AuthenticatedUserArgumentResolverTest {
         void throwsUnauthenticated_whenPasswordDoesNotMatch() {
             // arrange
             String rawLoginId = "kyleKim";
-            String storedRawPassword = "Kyle!2030";
             String wrongRawPassword = "Wrong!2030";
-            String encryptedValue = "ENCRYPTED";
             request.addHeader("X-Loopers-LoginId", rawLoginId);
             request.addHeader("X-Loopers-LoginPw", wrongRawPassword);
 
-            given(passwordEncrypter.encrypt(storedRawPassword)).willReturn(encryptedValue);
-            given(passwordEncrypter.matches(wrongRawPassword, encryptedValue)).willReturn(false);
-
-            UserModel storedUser = UserModel.builder()
-                .rawLoginId(rawLoginId)
-                .rawPassword(storedRawPassword)
-                .rawName("김카일")
-                .rawBirthDate(LocalDate.of(1995, 3, 21))
-                .rawEmail("kyle@example.com")
-                .passwordEncrypter(passwordEncrypter)
-                .build();
+            UserModel storedUser = mock(UserModel.class);
+            given(storedUser.authenticate(wrongRawPassword, passwordEncrypter)).willReturn(false);
             given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act & assert

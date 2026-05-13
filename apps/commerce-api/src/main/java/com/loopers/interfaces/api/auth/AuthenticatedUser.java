@@ -1,11 +1,4 @@
 package com.loopers.interfaces.api.auth;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AuthenticatedUser {
+public record AuthenticatedUser(Long userId) {
 }

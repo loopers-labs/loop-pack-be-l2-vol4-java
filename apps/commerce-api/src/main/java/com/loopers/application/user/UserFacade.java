@@ -21,7 +21,9 @@ public class UserFacade {
         return UserSignUpInfo.from(newUser);
     }
 
-    public UserMyInfo readMyInfo(UserModel authenticatedUser) {
-        return UserMyInfo.from(authenticatedUser);
+    public UserMyInfo readMyInfo(Long userId) {
+        UserModel user = userService.readMyInfo(userId);
+
+        return UserMyInfo.from(user);
     }
 }

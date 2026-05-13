@@ -29,12 +29,12 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
-        return parameter.hasParameterAnnotation(AuthenticatedUser.class)
-            && parameter.getParameterType().equals(UserModel.class);
+        return parameter.hasParameterAnnotation(LoginUser.class)
+            && parameter.getParameterType().equals(AuthenticatedUser.class);
     }
 
     @Override
-    public UserModel resolveArgument(
+    public AuthenticatedUser resolveArgument(
         MethodParameter parameter,
         ModelAndViewContainer mavContainer,
         NativeWebRequest webRequest,
@@ -48,13 +48,13 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
             throw new CoreException(ErrorType.UNAUTHENTICATED);
         }
 
-        UserModel authenticatedUser = userRepository.findByLoginId(loginId)
+        UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHENTICATED));
 
-        if (!authenticatedUser.authenticate(rawPassword, passwordEncrypter)) {
+        if (!user.authenticate(rawPassword, passwordEncrypter)) {
             throw new CoreException(ErrorType.UNAUTHENTICATED);
         }
 
-        return authenticatedUser;
+        return new AuthenticatedUser(user.getId());
     }
 }

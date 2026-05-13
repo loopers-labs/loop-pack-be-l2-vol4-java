@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -95,6 +97,40 @@ class UserServiceTest {
                     .isEqualTo(ErrorType.CONFLICT),
                 () -> verify(userRepository, never()).save(any(UserModel.class))
             );
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때,")
+    @Nested
+    class ReadMyInfo {
+
+        @DisplayName("저장된 회원이면 해당 UserModel을 반환한다.")
+        @Test
+        void returnsUser_whenUserIdIsRegistered() {
+            // arrange
+            Long userId = 1L;
+            UserModel storedUser = mock(UserModel.class);
+            given(userRepository.findById(userId)).willReturn(Optional.of(storedUser));
+
+            // act
+            UserModel readUser = userService.readMyInfo(userId);
+
+            // assert
+            assertThat(readUser).isSameAs(storedUser);
+        }
+
+        @DisplayName("저장되지 않은 회원이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserIdIsNotRegistered() {
+            // arrange
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // act & assert
+            assertThatThrownBy(() -> userService.readMyInfo(userId))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
