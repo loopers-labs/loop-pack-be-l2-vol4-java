@@ -181,6 +181,28 @@ class UserV1ApiE2ETest {
             );
         }
 
+        @DisplayName("이미 가입된 loginId로 회원가입 시도 시, 409 Conflict 응답을 반환한다.")
+        @Test
+        void returnsConflict_whenLoginIdAlreadyExists() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "user1", "Pass123!", "홍길동", "test@example.com", "2000-01-01", Gender.MALE
+            );
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), Void.class);
+
+            UserV1Dto.SignUpRequest duplicate = new UserV1Dto.SignUpRequest(
+                "user1", "Pass456@", "김길동", "other@example.com", "1990-05-15", Gender.FEMALE
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(duplicate), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+
         @DisplayName("성별이 없을 경우, 400 Bad Request 응답을 반환한다.")
         @Test
         void returnsBadRequest_whenGenderIsMissing() {
