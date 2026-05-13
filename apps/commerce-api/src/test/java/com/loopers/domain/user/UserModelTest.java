@@ -127,16 +127,28 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("이메일에 유효한 특수문자(+)가 포함되어도, 예외가 발생하지 않는다.")
+        @DisplayName("이메일에 허용된 특수문자(+ . - _)가 포함되어도, 예외가 발생하지 않는다.")
         @Test
-        void doesNotThrow_whenEmailContainsValidSpecialCharacter() {
-            // arrange
-            String email = "user+tag@example.com";
+        void doesNotThrow_whenEmailContainsAllowedSpecialCharacters() {
+            // arrange — +, -, _ 모두 허용 (구글 기준 실용적 범위)
+            assertDoesNotThrow(() -> new UserModel("user1", "Pass123!", "홍길동", "user+tag@example.com", "2000-01-01", Gender.MALE));
+            assertDoesNotThrow(() -> new UserModel("user1", "Pass123!", "홍길동", "user-name@example.com", "2000-01-01", Gender.MALE));
+            assertDoesNotThrow(() -> new UserModel("user1", "Pass123!", "홍길동", "user_name@example.com", "2000-01-01", Gender.MALE));
+        }
 
-            // act & assert
-            assertDoesNotThrow(() ->
+        @DisplayName("이메일에 허용되지 않는 특수문자(!)가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEmailContainsInvalidSpecialCharacter() {
+            // arrange
+            String email = "user!name@example.com";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
                 new UserModel("user1", "Pass123!", "홍길동", email, "2000-01-01", Gender.MALE)
             );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("이메일이 올바른 형식이 아니면, BAD_REQUEST 예외가 발생한다.")

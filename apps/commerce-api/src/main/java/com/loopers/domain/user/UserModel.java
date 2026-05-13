@@ -19,7 +19,7 @@ public class UserModel extends BaseEntity {
 
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
     private static final String LOGIN_ID_REGEX = "^[a-zA-Z0-9]{2,10}$";
-    private static final String EMAIL_REGEX = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
+    private static final String EMAIL_REGEX = "^[a-zA-Z0-9+._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
     private static final String PASSWORD_REGEX = "^[\\x21-\\x7E]{8,16}$";
     private static final String NAME_REGEX = "^[가-힣]{2,10}$";
 
