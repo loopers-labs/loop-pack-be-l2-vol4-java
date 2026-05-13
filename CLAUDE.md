@@ -59,22 +59,31 @@ supports/    ← 부가 기능 add-on
 ```
 com.loopers
   interfaces.api.<domain>     ← Controller, V1Dto, V1ApiSpec(SpringDoc)
+  interfaces.api.auth         ← 표현 계층 인증(어노테이션, ArgumentResolver) — 도메인 무관
   application.<domain>        ← Facade (유스케이스), Info (DTO)
   domain.<domain>             ← Service, Model(@Entity), Repository 인터페이스
   infrastructure.<domain>     ← RepositoryImpl, JpaRepository (Spring Data)
   support.error               ← CoreException + ErrorType
+  support.config              ← MVC 횡단 설정 (WebMvcConfig 등) — 도메인 무관
 ```
 
 호출 방향은 **항상** `interfaces → application → domain → infrastructure`이다. `domain.Repository`는 추상 인터페이스이고 `infrastructure.RepositoryImpl`이 `JpaRepository`를 위임 구현한다 — 도메인이 JPA에 직접 의존하지 않는다.
 
 핵심 공통 컴포넌트:
 - `BaseEntity` (`modules/jpa`): 모든 엔티티의 부모. `id`, `createdAt`, `updatedAt`, `deletedAt` 자동 관리. 검증이 필요하면 `guard()`를 오버라이드한다 (`@PrePersist`/`@PreUpdate`에서 호출됨). `delete()`/`restore()`는 멱등.
-- `CoreException` + `ErrorType` (`BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`): 도메인/서비스에서 던지는 단일 예외. 메시지는 `customMessage`로 override 가능.
+- `CoreException` + `ErrorType` (`BAD_REQUEST`, `UNAUTHENTICATED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`): 도메인/서비스에서 던지는 단일 예외. 메시지는 `customMessage`로 override 가능. `UNAUTHENTICATED`는 의미상 "인증 실패"(name 정확), HTTP status는 `HttpStatus.UNAUTHORIZED`, code는 reason phrase `"Unauthorized"` — RFC 7235 401의 명명(`Unauthorized`)과 의미(인증 실패) 불일치를 enum name이 보정.
 - `ApiControllerAdvice`: `CoreException` 및 Spring 표준 예외(타입 mismatch, JSON 파싱 등)를 `ApiResponse.fail(...)`로 변환.
 - `ApiResponse<T>` (record): `meta(result, errorCode, message)` + `data`. 컨트롤러는 항상 이 래퍼로 응답한다.
 - `ExampleV1*`이 위 레이어/네이밍 규약의 정식 참조 구현이다 — 새 도메인을 추가할 때 이 패턴을 그대로 따른다.
 
 **검증 위치는 VO에 단일화한다.** 형식·길이·null 검증은 각 VO의 `from()` 정적 팩토리가 책임지며, 컨트롤러 DTO에는 Bean Validation 어노테이션(`@NotBlank`/`@Pattern`/`@Size`/`@Email`/`@Past` 등)을 도입하지 않는다. VO가 던지는 `CoreException(BAD_REQUEST)`이 `ApiControllerAdvice`에서 400으로 변환되므로 별도 Bean Validation 계층은 DRY 위반이 된다. 예외는 VO를 두지 않는 도메인 — 그 경우 DTO Bean Validation 단독 허용.
+
+**인증 메커니즘.** 매 요청 헤더 인증(`X-Loopers-LoginId`/`X-Loopers-LoginPw`)은 `interfaces.api.auth` 패키지에 모인 컴포넌트로 처리한다.
+
+- 컨트롤러 파라미터는 `@LoginUser AuthenticatedUser` 시그니처로 받는다. `AuthenticatedUser`는 인증된 회원의 `userId`만 보유한 경량 record — 표현 계층이 도메인 엔티티(`*Model`)에 의존하지 않게 한다. 후속 조회는 Controller→Facade→Service→`Repository.findById(userId)` 흐름.
+- `AuthenticatedUserArgumentResolver`가 헤더 추출 + `UserRepository.findByLoginId` + `UserModel.matchesPassword`로 인증을 수행하고 `AuthenticatedUser`를 반환한다. `support.config.WebMvcConfig`가 Spring MVC에 등록.
+- 인증 실패의 모든 사유(헤더 누락 / 헤더 포맷 위반 / 회원 미존재 / 비밀번호 불일치)는 `ErrorType.UNAUTHENTICATED` 단일 응답으로 통합한다. 사용자 열거 공격(user enumeration) 방지 — `errorCode`/`message`/헤더 어디에도 사유 식별 신호를 두지 않는다.
+- 컨트롤러·Facade는 JPA 엔티티(`*Model`)를 파라미터로 직접 받지 않는다. 도메인 객체가 표현 계층에 노출되면 계층 결합·`LazyInitializationException` 위험이 커진다.
 
 ### 설정 / 프로파일
 
@@ -112,6 +121,9 @@ com.loopers
 - **호출**: `testRestTemplate.exchange(URL, METHOD, HttpEntity, ParameterizedTypeReference<ApiResponse<...>>)`. `postForEntity`는 `Class<T>` 한계로 제네릭 보존 불가.
 - **Content-Type**: `jsonRequest(body)` 같은 헬퍼로 명시적 부착. 자동 추론 가능하지만 통합 테스트에선 의도를 못박는 게 안전.
 - **setup용 첫 호출**: 결과를 무시하려면 `Void.class`로 받는다.
+- **E2E fixture는 Repository.save 직접**. 다른 API를 거쳐 fixture를 만들면 (1) 그 API에 대한 간접 의존성 (2) HTTP 라운드트립 오버헤드 (3) fixture 데이터의 정확한 제어 어려움 (예: 해시 비밀번호) — 세 가지 모두 부담된다. fixture가 본 테스트의 검증 대상이 아니라면 `*JpaRepository.save` 직접 호출이 정석. 해당 API의 자체 검증은 그 API의 E2E에서 이미 끝나 있어야 한다.
+- **HTTP 헤더 값은 ASCII 한정**. JDK HTTP 클라이언트가 non-ASCII 헤더 값을 `IllegalArgumentException: invalid header value`로 거부한다 (RFC 7230). "잘못된 헤더 값" 케이스를 설계할 때는 ASCII 범위 내(특수문자·길이 위반 등)로 입력을 구성한다. 한글·이모지 같은 non-ASCII는 클라이언트 단에서 차단되어 서버 로직에 도달하지 못한다.
+- **에러 응답 단언 = 컨트랙트만**. `statusCode` + `meta.result` + `errorCode`까지만 검증한다. `meta.message` 텍스트 단언은 도메인 단위 테스트의 책임이며, E2E에서 메시지 문구까지 잡으면 문구 변경에 깨지는 빡빡한 테스트가 된다. 응답 키 집합이 contract면 `containsOnlyKeys`로 추가 단언.
 
 ---
 
@@ -225,6 +237,9 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Grafana(3000, admin/adm
   - 매개변수 **하나** → `from(X)`. 예: `LoginId.from("kyle123")`, `Email.from("kyle@example.com")`.
   - 매개변수 **여러 개** → `of(X, Y, ...)`. 예: `UserModel.of(loginId, name, email, ...)`.
 - **변수명은 풀네임으로**: 축약형(`encoded`, `result`, `data`) 대신 의미를 담은 풀네임(`encryptedPassword`, `matchingResult`, `signUpRequest`)을 쓴다. 루프 변수 같은 짧은 스코프의 관행적 단일 문자(`i`, `e`)만 허용. `enc`, `pwd`, `usr` 같은 1~2글자 약어는 사용하지 않는다.
+- **도메인 메서드 어휘 강도**: 도메인 모델의 메서드는 행위 의미가 강한 동사형(`authenticate`, `mask`)보다 동작 자체를 묘사하는 명사·동사형이 자연스럽다. 행위가 강한 동사는 인증 서비스(Resolver 등) 같은 표현/인프라 계층의 책임처럼 읽힌다.
+  - **boolean 반환** → `matches*`/`is*`/`has*` 명사·상태 접두사 (`matchesPassword`, `isContainedIn`). `authenticate` 같은 행위 동사는 회피.
+  - **값 반환** → `*Value` 같은 명사형 접미사 (`maskedValue()`). `masked()`처럼 형용사형은 boolean 인상을 줘 회피.
 
 ---
 
