@@ -22,11 +22,11 @@ public class UserModelTest {
         @BeforeEach
         void setup() {
             // 모든 과정을 pass 할 수 있는 올바른 값
-            String id = "usertest123";
-            String name = "홍길동";
-            String password = "abc123!@#";
-            LocalDate birthDate = LocalDate.of(1995, 6, 10);
-            String email = "test@naver.com";
+            userId = "usertest123";
+            name = "홍길동";
+            password = "abc123!@#";
+            birthDate = LocalDate.of(1995, 6, 10);
+            email = "test@naver.com";
         }
 
         @DisplayName("정상적인 요청이 온 경우, 정상적으로 생성된다.")
@@ -40,7 +40,7 @@ public class UserModelTest {
 
             // assert = then
             assertAll(
-                () -> assertEquals(id, userModel.getUserId()),
+                () -> assertEquals(userId, userModel.getUserId()),
                 () -> assertEquals(name, userModel.getName()),
                 () -> assertEquals(birthDate, userModel.getBirthDate()),
                 () -> assertEquals(email, userModel.getEmail())
@@ -82,7 +82,7 @@ public class UserModelTest {
         @Test
         void throwsException_whenUserIdIncludesSpecialCharacter() {
             // arrange = given
-            userId = 'abdf$2341!!';
+            userId = "abdf$2341!!";
 
             // act = when
             CoreException result = assertThrows(CoreException.class, () -> {
