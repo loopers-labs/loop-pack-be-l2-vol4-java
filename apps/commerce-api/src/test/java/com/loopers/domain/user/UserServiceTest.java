@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.Optional;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -99,6 +101,97 @@ class UserServiceTest {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                     userService.signUp(VALID_LOGIN_ID, passwordContainingBirthDate, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+
+            // assert
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                    () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
+                    () -> verify(userRepository, never()).save(any(UserModel.class))
+            );
+        }
+    }
+
+    @DisplayName("비밀번호 수정 처리 시")
+    @Nested
+    class ChangePassword {
+
+        private static final String NEW_RAW_PASSWORD = "newPw5678!";
+        private static final EncodedPassword CURRENT_ENCODED = new EncodedPassword("CurrentHashedValue==");
+        private static final EncodedPassword NEW_ENCODED = new EncodedPassword("NewHashedValue==");
+
+        @DisplayName("유효한 요청이면 새 비밀번호를 인코딩 후 저장한다.")
+        @Test
+        void changesPassword_whenRequestIsValid() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
+            given(passwordEncoder.matches(NEW_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(false);
+            given(passwordEncoder.encode(any(RawPassword.class))).willReturn(NEW_ENCODED);
+            given(userRepository.save(any(UserModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // act
+            userService.changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, NEW_RAW_PASSWORD);
+
+            // assert
+            ArgumentCaptor<UserModel> savedCaptor = ArgumentCaptor.forClass(UserModel.class);
+            verify(userRepository, times(1)).save(savedCaptor.capture());
+            assertThat(savedCaptor.getValue().getPassword()).isEqualTo(NEW_ENCODED);
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면 UNAUTHORIZED 예외 발생")
+        @Test
+        void throwsUnauthorized_whenOldPasswordDoesNotMatch() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(false);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, NEW_RAW_PASSWORD));
+
+            // assert
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
+                    () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
+                    () -> verify(userRepository, never()).save(any(UserModel.class))
+            );
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 BAD_REQUEST 예외 발생")
+        @Test
+        void throwsBadRequest_whenNewPasswordEqualsCurrent() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_RAW_PASSWORD));
+
+            // assert
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                    () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
+                    () -> verify(userRepository, never()).save(any(UserModel.class))
+            );
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 포함되면 BAD_REQUEST 예외 발생")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
+            // arrange
+            String passwordWithBirthDate = "Pass19950510!";
+            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
+            given(passwordEncoder.matches(passwordWithBirthDate, CURRENT_ENCODED)).willReturn(false);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, passwordWithBirthDate));
 
             // assert
             assertAll(

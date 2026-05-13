@@ -19,6 +19,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,6 +137,96 @@ class UserV1ControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.meta.result").value("FAIL"))
                 .andExpect(jsonPath("$.meta.errorCode").value(ErrorType.UNAUTHORIZED.getCode()));
+        }
+    }
+
+    @DisplayName("PUT /api/v1/users/me/password 요청 시")
+    @Nested
+    class UpdatePassword {
+
+        private static final String UPDATE_ENDPOINT = "/api/v1/users/me/password";
+        private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
+        private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
+        private static final String NEW_RAW_PASSWORD = "newPw5678!";
+
+        @DisplayName("유효한 요청이면 200 OK 응답을 반환한다.")
+        @Test
+        void returns200_whenRequestIsValid() throws Exception {
+            // arrange
+            given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
+                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, NEW_RAW_PASSWORD);
+
+            // act & assert
+            mockMvc.perform(put(UPDATE_ENDPOINT)
+                    .header(LOGIN_ID_HEADER, VALID_LOGIN_ID)
+                    .header(LOGIN_PW_HEADER, VALID_RAW_PASSWORD)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.result").value("SUCCESS"));
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returns401_whenOldPasswordDoesNotMatch() throws Exception {
+            // arrange
+            String wrongOldPassword = "wrong1234!";
+            given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
+                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(wrongOldPassword, NEW_RAW_PASSWORD);
+            willThrow(new CoreException(ErrorType.UNAUTHORIZED, "기존 비밀번호가 일치하지 않습니다."))
+                .given(userFacade).changePassword(VALID_LOGIN_ID, wrongOldPassword, NEW_RAW_PASSWORD);
+
+            // act & assert
+            mockMvc.perform(put(UPDATE_ENDPOINT)
+                    .header(LOGIN_ID_HEADER, VALID_LOGIN_ID)
+                    .header(LOGIN_PW_HEADER, VALID_RAW_PASSWORD)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.meta.errorCode").value(ErrorType.UNAUTHORIZED.getCode()));
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 400 BAD_REQUEST 응답을 반환한다.")
+        @Test
+        void returns400_whenNewPasswordEqualsCurrent() throws Exception {
+            // arrange
+            given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
+                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, VALID_RAW_PASSWORD);
+            willThrow(new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 기존 비밀번호와 같을 수 없습니다."))
+                .given(userFacade).changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_RAW_PASSWORD);
+
+            // act & assert
+            mockMvc.perform(put(UPDATE_ENDPOINT)
+                    .header(LOGIN_ID_HEADER, VALID_LOGIN_ID)
+                    .header(LOGIN_PW_HEADER, VALID_RAW_PASSWORD)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.meta.errorCode").value(ErrorType.BAD_REQUEST.getCode()));
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 포함되면 400 BAD_REQUEST 응답을 반환한다.")
+        @Test
+        void returns400_whenNewPasswordContainsBirthDate() throws Exception {
+            // arrange
+            String newPasswordWithBirthDate = "Pass19950510!";
+            given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
+                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, newPasswordWithBirthDate);
+            willThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다."))
+                .given(userFacade).changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, newPasswordWithBirthDate);
+
+            // act & assert
+            mockMvc.perform(put(UPDATE_ENDPOINT)
+                    .header(LOGIN_ID_HEADER, VALID_LOGIN_ID)
+                    .header(LOGIN_PW_HEADER, VALID_RAW_PASSWORD)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.meta.errorCode").value(ErrorType.BAD_REQUEST.getCode()));
         }
     }
 }

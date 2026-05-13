@@ -13,6 +13,12 @@ public class UserV1Dto {
     ) {
     }
 
+    public record UpdatePasswordRequest(
+        String oldPassword,
+        String newPassword
+    ) {
+    }
+
     public record SignUpResponse(
         String loginId,
         String name,
