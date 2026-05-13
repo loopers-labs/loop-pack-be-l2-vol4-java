@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class PasswordTest {
 
-    private static final LocalDate DEFAULT_BIRTHDAY = LocalDate.of(2000, 1, 1);
+    private static final LocalDate DEFAULT_BIRTHDAY = LocalDate.of(1992, 6, 24);
 
     @Nested
     @DisplayName("비밀번호 검증")
@@ -26,7 +26,7 @@ public class PasswordTest {
         @ParameterizedTest
         @NullAndEmptySource
         @ValueSource(strings = {" ", "\t"})
-        void given_nullOrBlankPassword_when_createUserModel_then_throwsBadRequestException(String invalidPassword) {
+        void given_nullOrBlankPassword_when_createPassword_then_throwsBadRequestException(String invalidPassword) {
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
@@ -42,10 +42,10 @@ public class PasswordTest {
         @ValueSource(strings = {
                 "Abc1!",                  // 5자 (미만)
                 "Abc123!",                // 7자 (미만, 경계 직전)
-                "Abc12345!Abcdefg",       // 17자 (초과, 경계 직후)
+                "Abc12345!Abcdefgh",       // 17자 (초과, 경계 직후)
                 "Abc12345!Abcdefgh1234"   // 21자 (초과)
         })
-        void given_passwordLengthOutOfRange_when_createUserModel_then_throwsBadRequestException(String invalidPassword) {
+        void given_passwordLengthOutOfRange_when_createPassword_then_throwsBadRequestException(String invalidPassword) {
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
@@ -64,7 +64,7 @@ public class PasswordTest {
                 "Password1!\t",            // 탭
                 "Pässword1!"               // 특수 유니코드
         })
-        void given_passwordWithInvalidCharacters_when_createUserModel_then_throwsBadRequestException(String invalidPassword) {
+        void given_passwordWithInvalidCharacters_when_createPassword_then_throwsBadRequestException(String invalidPassword) {
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
@@ -77,15 +77,13 @@ public class PasswordTest {
 
         @DisplayName("비밀번호에 생년월일(YYYYMMDD)이 포함되면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void given_passwordContainingBirthdayYYYYMMDD_when_createUserModel_then_throwsBadRequestException() {
-            // Arrange
-            LocalDate birthday = LocalDate.of(1992, 6, 24);
+        void given_passwordContainingBirthdayYYYYMMDD_when_createPassword_then_throwsBadRequestException() {
             String password = "Pass19920624!";
 
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
-                    () -> new Password(birthday, password)
+                    () -> new Password(password, DEFAULT_BIRTHDAY)
             );
 
             // Assert
@@ -94,15 +92,14 @@ public class PasswordTest {
 
         @DisplayName("비밀번호에 생년월일(YYMMDD)이 포함되면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void given_passwordContainingBirthdayYYMMDD_when_createUserModel_then_throwsBadRequestException() {
+        void given_passwordContainingBirthdayYYMMDD_when_createPassword_then_throwsBadRequestException() {
             // Arrange
-            LocalDate birthday = LocalDate.of(1992, 6, 24);
             String password = "Pass920624!";
 
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
-                    () -> new Password(birthday, password)
+                    () -> new Password(password, DEFAULT_BIRTHDAY)
             );
 
             // Assert
@@ -111,15 +108,14 @@ public class PasswordTest {
 
         @DisplayName("비밀번호에 생년월일(MMDD)이 포함되면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void given_passwordContainingBirthdayMMDD_when_createUserModel_then_throwsBadRequestException() {
+        void given_passwordContainingBirthdayMMDD_when_createPassword_then_throwsBadRequestException() {
             // Arrange
-            LocalDate birthday = LocalDate.of(1992, 6, 24);
             String password = "Password0624!";
 
             // Act
             CoreException result = assertThrows(
                     CoreException.class,
-                    () -> new Password(birthday, password)
+                    () -> new Password(password, DEFAULT_BIRTHDAY)
             );
 
             // Assert
@@ -130,27 +126,23 @@ public class PasswordTest {
         @DisplayName("비밀번호가 허용 문자로만 구성되고 8~16자이며 생년월일을 포함하지 않으면 정상 생성된다")
         @ParameterizedTest
         @ValueSource(strings = {
-                "Abcdef7!",                      // 8자 (최소 경계)
-                "Abcdefgh12345!@#",              // 16자 (최대 경계)
-                "Password9!",                    // 일반 케이스
-                "P@ssw0rd",                      // 다양한 문자 조합
-                "Str0ng!Pass",                   // 영문 대소문자 + 숫자 + 특수문자
-                "MyP@ssw0rd99"                   // 혼합
+                "abcdefgh",                      // 8자, 영소문자만 (최소 경계)
+                "ABCDEFGH",                      // 8자, 영대문자만
+                "12345678",                      // 8자, 숫자만
+                "!@#$%^&*",                      // 8자, 특수문자만
+                "Password",                      // 영문 혼합
+                "Password9!",                    // 다종 조합
+                "Abcdefgh12345!@#"               // 16자 (최대 경계)
         })
-        void given_validPassword_when_createUserModel_then_createsUserModel(String validPassword) {
-            // Arrange — 픽스처 기본 생년월일과의 충돌 가능성을 차단
-            LocalDate birthday = LocalDate.of(2000, 1, 1);
+        void given_validPassword_when_createPassword_then_createsPassword(String validPassword) {
+            // Arrange
 
             // Act
-            UserModel userModel = aUser()
-                    .withBirthday(birthday)
-                    .withPassword(validPassword)
-                    .build();
+            Password password = new Password(validPassword, DEFAULT_BIRTHDAY);
 
-            // Assert — 비밀번호는 암호화되므로 평문 비교 대신 정상 생성을 검증
-            assertThat(userModel).isNotNull();
-            assertThat(userModel.getPassword()).isNotBlank();
-            assertThat(userModel.getPassword()).isNotEqualTo(validPassword);
+
+            // Assert  예외 없이 생성되면 성공
+            assertThat(password).isNotNull();
         }
     }
 }
