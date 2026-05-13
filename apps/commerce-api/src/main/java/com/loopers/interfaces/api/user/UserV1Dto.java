@@ -14,6 +14,8 @@ public class UserV1Dto {
         Gender gender
     ) {}
 
+    public record ChangePasswordRequest(String newPassword) {}
+
     public record UserResponse(Long id, String loginId, String name, String email, String birthDate, Gender gender) {
         public static UserResponse from(UserInfo info) {
             return new UserResponse(

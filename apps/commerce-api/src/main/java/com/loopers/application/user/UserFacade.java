@@ -20,6 +20,10 @@ public class UserFacade {
         return UserInfo.from(saved);
     }
 
+    public void changePassword(String loginId, String newPassword) {
+        userService.changePassword(loginId, newPassword);
+    }
+
     public UserInfo getMyInfo(String loginId) {
         // [유지/제거 검토] orElseThrow는 HTTP 흐름에서 도달 불가 — LoginUserResolver가 사용자 존재를 보장한 뒤 호출됨.
         // 제거 관점: 현재 호출 경로가 HTTP 전용이므로 죽은 코드에 해당, 오버엔지니어링.
