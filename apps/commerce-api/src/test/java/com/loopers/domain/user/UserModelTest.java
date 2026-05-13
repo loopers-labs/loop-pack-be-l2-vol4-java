@@ -211,6 +211,62 @@ public class UserModelTest {
         }
     }
 
+    @DisplayName("비밀번호 변경 테스트")
+    @Nested
+    class ChangePassword {
+        UserModel userModel;
+        final String currentPassword = "abc123!@#";
+
+        @BeforeEach
+        void setup() {
+            userModel = new UserModel(
+                "usertest123", currentPassword, "홍길동",
+                LocalDate.of(1995, 6, 10), "test@naver.com"
+            );
+        }
+
+        @DisplayName("올바른 현재 비밀번호와 새 비밀번호가 주어지면, 비밀번호가 변경된다.")
+        @Test
+        void changesPassword_whenRequestIsValid() {
+            // arrange
+            String newPassword = "newPass1!@";
+
+            // act
+            userModel.changePassword(currentPassword, newPassword);
+
+            // assert
+            assertNotEquals(currentPassword, userModel.getPassword());
+        }
+
+        @DisplayName("현재 비밀번호가 일치하지 않는 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenCurrentPasswordNotMatches() {
+            // arrange
+            String wrongPassword = "wrongPass1!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(wrongPassword, "newPass1!@")
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일한 경우, 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordIsSameAsCurrent() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(currentPassword, currentPassword)
+            );
+
+            // assert
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
+        }
+
+    }
+
     @DisplayName("이름 마스킹 테스트")
     @Nested
     class MaskName {
