@@ -62,7 +62,7 @@ class AuthenticatedUserArgumentResolverTest {
 
             UserModel storedUser = mock(UserModel.class);
             given(storedUser.getId()).willReturn(userId);
-            given(storedUser.authenticate(rawPassword, passwordEncrypter)).willReturn(true);
+            given(storedUser.matchesPassword(rawPassword, passwordEncrypter)).willReturn(true);
             given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act
@@ -127,7 +127,7 @@ class AuthenticatedUserArgumentResolverTest {
             request.addHeader("X-Loopers-LoginPw", wrongRawPassword);
 
             UserModel storedUser = mock(UserModel.class);
-            given(storedUser.authenticate(wrongRawPassword, passwordEncrypter)).willReturn(false);
+            given(storedUser.matchesPassword(wrongRawPassword, passwordEncrypter)).willReturn(false);
             given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act & assert

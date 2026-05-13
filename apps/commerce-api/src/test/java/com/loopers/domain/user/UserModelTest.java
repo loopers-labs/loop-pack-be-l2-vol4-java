@@ -115,9 +115,9 @@ class UserModelTest {
         }
     }
 
-    @DisplayName("UserModel로 본인 인증할 때,")
+    @DisplayName("비밀번호 일치 여부를 확인할 때,")
     @Nested
-    class Authenticate {
+    class MatchesPassword {
 
         @DisplayName("rawPassword가 저장된 encryptedPassword와 일치하면 true를 반환한다.")
         @Test
@@ -138,10 +138,10 @@ class UserModelTest {
                 .build();
 
             // act
-            boolean authenticated = userModel.authenticate(rawPassword, passwordEncrypter);
+            boolean matchingResult = userModel.matchesPassword(rawPassword, passwordEncrypter);
 
             // assert
-            assertThat(authenticated).isTrue();
+            assertThat(matchingResult).isTrue();
         }
 
         @DisplayName("rawPassword가 저장된 encryptedPassword와 일치하지 않으면 false를 반환한다.")
@@ -164,10 +164,10 @@ class UserModelTest {
                 .build();
 
             // act
-            boolean authenticated = userModel.authenticate(wrongRawPassword, passwordEncrypter);
+            boolean matchingResult = userModel.matchesPassword(wrongRawPassword, passwordEncrypter);
 
             // assert
-            assertThat(authenticated).isFalse();
+            assertThat(matchingResult).isFalse();
         }
     }
 }

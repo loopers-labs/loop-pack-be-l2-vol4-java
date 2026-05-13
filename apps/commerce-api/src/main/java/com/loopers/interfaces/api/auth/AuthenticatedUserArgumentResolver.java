@@ -51,7 +51,7 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHENTICATED));
 
-        if (!user.authenticate(rawPassword, passwordEncrypter)) {
+        if (!user.matchesPassword(rawPassword, passwordEncrypter)) {
             throw new CoreException(ErrorType.UNAUTHENTICATED);
         }
 
