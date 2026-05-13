@@ -5,7 +5,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import org.apache.catalina.User;
+import java.time.DateTimeException;import java.time.LocalDate;import java.time.format.DateTimeParseException;
 
 @Entity
 @Table(name = "user")
@@ -15,12 +15,11 @@ public class UserModel extends BaseEntity {
     private static final int PW_LETTER_MAX_SIZE = 20;
     private static final int PW_LETTER_MIN_SIZE = 8;
     private static final String PASSWORD_PATTERN = "^[A-Za-z0-9!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/~`|\\\\]+$";
-    private static final String BIRTH_DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";
 
     private String loginId;
     private String password;
     private String name;
-    private String birthDate;
+    private LocalDate birthDate;
     private String email;
 
     protected UserModel(){};
@@ -41,13 +40,16 @@ public class UserModel extends BaseEntity {
         if (!email.matches(EMAIL_PATTERN)){
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일을 형태에 알맞게 작성해주시기 바랍니다.");
         }
-        if(!birthDate.matches(BIRTH_DATE_PATTERN)){
-            throw new CoreException((ErrorType.BAD_REQUEST),"생년월일 타입이 yyyy-mm-dd 형태가 아닙니다.");
+        LocalDate parsedBirthDate;
+        try{
+            parsedBirthDate = LocalDate.parse(birthDate);
+        }catch (DateTimeParseException e){
+            throw new CoreException((ErrorType.BAD_REQUEST),"생년월일의 구조는 1998-04-11 에 맞춰서 넣어주시기 바랍니다." );
         }
         this.loginId = loginId;
         this.password = password;
         this.name = name;
-        this.birthDate = birthDate;
+        this.birthDate = parsedBirthDate;
         this.email = email;
     }
 
@@ -60,7 +62,7 @@ public class UserModel extends BaseEntity {
     public String getName(){
         return name;
     }
-    public String getBirthDate(){
+    public LocalDate getBirthDate(){
         return birthDate;
     }
     public String getEmail(){

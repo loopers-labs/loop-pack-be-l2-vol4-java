@@ -67,7 +67,7 @@ public class UserModelTest {
     @Test
     void createBadRequest_whenBirthDateIsNotRightSetting() {
         // arrange
-        String invalidBirthDate = "1998.04.11";
+        String invalidBirthDate = "1998-15-11";
         // act
         CoreException result = assertThrows(CoreException.class, () ->
                 new UserModel(VALID_LOGIN_ID, VALID_PW, VALID_NAME, invalidBirthDate, VALID_EMAIL));
