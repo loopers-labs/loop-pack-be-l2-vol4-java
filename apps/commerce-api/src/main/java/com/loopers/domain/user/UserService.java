@@ -2,16 +2,22 @@ package com.loopers.domain.user;
 
 import java.time.LocalDate;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 import lombok.RequiredArgsConstructor;
 
+@Service
+@Transactional
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
     private final PasswordEncrypter passwordEncrypter;
+
+    private final UserRepository userRepository;
 
     public UserModel signUp(String rawLoginId, String rawPassword, String rawName, LocalDate rawBirthDate, String rawEmail) {
         if (userRepository.existsByLoginId(rawLoginId)) {
