@@ -16,23 +16,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/users")
-public class UserV1Controller {
+public class UserV1Controller implements UserV1ApiSpec {
 
     private final UserFacade userFacade;
 
     @PostMapping
+    @Override
     public ApiResponse<UserV1Dto.UserResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
         UserInfo.User user = userFacade.signUp(request.toCommand());
         return ApiResponse.success(UserV1Dto.UserResponse.from(user));
     }
 
     @GetMapping("/me")
+    @Override
     public ApiResponse<UserV1Dto.MyInfoResponse> getMe(@AuthenticatedUser LoginUser loginUser) {
         UserInfo.User user = userFacade.getMe(loginUser.id());
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(user));
     }
 
     @PutMapping("/me/password")
+    @Override
     public ApiResponse<Object> changePassword(
         @AuthenticatedUser LoginUser loginUser,
         @RequestBody UserV1Dto.ChangePasswordRequest request
