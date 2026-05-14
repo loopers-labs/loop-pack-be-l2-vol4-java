@@ -28,7 +28,8 @@ class JacksonConfig {
                 JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN
             );
             builder.featuresToDisable(
-                SerializationFeature.FAIL_ON_EMPTY_BEANS
+                SerializationFeature.FAIL_ON_EMPTY_BEANS,
+                SerializationFeature.WRITE_DATES_AS_TIMESTAMPS
             );
 
             // Deserialization Features
