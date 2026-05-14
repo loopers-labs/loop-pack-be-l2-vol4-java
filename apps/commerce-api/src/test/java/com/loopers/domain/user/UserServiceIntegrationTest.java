@@ -72,4 +72,51 @@ class UserServiceIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
+
+    @DisplayName("내 정보를 조회할 때,")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("해당 ID 의 회원이 존재할 경우, 회원 정보가 반환된다")
+        @Test
+        void returnsUserInfo_whenUserExists() {
+            // arrange
+            String loginId = "user01";
+            String password = "Password1!";
+            userJpaRepository.save(new UserModel(loginId, password, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher));
+
+            // act
+            UserModel result = userService.findMyInfo(loginId, password);
+
+            // assert
+            assertThat(result.getLoginId()).isEqualTo(loginId);
+        }
+
+        @DisplayName("해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다")
+        @Test
+        void returnsNull_whenUserDoesNotExist() {
+            // act
+            UserModel result = userService.findMyInfo("nonexistent", "Password1!");
+
+            // assert
+            assertThat(result).isNull();
+        }
+
+        @DisplayName("헤더 loginPw 인증이 실패하면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenLoginPwAuthenticationFails() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new UserModel(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.findMyInfo(loginId, "WrongPass1!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+    }
 }
