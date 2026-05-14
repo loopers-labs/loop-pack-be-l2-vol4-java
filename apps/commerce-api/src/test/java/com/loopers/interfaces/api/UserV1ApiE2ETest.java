@@ -3,6 +3,7 @@ package com.loopers.interfaces.api;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.interfaces.auth.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
 import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -149,4 +151,183 @@ class UserV1ApiE2ETest {
         }
     }
 
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMe {
+
+        private static final String ME_ENDPOINT = "/api/v1/users/me";
+
+        private void signUp(String loginId, String password, String name) {
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                loginId, password, name, LocalDate.of(1999, 3, 22), "user@example.com"
+            );
+            testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
+            );
+        }
+
+        private HttpHeaders authHeaders(String loginId, String password) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_ID, loginId);
+            headers.set(AuthHeaders.LOGIN_PW, password);
+            return headers;
+        }
+
+        @DisplayName("유효한 인증 헤더로 요청하면, 본인 정보를 반환한다 (이름은 마지막 글자 마스킹).")
+        @Test
+        void returnsMyInfo_whenAuthHeadersAreValid() {
+            // given
+            signUp("user01", "Abcd1234!", "김철수");
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders("user01", "Abcd1234!")),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user01"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("김철*"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1999-03-22"),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("user@example.com")
+            );
+        }
+
+        @DisplayName("이름이 1글자인 사용자는, * 한 글자로 마스킹된다.")
+        @Test
+        void masksToSingleAsterisk_whenNameHasOneCharacter() {
+            // given
+            signUp("user01", "Abcd1234!", "김");
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders("user01", "Abcd1234!")),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("*")
+            );
+        }
+
+        @DisplayName("로그인 ID 헤더가 누락되면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenLoginIdHeaderIsMissing() {
+            // given
+            signUp("user01", "Abcd1234!", "김철수");
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_PW, "Abcd1234!");
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("비밀번호 헤더가 누락되면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenLoginPwHeaderIsMissing() {
+            // given
+            signUp("user01", "Abcd1234!", "김철수");
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_ID, "user01");
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                responseType
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("비밀번호가 일치하지 않으면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenPasswordIsWrong() {
+            // given
+            signUp("user01", "Abcd1234!", "김철수");
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders("user01", "Wrong9999!")),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("존재하지 않는 로그인 ID 면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenLoginIdDoesNotExist() {
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders("nobody", "Abcd1234!")),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("로그인 ID 형식이 잘못된 헤더면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenLoginIdFormatIsInvalid() {
+            // when - LoginId 패턴(^[a-z0-9]{4,20}$) 위반: 대문자
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ME_ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders("INVALID!!", "Abcd1234!")),
+                responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+    }
 }

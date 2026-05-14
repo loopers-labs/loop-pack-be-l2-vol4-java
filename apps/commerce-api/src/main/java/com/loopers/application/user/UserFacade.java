@@ -25,4 +25,9 @@ public class UserFacade {
         );
         return UserInfo.User.from(user);
     }
+
+    public UserInfo.User getMe(Long userId) {
+        UserModel user = userService.getUser(userId);
+        return UserInfo.User.from(user);
+    }
 }

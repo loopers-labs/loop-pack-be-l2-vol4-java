@@ -42,4 +42,24 @@ public class UserV1Dto {
             );
         }
     }
+
+    public record MyInfoResponse(
+        String loginId,
+        String name,
+        LocalDate birthDate,
+        String email
+    ) {
+        public static MyInfoResponse from(UserInfo.User info) {
+            return new MyInfoResponse(
+                info.loginId(),
+                maskLastCharacter(info.name()),
+                info.birthDate(),
+                info.email()
+            );
+        }
+
+        private static String maskLastCharacter(String name) {
+            return name.substring(0, name.length() - 1) + "*";
+        }
+    }
 }

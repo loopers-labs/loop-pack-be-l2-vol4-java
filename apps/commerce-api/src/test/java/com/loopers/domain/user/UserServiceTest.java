@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -179,5 +180,47 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(UserModel.class));
         }
 
+    }
+
+    @DisplayName("사용자 조회 시,")
+    @Nested
+    class GetUser {
+
+        @DisplayName("존재하는 ID 면, 해당 사용자를 반환한다.")
+        @Test
+        void returnsUser_whenIdExists() {
+            // given
+            Long userId = 1L;
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$encodedHash"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+            // when
+            UserModel result = userService.getUser(userId);
+
+            // then
+            assertThat(result).isSameAs(user);
+        }
+
+        @DisplayName("존재하지 않는 ID 면, NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            // given
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.getUser(userId)
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
     }
 }

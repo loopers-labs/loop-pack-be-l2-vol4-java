@@ -6,6 +6,8 @@ import com.loopers.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 @RequiredArgsConstructor
 public class UserRepositoryImpl implements UserRepository {
@@ -15,6 +17,16 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public boolean existsByLoginId(LoginId loginId) {
         return userJpaRepository.existsByLoginId(loginId);
+    }
+
+    @Override
+    public Optional<UserModel> findByLoginId(LoginId loginId) {
+        return userJpaRepository.findByLoginId(loginId);
+    }
+
+    @Override
+    public Optional<UserModel> findById(Long id) {
+        return userJpaRepository.findById(id);
     }
 
     @Override
