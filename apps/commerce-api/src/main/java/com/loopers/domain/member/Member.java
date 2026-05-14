@@ -6,8 +6,8 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import java.util.Objects;
 import lombok.Getter;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Entity
 @Table(name = "members")
@@ -31,37 +31,34 @@ public class Member extends BaseEntity {
 
     protected Member() {}
 
-    public Member(String loginId, String password, String name, String birthDate, String email) {
-        validatePassword(password, birthDate, email);
+    public Member(String loginId, Password password, String name, String birthDate, String email) {
+        validateBirthDate(birthDate);
+        validateEmail(email);
 
         this.loginId = loginId;
-        this.password = password;
+        this.password = password.getEncodedValue();
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
     }
 
-    private void validatePassword(String password, String birthDate, String email) {
-        if (password == null || password.length() < 8 || password.length() > 16) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자여야 합니다.");
-        }
-        if (!password.matches("^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]*$")) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자만 가능합니다.");
-        }
-        String birthDateWithoutHyphen = birthDate.replace("-", "");
-        if (password.contains(birthDate) || password.contains(birthDateWithoutHyphen)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
-        }
-        if (!Objects.requireNonNull(birthDate).matches("^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$")) {
+    private static void validateBirthDate(String birthDate) {
+        if (birthDate == null || !birthDate.matches("^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$")) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식이어야 합니다.");
         }
-        if (!email.matches("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$")) {
+    }
+
+    private static void validateEmail(String email) {
+        if (email == null || !email.matches("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$")) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
         }
     }
 
-
     public String getMaskedName() {
         return name.substring(0, name.length() - 1) + "*";
+    }
+
+    public boolean matchesPassword(String rawPassword, PasswordEncoder encoder) {
+        return encoder.matches(rawPassword, this.password);
     }
 }
