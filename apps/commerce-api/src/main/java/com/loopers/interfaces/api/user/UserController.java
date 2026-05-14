@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.auth.LoginCredentials;
+import com.loopers.interfaces.api.auth.LoginUser;
 import com.loopers.interfaces.api.user.dto.ChangePasswordRequest;
 import com.loopers.interfaces.api.user.dto.SignUpRequest;
 import com.loopers.interfaces.api.user.dto.UserResponse;
@@ -26,18 +28,19 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    @GetMapping("/{loginId}")
-    public ResponseEntity<ApiResponse<UserResponse>> getMyInfo(@PathVariable String loginId) {
-        UserInfo userInfo = userFacade.getMyInfo(loginId);
+    @GetMapping
+    public ResponseEntity<ApiResponse<UserResponse>> getMyInfo(@LoginUser LoginCredentials credentials) {
+        userFacade.authenticate(credentials.loginId(), credentials.loginPw()); // 해당 메소드는 요구사항과는 관련 없음
+        UserInfo userInfo = userFacade.getMyInfo(credentials.loginId());
         return ResponseEntity.ok(ApiResponse.success(UserResponse.maskedFrom(userInfo)));
     }
 
-    @PatchMapping("/{loginId}/password")
+    @PatchMapping("/password")
     public ResponseEntity<ApiResponse<UserResponse>> changePassword(
-        @PathVariable String loginId,
+        @LoginUser LoginCredentials credentials,
         @RequestBody ChangePasswordRequest request
     ) {
-        userFacade.changePassword(loginId, request.toCommand());
+        userFacade.changePassword(credentials.loginId(), request.toCommand(credentials.loginPw()));
         return ResponseEntity.ok(ApiResponse.success(UserResponse.empty()));
     }
 }
