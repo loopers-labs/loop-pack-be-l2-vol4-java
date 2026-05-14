@@ -57,14 +57,18 @@ public class User extends BaseEntity {
         this.encodedPassword = encodedPassword;
     }
 
-    public void changePassword(String newEncodedPassword) {
-        if (newEncodedPassword == null || newEncodedPassword.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 필수입니다.");
-        }
-        this.encodedPassword = newEncodedPassword;
-    }
-
     public String maskedName() {
         return new Name(this.name).masked();
+    }
+
+    public void changePassword(String currentPassword, String newPassword, PasswordEncoder encoder) {
+        if (!encoder.matches(currentPassword, this.encodedPassword)) {
+            throw new CoreException(ErrorType.UNAUTHORIZED);
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
+        }
+        Password validated = Password.of(newPassword, new Birth(this.birth));
+        this.encodedPassword = encoder.encode(validated.value());
     }
 }

@@ -1,5 +1,6 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.LoginId;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -32,5 +33,9 @@ public class UserFacade {
             user.getBirth(),
             user.getEmail()
         );
+    }
+
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        userService.changePassword(new LoginId(user.getLoginId()), currentPassword, newPassword);
     }
 }
