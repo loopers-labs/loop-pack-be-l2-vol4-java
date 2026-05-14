@@ -12,4 +12,12 @@ public class MemberCommand {
             String email
     ) {
     }
+
+    public record UpdatePassword(
+            String loginId,
+            String currentPassword,
+            String oldPassword,
+            String newPassword
+    ) {
+    }
 }

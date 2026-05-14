@@ -12,4 +12,10 @@ public class MemberRequest {
             String email
     ) {
     }
+
+    public record UpdatePassword(
+            String oldPassword,
+            String newPassword
+    ) {
+    }
 }
