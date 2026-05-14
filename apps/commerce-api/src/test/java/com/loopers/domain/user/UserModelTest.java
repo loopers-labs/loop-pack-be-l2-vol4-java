@@ -113,13 +113,12 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("비밀번호가 8~16자 영문/숫자/특수문자 RULE 을 위반하면 BAD_REQUEST 예외가 발생한다")
-        @ValueSource(strings = {"Pw1!", "Password1!Password1!", "한글Password1!", "Password 1!"})
-        @ParameterizedTest
-        void throwsBadRequestException_whenPasswordViolatesRule(String password) {
+        @DisplayName("비밀번호가 RULE 을 위반하면 BAD_REQUEST 예외가 발생한다 (상세 검증은 PasswordTest)")
+        @Test
+        void throwsBadRequestException_whenPasswordViolatesRule() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(VALID_LOGIN_ID, password, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER)
+                new UserModel(VALID_LOGIN_ID, "Pw1!", VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER)
             );
 
             // assert
@@ -136,6 +135,82 @@ class UserModelTest {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 new UserModel(VALID_LOGIN_ID, password, VALID_NAME, birthDate, VALID_EMAIL, VALID_GENDER, FAKE_HASHER)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+        @DisplayName("기존 비밀번호와 일치하고 신규 비밀번호가 RULE 을 만족하면 비밀번호가 변경된다")
+        @Test
+        void changesPassword_whenOldPasswordMatchesAndNewPasswordIsValid() {
+            // arrange
+            UserModel userModel = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER);
+            String newPassword = "NewPass99!";
+
+            // act & assert
+            userModel.changePassword(VALID_PASSWORD, newPassword, FAKE_HASHER);
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenOldPasswordDoesNotMatch() {
+            // arrange
+            UserModel userModel = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword("WrongPass1!", "NewPass99!", FAKE_HASHER)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("신규 비밀번호가 기존 비밀번호와 동일하면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenNewPasswordIsSameAsOld() {
+            // arrange
+            UserModel userModel = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(VALID_PASSWORD, VALID_PASSWORD, FAKE_HASHER)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("신규 비밀번호가 RULE 을 위반하면 BAD_REQUEST 예외가 발생한다 (상세 검증은 PasswordTest)")
+        @Test
+        void throwsBadRequestException_whenNewPasswordViolatesRule() {
+            // arrange
+            UserModel userModel = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(VALID_PASSWORD, "pw", FAKE_HASHER)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("신규 비밀번호에 생년월일이 포함되면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenNewPasswordContainsBirthDate() {
+            // arrange
+            UserModel userModel = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER, FAKE_HASHER);
+            String newPassword = "Pass19900101!";
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.changePassword(VALID_PASSWORD, newPassword, FAKE_HASHER)
             );
 
             // assert

@@ -220,6 +220,123 @@ class UserV1ApiE2ETest {
         }
     }
 
+    @DisplayName("PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+        @DisplayName("정상 요청 시 성공 응답을 반환한다")
+        @Test
+        void returnsSuccess_whenPasswordChangeSucceeds() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new com.loopers.domain.user.UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            ));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
+
+            // assert
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+        }
+
+        @DisplayName("X-Loopers-LoginId 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
+            // arrange
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, jsonEntity(request), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new com.loopers.domain.user.UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            ));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
+
+            // act
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(AuthHeaders.LOGIN_ID, loginId);
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("헤더 loginPw 인증이 실패할 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginPwAuthenticationFails() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new com.loopers.domain.user.UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            ));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, "WrongPass1!"), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("기존 비밀번호 불일치 시 400 Bad Request 를 반환한다")
+        @Test
+        void returnsBadRequest_whenOldPasswordDoesNotMatch() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new com.loopers.domain.user.UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            ));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("WrongPass1!", "NewPass99!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("신규 비밀번호 RULE 위반 시 400 Bad Request 를 반환한다")
+        @Test
+        void returnsBadRequest_whenNewPasswordViolatesRule() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new com.loopers.domain.user.UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            ));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "pw");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
     private <T> HttpEntity<T> jsonEntity(T body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -243,5 +360,13 @@ class UserV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set(AuthHeaders.LOGIN_ID, loginId);
         return new HttpEntity<>(null, headers);
+    }
+
+    private <T> HttpEntity<T> authJsonEntity(T body, String loginId, String loginPw) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(AuthHeaders.LOGIN_ID, loginId);
+        headers.set(AuthHeaders.LOGIN_PW, loginPw);
+        return new HttpEntity<>(body, headers);
     }
 }

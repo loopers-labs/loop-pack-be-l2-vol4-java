@@ -26,4 +26,8 @@ public class UserFacade {
         }
         return UserInfo.from(user);
     }
+
+    public void changePassword(String loginId, String loginPw, String oldPassword, String newPassword) {
+        userService.changePassword(loginId, loginPw, oldPassword, newPassword);
+    }
 }

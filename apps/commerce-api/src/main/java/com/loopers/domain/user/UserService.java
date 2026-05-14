@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Component
 public class UserService {
@@ -31,5 +33,15 @@ public class UserService {
                 return user;
             })
             .orElse(null);
+    }
+
+    @Transactional
+    public void changePassword(String loginId, String loginPw, String oldPassword, String newPassword) {
+        UserModel user = Optional.ofNullable(findMyInfo(loginId, loginPw))
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
+
+        user.changePassword(oldPassword, newPassword, passwordHasher);
+
+        userRepository.save(user);
     }
 }

@@ -6,6 +6,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -41,5 +42,16 @@ public class UserV1Controller implements UserV1ApiSpec {
     ) {
         UserInfo info = userFacade.getMyInfo(loginId, loginPw);
         return ApiResponse.success(UserV1Dto.UserResponse.fromMasked(info));
+    }
+
+    @PatchMapping("/me/password")
+    @Override
+    public ApiResponse<Void> changePassword(
+        @RequestHeader(AuthHeaders.LOGIN_ID) String loginId,
+        @RequestHeader(AuthHeaders.LOGIN_PW) String loginPw,
+        @Valid @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(loginId, loginPw, request.oldPassword(), request.newPassword());
+        return ApiResponse.success(null);
     }
 }

@@ -29,4 +29,10 @@ public class UserV1Dto {
         }
     }
 
+    public record ChangePasswordRequest(
+            @NotNull String oldPassword,
+            @NotNull String newPassword
+    ) {
+    }
+
 }
