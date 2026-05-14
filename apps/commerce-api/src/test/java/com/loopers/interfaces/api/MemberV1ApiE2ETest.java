@@ -67,11 +67,11 @@ public class MemberV1ApiE2ETest {
             assertAll(
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                     () -> assertThat(response.getBody().data().userId()).isEqualTo(request.userId()),
-                    () -> assertThat(response.getBody().data().userName()).isEqualTo(request.username())
+                    () -> assertThat(response.getBody().data().userName()).isEqualTo(request.userName())
             );
         }
 
-        @DisplayName("이미 존재하는 userId 로 가입을 시도하면, 409 Conflict 를 반환한다.")
+        @DisplayName("이미 존재하는 userId 로 가입을 시도하면,Conflict 를 반환한다.")
         @Test
         void throwsConflict_whenDuplicateUserIdProvided() {
             // arrange

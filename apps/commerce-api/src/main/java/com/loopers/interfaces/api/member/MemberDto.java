@@ -5,7 +5,24 @@ public class MemberDto {
             String userId,
             String password,
             String email,
-            String username,
+            String userName,
             String birthDate
+    ){}
+
+    public record CreateMemberResponse(
+            String userId,
+            String userName
+    ){}
+
+    public record MemberInfoResponse(
+            String userId,
+            String userName,
+            String birthDate,
+            String email
+    ){}
+
+    public record UpdatePasswordRequest(
+            String currentPassword,
+            String newPassword
     ){}
 }
