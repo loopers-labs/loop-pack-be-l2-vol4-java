@@ -188,6 +188,21 @@ public class UserServiceIntegrationTest {
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
+        @DisplayName("새 비밀번호가 RULE을 위반하면, BadRequest 예외가 발생한다.")
+        @Test
+        void given_invalidNewPassword_when_changePassword_then_throwsBadRequestException() {
+            // Arrange
+            UserModel saved = userService.signUp(UserModelFixture.aUser().build());
+
+            // Act
+            Throwable thrown = catchThrowable(() ->
+                    userService.changePassword(saved.getId(), "testPw1234", "short"));  // < 8자
+
+            // Assert
+            assertThat(thrown).isInstanceOf(CoreException.class);
+            assertThat(((CoreException) thrown).getErrorType())
+                    .isEqualTo(ErrorType.BAD_REQUEST);
+        }
     }
 
     @Nested
