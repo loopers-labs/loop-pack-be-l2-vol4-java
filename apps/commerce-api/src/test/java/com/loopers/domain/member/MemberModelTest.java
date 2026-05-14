@@ -60,7 +60,7 @@ class MemberModelTest {
     void validatePassword_ContainsBirthDate_ShouldThrowException() {
         LocalDate birthDate = LocalDate.of(1990, 1, 1);
         CoreException exception = assertThrows(CoreException.class, () -> 
-                MemberModel.validatePassword("P19900101!", birthDate));
+                MemberModel.validatePassword("p19900101A!", birthDate));
         assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_CONTAINS_BIRTHDATE);
     }
 

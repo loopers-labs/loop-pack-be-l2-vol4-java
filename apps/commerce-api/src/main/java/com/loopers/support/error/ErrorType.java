@@ -19,7 +19,7 @@ public enum ErrorType {
     INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "MEMBER-003", "비밀번호 규칙에 맞지 않습니다."),
     PASSWORD_CONTAINS_BIRTHDATE(HttpStatus.BAD_REQUEST, "MEMBER-004", "비밀번호에 생년월일을 포함할 수 없습니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER-005", "사용자를 찾을 수 없습니다."),
-    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "MEMBER-006", "비밀번호가 일치하지 않습니다."),
+    PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "MEMBER-006", "비밀번호가 일치하지 않습니다."),
     SAME_PASSWORD_AS_OLD(HttpStatus.BAD_REQUEST, "MEMBER-007", "기존 비밀번호와 동일한 비밀번호로 변경할 수 없습니다."),
     INVALID_NAME(HttpStatus.BAD_REQUEST, "MEMBER-008", "이름은 2~20자의 한글 또는 영문이어야 합니다."),
     INVALID_EMAIL(HttpStatus.BAD_REQUEST, "MEMBER-009", "올바른 이메일 형식이 아닙니다."),

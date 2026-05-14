@@ -77,10 +77,10 @@ class MemberControllerTest {
                         .header("X-Loopers-LoginId", loginId)
                         .header("X-Loopers-LoginPw", password))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.loginId").value("tester01"))
-                .andExpect(jsonPath("$.name").value("테스*"))
-                .andExpect(jsonPath("$.birthDate").value("1990-01-01"))
-                .andExpect(jsonPath("$.email").value("tester01@example.com"));
+                .andExpect(jsonPath("$.data.loginId").value("tester01"))
+                .andExpect(jsonPath("$.data.name").value("테스*"))
+                .andExpect(jsonPath("$.data.birthDate").value("1990-01-01"))
+                .andExpect(jsonPath("$.data.email").value("tester01@example.com"));
 
         verify(memberFacade).getMyInfo(loginId, password);
     }
