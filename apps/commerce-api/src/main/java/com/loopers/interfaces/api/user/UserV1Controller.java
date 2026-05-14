@@ -1,4 +1,54 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserInfo;
+import com.loopers.interfaces.api.ApiResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RequiredArgsConstructor
+@RestController
+@RequestMapping("/api/v1/users")
 public class UserV1Controller {
+
+    private final UserFacade userFacade;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<Object>> signup(
+        @RequestBody UserV1Dto.SignupRequest request
+    ) {
+        userFacade.signup(
+            request.userId(),
+            request.password(),
+            request.name(),
+            request.birthDate(),
+            request.email()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success());
+    }
+
+    @GetMapping("/myInfo")
+    public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
+        @RequestHeader("X-Loopers-LoginId") String userId,
+        @RequestHeader("X-Loopers-LoginPw") String password
+    ) {
+        UserInfo user = userFacade.getUser(userId, password);
+        return ApiResponse.success(UserV1Dto.UserResponse.from(user));
+    }
+
+    @PatchMapping("/myInfo/changePassword")
+    public ApiResponse<Object> changePassword(
+        @RequestHeader("X-Loopers-LoginId") String userId,
+        @RequestHeader("X-Loopers-LoginPw") String password,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(
+            userId,
+            request.currentPassword(),
+            request.newPassword()
+        );
+        return ApiResponse.success();
+    }
 }
