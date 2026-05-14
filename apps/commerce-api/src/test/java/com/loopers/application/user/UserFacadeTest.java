@@ -2,11 +2,9 @@ package com.loopers.application.user;
 
 import com.loopers.domain.user.Email;
 import com.loopers.domain.user.LoginId;
-import com.loopers.domain.user.service.UserAuthService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserName;
-import com.loopers.domain.user.service.UserPasswordService;
-import com.loopers.domain.user.service.UserSignupService;
+import com.loopers.domain.user.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,13 +31,7 @@ class UserFacadeTest {
     private static final String VALID_EMAIL = "test@loopers.com";
 
     @Mock
-    private UserSignupService userSignupService;
-
-    @Mock
-    private UserAuthService userAuthService;
-
-    @Mock
-    private UserPasswordService userPasswordService;
+    private UserService userService;
 
     @InjectMocks
     private UserFacade userFacade;
@@ -58,15 +50,15 @@ class UserFacadeTest {
     @Nested
     class SignUp {
 
-        @DisplayName("UserSignupService.signup에 입력값을 그대로 위임한다")
+        @DisplayName("UserService.signup에 입력값을 그대로 위임한다")
         @Test
-        void delegatesToUserSignupService_whenSignUpIsCalled() {
+        void delegatesToUserService_whenSignUpIsCalled() {
             // given
             // when
             userFacade.signUp(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
 
             // then
-            verify(userSignupService, times(1)).signup(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            verify(userService, times(1)).signup(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
         }
     }
 
@@ -74,12 +66,12 @@ class UserFacadeTest {
     @Nested
     class Authenticate {
 
-        @DisplayName("UserAuthService.authenticate에 위임하고 userId를 반환한다")
+        @DisplayName("UserService.authenticate에 위임하고 userId를 반환한다")
         @Test
         void returnsUserId_whenAuthenticateIsCalled() {
             // given
             UserModel user = sampleUser();
-            when(userAuthService.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD)).thenReturn(user);
+            when(userService.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD)).thenReturn(user);
 
             // when
             Long userId = userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD);
@@ -93,13 +85,13 @@ class UserFacadeTest {
     @Nested
     class GetMyInfo {
 
-        @DisplayName("UserAuthService.getById에 위임하고 UserInfo로 변환해 반환한다")
+        @DisplayName("UserService.getById에 위임하고 UserInfo로 변환해 반환한다")
         @Test
         void returnsUserInfo_whenGetMyInfoIsCalled() {
             // given
             Long userId = 1L;
             UserModel user = sampleUser();
-            when(userAuthService.getById(userId)).thenReturn(user);
+            when(userService.getById(userId)).thenReturn(user);
 
             // when
             UserInfo info = userFacade.getMyInfo(userId);
@@ -116,9 +108,9 @@ class UserFacadeTest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("UserPasswordService.changePassword에 입력값을 그대로 위임한다")
+        @DisplayName("UserService.changePassword에 입력값을 그대로 위임한다")
         @Test
-        void delegatesToUserPasswordService_whenChangePasswordIsCalled() {
+        void delegatesToUserService_whenChangePasswordIsCalled() {
             // given
             Long userId = 1L;
             String current = VALID_RAW_PASSWORD;
@@ -128,7 +120,7 @@ class UserFacadeTest {
             userFacade.changePassword(userId, current, next);
 
             // then
-            verify(userPasswordService, times(1)).changePassword(userId, current, next);
+            verify(userService, times(1)).changePassword(userId, current, next);
         }
     }
 }
