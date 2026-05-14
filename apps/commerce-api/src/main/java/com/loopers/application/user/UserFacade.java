@@ -16,4 +16,9 @@ public class UserFacade {
         UserModel user = userService.signUp(command);
         return UserInfo.from(user);
     }
+
+    public UserInfo getMe(UserCommand.Authenticate command) {
+        UserModel user = userService.authenticate(command);
+        return UserInfo.from(user);
+    }
 }

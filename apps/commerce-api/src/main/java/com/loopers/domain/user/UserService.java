@@ -29,4 +29,17 @@ public class UserService {
         );
         return userRepository.save(user);
     }
+
+    @Transactional(readOnly = true)
+    public UserModel authenticate(UserCommand.Authenticate command) {
+        if (command.loginIdInput() == null || command.rawPasswordInput() == null) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
+        }
+        UserModel user = userRepository.findByLoginIdValue(command.loginIdInput())
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다."));
+        if (!passwordEncoder.matches(command.rawPasswordInput(), user.getEncodedPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
+        }
+        return user;
+    }
 }

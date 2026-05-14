@@ -2,11 +2,14 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
+import com.loopers.domain.user.UserCommand;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +26,16 @@ public class UserV1Controller implements UserV1ApiSpec {
     @Override
     public ApiResponse<UserV1Dto.UserResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
         UserInfo info = userFacade.signUp(request.toCommand());
+        return ApiResponse.success(UserV1Dto.UserResponse.from(info));
+    }
+
+    @GetMapping("/me")
+    @Override
+    public ApiResponse<UserV1Dto.UserResponse> getMe(
+        @RequestHeader(value = "X-Loopers-LoginId", required = false) String loginId,
+        @RequestHeader(value = "X-Loopers-LoginPw", required = false) String password
+    ) {
+        UserInfo info = userFacade.getMe(new UserCommand.Authenticate(loginId, password));
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 }

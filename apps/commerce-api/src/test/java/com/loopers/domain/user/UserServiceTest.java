@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -102,6 +103,70 @@ class UserServiceTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             verify(passwordEncoder, never()).encode(any());
             verify(userRepository, never()).save(any(UserModel.class));
+        }
+    }
+
+    @DisplayName("인증 시, ")
+    @Nested
+    class Authenticate {
+
+        @DisplayName("loginId 또는 rawPassword 가 null 이면 UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenInputIsNull() {
+            // act
+            CoreException loginIdNull = assertThrows(CoreException.class,
+                () -> userService.authenticate(new UserCommand.Authenticate(null, "Abcd123!")));
+            CoreException passwordNull = assertThrows(CoreException.class,
+                () -> userService.authenticate(new UserCommand.Authenticate("kim99", null)));
+
+            // assert
+            assertThat(loginIdNull.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+            assertThat(passwordNull.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("loginId 에 해당하는 사용자가 없으면 UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenUserDoesNotExist() {
+            // arrange
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.empty());
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.authenticate(new UserCommand.Authenticate("kim99", "Abcd123!")));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("비밀번호가 일치하지 않으면 UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordDoesNotMatch() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches("WrongPass1!", ENCODED_PASSWORD)).thenReturn(false);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.authenticate(new UserCommand.Authenticate("kim99", "WrongPass1!")));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("loginId 와 비밀번호가 모두 일치하면 UserModel 을 반환한다.")
+        @Test
+        void returnsUserModel_whenCredentialsAreValid() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+
+            // act
+            UserModel result = userService.authenticate(new UserCommand.Authenticate("kim99", RAW_PASSWORD));
+
+            // assert
+            assertThat(result).isSameAs(storedUser);
         }
     }
 }

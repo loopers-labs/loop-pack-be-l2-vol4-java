@@ -13,4 +13,10 @@ public final class UserCommand {
         String rawPassword
     ) {
     }
+
+    public record Authenticate(
+        String loginIdInput,
+        String rawPasswordInput
+    ) {
+    }
 }
