@@ -20,6 +20,9 @@ public class UserModel extends BaseEntity {
 
     private UserModel() {}
 
+    private static final Pattern USERID_PATTERN =
+            Pattern.compile("^[a-zA-Z0-9]+$");
+
     private static final Pattern PASSWORD_PATTERN =
             Pattern.compile("^[a-zA-Z0-9!@#$%^&*()_+\\-=]{8,16}$");
 
@@ -39,11 +42,18 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    public UserModel(String userid, String encodedPassword, String name, String birthDay, String email) {
+    public static void validateUserId(String userid) {
         if (userid == null || userid.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 비어있을 수 없습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 빈값이 들어올 수 없습니다.");
         }
 
+        if (!USERID_PATTERN.matcher(userid).matches()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 영문과 숫자만 허용됩니다.");
+        }
+    }
+
+    public UserModel(String userid, String encodedPassword, String name, String birthDay, String email) {
+        validateUserId(userid);
         validateBirthDay(birthDay);
         validateEmail(email);
 

@@ -20,7 +20,6 @@ public record UserInfo(
     }
 
     private static String maskName(String name) {
-        if (name.length() == 1) return "*";
         return name.substring(0, name.length() - 1) + "*";
     }
 }
