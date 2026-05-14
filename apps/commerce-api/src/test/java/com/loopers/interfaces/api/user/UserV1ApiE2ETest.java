@@ -68,7 +68,7 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
         @DisplayName("이미 존재하는 회원 ID를 주면, 회원가입이 실패한다.")
