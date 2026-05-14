@@ -23,4 +23,10 @@ public class UserService {
         user.encodePassword(passwordEncoder);
         return userRepository.save(user);
     }
+
+    @Transactional
+    public UserModel getMyInfo(String loginId) {
+        return userRepository.findByLoginId(loginId).orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
+    }
 }
+
