@@ -39,4 +39,13 @@ public class MemberFacade {
         if (name == null || name.isEmpty()) return name;
         return name.substring(0, name.length() - 1) + "*";
     }
+
+    public void updatePassword(String loginId, String password, MemberRequest.UpdatePassword request) {
+        memberService.updatePassword(new MemberCommand.UpdatePassword(
+                loginId,
+                password,
+                request.oldPassword(),
+                request.newPassword()
+        ));
+    }
 }

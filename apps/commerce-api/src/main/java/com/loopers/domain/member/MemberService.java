@@ -28,7 +28,7 @@ public class MemberService {
             throw new RuntimeException("이미 존재하는 아이디입니다.");
         }
 
-        validatePassword(command);
+        validatePassword(command.password(), command.birthDate());
 
         String encryptedPassword = passwordEncoder.encode(command.password());
 
@@ -41,6 +41,25 @@ public class MemberService {
                 .build();
 
         memberRepository.save(member);
+    }
+
+    public void updatePassword(MemberCommand.UpdatePassword command) {
+        validateLoginId(command.loginId());
+
+        Member member = memberRepository.findByLoginId(command.loginId())
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        if (!passwordEncoder.matches(command.currentPassword(), member.getPassword())) {
+            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+        }
+
+        if (command.oldPassword().equals(command.newPassword())) {
+            throw new RuntimeException("기존 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.");
+        }
+
+        validatePassword(command.newPassword(), member.getBirthDate());
+
+        member.updatePassword(passwordEncoder.encode(command.newPassword()));
     }
 
     public MemberInfo getMember(String loginId, String password) {
@@ -91,13 +110,13 @@ public class MemberService {
         }
     }
 
-    private void validatePassword(MemberCommand.SignUp command) {
-        if (!PASSWORD_PATTERN.matcher(command.password()).matches()) {
+    private void validatePassword(String password, LocalDate birthDate) {
+        if (!PASSWORD_PATTERN.matcher(password).matches()) {
             throw new RuntimeException("비밀번호 규칙에 맞지 않습니다.");
         }
 
-        String birthDateStr = command.birthDate().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        if (command.password().contains(birthDateStr)) {
+        String birthDateStr = birthDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        if (password.contains(birthDateStr)) {
             throw new RuntimeException("비밀번호에 생년월일을 포함할 수 없습니다.");
         }
     }

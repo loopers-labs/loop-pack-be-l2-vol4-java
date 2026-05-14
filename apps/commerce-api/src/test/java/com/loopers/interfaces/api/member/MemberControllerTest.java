@@ -16,10 +16,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -80,5 +80,26 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.email").value("tester01@example.com"));
 
         verify(memberFacade).getMyInfo(loginId, password);
+    }
+
+    @Test
+    @DisplayName("비밀번호 수정 요청 시 200 OK를 반환하고 Facade를 호출한다.")
+    void updatePassword_ShouldReturnOkAndCallFacade() throws Exception {
+        // given
+        String loginId = "tester01";
+        String password = "OldPassword123!";
+        Map<String, Object> request = new HashMap<>();
+        request.put("oldPassword", "OldPassword123!");
+        request.put("newPassword", "NewPassword123!");
+
+        // when & then
+        mockMvc.perform(patch("/v1/members/me/password")
+                        .header("X-Loopers-LoginId", loginId)
+                        .header("X-Loopers-LoginPw", password)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(memberFacade).updatePassword(eq(loginId), eq(password), any());
     }
 }

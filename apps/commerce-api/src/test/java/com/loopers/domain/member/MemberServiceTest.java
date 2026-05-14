@@ -178,7 +178,7 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("회원 조회 시 비밀번호가 일치하지 않으면 예외가 발생한다.")
+    @DisplayName("비밀번호 조회 시 비밀번호가 일치하지 않으면 예외가 발생한다.")
     void getMember_WrongPassword_ShouldThrowException() {
         // given
         String loginId = "tester01";
@@ -194,4 +194,80 @@ class MemberServiceTest {
         // when & then
         assertThrows(RuntimeException.class, () -> memberService.getMember(loginId, wrongPassword));
     }
+
+    @Test
+    @DisplayName("비밀번호 수정 시 정상적으로 수정된다.")
+    void updatePassword_ShouldUpdate() {
+        // given
+        String loginId = "tester01";
+        String currentPassword = "OldPassword123!";
+        String encodedOldPassword = "encodedOldPassword";
+        Member member = Member.builder()
+                .loginId(loginId)
+                .password(encodedOldPassword)
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .build();
+
+        MemberCommand.UpdatePassword command = new MemberCommand.UpdatePassword(
+                loginId, currentPassword, currentPassword, "NewPassword123!"
+        );
+
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(currentPassword, encodedOldPassword)).willReturn(true);
+        given(passwordEncoder.encode("NewPassword123!")).willReturn("encodedNewPassword");
+
+        // when
+        memberService.updatePassword(command);
+
+        // then
+        assertThat(member.getPassword()).isEqualTo("encodedNewPassword");
+    }
+
+    @Test
+    @DisplayName("비밀번호 수정 시 헤더의 비밀번호가 일치하지 않으면 예외가 발생한다.")
+    void updatePassword_CurrentPasswordMismatch_ShouldThrowException() {
+        // given
+        String loginId = "tester01";
+        String wrongCurrentPassword = "wrongPassword";
+        String encodedOldPassword = "encodedOldPassword";
+        Member member = Member.builder()
+                .loginId(loginId)
+                .password(encodedOldPassword)
+                .build();
+
+        MemberCommand.UpdatePassword command = new MemberCommand.UpdatePassword(
+                loginId, wrongCurrentPassword, "OldPassword123!", "NewPassword123!"
+        );
+
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(wrongCurrentPassword, encodedOldPassword)).willReturn(false);
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.updatePassword(command));
+    }
+
+    @Test
+    @DisplayName("비밀번호 수정 시 신규 비밀번호가 기존과 동일하면 예외가 발생한다.")
+    void updatePassword_SamePassword_ShouldThrowException() {
+        // given
+        String loginId = "tester01";
+        String password = "OldPassword123!";
+        String encodedOldPassword = "encodedOldPassword";
+        Member member = Member.builder()
+                .loginId(loginId)
+                .password(encodedOldPassword)
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .build();
+
+        MemberCommand.UpdatePassword command = new MemberCommand.UpdatePassword(
+                loginId, password, password, password
+        );
+
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(password, encodedOldPassword)).willReturn(true);
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.updatePassword(command));
+    }
 }
+

@@ -23,4 +23,13 @@ public class MemberController {
     ) {
         return memberFacade.getMyInfo(loginId, password);
     }
+
+    @PatchMapping("/me/password")
+    public void updatePassword(
+            @RequestHeader("X-Loopers-LoginId") String loginId,
+            @RequestHeader("X-Loopers-LoginPw") String password,
+            @RequestBody MemberRequest.UpdatePassword request
+    ) {
+        memberFacade.updatePassword(loginId, password, request);
+    }
 }

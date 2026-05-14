@@ -65,4 +65,21 @@ class MemberFacadeTest {
         assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
         assertThat(response.email()).isEqualTo("tester01@example.com");
     }
+
+    @Test
+    @DisplayName("비밀번호 수정 요청 시 Service의 updatePassword를 호출한다.")
+    void updatePassword_ShouldCallService() {
+        // given
+        String loginId = "tester01";
+        String password = "OldPassword123!";
+        MemberRequest.UpdatePassword request = new MemberRequest.UpdatePassword(
+                "OldPassword123!", "NewPassword123!"
+        );
+
+        // when
+        memberFacade.updatePassword(loginId, password, request);
+
+        // then
+        verify(memberService).updatePassword(any());
+    }
 }
