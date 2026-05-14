@@ -15,4 +15,12 @@ public class MemberController {
     public void signUp(@RequestBody MemberRequest.SignUp request) {
         memberFacade.signUp(request);
     }
+
+    @GetMapping("/me")
+    public MemberResponse.Info getMyInfo(
+            @RequestHeader("X-Loopers-LoginId") String loginId,
+            @RequestHeader("X-Loopers-LoginPw") String password
+    ) {
+        return memberFacade.getMyInfo(loginId, password);
+    }
 }
