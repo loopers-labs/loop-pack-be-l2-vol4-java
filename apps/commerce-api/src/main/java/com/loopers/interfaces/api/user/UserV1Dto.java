@@ -15,7 +15,7 @@ public class UserV1Dto {
 
     public record ChangePasswordRequest (
             String currentPassword,
-            String rawPassword
+            String newPassword
     ) {}
 
     public record UserResponse (
