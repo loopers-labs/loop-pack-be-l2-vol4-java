@@ -26,6 +26,7 @@ class UserV1ApiE2ETest {
 
   private static final String ENDPOINT_USER = "/api/v1/users";
   private static final String ENDPOINT_MY_PROFILE = ENDPOINT_USER + "/{loginId}";
+  private static final String ENDPOINT_CHANGE_PASSWORD = ENDPOINT_USER + "/{loginId}/password";
 
   private final TestRestTemplate testRestTemplate;
   private final DatabaseCleanUp databaseCleanUp;
@@ -154,6 +155,118 @@ class UserV1ApiE2ETest {
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @DisplayName("PATCH /api/v1/users/{loginId}/password")
+  @Nested
+  class ChangePassword {
+
+    @DisplayName("비밀번호 변경에 성공할 경우, 200 OK 응답을 반환한다.")
+    @Test
+    void returnsOk_whenChangePasswordSucceeds() {
+      // arrange
+      signUp("loopers01", "Password1!", "1995-05-15");
+      Map<String, Object> request =
+          Map.of("currentPassword", "Password1!", "newPassword", "NewPass2@");
+
+      // act
+      ParameterizedTypeReference<ApiResponse<Object>> responseType =
+          new ParameterizedTypeReference<>() {};
+      ResponseEntity<ApiResponse<Object>> response =
+          testRestTemplate.exchange(
+              ENDPOINT_CHANGE_PASSWORD,
+              HttpMethod.PATCH,
+              new HttpEntity<>(request),
+              responseType,
+              "loopers01");
+
+      // assert
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 400 Bad Request 응답을 반환한다.")
+    @Test
+    void returnsBadRequest_whenNewPasswordEqualsCurrentPassword() {
+      // arrange
+      signUp("loopers01", "Password1!", "1995-05-15");
+      Map<String, Object> request =
+          Map.of("currentPassword", "Password1!", "newPassword", "Password1!");
+
+      // act
+      ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
+          new ParameterizedTypeReference<>() {};
+      ResponseEntity<ApiResponse<Map<String, Object>>> response =
+          testRestTemplate.exchange(
+              ENDPOINT_CHANGE_PASSWORD,
+              HttpMethod.PATCH,
+              new HttpEntity<>(request),
+              responseType,
+              "loopers01");
+
+      // assert
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @DisplayName("현재 비밀번호가 일치하지 않으면 400 Bad Request 응답을 반환한다.")
+    @Test
+    void returnsBadRequest_whenCurrentPasswordDoesNotMatch() {
+      // arrange
+      signUp("loopers01", "Password1!", "1995-05-15");
+      Map<String, Object> request =
+          Map.of("currentPassword", "Wrong1!@", "newPassword", "NewPass2@");
+
+      // act
+      ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
+          new ParameterizedTypeReference<>() {};
+      ResponseEntity<ApiResponse<Map<String, Object>>> response =
+          testRestTemplate.exchange(
+              ENDPOINT_CHANGE_PASSWORD,
+              HttpMethod.PATCH,
+              new HttpEntity<>(request),
+              responseType,
+              "loopers01");
+
+      // assert
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @DisplayName("존재하지 않는 ID 로 비밀번호 변경 시도 시 404 Not Found 응답을 반환한다.")
+    @Test
+    void returnsNotFound_whenUserDoesNotExist() {
+      // arrange
+      Map<String, Object> request =
+          Map.of("currentPassword", "Password1!", "newPassword", "NewPass2@");
+
+      // act
+      ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
+          new ParameterizedTypeReference<>() {};
+      ResponseEntity<ApiResponse<Map<String, Object>>> response =
+          testRestTemplate.exchange(
+              ENDPOINT_CHANGE_PASSWORD,
+              HttpMethod.PATCH,
+              new HttpEntity<>(request),
+              responseType,
+              "nonexistent");
+
+      // assert
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private void signUp(String loginId, String password, String birthDate) {
+      Map<String, Object> signUpRequest =
+          Map.of(
+              "loginId", loginId,
+              "password", password,
+              "name", "홍길동",
+              "birthDate", birthDate,
+              "email", "loopers@example.com",
+              "gender", "MALE");
+      testRestTemplate.exchange(
+          ENDPOINT_USER,
+          HttpMethod.POST,
+          new HttpEntity<>(signUpRequest),
+          new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});
     }
   }
 }
