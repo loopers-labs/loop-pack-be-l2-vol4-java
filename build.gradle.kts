@@ -52,6 +52,8 @@ subprojects {
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+        // security
+        implementation("org.springframework.security:spring-security-crypto")
         // Lombok
         implementation("org.projectlombok:lombok")
         annotationProcessor("org.projectlombok:lombok")
