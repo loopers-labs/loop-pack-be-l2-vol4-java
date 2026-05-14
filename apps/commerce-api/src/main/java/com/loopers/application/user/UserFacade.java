@@ -35,13 +35,7 @@ public class UserFacade {
     }
 
     public UserInfo findMyInfo(User user) {
-        return new UserInfo(
-            user.getId(),
-            user.getLoginId(),
-            user.maskedName(),
-            user.getBirth(),
-            user.getEmail()
-        );
+        return UserInfo.fromMasked(user);
     }
 
     public void changePassword(User user, String currentPassword, String newPassword) {

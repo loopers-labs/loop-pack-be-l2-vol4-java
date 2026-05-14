@@ -20,4 +20,14 @@ public record UserInfo(
             user.getEmail()
         );
     }
+
+    public static UserInfo fromMasked(User user) {
+        return new UserInfo(
+            user.getId(),
+            user.getLoginId(),
+            user.maskedName(),
+            user.getBirth(),
+            user.getEmail()
+        );
+    }
 }
