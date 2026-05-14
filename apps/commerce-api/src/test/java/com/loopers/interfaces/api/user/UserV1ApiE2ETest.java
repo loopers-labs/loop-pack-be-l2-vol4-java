@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,9 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserV1ApiE2ETest {
 
-  private static final String ENDPOINT_USER = "/api/v1/users";
-  private static final String ENDPOINT_MY_PROFILE = ENDPOINT_USER + "/{loginId}";
-  private static final String ENDPOINT_CHANGE_PASSWORD = ENDPOINT_USER + "/{loginId}/password";
+  private static final String ENDPOINT_USERS = "/api/v1/users";
+  private static final String ENDPOINT_CHANGE_PASSWORD = ENDPOINT_USERS + "/password";
 
   private final TestRestTemplate testRestTemplate;
   private final DatabaseCleanUp databaseCleanUp;
@@ -58,7 +58,7 @@ class UserV1ApiE2ETest {
           new ParameterizedTypeReference<>() {};
       ResponseEntity<ApiResponse<UserResponse>> response =
           testRestTemplate.exchange(
-              ENDPOINT_USER, HttpMethod.POST, new HttpEntity<>(request), responseType);
+                  ENDPOINT_USERS, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
       // assert
       assertAll(
@@ -83,7 +83,7 @@ class UserV1ApiE2ETest {
           new ParameterizedTypeReference<>() {};
       ResponseEntity<ApiResponse<Map<String, Object>>> response =
           testRestTemplate.exchange(
-              ENDPOINT_USER, HttpMethod.POST, new HttpEntity<>(request), responseType);
+                  ENDPOINT_USERS, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -98,18 +98,15 @@ class UserV1ApiE2ETest {
     @Test
     void returnsUserInfo_whenLookupSucceeds() {
       // arrange
-      testRestTemplate.exchange(
-          ENDPOINT_USER,
-          HttpMethod.POST,
-          new HttpEntity<>(UserFixture.defaultSignUpRequest()),
-          new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});
+      signUpDefault();
+      HttpHeaders headers = UserFixture.defaultLoginHeaders();
 
       // act
       ParameterizedTypeReference<ApiResponse<UserResponse>> responseType =
           new ParameterizedTypeReference<>() {};
       ResponseEntity<ApiResponse<UserResponse>> response =
           testRestTemplate.exchange(
-              ENDPOINT_MY_PROFILE, HttpMethod.GET, null, responseType, UserFixture.LOGIN_ID);
+                  ENDPOINT_USERS, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
       // assert
       assertAll(
@@ -126,15 +123,26 @@ class UserV1ApiE2ETest {
     @DisplayName("존재하지 않는 ID 로 조회할 경우, 404 Not Found 응답을 반환한다.")
     @Test
     void returnsNotFound_whenUserDoesNotExist() {
+      // arrange
+      HttpHeaders headers = UserFixture.loginHeaders("nonexistent", "AnyPass1!");
+
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
           new ParameterizedTypeReference<>() {};
       ResponseEntity<ApiResponse<Map<String, Object>>> response =
           testRestTemplate.exchange(
-              ENDPOINT_MY_PROFILE, HttpMethod.GET, null, responseType, "nonexistent");
+                  ENDPOINT_USERS, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private void signUpDefault() {
+      testRestTemplate.exchange(
+              ENDPOINT_USERS,
+          HttpMethod.POST,
+          new HttpEntity<>(UserFixture.defaultSignUpRequest()),
+          new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});
     }
   }
 
@@ -147,7 +155,8 @@ class UserV1ApiE2ETest {
     void returnsOk_whenChangePasswordSucceeds() {
       // arrange
       signUpDefault();
-      Map<String, Object> request = UserFixture.defaultChangePasswordRequest();
+      HttpHeaders headers = UserFixture.defaultLoginHeaders();
+      Map<String, Object> body = UserFixture.defaultChangePasswordRequest();
 
       // act
       ParameterizedTypeReference<ApiResponse<Object>> responseType =
@@ -156,9 +165,8 @@ class UserV1ApiE2ETest {
           testRestTemplate.exchange(
               ENDPOINT_CHANGE_PASSWORD,
               HttpMethod.PATCH,
-              new HttpEntity<>(request),
-              responseType,
-              UserFixture.LOGIN_ID);
+              new HttpEntity<>(body, headers),
+              responseType);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -169,8 +177,8 @@ class UserV1ApiE2ETest {
     void returnsBadRequest_whenNewPasswordEqualsCurrentPassword() {
       // arrange
       signUpDefault();
-      Map<String, Object> request =
-          UserFixture.changePasswordRequest(UserFixture.PASSWORD, UserFixture.PASSWORD);
+      HttpHeaders headers = UserFixture.defaultLoginHeaders();
+      Map<String, Object> body = UserFixture.changePasswordRequest(UserFixture.PASSWORD);
 
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
@@ -179,9 +187,8 @@ class UserV1ApiE2ETest {
           testRestTemplate.exchange(
               ENDPOINT_CHANGE_PASSWORD,
               HttpMethod.PATCH,
-              new HttpEntity<>(request),
-              responseType,
-              UserFixture.LOGIN_ID);
+              new HttpEntity<>(body, headers),
+              responseType);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -192,8 +199,8 @@ class UserV1ApiE2ETest {
     void returnsBadRequest_whenCurrentPasswordDoesNotMatch() {
       // arrange
       signUpDefault();
-      Map<String, Object> request =
-          UserFixture.changePasswordRequest("Wrong1!@", UserFixture.NEW_PASSWORD);
+      HttpHeaders headers = UserFixture.loginHeaders(UserFixture.LOGIN_ID, "Wrong1!@");
+      Map<String, Object> body = UserFixture.defaultChangePasswordRequest();
 
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
@@ -202,9 +209,8 @@ class UserV1ApiE2ETest {
           testRestTemplate.exchange(
               ENDPOINT_CHANGE_PASSWORD,
               HttpMethod.PATCH,
-              new HttpEntity<>(request),
-              responseType,
-              UserFixture.LOGIN_ID);
+              new HttpEntity<>(body, headers),
+              responseType);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -212,7 +218,7 @@ class UserV1ApiE2ETest {
 
     private void signUpDefault() {
       testRestTemplate.exchange(
-          ENDPOINT_USER,
+              ENDPOINT_USERS,
           HttpMethod.POST,
           new HttpEntity<>(UserFixture.defaultSignUpRequest()),
           new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});

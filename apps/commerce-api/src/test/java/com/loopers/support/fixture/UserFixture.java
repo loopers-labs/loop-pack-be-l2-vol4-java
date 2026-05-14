@@ -3,6 +3,7 @@ package com.loopers.support.fixture;
 import com.loopers.application.user.ChangePasswordCommand;
 import com.loopers.application.user.SignUpCommand;
 import com.loopers.domain.user.User;
+import org.springframework.http.HttpHeaders;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +18,9 @@ public final class UserFixture {
   public static final String GENDER = "MALE";
 
   public static final String NEW_PASSWORD = "NewPass2@";
+
+  public static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
+  public static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
   private UserFixture() {}
 
@@ -49,12 +53,21 @@ public final class UserFixture {
   }
 
   public static Map<String, Object> defaultChangePasswordRequest() {
-    return changePasswordRequest(PASSWORD, NEW_PASSWORD);
+    return changePasswordRequest(NEW_PASSWORD);
   }
 
-  public static Map<String, Object> changePasswordRequest(String currentPassword, String newPassword) {
-    return Map.of(
-        "currentPassword", currentPassword,
-        "newPassword", newPassword);
+  public static Map<String, Object> changePasswordRequest(String newPassword) {
+    return Map.of("newPassword", newPassword);
+  }
+
+  public static HttpHeaders defaultLoginHeaders() {
+    return loginHeaders(LOGIN_ID, PASSWORD);
+  }
+
+  public static HttpHeaders loginHeaders(String loginId, String loginPw) {
+    HttpHeaders headers = new HttpHeaders();
+    headers.set(HEADER_LOGIN_ID, loginId);
+    headers.set(HEADER_LOGIN_PW, loginPw);
+    return headers;
   }
 }
