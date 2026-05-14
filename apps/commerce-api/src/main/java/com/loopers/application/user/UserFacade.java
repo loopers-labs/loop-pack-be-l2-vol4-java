@@ -31,4 +31,10 @@ public class UserFacade {
         // 5. 반환
         return UserInfo.from(saved);
     }
+
+    public UserInfo getMe(UserModel user) {
+        // AuthInterceptor에서 인증이 완료된 UserModel을 그대로 수신
+        // 이름 마스킹(비즈니스 규칙)을 적용해 UserInfo 생성
+        return new UserInfo(user.getId(), user.getLoginId(), user.maskedName(), user.getBirthDate(), user.getEmail());
+    }
 }

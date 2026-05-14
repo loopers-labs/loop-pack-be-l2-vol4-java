@@ -68,4 +68,8 @@ public class UserModel extends BaseEntity {
         this.birthDate = birthDate;
         this.email = email;
     }
+
+    public String maskedName() {
+        return name.substring(0, name.length() - 1) + "*";
+    }
 }
