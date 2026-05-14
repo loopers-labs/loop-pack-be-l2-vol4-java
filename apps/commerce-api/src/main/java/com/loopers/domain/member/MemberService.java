@@ -25,8 +25,12 @@ public class MemberService {
     }
 
     @Transactional(readOnly = true)
-    public Member getMe(String loginId) {
-        return memberRepository.findByLoginId(loginId)
+    public Member getMe(String loginId, String rawPassword) {
+        Member member = memberRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+        if (!member.matchesPassword(rawPassword, passwordEncoder)) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "비밀번호가 올바르지 않습니다.");
+        }
+        return member;
     }
 }

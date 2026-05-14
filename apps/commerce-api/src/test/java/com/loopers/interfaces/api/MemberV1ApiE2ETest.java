@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MemberV1ApiE2ETest {
 
     private static final String ENDPOINT_REGISTER = "/api/v1/members";
+    private static final String ENDPOINT_GET_ME = "/api/v1/members/me";
 
     private final TestRestTemplate testRestTemplate;
     private final MemberJpaRepository memberJpaRepository;
@@ -90,6 +92,81 @@ class MemberV1ApiE2ETest {
                 () -> assertTrue(response.getStatusCode().is4xxClientError()),
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
             );
+        }
+    }
+
+    @DisplayName("GET /api/v1/members/me")
+    @Nested
+    class GetMe {
+
+        @DisplayName("올바른 헤더가 주어지면, 200 OK와 회원 정보를 반환한다.")
+        @Test
+        void returns200_whenHeadersAreValid() {
+            // Arrange
+            MemberV1Dto.RegisterRequest registerRequest = new MemberV1Dto.RegisterRequest(
+                "testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com"
+            );
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, new HttpEntity<>(registerRequest), Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                ENDPOINT_GET_ME, HttpMethod.GET, new HttpEntity<>(headers), responseType
+            );
+
+            // Assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("testUser1"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길동"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1990-01-01"),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com")
+            );
+        }
+
+        @DisplayName("존재하지 않는 loginId로 요청하면, 404 NOT_FOUND 응답을 받는다.")
+        @Test
+        void returns404_whenLoginIdDoesNotExist() {
+            // Arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "notExist");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                ENDPOINT_GET_ME, HttpMethod.GET, new HttpEntity<>(headers), responseType
+            );
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("비밀번호가 틀리면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returns401_whenPasswordIsWrong() {
+            // Arrange
+            MemberV1Dto.RegisterRequest registerRequest = new MemberV1Dto.RegisterRequest(
+                "testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com"
+            );
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, new HttpEntity<>(registerRequest), Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "WrongPassword1!");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+                ENDPOINT_GET_ME, HttpMethod.GET, new HttpEntity<>(headers), responseType
+            );
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 }

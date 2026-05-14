@@ -50,17 +50,18 @@ class MemberFacadeTest {
     @Nested
     class GetMe {
 
-        @DisplayName("loginId가 주어지면, MemberInfo를 반환한다.")
+        @DisplayName("loginId와 비밀번호가 주어지면, MemberInfo를 반환한다.")
         @Test
         void returnsMemberInfo_whenLoginIdIsGiven() {
             // Arrange
             String loginId = "testUser1";
-            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            String rawPassword = "Password1!";
+            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder());
             Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
-            when(memberService.getMe(loginId)).thenReturn(member);
+            when(memberService.getMe(loginId, rawPassword)).thenReturn(member);
 
             // Act
-            MemberInfo result = memberFacade.getMe(loginId);
+            MemberInfo result = memberFacade.getMe(loginId, rawPassword);
 
             // Assert
             assertAll(

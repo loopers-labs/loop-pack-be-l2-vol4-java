@@ -64,7 +64,62 @@ class MemberServiceTest {
 
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-            verify(memberRepository, never()).save(any(Member.class));  // save는 호출되지 않아야 함
+            verify(memberRepository, never()).save(any(Member.class));
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때, ")
+    @Nested
+    class GetMe {
+
+        @DisplayName("올바른 loginId와 비밀번호가 주어지면, 회원 정보를 반환한다.")
+        @Test
+        void returnsMember_whenCredentialsAreValid() {
+            // Arrange
+            String loginId = "testUser1";
+            String rawPassword = "Password1!";
+            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder());
+            Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
+            when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
+
+            // Act
+            Member result = memberService.getMe(loginId, rawPassword);
+
+            // Assert
+            assertThat(result.getLoginId()).isEqualTo(loginId);
+        }
+
+        @DisplayName("존재하지 않는 loginId가 주어지면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdDoesNotExist() {
+            // Arrange
+            when(memberRepository.findByLoginId("notExist")).thenReturn(Optional.empty());
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                memberService.getMe("notExist", "Password1!")
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordIsWrong() {
+            // Arrange
+            String loginId = "testUser1";
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
+            when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                memberService.getMe(loginId, "WrongPassword1!")
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
 }
