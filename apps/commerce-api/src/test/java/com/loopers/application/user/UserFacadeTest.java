@@ -4,6 +4,7 @@ import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.fixture.UserFixture;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
-class UserFacadeIntegrationTest {
+class UserFacadeTest {
 
   @Autowired private UserFacade userFacade;
 
@@ -41,8 +42,7 @@ class UserFacadeIntegrationTest {
     @Test
     void savesUser_whenRequiredFieldsAreValid() {
       // arrange
-      SignUpCommand command =
-          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+      SignUpCommand command = UserFixture.defaultSignUpCommand();
 
       // act
       UserInfo result = userFacade.signUp(command);
@@ -61,12 +61,10 @@ class UserFacadeIntegrationTest {
     @Test
     void throwsConflictException_whenLoginIdAlreadyExists() {
       // arrange
-      SignUpCommand command =
-          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
-      userFacade.signUp(command);
-
+      userFacade.signUp(UserFixture.defaultSignUpCommand());
       SignUpCommand duplicateCommand =
-          new SignUpCommand("loopers01", "Password1!", "김철수", "1997-07-20", "other@example.com");
+          new SignUpCommand(
+              UserFixture.LOGIN_ID, UserFixture.PASSWORD, "김철수", "1997-07-20", "other@example.com");
 
       // act
       CoreException exception =
@@ -85,12 +83,11 @@ class UserFacadeIntegrationTest {
     @Test
     void returnsUserInfo_whenUserExists() {
       // arrange
-      SignUpCommand command =
-          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+      SignUpCommand command = UserFixture.defaultSignUpCommand();
       UserInfo signedUp = userFacade.signUp(command);
 
       // act
-      UserInfo result = userFacade.getMyInfo("loopers01");
+      UserInfo result = userFacade.getMyInfo(UserFixture.LOGIN_ID);
 
       // assert
       assertAll(
@@ -122,19 +119,16 @@ class UserFacadeIntegrationTest {
     @Test
     void changesPassword_whenInputsAreValid() {
       // arrange
-      SignUpCommand signUpCommand =
-          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
-      userFacade.signUp(signUpCommand);
+      userFacade.signUp(UserFixture.defaultSignUpCommand());
       String originalEncrypted =
-          userRepository.findByLoginId("loopers01").orElseThrow().getPassword();
+          userRepository.findByLoginId(UserFixture.LOGIN_ID).orElseThrow().getPassword();
 
       // act
-      userFacade.changePassword(
-          "loopers01", new ChangePasswordCommand("Password1!", "NewPass2@"));
+      userFacade.changePassword(UserFixture.LOGIN_ID, UserFixture.defaultChangePasswordCommand());
 
       // assert
       String updatedEncrypted =
-          userRepository.findByLoginId("loopers01").orElseThrow().getPassword();
+          userRepository.findByLoginId(UserFixture.LOGIN_ID).orElseThrow().getPassword();
       assertThat(updatedEncrypted).isNotEqualTo(originalEncrypted);
     }
 
@@ -142,9 +136,7 @@ class UserFacadeIntegrationTest {
     @Test
     void throwsBadRequestException_whenNewPasswordEqualsCurrentPassword() {
       // arrange
-      SignUpCommand signUpCommand =
-          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
-      userFacade.signUp(signUpCommand);
+      userFacade.signUp(UserFixture.defaultSignUpCommand());
 
       // act
       CoreException exception =
@@ -152,7 +144,8 @@ class UserFacadeIntegrationTest {
               CoreException.class,
               () ->
                   userFacade.changePassword(
-                      "loopers01", new ChangePasswordCommand("Password1!", "Password1!")));
+                      UserFixture.LOGIN_ID,
+                      new ChangePasswordCommand(UserFixture.PASSWORD, UserFixture.PASSWORD)));
 
       // assert
       assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

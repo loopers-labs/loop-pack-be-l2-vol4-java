@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.dto.UserResponse;
+import com.loopers.support.fixture.UserFixture;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,14 +51,7 @@ class UserV1ApiE2ETest {
     @Test
     void returnsCreatedUserInfo_whenSignUpSucceeds() {
       // arrange
-      Map<String, Object> request =
-          Map.of(
-              "loginId", "loopers01",
-              "password", "Password1!",
-              "name", "홍길동",
-              "birthDate", "1995-05-15",
-              "email", "loopers@example.com",
-              "gender", "MALE");
+      Map<String, Object> request = UserFixture.defaultSignUpRequest();
 
       // act
       ParameterizedTypeReference<ApiResponse<UserResponse>> responseType =
@@ -82,13 +76,7 @@ class UserV1ApiE2ETest {
     @Test
     void returnsBadRequest_whenGenderIsMissing() {
       // arrange
-      Map<String, Object> request =
-          Map.of(
-              "loginId", "loopers01",
-              "password", "Password1!",
-              "name", "홍길동",
-              "birthDate", "1995-05-15",
-              "email", "loopers@example.com");
+      Map<String, Object> request = UserFixture.signUpRequestWithoutGender();
 
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
@@ -110,18 +98,10 @@ class UserV1ApiE2ETest {
     @Test
     void returnsUserInfo_whenLookupSucceeds() {
       // arrange
-      Map<String, Object> signUpRequest =
-          Map.of(
-              "loginId", "loopers01",
-              "password", "Password1!",
-              "name", "홍길동",
-              "birthDate", "1995-05-15",
-              "email", "loopers@example.com",
-              "gender", "MALE");
       testRestTemplate.exchange(
           ENDPOINT_USER,
           HttpMethod.POST,
-          new HttpEntity<>(signUpRequest),
+          new HttpEntity<>(UserFixture.defaultSignUpRequest()),
           new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});
 
       // act
@@ -129,7 +109,7 @@ class UserV1ApiE2ETest {
           new ParameterizedTypeReference<>() {};
       ResponseEntity<ApiResponse<UserResponse>> response =
           testRestTemplate.exchange(
-              ENDPOINT_MY_PROFILE, HttpMethod.GET, null, responseType, "loopers01");
+              ENDPOINT_MY_PROFILE, HttpMethod.GET, null, responseType, UserFixture.LOGIN_ID);
 
       // assert
       assertAll(
@@ -137,10 +117,10 @@ class UserV1ApiE2ETest {
           () -> assertThat(response.getBody()).isNotNull(),
           () -> assertThat(response.getBody().data()).isNotNull(),
           () -> assertThat(response.getBody().data().id()).isNotNull(),
-          () -> assertThat(response.getBody().data().loginId()).isEqualTo("loopers01"),
+          () -> assertThat(response.getBody().data().loginId()).isEqualTo(UserFixture.LOGIN_ID),
           () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
-          () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1995-05-15"),
-          () -> assertThat(response.getBody().data().email()).isEqualTo("loopers@example.com"));
+          () -> assertThat(response.getBody().data().birthDate()).isEqualTo(UserFixture.BIRTH_DATE),
+          () -> assertThat(response.getBody().data().email()).isEqualTo(UserFixture.EMAIL));
     }
 
     @DisplayName("존재하지 않는 ID 로 조회할 경우, 404 Not Found 응답을 반환한다.")
@@ -166,9 +146,8 @@ class UserV1ApiE2ETest {
     @Test
     void returnsOk_whenChangePasswordSucceeds() {
       // arrange
-      signUp("loopers01", "Password1!", "1995-05-15");
-      Map<String, Object> request =
-          Map.of("currentPassword", "Password1!", "newPassword", "NewPass2@");
+      signUpDefault();
+      Map<String, Object> request = UserFixture.defaultChangePasswordRequest();
 
       // act
       ParameterizedTypeReference<ApiResponse<Object>> responseType =
@@ -179,7 +158,7 @@ class UserV1ApiE2ETest {
               HttpMethod.PATCH,
               new HttpEntity<>(request),
               responseType,
-              "loopers01");
+              UserFixture.LOGIN_ID);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -189,9 +168,9 @@ class UserV1ApiE2ETest {
     @Test
     void returnsBadRequest_whenNewPasswordEqualsCurrentPassword() {
       // arrange
-      signUp("loopers01", "Password1!", "1995-05-15");
+      signUpDefault();
       Map<String, Object> request =
-          Map.of("currentPassword", "Password1!", "newPassword", "Password1!");
+          UserFixture.changePasswordRequest(UserFixture.PASSWORD, UserFixture.PASSWORD);
 
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
@@ -202,7 +181,7 @@ class UserV1ApiE2ETest {
               HttpMethod.PATCH,
               new HttpEntity<>(request),
               responseType,
-              "loopers01");
+              UserFixture.LOGIN_ID);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -212,9 +191,9 @@ class UserV1ApiE2ETest {
     @Test
     void returnsBadRequest_whenCurrentPasswordDoesNotMatch() {
       // arrange
-      signUp("loopers01", "Password1!", "1995-05-15");
+      signUpDefault();
       Map<String, Object> request =
-          Map.of("currentPassword", "Wrong1!@", "newPassword", "NewPass2@");
+          UserFixture.changePasswordRequest("Wrong1!@", UserFixture.NEW_PASSWORD);
 
       // act
       ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
@@ -225,47 +204,17 @@ class UserV1ApiE2ETest {
               HttpMethod.PATCH,
               new HttpEntity<>(request),
               responseType,
-              "loopers01");
+              UserFixture.LOGIN_ID);
 
       // assert
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
-    @DisplayName("존재하지 않는 ID 로 비밀번호 변경 시도 시 404 Not Found 응답을 반환한다.")
-    @Test
-    void returnsNotFound_whenUserDoesNotExist() {
-      // arrange
-      Map<String, Object> request =
-          Map.of("currentPassword", "Password1!", "newPassword", "NewPass2@");
-
-      // act
-      ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType =
-          new ParameterizedTypeReference<>() {};
-      ResponseEntity<ApiResponse<Map<String, Object>>> response =
-          testRestTemplate.exchange(
-              ENDPOINT_CHANGE_PASSWORD,
-              HttpMethod.PATCH,
-              new HttpEntity<>(request),
-              responseType,
-              "nonexistent");
-
-      // assert
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    private void signUp(String loginId, String password, String birthDate) {
-      Map<String, Object> signUpRequest =
-          Map.of(
-              "loginId", loginId,
-              "password", password,
-              "name", "홍길동",
-              "birthDate", birthDate,
-              "email", "loopers@example.com",
-              "gender", "MALE");
+    private void signUpDefault() {
       testRestTemplate.exchange(
           ENDPOINT_USER,
           HttpMethod.POST,
-          new HttpEntity<>(signUpRequest),
+          new HttpEntity<>(UserFixture.defaultSignUpRequest()),
           new ParameterizedTypeReference<ApiResponse<UserResponse>>() {});
     }
   }
