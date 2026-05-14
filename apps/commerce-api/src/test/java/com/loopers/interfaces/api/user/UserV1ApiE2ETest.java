@@ -27,6 +27,10 @@ public class UserV1ApiE2ETest {
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
+    private static final String ENDPOINT_SIGNUP   = "/api/v1/users";
+    private static final String ENDPOINT_MY_INFO  = "/api/v1/users/myInfo";
+    private static final String ENDPOINT_PASSWORD = "/api/v1/users/myInfo/changePassword";
+
     private static final String DEFAULT_USER_ID = "usertest123";
     private static final String DEFAULT_PASSWORD = "abc123!@#";
     private static final String DEFAULT_NAME = "홍길동";
@@ -49,11 +53,9 @@ public class UserV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    // 회원가입
     @DisplayName("POST /api/v1/users")
     @Nested
     class Signup {
-        String requestUrl = "/api/v1/users";
 
         @DisplayName("유효한 회원가입 정보를 주면, 회원가입이 성공한다.")
         @Test
@@ -62,8 +64,8 @@ public class UserV1ApiE2ETest {
             UserV1Dto.SignupRequest signupRequest = new UserV1Dto.SignupRequest(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<ApiResponse<Void>>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -73,27 +75,21 @@ public class UserV1ApiE2ETest {
         @Test
         void failSignup_whenExistingUserIdIsProvided() {
             // arrange
-            // 기존 user 저장
-            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
-            userJpaRepository.save(userModel);
-
-            // 기존 userId와 동일한 신규 user 생성 요청
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
             UserV1Dto.SignupRequest signupRequest = new UserV1Dto.SignupRequest(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<ApiResponse<Void>>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
     }
 
-    // 내 정보 조회
     @DisplayName("GET /api/v1/users/myInfo")
     @Nested
     class GetUser {
-        String requestUrl = "/api/v1/users/myInfo";
 
         @DisplayName("유효한 헤더로 요청하면, 마스킹된 이름을 포함한 내 정보를 반환한다.")
         @Test
@@ -106,7 +102,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -123,7 +119,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -140,7 +136,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -155,7 +151,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -170,18 +166,16 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 
-    // 비밀번호 변경
     @DisplayName("PATCH /api/v1/users/myInfo/changePassword")
     @Nested
     class ChangePassword {
-        String requestUrl = "/api/v1/users/myInfo/changePassword";
 
         @DisplayName("유효한 비밀번호로 수정하면, 200 OK와 응답 헤더에 새 비밀번호를 반환한다.")
         @Test
@@ -196,14 +190,14 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             Assertions.assertThat(response.getHeaders().getFirst(HEADER_LOGIN_PW)).isEqualTo(newPassword);
         }
 
-        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 400 Not Found를 반환한다.")
+        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 404 Not Found를 반환한다.")
         @Test
         void throwsNotFound_whenUserIdDoesNotExist() {
             // arrange
@@ -214,7 +208,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -232,7 +226,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -248,7 +242,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -264,7 +258,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
