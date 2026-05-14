@@ -1,0 +1,36 @@
+package com.loopers.interfaces.api.user;
+
+import com.loopers.application.user.UserInfo;
+import com.loopers.application.user.UserRegisterCommand;
+import lombok.Builder;
+
+import java.time.LocalDate;
+
+public class UserV1Dto {
+
+    public record UserRegisterRequest(
+        String loginId,
+        String password,
+        String name,
+        LocalDate birthDate,
+        String email
+    ) {
+        public UserRegisterCommand toCommand() {
+            return new UserRegisterCommand(loginId, password, name, birthDate, email);
+        }
+    }
+
+    @Builder
+    public record UserRegisterResponse(Long id, String loginId, String name, LocalDate birthDate, String email) {
+        public static UserRegisterResponse from(UserInfo info) {
+            return UserRegisterResponse.builder()
+                    .id(info.id())
+                    .loginId(info.loginId())
+                    .name(info.name())
+                    .birthDate(info.birthDate())
+                    .email(info.email())
+                    .birthDate(info.birthDate())
+                    .build();
+        }
+    }
+}
