@@ -1,0 +1,49 @@
+## 개발 규칙
+### 진행 Workflow - 증강 코딩
+- **대원칙** : 방향성 및 주요 의사 결정은 개발자에게 제안만 할 수 있으며, 최종 승인된 사항을 기반으로 작업을 수행.
+- **중간 결과 보고** : AI 가 반복적인 동작을 하거나, 요청하지 않은 기능을 구현, 테스트 삭제를 임의로 진행할 경우 개발자가 개입.
+- **설계 주도권 유지** : AI 가 임의판단을 하지 않고, 방향성에 대한 제안 등을 진행할 수 있으나 개발자의 승인을 받은 후 수행.
+
+### 프로젝트 컨텍스트
+- 레이어: `interfaces → application → domain ← infrastructure`
+- 네이밍, 빌드 명령어 등 상세 사항은 CLAUDE.md 참조
+
+### 개발 Workflow - TDD (Red > Green > Refactor)
+- 모든 테스트는 3A 원칙으로 작성할 것 (Arrange - Act - Assert)
+#### 1. Red Phase : 실패하는 테스트 먼저 작성
+- 요구사항을 만족하는 기능 테스트 케이스 작성
+#### 2. Green Phase : 테스트를 통과하는 코드 작성
+- Red Phase 의 테스트가 모두 통과할 수 있는 코드 작성
+- `./gradlew :apps:commerce-api:test` 로 테스트 통과 확인
+- 오버엔지니어링 금지
+#### 3. Refactor Phase : 불필요한 코드 제거 및 품질 개선
+- 불필요한 private 함수 지양, 객체지향적 코드 작성
+- unused import 제거
+- 성능 최적화
+- 모든 테스트 케이스가 통과해야 함
+
+## 주의사항
+### 1. Never Do
+- 실제 동작하지 않는 코드, 불필요한 Mock 데이터를 이용한 구현을 하지 말 것
+- null-safety 하지 않게 코드 작성하지 말 것 (Java 의 경우, Optional 을 활용할 것)
+- println 코드 남기지 말 것
+- domain 패키지에서 infrastructure 를 직접 import 하지 말 것
+- Controller 에서 Service 를 직접 호출하지 말 것 (Facade 를 거칠 것)
+- Entity 에 `@Data`, `@Setter` 사용하지 말 것
+- 테스트에서 `@Transactional` 롤백 대신 truncate 방식 사용할 것
+
+### 2. Recommendation
+- 실제 API 를 호출해 확인하는 E2E 테스트 코드 작성
+- 재사용 가능한 객체 설계
+- 성능 최적화에 대한 대안 및 제안
+- 개발 완료된 API 의 경우, `.http/**.http` 에 분류해 작성
+
+### 3. Priority
+1. 실제 동작하는 해결책만 고려
+2. null-safety, thread-safety 고려
+3. 테스트 가능한 구조로 설계
+4. 기존 코드 패턴 분석 후 일관성 유지
+
+### 4. 완료 기준
+- 모든 테스트 통과 (`./gradlew test`)
+- 커밋 전 개발자 확인 필수
