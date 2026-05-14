@@ -42,7 +42,7 @@ public class UserModelTest {
             // Assert (검증) - 결과가 기대한 대로인지 확인
             assertAll(
                     //assertj라는 테스트 검증 라이브러리의 검증 메소드 검증하고 싶은 대상을 메소드 인자로 받음
-                    () -> assertThat(userModel.getLoginId()).isEqualTo(loginId),
+                    () -> assertThat(userModel.getLoginId()).isEqualTo(new LoginId(loginId)),
                     () -> assertThat(userModel.getName()).isEqualTo(name),
                     () -> assertThat(userModel.getBirthday()).isEqualTo(birthday),
                     () -> assertThat(userModel.getEmail()).isEqualTo(email),

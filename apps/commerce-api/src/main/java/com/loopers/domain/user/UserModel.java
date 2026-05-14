@@ -78,9 +78,25 @@ public class UserModel extends BaseEntity {
         }
     }
 
+    // --- 비밀번호 관련 도메인 메서드 ---
+
+    /**
+     * 입력된 raw 비밀번호가 저장된 hash와 일치하는지 확인
+     */
+    public boolean matchesPassword(String rawPassword) {
+        return this.password.equals(encrypt(rawPassword));
+    }
+
+    /**
+     * 비밀번호 변경. raw 비밀번호 검증 후 해싱하여 저장
+     */
+    public void changePassword(String newRawPassword) {
+        this.password = encrypt(new Password(newRawPassword, this.birthday).getValue());
+    }
+
     // --- Getter ---
 
-    public String getLoginId() { return loginId; }
+    public LoginId getLoginId() { return new LoginId(loginId); }
     public String getPassword() { return password; }
     public String getName() { return name; }
     public LocalDate getBirthday() { return birthday; }
