@@ -1,0 +1,106 @@
+### ===== 정상 시나리오 =====
+
+### 회원가입
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "tester01",
+  "password": "Password1!",
+  "name": "홍길동",
+  "birthDate": "1990-05-14",
+  "email": "test@example.com",
+  "gender": "M"
+}
+
+### 내 정보 조회 (이름 마지막 글자 마스킹)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+### 비밀번호 수정
+PATCH {{commerce-api}}/api/v1/users/me/password
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "newPassword": "NewPass2@"
+}
+
+### 변경 후 내 정보 조회 (새 비밀번호 사용)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: NewPass2@
+
+
+### ===== 에러 시나리오 =====
+
+### [409 Conflict] 이미 가입된 로그인 ID 로 재가입 시도
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "tester01",
+  "password": "Another2@",
+  "name": "김철수",
+  "birthDate": "1991-06-15",
+  "email": "another@example.com",
+  "gender": "F"
+}
+
+### [400 Bad Request] 회원가입 - 성별 누락
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "noGender01",
+  "password": "Password1!",
+  "name": "이몽룡",
+  "birthDate": "1992-07-20",
+  "email": "nogender@example.com"
+}
+
+### [400 Bad Request] 내 정보 조회 - X-Loopers-LoginId 헤더 누락
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginPw: Password1!
+
+### [404 Not Found] 내 정보 조회 - 존재하지 않는 로그인 ID
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: nonexistent
+X-Loopers-LoginPw: AnyPw1!
+
+### [404 Not Found] 내 정보 조회 - 비밀번호 불일치 (ID 존재 누출 방지로 NOT_FOUND)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: WrongPw1!
+
+### [400 Bad Request] 비밀번호 수정 - 새 비번 정책 위반(너무 짧음)
+PATCH {{commerce-api}}/api/v1/users/me/password
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: NewPass2@
+
+{
+  "newPassword": "short"
+}
+
+### [400 Bad Request] 비밀번호 수정 - 새 비번에 생년월일 포함
+PATCH {{commerce-api}}/api/v1/users/me/password
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: NewPass2@
+
+{
+  "newPassword": "Aa1!19900514"
+}
+
+### [400 Bad Request] 비밀번호 수정 - 현재 비밀번호 불일치
+PATCH {{commerce-api}}/api/v1/users/me/password
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: WrongPw1!
+
+{
+  "newPassword": "Another3#"
+}
