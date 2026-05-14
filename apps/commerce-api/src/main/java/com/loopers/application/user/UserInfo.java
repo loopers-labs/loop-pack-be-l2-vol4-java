@@ -18,5 +18,4 @@ public record UserInfo(
             user.getEmail()
         );
     }
-
 }
