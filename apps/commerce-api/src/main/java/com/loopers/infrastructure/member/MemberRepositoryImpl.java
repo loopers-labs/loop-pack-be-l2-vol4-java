@@ -32,4 +32,9 @@ public class MemberRepositoryImpl implements MemberRepository {
     public void delete(Long id) {
         memberJpaRepository.deleteById(id);
     }
+
+    @Override
+    public boolean existsByUserId(String userId) {
+        return memberJpaRepository.existsByUserId(userId);
+    }
 }

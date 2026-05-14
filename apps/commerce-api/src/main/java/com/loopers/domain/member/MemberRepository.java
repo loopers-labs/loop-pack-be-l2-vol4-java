@@ -8,4 +8,5 @@ public interface MemberRepository {
     Optional<MemberModel> find(Long id);
     List<MemberModel> findAll();
     void delete(Long id);
+    boolean existsByUserId(String userId);
 }
