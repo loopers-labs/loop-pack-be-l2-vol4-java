@@ -5,6 +5,7 @@ import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.UserService;
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
+import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import fixture.UserModelFixture;
@@ -85,8 +86,8 @@ class UserFacadeIntegrateTest {
             
             // when then
             assertThatThrownBy(() -> userFacade.createUser(duplicate.loginId(), duplicate.name(), duplicate.birth(), duplicate.password(), duplicate.email()))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage(ErrorType.CONFLICT.getMessage());
+                    .isInstanceOf(CoreException.class)
+                    .hasMessage("이미 존재하는 유저의 아이디입니다");
         }
         
         @DisplayName("비밀번호는 암호화 된다")
@@ -148,7 +149,7 @@ class UserFacadeIntegrateTest {
 
             // when then
             assertThatThrownBy(() -> userFacade.getUserInfo(invalidId))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(CoreException.class)
                     .hasMessage("유저의 아이디가 존재하지 않습니다.");
         }
     }

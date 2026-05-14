@@ -2,6 +2,7 @@ package com.loopers.domain.user;
 
 import com.loopers.domain.value.BirthVO;
 import com.loopers.domain.value.EmailVO;
+import com.loopers.support.error.CoreException;
 import fixture.UserModelFixture;
 import org.junit.jupiter.api.*;
 
@@ -47,24 +48,20 @@ class UserServiceTest {
             // given
             String loginId = expectedId;
 
-            // when
-            boolean result = userService.checkLoginIdDuplication(loginId);
-
-            // then
-            Assertions.assertTrue(result);
+            // when then
+            assertThatThrownBy(() -> userService.checkLoginIdDuplication(loginId))
+                    .isInstanceOf(CoreException.class)
+                    .hasMessage("이미 존재하는 유저의 아이디입니다.");
         }
 
-        @DisplayName("중복 되지 않은 유저는 false를 반환한다.")
+        @DisplayName("중복 되지 않은 유저는 통과한다.")
         @Test
         public void notDuplicate() {
             // given
             String loginId = "tester_new";
 
-            // when
-            boolean result = userService.checkLoginIdDuplication(loginId);
-
-            // then
-            Assertions.assertFalse(result);
+            // when then
+            userService.checkLoginIdDuplication(loginId);
         }
     }
 
@@ -94,7 +91,7 @@ class UserServiceTest {
 
             // when then
             assertThatThrownBy(() -> userService.getUserModel(userSequenceId))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(CoreException.class)
                     .hasMessage("유저의 아이디가 존재하지 않습니다.");
         }
 
