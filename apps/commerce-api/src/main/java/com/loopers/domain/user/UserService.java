@@ -24,6 +24,6 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Optional<UserModel> getMyInfo(String loginId) {
-        return Optional.empty();
+        return userRepository.findByLoginId(loginId);
     }
 }
