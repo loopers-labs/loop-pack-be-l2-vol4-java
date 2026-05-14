@@ -29,7 +29,7 @@ public class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP   = "/api/v1/users";
     private static final String ENDPOINT_MY_INFO  = "/api/v1/users/myInfo";
-    private static final String ENDPOINT_PASSWORD = "/api/v1/users/myInfo/changePassword";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/myInfo/changePassword";
 
     private static final String DEFAULT_USER_ID = "usertest123";
     private static final String DEFAULT_PASSWORD = "abc123!@#";
@@ -190,7 +190,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -208,7 +208,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -226,7 +226,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -242,7 +242,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -258,7 +258,7 @@ public class UserV1ApiE2ETest {
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
