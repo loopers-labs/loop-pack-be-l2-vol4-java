@@ -286,7 +286,7 @@ docker-compose -f ./docker/monitoring-compose.yml up
     - 이메일
         - xx@yy.z 형태의 email 규칙 준수
     - 생년월일
-        - 19950610 입력이 오면, LocalDate에서 알아서 저장할 수 있도록 진행
+        - 1995-06-10 입력이 오면, LocalDate에서 알아서 저장할 수 있도록 진행
 - 비밀번호는 암호화해 저장하며, 아래와 같은 규칙을 따름
     - 가장 많이 사용하는 Bcrypt 방식으로 암호화해 저장한다.
 
@@ -317,4 +317,3 @@ docker-compose -f ./docker/monitoring-compose.yml up
 
 - 영문 대/소문자, 숫자, 특수문자 사용 가능
 - 생년월일 사용 불가
--> 해당 구조 작성 시, Return 할 때 헤더 정보 중 Pw를 변경해야 한다.
