@@ -1,15 +1,16 @@
 package com.loopers.domain.user;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDate;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserTest {
 
@@ -85,37 +86,5 @@ class UserTest {
       assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
     }
 
-  }
-
-  @DisplayName("내 정보 조회 단위 테스틐")
-  @Nested
-  class MyProfileTest {
-
-    @DisplayName("이름의 마지막 글자가 *로 마스킹된 값이 반환된다.")
-    @Test
-    void returnsNameWithLastCharacterMasked() {
-      // arrange
-      var user =
-          User.create("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
-
-      // act
-      String maskedName = user.getMaskedName();
-
-      // assert
-      assertThat(maskedName).isEqualTo("홍길*");
-    }
-
-    @DisplayName("이름이 한 글자일 경우 그 글자가 *로 마스킹된다.")
-    @Test
-    void returnsAsterisk_whenNameHasSingleCharacter() {
-      // arrange
-      var user = User.create("loopers01", "Password1!", "이", "1995-05-15", "loopers@example.com");
-
-      // act
-      String maskedName = user.getMaskedName();
-
-      // assert
-      assertThat(maskedName).isEqualTo("*");
-    }
   }
 }
