@@ -27,6 +27,16 @@ public class UserService {
         return userRepository.findByLoginId(loginId).orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public UserModel getMyInfo(String loginId, String password) {
+        UserModel user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED));
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED);
+        }
+        return user;
+    }
+
     @Transactional
     public void changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel user = userRepository.findByLoginId(loginId)

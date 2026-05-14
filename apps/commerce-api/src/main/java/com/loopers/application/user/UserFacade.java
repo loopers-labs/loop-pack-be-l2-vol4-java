@@ -1,10 +1,7 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.PasswordEncoder;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +10,6 @@ import org.springframework.stereotype.Component;
 public class UserFacade {
 
     private final UserService userService;
-    private final PasswordEncoder passwordEncoder;
 
     public UserInfo register(String loginId, String password, String name, String birth, String email) {
         UserModel userModel = new UserModel(loginId, password, name, birth, email);
@@ -21,15 +17,9 @@ public class UserFacade {
         return UserInfo.from(saved);
     }
 
-    /**
-     * 내 정보 조회 — loginId + password 로 인증 후 마스킹된 정보를 반환한다.
-     * 인증 실패(존재하지 않는 회원 / 비밀번호 불일치) 시 UNAUTHORIZED.
-     */
+    /** 내 정보 조회 — 인증은 Service 에서 처리, 마스킹된 정보를 반환한다. */
     public UserInfo getMyInfo(String loginId, String password) {
-        UserModel user = userService.findByLoginId(loginId);
-        if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
-            throw new CoreException(ErrorType.UNAUTHORIZED);
-        }
+        UserModel user = userService.getMyInfo(loginId, password);
         return UserInfo.from(user);
     }
 

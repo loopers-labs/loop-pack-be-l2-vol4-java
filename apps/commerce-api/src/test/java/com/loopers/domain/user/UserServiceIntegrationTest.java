@@ -14,9 +14,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @Import(TestPasswordEncoderConfig.class)
@@ -63,49 +64,35 @@ public class UserServiceIntegrationTest {
              * 차이:
              *   - Spy 검증 → "register 가 save 를 부른다" (구현 결합. 메서드명 바뀌면 깨짐)
              *   - DB 조회 검증 → "register 후 실제로 데이터가 존재한다" (결과 검증. 본질에 더 가까움)
-             *
-             * 사이클 7~8 부터는 Classicist 접근 (진짜 DB 조회) 으로 전환한다.
-             *   - 사이클 7: 중복 가입 시 CONFLICT — 진짜 DB unique 제약 검증
-             *   - 사이클 8: 비밀번호 암호화 저장 — DB 의 password 가 평문과 다름을 조회로 확인
              */
-
-            // arrange
             UserModel userModel = UserFixture.createModel();
 
-            // act
             userService.register(userModel);
 
-            // assert — Spy 로 "save 가 호출됐다" 만 검증
             verify(userRepository).save(any(UserModel.class));
         }
 
         @DisplayName("같은 loginId 로 가입 시도 시, CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
-            // arrange — 동일 loginId 로 두 번 시도
             UserModel first  = UserFixture.createModel();
             UserModel second = UserFixture.createModel();
             userService.register(first);
 
-            // act
             CoreException ex = assertThrows(CoreException.class, () ->
                 userService.register(second)
             );
 
-            // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
 
         @DisplayName("register 시 비밀번호가 암호화되어 저장된다.")
         @Test
         void passwordIsEncoded_whenRegister() {
-            // arrange
             UserModel user = UserFixture.createModel();
 
-            // act
             UserModel saved = userService.register(user);
 
-            // assert — 저장된 password 가 평문과 다름
             assertThat(saved.getPassword()).isNotEqualTo(UserFixture.PASSWORD);
         }
     }
@@ -117,13 +104,10 @@ public class UserServiceIntegrationTest {
         @DisplayName("회원이 존재하면 UserModel 을 반환한다.")
         @Test
         void returnsUser_whenExists() {
-            // arrange
             userService.register(UserFixture.createModel());
 
-            // act
             UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
 
-            // assert
             assertThat(found).isNotNull();
             assertThat(found.getLoginId()).isEqualTo(UserFixture.LOGIN_ID);
             assertThat(found.getEmail()).isEqualTo(UserFixture.EMAIL);
@@ -132,24 +116,59 @@ public class UserServiceIntegrationTest {
         @DisplayName("회원이 존재하지 않으면 null 을 반환한다.")
         @Test
         void returnsNull_whenNotExists() {
-            // act
             UserModel found = userService.findByLoginId("nonexistent");
 
-            // assert
             assertThat(found).isNull();
         }
 
-        @DisplayName("조회된 이름은 getMaskedName() 으로 마스킹이 적용된다.")
+        @DisplayName("DB 에 저장된 이름 원본이 올바르게 반환된다.")
         @Test
-        void returnsMaskedName_whenExists() {
-            // arrange
+        void returnsStoredName_whenExists() {
+            // 통합 계층의 관심사: DB 에서 name 이 정확히 저장/조회되는가
+            // 마스킹 동작은 단위 테스트(UserModelTest.MaskedName) 에서 별도 검증
             userService.register(UserFixture.createModel());
 
-            // act
             UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
 
-            // assert
-            assertThat(found.getMaskedName()).isEqualTo("홍길*");
+            assertThat(found.getName()).isEqualTo(UserFixture.NAME);
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때,")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("올바른 인증 정보로 조회 시, UserModel 을 반환한다.")
+        @Test
+        void returnsUser_whenValidAuth() {
+            userService.register(UserFixture.createModel());
+
+            UserModel found = userService.getMyInfo(UserFixture.LOGIN_ID, UserFixture.PASSWORD);
+
+            assertThat(found).isNotNull();
+            assertThat(found.getLoginId()).isEqualTo(UserFixture.LOGIN_ID);
+        }
+
+        @DisplayName("비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordIsWrong() {
+            userService.register(UserFixture.createModel());
+
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.getMyInfo(UserFixture.LOGIN_ID, "WrongPass@1")
+            );
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("존재하지 않는 loginId 로 조회 시, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenUserNotExists() {
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.getMyInfo("nonexistent", UserFixture.PASSWORD)
+            );
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
 
@@ -160,28 +179,27 @@ public class UserServiceIntegrationTest {
         @DisplayName("기존 비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenCurrentPasswordIsWrong() {
-            // arrange
             userService.register(UserFixture.createModel());
 
-            // act & assert
             CoreException ex = assertThrows(CoreException.class, () ->
                 userService.changePassword(UserFixture.LOGIN_ID, "WrongPass@1", "NewPass@99")
             );
+
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
         @DisplayName("정상 변경 시 DB 의 비밀번호가 새 값으로 암호화되어 갱신된다.")
         @Test
         void updatesEncodedPassword_whenValidChange() {
-            // arrange
             userService.register(UserFixture.createModel());
 
-            // act
             userService.changePassword(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "NewPass@99");
 
-            // assert — 새 비밀번호로 matches 통과 확인
             UserModel updated = userService.findByLoginId(UserFixture.LOGIN_ID);
+            // 새 비밀번호로 인증 성공
             assertThat(passwordEncoder.matches("NewPass@99", updated.getPassword())).isTrue();
+            // 구 비밀번호로 인증 실패 — 실제로 교체됐음을 확인
+            assertThat(passwordEncoder.matches(UserFixture.PASSWORD, updated.getPassword())).isFalse();
         }
     }
 }

@@ -12,11 +12,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import org.springframework.http.HttpHeaders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -24,14 +23,22 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserV1ApiE2ETest {
 
-    private static final String ENDPOINT_REGISTER    = "/api/v1/users";
-    private static final String ENDPOINT_MY_INFO     = "/api/v1/users/me";
-    private static final String ENDPOINT_CHANGE_PW   = "/api/v1/users/me/password";
+    private static final String ENDPOINT_REGISTER  = "/api/v1/users";
+    private static final String ENDPOINT_MY_INFO   = "/api/v1/users/me";
+    private static final String ENDPOINT_CHANGE_PW = "/api/v1/users/me/password";
 
+    /** GET /me 인증용 — loginId + password 헤더 모두 필요 */
     private HttpHeaders authHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
         headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
+        return headers;
+    }
+
+    /** PUT /me/password 용 — loginId 헤더만 필요 (비밀번호는 요청 바디로 전달) */
+    private HttpHeaders loginIdOnlyHeader() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
         return headers;
     }
 
@@ -65,13 +72,11 @@ class UserV1ApiE2ETest {
             registerDefaultUser();
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_MY_INFO, HttpMethod.GET,
                     new HttpEntity<>(authHeaders()),
-                    responseType
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert — 200 + 마스킹된 이름 "홍길*"
@@ -81,20 +86,16 @@ class UserV1ApiE2ETest {
             );
         }
 
-        @DisplayName("loginId 헤더 누락 시, 400 을 반환한다.")
+        @DisplayName("X-Loopers-LoginId 헤더 누락 시, 400 을 반환한다.")
         @Test
         void throwsBadRequest_whenLoginIdHeaderMissing() {
-            // arrange — 헤더 없이 요청
-            registerDefaultUser();
-
+            // arrange — 헤더 없이 요청 (회원 존재 여부와 무관하게 Spring 이 400 반환)
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_MY_INFO, HttpMethod.GET,
                     new HttpEntity<>(new HttpHeaders()),
-                    responseType
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert
@@ -112,13 +113,11 @@ class UserV1ApiE2ETest {
             wrongHeaders.set("X-Loopers-LoginPw", "WrongPass@1");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_MY_INFO, HttpMethod.GET,
                     new HttpEntity<>(wrongHeaders),
-                    responseType
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert
@@ -130,7 +129,7 @@ class UserV1ApiE2ETest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("올바른 인증 헤더와 유효한 새 비밀번호로 변경 시, 200 을 반환한다.")
+        @DisplayName("유효한 현재/새 비밀번호로 변경 시, 200 을 반환한다.")
         @Test
         void returnsOk_whenValidRequest() {
             // arrange
@@ -138,14 +137,12 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request =
                 new UserV1Dto.ChangePasswordRequest(UserFixture.PASSWORD, "NewPass@99");
 
-            // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
+            // act — X-Loopers-LoginId 헤더만 필요 (비밀번호 인증은 바디 currentPassword 로)
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_CHANGE_PW, HttpMethod.PUT,
-                    new HttpEntity<>(request, authHeaders()),
-                    responseType
+                    new HttpEntity<>(request, loginIdOnlyHeader()),
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert
@@ -161,13 +158,11 @@ class UserV1ApiE2ETest {
                 new UserV1Dto.ChangePasswordRequest("WrongPass@1", "NewPass@99");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_CHANGE_PW, HttpMethod.PUT,
-                    new HttpEntity<>(request, authHeaders()),
-                    responseType
+                    new HttpEntity<>(request, loginIdOnlyHeader()),
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert
@@ -183,13 +178,11 @@ class UserV1ApiE2ETest {
                 new UserV1Dto.ChangePasswordRequest(UserFixture.PASSWORD, "short");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_CHANGE_PW, HttpMethod.PUT,
-                    new HttpEntity<>(request, authHeaders()),
-                    responseType
+                    new HttpEntity<>(request, loginIdOnlyHeader()),
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert
@@ -212,42 +205,35 @@ class UserV1ApiE2ETest {
             );
 
             // act — 동일 loginId 로 재시도
-            UserV1Dto.RegisterRequest second = UserFixture.createRequest();
-            ParameterizedTypeReference<ApiResponse<Void>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_REGISTER, HttpMethod.POST,
-                    new HttpEntity<>(second), responseType
+                    new HttpEntity<>(UserFixture.createRequest()),
+                    new ParameterizedTypeReference<>() {}
                 );
 
-            // assert — CoreException(CONFLICT) 가 HTTP 409 로 매핑되는지 검증
+            // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
         @DisplayName("유효한 회원 정보로 가입 시, 200 + 유저 정보를 반환한다 (비밀번호 미포함).")
         @Test
         void returnsRegisteredUser_whenValidRequest() {
-            // arrange
-            UserV1Dto.RegisterRequest request = UserFixture.createRequest();
-
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>> responseType =
-                new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.RegisterResponse>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_REGISTER, HttpMethod.POST,
-                    new HttpEntity<>(request),
-                    responseType
+                    new HttpEntity<>(UserFixture.createRequest()),
+                    new ParameterizedTypeReference<>() {}
                 );
 
             // assert — 200 + loginId/name/email 반환 확인
             //          RegisterResponse 에 password 필드 없음 → 컴파일 수준에서 보장
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo("testuser"),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길동"),
-                () -> assertThat(response.getBody().data().email()).isEqualTo("test@loopers.com")
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo(UserFixture.LOGIN_ID),
+                () -> assertThat(response.getBody().data().name()).isEqualTo(UserFixture.NAME),
+                () -> assertThat(response.getBody().data().email()).isEqualTo(UserFixture.EMAIL)
             );
         }
     }
