@@ -32,8 +32,8 @@ public class UserModel extends BaseEntity {
         return loginId;
     }
 
-    public String getPassword() {
-        return password;
+    public boolean matchesPassword(String password) {
+        return this.password.equals(password);
     }
 
     public String getName() {
