@@ -7,12 +7,15 @@ import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 class UserServiceIntegrationTest {
@@ -28,6 +31,9 @@ class UserServiceIntegrationTest {
 
     @Autowired
     private UserJpaRepository userJpaRepository;
+
+    @MockitoSpyBean
+    private UserRepository userRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -63,6 +69,7 @@ class UserServiceIntegrationTest {
                 () -> assertEquals(DEFAULT_EMAIL, userModel.getEmail()),
                 () -> assertTrue(passwordEncoder.matches(DEFAULT_PASSWORD, userModel.getPassword()))
             );
+            verify(userRepository, times(1)).findByUserId(DEFAULT_USER_ID);
         }
 
         @DisplayName("이미 존재하는 userId로 회원가입 시도하면, Conflict 예외가 발생한다.")
@@ -104,6 +111,7 @@ class UserServiceIntegrationTest {
                 () -> assertEquals(DEFAULT_BIRTH_DATE, userModel.getBirthDate()),
                 () -> assertEquals(DEFAULT_EMAIL, userModel.getEmail())
             );
+            verify(userRepository, times(1)).findByUserId(DEFAULT_USER_ID);
         }
 
         @DisplayName("잘못된 비밀번호로 조회 시도하면, BAD_REQUEST 예외가 발생한다.")
@@ -157,6 +165,7 @@ class UserServiceIntegrationTest {
 
             // assert
             assertTrue(passwordEncoder.matches(newPassword, userModel.getPassword()));
+            verify(userRepository, times(1)).findByUserId(DEFAULT_USER_ID);
         }
 
         @DisplayName("현재 비밀번호가 일치하지 않는 경우, BAD_REQUEST 예외가 발생한다.")
