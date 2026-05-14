@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -17,43 +16,25 @@ public class UserService {
 
     @Transactional
     public UserModel signup(String userId, String password, String name, LocalDate birthDate, String email) {
-        // 1. 기존 user 확인
-        Optional<UserModel> existUser = userRepository.findByUserId(userId);
-        if (existUser.isPresent()) {
+        if (userRepository.findByUserId(userId).isPresent()) {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 사용자입니다.");
         }
-        // 2. userModel 생성 및 저장 후 return
         return userRepository.save(new UserModel(userId, password, name, birthDate, email));
     }
 
     @Transactional(readOnly = true)
     public UserModel getUser(String userId, String password) {
-        // 1. 기존 user 확인
-        Optional<UserModel> user = userRepository.findByUserId(userId);
-        // 1-1. 기존 user가 존재하지 않다면 exception
-        if (user.isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "없는 사용자입니다.");
-        }
-
-        // 2. password가 일치여부 확인
-        UserModel userModel = user.get();
+        UserModel userModel = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "없는 사용자입니다."));
         userModel.authenticate(password);
-        // 3. userModel return
         return userModel;
     }
 
-    @Transactional()
+    @Transactional
     public UserModel changePassword(String userId, String currentPassword, String newPassword) {
-        // 1. 기존 user Repository 확인
-        Optional<UserModel> user = userRepository.findByUserId(userId);
-        // 1-1. 기존 user가 존재하지 않다면 exception
-        if (user.isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "없는 사용자입니다.");
-        }
-        // 2. UserModel 에서 changePassword 처리
-        UserModel userModel = user.get();
-        userModel.changePassword(currentPassword, newPassword); // 트랜잭션 종료 시점에 JPA가 변경 감지 → 자동으로 UPDATE 쿼리 실행
-
+        UserModel userModel = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "없는 사용자입니다."));
+        userModel.changePassword(currentPassword, newPassword);
         return userModel;
     }
 }
