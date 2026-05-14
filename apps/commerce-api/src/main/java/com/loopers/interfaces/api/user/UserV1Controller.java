@@ -41,7 +41,7 @@ public class UserV1Controller {
     @PatchMapping("/myInfo/changePassword")
     public ApiResponse<Object> changePassword(
         @RequestHeader("X-Loopers-LoginId") String userId,
-        @RequestHeader("X-Loopers-LoginPw") String password,
+        @RequestHeader("X-Loopers-LoginPw") String password, // 헤더 필수 검증용, 비즈니스 로직 미사용
         @RequestBody UserV1Dto.ChangePasswordRequest request
     ) {
         userFacade.changePassword(
