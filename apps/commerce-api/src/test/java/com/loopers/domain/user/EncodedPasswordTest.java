@@ -71,7 +71,7 @@ class EncodedPasswordTest {
     @Nested
     class Matches {
 
-        @DisplayName("rawPassword 가 저장된 해시와 일치하면 true 를 반환한다.")
+        @DisplayName("입력한 비밀번호가 저장된 해시와 일치하면 true 를 반환한다.")
         @Test
         void returnsTrue_whenEncoderReportsMatch() {
             // arrange
@@ -86,7 +86,7 @@ class EncodedPasswordTest {
             assertThat(result).isTrue();
         }
 
-        @DisplayName("rawPassword 가 저장된 해시와 불일치하면 false 를 반환한다.")
+        @DisplayName("입력한 비밀번호가 저장된 해시와 불일치하면 false 를 반환한다.")
         @Test
         void returnsFalse_whenEncoderReportsMismatch() {
             // arrange

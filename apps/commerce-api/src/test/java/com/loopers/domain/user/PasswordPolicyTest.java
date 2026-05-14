@@ -68,9 +68,16 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("영문 대/소문자 + 숫자 + 특수문자 조합 8~16자이고 생년월일 substring 미포함이면 예외 없이 통과한다.")
+        @DisplayName("8~16자 영문 대소문자/숫자/특수문자 범위 내에서 생년월일 substring 미포함이면 예외 없이 통과한다.")
         @ParameterizedTest
-        @ValueSource(strings = {"Abcd123!", "Z!aB9@xY7#kL", "P@ssw0rdABCD1234"})
+        @ValueSource(strings = {
+            "Abcdefgh",
+            "12345678",
+            "Abcd1234",
+            "!@#$%^&*",
+            "Abcd123!",
+            "P@ssw0rdABCD1234"
+        })
         void passes_whenValid(String rawPassword) {
             // act & assert
             assertThatCode(() -> PasswordPolicy.validate(rawPassword, BIRTH_DATE))

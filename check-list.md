@@ -33,7 +33,7 @@
   - [x] `yy-MM-dd`, `yyyy-MM-dd`
   - [x] `yy/MM/dd`, `yyyy/MM/dd`
   - [x] `yy.MM.dd`, `yyyy.MM.dd`
-- [x] 영문 대/소문자 + 숫자 + 특수문자 조합 8~16자 + 생년월일 substring 미포함 → 허용
+- [x] 8~16자 영문 대소문자/숫자/특수문자 범위 내 + 생년월일 substring 미포함 → 허용
 
 ### 1-6. `UserModel`
 - [x] 생성 시 값 객체 위임 검증
