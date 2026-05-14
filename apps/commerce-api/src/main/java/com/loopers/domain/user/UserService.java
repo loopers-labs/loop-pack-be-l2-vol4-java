@@ -6,8 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-
 @RequiredArgsConstructor
 @Component
 public class UserService {
@@ -16,28 +14,15 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public User register(
-        String loginId,
-        String password,
-        String name,
-        LocalDate birth,
-        String email
-    ) {
-        LoginId loginIdValue = new LoginId(loginId);
-        Email emailValue = new Email(email);
-        Birth birthValue = new Birth(birth);
-
-        if (userRepository.existsByLoginId(loginIdValue)) {
+    public User register(LoginId loginId, String rawPassword, Name name, Birth birth, Email email) {
+        if (userRepository.existsByLoginId(loginId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }
-        if (userRepository.existsByEmail(emailValue)) {
+        if (userRepository.existsByEmail(email)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 등록된 이메일입니다.");
         }
 
-        Password passwordValue = Password.of(password, birthValue);
-        String encodedPassword = passwordEncoder.encode(passwordValue.value());
-
-        User user = new User(loginIdValue, new Name(name), birthValue, emailValue, encodedPassword);
+        User user = User.register(loginId, rawPassword, name, birth, email, passwordEncoder);
         return userRepository.save(user);
     }
 

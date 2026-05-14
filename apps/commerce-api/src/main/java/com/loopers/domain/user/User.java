@@ -57,6 +57,19 @@ public class User extends BaseEntity {
         this.encodedPassword = encodedPassword;
     }
 
+    public static User register(
+        LoginId loginId,
+        String rawPassword,
+        Name name,
+        Birth birth,
+        Email email,
+        PasswordEncoder encoder
+    ) {
+        Password validated = Password.of(rawPassword, birth);
+        String encoded = encoder.encode(validated.value());
+        return new User(loginId, name, birth, email, encoded);
+    }
+
     public String maskedName() {
         return new Name(this.name).masked();
     }

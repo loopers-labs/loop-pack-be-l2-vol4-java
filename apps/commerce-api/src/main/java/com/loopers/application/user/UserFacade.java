@@ -1,6 +1,9 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.Birth;
+import com.loopers.domain.user.Email;
 import com.loopers.domain.user.LoginId;
+import com.loopers.domain.user.Name;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +24,13 @@ public class UserFacade {
         LocalDate birth,
         String email
     ) {
-        User user = userService.register(loginId, password, name, birth, email);
+        User user = userService.register(
+            new LoginId(loginId),
+            password,
+            new Name(name),
+            new Birth(birth),
+            new Email(email)
+        );
         return UserInfo.from(user);
     }
 

@@ -22,14 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest
-class UserConcurrentRegisterTest {
+class UserRegisterConcurrencyTest {
 
     private final UserService userService;
     private final UserJpaRepository userJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    UserConcurrentRegisterTest(
+    UserRegisterConcurrencyTest(
         UserService userService,
         UserJpaRepository userJpaRepository,
         DatabaseCleanUp databaseCleanUp
@@ -62,11 +62,11 @@ class UserConcurrentRegisterTest {
                 try {
                     startLatch.await();
                     userService.register(
-                        "loopers" + idx,
+                        new LoginId("loopers" + idx),
                         "Pass1234!",
-                        "김민우",
-                        LocalDate.of(1990, 1, 1),
-                        "same@example.com"
+                        new Name("김민우"),
+                        new Birth(LocalDate.of(1990, 1, 1)),
+                        new Email("same@example.com")
                     );
                     successCount.incrementAndGet();
                 } catch (CoreException e) {
