@@ -120,10 +120,13 @@ class UserV1ApiE2ETest {
                     new ParameterizedTypeReference<>() {}
                 );
 
-            // assert — 200 + 마스킹된 이름 "홍길*"
+            // assert — 200 + 반환 필드 전체 확인 (이름은 마스킹)
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*")
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo(UserFixture.LOGIN_ID),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
+                () -> assertThat(response.getBody().data().birth()).isEqualTo(UserFixture.BIRTH),
+                () -> assertThat(response.getBody().data().email()).isEqualTo(UserFixture.EMAIL)
             );
         }
 
@@ -140,6 +143,22 @@ class UserV1ApiE2ETest {
                 );
 
             // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더 누락 시, 400 을 반환한다.")
+        @Test
+        void throwsBadRequest_whenPasswordHeaderMissing() {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
+
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<>() {}
+                );
+
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
@@ -207,6 +226,22 @@ class UserV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더 누락 시, 400 을 반환한다.")
+        @Test
+        void throwsBadRequest_whenPasswordHeaderMissing() {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
+
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_CHANGE_PW, HttpMethod.PUT,
+                    new HttpEntity<>(new UserV1Dto.ChangePasswordRequest("NewPass@99"), headers),
+                    new ParameterizedTypeReference<>() {}
+                );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
         @DisplayName("비밀번호 헤더가 틀리면, 401 을 반환한다.")
