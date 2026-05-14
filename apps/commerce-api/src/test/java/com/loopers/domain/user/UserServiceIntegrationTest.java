@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 
@@ -30,6 +31,10 @@ class UserServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private static final String RAW_PASSWORD = "Password1!";
     private UserModel user;
 
     @BeforeEach
@@ -78,6 +83,58 @@ class UserServiceIntegrationTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    @DisplayName("authenticate()를 호출할 때,")
+    @Nested
+    class Authenticate {
+
+        private UserModel savedUser;
+
+        @BeforeEach
+        void setUp() {
+            String encoded = passwordEncoder.encode(RAW_PASSWORD);
+            savedUser = userJpaRepository.save(
+                new UserModel("authuser", encoded, "홍길동", LocalDate.of(1990, 1, 15), "auth@example.com")
+            );
+        }
+
+        @DisplayName("Given 올바른 loginId와 비밀번호 / When 인증 요청 / Then UserModel이 반환된다.")
+        @Test
+        void returnsUser_whenCredentialsAreValid() {
+            // act
+            UserModel result = userService.authenticate(savedUser.getLoginId(), RAW_PASSWORD);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getId()).isEqualTo(savedUser.getId()),
+                () -> assertThat(result.getLoginId()).isEqualTo(savedUser.getLoginId())
+            );
+        }
+
+        @DisplayName("Given 존재하지 않는 loginId / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenLoginIdNotFound() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.authenticate("unknown", RAW_PASSWORD)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("Given 틀린 비밀번호 / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordIsWrong() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.authenticate(savedUser.getLoginId(), "WrongPw1!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
 }
