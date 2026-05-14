@@ -99,14 +99,99 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("비밀번호에 생년월일이 포함되면 예외가 발생한다.")
-    void signUp_PasswordContainsBirthDate_ShouldThrowException() {
+    @DisplayName("이름 형식이 올바르지 않으면 예외가 발생한다.")
+    void signUp_InvalidName_ShouldThrowException() {
         // given
         MemberCommand.SignUp command = new MemberCommand.SignUp(
-                "tester01", "Pass19900101!", "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com"
+                "tester01", "Password123!", "홍길동1", LocalDate.of(1990, 1, 1), "tester@example.com"
         );
 
         // when & then
         assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+    }
+
+    @Test
+    @DisplayName("이메일 형식이 올바르지 않으면 예외가 발생한다.")
+    void signUp_InvalidEmail_ShouldThrowException() {
+        // given
+        MemberCommand.SignUp command = new MemberCommand.SignUp(
+                "tester01", "Password123!", "홍길동", LocalDate.of(1990, 1, 1), "invalid-email"
+        );
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+    }
+
+    @Test
+    @DisplayName("생년월일이 미래 날짜이면 예외가 발생한다.")
+    void signUp_FutureBirthDate_ShouldThrowException() {
+        // given
+        MemberCommand.SignUp command = new MemberCommand.SignUp(
+                "tester01", "Password123!", "홍길동", LocalDate.now().plusDays(1), "tester@example.com"
+        );
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+    }
+
+    @Test
+    @DisplayName("회원 조회 시 로그인 ID 형식이 올바르지 않으면 예외가 발생한다.")
+    void getMember_InvalidLoginId_ShouldThrowException() {
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.getMember("id", "password"));
+    }
+
+    @Test
+    @DisplayName("회원 조회 시 아이디와 비밀번호가 일치하면 회원 정보를 반환한다.")
+    void getMember_CorrectCredentials_ShouldReturnMemberInfo() {
+        // given
+        String loginId = "tester01";
+        String password = "Password123!";
+        String encodedPassword = "encodedPassword";
+        Member member = Member.builder()
+                .loginId(loginId)
+                .password(encodedPassword)
+                .name("홍길동")
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .email("tester01@example.com")
+                .build();
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(password, encodedPassword)).willReturn(true);
+
+        // when
+        MemberInfo result = memberService.getMember(loginId, password);
+
+        // then
+        assertThat(result.loginId()).isEqualTo(loginId);
+        assertThat(result.name()).isEqualTo("홍길동");
+    }
+
+    @Test
+    @DisplayName("회원 조회 시 아이디가 존재하지 않으면 예외가 발생한다.")
+    void getMember_MemberNotFound_ShouldThrowException() {
+        // given
+        String loginId = "nonexistent";
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.getMember(loginId, "password"));
+    }
+
+    @Test
+    @DisplayName("회원 조회 시 비밀번호가 일치하지 않으면 예외가 발생한다.")
+    void getMember_WrongPassword_ShouldThrowException() {
+        // given
+        String loginId = "tester01";
+        String wrongPassword = "wrongPassword";
+        String encodedPassword = "encodedPassword";
+        Member member = Member.builder()
+                .loginId(loginId)
+                .password(encodedPassword)
+                .build();
+        given(memberRepository.findByLoginId(loginId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(wrongPassword, encodedPassword)).willReturn(false);
+
+        // when & then
+        assertThrows(RuntimeException.class, () -> memberService.getMember(loginId, wrongPassword));
     }
 }
