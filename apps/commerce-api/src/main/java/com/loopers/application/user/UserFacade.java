@@ -39,8 +39,24 @@ public class UserFacade {
 
     @Transactional(readOnly = true)
     public UserInfo getMyInfo(String loginId) {
+        return UserInfo.from(findByUserId(loginId));
+    }
+
+    @Transactional
+    public void changePassword(String loginId, ChangePasswordCommand command) {
+        User user = findByUserId(loginId);
+
+        String encryptedCurrent = encrypt(command.currentPassword());
+        if (!user.getPassword().equals(encryptedCurrent)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
+        }
+
+        user.changePassword(command.currentPassword(), command.newPassword());
+        user.encryptPassword(encrypt(command.newPassword()));
+    }
+
+    public User findByUserId(String loginId) {
         return userRepository.findByLoginId(loginId)
-            .map(UserInfo::from)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
     }
 

@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.user.dto.ChangePasswordRequest;
 import com.loopers.interfaces.api.user.dto.SignUpRequest;
 import com.loopers.interfaces.api.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
@@ -29,5 +30,14 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> getMyInfo(@PathVariable String loginId) {
         UserInfo userInfo = userFacade.getMyInfo(loginId);
         return ResponseEntity.ok(ApiResponse.success(UserResponse.maskedFrom(userInfo)));
+    }
+
+    @PatchMapping("/{loginId}/password")
+    public ResponseEntity<ApiResponse<UserResponse>> changePassword(
+        @PathVariable String loginId,
+        @RequestBody ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(loginId, request.toCommand());
+        return ResponseEntity.ok(ApiResponse.success(UserResponse.empty()));
     }
 }

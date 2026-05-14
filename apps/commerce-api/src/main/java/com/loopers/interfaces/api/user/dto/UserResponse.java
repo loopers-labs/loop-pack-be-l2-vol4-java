@@ -9,6 +9,10 @@ public record UserResponse(
     String birthDate,
     String email
 ) {
+    public static UserResponse empty() {
+        return null;
+    }
+
     public static UserResponse from(UserInfo userInfo) {
         return new UserResponse(
             userInfo.id(),

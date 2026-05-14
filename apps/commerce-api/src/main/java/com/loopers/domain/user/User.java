@@ -61,6 +61,14 @@ public class User extends BaseEntity {
         this.password = encryptedPassword;
     }
 
+    public void changePassword(String currentPassword, String newPassword) {
+        Password validated = Password.of(newPassword, BirthDate.of(this.birthDate.toString()));
+        if (validated.getValue().equals(currentPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
+        }
+        this.password = validated.getValue();
+    }
+
     private static void validateLoginId(String loginId) {
         if (loginId == null || !loginId.matches(LOGIN_ID_PATTERN)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 형식이 올바르지 않습니다.");
