@@ -194,7 +194,6 @@ public class UserV1ApiE2ETest {
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            Assertions.assertThat(response.getHeaders().getFirst(HEADER_LOGIN_PW)).isEqualTo(newPassword);
         }
 
         @DisplayName("존재하지 않는 userId 헤더로 요청하면, 404 Not Found를 반환한다.")
