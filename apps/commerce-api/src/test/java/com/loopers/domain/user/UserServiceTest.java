@@ -59,7 +59,7 @@ class UserServiceTest {
         @Test
         void savesUserWithEncodedPassword_whenInputIsValid() {
             // given
-            when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(false);
+            when(userRepository.existsByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(false);
             when(passwordEncryptor.encode(VALID_RAW_PASSWORD, VALID_BIRTH_DATE)).thenReturn(ENCODED_PASSWORD);
             when(userRepository.save(any(UserModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -76,7 +76,7 @@ class UserServiceTest {
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // given
-            when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(true);
+            when(userRepository.existsByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(true);
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
@@ -92,7 +92,7 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenPasswordEncryptorRejects() {
             // given
-            when(userRepository.existsByLoginId(VALID_LOGIN_ID)).thenReturn(false);
+            when(userRepository.existsByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(false);
             when(passwordEncryptor.encode(anyString(), any())).thenThrow(new CoreException(ErrorType.BAD_REQUEST, "정책 위반"));
 
             // when
@@ -115,7 +115,7 @@ class UserServiceTest {
         void returnsUser_whenCredentialsMatch() {
             // given
             UserModel user = validUser();
-            when(userRepository.findByLoginId(VALID_LOGIN_ID)).thenReturn(Optional.of(user));
+            when(userRepository.findByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(VALID_RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
 
             // when
@@ -129,7 +129,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenLoginIdDoesNotExist() {
             // given
-            when(userRepository.findByLoginId(VALID_LOGIN_ID)).thenReturn(Optional.empty());
+            when(userRepository.findByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(Optional.empty());
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
@@ -145,7 +145,7 @@ class UserServiceTest {
         void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // given
             UserModel user = validUser();
-            when(userRepository.findByLoginId(VALID_LOGIN_ID)).thenReturn(Optional.of(user));
+            when(userRepository.findByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(anyString(), anyString())).thenReturn(false);
 
             // when

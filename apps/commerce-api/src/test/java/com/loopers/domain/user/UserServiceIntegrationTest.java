@@ -54,7 +54,7 @@ class UserServiceIntegrationTest {
             UserModel returned = userService.signup(loginId, rawPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
 
             // then
-            UserModel saved = userJpaRepository.findByLoginId(loginId).orElseThrow();
+            UserModel saved = userJpaRepository.findByLoginId(new LoginId(loginId)).orElseThrow();
             assertAll(
                 () -> assertThat(saved.getId()).isEqualTo(returned.getId()),
                 () -> assertThat(saved.getLoginId().getValue()).isEqualTo(loginId),
@@ -100,7 +100,7 @@ class UserServiceIntegrationTest {
             // then
             assertAll(
                 () -> assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                () -> assertThat(userJpaRepository.findByLoginId(loginId)).isEmpty()
+                () -> assertThat(userJpaRepository.findByLoginId(new LoginId(loginId))).isEmpty()
             );
         }
     }
@@ -151,7 +151,7 @@ class UserServiceIntegrationTest {
             // given
             String loginId = "loopers01";
             userService.signup(loginId, "Pass1234!", "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
-            Long persistedId = userJpaRepository.findByLoginId(loginId).orElseThrow().getId();
+            Long persistedId = userJpaRepository.findByLoginId(new LoginId(loginId)).orElseThrow().getId();
 
             // when
             UserModel found = userService.getById(persistedId);
@@ -176,7 +176,7 @@ class UserServiceIntegrationTest {
             String oldPassword = "Pass1234!";
             String newPassword = "NewPw9876@";
             userService.signup(loginId, oldPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
-            Long userId = userJpaRepository.findByLoginId(loginId).orElseThrow().getId();
+            Long userId = userJpaRepository.findByLoginId(new LoginId(loginId)).orElseThrow().getId();
             String oldEncoded = userJpaRepository.findById(userId).orElseThrow().getEncodedPassword();
 
             // when
@@ -199,7 +199,7 @@ class UserServiceIntegrationTest {
             String oldPassword = "Pass1234!";
             String newPassword = "NewPw9876@";
             userService.signup(loginId, oldPassword, "홍길동", LocalDate.of(2002, 5, 11), "test@loopers.com");
-            Long userId = userJpaRepository.findByLoginId(loginId).orElseThrow().getId();
+            Long userId = userJpaRepository.findByLoginId(new LoginId(loginId)).orElseThrow().getId();
 
             // when
             userService.changePassword(userId, oldPassword, newPassword);

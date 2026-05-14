@@ -18,7 +18,7 @@ public class UserService {
     @Transactional
     public UserModel signup(String rawLoginId, String rawPassword, String rawName, LocalDate birthDate, String rawEmail) {
         LoginId loginId = new LoginId(rawLoginId);
-        if (userRepository.existsByLoginId(loginId.getValue())) {
+        if (userRepository.existsByLoginId(loginId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.");
         }
         String encoded = passwordEncryptor.encode(rawPassword, birthDate);
@@ -27,7 +27,13 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserModel authenticate(String loginId, String rawPassword) {
+    public UserModel authenticate(String rawLoginId, String rawPassword) {
+        LoginId loginId;
+        try {
+            loginId = new LoginId(rawLoginId);
+        } catch (CoreException e) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
+        }
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다."));
         if (!passwordEncryptor.matches(rawPassword, user.getEncodedPassword())) {
