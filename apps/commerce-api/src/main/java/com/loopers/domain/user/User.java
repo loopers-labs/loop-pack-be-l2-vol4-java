@@ -74,6 +74,12 @@ public class User extends BaseEntity {
         return new Name(this.name).masked();
     }
 
+    public void authenticate(String rawPassword, PasswordEncoder encoder) {
+        if (!encoder.matches(rawPassword, this.encodedPassword)) {
+            throw new CoreException(ErrorType.UNAUTHORIZED);
+        }
+    }
+
     public void changePassword(String currentPassword, String newPassword, PasswordEncoder encoder) {
         if (!encoder.matches(currentPassword, this.encodedPassword)) {
             throw new CoreException(ErrorType.UNAUTHORIZED);
