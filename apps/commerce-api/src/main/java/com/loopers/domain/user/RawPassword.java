@@ -13,7 +13,7 @@ public final class RawPassword {
 
     public RawPassword(String value) {
         if (value == null || !PATTERN.matcher(value).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문/숫자/특수문자로 구성된 8~16자여야 합니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자만 사용 가능하며 8~16자여야 합니다.");
         }
         this.value = value;
     }
