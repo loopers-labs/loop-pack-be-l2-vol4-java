@@ -18,4 +18,18 @@ public record UserResponse(
             userInfo.email()
         );
     }
+
+    public static UserResponse maskedFrom(UserInfo userInfo) {
+        return new UserResponse(
+            userInfo.id(),
+            userInfo.loginId(),
+            mask(userInfo.name()),
+            userInfo.birthDate(),
+            userInfo.email()
+        );
+    }
+
+    private static String mask(String name) {
+        return name.substring(0, name.length() - 1) + "*";
+    }
 }

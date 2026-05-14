@@ -8,10 +8,7 @@ import com.loopers.interfaces.api.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
@@ -26,5 +23,11 @@ public class UserController {
         UserResponse response = UserResponse.from(userInfo);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{loginId}")
+    public ResponseEntity<ApiResponse<UserResponse>> getMyInfo(@PathVariable String loginId) {
+        UserInfo userInfo = userFacade.getMyInfo(loginId);
+        return ResponseEntity.ok(ApiResponse.success(UserResponse.maskedFrom(userInfo)));
     }
 }

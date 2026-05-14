@@ -37,6 +37,13 @@ public class UserFacade {
         return UserInfo.from(userRepository.save(user));
     }
 
+    @Transactional(readOnly = true)
+    public UserInfo getMyInfo(String loginId) {
+        return userRepository.findByLoginId(loginId)
+            .map(UserInfo::from)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+    }
+
     private String encrypt(String password) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
