@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Component
 public class UserService {
@@ -18,5 +20,10 @@ public class UserService {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }
         return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserModel> getMyInfo(String loginId) {
+        return Optional.empty();
     }
 }

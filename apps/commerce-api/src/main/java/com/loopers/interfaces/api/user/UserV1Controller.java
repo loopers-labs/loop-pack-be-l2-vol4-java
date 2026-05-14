@@ -3,9 +3,13 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,5 +25,16 @@ public class UserV1Controller implements UserV1ApiSpec {
     public ApiResponse<UserV1Dto.SignUpResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
         UserInfo info = userFacade.signUp(request.toCommand());
         return ApiResponse.success(UserV1Dto.SignUpResponse.from(info));
+    }
+
+    @GetMapping("/me")
+    @Override
+    public ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(
+        @RequestHeader("X-Loopers-LoginId") String loginId,
+        @RequestHeader("X-Loopers-LoginPw") String loginPw
+    ) {
+        UserInfo info = userFacade.getMyInfo(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        return ApiResponse.success(UserV1Dto.MyInfoResponse.from(info));
     }
 }

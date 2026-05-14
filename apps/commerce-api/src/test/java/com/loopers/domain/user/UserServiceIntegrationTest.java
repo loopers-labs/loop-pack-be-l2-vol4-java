@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -75,6 +77,41 @@ class UserServiceIntegrationTest {
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    @DisplayName("내 정보를 조회할 때, ")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("해당 로그인 ID 의 회원이 존재하면, 회원 정보가 반환된다.")
+        @Test
+        void returnsUser_whenLoginIdExists() {
+            // arrange
+            UserModel saved = userService.signUp(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+
+            // act
+            Optional<UserModel> result = userService.getMyInfo("tester01");
+
+            // assert
+            assertAll(
+                () -> assertThat(result).isPresent(),
+                () -> assertThat(result.get().getId()).isEqualTo(saved.getId()),
+                () -> assertThat(result.get().getLoginId()).isEqualTo("tester01"),
+                () -> assertThat(result.get().getName()).isEqualTo("홍길동")
+            );
+        }
+
+        @DisplayName("해당 로그인 ID 의 회원이 존재하지 않으면, Optional.empty 가 반환된다.")
+        @Test
+        void returnsEmpty_whenLoginIdNotFound() {
+            // act
+            Optional<UserModel> result = userService.getMyInfo("nonexistent");
+
+            // assert
+            assertThat(result).isEmpty();
         }
     }
 }

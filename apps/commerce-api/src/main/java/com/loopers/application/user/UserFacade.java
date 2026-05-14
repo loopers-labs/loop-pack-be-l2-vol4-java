@@ -5,6 +5,8 @@ import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Component
 public class UserFacade {
@@ -15,5 +17,9 @@ public class UserFacade {
         UserModel user = command.toModel();
         UserModel saved = userService.signUp(user);
         return UserInfo.from(saved);
+    }
+
+    public Optional<UserInfo> getMyInfo(String loginId) {
+        return userService.getMyInfo(loginId).map(UserInfo::from);
     }
 }

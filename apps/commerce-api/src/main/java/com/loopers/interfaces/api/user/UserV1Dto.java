@@ -37,4 +37,20 @@ public class UserV1Dto {
             );
         }
     }
+
+    public record MyInfoResponse(
+        String loginId,
+        String name,
+        String birthDate,
+        String email
+    ) {
+        public static MyInfoResponse from(UserInfo info) {
+            return new MyInfoResponse(
+                info.loginId(),
+                info.name(),
+                info.birthDate(),
+                info.email()
+            );
+        }
+    }
 }
