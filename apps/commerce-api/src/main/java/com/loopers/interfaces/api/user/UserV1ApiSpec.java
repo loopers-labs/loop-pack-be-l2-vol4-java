@@ -33,4 +33,19 @@ public interface UserV1ApiSpec {
     ApiResponse<UserV1Dto.MyInfoResponse> me(
         @Parameter(hidden = true) User user
     );
+
+    @Operation(
+        summary = "비밀번호 변경",
+        description = "인증 헤더로 본인의 비밀번호를 변경합니다.",
+        parameters = {
+            @Parameter(name = "X-Loopers-LoginId", in = ParameterIn.HEADER, required = true,
+                description = "로그인 ID"),
+            @Parameter(name = "X-Loopers-LoginPw", in = ParameterIn.HEADER, required = true,
+                description = "현재 비밀번호")
+        }
+    )
+    ApiResponse<Object> changePassword(
+        @Parameter(hidden = true) User user,
+        @Schema(description = "비밀번호 변경 요청") UserV1Dto.ChangePasswordRequest request
+    );
 }

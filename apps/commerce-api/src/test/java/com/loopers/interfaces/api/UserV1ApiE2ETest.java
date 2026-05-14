@@ -29,6 +29,7 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
     private static final String ENDPOINT_ME = "/api/v1/users/me";
+    private static final String ENDPOINT_ME_PASSWORD = "/api/v1/users/me/password";
 
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
@@ -265,6 +266,57 @@ class UserV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().name()).isEqualTo("김민*"),
                 () -> assertThat(response.getBody().data().birth()).isEqualTo(LocalDate.of(1990, 1, 1)),
                 () -> assertThat(response.getBody().data().email()).isEqualTo("minwoo@example.com")
+            );
+        }
+    }
+
+    @DisplayName("PUT /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("유효한 헤더와 본문으로 요청하면, 200 응답을 받고 새 비밀번호로 후속 인증이 통과한다.")
+        @Test
+        void changesPassword_whenRequestIsValid() {
+            // arrange — 회원가입
+            UserV1Dto.SignupRequest signup = new UserV1Dto.SignupRequest(
+                "minwoo01",
+                "Curr3nt!",
+                "김민우",
+                LocalDate.of(1990, 1, 1),
+                "minwoo@example.com"
+            );
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> signupResponseType =
+                new ParameterizedTypeReference<>() {};
+            testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
+                new HttpEntity<>(signup), signupResponseType);
+
+            // act — PUT /me/password
+            HttpHeaders changeHeaders = new HttpHeaders();
+            changeHeaders.set("X-Loopers-LoginId", "minwoo01");
+            changeHeaders.set("X-Loopers-LoginPw", "Curr3nt!");
+            UserV1Dto.ChangePasswordRequest changeRequest = new UserV1Dto.ChangePasswordRequest(
+                "Curr3nt!", "N3wPass!"
+            );
+            ParameterizedTypeReference<ApiResponse<Object>> changeResponseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> changeResponse =
+                testRestTemplate.exchange(ENDPOINT_ME_PASSWORD, HttpMethod.PUT,
+                    new HttpEntity<>(changeRequest, changeHeaders), changeResponseType);
+
+            // act — 변경 후 새 PW 로 인증
+            HttpHeaders newPwHeaders = new HttpHeaders();
+            newPwHeaders.set("X-Loopers-LoginId", "minwoo01");
+            newPwHeaders.set("X-Loopers-LoginPw", "N3wPass!");
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> meResponseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> meResponse =
+                testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET,
+                    new HttpEntity<>(newPwHeaders), meResponseType);
+
+            // assert
+            assertAll(
+                () -> assertTrue(changeResponse.getStatusCode().is2xxSuccessful()),
+                () -> assertTrue(meResponse.getStatusCode().is2xxSuccessful())
             );
         }
     }

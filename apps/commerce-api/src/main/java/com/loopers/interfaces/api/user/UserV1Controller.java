@@ -7,6 +7,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,5 +39,15 @@ public class UserV1Controller implements UserV1ApiSpec {
     public ApiResponse<UserV1Dto.MyInfoResponse> me(@LoginUser User user) {
         UserInfo info = userFacade.findMyInfo(user);
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(info));
+    }
+
+    @PutMapping("/me/password")
+    @Override
+    public ApiResponse<Object> changePassword(
+        @LoginUser User user,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(user, request.currentPassword(), request.newPassword());
+        return ApiResponse.success();
     }
 }
