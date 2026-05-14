@@ -50,4 +50,10 @@ public class UserService {
         }
         return user;
     }
+
+    @Transactional
+    public void changePassword(LoginId loginId, String currentPassword, String newPassword) {
+        User user = userRepository.findByLoginId(loginId).orElseThrow();
+        user.changePassword(currentPassword, newPassword, passwordEncoder);
+    }
 }
