@@ -264,7 +264,6 @@ public class UserModelTest {
             // assert
             assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
         }
-
     }
 
     @DisplayName("이름 마스킹 테스트")
@@ -301,6 +300,38 @@ public class UserModelTest {
 
             // assert
             assertEquals("홍*", maskedName);
+        }
+    }
+
+    @DisplayName("비밀번호 인증 테스트")
+    @Nested
+    class Authenticate {
+
+        String userId = "usertest123";
+        String name = "홍길동";
+        String password = "abc123!@#";
+        LocalDate birthDate = LocalDate.of(1995, 6, 10);
+        String email = "test@naver.com";
+        UserModel userModel = new UserModel(userId, password, name, birthDate, email);
+
+        @DisplayName("정상적인 비밀번호를 주면 인증이 성공한다.")
+        @Test
+        void authenticatesSuccessfully_whenPasswordIsCorrect() {
+            // act & assert
+            assertDoesNotThrow(() -> userModel.authenticate(password));
+        }
+
+        @DisplayName("잘못된 비밀번호를 입력하면 인증이 실패한다.")
+        @Test
+        void authenticatesFail_whenPasswordIsIncorrect() {
+            // arrange
+            String wrongPassword = "wrongPass1!";
+
+            // act & assert
+            CoreException result = assertThrows(CoreException.class, () ->
+                userModel.authenticate(wrongPassword)
+            );
+            assertEquals(ErrorType.BAD_REQUEST, result.getErrorType());
         }
     }
 }

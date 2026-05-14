@@ -126,4 +126,8 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
         }
     }
+
+    public void authenticate(String password) {
+
+    }
 }
