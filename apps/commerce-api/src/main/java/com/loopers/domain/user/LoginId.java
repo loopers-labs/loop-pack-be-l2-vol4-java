@@ -14,12 +14,9 @@ public class LoginId {
     /**
      * 로그인 ID 형식 규칙
      * - 영문 소문자로 시작
-     * - 이후 영문 소문자/숫자/특수문자(_, -) 허용
-     * - 특수문자 뒤에는 반드시 영문 소문자/숫자가 와야 함
-     *   → 연속된 특수문자 금지
-     *   → 특수문자로 끝나는 것 금지
+     * - 이후 영문 소문자/숫자만 허용 (특수문자 X)
      */
-    private static final Pattern PATTERN = Pattern.compile("^[a-z]([a-z0-9]|[_-][a-z0-9])*$");
+    private static final Pattern PATTERN = Pattern.compile("^[a-z][a-z0-9]*$");
 
     private final String value;
 
