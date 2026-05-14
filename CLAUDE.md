@@ -25,6 +25,7 @@
 | Cache | Spring Data Redis | Spring Boot 관리 |
 | Messaging | Spring Kafka | Spring Boot 관리 |
 | Batch | Spring Batch | Spring Boot 관리 (`commerce-batch`) |
+| Security | Spring Security Crypto (BCrypt) | Spring Boot 관리 |
 | Docs | springdoc-openapi (webmvc-ui) | **2.7.0** |
 | Lombok | `org.projectlombok:lombok` | Spring Boot 관리 |
 | JSON | Jackson (jsr310, kotlin module) | Spring Boot 관리 |
