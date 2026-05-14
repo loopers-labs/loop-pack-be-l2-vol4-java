@@ -91,26 +91,6 @@ class LoginUserResolverTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        // [중복 주석 처리] E2E UserV1ApiE2ETest.GetMyInfo.returnsNotFound_whenUserDoesNotExist 에서
-        // 실제 HTTP 흐름 전체(LoginUserResolver → HTTP 404)를 검증하므로 이 단위 테스트와 동일한 시나리오를 커버함.
-        // Resolver 단위 테스트는 헤더 누락·비밀번호 불일치 케이스로 충분히 격리 검증되어 있어 이 케이스는 불필요.
-        // @DisplayName("존재하지 않는 loginId이면, NOT_FOUND 예외가 발생한다.")
-        // @Test
-        // void throwsNotFound_whenUserDoesNotExist() {
-        //     // arrange
-        //     given(webRequest.getHeader("X-Loopers-LoginId")).willReturn("unknown");
-        //     given(webRequest.getHeader("X-Loopers-LoginPw")).willReturn("Pass123!");
-        //     given(userService.findByLoginId("unknown")).willReturn(Optional.empty());
-        //
-        //     // act
-        //     CoreException result = assertThrows(CoreException.class, () ->
-        //         resolver.resolveArgument(null, null, webRequest, null)
-        //     );
-        //
-        //     // assert
-        //     assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        // }
-
         @DisplayName("비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordDoesNotMatch() {
