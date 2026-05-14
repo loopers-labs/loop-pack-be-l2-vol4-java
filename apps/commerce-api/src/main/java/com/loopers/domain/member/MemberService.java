@@ -1,6 +1,5 @@
 package com.loopers.domain.member;
 
-import com.loopers.infrastructure.member.MemberJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -11,17 +10,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MemberService {
 
-    private final MemberJpaRepository memberJpaRepository;
+    private final MemberRepository memberRepository;
 
     public MemberModel registerMember(String userId, String password, String email, String username, String birthDate) {
-        if (memberJpaRepository.existsByUserId(userId)) {
+        if (memberRepository.existsByUserId(userId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저 ID입니다.");
         }
-        return memberJpaRepository.save(new MemberModel(userId, password, email, username, birthDate));
+        return memberRepository.save(new MemberModel(userId, password, email, username, birthDate));
     }
 
     public MemberModel getMember(Long id) {
-        return memberJpaRepository.findById(id)
+        return memberRepository.find(id)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
     }
 
