@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.member;
 
-public class MemberDto {
+public class MemberV1Dto {
     public record CreateMemberRequest(
             String userId,
             String password,

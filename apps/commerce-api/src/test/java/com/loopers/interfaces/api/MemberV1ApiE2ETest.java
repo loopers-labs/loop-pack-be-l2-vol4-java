@@ -2,7 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.member.MemberModel;
 import com.loopers.domain.member.MemberRepository;
-import com.loopers.interfaces.api.member.MemberDto;
+import com.loopers.interfaces.api.member.MemberV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,13 +54,13 @@ public class MemberV1ApiE2ETest {
         @Test
         void createMember_whenMemberInfoProvided() {
             // arrange
-            MemberDto.CreateMemberRequest request = new MemberDto.CreateMemberRequest(
+            MemberV1Dto.CreateMemberRequest request = new MemberV1Dto.CreateMemberRequest(
                     "testuser", "Password1!", "test@example.com", "김테스트", "19940201"
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<MemberDto.CreateMemberResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<MemberDto.CreateMemberResponse>> response =
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.CreateMemberResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.CreateMemberResponse>> response =
                     testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
             // assert
@@ -76,13 +76,13 @@ public class MemberV1ApiE2ETest {
         void throwsConflict_whenDuplicateUserIdProvided() {
             // arrange
             memberRepository.save(new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201"));
-            MemberDto.CreateMemberRequest request = new MemberDto.CreateMemberRequest(
+            MemberV1Dto.CreateMemberRequest request = new MemberV1Dto.CreateMemberRequest(
                     "testuser", "Password2@", "other@example.com", "박테스트", "19950301"
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<MemberDto.CreateMemberResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<MemberDto.CreateMemberResponse>> response =
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.CreateMemberResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.CreateMemberResponse>> response =
                     testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
             // assert
@@ -106,8 +106,8 @@ public class MemberV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<MemberDto.MemberInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<MemberDto.MemberInfoResponse>> response =
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberInfoResponse>> response =
                     testRestTemplate.exchange(ENDPOINT + "/" + member.getId(), HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -127,8 +127,8 @@ public class MemberV1ApiE2ETest {
             Long invalidId = -1L;
 
             // act
-            ParameterizedTypeReference<ApiResponse<MemberDto.MemberInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<MemberDto.MemberInfoResponse>> response =
+            ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<MemberV1Dto.MemberInfoResponse>> response =
                     testRestTemplate.exchange(ENDPOINT + "/" + invalidId, HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -150,7 +150,7 @@ public class MemberV1ApiE2ETest {
             MemberModel member = memberRepository.save(
                     new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201")
             );
-            MemberDto.UpdatePasswordRequest request = new MemberDto.UpdatePasswordRequest("Password1!", "NewPass2@");
+            MemberV1Dto.UpdatePasswordRequest request = new MemberV1Dto.UpdatePasswordRequest("Password1!", "NewPass2@");
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
@@ -168,7 +168,7 @@ public class MemberV1ApiE2ETest {
             MemberModel member = memberRepository.save(
                     new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201")
             );
-            MemberDto.UpdatePasswordRequest request = new MemberDto.UpdatePasswordRequest("WrongPass1!", "NewPass2@");
+            MemberV1Dto.UpdatePasswordRequest request = new MemberV1Dto.UpdatePasswordRequest("WrongPass1!", "NewPass2@");
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
