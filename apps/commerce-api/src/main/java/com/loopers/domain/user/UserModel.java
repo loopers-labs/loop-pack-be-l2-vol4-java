@@ -70,9 +70,7 @@ public class UserModel extends BaseEntity {
     }
 
     public void changePassword(String currentPassword, String newPassword) {
-        if (!PASSWORD_ENCODER.matches(currentPassword, this.password)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
-        }
+        authenticate(currentPassword);
         if (PASSWORD_ENCODER.matches(newPassword, this.password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
         }
@@ -124,6 +122,12 @@ public class UserModel extends BaseEntity {
 
         if (password.contains(fullDate) || password.contains(yearlessDate) || password.contains(monthDay)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
+    }
+
+    public void authenticate(String rawPassword) {
+        if (!PASSWORD_ENCODER.matches(rawPassword, password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
     }
 }
