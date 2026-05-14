@@ -97,16 +97,16 @@ public class UserServiceIntegrationTest {
         }
     }
 
-    @DisplayName("내 정보를 조회할 때,")
+    @DisplayName("인증할 때,")
     @Nested
-    class GetMyInfo {
+    class Authenticate {
 
-        @DisplayName("올바른 인증 정보로 조회 시, UserModel 을 반환한다.")
+        @DisplayName("올바른 인증 정보로 인증 시, UserModel 을 반환한다.")
         @Test
         void returnsUser_whenValidAuth() {
             userService.register(UserFixture.createModel());
 
-            UserModel found = userService.getMyInfo(UserFixture.LOGIN_ID, UserFixture.PASSWORD);
+            UserModel found = userService.authenticate(UserFixture.LOGIN_ID, UserFixture.PASSWORD);
 
             assertThat(found).isNotNull();
             assertThat(found.getLoginId()).isEqualTo(UserFixture.LOGIN_ID);
@@ -118,17 +118,17 @@ public class UserServiceIntegrationTest {
             userService.register(UserFixture.createModel());
 
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.getMyInfo(UserFixture.LOGIN_ID, "WrongPass@1")
+                userService.authenticate(UserFixture.LOGIN_ID, "WrongPass@1")
             );
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("존재하지 않는 loginId 로 조회 시, UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("존재하지 않는 loginId 로 인증 시, UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenUserNotExists() {
             CoreException ex = assertThrows(CoreException.class, () ->
-                userService.getMyInfo("nonexistent", UserFixture.PASSWORD)
+                userService.authenticate("nonexistent", UserFixture.PASSWORD)
             );
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
@@ -139,24 +139,12 @@ public class UserServiceIntegrationTest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("기존 비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
-        @Test
-        void throwsUnauthorized_whenCurrentPasswordIsWrong() {
-            userService.register(UserFixture.createModel());
-
-            CoreException ex = assertThrows(CoreException.class, () ->
-                userService.changePassword(UserFixture.LOGIN_ID, "WrongPass@1", "NewPass@99")
-            );
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
-        }
-
         @DisplayName("정상 변경 시 DB 의 비밀번호가 새 값으로 암호화되어 갱신된다.")
         @Test
         void updatesEncodedPassword_whenValidChange() {
             userService.register(UserFixture.createModel());
 
-            userService.changePassword(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "NewPass@99");
+            userService.changePassword(UserFixture.LOGIN_ID, "NewPass@99");
 
             UserModel updated = userService.findByLoginId(UserFixture.LOGIN_ID);
             // 새 비밀번호로 인증 성공

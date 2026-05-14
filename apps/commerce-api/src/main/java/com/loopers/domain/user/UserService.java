@@ -23,12 +23,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserModel findByLoginId(String loginId) {
-        return userRepository.findByLoginId(loginId).orElse(null);
-    }
-
-    @Transactional(readOnly = true)
-    public UserModel getMyInfo(String loginId, String password) {
+    public UserModel authenticate(String loginId, String password) {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED));
         if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -37,13 +32,16 @@ public class UserService {
         return user;
     }
 
+    @Transactional(readOnly = true)
+    public UserModel findByLoginId(String loginId) {
+        return userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND));
+    }
+
     @Transactional
-    public void changePassword(String loginId, String currentPassword, String newPassword) {
+    public void changePassword(String loginId, String newPassword) {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED));
-        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new CoreException(ErrorType.UNAUTHORIZED);
-        }
         user.changePassword(newPassword, passwordEncoder);
     }
 }

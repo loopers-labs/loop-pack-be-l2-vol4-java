@@ -51,9 +51,8 @@ public class UserV1Dto {
         }
     }
 
-    // 비밀번호 변경 요청
+    // 비밀번호 변경 요청 — 현재 비밀번호는 X-Loopers-LoginPw 헤더로 전달
     public record ChangePasswordRequest(
-        String currentPassword,
         String newPassword
     ) {}
 }
