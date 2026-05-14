@@ -32,6 +32,10 @@ public class UserModel extends BaseEntity {
         return loginId;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
     public String getName() {
         return name;
     }
