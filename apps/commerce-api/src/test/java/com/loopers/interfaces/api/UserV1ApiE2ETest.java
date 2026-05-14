@@ -168,4 +168,80 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
+
+    @DisplayName("PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
+
+        @DisplayName("정상 요청이면, 2xx 응답과 함께 저장된 비밀번호가 갱신된다.")
+        @Test
+        void returnsOk_whenRequestIsValid() {
+            // arrange
+            UserModel saved = userJpaRepository.save(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "tester01");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("NewPass2@");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(userJpaRepository.findById(saved.getId()).orElseThrow().getPassword()).isEqualTo("NewPass2@")
+            );
+        }
+
+        @DisplayName("새 비밀번호가 정책을 위반하면, 400 Bad Request 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordInvalid() {
+            // arrange
+            userJpaRepository.save(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "tester01");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("short");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더 비밀번호가 일치하지 않으면, 400 Bad Request 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenAuthPasswordMismatch() {
+            // arrange
+            userJpaRepository.save(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "tester01");
+            headers.set("X-Loopers-LoginPw", "WrongPw1!");
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("NewPass2@");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
 }

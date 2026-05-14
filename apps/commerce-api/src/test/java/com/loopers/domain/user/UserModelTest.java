@@ -120,4 +120,81 @@ class UserModelTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("현재 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> user.changePassword("WrongPw1!", "NewPass2@"));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 형식 규칙(8~16자 영문/숫자/특수문자)에 맞지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @ParameterizedTest
+        @ValueSource(strings = {"Aa1!", "abcdefgh", "12345678", "abc12345", "abcdefg!"})
+        void throwsBadRequest_whenNewPasswordFormatIsInvalid(String invalidNewPassword) {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> user.changePassword(VALID_PASSWORD, invalidNewPassword));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordEqualsCurrent() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> user.changePassword(VALID_PASSWORD, VALID_PASSWORD));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호에 생년월일(yyyyMMdd) 이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            String newPasswordWithBirthDate = "Aa1!19900514";
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> user.changePassword(VALID_PASSWORD, newPasswordWithBirthDate));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("정상 입력이면, password 가 새 값으로 갱신된다.")
+        @Test
+        void changesPassword_whenInputIsValid() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            String newPassword = "NewPass2@";
+
+            // act
+            user.changePassword(VALID_PASSWORD, newPassword);
+
+            // assert
+            assertThat(user.getPassword()).isEqualTo(newPassword);
+        }
+    }
 }

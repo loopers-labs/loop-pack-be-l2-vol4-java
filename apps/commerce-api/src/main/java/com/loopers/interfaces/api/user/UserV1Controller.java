@@ -8,6 +8,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,5 +34,15 @@ public class UserV1Controller implements UserV1ApiSpec {
         UserInfo info = userFacade.getMyInfo(auth.loginId(), auth.loginPw())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(info));
+    }
+
+    @PatchMapping("/me/password")
+    @Override
+    public ApiResponse<Object> changePassword(
+        AuthHeaders auth,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(auth.loginId(), auth.loginPw(), request.newPassword());
+        return ApiResponse.success();
     }
 }

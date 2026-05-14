@@ -26,4 +26,9 @@ public class UserService {
     public Optional<UserModel> getMyInfo(String loginId) {
         return userRepository.findByLoginId(loginId);
     }
+
+    @Transactional
+    public void changePassword(String loginId, String currentPassword, String newPassword) {
+        // 실제 로직은 다음 feat 커밋
+    }
 }

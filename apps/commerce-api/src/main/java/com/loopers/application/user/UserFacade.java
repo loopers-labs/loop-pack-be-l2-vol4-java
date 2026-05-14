@@ -24,4 +24,8 @@ public class UserFacade {
             .filter(user -> user.matchesPassword(loginPw))
             .map(UserInfo::from);
     }
+
+    public void changePassword(String loginId, String currentPassword, String newPassword) {
+        userService.changePassword(loginId, currentPassword, newPassword);
+    }
 }

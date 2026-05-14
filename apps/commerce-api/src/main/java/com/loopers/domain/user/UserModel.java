@@ -74,6 +74,10 @@ public class UserModel extends BaseEntity {
         return this.password.equals(password);
     }
 
+    public void changePassword(String currentPassword, String newPassword) {
+        // 실제 검증/갱신 로직은 다음 feat 커밋
+    }
+
     private static void validateLoginId(String loginId) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 는 영문/숫자 10자 이내여야 합니다.");

@@ -114,4 +114,41 @@ class UserServiceIntegrationTest {
             assertThat(result).isEmpty();
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("정상 입력이면, 저장된 비밀번호가 새 값으로 갱신된다.")
+        @Test
+        void persistsNewPassword_whenInputIsValid() {
+            // arrange
+            userService.signUp(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+
+            // act
+            userService.changePassword("tester01", "Password1!", "NewPass2@");
+
+            // assert
+            UserModel reloaded = userService.getMyInfo("tester01").orElseThrow();
+            assertThat(reloaded.getPassword()).isEqualTo("NewPass2@");
+        }
+
+        @DisplayName("현재 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordMismatch() {
+            // arrange
+            userService.signUp(new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+            ));
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> userService.changePassword("tester01", "WrongPw1!", "NewPass2@"));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }
