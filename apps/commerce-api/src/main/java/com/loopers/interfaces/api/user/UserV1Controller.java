@@ -33,7 +33,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         return ApiResponse.success();
     }
 
-    @GetMapping("/myInfo")
+    @GetMapping("/me")
     public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
         @RequestHeader("X-Loopers-LoginId") String userId,
         @RequestHeader("X-Loopers-LoginPw") String password
@@ -42,7 +42,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         return ApiResponse.success(UserV1Dto.UserResponse.from(user));
     }
 
-    @PatchMapping("/myInfo/changePassword")
+    @PatchMapping("/me/password")
     public ApiResponse<Object> changePassword(
         @RequestHeader("X-Loopers-LoginId") String userId,
         @RequestHeader("X-Loopers-LoginPw") String password, // 헤더 필수 검증용, 비즈니스 로직 미사용
