@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -62,6 +63,25 @@ public class UserV1ApiE2ETest {
 
             // assert
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        }
+
+        @DisplayName("이미 존재하는 회원 ID를 주면, 회원가입이 실패한다.")
+        @Test
+        void failSignup_whenExistingUserIdIsProvided() {
+            // arrange
+            // 기존 user 저장
+            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            userJpaRepository.save(userModel);
+
+            // 기존 userId와 동일한 신규 user 생성 요청
+            UserV1Dto.SignupRequest signupRequest = new UserV1Dto.SignupRequest(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<ApiResponse<Void>>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(requestUrl, HttpMethod.POST, new HttpEntity<>(signupRequest), responseType);
+
+            // assert
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
     }
 
