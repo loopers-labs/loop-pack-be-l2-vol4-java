@@ -182,4 +182,39 @@ class UserServiceUnitTest {
             verify(passwordEncoder, never()).encode(anyString());
         }
     }
+
+    @DisplayName("내 정보를 조회할 때")
+    @Nested
+    class GetMyInfo {
+
+        @DisplayName("존재하는 loginId면, UserModel을 반환한다.")
+        @Test
+        void returnsUser_whenLoginIdExists() {
+            // given
+            String loginId = "minbo";
+            UserModel user = UserModel.of(loginId, "ENCODED", "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+            given(userRepository.findByLoginId(loginId)).willReturn(Optional.of(user));
+
+            // when
+            UserModel result = userService.getMyInfo(loginId);
+
+            // then
+            assertThat(result.getLoginId()).isEqualTo(loginId);
+        }
+
+        @DisplayName("존재하지 않는 loginId면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdNotFound() {
+            // given
+            given(userRepository.findByLoginId("nonexistent")).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.getMyInfo("nonexistent")
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }

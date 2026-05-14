@@ -22,6 +22,7 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -423,6 +424,93 @@ class UserV1ApiE2ETest {
             // then
             assertAll(
                     () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value()),
+                    () -> assertThat(response.meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+            );
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMyInfo {
+
+        private static final String ME_ENDPOINT = ENDPOINT + "/me";
+
+        private void signUp() throws Exception {
+            UserV1Dto.CreateUserRequest request = new UserV1Dto.CreateUserRequest(
+                    VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
+            );
+            mockMvc.perform(post(ENDPOINT)
+                   .contentType(MediaType.APPLICATION_JSON)
+                   .content(objectMapper.writeValueAsString(request)))
+                   .andReturn();
+        }
+
+        @DisplayName("인증된 사용자면, 마지막 글자가 *로 마스킹된 이름과 함께 내 정보를 반환한다.")
+        @Test
+        void returnsMyInfo_withMaskedName_whenAuthenticated() throws Exception {
+            // given
+            signUp();
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(get(ME_ENDPOINT)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_ID, VALID_LOGIN_ID)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_PW, VALID_PASSWORD))
+                                         .andReturn();
+            ApiResponse<UserV1Dto.UserResponse> response = objectMapper.readValue(
+                    mvcResult.getResponse().getContentAsString(),
+                    new TypeReference<>() {}
+            );
+
+            // then
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()),
+                    () -> assertThat(response.meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                    () -> assertThat(response.data().loginId()).isEqualTo(VALID_LOGIN_ID),
+                    () -> assertThat(response.data().name()).isEqualTo("민*"),
+                    () -> assertThat(response.data().birthDate()).isEqualTo(VALID_BIRTH_DATE),
+                    () -> assertThat(response.data().email()).isEqualTo(VALID_EMAIL)
+            );
+        }
+
+        @DisplayName("인증 헤더가 없으면, UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenHeadersMissing() throws Exception {
+            // given
+            signUp();
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(get(ME_ENDPOINT)).andReturn();
+            ApiResponse<UserV1Dto.UserResponse> response = objectMapper.readValue(
+                    mvcResult.getResponse().getContentAsString(),
+                    new TypeReference<>() {}
+            );
+
+            // then
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value()),
+                    () -> assertThat(response.meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+            );
+        }
+
+        @DisplayName("헤더의 비밀번호가 틀리면, UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returnsUnauthorized_whenPasswordInvalid() throws Exception {
+            // given
+            signUp();
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(get(ME_ENDPOINT)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_ID, VALID_LOGIN_ID)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_PW, "WrongPass!"))
+                                         .andReturn();
+            ApiResponse<UserV1Dto.UserResponse> response = objectMapper.readValue(
+                    mvcResult.getResponse().getContentAsString(),
+                    new TypeReference<>() {}
+            );
+
+            // then
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value()),
                     () -> assertThat(response.meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
             );
         }
