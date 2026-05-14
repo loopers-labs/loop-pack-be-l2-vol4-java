@@ -72,7 +72,7 @@ commerce-streamer → modules/jpa, modules/redis, modules/kafka, supports/*
 ```
 interfaces.api          Controller, DTO, ApiSpec, ArgumentResolver
     ↓
-application             Facade, Info, Command  (1:1 위임 + DTO 변환)
+application             Facade, Info, Command  (Service 위임/합성 + DTO 변환)
     ↓
 domain                  Aggregate(Entity), VO, 기능별 Service, 도메인 컴포넌트,
                         도메인 정책(static), Repository(인터페이스)
@@ -94,7 +94,7 @@ infrastructure          JpaRepository, RepositoryImpl 등
 | **Value Object (VO)** | `LoginId`, `UserName`, `Email`, `RawPassword` | 식별자 없음, 불변, 속성이 곧 정체성. 생성자 = 형식 검증. |
 | **Domain Policy** | `PasswordPolicy` (`static validate(...)`) | 여러 도메인 개념이 협력하는 *규칙*. 무상태. |
 | **Domain Component** | `PasswordEncryptor` | 도메인 부품(인프라 래퍼 등). 이름에 `Service`를 붙이지 않는다. **Service가 자유롭게 의존 가능**. |
-| **Service (기능별)** | `UserSignupService`, `UserAuthService`, `UserPasswordService` | 유스케이스 단위 도메인 흐름·검증·예외. Repository와 Domain Component에 의존. |
+| **Service** | `UserService` | 도메인 흐름·검증·예외, 트랜잭션 경계. Repository와 Domain Component에 의존. 기본은 도메인 단위 1개, *시그널*이 보이면 유스케이스 단위로 분할 (아래 *Service 분할 원칙* 참조). |
 | **Repository (인터페이스)** | `UserRepository` | 도메인이 소유. 구현은 infrastructure. |
 
 ### Facade · Service · Component 책임 분담
@@ -103,30 +103,54 @@ infrastructure          JpaRepository, RepositoryImpl 등
 
 | 레이어 | 책임 | 금지 |
 |---|---|---|
-| **Facade** (application) | ① 각 Service에 **1:1 위임** ② 도메인 모델 → DTO(`UserInfo`) 변환 | 흐름 분기·검증·예외 throw·트랜잭션 어노테이션 ❌ |
+| **Facade** (application) | ① Service에 위임 또는 **분기 없는 합성** ② 도메인 모델 → DTO(`UserInfo`) 변환 ③ 조건부 트랜잭션 경계 (아래 *트랜잭션 규약* 참조) | 흐름 분기(if/else)·검증·예외 throw ❌ |
 | **Service** (domain, 기능별) | 자기 유스케이스의 흐름·검증·예외, 트랜잭션 경계 | **다른 Service 의존 ❌** (Service ↔ Service 금지) |
 | **Domain Component** (domain) | 재사용 가능한 도메인 부품 (인프라 래퍼·해시·암호화 등) | 비즈니스 흐름 ❌ |
 
-**Service 분할 원칙**: 유스케이스(기능) 단위로 잘게 쪼갠다. 한 Service가 *너무 많은 책임을 들고* 다른 Service를 호출하고 싶어지면, 거기서 분할 시그널을 읽는다.
+**Service 분할 원칙 — 도메인 단위에서 출발, 시그널 기반 분할**
+
+기본은 **도메인 단위 Service 하나** (예: `UserService`)로 둔다. 사전 분할은 *미래의 분할 결정 비용을 미리 당겨 쓰는 오버엔지니어링*이다. 다음 시그널이 **둘 이상** 나타나면 그때 유스케이스 단위로 분할한다.
+
+**분할 시그널:**
+1. **의존성 비대칭** — 한 메서드만 새 의존을 필요로 한다 (예: `changePassword`에 `PasswordHistoryRepository`가 추가됨 → `UserPasswordService` 분리 정당화).
+2. **트랜잭션 속성이 메서드별로 갈리고 패턴이 굳어진다** — `REQUIRES_NEW`, 격리 수준, 타임아웃 등.
+3. **권한/호출자 경계가 갈린다** — 관리자만 호출하는 강제 비번 초기화 vs 본인이 호출하는 비번 변경.
+4. **메서드 수가 5~6개를 넘고**, 한 클래스 안에서 응집도가 두 덩어리로 갈라진다.
+5. **유스케이스마다 도메인 이벤트가 갈리고**, 이벤트 발행 책임이 명확히 분리된다.
 
 ```
-✅ UserSignupService    → signup
-✅ UserAuthService      → authenticate, getById
-✅ UserPasswordService  → changePassword
+✅ UserService          → signup, authenticate, getById, changePassword (도메인 단위, 시그널 없음)
+✅ UserPasswordService  → changePassword + PasswordHistoryRepository (시그널 1번 충족 — 의존성 비대칭)
 
-❌ UserService(범용)    → signup/authenticate/getById/changePassword 다 처리 (단일 책임 약함)
-❌ UserSignupService    → UserPasswordService 의존 (Service ↔ Service)
+❌ 사전 분할            → 시그널 없이 UserSignupService/UserAuthService/UserPasswordService로 미리 쪼개기
+❌ UserSignupService → UserPasswordService 의존 (Service ↔ Service)
 ```
 
-**Facade의 메서드는 한 줄~서너 줄이 정상**. 흐름 분기(if/else)가 들어가기 시작하면 *해당 흐름을 Service 안으로* 옮긴다.
+**Facade의 메서드는 한 줄~서너 줄이 정상**. 여러 Service를 호출하는 합성은 허용하되, 흐름 분기(if/else)가 들어가기 시작하면 *해당 흐름을 Service 안으로* 옮긴다.
 
 ### 트랜잭션 규약
 
-- **위치**: Facade가 아니라 **Service의 메서드 레벨**에 `@Transactional`을 명시한다.
+- **기본 위치**: **Service의 메서드 레벨**에 `@Transactional`을 명시한다.
   - 클래스 레벨은 readOnly/write 혼재 시 사고 위험 — 메서드 레벨이 의도가 코드에서 바로 보인다.
 - **읽기 전용 메서드**: `@Transactional(readOnly = true)`.
-- **Facade에 트랜잭션을 두지 않는 이유**: 외부 API 호출/비동기/단순 조회 조합 등 *트랜잭션 밖에서 처리해야 할 작업*이 합류할 자리를 비워둔다. *"같이 죽고 같이 사는 비즈니스 요구사항인가?"*에 Yes일 때만 더 큰 트랜잭션을 고려한다.
 - **`@TransactionalEventListener(phase = AFTER_COMMIT)`**: 커밋 후 부수 효과(알림, 카프카 발행) 발행에 사용.
+
+#### Facade `@Transactional` — 기본 금지, 조건부 허용
+
+기본은 두지 않는다. 한 번 박으면 그 안에 들어오는 모든 호출이 트랜잭션 안으로 끌려 들어와 락 점유 시간이 늘어나고, 이후 외부 API/비동기/이벤트가 합류할 자리가 없어진다.
+
+**예외적으로 허용 — 다음 세 조건을 모두 만족할 때만:**
+
+1. **단일 비즈니스 단위 안에서 여러 Service를 호출**해야 한다 (Service ↔ Service 금지 규약상, 묶을 자리는 Facade뿐).
+2. **부분 성공이 데이터 비일관성**을 만든다 — 한쪽만 커밋되면 보상 트랜잭션이 비현실적이거나 사용자에게 보이는 상태가 깨진다.
+3. 트랜잭션 내부에 **외부 I/O가 없다** (외부 API / 카프카 publish / 이메일 / 파일 업로드 등). 있으면 Saga / Outbox / `AFTER_COMMIT` 이벤트로 빼낸다.
+
+세 조건 중 하나라도 No → Facade에 `@Transactional`을 두지 않고 다른 패턴(이벤트 분리, Service 통합, 멱등 재시도)을 먼저 검토한다.
+
+**Facade 트랜잭션 사용 시 주의:**
+
+- **AOP 전파**: Facade `@Transactional` 안에서 호출되는 Service의 `@Transactional`은 기본 `REQUIRED`로 합쳐진다 (자가 호출이 아닌 빈 간 호출이라 AOP는 정상 동작). 분리해야 하면 `REQUIRES_NEW`를 명시한다.
+- **readOnly 잠식**: Facade가 write 트랜잭션을 시작하면 그 안의 `readOnly=true` 호출은 최적화(쓰기 지연/스냅샷) 효과가 사라진다 — Facade 트랜잭션은 *write 합성*에만 쓰고 조회 합성에는 쓰지 않는다.
 
 ### 식별자 전달 규약
 
