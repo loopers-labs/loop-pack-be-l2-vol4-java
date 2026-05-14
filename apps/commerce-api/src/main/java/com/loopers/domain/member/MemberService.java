@@ -23,4 +23,10 @@ public class MemberService {
         Password encodedPassword = Password.of(password, birthDate, passwordEncoder);
         return memberRepository.save(new Member(loginId, encodedPassword, name, birthDate, email));
     }
+
+    @Transactional(readOnly = true)
+    public Member getMe(String loginId) {
+        return memberRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+    }
 }
