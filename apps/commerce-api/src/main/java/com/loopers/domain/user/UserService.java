@@ -18,7 +18,7 @@ public class UserService {
         // 1. 기존 user 확인
         Optional<UserModel> existUser = userRepository.findByUserId(userId);
         if (existUser.isPresent()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이미 존재하는 사용자입니다.");
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 사용자입니다.");
         }
         // 2. userModel 생성 및 저장 후 return
         return userRepository.save(new UserModel(userId, password, name, birthDate, email));
