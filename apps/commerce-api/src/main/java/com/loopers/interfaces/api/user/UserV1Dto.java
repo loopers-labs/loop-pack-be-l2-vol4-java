@@ -21,6 +21,12 @@ public class UserV1Dto {
         public static UserResponse from(UserInfo info) {
             return new UserResponse(info.id(), info.loginId(), info.name(), info.birthDate(), info.email());
         }
+
+        public static UserResponse fromMasked(UserInfo info) {
+            String name = info.name();
+            String masked = name.substring(0, name.length() - 1) + "*";
+            return new UserResponse(info.id(), info.loginId(), masked, info.birthDate(), info.email());
+        }
     }
 
 }

@@ -20,4 +20,16 @@ public class UserService {
         }
         return userRepository.save(new UserModel(loginId, password, name, birthDate, email, gender, passwordHasher));
     }
+
+    @Transactional(readOnly = true)
+    public UserModel findMyInfo(String loginId, String loginPw) {
+        return userRepository.findByLoginId(loginId)
+            .map(user -> {
+                if (!user.matchesPassword(loginPw, passwordHasher)) {
+                    throw new CoreException(ErrorType.BAD_REQUEST, "아이디 또는 비밀번호가 올바르지 않습니다.");
+                }
+                return user;
+            })
+            .orElse(null);
+    }
 }

@@ -58,4 +58,8 @@ public class UserModel extends BaseEntity {
         this.email = email;
         this.gender = gender;
     }
+
+    public boolean matchesPassword(String raw, PasswordHasher hasher) {
+        return password.matches(raw, hasher);
+    }
 }
