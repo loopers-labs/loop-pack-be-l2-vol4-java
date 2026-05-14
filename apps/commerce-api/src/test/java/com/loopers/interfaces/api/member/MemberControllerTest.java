@@ -2,13 +2,15 @@ package com.loopers.interfaces.api.member;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.member.MemberFacade;
+import com.loopers.application.member.MemberInfo;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
@@ -18,6 +20,7 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,7 +55,7 @@ class MemberControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(memberFacade).signUp(any());
+        verify(memberFacade).signUp(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -61,7 +64,7 @@ class MemberControllerTest {
         // given
         String loginId = "tester01";
         String password = "Password123!";
-        MemberResponse.Info response = new MemberResponse.Info(
+        MemberInfo response = new MemberInfo(
                 "tester01",
                 "테스*",
                 LocalDate.of(1990, 1, 1),
@@ -100,6 +103,6 @@ class MemberControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(memberFacade).updatePassword(eq(loginId), eq(password), any());
+        verify(memberFacade).updatePassword(eq(loginId), eq(password), any(), any());
     }
 }
