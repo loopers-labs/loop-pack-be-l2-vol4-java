@@ -113,4 +113,50 @@ class UserFacadeIntegrationTest {
       assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
     }
   }
+
+  @DisplayName("비밀번호를 수정할 때,")
+  @Nested
+  class ChangePasswordTest {
+
+    @DisplayName("현재 비밀번호가 일치하고 새 비밀번호가 RULE 을 만족하면 비밀번호가 변경된다.")
+    @Test
+    void changesPassword_whenInputsAreValid() {
+      // arrange
+      SignUpCommand signUpCommand =
+          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+      userFacade.signUp(signUpCommand);
+      String originalEncrypted =
+          userRepository.findByLoginId("loopers01").orElseThrow().getPassword();
+
+      // act
+      userFacade.changePassword(
+          "loopers01", new ChangePasswordCommand("Password1!", "NewPass2@"));
+
+      // assert
+      String updatedEncrypted =
+          userRepository.findByLoginId("loopers01").orElseThrow().getPassword();
+      assertThat(updatedEncrypted).isNotEqualTo(originalEncrypted);
+    }
+
+    @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 BAD_REQUEST 예외가 발생한다.")
+    @Test
+    void throwsBadRequestException_whenNewPasswordEqualsCurrentPassword() {
+      // arrange
+      SignUpCommand signUpCommand =
+          new SignUpCommand("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+      userFacade.signUp(signUpCommand);
+
+      // act
+      CoreException exception =
+          assertThrows(
+              CoreException.class,
+              () ->
+                  userFacade.changePassword(
+                      "loopers01", new ChangePasswordCommand("Password1!", "Password1!")));
+
+      // assert
+      assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+  }
 }
