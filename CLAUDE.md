@@ -284,6 +284,8 @@ test: 유저 회원가입 E2E 테스트 ← UserApiE2ETest
 
 **Facade Integration**은 *합성/공유 트랜잭션 경계*가 도입되기 전까지 작성하지 않는다 (Service Integration + E2E가 흡수). 1:1 위임만 하는 동안에는 *중간 레이어 중복 테스트*가 됨.
 
+**Facade 단위 테스트**도 *합성/조건부 변환*이 도입되기 전까지 작성하지 않는다. 단순 위임을 `verify`로 검증하는 것은 *delegate test 안티패턴* — 시그니처 거울일 뿐이라 회귀 검출 가치가 없고 변경 저항만 만든다. 도메인 모델 → DTO 변환은 *DTO record의 책임*이므로 굳이 별도 테스트 없이 record 자체가 단순하면 통합/E2E로 충분.
+
 ### 테스트 코드 컨벤션
 
 **구조 — Given / When / Then**
