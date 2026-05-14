@@ -10,11 +10,12 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/users")
-public class UserV1Controller {
+public class UserV1Controller implements UserV1ApiSpec {
 
     private final UserFacade userFacade;
 
     @PostMapping
+    @Override
     public ApiResponse<UserV1Dto.UserResponse> createUser(
         @RequestBody @Valid UserV1Dto.CreateUserRequest request
     ) {
@@ -32,6 +33,7 @@ public class UserV1Controller {
     }
 
     @PatchMapping("/{id}")
+    @Override
     public ApiResponse<Object> updateUserPassword(
         @PathVariable Long id,
         @RequestBody @Valid UserV1Dto.ChangeUserPasswordRequest request
@@ -42,6 +44,7 @@ public class UserV1Controller {
     }
 
     @GetMapping("/{id}")
+    @Override
     public ApiResponse<UserV1Dto.UserResponse> getUserResponse(@PathVariable Long id) {
         UserInfo userInfo = userFacade.getUserInfo(id);
 
