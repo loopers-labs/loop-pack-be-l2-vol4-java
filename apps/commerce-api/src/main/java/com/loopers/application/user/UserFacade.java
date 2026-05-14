@@ -19,7 +19,9 @@ public class UserFacade {
         return UserInfo.from(saved);
     }
 
-    public Optional<UserInfo> getMyInfo(String loginId) {
-        return userService.getMyInfo(loginId).map(UserInfo::from);
+    public Optional<UserInfo> getMyInfo(String loginId, String loginPw) {
+        return userService.getMyInfo(loginId)
+            .filter(user -> user.matchesPassword(loginPw))
+            .map(UserInfo::from);
     }
 }

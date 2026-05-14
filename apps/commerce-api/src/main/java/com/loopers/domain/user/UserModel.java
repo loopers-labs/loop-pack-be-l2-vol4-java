@@ -70,6 +70,10 @@ public class UserModel extends BaseEntity {
         this.gender = gender;
     }
 
+    public boolean matchesPassword(String password) {
+        return this.password.equals(password);
+    }
+
     private static void validateLoginId(String loginId) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 는 영문/숫자 10자 이내여야 합니다.");
