@@ -119,4 +119,67 @@ class UserServiceIntegrationTest {
         }
 
     }
+
+    @DisplayName("비밀번호를 변경할 때,")
+    @Nested
+    class ChangePassword {
+        @DisplayName("기존 비밀번호가 일치하고 신규 비밀번호가 유효하면 비밀번호가 변경된다")
+        @Test
+        void changesPassword_whenOldPasswordMatchesAndNewPasswordIsValid() {
+            // arrange
+            String loginId = "user01";
+            UserModel user = userJpaRepository.save(new UserModel(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher));
+
+            // act
+            userService.changePassword(loginId, "Password1!", "Password1!", "NewPass99!");
+
+            // assert
+            UserModel updated = userJpaRepository.findById(user.getId()).orElseThrow();
+            assertThat(updated.matchesPassword("NewPass99!", passwordHasher)).isTrue();
+        }
+
+        @DisplayName("해당 loginId 의 회원이 존재하지 않으면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFoundException_whenUserDoesNotExist() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.changePassword("nonexistent", "Password1!", "Password1!", "NewPass99!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("헤더 loginPw 인증이 실패하면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenLoginPwAuthenticationFails() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new UserModel(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.changePassword(loginId, "WrongPass1!", "Password1!", "NewPass99!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequestException_whenOldPasswordDoesNotMatch() {
+            // arrange
+            String loginId = "user01";
+            userJpaRepository.save(new UserModel(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                userService.changePassword(loginId, "Password1!", "WrongPass1!", "NewPass99!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

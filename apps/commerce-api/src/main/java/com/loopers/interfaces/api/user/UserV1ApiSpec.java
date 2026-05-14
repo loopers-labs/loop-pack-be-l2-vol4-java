@@ -13,4 +13,7 @@ public interface UserV1ApiSpec {
 
     @Operation(summary = "내 정보 조회", description = "로그인 ID 로 내 정보를 조회합니다.")
     ApiResponse<UserV1Dto.UserResponse> getMyInfo(@RequestHeader String loginId, @RequestHeader String loginPw);
+
+    @Operation(summary = "비밀번호 수정", description = "기존 비밀번호 확인 후 신규 비밀번호로 변경합니다.")
+    ApiResponse<Void> changePassword(@RequestHeader String loginId, @RequestHeader String loginPw, UserV1Dto.ChangePasswordRequest request);
 }

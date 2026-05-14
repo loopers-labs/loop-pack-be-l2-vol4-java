@@ -62,4 +62,19 @@ public class UserModel extends BaseEntity {
     public boolean matchesPassword(String raw, PasswordHasher hasher) {
         return password.matches(raw, hasher);
     }
+
+    public void changePassword(String oldRaw, String newRaw, PasswordHasher hasher) {
+        if (!password.matches(oldRaw, hasher)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
+        }
+        if (password.matches(newRaw, hasher)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "신규 비밀번호는 기존 비밀번호와 달라야 합니다.");
+        }
+        Password newPassword = Password.of(newRaw, hasher);
+        String birthDateDigits = birthDate.replace("-", "");
+        if (newRaw.contains(birthDateDigits)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
+        this.password = newPassword;
+    }
 }
