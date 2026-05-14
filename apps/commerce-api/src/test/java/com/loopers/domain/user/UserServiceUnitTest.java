@@ -15,6 +15,8 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.Optional;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -96,6 +98,88 @@ class UserServiceUnitTest {
             verify(userRepository, never()).existsByLoginId(anyString());
             verify(passwordEncoder, never()).encode(anyString());
             verify(userRepository, never()).save(any());
+        }
+    }
+
+    @DisplayName("비밀번호를 변경할 때")
+    @Nested
+    class ChangePassword {
+
+        private final String loginId = "minbo";
+        private final String currentRaw = "Test1234!";
+        private final String newRaw = "NewPass5678!";
+        private final String encodedCurrent = "ENCODED_CURRENT";
+        private final String encodedNew = "ENCODED_NEW";
+
+        @DisplayName("정상 입력이면, 새 비밀번호가 암호화되어 저장된다.")
+        @Test
+        void encodesNewPasswordAndUpdates_whenValidInput() {
+            // given
+            UserModel user = UserModel.of(loginId, encodedCurrent, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+            given(userRepository.findByLoginId(loginId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, encodedCurrent)).willReturn(true);
+            given(passwordEncoder.matches(newRaw, encodedCurrent)).willReturn(false);
+            given(passwordEncoder.encode(newRaw)).willReturn(encodedNew);
+
+            // when
+            UserModel result = userService.changePassword(loginId, currentRaw, newRaw);
+
+            // then
+            verify(passwordEncoder).encode(newRaw);
+            assertThat(result.getPassword()).isEqualTo(encodedNew);
+        }
+
+        @DisplayName("존재하지 않는 loginId면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserNotFound() {
+            // given
+            given(userRepository.findByLoginId(loginId)).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(loginId, currentRaw, newRaw)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            verify(passwordEncoder, never()).encode(anyString());
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordMismatch() {
+            // given
+            UserModel user = UserModel.of(loginId, encodedCurrent, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+            given(userRepository.findByLoginId(loginId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, encodedCurrent)).willReturn(false);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(loginId, currentRaw, newRaw)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            verify(passwordEncoder, never()).encode(anyString());
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordSameAsCurrent() {
+            // given
+            UserModel user = UserModel.of(loginId, encodedCurrent, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+            given(userRepository.findByLoginId(loginId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, encodedCurrent)).willReturn(true);
+            given(passwordEncoder.matches(currentRaw, encodedCurrent)).willReturn(true);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(loginId, currentRaw, currentRaw)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            verify(passwordEncoder, never()).encode(anyString());
         }
     }
 }

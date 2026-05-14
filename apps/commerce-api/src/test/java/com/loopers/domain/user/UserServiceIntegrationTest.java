@@ -98,4 +98,72 @@ class UserServiceIntegrationTest {
             );
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때")
+    @Nested
+    class ChangePassword {
+
+        private static final String LOGIN_ID = "minbo";
+        private static final String CURRENT_PW = "Test1234!";
+        private static final String NEW_PW = "NewPass5678!";
+
+        @DisplayName("정상 입력이면, 새 비밀번호가 암호화되어 저장된다.")
+        @Test
+        void persistsEncodedNewPassword_whenValidInput() {
+            // given
+            userService.createUser(LOGIN_ID, CURRENT_PW, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+
+            // when
+            UserModel result = userService.changePassword(LOGIN_ID, CURRENT_PW, NEW_PW);
+
+            // then
+            assertAll(
+                    () -> assertThat(result.getPassword()).isNotEqualTo(NEW_PW),
+                    () -> assertThat(passwordEncoder.matches(NEW_PW, result.getPassword())).isTrue(),
+                    () -> assertThat(passwordEncoder.matches(CURRENT_PW, result.getPassword())).isFalse()
+            );
+        }
+
+        @DisplayName("존재하지 않는 loginId면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserNotFound() {
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword("nonexistent", CURRENT_PW, NEW_PW)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordMismatch() {
+            // given
+            userService.createUser(LOGIN_ID, CURRENT_PW, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(LOGIN_ID, "WrongPass!", NEW_PW)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordSameAsCurrent() {
+            // given
+            userService.createUser(LOGIN_ID, CURRENT_PW, "민보", LocalDate.of(1991, 8, 21), "test@example.com");
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(LOGIN_ID, CURRENT_PW, CURRENT_PW)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }
