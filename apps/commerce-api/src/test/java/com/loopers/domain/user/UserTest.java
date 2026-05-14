@@ -13,9 +13,9 @@ import org.junit.jupiter.api.Test;
 
 class UserTest {
 
-  @DisplayName("회원가입")
+  @DisplayName("회원 가입 단위 테스트")
   @Nested
-  class Create {
+  class SignupTest {
 
     @DisplayName("필요 정보가 모두 유효하면 User 객체 생성에 성공한다.")
     @Test
@@ -85,5 +85,37 @@ class UserTest {
       assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
     }
 
+  }
+
+  @DisplayName("내 정보 조회 단위 테스틐")
+  @Nested
+  class MyProfileTest {
+
+    @DisplayName("이름의 마지막 글자가 *로 마스킹된 값이 반환된다.")
+    @Test
+    void returnsNameWithLastCharacterMasked() {
+      // arrange
+      var user =
+          User.create("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+
+      // act
+      String maskedName = user.getMaskedName();
+
+      // assert
+      assertThat(maskedName).isEqualTo("홍길*");
+    }
+
+    @DisplayName("이름이 한 글자일 경우 그 글자가 *로 마스킹된다.")
+    @Test
+    void returnsAsterisk_whenNameHasSingleCharacter() {
+      // arrange
+      var user = User.create("loopers01", "Password1!", "이", "1995-05-15", "loopers@example.com");
+
+      // act
+      String maskedName = user.getMaskedName();
+
+      // assert
+      assertThat(maskedName).isEqualTo("*");
+    }
   }
 }
