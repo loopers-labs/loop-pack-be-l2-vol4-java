@@ -72,6 +72,21 @@ class UserModelTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("birth 가 존재하지 않는 날짜면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBirthIsInvalidDate() {
+            // arrange — 형식은 맞지만 실제로 존재하지 않는 날짜 (2월 30일)
+            String invalidBirth = "1990-02-30";
+
+            // act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, UserFixture.NAME, invalidBirth, UserFixture.EMAIL)
+            );
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("password 가 8~16자 영문/숫자/특수문자 규칙에 맞지 않으면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordFormatIsInvalid() {

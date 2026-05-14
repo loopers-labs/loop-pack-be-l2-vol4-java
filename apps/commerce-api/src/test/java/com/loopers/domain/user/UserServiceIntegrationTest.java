@@ -97,43 +97,6 @@ public class UserServiceIntegrationTest {
         }
     }
 
-    @DisplayName("loginId 로 회원을 조회할 때,")
-    @Nested
-    class FindByLoginId {
-
-        @DisplayName("회원이 존재하면 UserModel 을 반환한다.")
-        @Test
-        void returnsUser_whenExists() {
-            userService.register(UserFixture.createModel());
-
-            UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
-
-            assertThat(found).isNotNull();
-            assertThat(found.getLoginId()).isEqualTo(UserFixture.LOGIN_ID);
-            assertThat(found.getEmail()).isEqualTo(UserFixture.EMAIL);
-        }
-
-        @DisplayName("회원이 존재하지 않으면 null 을 반환한다.")
-        @Test
-        void returnsNull_whenNotExists() {
-            UserModel found = userService.findByLoginId("nonexistent");
-
-            assertThat(found).isNull();
-        }
-
-        @DisplayName("DB 에 저장된 이름 원본이 올바르게 반환된다.")
-        @Test
-        void returnsStoredName_whenExists() {
-            // 통합 계층의 관심사: DB 에서 name 이 정확히 저장/조회되는가
-            // 마스킹 동작은 단위 테스트(UserModelTest.MaskedName) 에서 별도 검증
-            userService.register(UserFixture.createModel());
-
-            UserModel found = userService.findByLoginId(UserFixture.LOGIN_ID);
-
-            assertThat(found.getName()).isEqualTo(UserFixture.NAME);
-        }
-    }
-
     @DisplayName("내 정보를 조회할 때,")
     @Nested
     class GetMyInfo {

@@ -9,6 +9,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 
 @Entity
@@ -19,7 +21,6 @@ public class UserModel extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]{1,10}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final Pattern BIRTH_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^[A-Za-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\",.<>/?|\\\\`~]{8,16}$");
 
     private String loginId;
@@ -61,7 +62,12 @@ public class UserModel extends BaseEntity {
     }
 
     private void validateBirth(String birth) {
-        if (birth == null || !BIRTH_PATTERN.matcher(birth).matches()) {
+        if (birth == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST);
+        }
+        try {
+            LocalDate.parse(birth);
+        } catch (DateTimeParseException e) {
             throw new CoreException(ErrorType.BAD_REQUEST);
         }
     }
