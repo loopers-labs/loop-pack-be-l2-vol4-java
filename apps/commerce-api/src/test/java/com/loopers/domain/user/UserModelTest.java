@@ -35,11 +35,18 @@ class UserModelTest {
     @DisplayName("회원 모델을 생성 할 때,")
     @Nested
     class Create {
-        @DisplayName("아이디가 공백이면,")
+        @DisplayName("아이디가 영문 대소문자 특수문자를 포함하지 않으면,")
         @Nested
         class UserIdFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {BLANK, SPACE})
+            @ValueSource(strings = {
+                    BLANK,
+                    SPACE,
+                    "유저1",     // 한글 포함
+                    "user_1",   // 언더스코어 포함
+                    "user-1",   // 하이픈 포함
+                    "user!1",   // 특수문자 포함
+            })
             @DisplayName("BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenUseridIsBlank(String invalidUserId) {
                 // act

@@ -93,6 +93,8 @@ class UserV1ApiE2ETest {
             assertThat(response.getBody()).isNotNull();
             assertThat(response.getBody().data().userid()).isEqualTo(DEFAULT_USERID);
             assertThat(response.getBody().data().name()).isEqualTo(MASKING_NAME);
+            assertThat(response.getBody().data().birthDay()).isEqualTo(DEFAULT_BIRTHDAY);
+            assertThat(response.getBody().data().email()).isEqualTo(DEFAULT_EMAIL);
         }
     }
 
