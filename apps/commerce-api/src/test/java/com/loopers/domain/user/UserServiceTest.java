@@ -182,6 +182,136 @@ class UserServiceTest {
 
     }
 
+    @DisplayName("비밀번호 변경 시,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("재인증·새 비번 규칙을 통과하면, 새 비밀번호를 암호화하여 교체한다.")
+        @Test
+        void replacesPasswordWithEncodedValue_whenValidInputIsProvided() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password newPassword = Password.of("Xyz!9876@");
+            String encodedNew = "$2a$10$newEncodedHashValue";
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+            given(passwordEncoder.encode(newPassword.getValue())).willReturn(encodedNew);
+
+            // when
+            userService.changePassword(userId, currentRaw, newPassword);
+
+            // then
+            assertThat(user.getPassword().getValue()).isEqualTo(encodedNew);
+        }
+
+        @DisplayName("존재하지 않는 userId 면, NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsNotFound_whenUserDoesNotExist() {
+            // given
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, "Abcd1234!", Password.of("Xyz!9876@"))
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("현재 비밀번호가 DB 와 일치하지 않으면, UNAUTHORIZED 예외를 던진다.")
+        @Test
+        void throwsUnauthorized_whenCurrentPasswordDoesNotMatch() {
+            // given
+            Long userId = 1L;
+            String wrongCurrentRaw = "WrongPwd1!";
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(wrongCurrentRaw, user.getPassword().getValue())).willReturn(false);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, wrongCurrentRaw, Password.of("Xyz!9876@"))
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면, BAD_REQUEST 예외를 던진다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password samePassword = Password.of(currentRaw);
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, currentRaw, samePassword)
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(exception.getCustomMessage()).isEqualTo("현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
+            );
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 yyyyMMdd 형식으로 포함되면, BAD_REQUEST 예외를 던진다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password newPasswordWithBirthDate = Password.of("ab19990322!");
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, currentRaw, newPasswordWithBirthDate)
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(exception.getCustomMessage()).isEqualTo("비밀번호에 생년월일을 포함할 수 없습니다.")
+            );
+        }
+    }
+
     @DisplayName("사용자 조회 시,")
     @Nested
     class GetUser {

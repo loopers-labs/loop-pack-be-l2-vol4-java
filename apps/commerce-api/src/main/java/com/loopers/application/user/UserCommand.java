@@ -10,4 +10,8 @@ public class UserCommand {
                          LocalDate birthDate,
                          String email) {
     }
+
+    public record ChangePassword(String currentPassword,
+                                 String newPassword) {
+    }
 }

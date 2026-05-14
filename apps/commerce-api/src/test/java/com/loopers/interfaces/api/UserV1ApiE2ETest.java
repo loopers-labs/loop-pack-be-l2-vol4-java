@@ -330,4 +330,230 @@ class UserV1ApiE2ETest {
             );
         }
     }
+
+    @DisplayName("PUT /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        private static final String PASSWORD_ENDPOINT = "/api/v1/users/me/password";
+        private static final String ME_ENDPOINT = "/api/v1/users/me";
+
+        private void signUp(String loginId, String password) {
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                loginId, password, "김철수", LocalDate.of(1999, 3, 22), "user@example.com"
+            );
+            testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
+            );
+        }
+
+        private HttpHeaders authHeaders(String loginId, String password) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_ID, loginId);
+            headers.set(AuthHeaders.LOGIN_PW, password);
+            return headers;
+        }
+
+        private ResponseEntity<ApiResponse<Object>> requestChangePassword(
+            HttpHeaders headers, UserV1Dto.ChangePasswordRequest body
+        ) {
+            return testRestTemplate.exchange(
+                PASSWORD_ENDPOINT,
+                HttpMethod.PUT,
+                new HttpEntity<>(body, headers),
+                new ParameterizedTypeReference<>() {
+                }
+            );
+        }
+
+        @DisplayName("정상 변경 시, 새 비밀번호로는 본인 정보 조회가 가능하고 기존 비밀번호로는 401 을 반환한다.")
+        @Test
+        void replacesPasswordSuccessfully_whenValidInputIsProvided() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> meResponseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> withNew = testRestTemplate.exchange(
+                ME_ENDPOINT, HttpMethod.GET,
+                new HttpEntity<>(authHeaders("user01", "Xyz!9876@")), meResponseType
+            );
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> withOld = testRestTemplate.exchange(
+                ME_ENDPOINT, HttpMethod.GET,
+                new HttpEntity<>(authHeaders("user01", "Abcd1234!")), meResponseType
+            );
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(withNew.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(withOld.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
+            );
+        }
+
+        @DisplayName("인증 헤더가 누락되면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAuthHeadersAreMissing() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(new HttpHeaders(), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("헤더의 비밀번호가 일치하지 않으면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenHeaderPasswordIsWrong() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Wrong9999!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("헤더 인증은 성공하나 body 의 현재 비밀번호가 DB 와 일치하지 않으면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenBodyCurrentPasswordDoesNotMatch() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Wrong9999!", "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("body 의 현재 비밀번호가 null 이면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenBodyCurrentPasswordIsNull() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest(null, "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("body 의 현재 비밀번호가 빈 문자열이면, UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenBodyCurrentPasswordIsBlank() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("", "Xyz!9876@");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("인증에 실패했습니다.")
+            );
+        }
+
+        @DisplayName("새 비밀번호 형식이 유효하지 않으면, BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordFormatIsInvalid() {
+            // given - 7자 비밀번호 (최소 8자 미달)
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "Abc123!");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().message())
+                    .isEqualTo("비밀번호는 영문 대/소문자, 숫자, 특수문자로 8~16자여야 합니다.")
+            );
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 포함되면, BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordContainsBirthDate() {
+            // given - 1999-03-22 를 비밀번호에 yyyyMMdd 형식으로 포함
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "ab19990322!");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().message())
+                    .isEqualTo("비밀번호에 생년월일을 포함할 수 없습니다.")
+            );
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면, BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // given
+            signUp("user01", "Abcd1234!");
+            UserV1Dto.ChangePasswordRequest body =
+                new UserV1Dto.ChangePasswordRequest("Abcd1234!", "Abcd1234!");
+
+            // when
+            ResponseEntity<ApiResponse<Object>> response =
+                requestChangePassword(authHeaders("user01", "Abcd1234!"), body);
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().message())
+                    .isEqualTo("현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
+            );
+        }
+    }
 }

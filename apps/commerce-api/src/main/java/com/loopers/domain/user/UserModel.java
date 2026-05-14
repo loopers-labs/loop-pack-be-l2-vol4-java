@@ -44,6 +44,10 @@ public class UserModel extends BaseEntity {
         this.email = email;
     }
 
+    void changePassword(Password password) {
+        this.password = password;
+    }
+
     public LoginId getLoginId() {
         return loginId;
     }

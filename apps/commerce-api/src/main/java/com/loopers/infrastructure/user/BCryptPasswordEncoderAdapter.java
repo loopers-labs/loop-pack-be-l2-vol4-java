@@ -16,6 +16,9 @@ public class BCryptPasswordEncoderAdapter implements PasswordEncoder {
 
     @Override
     public boolean matches(String rawPassword, String encodedPassword) {
+        if (rawPassword == null || rawPassword.isBlank()) {
+            return false;
+        }
         return delegate.matches(rawPassword, encodedPassword);
     }
 }

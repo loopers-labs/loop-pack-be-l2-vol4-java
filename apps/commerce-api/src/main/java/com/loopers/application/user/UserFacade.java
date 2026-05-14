@@ -30,4 +30,12 @@ public class UserFacade {
         UserModel user = userService.getUser(userId);
         return UserInfo.User.from(user);
     }
+
+    public void changePassword(Long userId, UserCommand.ChangePassword command) {
+        userService.changePassword(
+            userId,
+            command.currentPassword(),
+            Password.of(command.newPassword())
+        );
+    }
 }

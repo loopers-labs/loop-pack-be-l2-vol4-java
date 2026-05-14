@@ -43,6 +43,15 @@ public class UserV1Dto {
         }
     }
 
+    public record ChangePasswordRequest(
+        String currentPassword,
+        String newPassword
+    ) {
+        public UserCommand.ChangePassword toCommand() {
+            return new UserCommand.ChangePassword(currentPassword, newPassword);
+        }
+    }
+
     public record MyInfoResponse(
         String loginId,
         String name,

@@ -105,4 +105,29 @@ class UserModelTest {
         }
 
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("새로운 Password 가 주어지면, 보관 중인 비밀번호가 해당 인스턴스로 교체된다.")
+        @Test
+        void replacesPassword_whenNewPasswordIsGiven() {
+            // given
+            UserModel user = UserModel.create(
+                LoginId.of("loopers01"),
+                Password.encoded("$2a$10$oldEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            Password newEncoded = Password.encoded("$2a$10$newEncodedHashValue");
+
+            // when
+            user.changePassword(newEncoded);
+
+            // then
+            assertThat(user.getPassword()).isSameAs(newEncoded);
+        }
+    }
 }

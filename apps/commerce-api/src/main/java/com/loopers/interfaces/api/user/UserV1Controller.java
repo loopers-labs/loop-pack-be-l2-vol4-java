@@ -8,6 +8,7 @@ import com.loopers.interfaces.auth.LoginUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,5 +30,14 @@ public class UserV1Controller {
     public ApiResponse<UserV1Dto.MyInfoResponse> getMe(@AuthenticatedUser LoginUser loginUser) {
         UserInfo.User user = userFacade.getMe(loginUser.id());
         return ApiResponse.success(UserV1Dto.MyInfoResponse.from(user));
+    }
+
+    @PutMapping("/me/password")
+    public ApiResponse<Object> changePassword(
+        @AuthenticatedUser LoginUser loginUser,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(loginUser.id(), request.toCommand());
+        return ApiResponse.success();
     }
 }

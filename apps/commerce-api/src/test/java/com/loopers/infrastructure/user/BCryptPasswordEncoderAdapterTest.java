@@ -42,5 +42,44 @@ class BCryptPasswordEncoderAdapterTest {
             // then
             assertThat(result).isFalse();
         }
+
+        @DisplayName("원본 비밀번호가 null 이면, 예외 없이 false 를 반환한다.")
+        @Test
+        void returnsFalse_whenRawIsNull() {
+            // given
+            String encoded = passwordEncoder.encode("Abcd1234!");
+
+            // when
+            boolean result = passwordEncoder.matches(null, encoded);
+
+            // then
+            assertThat(result).isFalse();
+        }
+
+        @DisplayName("원본 비밀번호가 빈 문자열이면, 예외 없이 false 를 반환한다.")
+        @Test
+        void returnsFalse_whenRawIsEmpty() {
+            // given
+            String encoded = passwordEncoder.encode("Abcd1234!");
+
+            // when
+            boolean result = passwordEncoder.matches("", encoded);
+
+            // then
+            assertThat(result).isFalse();
+        }
+
+        @DisplayName("원본 비밀번호가 공백 문자로만 이루어져 있으면, 예외 없이 false 를 반환한다.")
+        @Test
+        void returnsFalse_whenRawIsBlank() {
+            // given
+            String encoded = passwordEncoder.encode("Abcd1234!");
+
+            // when
+            boolean result = passwordEncoder.matches("   ", encoded);
+
+            // then
+            assertThat(result).isFalse();
+        }
     }
 }
