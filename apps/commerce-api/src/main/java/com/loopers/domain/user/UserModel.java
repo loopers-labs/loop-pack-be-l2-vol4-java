@@ -30,6 +30,7 @@ public class UserModel extends BaseEntity {
 
     public UserModel(String loginId, String password, String name, String birth, String email) {
         validateLoginId(loginId);
+        validateName(name);
         validateEmail(email);
         validateBirth(birth);
         validatePass(password, birth);
@@ -43,6 +44,12 @@ public class UserModel extends BaseEntity {
 
     private void validateLoginId(String loginId) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
+            throw new CoreException(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    private void validateName(String name) {
+        if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST);
         }
     }
@@ -72,9 +79,8 @@ public class UserModel extends BaseEntity {
         this.password = encoder.encode(this.password);
     }
 
-    /** 이름의 마지막 글자를 '*' 로 마스킹한다. (사이클 11 GREEN 에서 구현) */
+    /** 이름의 마지막 글자를 '*' 로 마스킹한다. name 은 생성자에서 검증되어 항상 1자 이상. */
     public String getMaskedName() {
-        if (name == null || name.isEmpty()) return name;
         return name.substring(0, name.length() - 1) + "*";
     }
 

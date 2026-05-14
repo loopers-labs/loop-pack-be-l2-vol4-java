@@ -32,6 +32,16 @@ class UserModelTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("name 이 비어 있으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameIsBlank() {
+            CoreException ex = assertThrows(CoreException.class, () ->
+                new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "", UserFixture.BIRTH, UserFixture.EMAIL)
+            );
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("email 이 xx@yy.zz 형식에 맞지 않으면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenEmailFormatIsInvalid() {
@@ -101,7 +111,7 @@ class UserModelTest {
         @Test
         void returnsMaskedName_whenNameHasMultipleChars() {
             // arrange — "홍길동" (3글자)
-            UserModel user = UserFixture.createModel();
+            UserModel user = new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "홍길동", UserFixture.BIRTH, UserFixture.EMAIL);
 
             // act & assert
             assertThat(user.getMaskedName()).isEqualTo("홍길*");
@@ -111,9 +121,7 @@ class UserModelTest {
         @Test
         void returnsAsterisk_whenNameIsSingleChar() {
             // arrange — 이름이 1글자인 경우
-            UserModel user = new UserModel(
-                UserFixture.LOGIN_ID, UserFixture.PASSWORD, "홍", UserFixture.BIRTH, UserFixture.EMAIL
-            );
+            UserModel user = new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "홍", UserFixture.BIRTH, UserFixture.EMAIL);
 
             // act & assert
             assertThat(user.getMaskedName()).isEqualTo("*");
