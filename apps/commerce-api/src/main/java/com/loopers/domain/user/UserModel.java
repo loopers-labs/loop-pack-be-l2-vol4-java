@@ -1,14 +1,20 @@
 package com.loopers.domain.user;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "users")
 public class UserModel extends BaseEntity {
+
+    private static final String MASK = "*";
+    private static final DateTimeFormatter BIRTH_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private String loginId;
     private String password;
@@ -16,11 +22,38 @@ public class UserModel extends BaseEntity {
     private LocalDate birthDate;
     private String email;
 
-    private static final String MASK = "*";
-
     protected UserModel() {}
 
     public UserModel(String loginId, String password, String name, LocalDate birthDate, String email) {
+        // loginId 검증
+        if (loginId == null || loginId.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 비어있을 수 없습니다.");
+        }
+        if (!loginId.matches("^[a-zA-Z0-9]+$")) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 영문과 숫자만 사용 가능합니다.");
+        }
+
+        // birthDate 검증 (password 검증 전에 먼저)
+        if (birthDate == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 필수입니다.");
+        }
+
+        // password 검증
+        validatePassword(password, birthDate);
+
+        // name 검증
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
+        }
+
+        // email 검증
+        if (email == null || email.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.");
+        }
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
+        }
+
         this.loginId = loginId;
         this.password = password;
         this.name = name;
@@ -28,12 +61,23 @@ public class UserModel extends BaseEntity {
         this.email = email;
     }
 
-    public String getLoginId() {
-        return loginId;
+    public void updatePassword(String oldPassword, String newPassword) {
+        if (!matchesPassword(oldPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
+        }
+        if (matchesPassword(newPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다르게 설정해야 합니다.");
+        }
+        validatePassword(newPassword, this.birthDate);
+        this.password = newPassword;
     }
 
     public boolean matchesPassword(String password) {
         return this.password.equals(password);
+    }
+
+    public String getLoginId() {
+        return loginId;
     }
 
     public String getName() {
@@ -50,5 +94,21 @@ public class UserModel extends BaseEntity {
 
     public String getMaskedName() {
         return name.substring(0, name.length() - 1) + MASK;
+    }
+
+    private void validatePassword(String password, LocalDate birthDate) {
+        if (password == null || password.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
+        }
+        if (password.length() < 8 || password.length() > 16) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8자 이상 16자 이하여야 합니다.");
+        }
+        if (!password.matches("^[\\x21-\\x7E]+$")) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자만 사용 가능합니다.");
+        }
+        String birthDateStr = birthDate.format(BIRTH_DATE_FORMATTER);
+        if (password.contains(birthDateStr)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
     }
 }
