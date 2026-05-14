@@ -1,8 +1,11 @@
 package com.loopers.domain.member;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+import java.util.Optional;
 
-
-public interface MemberRepository extends JpaRepository<MemberModel,Long> {
-    boolean existsByUserId(String userId);
+public interface MemberRepository {
+    MemberModel save(MemberModel member);
+    Optional<MemberModel> find(Long id);
+    List<MemberModel> findAll();
+    void delete(Long id);
 }

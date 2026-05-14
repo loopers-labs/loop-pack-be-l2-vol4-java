@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.member.MemberModel;
-import com.loopers.domain.member.MemberRepository;
+import com.loopers.infrastructure.member.MemberJpaRepository;
 import com.loopers.interfaces.api.member.MemberV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -27,17 +27,17 @@ public class MemberV1ApiE2ETest {
     private static final String ENDPOINT = "/api/v1/member";
 
     private final TestRestTemplate testRestTemplate;
-    private final MemberRepository memberRepository;
+    private final MemberJpaRepository memberJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     public MemberV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            MemberRepository memberRepository,
+            MemberJpaRepository memberJpaRepository,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.memberRepository = memberRepository;
+        this.memberJpaRepository = memberJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -75,7 +75,7 @@ public class MemberV1ApiE2ETest {
         @Test
         void throwsConflict_whenDuplicateUserIdProvided() {
             // arrange
-            memberRepository.save(new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201"));
+            memberJpaRepository.save(new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201"));
             MemberV1Dto.CreateMemberRequest request = new MemberV1Dto.CreateMemberRequest(
                     "testuser", "Password2@", "other@example.com", "박테스트", "19950301"
             );
@@ -101,7 +101,7 @@ public class MemberV1ApiE2ETest {
         @Test
         void returnMemberInfo_whenValidIdIsProvided() {
             // arrange
-            MemberModel member = memberRepository.save(
+            MemberModel member = memberJpaRepository.save(
                     new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201")
             );
 
@@ -147,7 +147,7 @@ public class MemberV1ApiE2ETest {
         @Test
         void updateMemberPassword_whenValidPasswordIsProvided() {
             // arrange
-            MemberModel member = memberRepository.save(
+            MemberModel member = memberJpaRepository.save(
                     new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201")
             );
             MemberV1Dto.UpdatePasswordRequest request = new MemberV1Dto.UpdatePasswordRequest("Password1!", "NewPass2@");
@@ -165,7 +165,7 @@ public class MemberV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenCurrentPasswordIsWrong() {
             // arrange
-            MemberModel member = memberRepository.save(
+            MemberModel member = memberJpaRepository.save(
                     new MemberModel("testuser", "Password1!", "test@example.com", "김테스트", "19940201")
             );
             MemberV1Dto.UpdatePasswordRequest request = new MemberV1Dto.UpdatePasswordRequest("WrongPass1!", "NewPass2@");
