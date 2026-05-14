@@ -221,4 +221,29 @@ class UserModelTest {
             }
         }
     }
+
+    @DisplayName("maskedName()을 호출할 때,")
+    @Nested
+    class MaskedName {
+
+        @DisplayName("Given 2자 이상 이름 / When 마스킹 / Then 마지막 글자만 '*'로 치환된다.")
+        @Test
+        void masksLastCharacter_whenNameHasMultipleCharacters() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PW, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL);
+
+            // act & assert
+            assertThat(user.maskedName()).isEqualTo("홍길*");
+        }
+
+        @DisplayName("Given 1자 이름 / When 마스킹 / Then 전체가 '*'로 치환된다.")
+        @Test
+        void masksEntireName_whenNameHasSingleCharacter() {
+            // arrange
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PW, "김", VALID_BIRTH_DATE, VALID_EMAIL);
+
+            // act & assert
+            assertThat(user.maskedName()).isEqualTo("*");
+        }
+    }
 }
