@@ -30,6 +30,6 @@ public class MemberV1Controller {
     @PatchMapping("/{id}")
     public ApiResponse<Object> updatePassword(@PathVariable Long id, @RequestBody MemberV1Dto.UpdatePasswordRequest request) {
         memberFacade.updatePassword(id, request.currentPassword(), request.newPassword());
-        return ApiResponse.success();
+        return ApiResponse.success("비밀 번호 변경이 완료되었습니다.");
     }
 }
