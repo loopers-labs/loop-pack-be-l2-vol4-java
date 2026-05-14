@@ -1,6 +1,5 @@
-package com.loopers.infrastructure.member;
+package com.loopers.domain.member;
 
-import com.loopers.domain.member.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
