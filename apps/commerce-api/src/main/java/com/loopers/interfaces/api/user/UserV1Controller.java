@@ -2,8 +2,11 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
+import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.auth.CurrentUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,5 +25,11 @@ public class UserV1Controller {
     ) {
         UserInfo info = userFacade.register(request.toCommand());
         return ApiResponse.success(UserV1Dto.UserRegisterResponse.from(info));
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<UserV1Dto.UserMeResponse> getMe(@CurrentUser UserModel user) {
+        UserInfo info = userFacade.getMe(user);
+        return ApiResponse.success(UserV1Dto.UserMeResponse.from(info));
     }
 }
