@@ -38,7 +38,8 @@ public class UserService {
 
     @Transactional
     public void changePassword(LoginId loginId, String currentPassword, String newPassword) {
-        User user = userRepository.findByLoginId(loginId).orElseThrow();
+        User user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED));
         user.changePassword(currentPassword, newPassword, passwordEncoder);
     }
 }
