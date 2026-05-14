@@ -5,6 +5,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -93,5 +94,9 @@ public class UserModel extends BaseEntity {
 
     public String getEmail() {
         return email;
+    }
+
+    public void encodePassword(PasswordEncoder encoder){
+        this.password = encoder.encode(this.password);
     }
 }
