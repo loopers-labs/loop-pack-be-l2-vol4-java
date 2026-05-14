@@ -34,22 +34,6 @@ public class User extends BaseEntity {
     private String encodedPassword;
 
     public User(LoginId loginId, Name name, Birth birth, Email email, String encodedPassword) {
-        if (loginId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 는 필수입니다.");
-        }
-        if (name == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 필수입니다.");
-        }
-        if (birth == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 필수입니다.");
-        }
-        if (email == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 필수입니다.");
-        }
-        if (encodedPassword == null || encodedPassword.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 필수입니다.");
-        }
-
         this.loginId = loginId.value();
         this.name = name.value();
         this.birth = birth.value();
