@@ -7,6 +7,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -37,5 +38,16 @@ public class UserV1Controller implements UserV1ApiSpec {
     ) {
         UserInfo info = userFacade.getMe(new UserCommand.Authenticate(loginId, password));
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
+    }
+
+    @PatchMapping("/me/password")
+    @Override
+    public ApiResponse<Void> changePassword(
+        @RequestHeader(value = "X-Loopers-LoginId", required = false) String loginId,
+        @RequestHeader(value = "X-Loopers-LoginPw", required = false) String password,
+        @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        userFacade.changePassword(request.toCommand(loginId, password));
+        return ApiResponse.<Void>success(null);
     }
 }

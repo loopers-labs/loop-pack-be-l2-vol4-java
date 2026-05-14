@@ -29,6 +29,7 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
     private static final String ENDPOINT_ME = "/api/v1/users/me";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
 
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
@@ -75,6 +76,18 @@ class UserV1ApiE2ETest {
             headers.add("X-Loopers-LoginPw", password);
         }
         return testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+    }
+
+    private ResponseEntity<ApiResponse<Void>> patchPassword(String loginId, String password, UserV1Dto.ChangePasswordRequest request) {
+        ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+        HttpHeaders headers = new HttpHeaders();
+        if (loginId != null) {
+            headers.add("X-Loopers-LoginId", loginId);
+        }
+        if (password != null) {
+            headers.add("X-Loopers-LoginPw", password);
+        }
+        return testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
     }
 
     @DisplayName("POST /api/v1/users")
@@ -290,6 +303,87 @@ class UserV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        private static final String NEW_PASSWORD = "NewPass1!";
+
+        @DisplayName("정상 요청이면 200 OK 를 반환하고 신규 자격으로 인증되며 구 자격으로는 401 이 반환된다.")
+        @Test
+        void changesPassword_andOldCredentialsBecomeInvalid() {
+            // arrange
+            postSignUp(validRequest());
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", NEW_PASSWORD);
+
+            // act
+            ResponseEntity<ApiResponse<Void>> changeResponse = patchPassword("kim99", "Abcd123!", request);
+
+            // assert
+            assertAll(
+                () -> assertThat(changeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getMe("kim99", "Abcd123!").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(getMe("kim99", NEW_PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK)
+            );
+        }
+
+        @DisplayName("헤더 인증이 실패하면 401 UNAUTHORIZED 를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAuthFails() {
+            // arrange
+            postSignUp(validRequest());
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", NEW_PASSWORD);
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "WrongPass1!", request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("바디 currentPassword 가 저장된 비밀번호와 일치하지 않으면 400 BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenCurrentPasswordDoesNotMatch() {
+            // arrange
+            postSignUp(validRequest());
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("WrongCurrent1!", NEW_PASSWORD);
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 정책에 위반되면 400 BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordViolatesPolicy() {
+            // arrange
+            postSignUp(validRequest());
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", "short");
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 400 BAD_REQUEST 를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordEqualsCurrent() {
+            // arrange
+            postSignUp(validRequest());
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", "Abcd123!");
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 }

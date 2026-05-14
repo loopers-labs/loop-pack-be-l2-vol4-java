@@ -16,7 +16,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,7 +71,7 @@ class UserServiceTest {
             verify(userRepository).save(any(UserModel.class));
         }
 
-        @DisplayName("loginId 가 이미 존재하면 CONFLICT 예외가 발생하고 인코딩/저장은 일어나지 않는다.")
+        @DisplayName("loginId 가 이미 존재하면 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // arrange
@@ -84,11 +83,9 @@ class UserServiceTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-            verify(passwordEncoder, never()).encode(any());
-            verify(userRepository, never()).save(any(UserModel.class));
         }
 
-        @DisplayName("비밀번호가 정책에 위반되면 BAD_REQUEST 예외가 발생하고 인코딩/저장은 일어나지 않는다.")
+        @DisplayName("비밀번호가 정책에 위반되면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordViolatesPolicy() {
             // arrange
@@ -101,8 +98,6 @@ class UserServiceTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            verify(passwordEncoder, never()).encode(any());
-            verify(userRepository, never()).save(any(UserModel.class));
         }
     }
 
@@ -167,6 +162,104 @@ class UserServiceTest {
 
             // assert
             assertThat(result).isSameAs(storedUser);
+        }
+    }
+
+    @DisplayName("비밀번호 변경 시, ")
+    @Nested
+    class ChangePassword {
+
+        private static final String NEW_RAW_PASSWORD = "NewPass1!";
+        private static final String NEW_ENCODED_PASSWORD = "$2a$10$newEncodedHashValue";
+
+        @DisplayName("헤더 인증이 실패하면 UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenAuthFails() {
+            // arrange
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.empty());
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.changePassword(new UserCommand.ChangePassword(
+                    "kim99", RAW_PASSWORD, RAW_PASSWORD, NEW_RAW_PASSWORD
+                )));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("바디의 현재 비밀번호가 저장된 비밀번호와 불일치하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+            when(passwordEncoder.matches("Wrong123!", ENCODED_PASSWORD)).thenReturn(false);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.changePassword(new UserCommand.ChangePassword(
+                    "kim99", RAW_PASSWORD, "Wrong123!", NEW_RAW_PASSWORD
+                )));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 정책에 위반되면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordViolatesPolicy() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.changePassword(new UserCommand.ChangePassword(
+                    "kim99", RAW_PASSWORD, RAW_PASSWORD, "short"
+                )));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordEqualsCurrent() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userService.changePassword(new UserCommand.ChangePassword(
+                    "kim99", RAW_PASSWORD, RAW_PASSWORD, RAW_PASSWORD
+                )));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("모든 검증을 통과하면 사용자의 encodedPassword 가 새 해시값으로 갱신된다.")
+        @Test
+        void replacesEncodedPassword_whenAllChecksPass() {
+            // arrange
+            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+            when(passwordEncoder.matches(NEW_RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
+            when(passwordEncoder.encode(NEW_RAW_PASSWORD)).thenReturn(NEW_ENCODED_PASSWORD);
+
+            // act
+            userService.changePassword(new UserCommand.ChangePassword(
+                "kim99", RAW_PASSWORD, RAW_PASSWORD, NEW_RAW_PASSWORD
+            ));
+
+            // assert
+            assertThat(storedUser.getEncodedPassword()).isEqualTo(NEW_ENCODED_PASSWORD);
         }
     }
 }

@@ -19,4 +19,12 @@ public final class UserCommand {
         String rawPasswordInput
     ) {
     }
+
+    public record ChangePassword(
+        String loginIdInput,
+        String authPasswordInput,
+        String currentRawPassword,
+        String newRawPassword
+    ) {
+    }
 }

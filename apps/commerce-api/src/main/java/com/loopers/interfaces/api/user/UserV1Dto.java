@@ -29,6 +29,15 @@ public class UserV1Dto {
         }
     }
 
+    public record ChangePasswordRequest(
+        String currentPassword,
+        String newPassword
+    ) {
+        public UserCommand.ChangePassword toCommand(String loginIdHeader, String authPasswordHeader) {
+            return new UserCommand.ChangePassword(loginIdHeader, authPasswordHeader, currentPassword, newPassword);
+        }
+    }
+
     public record UserResponse(
         String loginId,
         String name,

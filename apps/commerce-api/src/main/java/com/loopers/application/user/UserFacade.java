@@ -21,4 +21,8 @@ public class UserFacade {
         UserModel user = userService.authenticate(command);
         return UserInfo.from(user);
     }
+
+    public void changePassword(UserCommand.ChangePassword command) {
+        userService.changePassword(command);
+    }
 }

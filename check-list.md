@@ -78,23 +78,23 @@
 ## 4. 비밀번호 수정 (`PATCH /api/v1/users/me/password`)
 
 ### 4-1. 인증
-- [ ] 헤더 누락/잘못된 자격 → 401
+- [x] 헤더 누락/잘못된 자격 → 401
 
 ### 4-2. 검증
-- [ ] `currentPassword` 불일치 → 400
-- [ ] `newPassword` 가 정책 위반 → 400
-- [ ] `newPassword == currentPassword` → 400
-- [ ] 정상 변경 후 기존 자격으로 재요청 → 401
+- [x] `currentPassword` 불일치 → 400
+- [x] `newPassword` 가 정책 위반 → 400
+- [x] `newPassword == currentPassword` → 400
+- [x] 정상 변경 후 기존 자격으로 재요청 → 401
 
 ---
 
 ## 5. 통합 / E2E
 
-- [ ] `@SpringBootTest` + Testcontainers(MySQL) 골든 패스: 회원가입 → 조회 → 비밀번호 변경 → (구 자격 401, 신 자격 200)
+- [x] `@SpringBootTest` + Testcontainers(MySQL) 골든 패스: 회원가입 → 조회 → 비밀번호 변경 → (구 자격 401, 신 자격 200)
 - [x] 회원가입 중복 ID → 409
 - [x] 회원가입 정책 위반 비밀번호(생년월일 포함, 길이 위반, 허용 외 문자) → 400
 - [x] 회원가입 잘못된 email / birthDate / loginId → 400
 - [x] 내 정보 조회 헤더 누락 / 미존재 ID / 비밀번호 불일치 → 401
-- [ ] 비밀번호 변경 현재 비밀번호 불일치 → 400
-- [ ] 비밀번호 변경 신규 == 현재 → 400
-- [ ] 비밀번호 변경 신규 정책 위반 → 400
+- [x] 비밀번호 변경 현재 비밀번호 불일치 → 400
+- [x] 비밀번호 변경 신규 == 현재 → 400
+- [x] 비밀번호 변경 신규 정책 위반 → 400
