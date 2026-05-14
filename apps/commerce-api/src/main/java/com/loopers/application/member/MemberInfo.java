@@ -18,18 +18,4 @@ public record MemberInfo(
                 model.getEmail()
         );
     }
-
-    public static MemberInfo of(
-            String loginId,
-            String name,
-            LocalDate birthDate,
-            String email
-    ) {
-        return new MemberInfo(
-                loginId,
-                name,
-                birthDate,
-                email
-        );
-    }
 }
