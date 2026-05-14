@@ -28,8 +28,8 @@ public class UserV1ApiE2ETest {
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
     private static final String ENDPOINT_SIGNUP   = "/api/v1/users";
-    private static final String ENDPOINT_MY_INFO  = "/api/v1/users/myInfo";
-    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/myInfo/changePassword";
+    private static final String ENDPOINT_MY_INFO  = "/api/v1/users/me";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
 
     private static final String DEFAULT_USER_ID = "usertest123";
     private static final String DEFAULT_PASSWORD = "abc123!@#";
@@ -87,7 +87,7 @@ public class UserV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/users/myInfo")
+    @DisplayName("GET /api/v1/users/me")
     @Nested
     class GetUser {
 
@@ -173,7 +173,7 @@ public class UserV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /api/v1/users/myInfo/changePassword")
+    @DisplayName("PATCH /api/v1/users/me/password")
     @Nested
     class ChangePassword {
 
