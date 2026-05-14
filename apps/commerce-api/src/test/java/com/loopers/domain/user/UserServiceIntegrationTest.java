@@ -189,4 +189,51 @@ public class UserServiceIntegrationTest {
         }
 
     }
+
+    @Nested
+    @DisplayName("인증할 때")
+    class Authenticate {
+
+        @DisplayName("올바른 loginId와 비밀번호로 인증하면, 회원 모델을 반환한다.")
+        @Test
+        void given_correctCredentials_when_authenticate_then_returnsUser() {
+            // Arrange
+            UserModel savedUserModel = userService.signUp(UserModelFixture.aUser().build());
+
+            // Act
+            UserModel resultUserModel = userService.authenticate("testid", "testPw1234");
+
+            // Assert
+            assertThat(resultUserModel.getId()).isEqualTo(savedUserModel.getId());
+        }
+
+        @DisplayName("비밀번호가 틀리면, Unauthorized 예외가 발생한다.")
+        @Test
+        void given_wrongPassword_when_authenticate_then_throwsUnauthorizedException() {
+            // Arrange
+            userService.signUp(UserModelFixture.aUser().build());
+
+            // Act
+            Throwable thrown = catchThrowable(() ->
+                    userService.authenticate("testid", "wrongPw9999"));
+
+            // Assert
+            assertThat(thrown).isInstanceOf(CoreException.class);
+            assertThat(((CoreException) thrown).getErrorType())
+                    .isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("존재하지 않는 loginId로 인증하면, Unauthorized 예외가 발생한다.")
+        @Test
+        void given_nonExistingLoginId_when_authenticate_then_throwsUnauthorizedException() {
+            // Act
+            Throwable thrown = catchThrowable(() ->
+                    userService.authenticate("notexist", "anyPw1234"));
+
+            // Assert
+            assertThat(thrown).isInstanceOf(CoreException.class);
+            assertThat(((CoreException) thrown).getErrorType())
+                    .isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+    }
 }

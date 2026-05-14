@@ -41,4 +41,14 @@ public class UserService {
         user.changePassword(newPassword);
         userRepository.save(user);
     }
+
+    @Transactional(readOnly = true)
+    public UserModel authenticate(String loginId, String rawPassword) {
+        UserModel user = userRepository.findByLoginId(new LoginId(loginId))
+                .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지않습니다."));
+        if (!user.matchesPassword(rawPassword)) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
+        }
+        return user;
+    }
 }
