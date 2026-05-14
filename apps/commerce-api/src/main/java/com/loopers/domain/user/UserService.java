@@ -20,18 +20,32 @@ public class UserService {
         if (existUser.isPresent()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이미 존재하는 사용자입니다.");
         }
-        // 2. userModel 생성 및 저장
+        // 2. userModel 생성 및 저장 후 return
         return userRepository.save(new UserModel(userId, password, name, birthDate, email));
     }
     public UserModel getUser(String userId, String password) {
         // 1. 기존 user 확인
+        Optional<UserModel> user = userRepository.findByUserId(userId);
         // 1-1. 기존 user가 존재하지 않다면 exception
-        // 2. password가 일치하지 않는 경우 exception
+        if (user.isEmpty()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "없는 사용자입니다.");
+        }
+
+        // 2. password가 일치여부 확인
+        UserModel userModel = user.get();
+        userModel.authenticate(password);
         // 3. userModel return
+        return userModel;
     }
-    public UserModel changePassword(String userId, String currentPassword, String newPassword) {
+    public void changePassword(String userId, String currentPassword, String newPassword) {
         // 1. 기존 user Repository 확인
-        // 1-1. 기존 user가 없다면 Exception 처리
+        Optional<UserModel> user = userRepository.findByUserId(userId);
+        // 1-1. 기존 user가 존재하지 않다면 exception
+        if (user.isEmpty()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "없는 사용자입니다.");
+        }
         // 2. UserModel 에서 changePassword 처리
+        UserModel userModel = user.get();
+        userModel.changePassword(currentPassword, newPassword);
     }
 }
