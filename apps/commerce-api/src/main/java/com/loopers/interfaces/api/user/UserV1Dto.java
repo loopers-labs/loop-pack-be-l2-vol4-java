@@ -4,9 +4,7 @@ import com.loopers.application.user.UserInfo;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -62,6 +60,25 @@ public class UserV1Dto {
                     userInfo.birthDate(),
                     userInfo.email()
             );
+        }
+
+        public static UserResponse forMyInfo(UserInfo userInfo) {
+            return new UserResponse(
+                    userInfo.loginId(),
+                    maskLastChar(userInfo.name()),
+                    userInfo.birthDate(),
+                    userInfo.email()
+            );
+        }
+
+        private static String maskLastChar(String name) {
+            if (name == null || name.isEmpty()) {
+                return name;
+            }
+            if (name.length() == 1) {
+                return "*";
+            }
+            return name.substring(0, name.length() - 1) + "*";
         }
     }
 }

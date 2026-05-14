@@ -33,6 +33,12 @@ public class UserFacade {
         return UserInfo.from(userModel);
     }
 
+
+    public UserInfo getMyInfo(String loginId) {
+        UserModel userModel = userService.getMyInfo(loginId);
+        return UserInfo.from(userModel);
+    }
+
     @Transactional
     public UserInfo changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel userModel = userService.changePassword(loginId, currentPassword, newPassword);

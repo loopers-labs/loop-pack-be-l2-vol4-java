@@ -6,6 +6,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.LoginUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,6 +32,15 @@ public class UserV1Controller {
                 request.email()
         );
         UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(userInfo);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
+            @LoginUser String loginId
+    ) {
+        UserInfo userInfo = userFacade.getMyInfo(loginId);
+        UserV1Dto.UserResponse response = UserV1Dto.UserResponse.forMyInfo(userInfo);
         return ApiResponse.success(response);
     }
 
