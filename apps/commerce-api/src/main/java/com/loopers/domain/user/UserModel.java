@@ -16,6 +16,8 @@ public class UserModel extends BaseEntity {
     private LocalDate birthDate;
     private String email;
 
+    private static final String MASK = "*";
+
     protected UserModel() {}
 
     public UserModel(String loginId, String password, String name, LocalDate birthDate, String email) {
@@ -43,6 +45,6 @@ public class UserModel extends BaseEntity {
     }
 
     public String getMaskedName() {
-        return name.substring(0, name.length() - 1) + "*";
+        return name.substring(0, name.length() - 1) + MASK;
     }
 }
