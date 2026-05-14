@@ -29,6 +29,8 @@ public class UserService {
 
     @Transactional
     public void changePassword(String loginId, String currentPassword, String newPassword) {
-        // 실제 로직은 다음 feat 커밋
+        UserModel user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        user.changePassword(currentPassword, newPassword);
     }
 }

@@ -75,7 +75,14 @@ public class UserModel extends BaseEntity {
     }
 
     public void changePassword(String currentPassword, String newPassword) {
-        // 실제 검증/갱신 로직은 다음 feat 커밋
+        if (!matchesPassword(currentPassword)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        validatePassword(newPassword, this.birthDate);
+        if (newPassword.equals(this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다른 값이어야 합니다.");
+        }
+        this.password = newPassword;
     }
 
     private static void validateLoginId(String loginId) {
