@@ -266,6 +266,24 @@ test: 유저 회원가입 E2E 테스트 ← UserApiE2ETest
 | 통합 테스트 | H2 인메모리 데이터베이스 | 레이어 간 연동 및 영속성 검증 |
 | E2E 테스트 | 실제 HTTP 요청 (`TestRestTemplate`) | API 전체 흐름 검증 |
 
+#### 단위 vs 통합 — 역할 분리
+
+같은 시나리오를 두 곳에서 검증하지 않는다. 시나리오 종류에 따라 자리를 명확히 분리한다:
+
+| 시나리오 종류 | 단위 (Mock) | 통합 (H2) |
+|---|---|---|
+| 분기/예외 조합 (CONFLICT, UNAUTHORIZED, NOT_FOUND, BAD_REQUEST) | ✅ | ❌ (중복) |
+| Mock 기반 *조건 조합* 검증 (예: 특정 조건에서 `encode` 미호출 verify) | ✅ | ❌ |
+| 영속 상태 확인 (DB row 존재, encodedPassword가 raw와 다름) | ❌ | ✅ |
+| dirty checking으로 UPDATE 발생 검증 | ❌ | ✅ |
+| 실제 인코더 매칭 (BCrypt 등) | ❌ | ✅ |
+| Repository 쿼리 실제 동작 (`existsByLoginId`, `findByLoginId`) | ❌ | ✅ |
+| `@Transactional(readOnly)` 의도 검증 | ❌ | ✅ |
+
+**도메인 Service**는 단위/통합 *둘 다 작성한다*. 단위는 분기/Mock 조합, 통합은 영속/실제 인코더/트랜잭션. *순수 헥사고날의 도메인이 아니라 DDD 도메인 레이어*이므로 인프라와의 정합성 검증이 도메인 책임의 일부.
+
+**Facade Integration**은 *합성/공유 트랜잭션 경계*가 도입되기 전까지 작성하지 않는다 (Service Integration + E2E가 흡수). 1:1 위임만 하는 동안에는 *중간 레이어 중복 테스트*가 됨.
+
 ### 테스트 코드 컨벤션
 
 **구조 — Given / When / Then**
