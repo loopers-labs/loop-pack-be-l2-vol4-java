@@ -112,8 +112,8 @@ class UserV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().email()).isEqualTo("kim@loopers.com")
             );
             UserModel saved = userJpaRepository.findAll().get(0);
-            assertThat(saved.getEncodedPassword()).isNotEqualTo("Abcd123!");
-            assertThat(saved.getEncodedPassword()).startsWith("$2a$");
+            assertThat(saved.getEncodedPassword().getValue()).isNotEqualTo("Abcd123!");
+            assertThat(saved.getEncodedPassword().getValue()).startsWith("$2a$");
         }
 
         @DisplayName("이미 존재하는 loginId 로 요청하면 409 CONFLICT 를 반환한다.")

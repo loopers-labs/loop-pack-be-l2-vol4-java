@@ -3,7 +3,6 @@ package com.loopers.domain.user;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -35,10 +34,10 @@ public class UserModel extends BaseEntity {
     @Embedded
     private Email email;
 
-    @Column(name = "encoded_password", nullable = false)
-    private String encodedPassword;
+    @Embedded
+    private EncodedPassword encodedPassword;
 
-    public UserModel(LoginId loginId, Name name, BirthDate birthDate, Email email, String encodedPassword) {
+    public UserModel(LoginId loginId, Name name, BirthDate birthDate, Email email, EncodedPassword encodedPassword) {
         if (loginId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 필수입니다.");
         }
@@ -51,7 +50,7 @@ public class UserModel extends BaseEntity {
         if (email == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 필수입니다.");
         }
-        if (encodedPassword == null || encodedPassword.isBlank()) {
+        if (encodedPassword == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 필수입니다.");
         }
         this.loginId = loginId;
@@ -61,10 +60,15 @@ public class UserModel extends BaseEntity {
         this.encodedPassword = encodedPassword;
     }
 
-    public void changeEncodedPassword(String newEncoded) {
-        if (newEncoded == null || newEncoded.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 필수입니다.");
-        }
-        this.encodedPassword = newEncoded;
+    public boolean matchesPassword(String rawPassword, PasswordEncoder encoder) {
+        return this.encodedPassword.matches(rawPassword, encoder);
+    }
+
+    public boolean doesNotMatchPassword(String rawPassword, PasswordEncoder encoder) {
+        return !matchesPassword(rawPassword, encoder);
+    }
+
+    public void changePassword(PasswordEncoder encoder, String newRawPassword) {
+        this.encodedPassword = EncodedPassword.create(encoder, newRawPassword);
     }
 }

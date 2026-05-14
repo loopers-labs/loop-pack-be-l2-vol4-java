@@ -37,9 +37,17 @@
 
 ### 1-6. `UserModel`
 - [x] 생성 시 값 객체 위임 검증
-- [x] `encodedPassword` null/blank → `BAD_REQUEST`
+- [x] `encodedPassword` null → `BAD_REQUEST`
 - [x] 비밀번호는 해시된 값으로 저장
-- [x] `changeEncodedPassword(newEncoded)` — 해시 교체 (null/blank 거부)
+- [x] `changePassword(encoder, newRawPassword)` — raw 비밀번호 받아 내부 인코딩 후 교체 (null/blank → `BAD_REQUEST`)
+- [x] `matchesPassword(rawPassword, encoder)` — 저장 해시와 일치 시 `true`, 불일치 시 `false`
+- [x] `doesNotMatchPassword(rawPassword, encoder)` — `matchesPassword` 의 부정 (불일치 시 `true`)
+
+### 1-7. `EncodedPassword`
+- [x] `create(encoder, rawPassword)` — `encoder` null → `BAD_REQUEST`
+- [x] `create(encoder, rawPassword)` — `rawPassword` null/blank → `BAD_REQUEST`
+- [x] `create(encoder, rawPassword)` — 정상 입력이면 인코더 결과로 VO 생성
+- [x] `matches(rawPassword, encoder)` — 일치 시 `true`, 불일치 시 `false`
 
 ---
 

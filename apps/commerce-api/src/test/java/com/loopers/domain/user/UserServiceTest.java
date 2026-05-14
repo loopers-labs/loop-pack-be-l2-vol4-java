@@ -36,10 +36,19 @@ class UserServiceTest {
     private static final BirthDate BIRTH_DATE = new BirthDate(LocalDate.of(1999, 1, 1));
     private static final Email EMAIL = new Email("kim@loopers.com");
     private static final String RAW_PASSWORD = "Abcd123!";
-    private static final String ENCODED_PASSWORD = "$2a$10$encodedPasswordHashValue";
+    private static final String ENCODED_VALUE = "$2a$10$encodedPasswordHashValue";
 
     private UserCommand.SignUp signUpCommand() {
         return new UserCommand.SignUp(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, RAW_PASSWORD);
+    }
+
+    private UserModel storedUser() {
+        return new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, encodedPassword(RAW_PASSWORD, ENCODED_VALUE));
+    }
+
+    private EncodedPassword encodedPassword(String rawPassword, String encodedValue) {
+        when(passwordEncoder.encode(rawPassword)).thenReturn(encodedValue);
+        return EncodedPassword.create(passwordEncoder, rawPassword);
     }
 
     @DisplayName("회원 가입 시, ")
@@ -51,7 +60,7 @@ class UserServiceTest {
         void savesUserWithEncodedPassword_whenLoginIdIsUnique() {
             // arrange
             when(userRepository.existsByLoginId(LOGIN_ID)).thenReturn(false);
-            when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
+            when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_VALUE);
             when(userRepository.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
@@ -63,10 +72,10 @@ class UserServiceTest {
                     UserModel::getLoginId,
                     UserModel::getName,
                     UserModel::getBirthDate,
-                    UserModel::getEmail,
-                    UserModel::getEncodedPassword
+                    UserModel::getEmail
                 )
-                .containsExactly(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+                .containsExactly(LOGIN_ID, NAME, BIRTH_DATE, EMAIL);
+            assertThat(result.getEncodedPassword().getValue()).isEqualTo(ENCODED_VALUE);
             verify(passwordEncoder).encode(RAW_PASSWORD);
             verify(userRepository).save(any(UserModel.class));
         }
@@ -137,9 +146,9 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches("WrongPass1!", ENCODED_PASSWORD)).thenReturn(false);
+            when(passwordEncoder.matches("WrongPass1!", ENCODED_VALUE)).thenReturn(false);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -153,9 +162,9 @@ class UserServiceTest {
         @Test
         void returnsUserModel_whenCredentialsAreValid() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_VALUE)).thenReturn(true);
 
             // act
             UserModel result = userService.authenticate(new UserCommand.Authenticate("kim99", RAW_PASSWORD));
@@ -170,7 +179,7 @@ class UserServiceTest {
     class ChangePassword {
 
         private static final String NEW_RAW_PASSWORD = "NewPass1!";
-        private static final String NEW_ENCODED_PASSWORD = "$2a$10$newEncodedHashValue";
+        private static final String NEW_ENCODED_VALUE = "$2a$10$newEncodedHashValue";
 
         @DisplayName("헤더 인증이 실패하면 UNAUTHORIZED 예외가 발생한다.")
         @Test
@@ -192,10 +201,10 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
-            when(passwordEncoder.matches("Wrong123!", ENCODED_PASSWORD)).thenReturn(false);
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_VALUE)).thenReturn(true);
+            when(passwordEncoder.matches("Wrong123!", ENCODED_VALUE)).thenReturn(false);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -211,9 +220,9 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordViolatesPolicy() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_VALUE)).thenReturn(true);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -229,9 +238,9 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordEqualsCurrent() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_VALUE)).thenReturn(true);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -247,11 +256,11 @@ class UserServiceTest {
         @Test
         void replacesEncodedPassword_whenAllChecksPass() {
             // arrange
-            UserModel storedUser = new UserModel(LOGIN_ID, NAME, BIRTH_DATE, EMAIL, ENCODED_PASSWORD);
+            UserModel storedUser = storedUser();
             when(userRepository.findByLoginIdValue("kim99")).thenReturn(Optional.of(storedUser));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
-            when(passwordEncoder.matches(NEW_RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
-            when(passwordEncoder.encode(NEW_RAW_PASSWORD)).thenReturn(NEW_ENCODED_PASSWORD);
+            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_VALUE)).thenReturn(true);
+            when(passwordEncoder.matches(NEW_RAW_PASSWORD, ENCODED_VALUE)).thenReturn(false);
+            when(passwordEncoder.encode(NEW_RAW_PASSWORD)).thenReturn(NEW_ENCODED_VALUE);
 
             // act
             userService.changePassword(new UserCommand.ChangePassword(
@@ -259,7 +268,7 @@ class UserServiceTest {
             ));
 
             // assert
-            assertThat(storedUser.getEncodedPassword()).isEqualTo(NEW_ENCODED_PASSWORD);
+            assertThat(storedUser.getEncodedPassword().getValue()).isEqualTo(NEW_ENCODED_VALUE);
         }
     }
 }
