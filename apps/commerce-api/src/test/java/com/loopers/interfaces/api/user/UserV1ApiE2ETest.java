@@ -47,9 +47,9 @@ public class UserV1ApiE2ETest {
     }
 
     // 비밀번호 변경
-    @DisplayName("PATCH /api/v1/users/changePassword")
+    @DisplayName("PATCH /api/v1/users/myInfo/changePassword")
     @Nested
     class ChangePassword {
-        
+
     }
 }
