@@ -106,6 +106,21 @@ public class LoginIdTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        @DisplayName("아이디에 언더스코어나 하이픈이 포함되면 BAD_REQUEST 예외가 발생한다")
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "user_name",       // 언더스코어
+                "user-name",       // 하이픈
+                "u_ser-name123"    // 혼합
+        })
+        void given_loginIdWithUnderscoreOrHyphen_when_createLoginId_then_throwsBadRequestException(String invalidId) {
+            CoreException result = assertThrows(
+                    CoreException.class,
+                    () -> new LoginId(invalidId)
+            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         // 해피케이스
         @DisplayName("아이디가 영문으로 시작하고 영문/숫자/특수문자(_, -)로 구성되고 4~20자이면 정상 생성된다")
         @ParameterizedTest
@@ -113,9 +128,6 @@ public class LoginIdTest {
                 "abcd",                          // 4자 (최소 경계)
                 "abcdefghij1234567890",          // 20자 (최대 경계)
                 "user1234",                      // 영문 + 숫자
-                "user_name",                     // 언더스코어 (중간)
-                "user-name",                     // 하이픈 (중간)
-                "u_ser-name123",                 // 영문/숫자/특수문자 혼합
                 "abcd1"                          // 영문 시작 + 숫자
         })
         void given_validLoginId_when_createLoginId_then_createsLoginId(String validId) {
