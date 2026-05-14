@@ -4,8 +4,6 @@ import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +20,7 @@ public class UserV1Controller {
     private final UserFacade userFacade;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Object>> signup(
+    public ApiResponse<Object> signup(
         @RequestBody UserV1Dto.SignupRequest request
     ) {
         userFacade.signup(
@@ -32,7 +30,7 @@ public class UserV1Controller {
             request.birthDate(),
             request.email()
         );
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success());
+        return ApiResponse.success();
     }
 
     @GetMapping("/myInfo")
