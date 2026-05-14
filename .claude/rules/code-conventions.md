@@ -29,7 +29,6 @@
 - 복잡한 분기에는 `switch expression` 사용을 허용한다.
 - pattern matching 은 타입 분기가 명확해질 때 사용한다.
 - `Optional` 은 반환 타입에서만 사용하고 필드, 파라미터, DTO 속성에는 사용하지 않는다.
-- 날짜/시간은 `java.time` 패키지를 사용한다.
 - null 가능성이 있는 값은 명시적으로 검증하거나 도메인 규칙으로 방어한다.
 
 ## Spring Boot 3.4.x 규칙
