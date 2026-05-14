@@ -1,5 +1,7 @@
 package com.loopers.domain.member;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,7 @@ public class MemberService {
         validateBirthDate(command.birthDate());
 
         if (memberRepository.existsByLoginId(command.loginId())) {
-            throw new RuntimeException("이미 존재하는 아이디입니다.");
+            throw new CoreException(ErrorType.DUPLICATE_LOGIN_ID);
         }
 
         validatePassword(command.password(), command.birthDate());
@@ -47,14 +49,14 @@ public class MemberService {
         validateLoginId(command.loginId());
 
         Member member = memberRepository.findByLoginId(command.loginId())
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.MEMBER_NOT_FOUND));
 
         if (!passwordEncoder.matches(command.currentPassword(), member.getPassword())) {
-            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+            throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
 
         if (command.oldPassword().equals(command.newPassword())) {
-            throw new RuntimeException("기존 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.");
+            throw new CoreException(ErrorType.SAME_PASSWORD_AS_OLD);
         }
 
         validatePassword(command.newPassword(), member.getBirthDate());
@@ -66,10 +68,10 @@ public class MemberService {
         validateLoginId(loginId);
 
         Member member = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.MEMBER_NOT_FOUND));
 
         if (!passwordEncoder.matches(password, member.getPassword())) {
-            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+            throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
 
         return new MemberInfo(
@@ -82,42 +84,42 @@ public class MemberService {
 
     private void validateLoginId(String loginId) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
-            throw new RuntimeException("로그인 ID 규칙에 맞지 않습니다.");
+            throw new CoreException(ErrorType.INVALID_LOGIN_ID);
         }
     }
 
     private void validateName(String name) {
         if (name == null || !NAME_PATTERN.matcher(name).matches()) {
-            throw new RuntimeException("이름은 2~20자의 한글 또는 영문이어야 합니다.");
+            throw new CoreException(ErrorType.INVALID_NAME);
         }
     }
 
     private void validateEmail(String email) {
         if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new RuntimeException("올바른 이메일 형식이 아닙니다.");
+            throw new CoreException(ErrorType.INVALID_EMAIL);
         }
     }
 
     private void validateBirthDate(LocalDate birthDate) {
         if (birthDate == null) {
-            throw new RuntimeException("생년월일을 입력해주세요.");
+            throw new CoreException(ErrorType.REQUIRED_BIRTHDATE);
         }
         if (birthDate.isAfter(LocalDate.now())) {
-            throw new RuntimeException("생년월일은 미래 날짜일 수 없습니다.");
+            throw new CoreException(ErrorType.INVALID_BIRTHDATE);
         }
         if (birthDate.isBefore(LocalDate.of(1900, 1, 1))) {
-            throw new RuntimeException("생년월일이 유효하지 않습니다.");
+            throw new CoreException(ErrorType.INVALID_BIRTHDATE);
         }
     }
 
     private void validatePassword(String password, LocalDate birthDate) {
         if (!PASSWORD_PATTERN.matcher(password).matches()) {
-            throw new RuntimeException("비밀번호 규칙에 맞지 않습니다.");
+            throw new CoreException(ErrorType.INVALID_PASSWORD);
         }
 
         String birthDateStr = birthDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         if (password.contains(birthDateStr)) {
-            throw new RuntimeException("비밀번호에 생년월일을 포함할 수 없습니다.");
+            throw new CoreException(ErrorType.PASSWORD_CONTAINS_BIRTHDATE);
         }
     }
 }

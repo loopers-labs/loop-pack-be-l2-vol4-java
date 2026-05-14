@@ -1,5 +1,7 @@
 package com.loopers.domain.member;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +40,8 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_LOGIN_ID);
     }
 
     @Test
@@ -50,7 +53,8 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_LOGIN_ID);
     }
 
     @Test
@@ -83,7 +87,8 @@ class MemberServiceTest {
         given(memberRepository.existsByLoginId(duplicateId)).willReturn(true);
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.DUPLICATE_LOGIN_ID);
     }
 
     @Test
@@ -95,7 +100,8 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_PASSWORD);
     }
 
     @Test
@@ -107,7 +113,8 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_NAME);
     }
 
     @Test
@@ -119,7 +126,8 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_EMAIL);
     }
 
     @Test
@@ -131,14 +139,16 @@ class MemberServiceTest {
         );
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.signUp(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.signUp(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_BIRTHDATE);
     }
 
     @Test
     @DisplayName("회원 조회 시 로그인 ID 형식이 올바르지 않으면 예외가 발생한다.")
     void getMember_InvalidLoginId_ShouldThrowException() {
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.getMember("id", "password"));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.getMember("id", "password"));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_LOGIN_ID);
     }
 
     @Test
@@ -174,7 +184,8 @@ class MemberServiceTest {
         given(memberRepository.findByLoginId(loginId)).willReturn(Optional.empty());
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.getMember(loginId, "password"));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.getMember(loginId, "password"));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.MEMBER_NOT_FOUND);
     }
 
     @Test
@@ -192,7 +203,8 @@ class MemberServiceTest {
         given(passwordEncoder.matches(wrongPassword, encodedPassword)).willReturn(false);
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.getMember(loginId, wrongPassword));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.getMember(loginId, wrongPassword));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
     }
 
     @Test
@@ -243,7 +255,8 @@ class MemberServiceTest {
         given(passwordEncoder.matches(wrongCurrentPassword, encodedOldPassword)).willReturn(false);
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.updatePassword(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.updatePassword(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.PASSWORD_MISMATCH);
     }
 
     @Test
@@ -267,7 +280,8 @@ class MemberServiceTest {
         given(passwordEncoder.matches(password, encodedOldPassword)).willReturn(true);
 
         // when & then
-        assertThrows(RuntimeException.class, () -> memberService.updatePassword(command));
+        CoreException exception = assertThrows(CoreException.class, () -> memberService.updatePassword(command));
+        assertThat(exception.getErrorType()).isEqualTo(ErrorType.SAME_PASSWORD_AS_OLD);
     }
 }
 
