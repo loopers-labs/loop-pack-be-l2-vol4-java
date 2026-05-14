@@ -117,7 +117,7 @@ JPA 설정 (`modules/jpa/src/main/resources/jpa.yml`):
 - **단위 테스트**: `XxxModelTest`, `CoreExceptionTest` 같은 POJO 테스트.
 - **통합 테스트**: `@SpringBootTest` + `@AfterEach databaseCleanUp.truncateAllTables()`. `DatabaseCleanUp` 은 `JpaRepository` 와 함께 `testFixtures(":modules:jpa")` 에서 주입.
 - **E2E 테스트**: `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate` + `ParameterizedTypeReference<ApiResponse<...>>`.
-- DisplayName 은 한글, `@Nested` 로 동작 그룹핑 (`Get`, `Create` 등). 메서드명은 영문 `verb_when조건` 패턴.
+- DisplayName 은 한글, `@Nested` 로 동작 그룹핑 (`Get`, `Create` 등). 메서드명은 영문 BDD 스타일 `given_조건_when_동작_then_결과` 패턴 (예: `given_validInput_when_signUp_then_userExists`).
 - Testcontainers MySQL 은 `MySqlTestContainersConfig` static 블록에서 한 번만 시작되고 `System.setProperty` 로 datasource URL 을 주입한다 — 별도 `@Testcontainers` 어노테이션 불필요.
 
 ## 환경 / 프로파일
