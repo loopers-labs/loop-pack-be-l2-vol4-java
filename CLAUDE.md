@@ -122,3 +122,12 @@ docker-compose -f ./docker/monitoring-compose.yml up
 
 - `apps/` 하위 모듈만 BootJar 생성
 - `modules/`, `supports/` 는 일반 Jar만 생성
+
+---
+
+## 문서
+
+| 문서 | 설명 |
+|---|---|
+| [개발 규칙](docs/dev-rules.md) | TDD Workflow, 증강 코딩 원칙 |
+| [주의사항](docs/cautions.md) | Never Do, Recommendation, Priority |
