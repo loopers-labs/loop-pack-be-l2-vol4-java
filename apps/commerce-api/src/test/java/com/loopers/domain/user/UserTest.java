@@ -87,4 +87,55 @@ class UserTest {
     }
 
   }
+
+  @DisplayName("비밀번호 수정 단위 테스트")
+  @Nested
+  class ChangePasswordTest {
+
+    @DisplayName("새 비밀번호가 비밀번호 규칙에 맞고 현재 비밀번호와 다르면 비밀번호가 변경된다.")
+    @Test
+    void changesPassword_whenNewPasswordIsValidAndDifferent() {
+      // arrange
+      var user =
+          User.create("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+
+      // act
+      user.changePassword("Password1!", "NewPass2@");
+
+      // assert
+      assertThat(user.getPassword()).isEqualTo("NewPass2@");
+    }
+
+    @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면 BAD_REQUEST 예외가 발생한다.")
+    @Test
+    void throwsBadRequestException_whenNewPasswordEqualsCurrentPassword() {
+      // arrange
+      var user =
+          User.create("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+
+      // act
+      CoreException exception =
+          assertThrows(
+              CoreException.class, () -> user.changePassword("Password1!", "Password1!"));
+
+      // assert
+      assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+    @DisplayName("새 비밀번호가 비밀번호 규칙에 맞지 않으면 BAD_REQUEST가 발생한다.")
+    @Test
+    void throwsBadRequestException_whenNewPasswordViolatesPasswordRule() {
+      // arrange
+      var user =
+          User.create("loopers01", "Password1!", "홍길동", "1995-05-15", "loopers@example.com");
+
+      // act
+      CoreException exception =
+          assertThrows(
+              CoreException.class, () -> user.changePassword("Password1!", "19950515!"));
+
+      // assert
+      assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+    }
+  }
 }
