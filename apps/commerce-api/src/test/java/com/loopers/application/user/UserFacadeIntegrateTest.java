@@ -87,7 +87,7 @@ class UserFacadeIntegrateTest {
             // when then
             assertThatThrownBy(() -> userFacade.createUser(duplicate.loginId(), duplicate.name(), duplicate.birth(), duplicate.password(), duplicate.email()))
                     .isInstanceOf(CoreException.class)
-                    .hasMessage("이미 존재하는 유저의 아이디입니다");
+                    .hasMessage("이미 존재하는 유저의 아이디입니다.");
         }
         
         @DisplayName("비밀번호는 암호화 된다")
