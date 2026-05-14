@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -122,24 +124,15 @@ class UserModelTest {
     @Nested
     class MaskedName {
 
-        @DisplayName("여러 글자 이름은 마지막 글자만 '*' 로 치환된다.")
-        @Test
-        void returnsMaskedName_whenNameHasMultipleChars() {
-            // arrange — "홍길동" (3글자)
-            UserModel user = new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "홍길동", UserFixture.BIRTH, UserFixture.EMAIL);
+        @ParameterizedTest(name = "{0} → {1}")
+        @CsvSource({
+            "홍길동, 홍길*",
+            "홍,    *"
+        })
+        void returnsMaskedName(String name, String expected) {
+            UserModel user = new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, name, UserFixture.BIRTH, UserFixture.EMAIL);
 
-            // act & assert
-            assertThat(user.getMaskedName()).isEqualTo("홍길*");
-        }
-
-        @DisplayName("한 글자 이름은 '*' 만 반환한다.")
-        @Test
-        void returnsAsterisk_whenNameIsSingleChar() {
-            // arrange — 이름이 1글자인 경우
-            UserModel user = new UserModel(UserFixture.LOGIN_ID, UserFixture.PASSWORD, "홍", UserFixture.BIRTH, UserFixture.EMAIL);
-
-            // act & assert
-            assertThat(user.getMaskedName()).isEqualTo("*");
+            assertThat(user.getMaskedName()).isEqualTo(expected.trim());
         }
     }
 
