@@ -1,0 +1,23 @@
+### 유저 생성
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "tester",
+  "name": "테스터",
+  "birth": "1993-03-16",
+  "password": "{{password}}",
+  "email": "test@tester.com"
+}
+
+### 유저 조회
+GET {{commerce-api}}/api/v1/users/1
+
+### 유저 비밀번호 변경
+PATCH {{commerce-api}}/api/v1/users/1
+Content-Type: application/json
+
+{
+  "oldPassword": "{{password}}",
+  "targetPassword": "q1w2e3r4!!"
+}
