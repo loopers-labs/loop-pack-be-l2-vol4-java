@@ -37,6 +37,18 @@ public class UserV1Dto {
             String email
     ) {}
 
+    public record ChangePasswordRequest(
+            @NotBlank
+            String currentPassword,
+
+            @NotBlank
+            @Pattern(
+                    regexp = "^[A-Za-z0-9!@#$%^&*()]{8,16}$",
+                    message = "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다."
+            )
+            String newPassword
+    ) {}
+
     public record UserResponse(
             String loginId,
             String name,

@@ -32,4 +32,10 @@ public class UserFacade {
 
         return UserInfo.from(userModel);
     }
+
+    @Transactional
+    public UserInfo changePassword(String loginId, String currentPassword, String newPassword) {
+        UserModel userModel = userService.changePassword(loginId, currentPassword, newPassword);
+        return UserInfo.from(userModel);
+    }
 }

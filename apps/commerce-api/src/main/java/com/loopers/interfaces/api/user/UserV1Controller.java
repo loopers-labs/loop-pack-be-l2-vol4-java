@@ -3,8 +3,10 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.auth.LoginUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,20 @@ public class UserV1Controller {
                 request.name(),
                 request.birthDate(),
                 request.email()
+        );
+        UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(userInfo);
+        return ApiResponse.success(response);
+    }
+
+    @PatchMapping("/me")
+    public ApiResponse<UserV1Dto.UserResponse> changePassword(
+            @LoginUser String loginId,
+            @Valid @RequestBody UserV1Dto.ChangePasswordRequest request
+    ) {
+        UserInfo userInfo = userFacade.changePassword(
+                loginId,
+                request.currentPassword(),
+                request.newPassword()
         );
         UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(userInfo);
         return ApiResponse.success(response);

@@ -50,6 +50,10 @@ public class UserModel extends BaseEntity {
         return new UserModel(loginId, password, name, birthDate, email);
     }
 
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     @Override
     public boolean equals(Object object) {
         if (this == object) {
