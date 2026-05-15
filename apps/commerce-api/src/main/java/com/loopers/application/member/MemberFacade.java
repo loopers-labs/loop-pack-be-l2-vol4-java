@@ -15,7 +15,8 @@ public class MemberFacade {
         memberService.register(loginId, password, name, birthDate, email);
     }
 
-    public void changePassword(String loginId, String oldRawPassword, String newRawPassword) {
+    public void changePassword(String loginId, String loginPw, String oldRawPassword, String newRawPassword) {
+        memberService.getMe(loginId, loginPw);  // 헤더로 본인 인증
         memberService.changePassword(loginId, oldRawPassword, newRawPassword);
     }
 

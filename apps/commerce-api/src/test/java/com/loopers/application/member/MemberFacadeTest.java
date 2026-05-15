@@ -46,6 +46,28 @@ class MemberFacadeTest {
         }
     }
 
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 정보가 주어지면, getMe()와 changePassword()가 순서대로 호출된다.")
+        @Test
+        void callsGetMeAndChangePassword_whenCredentialsAreValid() {
+            // Arrange
+            String loginId = "testUser1";
+            String loginPw = "Password1!";
+            String oldPassword = "Password1!";
+            String newPassword = "NewPassword2@";
+
+            // Act
+            memberFacade.changePassword(loginId, loginPw, oldPassword, newPassword);
+
+            // Assert
+            verify(memberService, times(1)).getMe(loginId, loginPw);
+            verify(memberService, times(1)).changePassword(loginId, oldPassword, newPassword);
+        }
+    }
+
     @DisplayName("내 정보를 조회할 때, ")
     @Nested
     class GetMe {

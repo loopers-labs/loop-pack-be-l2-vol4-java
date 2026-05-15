@@ -37,10 +37,10 @@ public class MemberV1Controller {
     @PatchMapping("/me/password")
     public ApiResponse<Object> changePassword(
         @RequestHeader("X-Loopers-LoginId") String loginId,
-        @RequestHeader("X-Loopers-LoginPw") String rawPassword,
+        @RequestHeader("X-Loopers-LoginPw") String loginPw,
         @RequestBody MemberV1Dto.ChangePasswordRequest request
     ) {
-        memberFacade.changePassword(loginId, request.oldPassword(), request.newPassword());
+        memberFacade.changePassword(loginId, loginPw, request.oldPassword(), request.newPassword());
         return ApiResponse.success();
     }
 

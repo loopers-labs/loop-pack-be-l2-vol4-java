@@ -219,6 +219,30 @@ class MemberV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
+        @DisplayName("헤더 비밀번호가 틀리면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returns401_whenLoginPwIsWrong() {
+            // Arrange
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST,
+                new HttpEntity<>(new MemberV1Dto.RegisterRequest("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com")),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "WrongPassword1!"); // 헤더 비번 틀림
+
+            MemberV1Dto.ChangePasswordRequest request = new MemberV1Dto.ChangePasswordRequest("Password1!", "NewPassword2@");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
         @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         void returns400_whenNewPasswordIsSameAsCurrent() {
