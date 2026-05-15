@@ -1,8 +1,9 @@
 package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.PasswordHasher;
-import com.loopers.infrastructure.user.UserJpaRepository;
+import com.loopers.domain.user.PasswordEncryptor;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -31,112 +32,26 @@ class UserV1ApiE2ETest {
     private static final String VALID_PASSWORD = "Password1!";
 
     private final TestRestTemplate testRestTemplate;
-    private final UserJpaRepository userJpaRepository;
+    private final UserRepository userRepository;
     private final DatabaseCleanUp databaseCleanUp;
-    private final PasswordHasher passwordHasher;
+    private final PasswordEncryptor passwordEncryptor;
 
     @Autowired
     public UserV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
-        UserJpaRepository userJpaRepository,
+        UserRepository userRepository,
         DatabaseCleanUp databaseCleanUp,
-        PasswordHasher passwordHasher
+        PasswordEncryptor passwordEncryptor
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.userJpaRepository = userJpaRepository;
+        this.userRepository = userRepository;
         this.databaseCleanUp = databaseCleanUp;
-        this.passwordHasher = passwordHasher;
+        this.passwordEncryptor = passwordEncryptor;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-    }
-
-    @DisplayName("GET /api/v1/users/me")
-    @Nested
-    class GetMyInfo {
-        @DisplayName("내 정보 조회에 성공할 경우, 해당하는 유저 정보를 응답으로 반환한다 (이름은 마스킹된 형태)")
-        @Test
-        void returnsMyInfo_whenUserExists() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity(loginId, VALID_PASSWORD), responseType);
-
-            // assert
-            assertAll(
-                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo(loginId),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*")
-            );
-        }
-
-        @DisplayName("X-Loopers-LoginId 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, new HttpEntity<>(null), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("X-Loopers-LoginPw 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, loginIdOnlyHeaderEntity(loginId), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("헤더 loginPw 인증이 실패할 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginPwAuthenticationFails() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity(loginId, "WrongPass1!"), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("존재하지 않는 ID 로 조회할 경우, 404 Not Found 응답을 반환한다")
-        @Test
-        void returnsNotFound_whenUserDoesNotExist() {
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity("nonexistent", VALID_PASSWORD), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        }
     }
 
     @DisplayName("POST /api/v1/users")
@@ -145,40 +60,48 @@ class UserV1ApiE2ETest {
         @DisplayName("회원 가입이 성공할 경우, 생성된 유저 정보를 응답으로 반환한다")
         @Test
         void returnsUserInfo_whenSignUpSucceeds() {
-            // arrange
+            // given
             UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
                 "user01", VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE
             );
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonEntity(request), responseType);
 
-            // assert
+            // then
+            UserModel persisted = userRepository.findByLoginId(request.loginId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().id()).isEqualTo(persisted.getId()),
                 () -> assertThat(response.getBody().data().loginId()).isEqualTo(request.loginId()),
                 () -> assertThat(response.getBody().data().name()).isEqualTo(request.name()),
                 () -> assertThat(response.getBody().data().birthDate()).isEqualTo(request.birthDate()),
-                () -> assertThat(response.getBody().data().email()).isEqualTo(request.email())
+                () -> assertThat(response.getBody().data().email()).isEqualTo(request.email()),
+                () -> assertThat(persisted.getLoginId().value()).isEqualTo(request.loginId()),
+                () -> assertThat(persisted.getName()).isEqualTo(request.name()),
+                () -> assertThat(persisted.getBirthDate().value()).isEqualTo(request.birthDate()),
+                () -> assertThat(persisted.getEmail().value()).isEqualTo(request.email()),
+                () -> assertThat(persisted.getGender()).isEqualTo(request.gender()),
+                () -> assertThat(persisted.matchesPassword(request.password(), passwordEncryptor)).isTrue()
             );
         }
 
         @DisplayName("회원 가입 시에 성별이 없을 경우, 400 Bad Request 응답을 반환한다")
         @Test
         void returnsBadRequest_whenGenderIsNull() {
-            // arrange
+            // given
             String body = """
                 {"loginId":"user01","password":"Password1!","name":"홍길동","birthDate":"1990-01-01","email":"user@example.com","gender":null}
                 """;
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonStringEntity(body), responseType);
 
-            // assert
+            // then
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
             );
@@ -187,36 +110,128 @@ class UserV1ApiE2ETest {
         @DisplayName("비밀번호 RULE 위반 입력 시 400 Bad Request 를 반환한다")
         @Test
         void returnsBadRequest_whenPasswordViolatesRule() {
-            // arrange
+            // given
             UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
                 "user01", "pw", "홍길동", "1990-01-01", "user@example.com", Gender.MALE
             );
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonEntity(request), responseType);
 
-            // assert
+            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
         @DisplayName("중복된 로그인 ID 로 요청 시 409 Conflict 를 반환한다")
         @Test
         void returnsConflict_whenDuplicateLoginIdIsProvided() {
-            // arrange
+            // given
             UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
                 "user01", VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE
             );
             testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonEntity(request), Void.class);
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGN_UP, HttpMethod.POST, jsonEntity(request), responseType);
 
-            // assert
+            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMyInfo {
+        @DisplayName("내 정보 조회에 성공할 경우, 해당하는 유저 정보를 응답으로 반환한다 (이름은 마스킹된 형태)")
+        @Test
+        void returnsMyInfo_whenUserExists() {
+            // given
+            String loginId = "user01";
+            UserModel saved = userRepository.save(new UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity(loginId, VALID_PASSWORD), responseType);
+
+            // then
+            UserModel persisted = userRepository.findByLoginId(loginId).orElseThrow();
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo(loginId),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1990-01-01"),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("user@example.com"),
+                () -> assertThat(persisted.getId()).isEqualTo(saved.getId()),
+                () -> assertThat(persisted.getName()).isEqualTo("홍길동")
+            );
+        }
+
+        @DisplayName("X-Loopers-LoginId 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, new HttpEntity<>(null), responseType);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
+            // given
+            String loginId = "user01";
+            userRepository.save(new UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, loginIdOnlyHeaderEntity(loginId), responseType);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("헤더 loginPw 인증이 실패할 경우, 400 Bad Request 응답을 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginPwAuthenticationFails() {
+            // given
+            String loginId = "user01";
+            userRepository.save(new UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity(loginId, "WrongPass1!"), responseType);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("존재하지 않는 ID 로 조회할 경우, 404 Not Found 응답을 반환한다")
+        @Test
+        void returnsNotFound_whenUserDoesNotExist() {
+            // when
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, authHeaderEntity("nonexistent", VALID_PASSWORD), responseType);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -226,113 +241,40 @@ class UserV1ApiE2ETest {
         @DisplayName("정상 요청 시 성공 응답을 반환한다")
         @Test
         void returnsSuccess_whenPasswordChangeSucceeds() {
-            // arrange
+            // given
             String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            userRepository.save(new UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
             ));
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
 
-            // assert
+            // then
             assertTrue(response.getStatusCode().is2xxSuccessful());
-        }
-
-        @DisplayName("X-Loopers-LoginId 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
-            // arrange
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
-
-            // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, jsonEntity(request), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("X-Loopers-LoginPw 헤더가 없을 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
-
-            // act
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set(AuthHeaders.LOGIN_ID, loginId);
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("헤더 loginPw 인증이 실패할 경우, 400 Bad Request 응답을 반환한다")
-        @Test
-        void returnsBadRequest_whenLoginPwAuthenticationFails() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "NewPass99!");
-
-            // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, "WrongPass1!"), responseType);
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            UserModel updated = userRepository.findByLoginId(loginId).orElseThrow();
+            assertThat(updated.matchesPassword("NewPass99!", passwordEncryptor)).isTrue();
         }
 
         @DisplayName("기존 비밀번호 불일치 시 400 Bad Request 를 반환한다")
         @Test
         void returnsBadRequest_whenOldPasswordDoesNotMatch() {
-            // arrange
+            // given
             String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
+            userRepository.save(new UserModel(
+                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
             ));
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("WrongPass1!", "NewPass99!");
 
-            // act
+            // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
 
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @DisplayName("신규 비밀번호 RULE 위반 시 400 Bad Request 를 반환한다")
-        @Test
-        void returnsBadRequest_whenNewPasswordViolatesRule() {
-            // arrange
-            String loginId = "user01";
-            userJpaRepository.save(new com.loopers.domain.user.UserModel(
-                loginId, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordHasher
-            ));
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PASSWORD, "pw");
-
-            // act
-            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
-
-            // assert
+            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }

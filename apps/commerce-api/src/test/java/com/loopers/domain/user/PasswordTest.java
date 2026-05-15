@@ -14,63 +14,52 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PasswordTest {
 
-    private static final PasswordHasher FAKE_HASHER = new PasswordHasher() {
-        @Override public String encode(String raw) { return raw; }
-        @Override public boolean matches(String raw, String encoded) { return raw.equals(encoded); }
-    };
+    private final PasswordEncryptor passwordEncryptor = new FakePasswordEncryptor("encrypted:");
 
     @DisplayName("Password 를 생성할 때, ")
     @Nested
     class Create {
-        @DisplayName("8~16자 영문/숫자/특수문자이면 생성에 성공하고 저장된다")
-        @ValueSource(strings = {"Password1!", "Abc12345!", "aA1!aA1!", "abcdefghij12345!"})
-        @ParameterizedTest
-        void createsPassword_whenValueIsValid(String value) {
-            // act
-            Password password = Password.of(value, FAKE_HASHER);
 
-            // assert
-            assertThat(password.matches(value, FAKE_HASHER)).isTrue();
+        @DisplayName("정상적으로 암호화되어 생성된다.")
+        @Test
+        void createsPassword() {
+            // given
+            String rawPassword = "Password";
+            BirthDate birthDate = new BirthDate("1998-06-12");
+
+            // when
+            Password password = new Password(rawPassword, birthDate, passwordEncryptor);
+
+            // then
+            assertThat(password.getValue()).isEqualTo("encrypted:" + rawPassword);
         }
 
-        @DisplayName("null 이거나 빈 문자열이면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("8~16자 영문/숫자/특수문자가 아니면 예외가 발생한다.")
         @NullAndEmptySource
+        @ValueSource(strings = {"Pw1234!", "PasswordPasswordP", "한글Password1!", "Password 1!"})
         @ParameterizedTest
-        void throwsBadRequestException_whenValueIsNullOrEmpty(String value) {
-            CoreException result = assertThrows(CoreException.class, () -> Password.of(value, FAKE_HASHER));
+        void throwsBadRequestException_whenRawPasswordIsInvalid(String rawPassword) {
+            // given
+            BirthDate birthDate = new BirthDate("1998-06-12");
 
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> new Password(rawPassword, birthDate, passwordEncryptor));
+
+            // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("7자 이하이면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("생년월일이 포함되어 있으면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequestException_whenValueIsTooShort() {
-            CoreException result = assertThrows(CoreException.class, () -> Password.of("Pw1!", FAKE_HASHER));
+        void throwsBadRequestException_whenRawPasswordContainsBirthDate() {
+            // given
+            String rawPassword = "Pass19900101!";
+            BirthDate birthDate = new BirthDate("1990-01-01");
 
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> new Password(rawPassword, birthDate, passwordEncryptor));
 
-        @DisplayName("17자 이상이면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequestException_whenValueIsTooLong() {
-            CoreException result = assertThrows(CoreException.class, () -> Password.of("Password1!Password1!", FAKE_HASHER));
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("한글이 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequestException_whenValueContainsKorean() {
-            CoreException result = assertThrows(CoreException.class, () -> Password.of("한글Password1!", FAKE_HASHER));
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("공백이 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequestException_whenValueContainsSpace() {
-            CoreException result = assertThrows(CoreException.class, () -> Password.of("Password 1!", FAKE_HASHER));
-
+            // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
