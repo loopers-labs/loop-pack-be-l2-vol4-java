@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.auth;
 
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserAccountFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
@@ -31,7 +31,7 @@ class AuthInterceptorIntegrationTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private UserFacade userFacade;
+    private UserAccountFacade userFacade;
 
     @MockitoBean
     private UserService userService;
