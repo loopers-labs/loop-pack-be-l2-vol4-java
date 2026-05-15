@@ -38,3 +38,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### QueryDSL ###
+**/src/main/generated/
