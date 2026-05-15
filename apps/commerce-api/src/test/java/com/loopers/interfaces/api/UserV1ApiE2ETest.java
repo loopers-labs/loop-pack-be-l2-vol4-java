@@ -116,6 +116,40 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
+        @DisplayName("null loginId로 회원가입 시 400 BAD_REQUEST가 반환된다.")
+        @Test
+        void returnsBadRequest_whenLoginIdIsNull() {
+            // arrange
+            UserV1Dto.UserRegisterRequest request = new UserV1Dto.UserRegisterRequest(
+                null, RAW_PASSWORD, "홍길동", LocalDate.of(1990, 1, 15), "hong@example.com"
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, new HttpEntity<>(request), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("null birthDate로 회원가입 시 400 BAD_REQUEST가 반환된다.")
+        @Test
+        void returnsBadRequest_whenBirthDateIsNull() {
+            // arrange
+            UserV1Dto.UserRegisterRequest request = new UserV1Dto.UserRegisterRequest(
+                "user123", RAW_PASSWORD, "홍길동", null, "hong@example.com"
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, new HttpEntity<>(request), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
         @DisplayName("비밀번호 형식 위반으로 회원가입 시 400 BAD_REQUEST가 반환된다.")
         @Test
         void returnsBadRequest_whenPasswordFormatIsInvalid() {
@@ -263,6 +297,23 @@ class UserV1ApiE2ETest {
             // arrange
             UserV1Dto.UserChangePasswordRequest request =
                 new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, "short");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request, authHeaders("pwuser", RAW_PASSWORD)), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("blank newPassword로 비밀번호 변경 시 400 BAD_REQUEST가 반환된다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordIsBlank() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, "");
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
