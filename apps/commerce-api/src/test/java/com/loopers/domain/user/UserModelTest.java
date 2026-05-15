@@ -19,7 +19,7 @@ class UserModelTest {
     private static final String VALID_NAME = "홍길동";
     private static final String VALID_BIRTH_DATE = "1990-05-14";
     private static final String VALID_EMAIL = "test@example.com";
-    private static final String VALID_GENDER = "M";
+    private static final Gender VALID_GENDER = Gender.M;
 
     @DisplayName("User 를 생성할 때, ")
     @Nested

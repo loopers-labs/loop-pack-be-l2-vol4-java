@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.application.user.SignUpCommand;
 import com.loopers.application.user.UserInfo;
+import com.loopers.domain.user.Gender;
 
 public class UserV1Dto {
 
@@ -11,7 +12,7 @@ public class UserV1Dto {
         String name,
         String birthDate,
         String email,
-        String gender
+        Gender gender
     ) {
         public SignUpCommand toCommand() {
             return new SignUpCommand(loginId, password, name, birthDate, email, gender);
@@ -24,7 +25,7 @@ public class UserV1Dto {
         String name,
         String birthDate,
         String email,
-        String gender
+        Gender gender
     ) {
         public static SignUpResponse from(UserInfo info) {
             return new SignUpResponse(

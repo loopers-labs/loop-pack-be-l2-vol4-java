@@ -1,5 +1,6 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.UserModel;
 
 public record SignUpCommand(
@@ -8,7 +9,7 @@ public record SignUpCommand(
     String name,
     String birthDate,
     String email,
-    String gender
+    Gender gender
 ) {
     public UserModel toModel() {
         return new UserModel(loginId, password, name, birthDate, email, gender);

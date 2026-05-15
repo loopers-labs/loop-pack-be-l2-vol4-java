@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api;
 
+import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.user.UserV1Dto;
@@ -59,7 +60,7 @@ class UserV1ApiE2ETest {
         void returnsCreatedUser_whenRequestIsValid() {
             // arrange
             UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             );
 
             // act
@@ -76,7 +77,7 @@ class UserV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().loginId()).isEqualTo("tester01"),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("홍길동"),
                 () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com"),
-                () -> assertThat(response.getBody().data().gender()).isEqualTo("M")
+                () -> assertThat(response.getBody().data().gender()).isEqualTo(Gender.M)
             );
         }
 
@@ -112,7 +113,7 @@ class UserV1ApiE2ETest {
         void returnsMaskedUserInfo_whenAuthenticated() {
             // arrange
             userJpaRepository.save(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
 
             // act
@@ -180,7 +181,7 @@ class UserV1ApiE2ETest {
         void returnsOk_whenRequestIsValid() {
             // arrange
             UserModel saved = userJpaRepository.save(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester01");
@@ -205,7 +206,7 @@ class UserV1ApiE2ETest {
         void returnsBadRequest_whenNewPasswordInvalid() {
             // arrange
             userJpaRepository.save(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester01");
@@ -227,7 +228,7 @@ class UserV1ApiE2ETest {
         void returnsBadRequest_whenAuthPasswordMismatch() {
             // arrange
             userJpaRepository.save(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester01");

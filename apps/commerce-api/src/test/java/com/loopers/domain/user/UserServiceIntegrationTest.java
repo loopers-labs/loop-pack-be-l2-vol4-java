@@ -45,7 +45,7 @@ class UserServiceIntegrationTest {
         void persistsUser_whenInputIsValid() {
             // arrange
             UserModel user = new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             );
 
             // act
@@ -64,12 +64,12 @@ class UserServiceIntegrationTest {
         void throwsConflict_whenLoginIdAlreadyExists() {
             // arrange
             UserModel existing = new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             );
             userService.signUp(existing);
 
             UserModel duplicate = new UserModel(
-                "tester01", "Password2@", "김철수", "1991-06-15", "another@example.com", "F"
+                "tester01", "Password2@", "김철수", "1991-06-15", "another@example.com", Gender.F
             );
 
             // act
@@ -89,7 +89,7 @@ class UserServiceIntegrationTest {
         void returnsUser_whenLoginIdExists() {
             // arrange
             UserModel saved = userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
 
             // act
@@ -124,7 +124,7 @@ class UserServiceIntegrationTest {
         void persistsNewPassword_whenInputIsValid() {
             // arrange
             userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
 
             // act
@@ -140,7 +140,7 @@ class UserServiceIntegrationTest {
         void throwsBadRequest_whenCurrentPasswordMismatch() {
             // arrange
             userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", "M"
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
 
             // act

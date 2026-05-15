@@ -1,5 +1,6 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.UserModel;
 
 public record UserInfo(
@@ -9,7 +10,7 @@ public record UserInfo(
     String maskedName,
     String birthDate,
     String email,
-    String gender
+    Gender gender
 ) {
     public static UserInfo from(UserModel model) {
         return new UserInfo(

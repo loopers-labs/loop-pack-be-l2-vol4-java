@@ -5,6 +5,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
@@ -49,12 +51,13 @@ public class UserModel extends BaseEntity {
     @Column(nullable = false)
     private String email;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String gender;
+    private Gender gender;
 
     protected UserModel() {}
 
-    public UserModel(String loginId, String password, String name, String birthDate, String email, String gender) {
+    public UserModel(String loginId, String password, String name, String birthDate, String email, Gender gender) {
         validateLoginId(loginId);
         validateName(name);
         validateBirthDate(birthDate);
@@ -121,8 +124,8 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private static void validateGender(String gender) {
-        if (gender == null || gender.isBlank()) {
+    private static void validateGender(Gender gender) {
+        if (gender == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "성별은 필수 입력값입니다.");
         }
     }
