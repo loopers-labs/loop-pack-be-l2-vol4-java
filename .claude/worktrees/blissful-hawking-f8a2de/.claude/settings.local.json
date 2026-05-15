@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/kkbm0225/Downloads/loopers-server/**)",
+      "Bash(git -C /Users/kkbm0225/Downloads/loopers-server log --oneline -5)",
+      "Bash(git -C /Users/kkbm0225/Downloads/loopers-server remote -v)",
+      "Bash(git -C /Users/kkbm0225/Downloads/loopers-server branch -a)"
+    ]
+  }
+}
