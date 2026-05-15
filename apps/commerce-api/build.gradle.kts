@@ -15,7 +15,7 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     // querydsl
-    annotationProcessor("com.querydsl:querydsl-apt::jakarta")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["openFeignQuerydslVersion"]}:jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 
