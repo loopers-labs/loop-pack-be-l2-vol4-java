@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+
 class MemberTest {
 
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
@@ -66,6 +67,26 @@ class MemberTest {
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+    }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 기존 비밀번호와 새 비밀번호가 주어지면, password 필드가 교체된다.")
+        @Test
+        void changesPassword_whenCredentialsAreValid() {
+            // Arrange
+            Member member = createMember("testUser1", "홍길동", "1990-01-01", "test@example.com");
+            Password oldPassword = member.getPassword();
+
+            // Act
+            member.changePassword("Password1!", "NewPassword2@", encoder);
+
+            // Assert
+            assertThat(member.getPassword()).isNotSameAs(oldPassword);
+        }
+
     }
 
     @DisplayName("이름을 마스킹할 때, ")

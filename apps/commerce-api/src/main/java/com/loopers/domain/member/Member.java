@@ -4,10 +4,12 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 
 @Entity
 @Table(name = "members")
@@ -17,8 +19,8 @@ public class Member extends BaseEntity {
     @Column(name = "login_id", nullable = false, unique = true)
     private String loginId;
 
-    @Column(name = "password", nullable = false)
-    private String password;
+    @Embedded
+    private Password password;
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -36,7 +38,7 @@ public class Member extends BaseEntity {
         validateEmail(email);
 
         this.loginId = loginId;
-        this.password = password.getEncodedValue();
+        this.password = password;
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
@@ -59,6 +61,10 @@ public class Member extends BaseEntity {
     }
 
     public boolean matchesPassword(String rawPassword, PasswordEncoder encoder) {
-        return encoder.matches(rawPassword, this.password);
+        return password.matches(rawPassword, encoder);
+    }
+
+    public void changePassword(String oldRawPassword, String newRawPassword, PasswordEncoder encoder) {
+        this.password = password.change(oldRawPassword, newRawPassword, this.birthDate, encoder);
     }
 }

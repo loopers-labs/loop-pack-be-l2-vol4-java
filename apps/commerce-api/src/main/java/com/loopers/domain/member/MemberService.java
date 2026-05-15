@@ -24,6 +24,13 @@ public class MemberService {
         return memberRepository.save(new Member(loginId, encodedPassword, name, birthDate, email));
     }
 
+    @Transactional
+    public void changePassword(String loginId, String oldRawPassword, String newRawPassword) {
+        Member member = memberRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+        member.changePassword(oldRawPassword, newRawPassword, passwordEncoder);
+    }
+
     @Transactional(readOnly = true)
     public Member getMe(String loginId, String rawPassword) {
         Member member = memberRepository.findByLoginId(loginId)

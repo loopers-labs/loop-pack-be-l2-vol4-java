@@ -122,4 +122,40 @@ class MemberServiceTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 정보가 주어지면, 새 비밀번호로 encode()가 호출된다.")
+        @Test
+        void callsEncode_whenCredentialsAreValid() {
+            // Arrange
+            String loginId = "testUser1";
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
+            when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
+
+            // Act
+            memberService.changePassword(loginId, "Password1!", "NewPassword2@");
+
+            // Assert
+            verify(passwordEncoder, times(1)).encode("NewPassword2@");
+        }
+
+        @DisplayName("존재하지 않는 loginId가 주어지면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdDoesNotExist() {
+            // Arrange
+            when(memberRepository.findByLoginId("notExist")).thenReturn(Optional.empty());
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                memberService.changePassword("notExist", "Password1!", "NewPassword2@")
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }

@@ -95,4 +95,55 @@ class PasswordTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class Change {
+
+        @DisplayName("올바른 정보가 주어지면, 새 비밀번호로 암호화된 Password가 반환된다.")
+        @Test
+        void returnsNewPassword_whenCredentialsAreValid() {
+            // Arrange
+            String birthDate = "1990-01-01";
+            Password current = Password.of("Password1!", birthDate, encoder);
+
+            // Act
+            Password changed = current.change("Password1!", "NewPassword2@", birthDate, encoder);
+
+            // Assert
+            assertThat(changed.matches("NewPassword2@", encoder)).isTrue();
+        }
+
+        @DisplayName("기존 비밀번호가 틀리면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenOldPasswordIsWrong() {
+            // Arrange
+            String birthDate = "1990-01-01";
+            Password current = Password.of("Password1!", birthDate, encoder);
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                current.change("WrongPassword1!", "NewPassword2@", birthDate, encoder)
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // Arrange
+            String birthDate = "1990-01-01";
+            Password current = Password.of("Password1!", birthDate, encoder);
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                current.change("Password1!", "Password1!", birthDate, encoder)
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

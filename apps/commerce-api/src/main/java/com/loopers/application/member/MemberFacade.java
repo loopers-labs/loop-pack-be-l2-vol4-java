@@ -15,6 +15,10 @@ public class MemberFacade {
         memberService.register(loginId, password, name, birthDate, email);
     }
 
+    public void changePassword(String loginId, String oldRawPassword, String newRawPassword) {
+        memberService.changePassword(loginId, oldRawPassword, newRawPassword);
+    }
+
     public MemberInfo getMe(String loginId, String rawPassword) {
         Member member = memberService.getMe(loginId, rawPassword);
         return MemberInfo.from(member);

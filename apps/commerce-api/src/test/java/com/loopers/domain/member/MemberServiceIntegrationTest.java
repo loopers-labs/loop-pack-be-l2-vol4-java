@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+
 @SpringBootTest
 class MemberServiceIntegrationTest {
 
@@ -103,5 +104,37 @@ class MemberServiceIntegrationTest {
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
+    }
+
+    @DisplayName("비밀번호를 변경할 때, ")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 정보가 주어지면, 비밀번호가 변경된다.")
+        @Test
+        void changesPassword_whenCredentialsAreValid() {
+            // Arrange
+            memberService.register("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com");
+
+            // Act
+            memberService.changePassword("testUser1", "Password1!", "NewPassword2@");
+
+            // Assert
+            Member member = memberService.getMe("testUser1", "NewPassword2@");
+            assertThat(member.getLoginId()).isEqualTo("testUser1");
+        }
+
+        @DisplayName("존재하지 않는 loginId가 주어지면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdDoesNotExist() {
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                memberService.changePassword("notExist", "Password1!", "NewPassword2@")
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
     }
 }

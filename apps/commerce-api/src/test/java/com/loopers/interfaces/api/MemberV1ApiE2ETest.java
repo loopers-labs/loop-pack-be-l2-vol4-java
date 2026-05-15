@@ -1,6 +1,5 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.infrastructure.member.MemberJpaRepository;
 import com.loopers.interfaces.api.member.MemberV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -26,19 +25,17 @@ class MemberV1ApiE2ETest {
 
     private static final String ENDPOINT_REGISTER = "/api/v1/members";
     private static final String ENDPOINT_GET_ME = "/api/v1/members/me";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/members/me/password";
 
     private final TestRestTemplate testRestTemplate;
-    private final MemberJpaRepository memberJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     public MemberV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
-        MemberJpaRepository memberJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.memberJpaRepository = memberJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -167,6 +164,83 @@ class MemberV1ApiE2ETest {
 
             // Assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("PATCH /api/v1/members/me/password")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("올바른 정보가 주어지면, 200 OK 응답을 받는다.")
+        @Test
+        void returns200_whenCredentialsAreValid() {
+            // Arrange
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST,
+                new HttpEntity<>(new MemberV1Dto.RegisterRequest("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com")),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+
+            MemberV1Dto.ChangePasswordRequest request = new MemberV1Dto.ChangePasswordRequest("Password1!", "NewPassword2@");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // Assert
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+        }
+
+        @DisplayName("기존 비밀번호가 틀리면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void returns401_whenOldPasswordIsWrong() {
+            // Arrange
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST,
+                new HttpEntity<>(new MemberV1Dto.RegisterRequest("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com")),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+
+            MemberV1Dto.ChangePasswordRequest request = new MemberV1Dto.ChangePasswordRequest("WrongPassword1!", "NewPassword2@");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returns400_whenNewPasswordIsSameAsCurrent() {
+            // Arrange
+            testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST,
+                new HttpEntity<>(new MemberV1Dto.RegisterRequest("testUser1", "Password1!", "홍길동", "1990-01-01", "test@example.com")),
+                Void.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", "testUser1");
+            headers.set("X-Loopers-LoginPw", "Password1!");
+
+            MemberV1Dto.ChangePasswordRequest request = new MemberV1Dto.ChangePasswordRequest("Password1!", "Password1!");
+
+            // Act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType
+            );
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 }
