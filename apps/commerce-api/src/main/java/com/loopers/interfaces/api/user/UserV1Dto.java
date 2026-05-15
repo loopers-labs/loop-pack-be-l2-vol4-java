@@ -47,20 +47,10 @@ public class UserV1Dto {
         public static MyInfoResponse from(UserInfo info) {
             return new MyInfoResponse(
                 info.loginId(),
-                maskLastChar(info.name()),
+                info.maskedName(),
                 info.birthDate(),
                 info.email()
             );
-        }
-
-        private static String maskLastChar(String name) {
-            if (name == null || name.isEmpty()) {
-                return name;
-            }
-            if (name.length() == 1) {
-                return "*";
-            }
-            return name.substring(0, name.length() - 1) + "*";
         }
     }
 

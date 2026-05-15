@@ -74,6 +74,13 @@ public class UserModel extends BaseEntity {
         return this.password.equals(password);
     }
 
+    public String getMaskedName() {
+        if (this.name.length() == 1) {
+            return "*";
+        }
+        return this.name.substring(0, this.name.length() - 1) + "*";
+    }
+
     public void changePassword(String currentPassword, String newPassword) {
         if (!matchesPassword(currentPassword)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");

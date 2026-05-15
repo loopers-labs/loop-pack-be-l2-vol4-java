@@ -121,6 +121,35 @@ class UserModelTest {
         }
     }
 
+    @DisplayName("이름을 마스킹할 때, ")
+    @Nested
+    class GetMaskedName {
+
+        @DisplayName("두 글자 이상이면, 마지막 글자가 * 로 마스킹된다.")
+        @Test
+        void masksLastChar_whenNameHasTwoOrMoreChars() {
+            // arrange
+            UserModel user = new UserModel(
+                VALID_LOGIN_ID, VALID_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
+            );
+
+            // act + assert
+            assertThat(user.getMaskedName()).isEqualTo("홍길*");
+        }
+
+        @DisplayName("한 글자이면, * 한 글자로 마스킹된다.")
+        @Test
+        void masksSingleChar_whenNameHasOneChar() {
+            // arrange
+            UserModel user = new UserModel(
+                VALID_LOGIN_ID, VALID_PASSWORD, "박", VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
+            );
+
+            // act + assert
+            assertThat(user.getMaskedName()).isEqualTo("*");
+        }
+    }
+
     @DisplayName("비밀번호를 변경할 때, ")
     @Nested
     class ChangePassword {
