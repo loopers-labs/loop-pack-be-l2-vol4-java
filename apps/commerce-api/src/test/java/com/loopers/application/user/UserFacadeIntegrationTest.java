@@ -38,7 +38,7 @@ class UserFacadeIntegrationTest {
         @Test
         void returnsUserInfo_whenIdExists() {
             // arrange
-            UserInfo saved = userFacade.signUp(new SignUpCommand(
+            UserInfo saved = userFacade.signUp(new SignUpRequestCommand(
                 "loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
             ));
 

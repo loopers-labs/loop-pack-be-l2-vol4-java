@@ -17,7 +17,7 @@ public class UserFacade {
 
     private final UserService userService;
 
-    public UserInfo signUp(SignUpCommand command) {
+    public UserInfo signUp(SignUpRequestCommand command) {
         BirthDate birthDate = BirthDate.of(command.birthDate());
         SignUpUserCommand signUpUserCommand = new SignUpUserCommand(
             LoginId.of(command.loginId()),
