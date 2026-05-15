@@ -83,6 +83,12 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        environment("DOCKER_HOST", "npipe:////./pipe/dockerDesktopLinuxEngine")
+        environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+        environment("DOCKER_API_VERSION", "1.47")
+        systemProperty("DOCKER_HOST", "npipe:////./pipe/dockerDesktopLinuxEngine")
+        systemProperty("TESTCONTAINERS_RYUK_DISABLED", "true")
+        systemProperty("DOCKER_API_VERSION", "1.47")
     }
 
     tasks.withType<JacocoReport> {
