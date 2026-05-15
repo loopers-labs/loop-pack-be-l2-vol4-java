@@ -16,7 +16,7 @@ import java.time.format.DateTimeParseException;
 public class UserModel extends BaseEntity {
     private static final String LOGIN_ID_PATTERN = "^[A-Za-z0-9]+$";
     private static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
-    private static final int PW_LETTER_MAX_SIZE = 20;
+    private static final int PW_LETTER_MAX_SIZE = 16;
     private static final int PW_LETTER_MIN_SIZE = 8;
     private static final String PASSWORD_PATTERN = "^[A-Za-z0-9!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/~`|\\\\]+$";
 
@@ -41,7 +41,7 @@ public class UserModel extends BaseEntity {
         }
 
         if (password.length() > PW_LETTER_MAX_SIZE || password.length() < PW_LETTER_MIN_SIZE) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~20자 이내로 작성해주시기 바랍니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자 이내로 작성해주시기 바랍니다.");
         }
         if (!password.matches(PASSWORD_PATTERN)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자로만 구성됩니다.");

@@ -27,7 +27,7 @@ public class UserModelTest {
         assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
     }
 
-    @DisplayName("pw가 20자를 넘어가면, BAD_REQUEST가 발생한다.")
+    @DisplayName("pw가 16자를 넘어가면, BAD_REQUEST가 발생한다.")
     @Test
     void createBadRequest_whenPWIsOver20Letter() {
         // arrange
