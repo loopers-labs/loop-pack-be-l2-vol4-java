@@ -27,7 +27,7 @@ class PasswordPolicyTest {
     @Nested
     class ValidateFormat {
 
-        @DisplayName("Given 유효한 비밀번호 / When 검증 / Then 예외가 발생하지 않는다.")
+        @DisplayName("유효한 비밀번호 검증 시 예외가 발생하지 않는다.")
         @Test
         void doesNotThrow_whenPasswordIsValid() {
             // arrange
@@ -37,7 +37,7 @@ class PasswordPolicyTest {
             assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
         }
 
-        @DisplayName("Given 8자 비밀번호 (최소 길이) / When 검증 / Then 예외가 발생하지 않는다.")
+        @DisplayName("8자 비밀번호(최소 길이) 검증 시 예외가 발생하지 않는다.")
         @Test
         void doesNotThrow_whenPasswordHasMinLength() {
             // arrange
@@ -47,7 +47,7 @@ class PasswordPolicyTest {
             assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
         }
 
-        @DisplayName("Given 16자 비밀번호 (최대 길이) / When 검증 / Then 예외가 발생하지 않는다.")
+        @DisplayName("16자 비밀번호(최대 길이) 검증 시 예외가 발생하지 않는다.")
         @Test
         void doesNotThrow_whenPasswordHasMaxLength() {
             // arrange
@@ -57,7 +57,7 @@ class PasswordPolicyTest {
             assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
         }
 
-        @DisplayName("Given 7자 비밀번호 (최소 길이 미만) / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("7자 비밀번호(최소 길이 미만) 검증 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordIsTooShort() {
             // arrange
@@ -72,7 +72,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given 17자 비밀번호 (최대 길이 초과) / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("17자 비밀번호(최대 길이 초과) 검증 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordIsTooLong() {
             // arrange
@@ -87,7 +87,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given 허용되지 않는 문자(한글) 포함 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("허용되지 않는 문자(한글) 포함 비밀번호 검증 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsInvalidCharacter() {
             // arrange
@@ -102,7 +102,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given null 비밀번호 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("null 비밀번호 검증 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordIsNull() {
             // arrange & act
@@ -119,7 +119,7 @@ class PasswordPolicyTest {
     @Nested
     class ValidateBirthDate {
 
-        @DisplayName("Given yyyyMMdd 형식의 생년월일 포함 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("yyyyMMdd 형식의 생년월일 포함 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDateAsYyyyMMdd() {
             // arrange
@@ -134,7 +134,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given yyyy-MM-dd 형식의 생년월일 포함 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("yyyy-MM-dd 형식의 생년월일 포함 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDateAsIso() {
             // arrange
@@ -149,7 +149,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given MMdd 형식의 생년월일 포함 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("MMdd 형식의 생년월일 포함 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDateAsMMdd() {
             // arrange
@@ -164,7 +164,7 @@ class PasswordPolicyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("Given yyyyMM 형식의 생년월일 포함 / When 검증 / Then BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("yyyyMM 형식의 생년월일 포함 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDateAsYyyyMM() {
             // arrange

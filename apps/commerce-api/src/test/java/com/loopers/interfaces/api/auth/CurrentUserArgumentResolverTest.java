@@ -28,7 +28,7 @@ class CurrentUserArgumentResolverTest {
     @Nested
     class SupportsParameter {
 
-        @DisplayName("Given @CurrentUser 애노테이션이 있는 파라미터 / When 지원 여부 확인 / Then true를 반환한다.")
+        @DisplayName("@CurrentUser 애노테이션이 있는 파라미터는 지원 여부 확인 시 true를 반환한다.")
         @Test
         void returnsTrue_whenParameterHasCurrentUserAnnotation() {
             // arrange
@@ -39,7 +39,7 @@ class CurrentUserArgumentResolverTest {
             assertThat(resolver.supportsParameter(parameter)).isTrue();
         }
 
-        @DisplayName("Given @CurrentUser 애노테이션이 없는 파라미터 / When 지원 여부 확인 / Then false를 반환한다.")
+        @DisplayName("@CurrentUser 애노테이션이 없는 파라미터는 지원 여부 확인 시 false를 반환한다.")
         @Test
         void returnsFalse_whenParameterHasNoCurrentUserAnnotation() {
             // arrange
@@ -55,7 +55,7 @@ class CurrentUserArgumentResolverTest {
     @Nested
     class ResolveArgument {
 
-        @DisplayName("Given request attribute에 currentUser가 존재 / When 파라미터 resolve / Then UserModel이 반환된다.")
+        @DisplayName("request attribute에 currentUser가 존재할 때 UserModel이 반환된다.")
         @Test
         void returnsCurrentUser_whenAttributeIsSet() throws Exception {
             // arrange

@@ -44,7 +44,7 @@ class UserServiceTest {
     @Nested
     class Register {
 
-        @DisplayName("Given 중복되지 않은 loginId / When 등록 요청 / Then 저장된 UserModel이 반환된다.")
+        @DisplayName("중복되지 않은 loginId 등록 시 저장된 UserModel이 반환된다.")
         @Test
         void returnsRegisteredUser_whenLoginIdIsUnique() {
             // arrange
@@ -58,7 +58,7 @@ class UserServiceTest {
             assertThat(result).isEqualTo(user);
         }
 
-        @DisplayName("Given 이미 존재하는 loginId / When 등록 요청 / Then CONFLICT 예외가 발생한다.")
+        @DisplayName("이미 존재하는 loginId 등록 시 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdIsDuplicated() {
             // arrange
@@ -79,7 +79,7 @@ class UserServiceTest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("Given 새 인코딩된 비밀번호 / When 변경 요청 / Then 비밀번호가 갱신되고 저장된다.")
+        @DisplayName("새 인코딩된 비밀번호로 변경 시 비밀번호가 갱신되고 저장된다.")
         @Test
         void updatesPasswordAndSaves_whenCalled() {
             // arrange
@@ -98,7 +98,7 @@ class UserServiceTest {
     @Nested
     class Authenticate {
 
-        @DisplayName("Given 올바른 loginId와 비밀번호 / When 인증 요청 / Then UserModel이 반환된다.")
+        @DisplayName("올바른 loginId와 비밀번호로 인증 시 UserModel이 반환된다.")
         @Test
         void returnsUser_whenCredentialsAreValid() {
             // arrange
@@ -112,7 +112,7 @@ class UserServiceTest {
             assertThat(result).isEqualTo(user);
         }
 
-        @DisplayName("Given 존재하지 않는 loginId / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("존재하지 않는 loginId로 인증 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenLoginIdNotFound() {
             // arrange
@@ -127,7 +127,7 @@ class UserServiceTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("Given 틀린 비밀번호 / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("틀린 비밀번호로 인증 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenPasswordIsWrong() {
             // arrange

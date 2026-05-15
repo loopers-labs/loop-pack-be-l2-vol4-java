@@ -74,7 +74,7 @@ class UserV1ApiE2ETest {
     @Nested
     class PostRegister {
 
-        @DisplayName("Given 유효한 회원 정보 / When 회원가입 / Then 200과 등록된 유저 정보가 반환된다.")
+        @DisplayName("유효한 정보로 회원가입 시 200과 등록된 유저 정보가 반환된다.")
         @Test
         void returnsRegisteredUser_whenValidInfoIsProvided() {
             // arrange
@@ -98,7 +98,7 @@ class UserV1ApiE2ETest {
             );
         }
 
-        @DisplayName("Given 이미 존재하는 loginId / When 회원가입 / Then 409 CONFLICT가 반환된다.")
+        @DisplayName("이미 존재하는 loginId로 회원가입 시 409 CONFLICT가 반환된다.")
         @Test
         void returnsConflict_whenLoginIdIsDuplicated() {
             // arrange
@@ -116,7 +116,7 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
-        @DisplayName("Given 비밀번호 형식 위반 / When 회원가입 / Then 400 BAD_REQUEST가 반환된다.")
+        @DisplayName("비밀번호 형식 위반으로 회원가입 시 400 BAD_REQUEST가 반환된다.")
         @Test
         void returnsBadRequest_whenPasswordFormatIsInvalid() {
             // arrange
@@ -138,7 +138,7 @@ class UserV1ApiE2ETest {
     @Nested
     class GetMe {
 
-        @DisplayName("Given 유효한 인증 헤더 / When 내 정보 조회 / Then 200과 마스킹된 이름이 반환된다.")
+        @DisplayName("유효한 인증 헤더로 내 정보 조회 시 200과 마스킹된 이름이 반환된다.")
         @Test
         void returnsMaskedUserInfo_whenValidCredentialsProvided() {
             // arrange
@@ -159,7 +159,7 @@ class UserV1ApiE2ETest {
             );
         }
 
-        @DisplayName("Given 인증 헤더 누락 / When 내 정보 조회 / Then 401 UNAUTHORIZED가 반환된다.")
+        @DisplayName("인증 헤더 누락으로 내 정보 조회 시 401 UNAUTHORIZED가 반환된다.")
         @Test
         void returnsUnauthorized_whenAuthHeadersAreMissing() {
             // act
@@ -171,7 +171,7 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("Given 틀린 비밀번호 / When 내 정보 조회 / Then 401 UNAUTHORIZED가 반환된다.")
+        @DisplayName("틀린 비밀번호로 내 정보 조회 시 401 UNAUTHORIZED가 반환된다.")
         @Test
         void returnsUnauthorized_whenPasswordIsWrong() {
             // arrange
@@ -199,7 +199,7 @@ class UserV1ApiE2ETest {
             savedUser = saveUser("pwuser", "홍길동");
         }
 
-        @DisplayName("Given 유효한 현재·새 비밀번호 / When 비밀번호 변경 / Then 200이 반환되고 새 비밀번호로 인증된다.")
+        @DisplayName("유효한 현재·새 비밀번호로 변경 시 200이 반환되고 새 비밀번호로 인증된다.")
         @Test
         void returns200_andNewPasswordWorks_whenPasswordChangedSuccessfully() {
             // arrange
@@ -223,7 +223,7 @@ class UserV1ApiE2ETest {
             assertThat(meResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
-        @DisplayName("Given 틀린 현재 비밀번호(body) / When 비밀번호 변경 / Then 401 UNAUTHORIZED가 반환된다.")
+        @DisplayName("틀린 현재 비밀번호(body)로 변경 시 401 UNAUTHORIZED가 반환된다.")
         @Test
         void returnsUnauthorized_whenCurrentPasswordInBodyIsWrong() {
             // arrange
@@ -240,7 +240,7 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("Given 현재와 동일한 새 비밀번호 / When 비밀번호 변경 / Then 400 BAD_REQUEST가 반환된다.")
+        @DisplayName("현재와 동일한 새 비밀번호로 변경 시 400 BAD_REQUEST가 반환된다.")
         @Test
         void returnsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // arrange
@@ -257,7 +257,7 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
-        @DisplayName("Given 형식에 맞지 않는 새 비밀번호 / When 비밀번호 변경 / Then 400 BAD_REQUEST가 반환된다.")
+        @DisplayName("형식에 맞지 않는 새 비밀번호로 변경 시 400 BAD_REQUEST가 반환된다.")
         @Test
         void returnsBadRequest_whenNewPasswordFormatIsInvalid() {
             // arrange
@@ -274,7 +274,7 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
-        @DisplayName("Given 인증 헤더 누락 / When 비밀번호 변경 / Then 401 UNAUTHORIZED가 반환된다.")
+        @DisplayName("인증 헤더 누락으로 비밀번호 변경 시 401 UNAUTHORIZED가 반환된다.")
         @Test
         void returnsUnauthorized_whenAuthHeadersAreMissing() {
             // arrange
@@ -296,7 +296,7 @@ class UserV1ApiE2ETest {
     @Nested
     class RegisterThenGetMe {
 
-        @DisplayName("Given 회원가입 완료된 유저 / When 인증 헤더로 내 정보 조회 / Then 등록 정보와 일치하고 이름이 마스킹된다.")
+        @DisplayName("회원가입 후 인증 헤더로 내 정보 조회 시 등록 정보와 일치하고 이름이 마스킹된다.")
         @Test
         void returnsMyInfo_afterRegistration() {
             // arrange - 회원가입
