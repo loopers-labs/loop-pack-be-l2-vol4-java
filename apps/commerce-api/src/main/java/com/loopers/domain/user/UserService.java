@@ -4,7 +4,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
 @RequiredArgsConstructor
-@Component
+@Service
 public class UserService {
 
     private static final Pattern PASSWORD_PATTERN =
@@ -24,11 +24,11 @@ public class UserService {
 
     @Transactional
     public UserModel register(UserRegisterCommand command) {
-        validatePassword(command.password(), command.birthDate());
-
         if (userRepository.existsByLoginId(command.loginId())) {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 loginId 입니다.");
         }
+
+        validatePassword(command.password(), command.birthDate());
 
         String encodedPassword = passwordEncoder.encode(command.password());
         UserModel user = new UserModel(
