@@ -1,0 +1,356 @@
+package com.loopers.domain.user;
+
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @InjectMocks
+    private UserService userService;
+
+    @DisplayName("회원가입 시,")
+    @Nested
+    class SignUp {
+
+        @DisplayName("유효한 입력이 주어지면, 회원을 저장하고 반환한다.")
+        @Test
+        void savesAndReturnsUser_whenValidInputIsProvided() {
+            // given
+            LoginId loginId = LoginId.of("user01");
+            Password password = Password.of("Abcd1234!");
+            String name = "김철수";
+            BirthDate birthDate = BirthDate.of(LocalDate.of(1999, 3, 22));
+            Email email = Email.of("user@example.com");
+
+            given(userRepository.existsByLoginId(loginId)).willReturn(false);
+            given(passwordEncoder.encode(anyString())).willAnswer(inv -> inv.getArgument(0));
+            given(userRepository.save(any(UserModel.class))).willAnswer(inv -> inv.getArgument(0));
+
+            // when
+            UserModel result = userService.signUp(loginId, password, name, birthDate, email);
+
+            // then
+            assertAll(
+                () -> assertThat(result.getLoginId()).isEqualTo(loginId),
+                () -> assertThat(result.getName()).isEqualTo(name),
+                () -> assertThat(result.getBirthDate()).isEqualTo(birthDate),
+                () -> assertThat(result.getEmail()).isEqualTo(email)
+            );
+            verify(userRepository).save(any(UserModel.class));
+        }
+
+        @DisplayName("유효한 입력이 주어지면, 비밀번호를 암호화하여 저장한다.")
+        @Test
+        void encodesPassword_whenValidInputIsProvided() {
+            // given
+            LoginId loginId = LoginId.of("user01");
+            Password password = Password.of("Abcd1234!");
+            String name = "김철수";
+            BirthDate birthDate = BirthDate.of(LocalDate.of(1999, 3, 22));
+            Email email = Email.of("user@example.com");
+            String encodedValue = "$2a$10$encodedHashValue";
+
+            given(userRepository.existsByLoginId(loginId)).willReturn(false);
+            given(passwordEncoder.encode("Abcd1234!")).willReturn(encodedValue);
+            given(userRepository.save(any(UserModel.class))).willAnswer(inv -> inv.getArgument(0));
+
+            // when
+            userService.signUp(loginId, password, name, birthDate, email);
+
+            // then
+            ArgumentCaptor<UserModel> captor = ArgumentCaptor.forClass(UserModel.class);
+            verify(userRepository).save(captor.capture());
+            assertThat(captor.getValue().getPassword().getValue()).isEqualTo(encodedValue);
+        }
+
+        @DisplayName("이미 사용 중인 로그인 ID 면, CONFLICT 예외를 던진다.")
+        @Test
+        void throwsConflict_whenLoginIdIsDuplicated() {
+            // given
+            LoginId duplicatedLoginId = LoginId.of("user01");
+            given(userRepository.existsByLoginId(duplicatedLoginId)).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.signUp(
+                    duplicatedLoginId,
+                    Password.of("Abcd1234!"),
+                    "김철수",
+                    BirthDate.of(LocalDate.of(1999, 3, 22)),
+                    Email.of("user@example.com")
+                )
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("이미 사용 중인 로그인 ID 면, 저장을 시도하지 않는다.")
+        @Test
+        void doesNotInvokeSave_whenLoginIdIsDuplicated() {
+            // given
+            LoginId duplicatedLoginId = LoginId.of("user01");
+            given(userRepository.existsByLoginId(duplicatedLoginId)).willReturn(true);
+
+            // when
+            assertThrows(CoreException.class, () ->
+                userService.signUp(
+                    duplicatedLoginId,
+                    Password.of("Abcd1234!"),
+                    "김철수",
+                    BirthDate.of(LocalDate.of(1999, 3, 22)),
+                    Email.of("user@example.com")
+                )
+            );
+
+            // then
+            verify(userRepository, never()).save(any(UserModel.class));
+        }
+
+        @DisplayName("비밀번호에 생년월일이 yyyyMMdd 형식으로 포함되면, BAD_REQUEST 예외를 던진다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsBirthDate() {
+            // given
+            LoginId loginId = LoginId.of("user01");
+            Password password = Password.of("ab19990322!");
+            BirthDate birthDate = BirthDate.of(LocalDate.of(1999, 3, 22));
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.signUp(
+                    loginId,
+                    password,
+                    "김철수",
+                    birthDate,
+                    Email.of("user@example.com")
+                )
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호에 생년월일이 포함되면, 저장을 시도하지 않는다.")
+        @Test
+        void doesNotInvokeSave_whenPasswordContainsBirthDate() {
+            // given
+            LoginId loginId = LoginId.of("user01");
+            Password password = Password.of("ab19990322!");
+            BirthDate birthDate = BirthDate.of(LocalDate.of(1999, 3, 22));
+
+            // when
+            assertThrows(CoreException.class, () ->
+                userService.signUp(
+                    loginId,
+                    password,
+                    "김철수",
+                    birthDate,
+                    Email.of("user@example.com")
+                )
+            );
+
+            // then
+            verify(userRepository, never()).save(any(UserModel.class));
+        }
+
+    }
+
+    @DisplayName("비밀번호 변경 시,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("재인증·새 비번 규칙을 통과하면, 새 비밀번호를 암호화하여 교체한다.")
+        @Test
+        void replacesPasswordWithEncodedValue_whenValidInputIsProvided() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password newPassword = Password.of("Xyz!9876@");
+            String encodedNew = "$2a$10$newEncodedHashValue";
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+            given(passwordEncoder.encode(newPassword.getValue())).willReturn(encodedNew);
+
+            // when
+            userService.changePassword(userId, currentRaw, newPassword);
+
+            // then
+            assertThat(user.getPassword().getValue()).isEqualTo(encodedNew);
+        }
+
+        @DisplayName("존재하지 않는 userId 면, NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsNotFound_whenUserDoesNotExist() {
+            // given
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, "Abcd1234!", Password.of("Xyz!9876@"))
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("현재 비밀번호가 DB 와 일치하지 않으면, UNAUTHORIZED 예외를 던진다.")
+        @Test
+        void throwsUnauthorized_whenCurrentPasswordDoesNotMatch() {
+            // given
+            Long userId = 1L;
+            String wrongCurrentRaw = "WrongPwd1!";
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(wrongCurrentRaw, user.getPassword().getValue())).willReturn(false);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, wrongCurrentRaw, Password.of("Xyz!9876@"))
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 동일하면, BAD_REQUEST 예외를 던진다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password samePassword = Password.of(currentRaw);
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, currentRaw, samePassword)
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(exception.getCustomMessage()).isEqualTo("현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
+            );
+        }
+
+        @DisplayName("새 비밀번호에 생년월일이 yyyyMMdd 형식으로 포함되면, BAD_REQUEST 예외를 던진다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
+            // given
+            Long userId = 1L;
+            String currentRaw = "Abcd1234!";
+            Password newPasswordWithBirthDate = Password.of("ab19990322!");
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$currentEncodedHashValue"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(passwordEncoder.matches(currentRaw, user.getPassword().getValue())).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.changePassword(userId, currentRaw, newPasswordWithBirthDate)
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(exception.getCustomMessage()).isEqualTo("비밀번호에 생년월일을 포함할 수 없습니다.")
+            );
+        }
+    }
+
+    @DisplayName("사용자 조회 시,")
+    @Nested
+    class GetUser {
+
+        @DisplayName("존재하는 ID 면, 해당 사용자를 반환한다.")
+        @Test
+        void returnsUser_whenIdExists() {
+            // given
+            Long userId = 1L;
+            UserModel user = UserModel.create(
+                LoginId.of("user01"),
+                Password.encoded("$2a$10$encodedHash"),
+                "김철수",
+                BirthDate.of(LocalDate.of(1999, 3, 22)),
+                Email.of("user@example.com")
+            );
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+            // when
+            UserModel result = userService.getUser(userId);
+
+            // then
+            assertThat(result).isSameAs(user);
+        }
+
+        @DisplayName("존재하지 않는 ID 면, NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            // given
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.getUser(userId)
+            );
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+}
