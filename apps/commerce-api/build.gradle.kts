@@ -19,9 +19,6 @@ dependencies {
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 
-    // test - h2 (integration test)
-    testRuntimeOnly("com.h2database:h2")
-
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))

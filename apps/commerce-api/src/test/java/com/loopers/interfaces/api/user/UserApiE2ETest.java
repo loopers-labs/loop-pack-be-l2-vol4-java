@@ -5,13 +5,13 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.dto.ChangePasswordV1Request;
 import com.loopers.interfaces.api.user.dto.MyInfoV1Response;
 import com.loopers.interfaces.api.user.dto.SignUpV1Request;
-import com.loopers.support.E2ETest;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -25,7 +25,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-@E2ETest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";

@@ -1,9 +1,9 @@
 package com.loopers;
 
-import com.loopers.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@IntegrationTest
+@SpringBootTest
 class CommerceApiContextTest {
 
     @Test
