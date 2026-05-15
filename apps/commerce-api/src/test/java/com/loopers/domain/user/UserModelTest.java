@@ -342,6 +342,7 @@ public class UserModelTest {
             // arrange
             PasswordEncoder mockEncoder = mock(PasswordEncoder.class);
             String hashPassword = "hashPassword";
+            // 여기서 stub도 들어간다.
             when(mockEncoder.encode(anyString())).thenReturn(hashPassword);
             when(mockEncoder.matches(DEFAULT_PASSWORD, hashPassword)).thenReturn(true);
 
