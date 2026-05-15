@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
 @Component
-public class UserFacade {
+public class UserAccountFacade {
 
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;

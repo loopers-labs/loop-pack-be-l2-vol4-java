@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserAccountFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserV1Controller {
 
-    private final UserFacade userFacade;
+    private final UserAccountFacade userFacade;
 
     @PostMapping
     public ApiResponse<UserV1Dto.UserRegisterResponse> register(
