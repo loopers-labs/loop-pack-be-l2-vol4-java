@@ -3,10 +3,7 @@ package com.loopers.application.user;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.UserService;
-import com.loopers.domain.value.BirthVO;
-import com.loopers.domain.value.EmailVO;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import fixture.UserModelFixture;
 import org.assertj.core.api.Assertions;
@@ -165,9 +162,9 @@ class UserFacadeIntegrateTest {
         public void init() {
             UserModelFixture defaults = UserModelFixture.defaults();
             String encrypted = bCryptPasswordEncoder.encode(defaults.password());
-            UserModel savedUser = userRepository.save(
-                    UserModel.of(defaults.loginId(), defaults.name(), encrypted, new BirthVO(defaults.birth()), new EmailVO(defaults.email()))
-            );
+            UserModel userModel = defaults.toModel();
+            userModel.changePassword(encrypted);
+            UserModel savedUser = userRepository.save(userModel);
 
             expectedId = savedUser.getId();
             currentPassword = defaults.password();

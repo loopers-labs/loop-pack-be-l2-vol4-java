@@ -1,11 +1,10 @@
 package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.UserModel;
-import com.loopers.domain.value.BirthVO;
-import com.loopers.domain.value.EmailVO;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
+import fixture.UserModelFixture;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -58,9 +57,10 @@ class UserV1ControllerTest {
         UserModel userModel = null;
         @BeforeEach
         void init() {
-            userModel = userJpaRepository.save(
-                    UserModel.of("tester", "테스터", passwordEncoder.encode("original_1234"), new BirthVO(LocalDate.of(1993, 3, 16)), new EmailVO("test@test.com"))
-            );
+            UserModel target = UserModelFixture.defaults().toModel();
+            target.changePassword(passwordEncoder.encode(target.getPassword()));
+            userModel = userJpaRepository.save(target);
+
         }
 
         @DisplayName("존재하는 유저 ID를 주면, 해당 유저 정보를 반환한다.")
@@ -181,9 +181,9 @@ class UserV1ControllerTest {
         long id = 0L;
         @BeforeEach
         void init() {
-            id = userJpaRepository.save(
-                    UserModel.of("tester", "테스터", passwordEncoder.encode("original_1234"), new BirthVO(LocalDate.of(1993, 3, 16)), new EmailVO("test@test.com"))
-            ).getId();
+            UserModel target = UserModelFixture.defaults().toModel();
+            target.changePassword(passwordEncoder.encode(target.getPassword()));
+            id = userJpaRepository.save(target).getId();
         }
 
         @DisplayName("유효한 입력값이 들어오면, OK에 body는 null 인 상태를 반환한다.")
@@ -191,7 +191,7 @@ class UserV1ControllerTest {
         public void returnNon_whenValidInputProvided() {
             // given
             UserV1Dto.ChangeUserPasswordRequest request = new UserV1Dto.ChangeUserPasswordRequest(
-                    "original_1234",
+                    UserModelFixture.defaults().password(),
                     "target_1234"
             );
 

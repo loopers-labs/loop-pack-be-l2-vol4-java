@@ -22,9 +22,9 @@ public class UserFacade {
         EmailVO emailVO = new EmailVO(email);
 
         userService.checkLoginIdDuplication(loginId);
-
+        UserModel userModel = userService.createUserModel(loginId, name, password, birthVO, emailVO);
         String encrypted = bCryptPasswordEncoder.encode(password);
-        UserModel userModel = userService.createUserModel(loginId, name, encrypted, birthVO, emailVO);
+        userService.changePassword(userModel, encrypted);
 
         return UserInfo.from(userModel);
     }
