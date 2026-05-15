@@ -6,6 +6,7 @@ import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.CurrentUser;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +23,7 @@ public class UserV1Controller {
 
     @PostMapping
     public ApiResponse<UserV1Dto.UserRegisterResponse> register(
-        @RequestBody UserV1Dto.UserRegisterRequest request
+        @Valid @RequestBody UserV1Dto.UserRegisterRequest request
     ) {
         UserInfo info = userFacade.register(request.toCommand());
         return ApiResponse.success(UserV1Dto.UserRegisterResponse.from(info));
@@ -31,7 +32,7 @@ public class UserV1Controller {
     @PatchMapping("/me/password")
     public ApiResponse<Object> changePassword(
         @CurrentUser UserModel user,
-        @RequestBody UserV1Dto.UserChangePasswordRequest request
+        @Valid @RequestBody UserV1Dto.UserChangePasswordRequest request
     ) {
         userFacade.changePassword(user, request.toCommand());
         return ApiResponse.success();
