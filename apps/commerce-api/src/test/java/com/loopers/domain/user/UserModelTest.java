@@ -9,6 +9,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class UserModelTest {
 
@@ -51,6 +54,22 @@ public class UserModelTest {
                 () -> assertEquals(email, userModel.getEmail()),
                 () -> assertNotEquals(password, userModel.getPassword())
             );
+        }
+
+        @DisplayName("Stub: Bcrypt 연산 없이 비밀번호 규칙 검증만 집중하는 테스트")
+        @Test
+        void createsUserModel_withStubEncoder() {
+            // arrange
+            PasswordEncoder stubEncoder = mock(PasswordEncoder.class);
+            String hashPassword = "stubbed_hash";
+            when(stubEncoder.encode(anyString())).thenReturn(hashPassword);
+
+            // act
+            UserModel userModel = new UserModel(userId, password, name, birthDate, email, stubEncoder);
+
+            // assert - 검증 로직
+            assertEquals(DEFAULT_USER_ID, userModel.getUserId());
+            assertEquals(hashPassword, userModel.getPassword());
         }
 
         @DisplayName("userId 가 빈 값인 경우, 예외가 발생한다.")
