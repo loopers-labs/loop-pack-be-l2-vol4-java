@@ -38,3 +38,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### oh-my-claudecode ###
+.omc/
