@@ -109,8 +109,8 @@ supports/    add-on (java-library)
 `com.loopers` 하위 레이어별 패키지:
 
 - `interfaces/api/<feature>` — REST 컨트롤러 + `*V1Dto` (record). 파싱 → facade → `ApiResponse` 래핑만.
-- `application/<feature>` — `*Facade` (오케스트레이션) + `*Info` DTO. 컨트롤러는 facade 만 호출.
-- `domain/<feature>` — `*Model` (JPA 엔티티, 생성/변경 메서드에서 invariant 검증), `*Service` (트랜잭션), `*Repository` (인터페이스, Spring Data 직접 사용 금지).
+- `application/<feature>` — `*Facade` (오케스트레이션) + `*Info` (응답 DTO) + `*RequestCommand` (Facade 입력, raw 타입). 컨트롤러는 facade 만 호출.
+- `domain/<feature>` — `*Model` (JPA 엔티티, 생성/변경 메서드에서 invariant 검증), `*Service` (트랜잭션), `*Repository` (인터페이스, Spring Data 직접 사용 금지), `*Command` (도메인 서비스 입력, VO 기반). 도메인 Command 에는 `Request` 접미사를 붙이지 않는다.
 - `infrastructure/<feature>` — `*JpaRepository` (Spring Data) + 도메인 포트를 구현하는 `*RepositoryImpl`.
 - `support/error` — `CoreException(ErrorType, msg)` 를 throw 하면 `ApiControllerAdvice` 가 `ApiResponse.fail(...)` 로 매핑.
 
