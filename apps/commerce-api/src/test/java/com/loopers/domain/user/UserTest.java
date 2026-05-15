@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class UserModelTest {
+class UserTest {
 
     private static final LocalDate BIRTH = LocalDate.of(1993, 11, 3);
 
@@ -36,7 +36,7 @@ class UserModelTest {
             String email = "loopers@example.com";
 
             // act
-            UserModel user = UserModel.signUp(
+            User user = User.signUp(
                 LoginId.of(loginId),
                 EncodedPassword.of(encodedPassword),
                 UserName.of(name),
@@ -61,7 +61,7 @@ class UserModelTest {
             String blankName = "  ";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> UserModel.signUp(
+            CoreException result = assertThrows(CoreException.class, () -> User.signUp(
                 LoginId.of("loopers01"),
                 EncodedPassword.of("encoded:Loopers!2026"),
                 UserName.of(blankName),
@@ -86,7 +86,7 @@ class UserModelTest {
             // arrange
             String currentRaw = "Loopers!2026";
             String newRaw = "NewLoopers!9999";
-            UserModel user = userWithPassword(currentRaw);
+            User user = userWithPassword(currentRaw);
 
             // act
             user.changePassword(currentRaw, newRaw, hasher);
@@ -99,7 +99,7 @@ class UserModelTest {
         @Test
         void throwsUnauthorizedException_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel user = userWithPassword("Loopers!2026");
+            User user = userWithPassword("Loopers!2026");
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -114,7 +114,7 @@ class UserModelTest {
         void throwsBadRequestException_whenNewPasswordIsSameAsCurrent() {
             // arrange
             String samePassword = "Loopers!2026";
-            UserModel user = userWithPassword(samePassword);
+            User user = userWithPassword(samePassword);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -130,7 +130,7 @@ class UserModelTest {
             // arrange
             String currentRaw = "Loopers!2026";
             String newWithBirth = "Aa!19931103";
-            UserModel user = userWithPassword(currentRaw);
+            User user = userWithPassword(currentRaw);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -140,8 +140,8 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        private UserModel userWithPassword(String rawPassword) {
-            return UserModel.signUp(
+        private User userWithPassword(String rawPassword) {
+            return User.signUp(
                 LoginId.of("loopers01"),
                 hasher.hash(PlainPassword.of(rawPassword)),
                 UserName.of("김성호"),

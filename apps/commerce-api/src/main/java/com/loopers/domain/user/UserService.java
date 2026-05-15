@@ -16,13 +16,13 @@ public class UserService {
     private final PasswordHasher passwordHasher;
 
     @Transactional
-    public UserModel signUp(SignUpUserCommand signUpUserCommand) {
+    public User signUp(SignUpUserCommand signUpUserCommand) {
         if (userRepository.findByLoginId(signUpUserCommand.loginId()).isPresent()) {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }
 
         EncodedPassword encodedPassword = passwordHasher.hash(signUpUserCommand.plainPassword());
-        UserModel user = UserModel.signUp(
+        User user = User.signUp(
             signUpUserCommand.loginId(),
             encodedPassword,
             signUpUserCommand.name(),
@@ -33,14 +33,14 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserModel getUser(Long userId) {
+    public User getUser(Long userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
     }
 
     @Transactional
     public void changePassword(Long userId, String currentPassword, String newPassword) {
-        UserModel user = getUser(userId);
+        User user = getUser(userId);
         user.changePassword(currentPassword, newPassword, passwordHasher);
     }
 }

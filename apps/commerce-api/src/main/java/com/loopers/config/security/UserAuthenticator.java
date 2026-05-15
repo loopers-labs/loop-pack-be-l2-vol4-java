@@ -1,6 +1,6 @@
 package com.loopers.config.security;
 
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.vo.LoginId;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +24,10 @@ public class UserAuthenticator {
         return LoginId.tryParse(loginId)
             .flatMap(userRepository::findByLoginId)
             .filter(user -> matchesPassword(rawPassword, user))
-            .map(UserModel::getId);
+            .map(User::getId);
     }
 
-    private boolean matchesPassword(String rawPassword, UserModel user) {
+    private boolean matchesPassword(String rawPassword, User user) {
         return passwordEncoder.matches(rawPassword, user.getPassword().value());
     }
 }

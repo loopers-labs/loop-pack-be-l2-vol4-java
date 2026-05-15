@@ -4,8 +4,8 @@ import java.util.Optional;
 import java.util.List;
 
 public interface ProductRepository {
-    ProductModel save(ProductModel product);
-    Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
+    Product save(Product product);
+    Optional<Product> find(Long id);
+    List<Product> findAll();
     void delete(Long id);
 }

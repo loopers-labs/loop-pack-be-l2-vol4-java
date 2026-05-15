@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "users")
-public class UserModel extends BaseEntity {
+public class User extends BaseEntity {
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "login_id", nullable = false, unique = true, length = 20))
@@ -46,7 +46,7 @@ public class UserModel extends BaseEntity {
     private Email email;
 
     @Builder(access = AccessLevel.PRIVATE)
-    private UserModel(LoginId loginId, EncodedPassword password, UserName name, BirthDate birthDate, Email email) {
+    private User(LoginId loginId, EncodedPassword password, UserName name, BirthDate birthDate, Email email) {
         this.loginId = loginId;
         this.password = password;
         this.name = name;
@@ -54,14 +54,14 @@ public class UserModel extends BaseEntity {
         this.email = email;
     }
 
-    public static UserModel signUp(
+    public static User signUp(
         LoginId loginId,
         EncodedPassword password,
         UserName name,
         BirthDate birthDate,
         Email email
     ) {
-        return UserModel.builder()
+        return User.builder()
             .loginId(loginId)
             .password(password)
             .name(name)

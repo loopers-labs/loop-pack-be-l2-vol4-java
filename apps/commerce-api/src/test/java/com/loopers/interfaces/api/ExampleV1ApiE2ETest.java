@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.example.ExampleModel;
+import com.loopers.domain.example.Example;
 import com.loopers.domain.user.UserService;
 import com.loopers.domain.user.command.SignUpUserCommand;
 import com.loopers.domain.user.vo.BirthDate;
@@ -90,8 +90,8 @@ class ExampleV1ApiE2ETest {
         @Test
         void returnsExampleInfo_whenValidIdIsProvided() {
             // arrange
-            ExampleModel exampleModel = exampleJpaRepository.save(
-                ExampleModel.builder().name("예시 제목").description("예시 설명").build()
+            Example exampleModel = exampleJpaRepository.save(
+                Example.builder().name("예시 제목").description("예시 설명").build()
             );
             String requestUrl = ENDPOINT_GET.apply(exampleModel.getId());
 

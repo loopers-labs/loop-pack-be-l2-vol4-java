@@ -14,13 +14,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "example")
-public class ExampleModel extends BaseEntity {
+public class Example extends BaseEntity {
 
     private String name;
     private String description;
 
     @Builder
-    public ExampleModel(String name, String description) {
+    public Example(String name, String description) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }

@@ -53,7 +53,7 @@ class UserServiceIntegrationTest {
             String rawPassword = "Loopers!2026";
 
             // act
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 rawPassword,
                 "김성호",
@@ -108,7 +108,7 @@ class UserServiceIntegrationTest {
             // arrange
             String currentPassword = "Loopers!2026";
             String newPassword = "NewLoopers!9999";
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 currentPassword,
                 "김성호",
@@ -124,7 +124,7 @@ class UserServiceIntegrationTest {
             );
 
             // assert
-            UserModel reloaded = userService.getUser(saved.getId());
+            User reloaded = userService.getUser(saved.getId());
             assertAll(
                 () -> assertThat(passwordEncoder.matches(newPassword, reloaded.getPassword().value())).isTrue(),
                 () -> assertThat(passwordEncoder.matches(currentPassword, reloaded.getPassword().value())).isFalse()
@@ -135,7 +135,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsUnauthorizedException_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 "Loopers!2026",
                 "김성호",
@@ -163,7 +163,7 @@ class UserServiceIntegrationTest {
         void throwsBadRequestException_whenNewPasswordViolatesPolicy() {
             // arrange
             String currentPassword = "Loopers!2026";
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 currentPassword,
                 "김성호",
@@ -190,7 +190,7 @@ class UserServiceIntegrationTest {
         void throwsBadRequestException_whenNewPasswordIsSameAsCurrent() {
             // arrange
             String currentPassword = "Loopers!2026";
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 currentPassword,
                 "김성호",
@@ -220,7 +220,7 @@ class UserServiceIntegrationTest {
         @Test
         void returnsUser_whenIdExists() {
             // arrange
-            UserModel saved = signUp(
+            User saved = signUp(
                 "loopers01",
                 "Loopers!2026",
                 "김성호",
@@ -229,7 +229,7 @@ class UserServiceIntegrationTest {
             );
 
             // act
-            UserModel found = userService.getUser(saved.getId());
+            User found = userService.getUser(saved.getId());
 
             // assert
             assertAll(
@@ -250,7 +250,7 @@ class UserServiceIntegrationTest {
         }
     }
 
-    private UserModel signUp(
+    private User signUp(
         String loginId,
         String rawPassword,
         String name,

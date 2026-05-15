@@ -1,6 +1,6 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserService;
 import com.loopers.domain.user.command.SignUpUserCommand;
 import com.loopers.domain.user.vo.BirthDate;
@@ -26,12 +26,12 @@ public class UserFacade {
             birthDate,
             Email.of(command.email())
         );
-        UserModel user = userService.signUp(signUpUserCommand);
+        User user = userService.signUp(signUpUserCommand);
         return UserInfo.from(user);
     }
 
     public UserInfo getMyInfo(Long userId) {
-        UserModel user = userService.getUser(userId);
+        User user = userService.getUser(userId);
         return UserInfo.from(user);
     }
 

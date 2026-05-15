@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "product")
-public class ProductModel extends BaseEntity {
+public class Product extends BaseEntity {
 
     private String name;
     private String description;
@@ -22,7 +22,7 @@ public class ProductModel extends BaseEntity {
     private Integer stock;
 
     @Builder
-    public ProductModel(String name, String description, Long price, Integer stock) {
+    public Product(String name, String description, Long price, Integer stock) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
