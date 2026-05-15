@@ -16,7 +16,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -53,7 +53,7 @@ class UserServiceIntegrationTest {
 
             // assert
             assertAll(
-                () -> verify(userRepository).save(any(UserModel.class)),
+                () -> verify(userRepository).save(same(user)),
                 () -> assertThat(saved.getId()).isPositive(),
                 () -> assertThat(saved.getLoginId()).isEqualTo("tester01")
             );
