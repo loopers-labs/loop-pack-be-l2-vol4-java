@@ -22,6 +22,12 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
+    public void changePassword(UserModel user, String encodedNewPassword) {
+        user.changePassword(encodedNewPassword);
+        userRepository.save(user);
+    }
+
     @Transactional(readOnly = true)
     public UserModel authenticate(String loginId, String rawPassword) {
         UserModel user = userRepository.findByLoginId(loginId)
