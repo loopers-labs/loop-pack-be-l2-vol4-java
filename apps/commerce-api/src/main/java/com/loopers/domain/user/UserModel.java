@@ -70,16 +70,16 @@ public class UserModel extends BaseEntity {
             .build();
     }
 
-    public void changePassword(String currentRaw, String newRaw, PasswordHasher hasher) {
-        PlainPassword current = PlainPassword.of(currentRaw);
-        PlainPassword next = PlainPassword.of(newRaw, this.birthDate);
+    public void changePassword(String currentPassword, String newPassword, PasswordHasher hasher) {
+        PlainPassword currentPlain = PlainPassword.of(currentPassword);
+        PlainPassword newPlain = PlainPassword.of(newPassword, this.birthDate);
 
-        if (!hasher.matches(current, this.password)) {
+        if (!hasher.matches(currentPlain, this.password)) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
-        if (current.equals(next)) {
+        if (currentPlain.equals(newPlain)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
         }
-        this.password = hasher.hash(next);
+        this.password = hasher.hash(newPlain);
     }
 }
