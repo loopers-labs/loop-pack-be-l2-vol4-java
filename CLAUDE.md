@@ -110,7 +110,7 @@ supports/    add-on (java-library)
 
 - `interfaces/api/<feature>` — REST 컨트롤러 + `*V1Dto` (record). 파싱 → facade → `ApiResponse` 래핑만.
 - `application/<feature>` — `*Facade` (오케스트레이션) + `*Info` (응답 DTO) + `*RequestCommand` (Facade 입력, raw 타입). 컨트롤러는 facade 만 호출.
-- `domain/<feature>` — `*Model` (JPA 엔티티, 생성/변경 메서드에서 invariant 검증), `*Service` (트랜잭션), `*Repository` (인터페이스, Spring Data 직접 사용 금지), `*Command` (도메인 서비스 입력, VO 기반). 도메인 Command 에는 `Request` 접미사를 붙이지 않는다.
+- `domain/<feature>` — 도메인 엔티티 (예: `User`, `Product` — JPA 엔티티 + 생성/변경 메서드에서 invariant 검증, **`Model` 같은 접미사 금지**), `*Service` (트랜잭션), `*Repository` (인터페이스, Spring Data 직접 사용 금지), `*Command` (도메인 서비스 입력, VO 기반). 도메인 Command 에는 `Request` 접미사를 붙이지 않는다.
 - `infrastructure/<feature>` — `*JpaRepository` (Spring Data) + 도메인 포트를 구현하는 `*RepositoryImpl`.
 - `support/error` — `CoreException(ErrorType, msg)` 를 throw 하면 `ApiControllerAdvice` 가 `ApiResponse.fail(...)` 로 매핑.
 
@@ -124,7 +124,7 @@ supports/    add-on (java-library)
 - Testcontainers (MySQL/Redis) 사용 → Docker 필수. `test` 프로필도 `ddl-auto=create`.
 - E2E: `*ApiE2ETest` + `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate`, `@AfterEach` 에서 `databaseCleanUp.truncateAllTables()` (JPA 메타모델 기반, FK 체크 끄고 truncate).
 - 앱은 `testImplementation(testFixtures(project(":modules:jpa")))` 로 fixtures 사용.
-- 네이밍: `*ModelTest` (단위), `*ServiceIntegrationTest`, `*ApiE2ETest`. DisplayName 한국어, HTTP 엔드포인트별 `@Nested`.
+- 네이밍: `*Test` (도메인 엔티티 단위 — 예: `UserTest`), `*ServiceIntegrationTest`, `*ApiE2ETest`. DisplayName 한국어, HTTP 엔드포인트별 `@Nested`.
 
 ## Local Profiles
 
