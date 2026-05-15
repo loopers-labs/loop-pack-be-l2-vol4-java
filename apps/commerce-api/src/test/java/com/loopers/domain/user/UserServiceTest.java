@@ -75,6 +75,25 @@ class UserServiceTest {
         }
     }
 
+    @DisplayName("changePassword()를 호출할 때,")
+    @Nested
+    class ChangePassword {
+
+        @DisplayName("Given 새 인코딩된 비밀번호 / When 변경 요청 / Then 비밀번호가 갱신되고 저장된다.")
+        @Test
+        void updatesPasswordAndSaves_whenCalled() {
+            // arrange
+            given(userRepository.save(user)).willReturn(user);
+
+            // act
+            userService.changePassword(user, "newEncodedPassword!");
+
+            // assert
+            assertThat(user.getPassword()).isEqualTo("newEncodedPassword!");
+            then(userRepository).should().save(user);
+        }
+    }
+
     @DisplayName("authenticate()를 호출할 때,")
     @Nested
     class Authenticate {

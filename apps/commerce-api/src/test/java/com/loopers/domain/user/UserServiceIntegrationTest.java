@@ -86,6 +86,38 @@ class UserServiceIntegrationTest {
         }
     }
 
+    @DisplayName("changePassword()를 호출할 때,")
+    @Nested
+    class ChangePassword {
+
+        private UserModel savedUser;
+
+        @BeforeEach
+        void setUp() {
+            String encoded = passwordEncoder.encode(RAW_PASSWORD);
+            savedUser = userJpaRepository.save(
+                new UserModel("pwuser", encoded, "홍길동", LocalDate.of(1990, 1, 15), "pw@example.com")
+            );
+        }
+
+        @DisplayName("Given 새 비밀번호 / When 변경 요청 / Then 변경된 비밀번호가 DB에 반영된다.")
+        @Test
+        void updatesPasswordInDb_whenCalled() {
+            // arrange
+            String newEncoded = passwordEncoder.encode("NewPassword2@");
+
+            // act
+            userService.changePassword(savedUser, newEncoded);
+
+            // assert
+            UserModel updated = userJpaRepository.findById(savedUser.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(passwordEncoder.matches("NewPassword2@", updated.getPassword())).isTrue(),
+                () -> assertThat(passwordEncoder.matches(RAW_PASSWORD, updated.getPassword())).isFalse()
+            );
+        }
+    }
+
     @DisplayName("authenticate()를 호출할 때,")
     @Nested
     class Authenticate {

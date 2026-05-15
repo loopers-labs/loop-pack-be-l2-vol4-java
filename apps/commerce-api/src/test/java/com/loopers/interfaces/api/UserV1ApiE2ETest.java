@@ -29,7 +29,9 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_REGISTER = "/api/v1/users";
     private static final String ENDPOINT_ME = "/api/v1/users/me";
+    private static final String ENDPOINT_PASSWORD = "/api/v1/users/me/password";
     private static final String RAW_PASSWORD = "Password1!";
+    private static final String NEW_PASSWORD = "NewPassword2@";
 
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
@@ -180,6 +182,110 @@ class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET,
                     new HttpEntity<>(authHeaders("user123", "WrongPw1!")), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("PATCH /api/v1/users/me/password 요청 시,")
+    @Nested
+    class PatchPassword {
+
+        private UserModel savedUser;
+
+        @org.junit.jupiter.api.BeforeEach
+        void setUp() {
+            savedUser = saveUser("pwuser", "홍길동");
+        }
+
+        @DisplayName("Given 유효한 현재·새 비밀번호 / When 비밀번호 변경 / Then 200이 반환되고 새 비밀번호로 인증된다.")
+        @Test
+        void returns200_andNewPasswordWorks_whenPasswordChangedSuccessfully() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request, authHeaders("pwuser", RAW_PASSWORD)), responseType);
+
+            // assert - 변경 성공
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+            // assert - 새 비밀번호로 내 정보 조회 가능
+            ResponseEntity<ApiResponse<UserV1Dto.UserMeResponse>> meResponse = testRestTemplate.exchange(
+                ENDPOINT_ME, HttpMethod.GET,
+                new HttpEntity<>(authHeaders("pwuser", NEW_PASSWORD)),
+                new ParameterizedTypeReference<>() {});
+            assertThat(meResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @DisplayName("Given 틀린 현재 비밀번호(body) / When 비밀번호 변경 / Then 401 UNAUTHORIZED가 반환된다.")
+        @Test
+        void returnsUnauthorized_whenCurrentPasswordInBodyIsWrong() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest("WrongPw1!", NEW_PASSWORD);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request, authHeaders("pwuser", RAW_PASSWORD)), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("Given 현재와 동일한 새 비밀번호 / When 비밀번호 변경 / Then 400 BAD_REQUEST가 반환된다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, RAW_PASSWORD);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request, authHeaders("pwuser", RAW_PASSWORD)), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("Given 형식에 맞지 않는 새 비밀번호 / When 비밀번호 변경 / Then 400 BAD_REQUEST가 반환된다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordFormatIsInvalid() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, "short");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request, authHeaders("pwuser", RAW_PASSWORD)), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("Given 인증 헤더 누락 / When 비밀번호 변경 / Then 401 UNAUTHORIZED가 반환된다.")
+        @Test
+        void returnsUnauthorized_whenAuthHeadersAreMissing() {
+            // arrange
+            UserV1Dto.UserChangePasswordRequest request =
+                new UserV1Dto.UserChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ENDPOINT_PASSWORD, HttpMethod.PATCH,
+                new HttpEntity<>(request), responseType);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
