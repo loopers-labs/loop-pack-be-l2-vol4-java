@@ -16,11 +16,11 @@ class UserV1DtoTest {
     @Nested
     class MyInfoResponseCreate {
 
-        @DisplayName("이름의 마지막 글자를 * 로 마스킹한다.")
+        @DisplayName("UserInfo 의 maskedName 을 name 필드로 노출한다.")
         @Test
-        void masksLastCharOfName() {
+        void exposesMaskedNameFromUserInfo() {
             // arrange
-            UserInfo info = new UserInfo(1L, "loopers01", "김루퍼스", LocalDate.of(1993, 11, 3), "loopers@example.com");
+            UserInfo info = new UserInfo(1L, "loopers01", "김루퍼스", "김루퍼*", LocalDate.of(1993, 11, 3), "loopers@example.com");
 
             // act
             UserV1Dto.MyInfoResponse response = UserV1Dto.MyInfoResponse.from(info);
@@ -32,19 +32,6 @@ class UserV1DtoTest {
                 () -> assertThat(response.birthDate()).isEqualTo(LocalDate.of(1993, 11, 3)),
                 () -> assertThat(response.email()).isEqualTo("loopers@example.com")
             );
-        }
-
-        @DisplayName("이름이 한 글자면, * 한 글자로 마스킹된다.")
-        @Test
-        void masksSingleCharName() {
-            // arrange
-            UserInfo info = new UserInfo(1L, "loopers01", "김", LocalDate.of(1993, 11, 3), "loopers@example.com");
-
-            // act
-            UserV1Dto.MyInfoResponse response = UserV1Dto.MyInfoResponse.from(info);
-
-            // assert
-            assertThat(response.name()).isEqualTo("*");
         }
     }
 }

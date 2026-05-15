@@ -9,20 +9,19 @@ public record UserInfo(
     Long id,
     String loginId,
     String name,
+    String maskedName,
     LocalDate birthDate,
     String email
 ) {
     public static UserInfo from(UserModel model) {
+        UserName userName = model.getName();
         return new UserInfo(
             model.getId(),
             model.getLoginId().value(),
-            model.getName().value(),
+            userName.value(),
+            userName.mask(),
             model.getBirthDate().value(),
             model.getEmail().value()
         );
-    }
-
-    public String maskedName() {
-        return UserName.of(name).mask();
     }
 }
