@@ -1,8 +1,14 @@
 package com.loopers.domain.user;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.domain.user.vo.BirthDate;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.EncodedPassword;
+import com.loopers.domain.user.vo.LoginId;
+import com.loopers.domain.user.vo.UserName;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -10,75 +16,58 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-import java.util.regex.Pattern;
-
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "users")
 public class UserModel extends BaseEntity {
 
-    private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "login_id", nullable = false, unique = true, length = 20))
+    private LoginId loginId;
 
-    private String loginId;
-    private String password;
-    private String name;
-    private LocalDate birthDate;
-    private String email;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "password", nullable = false))
+    private EncodedPassword password;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "name", nullable = false))
+    private UserName name;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "birth_date", nullable = false))
+    private BirthDate birthDate;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false))
+    private Email email;
 
     @Builder
-    public UserModel(String loginId, String encodedPassword, String name, LocalDate birthDate, String email) {
-        validateLoginId(loginId);
-        validateEmail(email);
-        validateName(name);
-        validateEncodedPassword(encodedPassword);
-        validateBirthDate(birthDate);
-
+    public UserModel(LoginId loginId, EncodedPassword password, UserName name, BirthDate birthDate, Email email) {
         this.loginId = loginId;
-        this.password = encodedPassword;
+        this.password = password;
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
     }
 
-    private static void validateLoginId(String loginId) {
-        if (loginId == null || loginId.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 는 비어있을 수 없습니다.");
-        }
-        if (!LOGIN_ID_PATTERN.matcher(loginId).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 는 영문과 숫자만 사용할 수 있습니다.");
-        }
+    public static UserModel signUp(
+        LoginId loginId,
+        EncodedPassword password,
+        UserName name,
+        BirthDate birthDate,
+        Email email
+    ) {
+        return UserModel.builder()
+            .loginId(loginId)
+            .password(password)
+            .name(name)
+            .birthDate(birthDate)
+            .email(email)
+            .build();
     }
 
-    private static void validateEmail(String email) {
-        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
-        }
+    public void changePassword(EncodedPassword newPassword) {
+        this.password = newPassword;
     }
-
-    private static void validateName(String name) {
-        if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
-        }
-    }
-
-    private static void validateEncodedPassword(String encodedPassword) {
-        if (encodedPassword == null || encodedPassword.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
-        }
-    }
-
-    private static void validateBirthDate(LocalDate birthDate) {
-        if (birthDate == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비어있을 수 없습니다.");
-        }
-    }
-
-    public void changePassword(String newEncodedPassword) {
-        validateEncodedPassword(newEncodedPassword);
-        this.password = newEncodedPassword;
-    }
-
 }

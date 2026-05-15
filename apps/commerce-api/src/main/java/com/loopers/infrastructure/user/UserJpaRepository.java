@@ -1,11 +1,11 @@
 package com.loopers.infrastructure.user;
 
 import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.vo.LoginId;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
 public interface UserJpaRepository extends JpaRepository<UserModel, Long> {
-    boolean existsByLoginId(String loginId);
-    Optional<UserModel> findByLoginId(String loginId);
+    Optional<UserModel> findByLoginId(LoginId loginId);
 }

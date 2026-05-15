@@ -1,5 +1,10 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.vo.BirthDate;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.EncodedPassword;
+import com.loopers.domain.user.vo.LoginId;
+import com.loopers.domain.user.vo.UserName;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -30,84 +35,21 @@ class UserModelTest {
 
             // act
             UserModel user = UserModel.builder()
-                .loginId(loginId)
-                .encodedPassword(password)
-                .name(name)
-                .birthDate(birthDate)
-                .email(email)
+                .loginId(LoginId.of(loginId))
+                .password(EncodedPassword.of(password))
+                .name(UserName.of(name))
+                .birthDate(BirthDate.of(birthDate))
+                .email(Email.of(email))
                 .build();
 
             // assert
             assertAll(
-                () -> assertThat(user.getLoginId()).isEqualTo(loginId),
-                () -> assertThat(user.getPassword()).isEqualTo(password),
-                () -> assertThat(user.getName()).isEqualTo(name),
-                () -> assertThat(user.getBirthDate()).isEqualTo(birthDate),
-                () -> assertThat(user.getEmail()).isEqualTo(email)
+                () -> assertThat(user.getLoginId().value()).isEqualTo(loginId),
+                () -> assertThat(user.getPassword().value()).isEqualTo(password),
+                () -> assertThat(user.getName().value()).isEqualTo(name),
+                () -> assertThat(user.getBirthDate().value()).isEqualTo(birthDate),
+                () -> assertThat(user.getEmail().value()).isEqualTo(email)
             );
-        }
-
-        @DisplayName("로그인 ID 가 비어있으면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequestException_whenLoginIdIsBlank() {
-            // arrange
-            String blankLoginId = "   ";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                UserModel.builder()
-                    .loginId(blankLoginId)
-                    .encodedPassword("Loopers!2026")
-                    .name("김성호")
-                    .birthDate(LocalDate.of(1993, 11, 3))
-                    .email("loopers@example.com")
-                    .build();
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("로그인 ID 가 영문/숫자 외의 문자를 포함하면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequestException_whenLoginIdHasInvalidCharacters() {
-            // arrange
-            String invalidLoginId = "loopers!";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                UserModel.builder()
-                    .loginId(invalidLoginId)
-                    .encodedPassword("Loopers!2026")
-                    .name("김성호")
-                    .birthDate(LocalDate.of(1993, 11, 3))
-                    .email("loopers@example.com")
-                    .build();
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("이메일이 xx@yy.zz 포맷이 아니면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequestException_whenEmailFormatIsInvalid() {
-            // arrange
-            String invalidEmail = "loopers#example";
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                UserModel.builder()
-                    .loginId("loopers01")
-                    .encodedPassword("Loopers!2026")
-                    .name("김성호")
-                    .birthDate(LocalDate.of(1993, 11, 3))
-                    .email(invalidEmail)
-                    .build();
-            });
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("이름이 비어있으면, BAD_REQUEST 예외가 발생한다.")
@@ -119,11 +61,11 @@ class UserModelTest {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
                 UserModel.builder()
-                    .loginId("loopers01")
-                    .encodedPassword("Loopers!2026")
-                    .name(blankName)
-                    .birthDate(LocalDate.of(1993, 11, 3))
-                    .email("loopers@example.com")
+                    .loginId(LoginId.of("loopers01"))
+                    .password(EncodedPassword.of("Loopers!2026"))
+                    .name(UserName.of(blankName))
+                    .birthDate(BirthDate.of(LocalDate.of(1993, 11, 3)))
+                    .email(Email.of("loopers@example.com"))
                     .build();
             });
 
@@ -142,19 +84,19 @@ class UserModelTest {
         void changesPassword_whenValidEncodedPasswordIsProvided() {
             // arrange
             UserModel user = UserModel.builder()
-                .loginId("loopers01")
-                .encodedPassword("encoded-old-password")
-                .name("김성호")
-                .birthDate(LocalDate.of(1993, 11, 3))
-                .email("loopers@example.com")
+                .loginId(LoginId.of("loopers01"))
+                .password(EncodedPassword.of("encoded-old-password"))
+                .name(UserName.of("김성호"))
+                .birthDate(BirthDate.of(LocalDate.of(1993, 11, 3)))
+                .email(Email.of("loopers@example.com"))
                 .build();
             String newEncodedPassword = "encoded-new-password";
 
             // act
-            user.changePassword(newEncodedPassword);
+            user.changePassword(EncodedPassword.of(newEncodedPassword));
 
             // assert
-            assertThat(user.getPassword()).isEqualTo(newEncodedPassword);
+            assertThat(user.getPassword().value()).isEqualTo(newEncodedPassword);
         }
 
         @DisplayName("새 인코딩 비밀번호가 비어있으면, BAD_REQUEST 예외가 발생한다.")
@@ -162,16 +104,16 @@ class UserModelTest {
         void throwsBadRequestException_whenNewEncodedPasswordIsBlank() {
             // arrange
             UserModel user = UserModel.builder()
-                .loginId("loopers01")
-                .encodedPassword("encoded-old-password")
-                .name("김성호")
-                .birthDate(LocalDate.of(1993, 11, 3))
-                .email("loopers@example.com")
+                .loginId(LoginId.of("loopers01"))
+                .password(EncodedPassword.of("encoded-old-password"))
+                .name(UserName.of("김성호"))
+                .birthDate(BirthDate.of(LocalDate.of(1993, 11, 3)))
+                .email(Email.of("loopers@example.com"))
                 .build();
             String blankPassword = "   ";
 
             // act
-            CoreException result = assertThrows(CoreException.class, () -> user.changePassword(blankPassword));
+            CoreException result = assertThrows(CoreException.class, () -> user.changePassword(EncodedPassword.of(blankPassword)));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
