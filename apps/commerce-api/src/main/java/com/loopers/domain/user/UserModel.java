@@ -5,7 +5,6 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -16,7 +15,6 @@ import java.util.regex.Pattern;
 @Table(name = "users")
 public class UserModel extends BaseEntity {
 
-    private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
     private static final Pattern USER_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[가-힣]+$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -32,7 +30,7 @@ public class UserModel extends BaseEntity {
 
     protected UserModel() {}
 
-    public UserModel(String userId, String password, String name, LocalDate birthDate, String email) {
+    public UserModel(String userId, String password, String name, LocalDate birthDate, String email, PasswordEncoder passwordEncoder) {
         validateUserId(userId);
         validateName(name);
         validateEmail(email);
@@ -42,7 +40,7 @@ public class UserModel extends BaseEntity {
         this.name = name;
         this.email = email;
         this.birthDate = birthDate;
-        this.password = PASSWORD_ENCODER.encode(password);
+        this.password = passwordEncoder.encode(password);
     }
 
     public String getUserId() {
@@ -69,13 +67,12 @@ public class UserModel extends BaseEntity {
         return name.substring(0, name.length() - 1) + "*";
     }
 
-    public void changePassword(String currentPassword, String newPassword) {
-        authenticate(currentPassword);
-        if (PASSWORD_ENCODER.matches(newPassword, this.password)) {
+    public void changePassword(String newPassword, PasswordEncoder passwordEncoder) {
+        if (passwordEncoder.matches(newPassword, this.password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
         }
         validatePassword(newPassword, this.birthDate);
-        this.password = PASSWORD_ENCODER.encode(newPassword);
+        this.password = passwordEncoder.encode(newPassword);
     }
 
     private void validateUserId(String userId) {
@@ -125,8 +122,8 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    public void authenticate(String rawPassword) {
-        if (!PASSWORD_ENCODER.matches(rawPassword, password)) {
+    public void authenticate(String rawPassword, PasswordEncoder passwordEncoder) {
+        if (!passwordEncoder.matches(rawPassword, password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
     }

@@ -41,7 +41,7 @@ public class UserModelTest {
         @Test
         void createsUserModel_whenRequestIsValid() {
             // act
-            UserModel userModel = new UserModel(userId, password, name, birthDate, email);
+            UserModel userModel = new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER);
 
             // assert
             assertAll(
@@ -61,7 +61,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -76,7 +76,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -91,7 +91,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -106,7 +106,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -121,7 +121,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -136,7 +136,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -151,7 +151,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -166,7 +166,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -181,7 +181,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -196,7 +196,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -211,7 +211,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email)
+                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -226,7 +226,7 @@ public class UserModelTest {
 
         @BeforeEach
         void setup() {
-            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
         }
 
         @DisplayName("올바른 현재 비밀번호와 새 비밀번호가 주어지면, 비밀번호가 변경된다.")
@@ -236,7 +236,7 @@ public class UserModelTest {
             String newPassword = "newPass1!@";
 
             // act
-            userModel.changePassword(DEFAULT_PASSWORD, newPassword);
+            userModel.changePassword(newPassword, PASSWORD_ENCODER);
 
             // assert
             assertTrue(PASSWORD_ENCODER.matches(newPassword, userModel.getPassword()));
@@ -250,7 +250,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                userModel.changePassword(wrongPassword, "newPass1!@")
+                userModel.authenticate(wrongPassword, PASSWORD_ENCODER)
             );
 
             // assert
@@ -262,7 +262,7 @@ public class UserModelTest {
         void throwsException_whenNewPasswordIsSameAsCurrent() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                userModel.changePassword(DEFAULT_PASSWORD, DEFAULT_PASSWORD)
+                userModel.changePassword(DEFAULT_PASSWORD, PASSWORD_ENCODER)
             );
 
             // assert
@@ -278,7 +278,7 @@ public class UserModelTest {
         @Test
         void returnsMaskedName_whenNameHasThreeChars() {
             // arrange
-            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
 
             // act
             String maskedName = userModel.getMaskedName();
@@ -291,7 +291,7 @@ public class UserModelTest {
         @Test
         void returnsMaskedName_whenNameHasTwoChars() {
             // arrange
-            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, "홍길", DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, "홍길", DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
 
             // act
             String maskedName = userModel.getMaskedName();
@@ -308,14 +308,14 @@ public class UserModelTest {
 
         @BeforeEach
         void setup() {
-            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
         }
 
         @DisplayName("정상적인 비밀번호를 주면 인증이 성공한다.")
         @Test
         void authenticatesSuccessfully_whenPasswordIsCorrect() {
             // act & assert
-            assertDoesNotThrow(() -> userModel.authenticate(DEFAULT_PASSWORD));
+            assertDoesNotThrow(() -> userModel.authenticate(DEFAULT_PASSWORD, PASSWORD_ENCODER));
         }
 
         @DisplayName("잘못된 비밀번호를 입력하면 인증이 실패한다.")
@@ -326,7 +326,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                userModel.authenticate(wrongPassword)
+                userModel.authenticate(wrongPassword, PASSWORD_ENCODER)
             );
 
             // assert

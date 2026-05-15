@@ -15,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 
@@ -23,6 +24,7 @@ public class UserV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final PasswordEncoder passwordEncoder;
 
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
@@ -41,11 +43,13 @@ public class UserV1ApiE2ETest {
     public UserV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         UserJpaRepository userJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        PasswordEncoder passwordEncoder
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userJpaRepository = userJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @AfterEach
@@ -75,7 +79,7 @@ public class UserV1ApiE2ETest {
         @Test
         void failSignup_whenExistingUserIdIsProvided() {
             // arrange
-            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder));
             UserV1Dto.SignupRequest signupRequest = new UserV1Dto.SignupRequest(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
 
             // act
@@ -95,7 +99,7 @@ public class UserV1ApiE2ETest {
         @Test
         void returnsMyInfo_whenValidHeaderIsProvided() {
             // arrange
-            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder));
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
@@ -129,7 +133,7 @@ public class UserV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenPasswordDoesNotMatch() {
             // arrange
-            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder));
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, "wrongPassword1!");
@@ -181,7 +185,7 @@ public class UserV1ApiE2ETest {
         @Test
         void returnsNewPasswordInHeader_whenValidPasswordIsProvided() {
             // arrange
-            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder));
             String newPassword = "newPass99@";
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
@@ -217,7 +221,7 @@ public class UserV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            userJpaRepository.save(new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder));
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
