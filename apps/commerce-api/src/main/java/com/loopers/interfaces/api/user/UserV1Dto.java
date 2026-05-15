@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.application.user.UserChangePasswordCommand;
 import com.loopers.application.user.UserInfo;
 import com.loopers.application.user.UserRegisterCommand;
 import lombok.Builder;
@@ -17,6 +18,12 @@ public class UserV1Dto {
     ) {
         public UserRegisterCommand toCommand() {
             return new UserRegisterCommand(loginId, password, name, birthDate, email);
+        }
+    }
+
+    public record UserChangePasswordRequest(String currentPassword, String newPassword) {
+        public UserChangePasswordCommand toCommand() {
+            return new UserChangePasswordCommand(currentPassword, newPassword);
         }
     }
 

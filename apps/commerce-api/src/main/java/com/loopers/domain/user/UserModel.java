@@ -72,4 +72,8 @@ public class UserModel extends BaseEntity {
     public String maskedName() {
         return name.substring(0, name.length() - 1) + "*";
     }
+
+    public void changePassword(String encodedNewPassword) {
+        this.password = encodedNewPassword;
+    }
 }

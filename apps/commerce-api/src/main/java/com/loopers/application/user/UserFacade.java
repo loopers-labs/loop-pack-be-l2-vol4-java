@@ -3,6 +3,8 @@ package com.loopers.application.user;
 import com.loopers.domain.user.PasswordPolicy;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -30,6 +32,18 @@ public class UserFacade {
 
         // 5. 반환
         return UserInfo.from(saved);
+    }
+
+    public void changePassword(UserModel user, UserChangePasswordCommand command) {
+        if (!passwordEncoder.matches(command.currentPassword(), user.getPassword())) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        passwordPolicy.validate(command.newPassword(), user.getBirthDate());
+        if (passwordEncoder.matches(command.newPassword(), user.getPassword())) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.");
+        }
+        String encodedNewPassword = passwordEncoder.encode(command.newPassword());
+        userService.changePassword(user, encodedNewPassword);
     }
 
     public UserInfo getMe(UserModel user) {
