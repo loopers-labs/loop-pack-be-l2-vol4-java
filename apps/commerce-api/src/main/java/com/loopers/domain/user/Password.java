@@ -3,32 +3,32 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Embeddable;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
+@Getter
 @Embeddable
-public class Password {
-
-    private String password;
+@EqualsAndHashCode
+class Password {
+    private String value;
 
     private static final String PATTERN = "^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$";
 
-    protected Password() {}
-
-    private Password(String encodedValue) {
-        this.password = encodedValue;
+    protected Password() {
     }
 
-    public static Password of(String raw, PasswordHasher hasher) {
-        validate(raw);
-        return new Password(hasher.encode(raw));
-    }
-
-    public boolean matches(String raw, PasswordHasher hasher) {
-        return hasher.matches(raw, password);
-    }
-
-    private static void validate(String raw) {
-        if (raw == null || !raw.matches(PATTERN)) {
+    public Password(String rawPassword, BirthDate birthDate, PasswordEncryptor passwordEncryptor) {
+        if (rawPassword == null || !rawPassword.matches(PATTERN)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자 영문/숫자/특수문자여야 합니다.");
         }
+        if (rawPassword.contains(birthDate.toCompactString())) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+        }
+
+        this.value = passwordEncryptor.encrypt(rawPassword);
+    }
+
+    public boolean matches(String rawPassword, PasswordEncryptor passwordEncryptor) {
+        return passwordEncryptor.matches(rawPassword, this.value);
     }
 }
