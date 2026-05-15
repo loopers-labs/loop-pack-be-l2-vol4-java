@@ -32,7 +32,6 @@ public class UserModel extends BaseEntity {
         if (!loginId.matches(LOGIN_ID_PATTERN)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 id는 영문과 숫자만 허용됩니다.");
         }
-
         LocalDate parsedBirthDate;
         try {
             parsedBirthDate = LocalDate.parse(birthDate);
@@ -40,12 +39,8 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일의 구조는 yyyy-MM-dd 에 맞춰서 넣어주시기 바랍니다.");
         }
 
-        if (password.length() > PW_LETTER_MAX_SIZE || password.length() < PW_LETTER_MIN_SIZE) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자 이내로 작성해주시기 바랍니다.");
-        }
-        if (!password.matches(PASSWORD_PATTERN)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자로만 구성됩니다.");
-        }
+        validatePassword(password);
+
         if (passwordContainsBirthDate(password, parsedBirthDate)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일 정보가 포함될 수 없습니다.");
         }
@@ -76,6 +71,25 @@ public class UserModel extends BaseEntity {
                 || password.contains(monthDay);
     }
 
+    public void changePassword(String rawNewPassword, PasswordEncoder encoder) {
+        validatePassword(rawNewPassword);                              // 비밀번호 RULE 검증
+        if (passwordContainsBirthDate(rawNewPassword, this.birthDate)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일 정보가 포함될 수 없습니다.");
+        }
+        if (encoder.matches(rawNewPassword, this.password)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
+        }
+        this.password = encoder.encode(rawNewPassword);
+    }
+
+    private static void validatePassword(String password) {
+        if (password.length() > PW_LETTER_MAX_SIZE || password.length() < PW_LETTER_MIN_SIZE) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자 이내로 작성해주시기 바랍니다.");
+        }
+        if (!password.matches(PASSWORD_PATTERN)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자로만 구성됩니다.");
+        }
+    }
     public String getLoginId() {
         return loginId;
     }

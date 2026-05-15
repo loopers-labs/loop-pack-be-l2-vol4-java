@@ -21,4 +21,8 @@ public class UserFacade {
         UserModel user = userService.authenticate(loginId, rawPassword);
         return UserInfo.from(user);
     }
+
+    public void changePassword(String loginId, String currentPassword, String newPassword){
+        userService.changePassword(loginId,currentPassword,newPassword);
+    }
 }

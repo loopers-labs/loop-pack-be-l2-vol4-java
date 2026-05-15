@@ -14,4 +14,7 @@ public interface UserV1ApiSpec {
 
     @Operation(summary = "내 정보 조회", description = "헤더 인증된 본인 정보를 반환합니다.")
     ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(String loginId, String loginPw);
+
+    @Operation(summary = "비밀번호 변경", description = "헤더 인증된 본인의 비밀번호를 변경합니다.")
+    ApiResponse<Object> changePassword(String loginId, String loginPw, UserV1Dto.ChangePasswordRequest request);
 }

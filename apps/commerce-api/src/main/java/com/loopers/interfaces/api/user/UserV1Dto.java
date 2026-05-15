@@ -30,4 +30,6 @@ public class UserV1Dto {
             return name.substring(0, name.length() - 1) + "*";
         }
     }
+
+    public record ChangePasswordRequest (String curPassword, String newPassword){}
 }

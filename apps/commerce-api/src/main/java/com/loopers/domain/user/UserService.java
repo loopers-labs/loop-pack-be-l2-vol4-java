@@ -38,5 +38,11 @@ public class UserService {
         }
         return user;
     }
+
+    @Transactional
+    public void changePassword(String loginId, String currentPassword, String newPassword) {
+        UserModel user = authenticate(loginId, currentPassword);
+        user.changePassword(newPassword, passwordEncoder);
+    }
 }
 

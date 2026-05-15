@@ -18,6 +18,7 @@ public class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
     private static final String ENDPOINT_GET_MY_INFO = "/api/v1/users/me";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
 
     private static final String VALID_LOGIN_ID = "testId";
     private static final String VALID_PW = "validPassword123";
@@ -158,6 +159,90 @@ public class UserV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response =
                     testRestTemplate.exchange(ENDPOINT_GET_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("PATCH /api/v1/users/me/password")
+    @Nested
+    class ChangePassword {
+
+        private void signUpDefault() {
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                    VALID_LOGIN_ID, VALID_PW, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(request),
+                    new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {});
+        }
+
+        @DisplayName("정상 정보로 비밀번호 변경 시 200 OK 응답을 받는다.")
+        @Test
+        void returnsOk_whenValidRequest() {
+            // arrange
+            signUpDefault();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", VALID_LOGIN_ID);
+            headers.set("X-Loopers-LoginPw", VALID_PW);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PW, "newPassword456");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+        }
+
+        @DisplayName("현재 비밀번호와 새 비밀번호가 같으면 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordSameAsCurrent() {
+            // arrange
+            signUpDefault();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", VALID_LOGIN_ID);
+            headers.set("X-Loopers-LoginPw", VALID_PW);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PW, VALID_PW);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 RULE 위반(7자) 이면 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordTooShort() {
+            // arrange
+            signUpDefault();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", VALID_LOGIN_ID);
+            headers.set("X-Loopers-LoginPw", VALID_PW);
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PW, "short1!");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers 헤더가 없으면 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void returnsBadRequest_whenHeadersMissing() {
+            // arrange
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(VALID_PW, "newPassword456");
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request), responseType);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
