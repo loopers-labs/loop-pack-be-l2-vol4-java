@@ -33,6 +33,55 @@ class UserServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    @DisplayName("회원가입을 할 때,")
+    @Nested
+    class SignUp {
+
+        @DisplayName("유효한 정보가 주어지면, 유저가 저장된다.")
+        @Test
+        void savesUser_whenValidUserInfoIsProvided() {
+            // arrange
+            UserModel user = new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            );
+
+            // act
+            UserModel saved = userService.signUp(user);
+
+            // assert
+            assertAll(
+                () -> assertThat(saved.getId()).isNotNull(),
+                () -> assertThat(saved.getLoginId()).isEqualTo("user01"),
+                () -> assertThat(saved.getName()).isEqualTo("홍길동"),
+                () -> assertThat(saved.getEmail()).isEqualTo("user@example.com")
+            );
+        }
+
+        @DisplayName("이미 존재하는 loginId로 가입하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsException_whenLoginIdAlreadyExists() {
+            // arrange
+            userRepository.save(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            UserModel duplicateUser = new UserModel(
+                "user01", "Password2@", "김철수",
+                LocalDate.of(1995, 5, 5), "other@example.com"
+            );
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.signUp(duplicateUser)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
     @DisplayName("내 정보를 조회할 때,")
     @Nested
     class GetUser {
@@ -42,11 +91,8 @@ class UserServiceIntegrationTest {
         void returnsUserInfo_whenValidCredentialsAreProvided() {
             // arrange
             UserModel saved = userRepository.save(new UserModel(
-                "user01",
-                "Password1!",
-                "홍길동",
-                LocalDate.of(1990, 1, 1),
-                "user@example.com"
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
             // act
@@ -81,11 +127,8 @@ class UserServiceIntegrationTest {
         void throwsException_whenPasswordNotMatches() {
             // arrange
             userRepository.save(new UserModel(
-                "user01",
-                "Password1!",
-                "홍길동",
-                LocalDate.of(1990, 1, 1),
-                "user@example.com"
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
             // act
@@ -95,6 +138,64 @@ class UserServiceIntegrationTest {
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("비밀번호를 수정할 때,")
+    @Nested
+    class UpdatePassword {
+
+        @DisplayName("기존 비밀번호가 일치하면, 비밀번호가 변경된다.")
+        @Test
+        void updatesPassword_whenOldPasswordMatches() {
+            // arrange
+            userRepository.save(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            // act
+            userService.updatePassword("user01", "Password1!", "NewPassword1!");
+
+            // assert
+            UserModel updated = userService.getUser("user01", "NewPassword1!");
+            assertThat(updated.matchesPassword("NewPassword1!")).isTrue();
+        }
+
+        @DisplayName("기존 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsException_whenOldPasswordNotMatches() {
+            // arrange
+            userRepository.save(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.updatePassword("user01", "WrongPassword!", "NewPassword1!")
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsException_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            userRepository.save(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.updatePassword("user01", "Password1!", "Password1!")
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }
