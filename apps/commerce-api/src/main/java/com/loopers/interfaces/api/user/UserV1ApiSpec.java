@@ -86,9 +86,7 @@ public interface UserV1ApiSpec {
             })
         )
     })
-    ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(
-        @Parameter(hidden = true) Long userId
-    );
+    ApiResponse<UserV1Dto.MyInfoResponse> getMyInfo(@Parameter(hidden = true) Long userId);
 
     @Operation(
         summary = "비밀번호 변경",
@@ -124,8 +122,5 @@ public interface UserV1ApiSpec {
             })
         )
     })
-    ApiResponse<Object> changePassword(
-        @Parameter(hidden = true) Long userId,
-        UserV1Dto.ChangePasswordRequest request
-    );
+    ApiResponse<Object> changePassword(@Parameter(hidden = true) Long userId, UserV1Dto.ChangePasswordRequest request);
 }

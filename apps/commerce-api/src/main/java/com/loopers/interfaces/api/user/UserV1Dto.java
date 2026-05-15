@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.application.user.SignUpCommand;
 import com.loopers.application.user.UserInfo;
+import com.loopers.application.user.SignUpCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -72,17 +72,10 @@ public class UserV1Dto {
         public static MyInfoResponse from(UserInfo info) {
             return new MyInfoResponse(
                 info.loginId(),
-                maskLastChar(info.name()),
+                info.maskedName(),
                 info.birthDate(),
                 info.email()
             );
         }
-    }
-
-    private static String maskLastChar(String value) {
-        if (value.length() <= 1) {
-            return "*";
-        }
-        return value.substring(0, value.length() - 1) + "*";
     }
 }
