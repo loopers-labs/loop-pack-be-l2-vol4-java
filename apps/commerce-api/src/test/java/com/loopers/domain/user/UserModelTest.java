@@ -10,8 +10,7 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 public class UserModelTest {
 
@@ -335,6 +334,25 @@ public class UserModelTest {
         void authenticatesSuccessfully_whenPasswordIsCorrect() {
             // act & assert
             assertDoesNotThrow(() -> userModel.authenticate(DEFAULT_PASSWORD, PASSWORD_ENCODER));
+        }
+
+        @DisplayName("Mock: authenticate matches()가 정확히 1회 호출되는지 검증")
+        @Test
+        void authenticatesSuccessfully_withMockEncoder() {
+            // arrange
+            PasswordEncoder mockEncoder = mock(PasswordEncoder.class);
+            String hashPassword = "hashPassword";
+            when(mockEncoder.encode(anyString())).thenReturn(hashPassword);
+            when(mockEncoder.matches(DEFAULT_PASSWORD, hashPassword)).thenReturn(true);
+
+            UserModel user = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, mockEncoder);
+
+            // act
+            user.authenticate(DEFAULT_PASSWORD, mockEncoder);
+
+            // assert - 행위 검증
+            verify(mockEncoder, times(1)).encode(DEFAULT_PASSWORD);
+            verify(mockEncoder, times(1)).matches(DEFAULT_PASSWORD, hashPassword);
         }
 
         @DisplayName("잘못된 비밀번호를 입력하면 인증이 실패한다.")
