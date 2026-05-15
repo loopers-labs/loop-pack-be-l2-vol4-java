@@ -53,7 +53,7 @@ class MemberServiceTest {
         void throwsConflict_whenLoginIdAlreadyExists() {
             // Arrange
             String loginId = "testUser1";
-            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder().encode("Password1!"));
             Member existingMember = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
             when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(existingMember));
 
@@ -78,7 +78,7 @@ class MemberServiceTest {
             // Arrange
             String loginId = "testUser1";
             String rawPassword = "Password1!";
-            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder());
+            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder().encode(rawPassword));
             Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
             when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
 
@@ -109,7 +109,7 @@ class MemberServiceTest {
         void throwsUnauthorized_whenPasswordIsWrong() {
             // Arrange
             String loginId = "testUser1";
-            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder().encode("Password1!"));
             Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
             when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
 
@@ -132,7 +132,7 @@ class MemberServiceTest {
         void callsEncode_whenCredentialsAreValid() {
             // Arrange
             String loginId = "testUser1";
-            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder());
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder().encode("Password1!"));
             Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
             when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
 

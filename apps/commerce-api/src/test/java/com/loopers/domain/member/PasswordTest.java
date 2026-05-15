@@ -25,9 +25,10 @@ class PasswordTest {
             // Arrange
             String rawPassword = "Password1!";
             String birthDate = "1990-01-01";
+            String encoded = encoder.encode(rawPassword);
 
             // Act
-            Password password = Password.of(rawPassword, birthDate, encoder);
+            Password password = Password.of(rawPassword, birthDate, encoded);
 
             // Assert
             assertThat(password.matches(rawPassword, encoder)).isTrue();
@@ -41,7 +42,7 @@ class PasswordTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                Password.of(shortPassword, "1990-01-01", encoder)
+                Password.of(shortPassword, "1990-01-01", encoder.encode(shortPassword))
             );
 
             // Assert
@@ -56,7 +57,7 @@ class PasswordTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                Password.of(longPassword, "1990-01-01", encoder)
+                Password.of(longPassword, "1990-01-01", encoder.encode(longPassword))
             );
 
             // Assert
@@ -72,7 +73,7 @@ class PasswordTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                Password.of(passwordWithBirth, birthDate, encoder)
+                Password.of(passwordWithBirth, birthDate, encoder.encode(passwordWithBirth))
             );
 
             // Assert
@@ -88,7 +89,7 @@ class PasswordTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                Password.of(passwordWithBirth, birthDate, encoder)
+                Password.of(passwordWithBirth, birthDate, encoder.encode(passwordWithBirth))
             );
 
             // Assert
@@ -105,10 +106,11 @@ class PasswordTest {
         void returnsNewPassword_whenCredentialsAreValid() {
             // Arrange
             String birthDate = "1990-01-01";
-            Password current = Password.of("Password1!", birthDate, encoder);
+            Password current = Password.of("Password1!", birthDate, encoder.encode("Password1!"));
+            String newEncoded = encoder.encode("NewPassword2@");
 
             // Act
-            Password changed = current.change("Password1!", "NewPassword2@", birthDate, encoder);
+            Password changed = current.change("Password1!", "NewPassword2@", birthDate, newEncoded, encoder);
 
             // Assert
             assertThat(changed.matches("NewPassword2@", encoder)).isTrue();
@@ -119,11 +121,12 @@ class PasswordTest {
         void throwsUnauthorized_whenOldPasswordIsWrong() {
             // Arrange
             String birthDate = "1990-01-01";
-            Password current = Password.of("Password1!", birthDate, encoder);
+            Password current = Password.of("Password1!", birthDate, encoder.encode("Password1!"));
+            String newEncoded = encoder.encode("NewPassword2@");
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                current.change("WrongPassword1!", "NewPassword2@", birthDate, encoder)
+                current.change("WrongPassword1!", "NewPassword2@", birthDate, newEncoded, encoder)
             );
 
             // Assert
@@ -135,11 +138,12 @@ class PasswordTest {
         void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // Arrange
             String birthDate = "1990-01-01";
-            Password current = Password.of("Password1!", birthDate, encoder);
+            Password current = Password.of("Password1!", birthDate, encoder.encode("Password1!"));
+            String newEncoded = encoder.encode("Password1!");
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                current.change("Password1!", "Password1!", birthDate, encoder)
+                current.change("Password1!", "Password1!", birthDate, newEncoded, encoder)
             );
 
             // Assert

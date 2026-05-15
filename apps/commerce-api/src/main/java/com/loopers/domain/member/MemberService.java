@@ -20,7 +20,8 @@ public class MemberService {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 로그인 ID입니다.");
         });
 
-        Password encodedPassword = Password.of(password, birthDate, passwordEncoder);
+        String encoded = passwordEncoder.encode(password);
+        Password encodedPassword = Password.of(password, birthDate, encoded);
         return memberRepository.save(new Member(loginId, encodedPassword, name, birthDate, email));
     }
 
@@ -28,7 +29,8 @@ public class MemberService {
     public void changePassword(String loginId, String oldRawPassword, String newRawPassword) {
         Member member = memberRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
-        member.changePassword(oldRawPassword, newRawPassword, passwordEncoder);
+        String newEncoded = passwordEncoder.encode(newRawPassword);
+        member.changePassword(oldRawPassword, newRawPassword, newEncoded, passwordEncoder);
     }
 
     @Transactional(readOnly = true)

@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+
 @Embeddable
 public class Password {
 
@@ -18,9 +19,9 @@ public class Password {
         this.encodedValue = encodedValue;
     }
 
-    public static Password of(String rawPassword, String birthDate, PasswordEncoder encoder) {
+    public static Password of(String rawPassword, String birthDate, String encodedValue) {
         validate(rawPassword, birthDate);
-        return new Password(encoder.encode(rawPassword));
+        return new Password(encodedValue);
     }
 
     private static void validate(String rawPassword, String birthDate) {
@@ -40,13 +41,13 @@ public class Password {
         return encoder.matches(rawPassword, this.encodedValue);
     }
 
-    public Password change(String oldRaw, String newRaw, String birthDate, PasswordEncoder encoder) {
+    public Password change(String oldRaw, String newRaw, String birthDate, String newEncoded, PasswordEncoder encoder) {
         if (!matches(oldRaw, encoder)) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "기존 비밀번호가 올바르지 않습니다.");
         }
         if (matches(newRaw, encoder)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.");
         }
-        return Password.of(newRaw, birthDate, encoder);
+        return Password.of(newRaw, birthDate, newEncoded);
     }
 }

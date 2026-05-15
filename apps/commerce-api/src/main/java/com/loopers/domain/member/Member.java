@@ -64,7 +64,7 @@ public class Member extends BaseEntity {
         return password.matches(rawPassword, encoder);
     }
 
-    public void changePassword(String oldRawPassword, String newRawPassword, PasswordEncoder encoder) {
-        this.password = password.change(oldRawPassword, newRawPassword, this.birthDate, encoder);
+    public void changePassword(String oldRawPassword, String newRawPassword, String newEncoded, PasswordEncoder encoder) {
+        this.password = password.change(oldRawPassword, newRawPassword, this.birthDate, newEncoded, encoder);
     }
 }

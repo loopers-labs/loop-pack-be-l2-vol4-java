@@ -56,7 +56,7 @@ class MemberFacadeTest {
             // Arrange
             String loginId = "testUser1";
             String rawPassword = "Password1!";
-            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder());
+            Password password = Password.of(rawPassword, "1990-01-01", new BCryptPasswordEncoder().encode(rawPassword));
             Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
             when(memberService.getMe(loginId, rawPassword)).thenReturn(member);
 

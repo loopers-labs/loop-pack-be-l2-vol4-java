@@ -17,7 +17,7 @@ class MemberTest {
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private Member createMember(String loginId, String name, String birthDate, String email) {
-        Password password = Password.of("Password1!", birthDate, encoder);
+        Password password = Password.of("Password1!", birthDate, encoder.encode("Password1!"));
         return new Member(loginId, password, name, birthDate, email);
     }
 
@@ -81,7 +81,7 @@ class MemberTest {
             Password oldPassword = member.getPassword();
 
             // Act
-            member.changePassword("Password1!", "NewPassword2@", encoder);
+            member.changePassword("Password1!", "NewPassword2@", encoder.encode("NewPassword2@"), encoder);
 
             // Assert
             assertThat(member.getPassword()).isNotSameAs(oldPassword);
