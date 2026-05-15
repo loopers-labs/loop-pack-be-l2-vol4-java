@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserChangePasswordCommand;
 import com.loopers.application.user.UserInfo;
 import com.loopers.application.user.UserRegisterCommand;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
 import java.time.LocalDate;
@@ -10,18 +12,18 @@ import java.time.LocalDate;
 public class UserV1Dto {
 
     public record UserRegisterRequest(
-        String loginId,
-        String password,
-        String name,
-        LocalDate birthDate,
-        String email
+        @NotBlank String loginId,
+        @NotBlank String password,
+        @NotBlank String name,
+        @NotNull  LocalDate birthDate,
+        @NotBlank String email
     ) {
         public UserRegisterCommand toCommand() {
             return new UserRegisterCommand(loginId, password, name, birthDate, email);
         }
     }
 
-    public record UserChangePasswordRequest(String currentPassword, String newPassword) {
+    public record UserChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {
         public UserChangePasswordCommand toCommand() {
             return new UserChangePasswordCommand(currentPassword, newPassword);
         }
