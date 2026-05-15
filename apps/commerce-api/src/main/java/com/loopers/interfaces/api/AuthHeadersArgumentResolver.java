@@ -11,9 +11,6 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 @Component
 public class AuthHeadersArgumentResolver implements HandlerMethodArgumentResolver {
 
-    private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
-    private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
-
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.getParameterType().equals(AuthHeaders.class);
@@ -26,13 +23,13 @@ public class AuthHeadersArgumentResolver implements HandlerMethodArgumentResolve
         NativeWebRequest webRequest,
         WebDataBinderFactory binderFactory
     ) throws Exception {
-        String loginId = webRequest.getHeader(HEADER_LOGIN_ID);
+        String loginId = webRequest.getHeader(AuthHeaders.HEADER_LOGIN_ID);
         if (loginId == null) {
-            throw new MissingRequestHeaderException(HEADER_LOGIN_ID, parameter);
+            throw new MissingRequestHeaderException(AuthHeaders.HEADER_LOGIN_ID, parameter);
         }
-        String loginPw = webRequest.getHeader(HEADER_LOGIN_PW);
+        String loginPw = webRequest.getHeader(AuthHeaders.HEADER_LOGIN_PW);
         if (loginPw == null) {
-            throw new MissingRequestHeaderException(HEADER_LOGIN_PW, parameter);
+            throw new MissingRequestHeaderException(AuthHeaders.HEADER_LOGIN_PW, parameter);
         }
         return new AuthHeaders(loginId, loginPw);
     }

@@ -118,8 +118,8 @@ class UserV1ApiE2ETest {
 
             // act
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginId", "tester01");
-            headers.set("X-Loopers-LoginPw", "Password1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "tester01");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "Password1!");
             ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
@@ -141,8 +141,8 @@ class UserV1ApiE2ETest {
         void returnsNotFound_whenLoginIdNotExists() {
             // act
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginId", "nonexistent");
-            headers.set("X-Loopers-LoginPw", "AnyPw1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "nonexistent");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "AnyPw1!");
             ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
@@ -158,7 +158,7 @@ class UserV1ApiE2ETest {
         void returnsBadRequest_whenLoginIdHeaderMissing() {
             // act
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginPw", "Password1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "Password1!");
             ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
@@ -184,8 +184,8 @@ class UserV1ApiE2ETest {
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginId", "tester01");
-            headers.set("X-Loopers-LoginPw", "Password1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "tester01");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "Password1!");
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("NewPass2@");
 
             // act
@@ -209,8 +209,8 @@ class UserV1ApiE2ETest {
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginId", "tester01");
-            headers.set("X-Loopers-LoginPw", "Password1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "tester01");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "Password1!");
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("short");
 
             // act
@@ -231,8 +231,8 @@ class UserV1ApiE2ETest {
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Loopers-LoginId", "tester01");
-            headers.set("X-Loopers-LoginPw", "WrongPw1!");
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "tester01");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "WrongPw1!");
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("NewPass2@");
 
             // act

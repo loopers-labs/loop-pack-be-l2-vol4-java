@@ -24,6 +24,9 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class ApiControllerAdvice {
+
+    private static final Pattern MISSING_PARAM_PATTERN = Pattern.compile("'(.+?)'");
+
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handle(CoreException e) {
         log.warn("CoreException : {}", e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage(), e);
@@ -121,8 +124,7 @@ public class ApiControllerAdvice {
     }
 
     private String extractMissingParameter(String message) {
-        Pattern pattern = Pattern.compile("'(.+?)'");
-        Matcher matcher = pattern.matcher(message);
+        Matcher matcher = MISSING_PARAM_PATTERN.matcher(message);
         return matcher.find() ? matcher.group(1) : "";
     }
 

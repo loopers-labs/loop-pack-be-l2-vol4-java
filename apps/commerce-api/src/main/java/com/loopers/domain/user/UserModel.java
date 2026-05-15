@@ -23,7 +23,6 @@ public class UserModel extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]{1,10}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-    private static final Pattern BIRTH_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
     private static final DateTimeFormatter BIRTH_DATE_FORMATTER =
         DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
 
@@ -108,13 +107,13 @@ public class UserModel extends BaseEntity {
     }
 
     private static void validateBirthDate(String birthDate) {
-        if (birthDate == null || !BIRTH_DATE_PATTERN.matcher(birthDate).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식이어야 합니다.");
+        if (birthDate == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비어있을 수 없습니다.");
         }
         try {
             LocalDate.parse(birthDate, BIRTH_DATE_FORMATTER);
         } catch (DateTimeParseException e) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일이 유효한 날짜가 아닙니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식이어야 합니다.");
         }
     }
 
