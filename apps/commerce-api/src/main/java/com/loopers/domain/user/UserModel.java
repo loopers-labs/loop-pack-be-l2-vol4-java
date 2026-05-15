@@ -5,7 +5,10 @@ import com.loopers.domain.user.vo.BirthDate;
 import com.loopers.domain.user.vo.Email;
 import com.loopers.domain.user.vo.EncodedPassword;
 import com.loopers.domain.user.vo.LoginId;
+import com.loopers.domain.user.vo.PlainPassword;
 import com.loopers.domain.user.vo.UserName;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -42,8 +45,8 @@ public class UserModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false))
     private Email email;
 
-    @Builder
-    public UserModel(LoginId loginId, EncodedPassword password, UserName name, BirthDate birthDate, Email email) {
+    @Builder(access = AccessLevel.PRIVATE)
+    private UserModel(LoginId loginId, EncodedPassword password, UserName name, BirthDate birthDate, Email email) {
         this.loginId = loginId;
         this.password = password;
         this.name = name;
@@ -67,7 +70,16 @@ public class UserModel extends BaseEntity {
             .build();
     }
 
-    public void changePassword(EncodedPassword newPassword) {
-        this.password = newPassword;
+    public void changePassword(String currentRaw, String newRaw, PasswordHasher hasher) {
+        PlainPassword current = PlainPassword.of(currentRaw);
+        PlainPassword next = PlainPassword.of(newRaw, this.birthDate);
+
+        if (!hasher.matches(current, this.password)) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        if (current.equals(next)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
+        }
+        this.password = hasher.hash(next);
     }
 }

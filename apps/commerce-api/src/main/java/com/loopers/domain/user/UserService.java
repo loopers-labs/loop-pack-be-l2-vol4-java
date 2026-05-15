@@ -2,11 +2,9 @@ package com.loopers.domain.user;
 
 import com.loopers.domain.user.command.SignUpUserCommand;
 import com.loopers.domain.user.vo.EncodedPassword;
-import com.loopers.domain.user.vo.PlainPassword;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordHasher;
 
     @Transactional
     public UserModel signUp(SignUpUserCommand signUpUserCommand) {
@@ -23,9 +21,7 @@ public class UserService {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }
 
-        EncodedPassword encodedPassword = EncodedPassword.of(
-            passwordEncoder.encode(signUpUserCommand.plainPassword().value())
-        );
+        EncodedPassword encodedPassword = passwordHasher.hash(signUpUserCommand.plainPassword());
         UserModel user = UserModel.signUp(
             signUpUserCommand.loginId(),
             encodedPassword,
@@ -45,16 +41,6 @@ public class UserService {
     @Transactional
     public void changePassword(Long userId, String currentPassword, String newPassword) {
         UserModel user = getUser(userId);
-
-        if (!passwordEncoder.matches(currentPassword, user.getPassword().value())) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
-        }
-        if (currentPassword.equals(newPassword)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
-        }
-
-        PlainPassword plainNewPassword = PlainPassword.of(newPassword, user.getBirthDate());
-        EncodedPassword encodedNewPassword = EncodedPassword.of(passwordEncoder.encode(plainNewPassword.value()));
-        user.changePassword(encodedNewPassword);
+        user.changePassword(currentPassword, newPassword, passwordHasher);
     }
 }
