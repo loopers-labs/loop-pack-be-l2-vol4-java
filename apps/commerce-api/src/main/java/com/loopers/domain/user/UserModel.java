@@ -5,7 +5,6 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -124,7 +123,7 @@ public class UserModel extends BaseEntity {
     }
 
     public void authenticate(String rawPassword, PasswordEncoder passwordEncoder) {
-        if (passwordEncoder.matches(rawPassword, password)) {
+        if (!passwordEncoder.matches(rawPassword, password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
     }
