@@ -24,7 +24,7 @@ class UserModelTest {
     @Nested
     class Create {
 
-        @DisplayName("Given 유효한 모든 필드 / When 생성 / Then 정상 생성된다.")
+        @DisplayName("유효한 모든 필드로 생성 시 정상 생성된다.")
         @Test
         void createsUserModel_whenAllFieldsAreValid() {
             // arrange & act
@@ -44,7 +44,7 @@ class UserModelTest {
         @Nested
         class LoginId {
 
-            @DisplayName("Given null loginId / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("null loginId로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenLoginIdIsNull() {
                 // arrange & act
@@ -56,7 +56,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 공백 loginId / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("공백 loginId로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenLoginIdIsBlank() {
                 // arrange & act
@@ -68,7 +68,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 특수문자 포함 loginId / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("특수문자 포함 loginId로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenLoginIdContainsSpecialCharacter() {
                 // arrange & act
@@ -85,7 +85,7 @@ class UserModelTest {
         @Nested
         class Password {
 
-            @DisplayName("Given null password / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("null password로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenPasswordIsNull() {
                 // arrange & act
@@ -97,7 +97,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 공백 password / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("공백 password로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenPasswordIsBlank() {
                 // arrange & act
@@ -114,7 +114,7 @@ class UserModelTest {
         @Nested
         class Name {
 
-            @DisplayName("Given null name / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("null name으로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenNameIsNull() {
                 // arrange & act
@@ -126,7 +126,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 공백 name / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("공백 name으로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenNameIsBlank() {
                 // arrange & act
@@ -143,7 +143,7 @@ class UserModelTest {
         @Nested
         class BirthDate {
 
-            @DisplayName("Given null birthDate / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("null birthDate로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenBirthDateIsNull() {
                 // arrange & act
@@ -155,7 +155,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 오늘 날짜 birthDate / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("오늘 날짜 birthDate로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenBirthDateIsToday() {
                 // arrange & act
@@ -167,7 +167,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 미래 birthDate / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("미래 birthDate로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenBirthDateIsInFuture() {
                 // arrange & act
@@ -184,7 +184,7 @@ class UserModelTest {
         @Nested
         class Email {
 
-            @DisplayName("Given null email / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("null email로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenEmailIsNull() {
                 // arrange & act
@@ -196,7 +196,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 공백 email / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("공백 email로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenEmailIsBlank() {
                 // arrange & act
@@ -208,7 +208,7 @@ class UserModelTest {
                 assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             }
 
-            @DisplayName("Given 잘못된 형식의 email / When 생성 / Then BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("잘못된 형식의 email로 생성 시 BAD_REQUEST 예외가 발생한다.")
             @Test
             void throwsBadRequest_whenEmailFormatIsInvalid() {
                 // arrange & act
@@ -226,7 +226,7 @@ class UserModelTest {
     @Nested
     class MaskedName {
 
-        @DisplayName("Given 2자 이상 이름 / When 마스킹 / Then 마지막 글자만 '*'로 치환된다.")
+        @DisplayName("2자 이상 이름 마스킹 시 마지막 글자만 '*'로 치환된다.")
         @Test
         void masksLastCharacter_whenNameHasMultipleCharacters() {
             // arrange
@@ -236,7 +236,7 @@ class UserModelTest {
             assertThat(user.maskedName()).isEqualTo("홍길*");
         }
 
-        @DisplayName("Given 1자 이름 / When 마스킹 / Then 전체가 '*'로 치환된다.")
+        @DisplayName("1자 이름 마스킹 시 전체가 '*'로 치환된다.")
         @Test
         void masksEntireName_whenNameHasSingleCharacter() {
             // arrange

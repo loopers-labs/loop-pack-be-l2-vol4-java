@@ -20,7 +20,7 @@
    - 전체 흐름 → E2E: `@SpringBootTest(webEnvironment=RANDOM_PORT)` + Testcontainers + `http/*.http` 파일
 3. **테스트 작성** (3A 원칙 필수):
    - `// Arrange` / `// Act` / `// Assert` 주석으로 구획
-   - `@DisplayName("Given ... / When ... / Then ...")` 형식으로 명칭 기술
+   - `@DisplayName`은 행동 중심으로 간결하게 기술 (e.g. `"null loginId로 생성 시 BAD_REQUEST 예외가 발생한다."`)
    - Best case + Edge case (경계값, null 입력, 예외) 모두 커버
 4. **E2E 작성 시**: `http/` 디렉터리에 `.http` 파일도 함께 생성
 

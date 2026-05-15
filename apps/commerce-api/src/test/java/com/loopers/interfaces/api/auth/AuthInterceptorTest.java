@@ -44,7 +44,7 @@ class AuthInterceptorTest {
     @Nested
     class PreHandle {
 
-        @DisplayName("Given X-Loopers-LoginId 헤더 누락 / When 인터셉터 처리 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("X-Loopers-LoginId 헤더 누락 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenLoginIdHeaderIsMissing() {
             // arrange
@@ -59,7 +59,7 @@ class AuthInterceptorTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("Given X-Loopers-LoginPw 헤더 누락 / When 인터셉터 처리 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("X-Loopers-LoginPw 헤더 누락 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenLoginPwHeaderIsMissing() {
             // arrange
@@ -74,7 +74,7 @@ class AuthInterceptorTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("Given 유효한 인증 헤더 / When 인터셉터 처리 / Then currentUser attribute가 저장되고 true를 반환한다.")
+        @DisplayName("유효한 인증 헤더로 인터셉터 처리 시 currentUser attribute가 저장되고 true가 반환된다.")
         @Test
         void storesCurrentUserAndReturnsTrue_whenCredentialsAreValid() {
             // arrange
@@ -91,7 +91,7 @@ class AuthInterceptorTest {
             assertThat(request.getAttribute("currentUser")).isEqualTo(user);
         }
 
-        @DisplayName("Given 틀린 인증 정보 / When 인터셉터 처리 / Then UserService의 UNAUTHORIZED 예외가 전파된다.")
+        @DisplayName("틀린 인증 정보로 인터셉터 처리 시 UNAUTHORIZED 예외가 전파된다.")
         @Test
         void propagatesUnauthorized_whenAuthenticationFails() {
             // arrange

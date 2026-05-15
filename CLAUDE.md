@@ -45,7 +45,7 @@ supports/
 
 ### Workflow — 테스트 작성 원칙
 - 모든 테스트는 **Arrange / Act / Assert** 3A 원칙으로 작성
-- 테스트 설명은 **Given / When / Then** 구조로 명확하게 기술
+- 테스트 설명은 **행동 중심**으로 간결하게 기술 (e.g. "null loginId로 생성 시 BAD_REQUEST 예외가 발생한다.")
 - **Best case** (정상 흐름) 와 **Edge case** (경계값, 예외 상황, 누락 입력 등) 를 모두 꼼꼼히 작성
 
 ## 주의사항

@@ -51,7 +51,7 @@ class UserServiceIntegrationTest {
     @Nested
     class Register {
 
-        @DisplayName("Given 유효한 유저 정보 / When 등록 요청 / Then DB에 저장되고 ID가 부여된 UserModel이 반환된다.")
+        @DisplayName("유효한 유저 정보 등록 시 DB에 저장되고 ID가 부여된 UserModel이 반환된다.")
         @Test
         void savesUser_whenValidUserIsProvided() {
             // act
@@ -67,7 +67,7 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("Given 이미 존재하는 loginId / When 등록 요청 / Then CONFLICT 예외가 발생한다.")
+        @DisplayName("이미 존재하는 loginId 등록 시 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdIsDuplicated() {
             // arrange
@@ -100,7 +100,7 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("Given 새 비밀번호 / When 변경 요청 / Then 변경된 비밀번호가 DB에 반영된다.")
+        @DisplayName("새 비밀번호로 변경 시 변경된 비밀번호가 DB에 반영된다.")
         @Test
         void updatesPasswordInDb_whenCalled() {
             // arrange
@@ -132,7 +132,7 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("Given 올바른 loginId와 비밀번호 / When 인증 요청 / Then UserModel이 반환된다.")
+        @DisplayName("올바른 loginId와 비밀번호로 인증 시 UserModel이 반환된다.")
         @Test
         void returnsUser_whenCredentialsAreValid() {
             // act
@@ -145,7 +145,7 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("Given 존재하지 않는 loginId / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("존재하지 않는 loginId로 인증 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenLoginIdNotFound() {
             // act
@@ -157,7 +157,7 @@ class UserServiceIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("Given 틀린 비밀번호 / When 인증 요청 / Then UNAUTHORIZED 예외가 발생한다.")
+        @DisplayName("틀린 비밀번호로 인증 시 UNAUTHORIZED 예외가 발생한다.")
         @Test
         void throwsUnauthorized_whenPasswordIsWrong() {
             // act

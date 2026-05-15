@@ -40,14 +40,14 @@ class AuthInterceptorIntegrationTest {
     @Nested
     class GetMe {
 
-        @DisplayName("Given 인증 헤더 누락 / When 요청 / Then 401이 반환된다.")
+        @DisplayName("인증 헤더 누락 시 401이 반환된다.")
         @Test
         void returns401_whenAuthHeadersAreMissing() throws Exception {
             mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized());
         }
 
-        @DisplayName("Given 유효한 인증 헤더 / When 요청 / Then 200이 반환된다.")
+        @DisplayName("유효한 인증 헤더로 요청 시 200이 반환된다.")
         @Test
         void returns200_whenValidCredentialsProvided() throws Exception {
             // arrange
