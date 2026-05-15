@@ -28,5 +28,15 @@ public class UserService {
     public UserModel getMyInfo(String loginId) {
         return userRepository.findByLoginId(loginId).orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
     }
+
+    @Transactional(readOnly = true)
+    public UserModel authenticate(String loginId, String rawPassword) {
+        UserModel user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다.");
+        }
+        return user;
+    }
 }
 
