@@ -1,5 +1,11 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.command.SignUpUserCommand;
+import com.loopers.domain.user.vo.BirthDate;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.LoginId;
+import com.loopers.domain.user.vo.PlainPassword;
+import com.loopers.domain.user.vo.UserName;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -25,11 +31,7 @@ class UserServiceIntegrationTest {
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    UserServiceIntegrationTest(
-        UserService userService,
-        PasswordEncoder passwordEncoder,
-        DatabaseCleanUp databaseCleanUp
-    ) {
+    UserServiceIntegrationTest(UserService userService, PasswordEncoder passwordEncoder, DatabaseCleanUp databaseCleanUp) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.databaseCleanUp = databaseCleanUp;
@@ -51,16 +53,20 @@ class UserServiceIntegrationTest {
             String rawPassword = "Loopers!2026";
 
             // act
-            UserModel saved = userService.signUp(
-                "loopers01", rawPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                rawPassword,
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
 
             // assert
             assertAll(
                 () -> assertThat(saved.getId()).isNotNull(),
-                () -> assertThat(saved.getLoginId()).isEqualTo("loopers01"),
-                () -> assertThat(saved.getPassword()).isNotEqualTo(rawPassword),
-                () -> assertThat(passwordEncoder.matches(rawPassword, saved.getPassword())).isTrue()
+                () -> assertThat(saved.getLoginId().value()).isEqualTo("loopers01"),
+                () -> assertThat(saved.getPassword().value()).isNotEqualTo(rawPassword),
+                () -> assertThat(passwordEncoder.matches(rawPassword, saved.getPassword().value())).isTrue()
             );
         }
 
@@ -68,11 +74,23 @@ class UserServiceIntegrationTest {
         @Test
         void throwsConflictException_whenLoginIdAlreadyExists() {
             // arrange
-            userService.signUp("loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com");
+            signUp(
+                "loopers01",
+                "Loopers!2026",
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
+            );
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.signUp("loopers01", "Different!9999", "김다른", LocalDate.of(1991, 1, 1), "other@example.com");
+                signUp(
+                    "loopers01",
+                    "Different!9999",
+                    "김다른",
+                    LocalDate.of(1991, 1, 1),
+                    "other@example.com"
+                );
             });
 
             // assert
@@ -90,18 +108,26 @@ class UserServiceIntegrationTest {
             // arrange
             String currentPassword = "Loopers!2026";
             String newPassword = "NewLoopers!9999";
-            UserModel saved = userService.signUp(
-                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                currentPassword,
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
 
             // act
-            userService.changePassword(saved.getId(), currentPassword, newPassword);
+            userService.changePassword(
+                saved.getId(),
+                currentPassword,
+                newPassword
+            );
 
             // assert
-            UserModel reloaded = userService.getById(saved.getId());
+            UserModel reloaded = userService.getUser(saved.getId());
             assertAll(
-                () -> assertThat(passwordEncoder.matches(newPassword, reloaded.getPassword())).isTrue(),
-                () -> assertThat(passwordEncoder.matches(currentPassword, reloaded.getPassword())).isFalse()
+                () -> assertThat(passwordEncoder.matches(newPassword, reloaded.getPassword().value())).isTrue(),
+                () -> assertThat(passwordEncoder.matches(currentPassword, reloaded.getPassword().value())).isFalse()
             );
         }
 
@@ -109,15 +135,23 @@ class UserServiceIntegrationTest {
         @Test
         void throwsUnauthorizedException_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel saved = userService.signUp(
-                "loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                "Loopers!2026",
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
             String wrongCurrentPassword = "Wrong!9999";
             String newPassword = "NewLoopers!9999";
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword(saved.getId(), wrongCurrentPassword, newPassword);
+                userService.changePassword(
+                    saved.getId(),
+                    wrongCurrentPassword,
+                    newPassword
+                );
             });
 
             // assert
@@ -129,14 +163,22 @@ class UserServiceIntegrationTest {
         void throwsBadRequestException_whenNewPasswordViolatesPolicy() {
             // arrange
             String currentPassword = "Loopers!2026";
-            UserModel saved = userService.signUp(
-                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                currentPassword,
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
             String tooShortNewPassword = "Aa1!56";
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword(saved.getId(), currentPassword, tooShortNewPassword);
+                userService.changePassword(
+                    saved.getId(),
+                    currentPassword,
+                    tooShortNewPassword
+                );
             });
 
             // assert
@@ -148,13 +190,21 @@ class UserServiceIntegrationTest {
         void throwsBadRequestException_whenNewPasswordIsSameAsCurrent() {
             // arrange
             String currentPassword = "Loopers!2026";
-            UserModel saved = userService.signUp(
-                "loopers01", currentPassword, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                currentPassword,
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword(saved.getId(), currentPassword, currentPassword);
+                userService.changePassword(
+                    saved.getId(),
+                    currentPassword,
+                    currentPassword
+                );
             });
 
             // assert
@@ -170,18 +220,22 @@ class UserServiceIntegrationTest {
         @Test
         void returnsUser_whenIdExists() {
             // arrange
-            UserModel saved = userService.signUp(
-                "loopers01", "Loopers!2026", "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com"
+            UserModel saved = signUp(
+                "loopers01",
+                "Loopers!2026",
+                "김성호",
+                LocalDate.of(1993, 11, 3),
+                "loopers@example.com"
             );
 
             // act
-            UserModel found = userService.getById(saved.getId());
+            UserModel found = userService.getUser(saved.getId());
 
             // assert
             assertAll(
                 () -> assertThat(found.getId()).isEqualTo(saved.getId()),
-                () -> assertThat(found.getLoginId()).isEqualTo("loopers01"),
-                () -> assertThat(found.getName()).isEqualTo("김성호")
+                () -> assertThat(found.getLoginId().value()).isEqualTo("loopers01"),
+                () -> assertThat(found.getName().value()).isEqualTo("김성호")
             );
         }
 
@@ -189,10 +243,28 @@ class UserServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenIdDoesNotExist() {
             // act
-            CoreException result = assertThrows(CoreException.class, () -> userService.getById(999_999L));
+            CoreException result = assertThrows(CoreException.class, () -> userService.getUser(999_999L));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
+    }
+
+    private UserModel signUp(
+        String loginId,
+        String rawPassword,
+        String name,
+        LocalDate birthDate,
+        String email
+    ) {
+        BirthDate wrappedBirthDate = BirthDate.of(birthDate);
+        SignUpUserCommand signUpUserCommand = new SignUpUserCommand(
+            LoginId.of(loginId),
+            PlainPassword.of(rawPassword, wrappedBirthDate),
+            UserName.of(name),
+            wrappedBirthDate,
+            Email.of(email)
+        );
+        return userService.signUp(signUpUserCommand);
     }
 }

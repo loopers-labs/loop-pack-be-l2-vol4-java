@@ -2,6 +2,12 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.example.ExampleModel;
 import com.loopers.domain.user.UserService;
+import com.loopers.domain.user.command.SignUpUserCommand;
+import com.loopers.domain.user.vo.BirthDate;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.LoginId;
+import com.loopers.domain.user.vo.PlainPassword;
+import com.loopers.domain.user.vo.UserName;
 import com.loopers.infrastructure.example.ExampleJpaRepository;
 import com.loopers.interfaces.api.example.ExampleV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -54,7 +60,15 @@ class ExampleV1ApiE2ETest {
 
     @BeforeEach
     void setUp() {
-        userService.signUp(AUTH_LOGIN_ID, AUTH_PASSWORD, "김성호", LocalDate.of(1993, 11, 3), "loopers@example.com");
+        BirthDate birthDate = BirthDate.of(LocalDate.of(1993, 11, 3));
+        SignUpUserCommand signUpUserCommand = new SignUpUserCommand(
+            LoginId.of(AUTH_LOGIN_ID),
+            PlainPassword.of(AUTH_PASSWORD, birthDate),
+            UserName.of("김성호"),
+            birthDate,
+            Email.of("loopers@example.com")
+        );
+        userService.signUp(signUpUserCommand);
     }
 
     @AfterEach
