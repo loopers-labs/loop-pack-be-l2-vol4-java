@@ -41,7 +41,7 @@ Spring Boot 기반 멀티 모듈 프로젝트로, REST API / Batch / Kafka Consu
 
 ## 모듈 구조
 
-```
+```text
 loopers-java-spring-template/
 ├── apps/                          # 실행 가능한 애플리케이션 (BootJar)
 │   ├── commerce-api               # REST API 서버
@@ -59,7 +59,7 @@ loopers-java-spring-template/
 
 ### 모듈 의존 관계
 
-```
+```text
 commerce-api      → modules/jpa, modules/redis, supports/*
 commerce-batch    → modules/jpa, modules/redis, supports/*
 commerce-streamer → modules/jpa, modules/redis, modules/kafka, supports/*
@@ -69,7 +69,7 @@ commerce-streamer → modules/jpa, modules/redis, modules/kafka, supports/*
 
 ## 레이어드 아키텍처 (commerce-api 기준)
 
-```
+```text
 interfaces.api          Controller, DTO, ApiSpec, ArgumentResolver
     ↓
 application             Facade, Info, Command  (Service 위임/합성 + DTO 변환)
@@ -118,7 +118,7 @@ infrastructure          JpaRepository, RepositoryImpl 등
 4. **메서드 수가 5~6개를 넘고**, 한 클래스 안에서 응집도가 두 덩어리로 갈라진다.
 5. **유스케이스마다 도메인 이벤트가 갈리고**, 이벤트 발행 책임이 명확히 분리된다.
 
-```
+```text
 ✅ UserService          → signup, authenticate, getById, changePassword (도메인 단위, 시그널 없음)
 ✅ UserPasswordService  → changePassword + PasswordHistoryRepository (시그널 1번 충족 — 의존성 비대칭)
 
@@ -134,6 +134,14 @@ infrastructure          JpaRepository, RepositoryImpl 등
   - 클래스 레벨은 readOnly/write 혼재 시 사고 위험 — 메서드 레벨이 의도가 코드에서 바로 보인다.
 - **읽기 전용 메서드**: `@Transactional(readOnly = true)`.
 - **`@TransactionalEventListener(phase = AFTER_COMMIT)`**: 커밋 후 부수 효과(알림, 카프카 발행) 발행에 사용.
+
+#### 격리 수준(Isolation) — 기본은 DB 디폴트, 명시는 시그널 기반
+
+- **기본**: 격리 수준을 *명시하지 않는다*. MySQL InnoDB의 디폴트(`REPEATABLE_READ`)를 그대로 사용한다. 사전 튜닝은 성능/락 동작을 흐려놓는 오버엔지니어링.
+- **명시가 필요한 시그널** — 다음 중 하나가 분명할 때만 `isolation`을 지정한다:
+  - 동시성이 높고 Phantom Read를 감수해도 되는 *조회 위주* 흐름 → `READ_COMMITTED`.
+  - 재고 차감·잔액 변경처럼 *정합성이 절대적인 쓰기* 흐름 → `SERIALIZABLE` 또는 비관 락(`@Lock(PESSIMISTIC_WRITE)`)로 분리. 비관 락이 보통 더 좁고 명확하다.
+- 격리 수준을 바꾸는 결정은 *왜 바꾸는지* 주석/PR 설명으로 남긴다 — 디폴트에서 벗어나는 결정은 디버깅 비용을 동반한다.
 
 #### Facade `@Transactional` — 기본 금지, 조건부 허용
 
@@ -174,10 +182,11 @@ infrastructure          JpaRepository, RepositoryImpl 등
 | 종류 | 어노테이션 | 특징 |
 |---|---|---|
 | 단위 테스트 | (순수 Java) | `@Nested` + `@DisplayName` |
-| 통합 테스트 | `@SpringBootTest` | Testcontainers (MySQL/Redis/Kafka) |
+| 통합 테스트 | `@SpringBootTest` | H2 인메모리 DB (기본) / Testcontainers MySQL (운영 정합성 필요 시 옵션) |
 | E2E 테스트 | `@SpringBootTest(RANDOM_PORT)` | TestRestTemplate 사용 |
 
-- `@AfterEach`에서 `DatabaseCleanUp.truncateAllTables()` / `RedisCleanUp`으로 상태 초기화.
+- Service 통합 테스트는 H2 사용. MySQL 특화 기능(예: 락 동작, 특정 함수, 인덱스 힌트) 검증 시에만 Testcontainers를 병행한다.
+- `@AfterEach`에서 `DatabaseCleanUp.truncateAllTables()` / `RedisCleanUp`(Redis를 실제로 사용하는 테스트에 한정)으로 상태 초기화.
 - 테스트 내부 주석 컨벤션: `// arrange / // act / // assert`.
 
 ---
@@ -244,7 +253,7 @@ infrastructure          JpaRepository, RepositoryImpl 등
 **작업 단위마다 커밋한다.** 구현과 테스트를 한 번에 커밋하지 않는다.
 
 예시 흐름:
-```
+```text
 feat: 유저 도메인 설계        ← UserModel, UserService, UserRepository
 test: 유저 도메인 단위 테스트  ← UserModelTest
 feat: 유저 회원가입 API 구현   ← Controller, Facade, RepositoryImpl
@@ -333,8 +342,11 @@ class SignUp {
 ### Never Do
 
 - 실제 동작하지 않는 코드, 불필요한 Mock 데이터를 이용한 구현 금지.
-- null-safety하지 않게 코드 작성 금지 (Java의 경우 `Optional` 활용).
+- null-safety하지 않게 코드 작성 금지 (Java의 경우 `Optional` 활용). `Optional.get()` 무방비 호출 금지 — `orElseThrow()` / `orElse()` / `ifPresent()`로 분기한다.
 - `println` 코드 남기지 말 것.
+- **민감 정보 로깅 금지** — 비밀번호(raw/encoded), 토큰, 카드번호, 주민번호 등은 로그·`toString()`·예외 메시지에 절대 노출하지 않는다. 식별자(loginId 등)도 운영 로그에서는 마스킹을 우선 검토한다.
+- **하드코딩된 자격증명 금지** — DB 패스워드, API Key, JWT Secret 등은 코드에 직접 넣지 않고 환경변수 / Secret Manager로 주입한다. 테스트 더미값도 명백히 더미임을 알 수 있게 한다(예: `dummy-...`).
+- **SQL Injection 표면 금지** — 문자열 concat 기반 native 쿼리 금지. JPA Query Method / `@Query` 파라미터 바인딩 / QueryDSL을 사용한다. 동적 정렬·검색은 화이트리스트로만 받는다.
 
 ### Recommendation
 
