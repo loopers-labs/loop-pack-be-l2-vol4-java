@@ -7,8 +7,8 @@ dependencies {
     // jpa
     api("org.springframework.boot:spring-boot-starter-data-jpa")
     // querydsl
-    api("com.querydsl:querydsl-jpa::jakarta")
-    annotationProcessor("com.querydsl:querydsl-apt::jakarta")
+    api("io.github.openfeign.querydsl:querydsl-jpa:${project.properties["queryDslVersion"]}")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["queryDslVersion"]}:jpa")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
     // jdbc-mysql

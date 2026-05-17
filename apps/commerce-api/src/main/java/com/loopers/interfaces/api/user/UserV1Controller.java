@@ -1,0 +1,58 @@
+package com.loopers.interfaces.api.user;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserMyInfo;
+import com.loopers.application.user.UserSignUpInfo;
+import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.auth.AuthenticatedUser;
+import com.loopers.interfaces.api.auth.LoginUser;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/users")
+public class UserV1Controller implements UserV1ApiSpec {
+
+    private final UserFacade userFacade;
+
+    @Override
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
+        UserSignUpInfo newUserSignUpInfo = userFacade.signUp(
+            request.loginId(),
+            request.password(),
+            request.name(),
+            request.birthDate(),
+            request.email()
+        );
+
+        return ApiResponse.success(UserV1Dto.SignUpResponse.from(newUserSignUpInfo));
+    }
+
+    @Override
+    @GetMapping("/me")
+    public ApiResponse<UserV1Dto.MyInfoResponse> readMyInfo(@LoginUser AuthenticatedUser loginUser) {
+        UserMyInfo userMyInfo = userFacade.readMyInfo(loginUser.userId());
+
+        return ApiResponse.success(UserV1Dto.MyInfoResponse.from(userMyInfo));
+    }
+
+    @Override
+    @PatchMapping("/me/password")
+    public ApiResponse<Void> changePassword(@LoginUser AuthenticatedUser loginUser, @RequestBody UserV1Dto.ChangePasswordRequest request) {
+        userFacade.changePassword(loginUser.userId(), request.currentPassword(), request.newPassword());
+
+        return ApiResponse.success();
+    }
+}
