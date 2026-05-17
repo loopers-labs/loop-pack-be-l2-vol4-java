@@ -144,12 +144,15 @@ class UserApiE2ETest {
             );
 
             // then
+            assertThat(response.getBody()).isNotNull();
+            MyInfoV1Response data = response.getBody().data();
+            assertThat(data).isNotNull();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo(VALID_LOGIN_ID),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
-                () -> assertThat(response.getBody().data().email()).isEqualTo(VALID_EMAIL),
-                () -> assertThat(response.getBody().data().birthDate()).isEqualTo(VALID_BIRTH_DATE)
+                () -> assertThat(data.loginId()).isEqualTo(VALID_LOGIN_ID),
+                () -> assertThat(data.name()).isEqualTo("홍길*"),
+                () -> assertThat(data.email()).isEqualTo(VALID_EMAIL),
+                () -> assertThat(data.birthDate()).isEqualTo(VALID_BIRTH_DATE)
             );
         }
 
