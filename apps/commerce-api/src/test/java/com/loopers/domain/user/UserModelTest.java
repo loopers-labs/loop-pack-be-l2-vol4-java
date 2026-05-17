@@ -35,7 +35,7 @@ class UserModelTest {
 
             // then
             assertThat(userModel.getLoginId()).isEqualTo(new LoginId(loginId));
-            assertThat(userModel.getPassword()).isEqualTo(new Password(password, new BirthDate(birthDate), passwordEncryptor));
+            assertThat(userModel.getPassword()).isEqualTo(Password.of(password, new BirthDate(birthDate), passwordEncryptor));
             assertThat(userModel.getName()).isEqualTo(name);
             assertThat(userModel.getBirthDate()).isEqualTo(new BirthDate(birthDate));
             assertThat(userModel.getEmail()).isEqualTo(new Email(email));
@@ -129,7 +129,7 @@ class UserModelTest {
             userModel.changePassword(newPassword, passwordEncryptor);
 
             // then
-            assertThat(userModel.getPassword()).isEqualTo(new Password(newPassword, new BirthDate("1990-01-01"), passwordEncryptor));
+            assertThat(userModel.getPassword()).isEqualTo(Password.of(newPassword, new BirthDate("1990-01-01"), passwordEncryptor));
         }
 
         @DisplayName("신규 비밀번호가 기존 비밀번호와 같으면 예외가 발생한다.")
