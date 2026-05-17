@@ -20,13 +20,13 @@ public class BirthDateTest {
         @Test
         void createBirthDate() {
             // given
-            String str = "1998-06-12";
+            String value = "1998-06-12";
 
             // when
-            BirthDate birthDate = new BirthDate(str);
+            BirthDate birthDate = new BirthDate(value);
 
             // then
-            assertThat(birthDate.value()).isEqualTo(str);
+            assertThat(birthDate).isEqualTo(new BirthDate(value));
         }
 
         @DisplayName("yyyy-MM-dd 형식에 맞지 않으면 BAD_REQUEST 예외가 발생한다")
