@@ -48,7 +48,7 @@ public class UserModel extends BaseEntity {
         }
         this.loginId = new LoginId(loginId);
         this.birthDate = new BirthDate(birthDate);
-        this.password = new Password(password, this.birthDate, passwordEncryptor);
+        this.password = Password.of(password, this.birthDate, passwordEncryptor);
         this.email = new Email(email);
         this.name = name;
         this.gender = gender;
@@ -63,6 +63,6 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "신규 비밀번호는 기존 비밀번호와 달라야 합니다.");
         }
 
-        this.password = new Password(newPassword, this.birthDate, passwordEncryptor);
+        this.password = Password.of(newPassword, this.birthDate, passwordEncryptor);
     }
 }

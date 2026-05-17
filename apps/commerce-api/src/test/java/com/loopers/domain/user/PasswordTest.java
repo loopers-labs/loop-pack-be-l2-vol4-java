@@ -28,10 +28,10 @@ class PasswordTest {
             BirthDate birthDate = new BirthDate("1998-06-12");
 
             // when
-            Password password = new Password(rawPassword, birthDate, passwordEncryptor);
+            Password password = Password.of(rawPassword, birthDate, passwordEncryptor);
 
             // then
-            assertThat(password.getValue()).isEqualTo("encrypted:" + rawPassword);
+            assertThat(password.value()).isEqualTo("encrypted:" + rawPassword);
         }
 
         @DisplayName("8~16자 영문/숫자/특수문자가 아니면 예외가 발생한다.")
@@ -43,7 +43,7 @@ class PasswordTest {
             BirthDate birthDate = new BirthDate("1998-06-12");
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> new Password(rawPassword, birthDate, passwordEncryptor));
+            CoreException result = assertThrows(CoreException.class, () -> Password.of(rawPassword, birthDate, passwordEncryptor));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -57,7 +57,7 @@ class PasswordTest {
             BirthDate birthDate = new BirthDate("1990-01-01");
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> new Password(rawPassword, birthDate, passwordEncryptor));
+            CoreException result = assertThrows(CoreException.class, () -> Password.of(rawPassword, birthDate, passwordEncryptor));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
