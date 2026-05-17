@@ -20,7 +20,7 @@ class PasswordPolicyTest {
     @Nested
     class Validate {
 
-        @DisplayName("생년월일 조각이 포함되지 않은 비밀번호면 통과한다")
+        @DisplayName("생년월일 연속 토큰이 포함되지 않은 비밀번호면 통과한다")
         @Test
         void passes_whenPasswordDoesNotContainBirthDate() {
             // given
@@ -30,11 +30,21 @@ class PasswordPolicyTest {
             assertDoesNotThrow(() -> PasswordPolicy.validate(password, VALID_BIRTH_DATE));
         }
 
-        @DisplayName("생년월일 전체 연도(YYYY)가 포함되면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("월(MM)이나 일(DD) 두 자리만 포함된 비밀번호는 통과한다")
         @Test
-        void throwsBadRequest_whenPasswordContainsFullYear() {
-            // given
-            RawPassword password = new RawPassword("Aa!2002xyz");
+        void passes_whenPasswordContainsOnlyMonthOrDay() {
+            // given - 생년월일 2002-05-11 기준, 월(05)/일(11)/연도뒤2자리(02) 단독 포함은 허용
+            RawPassword password = new RawPassword("Aa!05xy11");
+
+            // when & then
+            assertDoesNotThrow(() -> PasswordPolicy.validate(password, VALID_BIRTH_DATE));
+        }
+
+        @DisplayName("yyyyMMdd 연속 토큰이 포함되면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenPasswordContainsFullBirthDate() {
+            // given - 생년월일 2002-05-11 → 20020511
+            RawPassword password = new RawPassword("Aa!20020511xy@");
 
             // when
             CoreException ex = assertThrows(CoreException.class,
@@ -44,39 +54,11 @@ class PasswordPolicyTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("생년월일 뒤 2자리(YY) 연도가 포함되면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("yyMMdd 연속 토큰이 포함되면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void throwsBadRequest_whenPasswordContainsShortYear() {
-            // given
-            RawPassword password = new RawPassword("Aabc!@xy02");
-
-            // when
-            CoreException ex = assertThrows(CoreException.class,
-                () -> PasswordPolicy.validate(password, VALID_BIRTH_DATE));
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("생년월일 월(MM)이 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenPasswordContainsMonth() {
-            // given
-            RawPassword password = new RawPassword("Aabc!@xy05");
-
-            // when
-            CoreException ex = assertThrows(CoreException.class,
-                () -> PasswordPolicy.validate(password, VALID_BIRTH_DATE));
-
-            // then
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("생년월일 일(DD)이 포함되면 BAD_REQUEST 예외가 발생한다")
-        @Test
-        void throwsBadRequest_whenPasswordContainsDay() {
-            // given
-            RawPassword password = new RawPassword("Aabc!@xy11");
+        void throwsBadRequest_whenPasswordContainsShortBirthDate() {
+            // given - 생년월일 2002-05-11 → 020511
+            RawPassword password = new RawPassword("Aa!020511");
 
             // when
             CoreException ex = assertThrows(CoreException.class,
@@ -95,6 +77,17 @@ class PasswordPolicyTest {
             // when
             CoreException ex = assertThrows(CoreException.class,
                 () -> PasswordPolicy.validate(password, null));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 null이면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenPasswordIsNull() {
+            // when
+            CoreException ex = assertThrows(CoreException.class,
+                () -> PasswordPolicy.validate(null, VALID_BIRTH_DATE));
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

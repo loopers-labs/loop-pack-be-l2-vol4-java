@@ -85,12 +85,12 @@ class UserServiceIntegrationTest {
             );
         }
 
-        @DisplayName("비밀번호에 생년월일 연도가 포함되면 BAD_REQUEST 예외가 발생하고 저장되지 않는다")
+        @DisplayName("비밀번호에 생년월일 연속 토큰이 포함되면 BAD_REQUEST 예외가 발생하고 저장되지 않는다")
         @Test
-        void throwsBadRequest_andDoesNotPersist_whenPasswordContainsBirthYear() {
-            // given
+        void throwsBadRequest_andDoesNotPersist_whenPasswordContainsBirthDate() {
+            // given - 생년월일 2002-05-11 → 20020511 연속 토큰 포함
             String loginId = "loopers01";
-            String passwordWithBirthYear = "Aa!2002xy";
+            String passwordWithBirthYear = "Aa!20020511xy@";
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->

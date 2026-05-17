@@ -65,11 +65,11 @@ class PasswordEncryptorTest {
             verify(passwordEncoder, never()).encode(anyString());
         }
 
-        @DisplayName("정책 위반(생년월일 포함) 비밀번호면 BAD_REQUEST 예외가 발생하고 encode가 호출되지 않는다")
+        @DisplayName("정책 위반(생년월일 yyyyMMdd 포함) 비밀번호면 BAD_REQUEST 예외가 발생하고 encode가 호출되지 않는다")
         @Test
         void throwsBadRequest_whenPolicyIsViolated() {
-            // given
-            String withBirthYear = "Aa!2002xy";
+            // given - 생년월일 2002-05-11 → 20020511 연속 토큰 포함
+            String withBirthYear = "Aa!20020511xy@";
 
             // when
             CoreException ex = assertThrows(CoreException.class,
@@ -109,6 +109,50 @@ class PasswordEncryptorTest {
 
             // then
             assertThat(result).isFalse();
+        }
+
+        @DisplayName("raw가 null이면 PasswordEncoder를 호출하지 않고 false를 반환한다")
+        @Test
+        void returnsFalse_whenRawIsNull() {
+            // when
+            boolean result = passwordEncryptor.matches(null, ENCODED_PASSWORD);
+
+            // then
+            assertThat(result).isFalse();
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
+        }
+
+        @DisplayName("raw가 공백이면 PasswordEncoder를 호출하지 않고 false를 반환한다")
+        @Test
+        void returnsFalse_whenRawIsBlank() {
+            // when
+            boolean result = passwordEncryptor.matches("   ", ENCODED_PASSWORD);
+
+            // then
+            assertThat(result).isFalse();
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
+        }
+
+        @DisplayName("encoded가 null이면 PasswordEncoder를 호출하지 않고 false를 반환한다")
+        @Test
+        void returnsFalse_whenEncodedIsNull() {
+            // when
+            boolean result = passwordEncryptor.matches(VALID_RAW_PASSWORD, null);
+
+            // then
+            assertThat(result).isFalse();
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
+        }
+
+        @DisplayName("encoded가 공백이면 PasswordEncoder를 호출하지 않고 false를 반환한다")
+        @Test
+        void returnsFalse_whenEncodedIsBlank() {
+            // when
+            boolean result = passwordEncryptor.matches(VALID_RAW_PASSWORD, "  ");
+
+            // then
+            assertThat(result).isFalse();
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
         }
     }
 }

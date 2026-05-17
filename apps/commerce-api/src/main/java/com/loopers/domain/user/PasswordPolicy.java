@@ -10,6 +10,9 @@ public final class PasswordPolicy {
     private PasswordPolicy() {}
 
     public static void validate(RawPassword password, LocalDate birthDate) {
+        if (password == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
+        }
         if (birthDate == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비어있을 수 없습니다.");
         }
@@ -23,9 +26,7 @@ public final class PasswordPolicy {
         String yearShort = year.substring(2);
         String month = String.format("%02d", birthDate.getMonthValue());
         String day = String.format("%02d", birthDate.getDayOfMonth());
-        return password.contains(year)
-            || password.contains(yearShort)
-            || password.contains(month)
-            || password.contains(day);
+        return password.contains(year + month + day)
+            || password.contains(yearShort + month + day);
     }
 }

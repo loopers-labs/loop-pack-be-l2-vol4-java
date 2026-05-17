@@ -68,6 +68,42 @@ class UserModelTest {
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("로그인 ID가 null이면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenLoginIdIsNull() {
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                new UserModel(null, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 null이면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenNameIsNull() {
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, null, VALID_BIRTH_DATE, VALID_EMAIL)
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일이 null이면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenEmailIsNull() {
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, null)
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
     }
 
     @DisplayName("이름 마스킹 시")
@@ -114,6 +150,19 @@ class UserModelTest {
 
             // when
             CoreException ex = assertThrows(CoreException.class, () -> user.changePassword(""));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("새 비밀번호가 null이면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenNewEncodedPasswordIsNull() {
+            // given
+            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_ENCODED_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> user.changePassword(null));
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

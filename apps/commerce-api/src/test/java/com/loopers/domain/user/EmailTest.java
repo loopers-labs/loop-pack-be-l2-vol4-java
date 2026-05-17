@@ -64,5 +64,34 @@ class EmailTest {
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("길이가 254자를 초과하면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenLengthExceedsLimit() {
+            // given - local part 245자 + "@a.com" 6자 = 251자(허용), 248자 + "@a.com" 6자 = 254자(허용)
+            // 255자가 되도록 local part를 249자로 만든다
+            String local = "a".repeat(249);
+            String tooLong = local + "@a.com"; // 255자
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> new Email(tooLong));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("길이가 254자 경계면 정상 생성된다")
+        @Test
+        void createsEmail_whenLengthIsAtLimit() {
+            // given - 248자 local + "@a.com" 6자 = 254자
+            String local = "a".repeat(248);
+            String atLimit = local + "@a.com";
+
+            // when
+            Email email = new Email(atLimit);
+
+            // then
+            assertThat(email.getValue()).isEqualTo(atLimit);
+        }
     }
 }

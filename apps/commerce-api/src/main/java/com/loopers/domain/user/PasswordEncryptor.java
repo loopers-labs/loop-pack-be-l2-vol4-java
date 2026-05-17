@@ -19,6 +19,9 @@ public class PasswordEncryptor {
     }
 
     public boolean matches(String raw, String encoded) {
+        if (raw == null || raw.isBlank() || encoded == null || encoded.isBlank()) {
+            return false;
+        }
         return passwordEncoder.matches(raw, encoded);
     }
 }
