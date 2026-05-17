@@ -22,13 +22,13 @@ public class LoginIdTest {
         @Test
         void createLoginId() {
             // given
-            String string = "loginId";
+            String value = "loginId";
 
             // when
-            LoginId loginId = new LoginId(string);
+            LoginId loginId = new LoginId(value);
 
             // then
-            assertThat(loginId.value()).isEqualTo(string);
+            assertThat(loginId).isEqualTo(new LoginId(value));
         }
 
         @DisplayName("영문/숫자 10자 이내 형식에 맞지 않으면 BAD_REQUEST 예외가 발생한다")

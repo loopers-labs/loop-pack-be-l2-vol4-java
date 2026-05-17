@@ -5,7 +5,7 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Embeddable;
 
 @Embeddable
-public record Password(String value) {
+record Password(String value) {
     private static final String PATTERN = "^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$";
 
     public static Password of(String rawPassword, BirthDate birthDate, PasswordEncryptor passwordEncryptor) {

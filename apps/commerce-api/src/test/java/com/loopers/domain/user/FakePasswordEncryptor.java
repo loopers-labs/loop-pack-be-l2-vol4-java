@@ -1,15 +1,15 @@
 package com.loopers.domain.user;
 
 public class FakePasswordEncryptor implements PasswordEncryptor {
-    private final String prefix;
+    private final String encryptPrefix;
 
-    public FakePasswordEncryptor(String prefix) {
-        this.prefix = prefix;
+    public FakePasswordEncryptor(String encryptPrefix) {
+        this.encryptPrefix = encryptPrefix;
     }
 
     @Override
     public String encrypt(String rawPassword) {
-        return prefix + rawPassword;
+        return encryptPrefix + rawPassword;
     }
 
     @Override

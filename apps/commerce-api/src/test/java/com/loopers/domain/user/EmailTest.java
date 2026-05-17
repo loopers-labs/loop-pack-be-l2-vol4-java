@@ -20,13 +20,13 @@ public class EmailTest {
         @Test
         void createEmail() {
             // given
-            String str = "example@gmail.com";
+            String value = "example@gmail.com";
 
             // when
-            Email email = new Email(str);
+            Email email = new Email(value);
 
             // then
-            assertThat(email.value()).isEqualTo(str);
+            assertThat(email).isEqualTo(new Email(value));
         }
 
         @DisplayName("xx@yy.zz 형식에 맞지 않으면 BAD_REQUEST 예외가 발생한다")

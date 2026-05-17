@@ -20,9 +20,23 @@ class PasswordTest {
     @Nested
     class Create {
 
-        @DisplayName("정상적으로 암호화되어 생성된다.")
+        @DisplayName("정상적으로 생성된다.")
         @Test
         void createsPassword() {
+            // given
+            String rawPassword = "Password";
+            BirthDate birthDate = new BirthDate("1998-06-12");
+
+            // when
+            Password password = Password.of(rawPassword, birthDate, passwordEncryptor);
+
+            // then
+            assertThat(password).isEqualTo(Password.of(rawPassword, birthDate, passwordEncryptor));
+        }
+
+        @DisplayName("비밀번호는 암호화되어 저장된다.")
+        @Test
+        void encryptPassword() {
             // given
             String rawPassword = "Password";
             BirthDate birthDate = new BirthDate("1998-06-12");
