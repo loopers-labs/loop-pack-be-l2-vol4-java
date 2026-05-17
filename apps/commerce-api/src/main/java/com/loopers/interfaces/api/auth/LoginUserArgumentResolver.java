@@ -11,6 +11,8 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver {
@@ -32,12 +34,16 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
         NativeWebRequest webRequest,
         WebDataBinderFactory binderFactory
     ) {
-        String loginId = webRequest.getHeader(HEADER_LOGIN_ID);
-        String loginPw = webRequest.getHeader(HEADER_LOGIN_PW);
-        if (loginId == null || loginId.isBlank() || loginPw == null || loginPw.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다.");
-        }
+        String loginId = requiredHeader(webRequest, HEADER_LOGIN_ID);
+        String loginPw = requiredHeader(webRequest, HEADER_LOGIN_PW);
         Long userId = userFacade.authenticate(loginId, loginPw);
         return new AuthUser(userId, loginId);
+    }
+
+    private String requiredHeader(NativeWebRequest webRequest, String name) {
+        return Optional.ofNullable(webRequest.getHeader(name))
+            .map(String::trim)
+            .filter(value -> !value.isEmpty())
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다."));
     }
 }
