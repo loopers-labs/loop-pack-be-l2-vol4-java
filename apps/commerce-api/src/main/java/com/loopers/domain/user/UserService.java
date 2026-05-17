@@ -3,6 +3,7 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +12,8 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 @Component
 public class UserService {
+
+    private static final String DUMMY_BCRYPT_HASH = "$2a$10$abcdefghijklmnopqrstuuRfYJqBV.OCpdHEcN9bD2dRzC6lJUiZG";
 
     private final UserRepository userRepository;
     private final PasswordEncryptor passwordEncryptor;
@@ -23,7 +26,11 @@ public class UserService {
         }
         String encoded = passwordEncryptor.encode(rawPassword, birthDate);
         UserModel user = new UserModel(loginId, encoded, new UserName(rawName), birthDate, new Email(rawEmail));
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -32,10 +39,14 @@ public class UserService {
         try {
             loginId = new LoginId(rawLoginId);
         } catch (CoreException e) {
+            passwordEncryptor.matches(rawPassword, DUMMY_BCRYPT_HASH);
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
         }
-        UserModel user = userRepository.findByLoginId(loginId)
-            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다."));
+        UserModel user = userRepository.findByLoginId(loginId).orElse(null);
+        if (user == null) {
+            passwordEncryptor.matches(rawPassword, DUMMY_BCRYPT_HASH);
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
+        }
         if (!passwordEncryptor.matches(rawPassword, user.getEncodedPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
         }
@@ -50,7 +61,7 @@ public class UserService {
 
     @Transactional
     public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
-        UserModel user = userRepository.findById(userId)
+        UserModel user = userRepository.findByIdForUpdate(userId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다."));
         if (!passwordEncryptor.matches(currentRawPassword, user.getEncodedPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");

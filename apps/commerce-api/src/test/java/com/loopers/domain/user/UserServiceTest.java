@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -88,6 +90,24 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(UserModel.class));
         }
 
+        @DisplayName("save 직전에 동시 가입으로 DataIntegrityViolationException이 발생하면 CONFLICT로 변환된다")
+        @Test
+        void throwsConflict_whenSaveRacesWithConcurrentInsert() {
+            // given - existsByLoginId 시점에는 없었지만 save 시점에 UNIQUE 제약 위반
+            when(userRepository.existsByLoginId(new LoginId(VALID_LOGIN_ID))).thenReturn(false);
+            when(passwordEncryptor.encode(VALID_RAW_PASSWORD, VALID_BIRTH_DATE)).thenReturn(ENCODED_PASSWORD);
+            when(userRepository.save(any(UserModel.class)))
+                .thenThrow(new DataIntegrityViolationException("unique violation"));
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.signup(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL)
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
         @DisplayName("PasswordEncryptor가 BAD_REQUEST를 던지면 그대로 전파되고 저장되지 않는다")
         @Test
         void throwsBadRequest_whenPasswordEncryptorRejects() {
@@ -125,7 +145,7 @@ class UserServiceTest {
             assertThat(result).isSameAs(user);
         }
 
-        @DisplayName("존재하지 않는 로그인 ID로 인증하면 UNAUTHORIZED 예외가 발생한다")
+        @DisplayName("존재하지 않는 로그인 ID로 인증하면 UNAUTHORIZED 예외가 발생하고 타이밍 평준화를 위해 dummy bcrypt 비교를 수행한다")
         @Test
         void throwsUnauthorized_whenLoginIdDoesNotExist() {
             // given
@@ -138,6 +158,24 @@ class UserServiceTest {
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+            verify(passwordEncryptor).matches(eq(VALID_RAW_PASSWORD), anyString());
+        }
+
+        @DisplayName("로그인 ID 형식이 잘못되면 UNAUTHORIZED 예외가 발생하고 repository는 호출되지 않으며 타이밍 평준화를 위해 dummy bcrypt 비교를 수행한다")
+        @Test
+        void throwsUnauthorized_whenLoginIdFormatIsInvalid() {
+            // given - LoginId 정규식 위반
+            String invalidLoginId = "a";
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () ->
+                userService.authenticate(invalidLoginId, VALID_RAW_PASSWORD)
+            );
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+            verify(userRepository, never()).findByLoginId(any());
+            verify(passwordEncryptor).matches(eq(VALID_RAW_PASSWORD), anyString());
         }
 
         @DisplayName("비밀번호가 일치하지 않으면 UNAUTHORIZED 예외가 발생한다")
@@ -205,7 +243,7 @@ class UserServiceTest {
             String currentPassword = "Current1!";
             String newPassword = "NewPass1@";
             String newEncoded = "$2a$10$newEncodedHash";
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
             when(passwordEncryptor.matches(newPassword, ENCODED_PASSWORD)).thenReturn(false);
             when(passwordEncryptor.encode(newPassword, VALID_BIRTH_DATE)).thenReturn(newEncoded);
@@ -222,7 +260,7 @@ class UserServiceTest {
         void throwsNotFound_whenUserDoesNotExist() {
             // given
             Long userId = 999L;
-            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.empty());
 
             // when
             CoreException ex = assertThrows(CoreException.class, () ->
@@ -239,7 +277,7 @@ class UserServiceTest {
             // given
             Long userId = 1L;
             UserModel user = validUser();
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(anyString(), anyString())).thenReturn(false);
 
             // when
@@ -258,7 +296,7 @@ class UserServiceTest {
             Long userId = 1L;
             UserModel user = validUser();
             String samePassword = "SamePass1!";
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(samePassword, ENCODED_PASSWORD)).thenReturn(true);
 
             // when
@@ -278,8 +316,8 @@ class UserServiceTest {
             Long userId = 1L;
             UserModel user = validUser();
             String currentPassword = "Current1!";
-            String newPasswordWithBirthYear = "Aa!2002xy";
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            String newPasswordWithBirthYear = "Aa!20020511xy@";
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
             when(passwordEncryptor.matches(currentPassword, ENCODED_PASSWORD)).thenReturn(true);
             when(passwordEncryptor.matches(newPasswordWithBirthYear, ENCODED_PASSWORD)).thenReturn(false);
             when(passwordEncryptor.encode(newPasswordWithBirthYear, VALID_BIRTH_DATE))
