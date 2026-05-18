@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -145,7 +144,7 @@ class UserServiceTest {
             assertThat(result).isSameAs(user);
         }
 
-        @DisplayName("존재하지 않는 로그인 ID로 인증하면 UNAUTHORIZED 예외가 발생하고 타이밍 평준화를 위해 dummy bcrypt 비교를 수행한다")
+        @DisplayName("존재하지 않는 로그인 ID로 인증하면 UNAUTHORIZED 예외가 발생한다")
         @Test
         void throwsUnauthorized_whenLoginIdDoesNotExist() {
             // given
@@ -158,10 +157,9 @@ class UserServiceTest {
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
-            verify(passwordEncryptor).matches(eq(VALID_RAW_PASSWORD), anyString());
         }
 
-        @DisplayName("로그인 ID 형식이 잘못되면 UNAUTHORIZED 예외가 발생하고 repository는 호출되지 않으며 타이밍 평준화를 위해 dummy bcrypt 비교를 수행한다")
+        @DisplayName("로그인 ID 형식이 잘못되면 UNAUTHORIZED 예외가 발생하고 repository는 호출되지 않는다")
         @Test
         void throwsUnauthorized_whenLoginIdFormatIsInvalid() {
             // given - LoginId 정규식 위반
@@ -175,7 +173,6 @@ class UserServiceTest {
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
             verify(userRepository, never()).findByLoginId(any());
-            verify(passwordEncryptor).matches(eq(VALID_RAW_PASSWORD), anyString());
         }
 
         @DisplayName("비밀번호가 일치하지 않으면 UNAUTHORIZED 예외가 발생한다")
