@@ -19,7 +19,7 @@ sequenceDiagram
     Note over LikeController: X-Loopers-LoginId, X-Loopers-LoginPw 헤더
 
     LikeController->>AuthUserArgumentResolver: @AuthUser 파라미터 resolve
-    AuthUserArgumentResolver->>AuthUserArgumentResolver: authenticate(loginId, loginPw)
+    AuthUserArgumentResolver->>AuthUserArgumentResolver: resolveLoginId(header)
     AuthUserArgumentResolver-->>LikeController: AuthUserContext(loginId)
 
     LikeController->>LikeFacade: like(loginId, productId)
@@ -80,6 +80,7 @@ sequenceDiagram
     Note over OrderController: { items: [{productId, quantity}, ...] }
 
     OrderController->>AuthUserArgumentResolver: @AuthUser 파라미터 resolve
+    AuthUserArgumentResolver->>AuthUserArgumentResolver: resolveLoginId(header)
     AuthUserArgumentResolver-->>OrderController: AuthUserContext(loginId)
 
     OrderController->>OrderFacade: createOrder(loginId, items)
