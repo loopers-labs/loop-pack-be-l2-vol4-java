@@ -2,6 +2,8 @@
 
 ## 전체 ERD
 
+영속성 구조, 테이블 간 관계, soft delete 컬럼 위치, 스냅샷 컬럼 위치, UK 제약을 확인한다.
+
 ```mermaid
 erDiagram
     users {
@@ -21,6 +23,7 @@ erDiagram
         varchar description
         datetime created_at
         datetime updated_at
+        datetime deleted_at
     }
 
     products {
@@ -31,6 +34,7 @@ erDiagram
         int stock
         datetime created_at
         datetime updated_at
+        datetime deleted_at
     }
 
     likes {
@@ -53,7 +57,7 @@ erDiagram
     order_items {
         bigint id PK
         bigint order_id FK
-        bigint product_id FK
+        bigint product_id
         varchar product_name
         int product_price
         int quantity
@@ -63,45 +67,47 @@ erDiagram
     users ||--o{ orders : ""
     brands ||--o{ products : ""
     products ||--o{ likes : ""
-    products ||--o{ order_items : ""
     orders ||--o{ order_items : ""
 ```
 
+**읽는 포인트**
+- `brands`, `products` 모두 `deleted_at` 컬럼 보유. 브랜드 삭제 시 연관 상품의 `deleted_at`도 함께 채운다. 조회 시 `deleted_at IS NULL` 조건 필수.
+- `order_items.product_id`는 FK 제약 없음. 상품이 삭제되어도 주문 내역은 `product_name`, `product_price` 스냅샷으로 독립 보존된다.
+- `likes`는 `(user_id, product_id)` 복합 UK 제약으로 DB 레벨에서 중복 좋아요 방지.
+
 ---
 
-## 테이블 설계 설명
+## 테이블별 설계 설명
 
 ### brands
-브랜드 정보. 삭제 시 연관 products도 삭제되어야 하므로 products에 `brand_id` FK를 두고 cascade delete 또는 애플리케이션 레벨에서 처리.
+- `deleted_at`: soft delete 컬럼. null이면 활성, 값이 있으면 삭제 처리.
 
 ### products
-- `stock`: 재고 수량. 주문 시 차감.
+- `stock`: 주문 시 차감되는 재고 수량. 어드민에게만 수량 노출, 사용자에게는 `stock > 0` 여부만 노출.
 - `brand_id`: 브랜드 FK. 상품 수정 시 변경 불가.
-- 어드민에게는 `stock` 노출, 고객에게는 재고 유무 정도만 노출 가능.
+- `deleted_at`: 브랜드 삭제 시 연관 상품에도 함께 채워진다.
 
 ### likes
 - `(user_id, product_id)` 복합 UK 제약으로 중복 좋아요 방지.
-- 좋아요 수는 `likes` 테이블 count 쿼리로 계산하거나, `products.like_count` 캐시 컬럼으로 관리 가능. 현재는 별도 컬럼 없이 집계.
+- 좋아요 수는 별도 컬럼 없이 COUNT 집계로 처리. 성능 이슈 발생 시 `products.like_count` 캐시 컬럼 도입 검토.
 
 ### orders
-- `status`: 주문 상태 (`PENDING`, `COMPLETED`, `CANCELLED` 등)
-- `total_price`: 주문 시점 총 금액. 이후 가격 변동과 무관하게 보존.
+- `status`: `PENDING` → `COMPLETED` / `CANCELLED` 상태 전이.
+- `total_price`: 주문 시점 총 금액. 이후 상품 가격 변동과 무관하게 보존.
 - `ordered_at`: 주문 요청 시각.
 
 ### order_items
-- `product_name`, `product_price`: 주문 당시 상품 정보 스냅샷.
-  - 이후 상품 정보가 변경되어도 주문 내역은 당시 값을 보존.
-- `product_id`: 원본 상품 참조 (상품이 삭제되어도 주문 내역은 유지되어야 하므로 FK 제약 주의).
+- `product_name`, `product_price`: 주문 당시 상품 정보 스냅샷. `product_id`가 가리키는 상품이 변경/삭제되어도 주문 내역은 영향받지 않는다.
+- `product_id`: FK 제약 없이 참조용으로만 보유.
 
 ---
 
 ## 설계 고민
 
-**좋아요 수를 어떻게 관리할 것인가**
-- A: `likes` 테이블 COUNT 집계 → 항상 정확하지만 상품 목록 정렬 시 성능 이슈
-- B: `products.like_count` 캐시 컬럼 유지 → 빠르지만 좋아요 등록/취소 시 동기화 필요
+**좋아요 수 정렬 (`likes_desc`)**
+- 현재: `likes` 테이블 COUNT JOIN으로 집계 → 항상 정확하지만 상품 수가 많아지면 느려질 수 있음
+- 추후: `products.like_count` 캐시 컬럼 도입 → 빠르지만 좋아요 등록/취소 시 동기화 필요, 동시성 문제 고려 필요
 
-현재는 설계 단계이므로 A로 시작하고, 성능 이슈 발생 시 B를 고려.
-
-**order_items.product_id FK 제약**
-상품이 삭제되더라도 주문 내역은 남아야 한다. `product_id`는 참조용으로만 두고 FK 제약을 걸지 않거나, soft delete로 상품을 처리하는 방식 중 선택 필요.
+**`order_items.product_id` FK 제약**
+- FK 제약을 걸면 상품 물리 삭제 시 주문 내역도 영향받음
+- soft delete 방식을 쓰더라도 FK 제약 없이 참조용으로만 두는 것이 안전

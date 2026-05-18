@@ -2,13 +2,17 @@
 
 ## 도메인 모델
 
+도메인 객체의 책임과 의존 방향, 비즈니스 로직이 Service에 몰리지 않고 적절히 분산되어 있는지 확인한다.
+
 ```mermaid
 classDiagram
     class Brand {
         Long id
         String name
         String description
-        validateName()
+        LocalDateTime deletedAt
+        delete()
+        isDeleted() boolean
     }
 
     class Product {
@@ -17,14 +21,19 @@ classDiagram
         String name
         int price
         int stock
+        LocalDateTime deletedAt
         deductStock(quantity)
-        hasEnoughStock(quantity)
+        hasEnoughStock(quantity) boolean
+        isInStock() boolean
+        delete()
+        isDeleted() boolean
     }
 
     class Like {
         Long id
         Long userId
         Long productId
+        LocalDateTime createdAt
     }
 
     class Order {
@@ -32,9 +41,11 @@ classDiagram
         Long userId
         OrderStatus status
         int totalPrice
+        LocalDateTime orderedAt
         List~OrderItem~ items
         complete()
         cancel()
+        calculateTotalPrice() int
     }
 
     class OrderItem {
@@ -43,6 +54,7 @@ classDiagram
         String productName
         int productPrice
         int quantity
+        calculateSubtotal() int
     }
 
     class OrderStatus {
@@ -57,16 +69,27 @@ classDiagram
     Product --> Brand
 ```
 
+**읽는 포인트**
+- `Product.deductStock()`이 재고 부족 예외를 던지는 책임까지 가진다. Service가 `stock >= quantity` 조건을 직접 체크하지 않는다.
+- `Brand.delete()`, `Product.delete()`는 `deletedAt`을 채우는 메서드로, 물리 삭제가 아닌 상태 변경이다.
+- `OrderItem`은 `Order` 없이 존재할 수 없는 구조(Aggregate Root 패턴). `productName`, `productPrice`는 주문 시점 스냅샷이라 이후 상품 변경에 영향받지 않는다.
+
 ---
 
 ## 레이어별 구조
 
+각 Service가 어떤 Repository에 의존하는지, 의존 방향이 domain → infrastructure로 향하는지 확인한다.
+
 ```mermaid
 classDiagram
+    class BrandService {
+        +getBrand(brandId) Brand
+        +deleteBrand(brandId)
+    }
+
     class ProductService {
         +getProducts(filter) List~Product~
         +getProduct(productId) Product
-        +deductStock(productId, quantity)
     }
 
     class LikeService {
@@ -81,10 +104,18 @@ classDiagram
         +getOrder(userId, orderId) Order
     }
 
+    class BrandRepository {
+        <<interface>>
+        +findById(id) Optional~Brand~
+        +findAll(pageable) List~Brand~
+        +save(brand) Brand
+    }
+
     class ProductRepository {
         <<interface>>
         +findById(id) Optional~Product~
-        +findAll(filter) List~Product~
+        +findAll(filter, pageable) List~Product~
+        +findAllByBrandId(brandId) List~Product~
         +save(product) Product
     }
 
@@ -93,7 +124,7 @@ classDiagram
         +existsByUserIdAndProductId(userId, productId) boolean
         +findByUserId(userId) List~Like~
         +save(like) Like
-        +delete(like)
+        +delete(userId, productId)
     }
 
     class OrderRepository {
@@ -103,6 +134,8 @@ classDiagram
         +findById(id) Optional~Order~
     }
 
+    BrandService --> BrandRepository
+    BrandService --> ProductRepository
     ProductService --> ProductRepository
     LikeService --> LikeRepository
     LikeService --> ProductRepository
@@ -110,27 +143,7 @@ classDiagram
     OrderService --> ProductRepository
 ```
 
----
-
-## 설계 포인트
-
-**Product.deductStock()**
-재고 차감 로직을 Service가 아닌 Product 도메인 객체에 둔다.
-재고 부족 시 예외를 던지는 책임도 Product이 갖는다.
-
-```java
-public void deductStock(int quantity) {
-    if (this.stock < quantity) {
-        throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
-    }
-    this.stock -= quantity;
-}
-```
-
-**OrderItem 스냅샷**
-OrderItem은 주문 시점의 상품명과 가격을 직접 보유한다.
-Product와의 연관은 `productId` 참조로만 유지하고, 상품 정보 변경에 영향받지 않는다.
-
-**Order와 OrderItem 관계**
-Order가 OrderItem 목록을 소유한다 (Aggregate Root).
-OrderItem은 Order 없이 독립적으로 존재할 수 없다.
+**읽는 포인트**
+- `BrandService`가 `ProductRepository`에 의존하는 이유: 브랜드 삭제 시 연관 상품도 soft delete 처리해야 하기 때문이다.
+- `LikeService`가 `ProductRepository`에 의존하는 이유: 좋아요 등록 전 상품 존재 여부 확인이 필요하기 때문이다.
+- Repository는 모두 interface로 선언하여 domain이 infrastructure 구현체에 직접 의존하지 않는다.
