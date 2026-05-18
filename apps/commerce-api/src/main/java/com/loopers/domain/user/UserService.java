@@ -27,7 +27,7 @@ public class UserService {
         try {
             return userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.");
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 유저입니다.", e);
         }
     }
 
@@ -37,7 +37,7 @@ public class UserService {
         try {
             loginId = new LoginId(rawLoginId);
         } catch (CoreException e) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.", e);
         }
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증 정보가 올바르지 않습니다."));
