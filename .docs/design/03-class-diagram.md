@@ -10,6 +10,19 @@
 
 이 클래스 설계는 도메인 책임과 의존 방향을 확인하기 위해 작성한다. 핵심 규칙은 도메인 모델과 도메인 서비스에 두고, 여러 도메인의 조합과 외부 시스템 호출은 application 계층에서 조정한다.
 
+## 모듈 경계
+
+이번 설계는 도메인 우선 모듈러 모놀리스 구조를 기준으로 한다.
+
+| 모듈 | 포함 클래스 |
+| --- | --- |
+| `catalog` | `Brand`, `Product`, `ProductLike`, `ProductService`, `ProductLikeService`, `StockService` |
+| `ordering` | `Order`, `OrderLine`, `OrderFacade`, `OrderService` |
+| `payment` | `Payment`, `PaymentWorker`, `PaymentService`, `PaymentGateway`, `PaymentRepository` |
+| `event` | `OrderEventPublisher`, `OrderEventOutbox`, `EventRelayWorker`, `DataPlatformClient` |
+
+`StockService`는 재고가 향후 옵션/창고/예약 재고로 확장될 수 있다는 전제로 별도 도메인 서비스로 둔다. 현재 저장 구조에서는 별도 재고 테이블을 만들지 않고 `Product.stockQuantity`를 비관적 락으로 차감/복구한다.
+
 ## 클래스 다이어그램
 
 ```mermaid
@@ -149,6 +162,7 @@ classDiagram
         findPendingEvents()
         markSent(eventId)
         increaseRetryCount(eventId)
+        markFailed(eventId)
     }
 
     class EventRelayWorker {
@@ -211,6 +225,13 @@ classDiagram
 - 실제 좋아요 이력이 삭제된 경우에만 `likeCount`를 감소시킨다.
 - `product_like`를 정합성 기준 데이터로 두고, `likeCount`는 조회용 카운터로 관리한다.
 
+### StockService
+
+- `catalog` 모듈의 재고 도메인 서비스다.
+- 주문 생성 시 `Product` 행을 비관적 락으로 잠그고 재고 부족 여부를 확인한 뒤 차감한다.
+- 결제 실패, 취소, 타임아웃 시 주문 항목 기준으로 차감했던 재고를 복구한다.
+- 현재는 `Product.stockQuantity`를 조작하지만, 향후 옵션 재고나 창고 재고로 확장될 수 있어 `ProductService`와 분리한다.
+
 ### Order
 
 - 주문의 생명주기와 상태 전이를 관리한다.
@@ -259,12 +280,14 @@ classDiagram
 - 외부 데이터 플랫폼으로 보낼 주문 이벤트를 저장한다.
 - 아직 전송되지 않은 이벤트를 조회할 수 있게 한다.
 - 전송 성공 시 상태를 갱신하고, 실패 시 재시도 횟수를 증가시킨다.
+- 최대 재시도 횟수를 초과하면 `FAILED` 상태로 확정한다.
 
 ### EventRelayWorker
 
 - outbox에 남아 있는 주문 이벤트를 조회한다.
 - `DataPlatformClient`를 통해 외부 데이터 플랫폼에 이벤트를 전송한다.
 - 전송 결과에 따라 outbox 상태를 갱신한다.
+- `PENDING` 이벤트만 전송 대상으로 조회하고, `FAILED` 이벤트는 수동 확인 대상으로 남긴다.
 
 ### DataPlatformClient
 
@@ -273,6 +296,7 @@ classDiagram
 
 ## 의존 방향
 
+- 최상위 구조는 도메인 모듈을 먼저 나누고, 각 모듈 내부에 계층을 둔다.
 - `interfaces`는 HTTP 요청/응답 변환만 담당한다.
 - `application`은 여러 도메인 서비스를 조합한다.
 - `domain`은 비즈니스 규칙을 가진다.
@@ -280,7 +304,7 @@ classDiagram
 - 도메인 모델은 외부 결제 시스템이나 HTTP 계층을 직접 알지 않는다.
 - `PaymentService`는 `DataPlatformClient`를 직접 알지 않고, `OrderEventPublisher`를 통해 outbox 저장만 요청한다.
 
-## 상태 정의 초안
+## 상태 정의와 전이 요약
 
 ```text
 ProductStatus
@@ -299,7 +323,17 @@ PaymentStatus
 - SUCCESS
 - FAILED
 - CANCELED
+
+OutboxStatus
+- PENDING
+- SENT
+- FAILED
 ```
+
+- 주문은 생성 직후 `PAYMENT_PENDING`이 되며, 결제 성공 시 `PAID`, 실패/타임아웃 시 `PAYMENT_FAILED`, 취소 시 `CANCELED`로 전이한다.
+- 이미 `PAID`, `PAYMENT_FAILED`, `CANCELED`로 확정된 주문은 늦게 도착한 결제 결과로 되돌리지 않는다.
+- 결제는 외부 요청 전에 `REQUESTED`로 먼저 저장하고, 성공/실패/취소/타임아웃 결과에 따라 확정 상태로 전이한다.
+- Outbox는 주문 성공 이벤트 저장 시 `PENDING`이 되고, 전송 성공 시 `SENT`, 최대 재시도 초과 시 `FAILED`로 전이한다.
 
 ## 리스크와 선택지
 

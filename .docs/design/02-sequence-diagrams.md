@@ -6,6 +6,19 @@
 - 상품 조회와 좋아요는 비교적 짧은 흐름이고, 주문/결제는 내부 정합성과 외부 장애를 분리하는 흐름이다.
 - 결제 성공 이벤트 전송은 사용자 응답 성공과 외부 데이터 플랫폼 전송 성공이 같은 의미가 아님을 보여준다.
 
+## 트랜잭션 경계 요약
+
+| 유스케이스 | 트랜잭션 경계 | 포함 작업 | 제외 작업 | 실패 처리 |
+| --- | --- | --- | --- | --- |
+| 상품 상세 조회 | read-only | 판매 가능 상품 조회, 브랜드 조회, 좋아요 여부 조회 | 없음 | 상품이 없거나 숨김 상태면 조회 실패 |
+| 좋아요 등록 | write | 상품 상태 확인, `product_like` insert, `product.like_count` 증가 | 없음 | 중복 insert는 멱등 성공으로 변환 |
+| 좋아요 취소 | write | `product_like` delete, 실제 삭제 시 `product.like_count` 감소 | 없음 | 좋아요 이력이 없어도 멱등 성공 |
+| 주문 생성 | write | 상품 판매 상태 검증, 비관적 락 기반 재고 차감, 주문/주문 항목 저장 | 외부 결제 요청 | 재고 부족이면 주문을 생성하지 않음 |
+| 결제 처리권 선점 | write | `payment(order_id, REQUESTED)` 저장 | 외부 결제 요청 | 이미 결제 row가 있으면 no-op |
+| 결제 성공 확정 | write | 결제 성공 기록, 주문 `PAID` 전이, 주문 완료 outbox 저장 | 외부 데이터 플랫폼 전송 | 확정 상태 중복 수신은 no-op |
+| 결제 실패/취소/타임아웃 | write | 결제 결과 기록, 주문 실패/취소 전이, 재고 복구 | 외부 데이터 플랫폼 전송 | 중복 실행은 상태 기반 no-op |
+| Outbox 전송 | write per event | 전송 성공 시 `SENT`, 실패 시 `retry_count` 증가 또는 `FAILED` 확정 | 주문/결제 상태 변경 | 외부 전송 실패는 주문 성공을 되돌리지 않음 |
+
 ## 상품 상세 조회
 
 이 다이어그램은 상품 상세 조회에서 상품, 브랜드, 좋아요 여부가 어떤 책임으로 조합되는지 확인하기 위해 필요하다. 좋아요 수는 `product.like_count` 카운터를 사용하고, 사용자별 좋아요 여부만 좋아요 이력에서 확인한다.
@@ -55,7 +68,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User as 사용자
-    participant Controller as LikeController
+    participant Controller as ProductLikeController
     participant Service as ProductLikeService
     participant ProductRepo as ProductRepository
     participant LikeRepo as ProductLikeRepository
@@ -99,7 +112,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User as 사용자
-    participant Controller as LikeController
+    participant Controller as ProductLikeController
     participant Service as ProductLikeService
     participant ProductRepo as ProductRepository
     participant LikeRepo as ProductLikeRepository
@@ -135,7 +148,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User as 사용자
-    participant Controller as LikeController
+    participant Controller as ProductLikeController
     participant Service as ProductLikeService
     participant LikeRepo as ProductLikeRepository
     participant ProductRepo as ProductRepository
@@ -313,6 +326,11 @@ sequenceDiagram
         else 전송 실패
             DataPlatform-->>Worker: error
             Worker->>Outbox: increaseRetryCount(eventId)
+            alt 최대 재시도 초과
+                Worker->>Outbox: markFailed(eventId)
+            else 재시도 가능
+                Worker->>Outbox: keepPending(eventId)
+            end
         end
     end
 ```
@@ -322,4 +340,5 @@ sequenceDiagram
 - 외부 데이터 플랫폼 전송은 주문 결제 성공 이후의 부가 연동으로 분리한다.
 - Outbox를 두면 주문 성공 이벤트 저장과 주문 상태 변경을 같은 DB 트랜잭션으로 묶을 수 있다.
 - `DataPlatformClient`는 `EventRelayWorker`만 사용하고, `PaymentService`는 직접 의존하지 않는다.
-- 전송 실패는 사용자 응답 실패가 아니라 재시도 대상이다.
+- 전송 실패는 사용자 응답 실패가 아니라 재시도 대상이며, 실패할 때마다 `retry_count`를 증가시킨다.
+- 최대 재시도 횟수를 초과하면 outbox 상태를 `FAILED`로 확정하고 수동 확인 대상으로 남긴다.

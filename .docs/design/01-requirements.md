@@ -24,6 +24,10 @@
 - 주문/결제/외부 연동은 하나의 성공 흐름처럼 보이지만, 실제로는 서로 다른 트랜잭션 경계와 장애 경계를 가진다.
 - 이후 다이어그램 문서는 이 요구사항에서 나온 책임 분리와 정합성 전략을 시각적으로 검증한다.
 
+## 아키텍처 원칙
+
+이번 설계는 장기적으로 큰 서비스를 만든다는 전제로 도메인 우선 모듈러 모놀리스 구조를 기준으로 한다. 최상위 모듈은 `catalog`, `ordering`, `payment`, `event`로 나누고, 각 모듈 내부에서 `interfaces`, `application`, `domain`, `infrastructure` 계층을 둔다.
+
 ## 문제 상황 재해석
 
 이번 설계의 핵심 문제는 상품 탐색부터 주문, 결제, 재고 차감까지 이어지는 이커머스 흐름에서 데이터 정합성을 유지하는 것이다.
@@ -59,6 +63,8 @@
 상세 시나리오 문서가 현재 저장소에 충분히 포함되어 있지 않아, 아래 내용은 설계 초안의 기본 가정이다. 실제 구현 전 정책 확정이 필요하다.
 
 - 사용자는 기존 회원 시스템의 `userId`로 식별한다.
+- `User`는 volume-2의 새 도메인이 아니며, 기존 `identity` 모듈의 `userId` 참조로만 다룬다.
+- volume-2 ERD에서는 `User` 내부 테이블과 필드를 상세 설계하지 않는다.
 - 상품은 하나의 브랜드에 속한다.
 - 상품 상태는 `ON_SALE`, `SOLD_OUT`, `STOPPED`로 구분한다.
 - 상품 목록과 상세 조회에는 판매 가능한 상품만 노출하며, `SOLD_OUT`/`STOPPED` 상품은 제외한다.
@@ -101,6 +107,7 @@
 
 | 항목 | 상태 | 비고 |
 | --- | --- | --- |
+| 회원 경계 | 확정 | `User`는 기존 `identity` 모듈의 `userId` 참조로만 보고, volume-2에서는 내부 테이블/필드를 설계하지 않는다. |
 | 상품과 브랜드 관계 | 기본안 확정 | 상품은 하나의 브랜드에 속한다고 본다. |
 | 좋아요 멱등성 | 기본안 확정 | `userId + productId` 유니크 제약을 기준으로 한다. |
 | 좋아요 수 정합성 수준 | 확정 | 강한 정합성으로 관리한다. |
@@ -116,6 +123,42 @@
 | 결제 결과 확인 | 확정 | 주문 상태 조회 API로 확인한다. |
 | 중복 결제 요청 처리 | 확정 | `payment` row 선생성과 `payment.order_id` unique 제약으로 worker 처리 권한을 선점하고, 외부 결제에는 `orderId` idempotency key를 사용한다. |
 | 품절/판매 중지 상품 조회 | 확정 | 목록과 상세 조회 모두 노출하지 않는다. |
+
+## 상태 전이 정책
+
+### OrderStatus
+
+| 현재 상태 | 이벤트 | 다음 상태 | 처리 |
+| --- | --- | --- | --- |
+| - | 주문 생성 성공 | `PAYMENT_PENDING` | 재고 차감과 주문 저장을 완료하고 사용자에게 먼저 응답한다. |
+| `PAYMENT_PENDING` | 결제 성공 | `PAID` | 결제 성공 기록과 주문 완료 이벤트 저장을 같은 DB 트랜잭션에 묶는다. |
+| `PAYMENT_PENDING` | 결제 실패 | `PAYMENT_FAILED` | 결제 실패 기록, 주문 상태 전이, 재고 복구를 같은 DB 트랜잭션에 묶는다. |
+| `PAYMENT_PENDING` | 결제 대기 1분 초과 | `PAYMENT_FAILED` | 실패 사유 값은 `TIMEOUT`으로 기록하고 재고를 복구한다. |
+| `PAYMENT_PENDING` | 결제 취소 | `CANCELED` | 결제 취소 기록, 주문 상태 전이, 재고 복구를 같은 DB 트랜잭션에 묶는다. |
+| `PAID` | 결제 성공 이벤트 중복 수신 | `PAID` | 멱등하게 무시한다. |
+| `PAYMENT_FAILED` | 1분 이후 결제 성공 응답 도착 | `PAYMENT_FAILED` | 이미 실패 확정된 주문은 `PAID`로 되돌리지 않는다. |
+| `CANCELED` | 결제 성공 응답 도착 | `CANCELED` | 이미 취소 확정된 주문은 `PAID`로 되돌리지 않는다. |
+
+### PaymentStatus
+
+| 현재 상태 | 이벤트 | 다음 상태 | 처리 |
+| --- | --- | --- | --- |
+| - | worker 처리권 선점 | `REQUESTED` | 외부 결제 요청 전에 `payment(order_id, REQUESTED)`를 먼저 저장한다. |
+| `REQUESTED` | 외부 승인/매입 성공 | `SUCCESS` | `transactionKey`를 저장하고 주문을 `PAID`로 전이한다. |
+| `REQUESTED` | 외부 결제 실패 | `FAILED` | 실패 사유를 저장하고 주문 실패 및 재고 복구를 수행한다. |
+| `REQUESTED` | 외부 결제 취소 | `CANCELED` | 취소 사유를 저장하고 주문 취소 및 재고 복구를 수행한다. |
+| `REQUESTED` | 결제 대기 1분 초과 | `FAILED` | 실패 사유 값은 `TIMEOUT`으로 기록한다. |
+| `SUCCESS`/`FAILED`/`CANCELED` | 만료 스캔 또는 중복 결과 수신 | 현재 상태 유지 | 확정 상태는 다시 처리하지 않는다. |
+
+### OutboxStatus
+
+| 현재 상태 | 이벤트 | 다음 상태 | 처리 |
+| --- | --- | --- | --- |
+| - | 주문 결제 성공 이벤트 저장 | `PENDING` | 주문 `PAID` 전이와 같은 DB 트랜잭션에서 저장한다. |
+| `PENDING` | 외부 데이터 플랫폼 전송 성공 | `SENT` | 전송 완료 상태로 갱신한다. |
+| `PENDING` | 외부 데이터 플랫폼 전송 실패, 재시도 가능 | `PENDING` | `retry_count`를 증가시키고 다음 재시도 대상으로 남긴다. |
+| `PENDING` | 외부 데이터 플랫폼 전송 실패, 최대 재시도 초과 | `FAILED` | 수동 확인 대상으로 남긴다. |
+| `SENT`/`FAILED` | worker 재스캔 | 현재 상태 유지 | 전송 대상에서 제외한다. |
 
 ## 기능 요구사항
 
@@ -195,6 +238,51 @@
 - 외부 시스템 실패는 내부 주문 정합성과 분리해 재시도 또는 보상 대상으로 관리한다.
 - PG는 `auth/capture/void` 계약을 제공한다고 가정한다.
 - 주문 완료 이벤트는 outbox에 먼저 저장하고, 실제 전송은 별도 worker가 처리한다.
+
+## API 계약 초안
+
+### 공통 규칙
+
+- 응답은 현재 코드 패턴과 맞춰 `ApiResponse<T>` 형태로 감싼다.
+- 성공 응답은 `meta.result=SUCCESS`, 실패 응답은 `meta.result=FAIL`을 사용한다.
+- 사용자 식별이 필요한 API는 `X-Loopers-LoginId` 헤더를 필수로 받는다.
+- `X-Loopers-LoginId`는 기존 `identity` 모듈의 `userId` 참조이며, volume-2에서는 회원 내부 필드를 검증하지 않는다.
+- 상품 목록과 상품 상세 조회는 공개 API로 두되, 로그인 사용자의 좋아요 여부가 필요한 경우 `X-Loopers-LoginId`를 선택적으로 받을 수 있다.
+
+### 공개 API
+
+| 기능 | Method | Path | Header | Request | Response |
+| --- | --- | --- | --- | --- | --- |
+| 상품 목록 조회 | GET | `/api/v1/products` | 선택: `X-Loopers-LoginId` | query: `brandId`, `page`, `size` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
+| 상품 상세 조회 | GET | `/api/v1/products/{productId}` | 선택: `X-Loopers-LoginId` | path: `productId` | `productId`, `name`, `description`, `price`, `status`, `stockQuantity`, `brand`, `likeCount`, `liked` |
+| 브랜드 조회 | GET | `/api/v1/brands/{brandId}` | 없음 | path: `brandId` | `brandId`, `name`, `description` |
+| 좋아요 등록 | POST | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId` | path: `productId` | `productId`, `liked=true`, `likeCount` |
+| 좋아요 취소 | DELETE | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId` | path: `productId` | `productId`, `liked=false`, `likeCount` |
+| 내 좋아요 목록 조회 | GET | `/api/v1/product-likes/me` | 필수: `X-Loopers-LoginId` | query: `page`, `size` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
+| 주문 생성 | POST | `/api/v1/orders` | 필수: `X-Loopers-LoginId` | body: `items[].{productId,quantity}` | `orderId`, `orderStatus=PAYMENT_PENDING`, `totalAmount` |
+| 주문 상태 조회 | GET | `/api/v1/orders/{orderId}` | 필수: `X-Loopers-LoginId` | path: `orderId` | `orderId`, `orderStatus`, `paymentStatus`, `failureReason`, `totalAmount`, `items[]` |
+
+### 내부/외부 계약
+
+| 대상 | 호출 | 요청 | 응답 | 비고 |
+| --- | --- | --- | --- | --- |
+| `PaymentGateway` | `authorize` | `orderId`, `amount`, `idempotencyKey=orderId` | `transactionKey`, `result` | 외부 결제 승인 |
+| `PaymentGateway` | `capture` | `transactionKey` | `result` | 승인된 결제 매입 |
+| `PaymentGateway` | `voidAuthorization` | `transactionKey` | `result` | 매입 실패 또는 취소 시 승인 취소 |
+| `DataPlatformClient` | `sendOrderPaid` | `OrderPaidEvent` | `result` | 실패해도 주문 성공을 되돌리지 않는다. |
+
+### 주요 에러 매핑
+
+| 상황 | HTTP | `errorCode` | 처리 기준 |
+| --- | --- | --- | --- |
+| 필수 헤더 누락, 요청 값 누락, 수량 0 이하 | 400 | `Bad Request` | `BAD_REQUEST` |
+| 판매 중지/품절 상품 상세 조회 | 404 | `Not Found` | 공개 조회에서는 노출하지 않는 리소스로 본다. |
+| 상품/브랜드/주문이 존재하지 않음 | 404 | `Not Found` | `NOT_FOUND` |
+| 판매 중지/품절 상품 좋아요 등록 | 400 | `Bad Request` | 정책 위반으로 본다. |
+| 재고 부족 주문 | 400 | `Bad Request` | 주문은 생성하지 않는다. |
+| 중복 좋아요 등록/취소 | 200 | - | 멱등 성공으로 응답한다. |
+| 외부 결제 실패/취소/타임아웃 | 200 | - | 주문 상태 조회에서 `PAYMENT_FAILED` 또는 `CANCELED`로 확인한다. |
+| 서버 내부 오류 | 500 | `Internal Server Error` | `INTERNAL_ERROR` |
 
 ## 확인 필요 질문
 

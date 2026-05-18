@@ -16,8 +16,6 @@
 erDiagram
     BRAND ||--o{ PRODUCT : has
     PRODUCT ||--o{ PRODUCT_LIKE : liked_by
-    USER ||--o{ PRODUCT_LIKE : likes
-    USER ||--o{ ORDERS : places
     ORDERS ||--|{ ORDER_LINE : contains
     PRODUCT ||--o{ ORDER_LINE : ordered_as
     ORDERS ||--o| PAYMENT : paid_by
@@ -46,26 +44,15 @@ erDiagram
 
     PRODUCT_LIKE {
         bigint id PK
-        varchar user_id FK
+        varchar user_id
         bigint product_id FK
-        datetime created_at
-        datetime updated_at
-    }
-
-    USER {
-        bigint id PK
-        varchar user_id UK
-        varchar encoded_password
-        varchar name
-        date birth_date
-        varchar email
         datetime created_at
         datetime updated_at
     }
 
     ORDERS {
         bigint id PK
-        varchar user_id FK
+        varchar user_id
         bigint total_amount
         varchar status
         datetime created_at
@@ -107,6 +94,8 @@ erDiagram
     }
 ```
 
+`user_id`는 기존 `identity` 모듈의 사용자 식별자 참조다. 이번 volume-2 설계에서는 `User` 내부 테이블과 필드를 상세 설계하지 않는다.
+
 ## 테이블별 설명
 
 ### brand
@@ -119,11 +108,11 @@ erDiagram
 
 ### product_like
 
-사용자의 상품 좋아요 관계를 저장한다. 좋아요 수 정합성과 내 좋아요 목록 조회의 기준 데이터이며, `user_id + product_id`에 unique 제약을 둔다.
+사용자의 상품 좋아요 관계를 저장한다. `user_id`는 기존 `identity` 모듈의 식별자 참조이며, 좋아요 수 정합성과 내 좋아요 목록 조회의 기준 데이터다. `user_id + product_id`에 unique 제약을 둔다.
 
 ### orders
 
-주문의 대표 상태와 총액을 저장한다. `order`는 SQL 예약어와 충돌할 수 있어 테이블명은 `orders`를 사용한다.
+주문의 대표 상태와 총액을 저장한다. `user_id`는 기존 `identity` 모듈의 식별자 참조다. `order`는 SQL 예약어와 충돌할 수 있어 테이블명은 `orders`를 사용한다.
 
 ### order_line
 
@@ -135,7 +124,9 @@ erDiagram
 
 ### order_event_outbox
 
-외부 데이터 플랫폼 전송 이벤트를 저장한다. 주문 상태 변경과 이벤트 저장을 같은 트랜잭션에 묶고, 실제 외부 전송은 `EventRelayWorker`가 재시도한다.
+외부 데이터 플랫폼 전송 이벤트를 저장한다. 주문 상태 변경과 이벤트 저장을 같은 트랜잭션에 묶고, 실제 외부 전송은 `EventRelayWorker`가 재시도한다. 전송 실패 시 `retry_count`를 증가시키고, 최대 재시도 초과 시 상태를 `FAILED`로 확정한다.
+
+최대 재시도 횟수는 코드 상수 또는 설정값으로 두고, ERD에서는 구체 숫자를 고정하지 않는다.
 
 ## 주요 제약
 
@@ -196,7 +187,9 @@ erDiagram
 - 주문 `PAID` 상태 전이와 outbox 저장은 같은 DB 트랜잭션으로 처리한다.
 - `PaymentService`는 `DataPlatformClient`를 직접 호출하지 않는다.
 - 외부 데이터 플랫폼 전송은 `EventRelayWorker`가 수행하는 재시도 가능한 별도 흐름으로 둔다.
-- 전송 성공 시 outbox 상태를 갱신하고, 전송 실패 시 재시도 대상으로 남긴다.
+- 전송 성공 시 outbox 상태를 `SENT`로 갱신한다.
+- 전송 실패 시 `retry_count`를 증가시키고, 재시도 가능하면 `PENDING`으로 유지한다.
+- 최대 재시도 횟수를 초과하면 outbox 상태를 `FAILED`로 확정하고 수동 확인 대상으로 남긴다.
 
 ## 리스크와 보완책
 
