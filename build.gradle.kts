@@ -82,6 +82,11 @@ subprojects {
         useJUnitPlatform()
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
+        // Rancher Desktop의 dockerd는 API 1.41+ 요구. docker-java의 기본은 1.32라 BadRequest.
+        // docker-java 프로퍼티 키는 'api.version'(점 포함). 시스템 프로퍼티로 강제.
+        // DOCKER_HOST는 EnvironmentAndSystemPropertyClientProviderStrategy가 먼저 잡도록 유도.
+        systemProperty("api.version", "1.45")
+        environment("DOCKER_HOST", "npipe:////./pipe/docker_engine")
         jvmArgs("-Xshare:off")
     }
 
