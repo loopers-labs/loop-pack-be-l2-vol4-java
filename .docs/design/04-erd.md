@@ -1,0 +1,155 @@
+# ERD
+
+## 목적
+영속성 구조에서 관계의 주인, 유니크 제약, 정규화 여부를 검증한다.
+
+## 다이어그램
+
+```mermaid
+erDiagram
+    users {
+        bigint id PK
+        varchar login_id UK
+        varchar password
+        varchar name
+        varchar email
+        varchar birth
+        bigint point
+        datetime created_at
+    }
+
+    brands {
+        bigint id PK
+        varchar name
+        varchar description
+        datetime created_at
+    }
+
+    products {
+        bigint id PK
+        bigint brand_id FK
+        varchar name
+        bigint price
+        text description
+        datetime created_at
+    }
+
+    stocks {
+        bigint id PK
+        bigint product_id FK UK
+        int total_quantity
+        int reserved_quantity
+        datetime updated_at
+    }
+
+    likes {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        datetime created_at
+    }
+
+    orders {
+        bigint id PK
+        bigint user_id FK
+        varchar status
+        bigint total_amount
+        bigint point_amount
+        bigint pg_amount
+        datetime created_at
+    }
+
+    order_items {
+        bigint id PK
+        bigint order_id FK
+        bigint product_id FK
+        int quantity
+        bigint price
+    }
+
+    payments {
+        bigint id PK
+        bigint order_id FK UK
+        varchar pg_transaction_id UK
+        varchar status
+        bigint amount
+        datetime created_at
+    }
+
+    point_histories {
+        bigint id PK
+        bigint user_id FK
+        bigint order_id FK
+        varchar type
+        bigint amount
+        datetime created_at
+    }
+
+    users ||--o{ orders : ""
+    users ||--o{ likes : ""
+    users ||--o{ point_histories : ""
+    brands ||--o{ products : ""
+    products ||--|| stocks : ""
+    products ||--o{ likes : ""
+    products ||--o{ order_items : ""
+    orders ||--o{ order_items : ""
+    orders ||--o| payments : ""
+    orders ||--o{ point_histories : ""
+```
+
+## 테이블 설계 상세
+
+### users
+- `point`: 포인트 잔액. `UPDATE ... WHERE point >= ?` atomic UPDATE로 동시성 보장
+- `login_id`: 유니크 제약. 중복 가입 방지
+
+### brands
+- 상품과 독립된 엔티티. 브랜드 단독 조회 가능
+- 상품이 brand_id를 외래키로 참조
+
+### products
+- `brand_id`: brands 테이블 외래키
+- 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
+
+### stocks
+- `product_id`: UK — 상품당 재고 1개
+- `total_quantity`: 실제 보유 재고 (결제 확정 시 차감)
+- `reserved_quantity`: 예약 중인 수량 (주문 생성 시 증가)
+- 가용 재고 = `total_quantity - reserved_quantity`
+- `updated_at`: 재고 변경 추적용
+
+### likes
+- `(user_id, product_id)` 복합 유니크 제약 필요 → 중복 좋아요 DB 레벨 방어
+- 멱등 토글: 존재하면 DELETE, 없으면 INSERT
+
+### orders
+- `status`: PENDING / CONFIRMED / FAILED
+- `total_amount`: 총 결제 금액 (point_amount + pg_amount)
+- `point_amount`: 포인트로 결제한 금액
+- `pg_amount`: PG로 결제한 금액
+- `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준으로 만료 판단)
+
+### order_items
+- 주문 시점의 가격(`price`) 스냅샷 저장
+- 상품 가격이 변경되어도 주문 이력에 영향 없음
+
+### payments
+- `order_id`: UK — 주문당 결제 1건 (재시도 없음)
+- `pg_transaction_id`: UK — PG 트랜잭션 ID 중복 방지
+- `status`: SUCCESS / FAILED
+
+### point_histories
+- append-only 이력 테이블
+- `type`: EARN (적립) / USE (사용)
+- `amount`: 양수(적립) / 음수(사용)
+- `order_id`: 주문으로 인한 포인트 변경 추적
+
+## 제약 조건 요약
+
+| 테이블 | 제약 | 목적 |
+|---|---|---|
+| users.login_id | UNIQUE | 중복 가입 방지 |
+| stocks.product_id | UNIQUE | 상품당 재고 1개 보장 |
+| likes.(user_id, product_id) | 복합 UNIQUE | 중복 좋아요 방지 |
+| payments.order_id | UNIQUE | 주문당 결제 1건 |
+| payments.pg_transaction_id | UNIQUE | PG 트랜잭션 중복 방지 |
