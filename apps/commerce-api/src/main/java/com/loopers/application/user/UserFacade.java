@@ -17,15 +17,13 @@ public class UserFacade {
         return UserInfo.from(saved);
     }
 
-    /** 내 정보 조회 — 먼저 인증 후, 인증된 유저 정보를 반환한다. */
-    public UserInfo getMyInfo(String loginId, String password) {
-        UserModel user = userService.authenticate(loginId, password);
+    /** 내 정보 조회 — 인터셉터에서 인증된 유저 정보를 반환한다. */
+    public UserInfo getMyInfo(UserModel user) {
         return UserInfo.from(user);
     }
 
-    /** 비밀번호 변경 — 먼저 인증 후, 새 비밀번호로 변경한다. */
-    public void changePassword(String loginId, String password, String newPassword) {
-        userService.authenticate(loginId, password);
-        userService.changePassword(loginId, newPassword);
+    /** 비밀번호 변경 — 인터셉터에서 인증된 유저의 비밀번호를 변경한다. */
+    public void changePassword(UserModel user, String newPassword) {
+        userService.changePassword(user.getLoginId(), newPassword);
     }
 }
