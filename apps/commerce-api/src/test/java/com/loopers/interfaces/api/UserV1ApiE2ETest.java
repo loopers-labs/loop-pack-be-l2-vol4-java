@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.interfaces.api.common.dto.ApiResponse;
+import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.fixture.UserFixture;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;

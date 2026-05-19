@@ -2,7 +2,7 @@ package com.loopers.interfaces.api.example;
 
 import com.loopers.application.example.ExampleFacade;
 import com.loopers.application.example.ExampleInfo;
-import com.loopers.interfaces.api.common.dto.ApiResponse;
+import com.loopers.interfaces.api.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
-import com.loopers.interfaces.api.common.dto.ApiResponse;
+import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.interfaces.api.common.interceptor.AuthInterceptor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

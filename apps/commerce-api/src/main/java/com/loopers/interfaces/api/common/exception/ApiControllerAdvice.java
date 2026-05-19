@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.common.exception;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import com.loopers.interfaces.api.common.dto.ApiResponse;
+import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.ConstraintViolationException;
