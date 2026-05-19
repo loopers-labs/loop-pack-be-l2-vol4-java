@@ -37,6 +37,8 @@ subprojects {
     apply(plugin = "java")
     apply(plugin = "org.springframework.boot")
     apply(plugin = "io.spring.dependency-management")
+
+    ext["spring-security.version"] = project.properties["springSecurityVersion"]
     apply(plugin = "jacoco")
 
     dependencyManagement {

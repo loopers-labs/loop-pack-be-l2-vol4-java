@@ -8,8 +8,12 @@ dependencies {
 
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
+
+    // security (apps/commerce-api에서만 선언)
+    implementation("org.springframework.security:spring-security-crypto")
 
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
