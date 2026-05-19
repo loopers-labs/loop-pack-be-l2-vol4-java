@@ -31,6 +31,7 @@ erDiagram
         varchar name
         bigint price
         text description
+        bigint like_count
         datetime created_at
     }
 
@@ -109,6 +110,10 @@ erDiagram
 
 ### products
 - `brand_id`: brands 테이블 외래키
+- `like_count`: 좋아요 수 카운터 캐시. 빠른 조회를 위해 비정규화
+  - 좋아요 등록 시 likes INSERT + like_count +1 (같은 트랜잭션)
+  - 좋아요 취소 시 likes DELETE + like_count -1 (같은 트랜잭션)
+  - 정합성 보정: 주기적 배치로 `COUNT(*) FROM likes` 와 동기화
 - 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
 
 ### stocks
