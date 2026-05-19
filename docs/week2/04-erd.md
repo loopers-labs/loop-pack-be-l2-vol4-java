@@ -31,6 +31,7 @@ erDiagram
         bigint brand_id FK
         varchar name
         bigint price
+        varchar status "ON_SALE|SOLD_OUT|HIDDEN|DELETED"
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -68,6 +69,16 @@ erDiagram
         varchar product_name
         bigint product_price
         int quantity
+        bigint discount_amount "default 0, 할인 금액"
+        bigint coupon_id "nullable, FK to future coupons table"
+    }
+
+    order_status_histories {
+        bigint id PK
+        bigint order_id FK
+        varchar from_status "nullable"
+        varchar to_status
+        datetime changed_at
     }
 
     users ||--o{ likes : ""
@@ -76,6 +87,7 @@ erDiagram
     products ||--|| stocks : ""
     products ||--o{ likes : ""
     orders ||--o{ order_items : ""
+    orders ||--o{ order_status_histories : ""
 ```
 
 **읽는 포인트**
@@ -86,6 +98,9 @@ erDiagram
 - `order_items.product_id`는 FK 제약 없음. 상품이 삭제되어도 주문 내역은 `product_name`, `product_price` 스냅샷으로 독립 보존된다.
 - `likes`는 `(user_id, product_id)` 복합 UK 제약으로 DB 레벨에서 중복 좋아요 방지.
 - 가격 관련 컬럼(`price`, `total_price`, `product_price`)은 `bigint`로 선언한다. `int` 범위(약 21억)를 초과하는 경우를 대비한다.
+- `order_status_histories`: 주문 상태 전이 이력. 언제 취소됐는지, 처리 시간이 얼마나 걸렸는지 추적 가능.
+- `order_items.discount_amount`: 쿠폰/포인트 적용 시 할인 금액. 현재는 0이 기본값이며, 향후 쿠폰 도메인 연동 시 활용.
+- `order_items.coupon_id`: 적용된 쿠폰 ID. FK 제약 없이 참조용으로만 보유 (쿠폰 도메인은 추후 추가 예정).
 
 ---
 
@@ -96,7 +111,8 @@ erDiagram
 
 ### products
 - `brand_id`: 브랜드 FK. 상품 수정 시 변경 불가.
-- `deleted_at`: 브랜드 삭제 시 연관 상품에도 함께 채워진다.
+- `status`: 상품 상태. `ON_SALE`(판매중) / `SOLD_OUT`(품절) / `HIDDEN`(숨김) / `DELETED`(삭제). 기본값 `ON_SALE`.
+- `deleted_at`: 브랜드 삭제 시 연관 상품에도 함께 채워진다. 삭제 시 `status = DELETED`로 함께 변경.
 
 ### stocks
 - `product_id`: UK 제약으로 products와 1:1 관계를 보장한다.
@@ -115,6 +131,14 @@ erDiagram
 ### order_items
 - `product_name`, `product_price`: 주문 당시 상품 정보 스냅샷. `product_id`가 가리키는 상품이 변경/삭제되어도 주문 내역은 영향받지 않는다.
 - `product_id`: FK 제약 없이 참조용으로만 보유.
+- `discount_amount`: 쿠폰/포인트 적용 시 할인 금액. 현재는 0이 기본값이며, 향후 쿠폰 도메인 연동 시 활용.
+- `coupon_id`: 적용된 쿠폰 ID. FK 제약 없이 참조용으로만 보유 (쿠폰 도메인은 추후 추가 예정).
+
+### order_status_histories
+- `order_id`: FK. 어떤 주문의 상태 전이 이력인지 참조.
+- `from_status`: 이전 상태. 최초 생성 시 null (PENDING이 첫 상태이므로 이전 상태 없음).
+- `to_status`: 변경된 상태.
+- `changed_at`: 상태 전이 발생 시각. 언제 취소됐는지, 처리 시간이 얼마나 걸렸는지 추적 가능.
 
 ---
 

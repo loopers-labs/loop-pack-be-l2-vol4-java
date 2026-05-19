@@ -170,7 +170,7 @@ sequenceDiagram
 
     loop 각 상품
         BrandService->>Product: delete()
-        Note over Product: deleted_at 채움
+        Note over Product: deleted_at 채움, status = DELETED
         BrandService->>ProductRepository: save(product)
     end
 
@@ -187,5 +187,5 @@ sequenceDiagram
 **읽는 포인트**
 - 상품 soft delete → 브랜드 soft delete 순서로 처리된다.
 - 하나의 트랜잭션 안에서 처리되므로 중간 실패 시 전체 롤백, 부분 삭제 상태가 발생하지 않는다.
-- `deleted_at`을 채우는 책임은 `Brand.delete()`, `Product.delete()` 도메인 메서드에 있으며, BaseEntity에서 상속된다.
+- `deleted_at`을 채우고 `status = DELETED`로 변경하는 책임은 `Brand.delete()`, `Product.delete()` 도메인 메서드에 있다. `Product.delete()`는 BaseEntity의 `delete()`를 오버라이드하여 status도 함께 변경한다.
 - `ProductRepository.findAllByBrandId()`는 이미 soft delete된 상품은 제외하고 반환한다 (deletedAt IS NULL 조건).

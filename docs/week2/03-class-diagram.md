@@ -27,9 +27,18 @@ classDiagram
         Long brandId
         String name
         Long price
+        ProductStatus status
         ZonedDateTime deletedAt
         delete()
         isDeleted() boolean
+    }
+
+    class ProductStatus {
+        <<enumeration>>
+        ON_SALE
+        SOLD_OUT
+        HIDDEN
+        DELETED
     }
 
     class Stock {
@@ -68,7 +77,15 @@ classDiagram
         String productName
         Long productPrice
         int quantity
+        Long discountAmount
         calculateSubtotal() Long
+    }
+
+    class OrderStatusHistory {
+        Long id
+        String fromStatus
+        String toStatus
+        ZonedDateTime changedAt
     }
 
     class OrderStatus {
@@ -78,8 +95,10 @@ classDiagram
         CANCELLED
     }
 
+    Product --> ProductStatus
     Order --> OrderStatus
     Order "1" *-- "N" OrderItem
+    Order "1" *-- "N" OrderStatusHistory
     Product "N" --> "1" Brand
     Product "1" -- "1" Stock
     User "1" -- "N" Like : likes
