@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +22,7 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @PostMapping
     @Override
-    public ApiResponse<UserV1Dto.UserResponse> register(@RequestBody UserV1Dto.RegisterRequest request) {
+    public ApiResponse<UserV1Dto.UserResponse> register(@Valid @RequestBody UserV1Dto.RegisterRequest request) {
         UserInfo info = userFacade.registerUser(
             request.userid(),
             request.password(),
@@ -43,7 +44,7 @@ public class UserV1Controller implements UserV1ApiSpec {
     @Override
     public ApiResponse<UserV1Dto.UserResponse> changePassword(
             @RequestHeader("X-Loopers-LoginId") String loginId,
-            @RequestBody UserV1Dto.ChangePasswordRequest request) {
+            @Valid @RequestBody UserV1Dto.ChangePasswordRequest request) {
         UserInfo info = userFacade.changePassword(loginId, request.newPassword());
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }

@@ -1,18 +1,20 @@
 package com.loopers.interfaces.api.user;
 
 import com.loopers.application.user.UserInfo;
+import jakarta.validation.constraints.NotBlank;
+
 public class UserV1Dto {
 
     public record RegisterRequest(
-        String userid,
-        String password,
-        String name,
-        String birthDay,
-        String email
+        @NotBlank(message = "아이디는 빈값이 들어올 수 없습니다.") String userid,
+        @NotBlank(message = "비밀번호는 빈값이 들어올 수 없습니다.") String password,
+        @NotBlank(message = "이름은 빈값이 들어올 수 없습니다.") String name,
+        @NotBlank(message = "생년월일은 빈값이 들어올 수 없습니다.") String birthDay,
+        @NotBlank(message = "이메일은 빈값이 들어올 수 없습니다.") String email
     ) {}
 
     public record ChangePasswordRequest(
-        String newPassword
+        @NotBlank(message = "비밀번호는 빈값이 들어올 수 없습니다.") String newPassword
     ) {}
 
     public record UserResponse(
