@@ -35,7 +35,7 @@
 
 ## 모듈 구조
 
-```
+```text
 loopers-java-spring-template/
 ├── apps/                        # 실행 가능한 Spring Boot 애플리케이션
 │   ├── commerce-api/            # REST API 서버 (Web MVC, Swagger)
@@ -61,7 +61,7 @@ loopers-java-spring-template/
 
 ### 모듈 의존 관계
 
-```
+```text
 commerce-api      → modules:jpa, modules:redis
                   → supports:jackson, supports:logging, supports:monitoring
 
@@ -76,7 +76,7 @@ commerce-streamer → modules:jpa, modules:redis, modules:kafka
 
 ## 애플리케이션 레이어 구조 (commerce-api 기준)
 
-```
+```text
 interfaces/api/          # Controller, Dto, ApiSpec (OpenAPI 인터페이스)
 application/             # Facade (유스케이스 조합), Info (응답 객체)
 domain/                  # Model (JPA Entity + 비즈니스 로직), Service, Repository 인터페이스

@@ -23,7 +23,7 @@ docker-compose -f ./docker/monitoring-compose.yml up
 - modules : 특정 구현이나 도메인에 의존적이지 않고, reusable 한 configuration 을 원칙으로 합니다.
 - supports : logging, monitoring 과 같이 부가적인 기능을 지원하는 add-on 모듈입니다.
 
-```
+```text
 Root
 ├── apps ( spring-applications )
 │   ├── 📦 commerce-api
