@@ -45,7 +45,7 @@ erDiagram
 
     stocks {
         bigint id PK
-        bigint product_option_id FK UK
+        bigint product_option_id FK
         int total_quantity
         int reserved_quantity
         datetime updated_at
@@ -86,7 +86,7 @@ erDiagram
 
     payments {
         bigint id PK
-        bigint order_id FK UK
+        bigint order_id FK
         varchar pg_transaction_id UK
         varchar status
         bigint amount
