@@ -1,208 +1,97 @@
-# 테스트 가이드
-
-## 테스트 피라미드
-
-```
-         /‾‾‾‾‾‾‾\
-        /   E2E   \       ← 적게, 핵심 시나리오만
-       /‾‾‾‾‾‾‾‾‾‾‾\
-      /   통합 테스트   \    ← 레이어 연결 검증
-     /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
-    /   단위 테스트    \   ← 많이, 빠르게
-   /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
-```
-
-| 계층 | 답하는 질문 |
-| --- | --- |
-| 단위 | "이 도메인 규칙/분기가 의도대로 동작하는가?" |
-| 통합 | "내 코드 + 프레임워크 + DB가 진짜 환경에서 맞물려 도는가?" |
-| E2E | "외부에서 본 API 계약(HTTP/JSON/Status)이 지켜지는가?" |
-
+---
+name: test-guide
+description: 테스트 케이스를 설계하고 작성할 때 이 프로젝트의 규칙과 설계 기법을 적용합니다.
 ---
 
-## 공통 작성 규칙
+테스트를 작성할 때 반드시 아래 흐름을 따른다.
 
-### AAA 패턴
+## 1단계 — 테스트 계층을 먼저 결정한다
 
-```
-Arrange (준비)  — 테스트에 필요한 입력/상태를 만든다
-Act     (실행)  — 검증하려는 메서드를 호출한다 (보통 한 줄)
-Assert  (검증)  — 결과 또는 상태 변화를 확인한다
-```
+테스트를 바로 작성하기 전에, 지금 작성하려는 테스트가 어느 계층인지 먼저 명시한다.
 
-### 테스트 명명 규칙 — `<기대결과>_when<조건>`
+| 계층 | 파일 패턴 | 검증 대상 |
+|---|---|---|
+| 단위 (Unit) | `domain/*ModelTest` | 도메인 규칙, 생성자 검증, 상태 변경 |
+| 통합 (Integration) | `domain/*ServiceIntegrationTest` | Service + Repository + 실제 DB |
+| E2E | `interfaces/api/*E2ETest` | HTTP 요청 전체 흐름 |
 
-```
-throwsBadRequest_whenEmailFormatIsInvalid()
-returnsMaskedName_whenLoginIdExists()
-throwsConflict_whenLoginIdAlreadyExists()
-```
+계층이 결정되면, 그 계층에 맞는 환경 설정을 사용한다:
+- 단위: 순수 JUnit, Spring 컨텍스트 없음, 테스트 더블 사용
+- 통합: `@SpringBootTest`, Testcontainers MySQL, `@AfterEach` DatabaseCleanUp
+- E2E: `@SpringBootTest(webEnvironment = RANDOM_PORT)`, `TestRestTemplate`
 
----
+## 2단계 — 테스트 케이스 설계 기법으로 케이스를 도출한다
 
-## 1. 단위 테스트 (Unit Test)
+테스트 메서드를 바로 작성하지 않는다. 먼저 아래 기법들을 적용해 **어떤 케이스를 테스트할지** 목록을 만든다.
 
-**파일 패턴:** `domain/*ModelTest`
+### 경계값 분석 (BVA)
+숫자/길이/날짜 제약이 있는 필드는 반드시 경계를 테스트한다.
+- 최솟값, 최솟값 -1, 최댓값, 최댓값 +1
+- 예: 비밀번호 8~20자 → 7자(실패), 8자(성공), 20자(성공), 21자(실패)
 
-- Spring 컨텍스트 없음 — 순수 JVM
-- DB / 네트워크 / 외부 의존성 없음
-- 테스트 더블로 모든 협력자를 대체
-- 빠름 (밀리초 단위)
+### 동등 클래스 분할 (ECP)
+같은 결과를 내는 입력끼리 묶고, 그룹당 대표값 하나만 테스트한다.
+- 유효 클래스 1개 + 무효 클래스 N개 도출
+- 예: 로그인 ID → 유효(`"user1"`), 형식 위반(`"user_1"`), 길이 초과(`"verylongid123"`)
+
+### 결정 테이블
+여러 조건이 조합되어 결과가 달라지는 경우 테이블로 정리한다.
+- 모든 조건 조합을 나열하고 누락 케이스를 먼저 찾는다.
+
+### 상태 전이 테스트
+이벤트 후 상태가 바뀌는 케이스는 전이 전/후를 모두 검증한다.
+- 예: 비밀번호 변경 → 구 비밀번호 401 확인 + 신 비밀번호 200 확인
+
+### 오류 추측 (Error Guessing)
+경험 기반으로 자주 발생하는 결함 패턴을 추가한다.
+- null, 빈 문자열, 공백만 있는 입력
+- 존재하지 않는 ID, 이미 삭제된 리소스
+- 중복 요청 (동시 가입 등)
+
+## 3단계 — AAA 패턴으로 테스트를 작성한다
+
+모든 테스트는 반드시 세 블록으로 구분해서 작성한다.
 
 ```java
-class UserModelTest {
-    @Test
-    void throwsBadRequest_whenEmailFormatIsInvalid() {
-        // arrange
-        String invalidEmail = "invalid-email";
-        // act
-        CoreException ex = assertThrows(CoreException.class, () ->
-            new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH, invalidEmail)
-        );
-        // assert
-        assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-    }
-}
+// arrange — 테스트에 필요한 입력/상태를 만든다
+// act     — 검증하려는 메서드를 호출한다 (보통 한 줄)
+// assert  — 결과 또는 상태 변화를 확인한다
 ```
 
-**무엇을 테스트하나**
-- 생성자의 유효성 검증 (null, 포맷 체크)
-- 도메인 상태 변경 메서드 (`changePassword()`, `update()` 등)
-- 도메인 규칙 위반 시 올바른 예외(`CoreException`) 발생
+여러 필드를 동시에 검증할 때는 `assertAll`을 사용한다.
 
----
+## 4단계 — 테스트 메서드 이름 규칙을 지킨다
 
-## 2. 통합 테스트 (Integration Test)
-
-**파일 패턴:** `domain/*ServiceIntegrationTest`
-
-- `@SpringBootTest` — Spring 컨텍스트 전체 로드
-- Testcontainers로 실제 MySQL 컨테이너
-- `@AfterEach` 에서 `DatabaseCleanUp.truncateAllTables()` 로 격리
-- 보통 (초 단위)
-
-```java
-@SpringBootTest
-class UserServiceIntegrationTest {
-    @Autowired private UserService userService;
-    @Autowired private DatabaseCleanUp databaseCleanUp;
-
-    @AfterEach
-    void tearDown() { databaseCleanUp.truncateAllTables(); }
-
-    @Test
-    void throwsConflict_whenLoginIdAlreadyExists() {
-        userService.register(new UserModel("testuser", ...));
-        CoreException ex = assertThrows(CoreException.class, () ->
-            userService.register(new UserModel("testuser", ...))
-        );
-        assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-    }
-}
+```
+<기대결과>_when<조건>
 ```
 
-**무엇을 테스트하나**
-- 비즈니스 로직이 실제 DB와 맞물려 의도대로 동작하는지
-- 중복 데이터, 조회 실패 등 DB 의존적 시나리오
-- 트랜잭션 경계 / `@Transactional` dirty checking
+예시:
+- `throwsBadRequest_whenEmailFormatIsInvalid`
+- `returnsOk_whenValidRequest`
+- `throwsConflict_whenLoginIdAlreadyExists`
+- `throwsUnauthorized_whenPasswordIsWrong`
+
+이름만 봐도 "어떤 입력에 어떤 결과가 나와야 하는지" 즉시 알 수 있어야 한다.
+
+## 5단계 — 테스트 더블 선택 기준을 따른다
+
+| 역할 | 언제 사용하나 | 방법 |
+|---|---|---|
+| **Stub** | 흐름 제어 — 특정 응답을 고정해야 할 때 | `when().thenReturn()` |
+| **Mock** | 호출 자체가 검증 대상일 때 | `verify(...)` |
+| **Spy** | 진짜 로직은 유지하면서 일부만 검증 | `@MockitoSpyBean` |
+| **Fake** | 실제 구현이 느리거나 비결정적일 때 | 직접 구현 |
+
+단위 테스트에서 협력자는 무조건 테스트 더블로 대체한다. 통합 테스트에서는 실제 빈을 사용하고 Spy만 제한적으로 허용한다.
+
+## 주의사항
+
+- 테스트 격리: 각 테스트는 독립적으로 실행되어야 한다. `@AfterEach`에서 `DatabaseCleanUp.truncateAllTables()` 를 반드시 호출한다.
+- 오버스펙 금지: 테스트가 요구하지 않은 로직을 구현에 미리 넣지 않는다.
+- Mock 남용 금지: E2E 테스트에서 Mock을 쓰면 통합 신뢰도가 깨진다. E2E는 실제 흐름 그대로 검증한다.
+- `println` 금지: 테스트 코드에 `System.out.println`을 남기지 않는다.
 
 ---
 
-## 3. E2E 테스트 (End-to-End Test)
-
-**파일 패턴:** `interfaces/api/*E2ETest`
-
-- `@SpringBootTest(webEnvironment = RANDOM_PORT)` — 실제 서버 포트
-- `TestRestTemplate` 으로 진짜 HTTP 요청 전송
-- 가장 느림 (수십 초)
-
-```java
-@SpringBootTest(webEnvironment = RANDOM_PORT)
-class UserV1ApiE2ETest {
-    @Autowired private TestRestTemplate testRestTemplate;
-
-    @Test
-    void returnsRegisteredUser_whenValidRequest() {
-        // arrange
-        UserV1Dto.RegisterRequest req = new UserV1Dto.RegisterRequest(...);
-        // act
-        ResponseEntity<ApiResponse<UserV1Dto.RegisterResponse>> response =
-            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(req), ...);
-        // assert
-        assertAll(
-            () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-            () -> assertThat(response.getBody().data().loginId()).isEqualTo("testuser")
-        );
-    }
-}
-```
-
-**무엇을 테스트하나**
-- API 경로, HTTP 메서드, 요청/응답 포맷 매핑
-- 잘못된 입력에 대한 HTTP 상태 코드 (400, 401, 409 등)
-- JSON 직렬화/역직렬화, 헤더 처리 (`X-Loopers-LoginId`)
-- ApiControllerAdvice가 도메인 예외를 올바른 status로 변환하는지
-
----
-
-## 테스트 더블 (Test Doubles)
-
-| 역할 | 목적 | 사용 방식 |
-| --- | --- | --- |
-| **Dummy** | 자리만 채움 (사용되지 않음) | 인자에 그냥 넘김 |
-| **Stub** | 고정된 응답 제공 (상태 기반) | `when().thenReturn()` |
-| **Mock** | 호출 여부/횟수 검증 (행위 기반) | `verify(...)` |
-| **Spy** | 진짜 객체 감싸기 + 일부 조작 | `spy()`, `@MockitoSpyBean` |
-| **Fake** | 실제처럼 동작하는 가짜 구현체 | 직접 클래스 구현 |
-
-> `Mockito.mock()`은 **도구**, `Mock`은 테스트 더블 5형제 중 **역할(개념)**. 한 mock 객체에 Stub과 Mock 역할을 동시에 부여할 수 있다.
-
----
-
-## TDD 진행 (Red → Green → Refactor)
-
-| 단계 | 목표 | 만들어야 하는 것 | 만들면 안 되는 것 |
-| --- | --- | --- | --- |
-| **RED** | 실패하는 테스트 1개 작성 | 컴파일될 정도의 최소 스켈레톤 | 검증 로직, 비즈니스 규칙 |
-| **GREEN** | 그 테스트만 통과시키기 | 테스트를 통과시킬 최소 코드 | 미래 테스트를 위한 코드 |
-| **REFACTOR** | 중복 제거 / 가독성 개선 | 없음 (구조만 정리) | 새로운 기능, 새로운 검증 |
-
-### 계층별 RED 직전 준비물
-
-**단위 테스트 (Model):**
-- `domain/<도메인>Model.java` — 필드 + 생성자 (검증 로직 없이)
-
-**통합 테스트 (Service):**
-- `domain/<도메인>Repository.java` (인터페이스)
-- `infrastructure/<도메인>JpaRepository.java`
-- `infrastructure/<도메인>RepositoryImpl.java`
-- `domain/<도메인>Service.java` (메서드 시그니처만)
-
-**E2E 테스트 (API):**
-- `interfaces/api/<도메인>V1Dto.java`
-- `interfaces/api/<도메인>V1ApiSpec.java`
-- `interfaces/api/<도메인>V1Controller.java` (빈 메서드)
-- `application/<도메인>Facade.java` (시그니처만)
-- `application/<도메인>Info.java`
-
-### 체크리스트
-
-- [ ] **RED 시작 전**: 스켈레톤이 "테스트 컴파일을 위한 최소한"인가? 검증 로직을 미리 넣지 않았는가?
-- [ ] **RED 확인**: 정말 실패하는가? (`AssertionError` / 예외 미발생 등)
-- [ ] **GREEN 시작 전**: 추가하는 코드가 "이 테스트를 통과시키는 데 꼭 필요한" 코드인가?
-- [ ] **GREEN 확인**: 이전 모든 테스트도 여전히 통과하는가?
-- [ ] **REFACTOR 확인**: 리팩토링 후에도 모든 테스트가 통과하는가? 새 기능을 끼워넣지 않았는가?
-
----
-
-## 비교 요약
-
-| | 단위 테스트 | 통합 테스트 | E2E 테스트 |
-|---|---|---|---|
-| **파일 패턴** | `*ModelTest` | `*ServiceIntegrationTest` | `*E2ETest` |
-| **검증 범위** | Model 클래스 1개 | Service + Repository + DB | HTTP → DB 전체 |
-| **Spring 컨텍스트** | ❌ | ✅ | ✅ |
-| **실제 DB** | ❌ | ✅ Testcontainers | ✅ Testcontainers |
-| **실제 HTTP** | ❌ | ❌ | ✅ TestRestTemplate |
-| **속도** | 빠름 (ms) | 보통 (수 초) | 느림 (수십 초) |
-| **테스트 더블** | 적극 사용 (Fake / Stub) | 제한적 (Spy 정도) | 거의 안 씀 |
+테스트 케이스 목록을 먼저 제안하고, 개발자의 확인 후 코드를 작성한다.
