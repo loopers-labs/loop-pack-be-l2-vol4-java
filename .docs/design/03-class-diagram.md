@@ -37,9 +37,12 @@ classDiagram
         +Long price
         +int stock
         +String description
+        +Long likeCount
         +ProductModel(brand, name, price, stock, description)
         +update(name, price, stock, description) void
         +decrementStock(quantity) void
+        +likeAdded() void
+        +likeRemoved() void
     }
 
     class LikeModel {
@@ -94,7 +97,25 @@ classDiagram
 ### LikeModel — 복합 유니크 제약
 `userId + productId` 조합에 유니크 제약을 걸어 DB 레벨에서도 중복 좋아요를 방지한다.
 
-### [미결] 좋아요 수(likeCount) 저장 방식
-상품 목록·상세에 좋아요 수 표시, `likes_desc` 정렬 지원이 필요하다. 두 가지 선택지가 있다.
-- **집계 쿼리**: `LikeModel`을 COUNT로 집계. 구현이 단순하지만 정렬 시 성능 부담
-- **역정규화 필드**: `ProductModel`에 `likeCount` 필드 추가. 정렬 성능은 좋지만 좋아요 등록·취소마다 업데이트가 필요하고 동시성 처리가 복잡해짐
+### ProductModel — likeCount 역정규화
+`likes_desc` 정렬을 집계 쿼리로 처리하면 페이지마다 `GROUP BY` + `COUNT` 조합이 발생해 성능 보장이 어렵다. `ProductModel`에 `likeCount` 필드를 역정규화하고, 좋아요 등록·취소 시 `like_count = like_count ± 1` 형태의 DB 원자 UPDATE로 처리한다. 이렇게 하면 동시성 문제 없이 `ORDER BY like_count DESC` 단순 인덱스 정렬이 가능하다. 메서드명은 구현 방식이 아닌 도메인 이벤트를 기준으로 `likeAdded()` / `likeRemoved()`로 명명한다.
+
+### OrderModel — 주문 총액은 집계 쿼리
+주문 항목 수는 수십 개 수준이므로 `SUM(price * quantity)` 집계 부담이 크지 않다. 총액은 추후 결제 도메인 추가 시 계산 방식이 달라질 수 있어 지금 역정규화하지 않는다.
+
+### [미결] LikeModel — 좋아요 취소 시 소프트 딜리트 vs 하드 딜리트
+`LikeModel`은 `userId + productId` 유니크 제약이 있다. 소프트 딜리트(deletedAt 설정)로 취소하면 레코드가 DB에 남아있으므로, 동일 상품에 재좋아요 시 INSERT가 유니크 제약을 위반한다. 두 가지 선택지가 있다.
+- **하드 딜리트**: 취소 시 레코드를 실제로 삭제. 유니크 제약 문제가 없고 구현이 단순하다. 요구사항에 좋아요 이력 조회가 없으므로 이력 손실은 무방하다.
+- **소프트 딜리트 + `restore()`**: 재좋아요 시 기존 deletedAt 레코드를 `restore()`로 복원. 이력은 보존되지만 좋아요 등록 로직에 "INSERT 또는 restore?" 분기가 필요하다.
+
+---
+
+## 결정 간 연관성
+
+### likeCount 역정규화 ↔ LikeModel 삭제 방식
+likeCount를 역정규화했으므로 좋아요 등록·취소 시 `likeAdded()` / `likeRemoved()`를 반드시 함께 호출해야 한다. 삭제 방식에 따라 호출 구조가 달라진다.
+- **하드 딜리트 선택 시**: `DELETE like` + `likeRemoved()` — 명확하고 단순
+- **소프트 딜리트 선택 시**: `delete()` 시 `likeRemoved()`, `restore()` 시 `likeAdded()` — BaseEntity가 likeCount를 모르므로 Service에서 두 동작을 항상 짝으로 챙겨야 하며, 누락 시 likeCount 정합성이 깨진다
+
+### likeCount 역정규화 ↔ decrementStock 비관적 락
+둘 다 `ProductModel`의 같은 row를 업데이트한다. 주문(`SELECT ... FOR UPDATE`)과 좋아요(`UPDATE like_count = like_count ± 1`)가 같은 상품에 동시에 발생하면 likeCount UPDATE가 락 해제를 기다려야 한다. 기능상 문제는 없지만 주문이 많은 상품일수록 좋아요 응답도 같이 느려질 수 있다.
