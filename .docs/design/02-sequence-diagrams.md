@@ -164,3 +164,58 @@ sequenceDiagram
 **읽는 포인트**
 - 스케줄러는 조회와 위임만 한다. 실제 재고 해제는 StockService, 상태 전이는 OrderService가 책임진다.
 - 만료 기준은 주문 생성 시간 기준으로 설정한다. (ex. 생성 후 30분 초과 PENDING)
+
+---
+
+## 5. 주문 취소 (DELETE /api/v1/orders/{id})
+
+**목적**: CONFIRMED 상태 주문 취소 시 PG 결제 취소 → 재고 복구 → 포인트 환불의 처리 순서와 각 서비스의 책임을 검증한다.
+**검증 포인트**: 세 작업이 단일 트랜잭션으로 묶이는 것, 외부 PG 취소 실패 시 전체 롤백되는 것.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API
+    participant OrderFacade
+    participant OrderService
+    participant PGClient
+    participant ExternalPG
+    participant StockService
+    participant PointService
+
+    User->>API: DELETE /api/v1/orders/{id}
+    API->>OrderFacade: cancelOrder(userId, orderId)
+
+    OrderFacade->>OrderService: findOrder(orderId)
+    OrderService-->>OrderFacade: Order
+
+    alt CONFIRMED 상태가 아님
+        OrderFacade-->>API: CoreException(INVALID_ORDER_STATUS)
+        API-->>User: 400 Bad Request
+    end
+
+    Note over OrderFacade, PointService: 단일 트랜잭션 시작
+
+    OrderFacade->>PGClient: cancelPayment(pgTransactionId)
+    PGClient->>ExternalPG: 결제 취소 요청
+    ExternalPG-->>PGClient: 취소 완료
+    PGClient-->>OrderFacade: ok
+
+    OrderFacade->>StockService: restoreStock(productId, qty)
+    Note over StockService: total_quantity += qty
+
+    OrderFacade->>PointService: refundPoint(userId, pointAmount)
+    Note over PointService: UPDATE users SET point = point + pointAmount<br/>point_histories INSERT (REFUND, +amount)
+
+    OrderFacade->>OrderService: updateStatus(orderId, CANCELLED)
+
+    Note over OrderFacade, PointService: 트랜잭션 커밋
+
+    OrderFacade-->>API: ok
+    API-->>User: 200 OK
+```
+
+**읽는 포인트**
+- PG 취소를 가장 먼저 호출한다. 외부 시스템 취소가 실패하면 재고/포인트를 건드리지 않고 전체 롤백한다.
+- 포인트 환불은 `point_histories`에 `type=REFUND`로 INSERT되어 이력이 남는다.
+- 취소 가능 상태는 CONFIRMED만 해당한다. PENDING/FAILED/CANCELLED 주문은 취소 요청 시 400을 반환한다.

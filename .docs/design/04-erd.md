@@ -57,6 +57,11 @@ erDiagram
         bigint total_amount
         bigint point_amount
         bigint pg_amount
+        varchar receiver_name
+        varchar receiver_phone
+        varchar zip_code
+        varchar address
+        varchar detail_address
         datetime created_at
     }
 
@@ -64,6 +69,7 @@ erDiagram
         bigint id PK
         bigint order_id FK
         bigint product_id FK
+        varchar product_name
         int quantity
         bigint price
     }
@@ -128,16 +134,18 @@ erDiagram
 - 멱등 토글: 존재하면 DELETE, 없으면 INSERT
 
 ### orders
-- `status`: PENDING / CONFIRMED / FAILED
+- `status`: PENDING / CONFIRMED / FAILED / CANCELLED
 - `total_amount`: 총 결제 금액 (point_amount + pg_amount)
 - `point_amount`: 포인트로 결제한 금액
 - `pg_amount`: PG로 결제한 금액
+- 배송지 컬럼 (`receiver_name`, `receiver_phone`, `zip_code`, `address`, `detail_address`): 주문 시점 스냅샷
 - `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준으로 만료 판단)
 - 인덱스: `(status, created_at)` → 스케줄러의 만료 PENDING 주문 조회 성능 보장
 
 ### order_items
-- 주문 시점의 가격(`price`) 스냅샷 저장
-- 상품 가격이 변경되어도 주문 이력에 영향 없음
+- 주문 생성 시점에 INSERT되는 라인 아이템 테이블
+- `product_name`: 당시 상품명 스냅샷 → 상품명 변경/삭제 후에도 주문 이력 보존
+- `price`: 당시 단가 스냅샷 → 상품 가격 변경 후에도 주문 이력 보존
 
 ### payments
 - `order_id`: UK — 주문당 결제 1건 (재시도 없음)
@@ -146,8 +154,8 @@ erDiagram
 
 ### point_histories
 - append-only 이력 테이블
-- `type`: EARN (적립) / USE (사용)
-- `amount`: 양수(적립) / 음수(사용)
+- `type`: EARN (적립) / USE (사용) / REFUND (환불)
+- `amount`: 양수(적립/환불) / 음수(사용)
 - `order_id`: 주문으로 인한 포인트 변경 추적
 
 ## 제약 조건 요약
