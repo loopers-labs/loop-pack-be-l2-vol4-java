@@ -36,11 +36,12 @@ class UserV1ApiE2ETest {
     }
 
     private void registerDefaultUser() {
-        testRestTemplate.exchange(
+        ResponseEntity<ApiResponse<UserV1Dto.RegisterResponse>> response = testRestTemplate.exchange(
             ENDPOINT_REGISTER, HttpMethod.POST,
             new HttpEntity<>(UserFixture.createRequest()),
             new ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterResponse>>() {}
         );
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Autowired
@@ -209,12 +210,13 @@ class UserV1ApiE2ETest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("올바른 인증 헤더와 유효한 새 비밀번호로 변경 시, 200 을 반환한다.")
+        @DisplayName("올바른 인증 헤더와 유효한 새 비밀번호로 변경 시, 200 을 반환하고 인증 상태가 전이된다.")
         @Test
         void returnsOk_whenValidRequest() {
             // arrange
             registerDefaultUser();
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("NewPass@99");
+            String newPassword = "NewPass@99";
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(newPassword);
 
             // act — X-Loopers-LoginId + X-Loopers-LoginPw 헤더로 인증, 바디에 새 비밀번호
             ResponseEntity<ApiResponse<Void>> response =
@@ -224,8 +226,29 @@ class UserV1ApiE2ETest {
                     new ParameterizedTypeReference<>() {}
                 );
 
-            // assert
+            // assert — 변경 성공
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+            // assert — 구 비밀번호로 인증 시 401
+            ResponseEntity<ApiResponse<Void>> oldPwResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(authHeaders()),
+                    new ParameterizedTypeReference<>() {}
+                );
+            assertThat(oldPwResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+            // assert — 신 비밀번호로 인증 시 200
+            HttpHeaders newHeaders = new HttpHeaders();
+            newHeaders.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
+            newHeaders.set("X-Loopers-LoginPw", newPassword);
+            ResponseEntity<ApiResponse<Void>> newPwResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_MY_INFO, HttpMethod.GET,
+                    new HttpEntity<>(newHeaders),
+                    new ParameterizedTypeReference<>() {}
+                );
+            assertThat(newPwResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
         @DisplayName("X-Loopers-LoginPw 헤더 누락 시, 400 을 반환한다.")
