@@ -19,8 +19,8 @@ class UserServiceUnitTest {
     private UserService sut;
 
     private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "dlaxodid1!";
-    private final String NEW_PASSWORD = "dlaxodid2!";
+    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
+    private final String NEW_PASSWORD     = "Dlaxodid2!";
     private final String DEFAULT_NAME     = "홍길동";
     private final String DEFAULT_BIRTHDAY = "1990-01-01";
     private final String DEFAULT_EMAIL    = "test@test.com";

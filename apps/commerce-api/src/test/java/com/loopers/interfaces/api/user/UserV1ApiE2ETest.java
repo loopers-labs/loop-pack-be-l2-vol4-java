@@ -39,13 +39,13 @@ class UserV1ApiE2ETest {
     private DatabaseCleanUp databaseCleanUp;
 
     private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "dlaxodid1!";
+    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
     private final String DEFAULT_NAME     = "홍길동";
     private final String DEFAULT_BIRTHDAY = "1990-01-01";
     private final String DEFAULT_EMAIL    = "test@test.com";
 
     private final String MASKING_NAME = "홍길*";
-    private final String NEW_PASSWORD = "dlaxodid2!";
+    private final String NEW_PASSWORD = "Dlaxodid2!";
 
     @AfterEach
     void tearDown() {
@@ -123,6 +123,25 @@ class UserV1ApiE2ETest {
             assertThat(response.getBody().data().userid()).isEqualTo(DEFAULT_USERID);
         }
 
+        @DisplayName("필수 필드가 null이면, 400 BAD_REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenRequiredFieldIsNull() {
+            // arrange
+            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
+                null, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL
+            );
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                    testRestTemplate.exchange("/api/v1/users", HttpMethod.POST, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
         @DisplayName("이미 사용 중인 아이디로 가입하면, 409 CONFLICT를 반환한다.")
         @Test
         void returnsConflict_whenUseridAlreadyExists() {
@@ -166,6 +185,24 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).isNotNull();
             assertThat(response.getBody().data().userid()).isEqualTo(DEFAULT_USERID);
+        }
+
+        @DisplayName("새 비밀번호가 null이면, 400 BAD_REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNewPasswordIsNull() {
+            // arrange
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(null);
+            HttpHeaders headers = authHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+                    testRestTemplate.exchange("/api/v1/users/password", HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
         @DisplayName("현재 비밀번호와 동일한 비밀번호로 요청하면, 400 BAD_REQUEST를 반환한다.")

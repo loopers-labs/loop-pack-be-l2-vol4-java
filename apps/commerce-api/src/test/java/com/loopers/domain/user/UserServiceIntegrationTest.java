@@ -1,17 +1,24 @@
 package com.loopers.domain.user;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-@ActiveProfiles("test")
 class UserServiceIntegrationTest {
 
     @Autowired
@@ -25,12 +32,12 @@ class UserServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    private final String DEFAULT_USERID       = "user1";
-    private final String DEFAULT_PASSWORD     = "dlaxodid1!";
-    private final String NEW_PASSWORD = "dlaxodid2!";
-    private final String DEFAULT_NAME         = "홍길동";
-    private final String DEFAULT_BIRTHDAY     = "1990-01-01";
-    private final String DEFAULT_EMAIL        = "test@test.com";
+    private final String DEFAULT_USERID   = "user1";
+    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
+    private final String NEW_PASSWORD     = "Dlaxodid2!";
+    private final String DEFAULT_NAME     = "홍길동";
+    private final String DEFAULT_BIRTHDAY = "1990-01-01";
+    private final String DEFAULT_EMAIL    = "test@test.com";
 
     @AfterEach
     void tearDown() {
@@ -50,6 +57,58 @@ class UserServiceIntegrationTest {
             // assert
             assertThat(result.getUserid()).isEqualTo(DEFAULT_USERID);
         }
+
+        @DisplayName("동시에 같은 아이디로 회원가입하면, 한 명만 성공한다.")
+        @Test
+        void onlyOneSucceeds_whenConcurrentRegistrationWithSameUserid() throws InterruptedException {
+            // act
+            int successCount = runConcurrent(5, () ->
+                    userService.register(DEFAULT_USERID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL)
+            );
+
+            // assert
+            assertThat(successCount).isEqualTo(1);
+        }
+
+        @DisplayName("이미 존재하는 아이디로 가입하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenUseridAlreadyExists() {
+            // arrange
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.register(DEFAULT_USERID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    private int runConcurrent(int threadCount, Runnable task) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    task.run();
+                    successCount.incrementAndGet();
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        doneLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+        return successCount.get();
     }
 
     @DisplayName("회원조회 시,")
@@ -86,6 +145,36 @@ class UserServiceIntegrationTest {
             // assert
             UserModel saved = userRepository.findByUserid(DEFAULT_USERID).get();
             assertThat(passwordEncoder.matches(NEW_PASSWORD, saved.getPassword())).isTrue();
+        }
+
+        @DisplayName("형식에 맞지 않는 비밀번호로 변경하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordFormatIsInvalid() {
+            // arrange
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(DEFAULT_USERID, "weakpassword")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("현재 비밀번호와 동일한 비밀번호로 변경하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
+            // arrange
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.changePassword(DEFAULT_USERID, DEFAULT_PASSWORD)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }

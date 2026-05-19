@@ -18,12 +18,12 @@ class UserModelTest {
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "dlaxodid1!";
+    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
     private final String DEFAULT_NAME     = "홍길동";
     private final String DEFAULT_BIRTHDAY = "1990-01-01";
     private final String DEFAULT_EMAIL    = "test@test.com";
 
-    private final String NEW_PASSWORD     = "dlaxodid2!";
+    private final String NEW_PASSWORD     = "Dlaxodid2!";
 
     private static final String BLANK      = "";
     private static final String SPACE      = " ";
@@ -76,16 +76,21 @@ class UserModelTest {
             }
         }
 
-        @DisplayName("비밀번호가 8~16자의 영문 대소문자, 숫자, 특수문자를 포함하지 않으면,")
+        @DisplayName("비밀번호 사용에서 ")
         @Nested
         class PasswordFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
             @ValueSource(strings = {
+                    BLANK,
+                    SPACE,
                     "abc1",                    // 8자 미만
                     "toolongpassword12345!",   // 16자 초과
                     "한글포함패스워드",           // 허용 문자 외
+                    "dlaxodidAA!",             // 숫자 없음
+                    "Dlaxodid11",              // 특수문자 없음
+                    "12345678!!",              // 영문 없음
             })
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("8~16자의 영문 대소문자, 숫자, 특수문자를 포함하지 않으면 BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenPasswordFormatIsInvalid(String invalidPassword) {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
@@ -97,11 +102,11 @@ class UserModelTest {
             }
 
             @Test
-            @DisplayName("비밀번호에 생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
+            @DisplayName("생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenPasswordContainsBirthday() {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
-                        UserModel.validatePassword("19900101abc!", DEFAULT_BIRTHDAY)
+                        UserModel.validatePassword("19900101Abc!", DEFAULT_BIRTHDAY)
                 );
 
                 // assert
@@ -114,6 +119,8 @@ class UserModelTest {
         class BirthDayFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
             @ValueSource(strings = {
+                    BLANK,
+                    SPACE,
                     "1998-04",                   // 형식 안맞음
                     "19980410",               // 형식 안맞음
             })
@@ -134,8 +141,10 @@ class UserModelTest {
         class EmailFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
             @ValueSource(strings = {
+                    BLANK,
+                    SPACE,
                     "test",                   // 형식 안맞음
-                    "test1234",               // 형식 안맞음
+                    "test1234@",               // 형식 안맞음
             })
             @DisplayName("BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenEmailFormatIsInvalid(String invalidEmail) {
