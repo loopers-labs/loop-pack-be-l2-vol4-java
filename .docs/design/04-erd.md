@@ -133,6 +133,7 @@ erDiagram
 - `point_amount`: 포인트로 결제한 금액
 - `pg_amount`: PG로 결제한 금액
 - `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준으로 만료 판단)
+- 인덱스: `(status, created_at)` → 스케줄러의 만료 PENDING 주문 조회 성능 보장
 
 ### order_items
 - 주문 시점의 가격(`price`) 스냅샷 저장
@@ -158,3 +159,9 @@ erDiagram
 | likes.(user_id, product_id) | 복합 UNIQUE | 중복 좋아요 방지 |
 | payments.order_id | UNIQUE | 주문당 결제 1건 |
 | payments.pg_transaction_id | UNIQUE | PG 트랜잭션 중복 방지 |
+
+## 인덱스 요약
+
+| 테이블 | 인덱스 | 목적 |
+|---|---|---|
+| orders | `(status, created_at)` | 스케줄러의 만료 PENDING 주문 조회 풀스캔 방지 |
