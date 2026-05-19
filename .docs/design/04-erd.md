@@ -20,6 +20,7 @@
   |{  →  1개 이상 (반드시 존재)
 ```
 
+
 ## 다이어그램
 
 ```mermaid
@@ -119,18 +120,18 @@ erDiagram
         datetime created_at
     }
 
-    users ||--o{ orders : ""
-    users ||--o{ likes : ""
-    users ||--o{ point_histories : ""
-    brands ||--o{ products : ""
-    products ||--o{ product_options : ""
-    product_options ||--|| stocks : ""
-    products ||--o{ likes : ""
-    products ||--o{ order_items : ""
-    product_options ||--o{ order_items : ""
-    orders ||--o{ order_items : ""
-    orders ||--o| payments : ""
-    orders ||--o{ point_histories : ""
+    users ||--o{ orders : "회원은 주문을 여러 개 할 수 있다"
+    users ||--o{ likes : "회원은 좋아요를 여러 개 누를 수 있다"
+    users ||--o{ point_histories : "회원의 포인트 변경 이력"
+    brands ||--o{ products : "브랜드는 상품을 여러 개 가진다"
+    products ||--o{ product_options : "상품은 옵션을 1개 이상 가진다"
+    product_options ||--|| stocks : "옵션당 재고는 반드시 1개"
+    products ||--o{ likes : "상품은 좋아요를 여러 개 받을 수 있다"
+    products ||--o{ order_items : "상품은 여러 주문에 담길 수 있다"
+    product_options ||--o{ order_items : "옵션 단위로 주문에 담긴다"
+    orders ||--o{ order_items : "주문은 상품을 1개 이상 포함한다"
+    orders ||--o| payments : "주문당 결제는 최대 1건"
+    orders ||--o{ point_histories : "주문으로 인한 포인트 변경 이력"
 ```
 
 ## 테이블 설계 상세
