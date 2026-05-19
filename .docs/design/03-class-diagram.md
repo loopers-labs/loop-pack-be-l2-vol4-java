@@ -103,19 +103,31 @@ classDiagram
 ### OrderModel — 주문 총액은 집계 쿼리
 주문 항목 수는 수십 개 수준이므로 `SUM(price * quantity)` 집계 부담이 크지 않다. 총액은 추후 결제 도메인 추가 시 계산 방식이 달라질 수 있어 지금 역정규화하지 않는다.
 
-### [미결] LikeModel — 좋아요 취소 시 소프트 딜리트 vs 하드 딜리트
-`LikeModel`은 `userId + productId` 유니크 제약이 있다. 소프트 딜리트(deletedAt 설정)로 취소하면 레코드가 DB에 남아있으므로, 동일 상품에 재좋아요 시 INSERT가 유니크 제약을 위반한다. 두 가지 선택지가 있다.
-- **하드 딜리트**: 취소 시 레코드를 실제로 삭제. 유니크 제약 문제가 없고 구현이 단순하다. 요구사항에 좋아요 이력 조회가 없으므로 이력 손실은 무방하다.
-- **소프트 딜리트 + `restore()`**: 재좋아요 시 기존 deletedAt 레코드를 `restore()`로 복원. 이력은 보존되지만 좋아요 등록 로직에 "INSERT 또는 restore?" 분기가 필요하다.
+### LikeModel — 좋아요 취소 시 하드 딜리트
+좋아요 취소 시 레코드를 실제로 삭제한다. `userId + productId` 유니크 제약과 충돌 없이 재좋아요가 가능하고 구현이 단순하다. 요구사항에 좋아요 이력 조회가 없으므로 이력 손실은 무방하다. likeCount 연동도 `DELETE like` + `likeRemoved()` 한 쌍으로 처리된다.
 
 ---
 
 ## 결정 간 연관성
 
-### likeCount 역정규화 ↔ LikeModel 삭제 방식
-likeCount를 역정규화했으므로 좋아요 등록·취소 시 `likeAdded()` / `likeRemoved()`를 반드시 함께 호출해야 한다. 삭제 방식에 따라 호출 구조가 달라진다.
-- **하드 딜리트 선택 시**: `DELETE like` + `likeRemoved()` — 명확하고 단순
-- **소프트 딜리트 선택 시**: `delete()` 시 `likeRemoved()`, `restore()` 시 `likeAdded()` — BaseEntity가 likeCount를 모르므로 Service에서 두 동작을 항상 짝으로 챙겨야 하며, 누락 시 likeCount 정합성이 깨진다
+### likeCount 역정규화 ↔ LikeModel 하드 딜리트
+하드 딜리트로 결정했으므로 `DELETE like` + `likeRemoved()` 한 쌍으로 처리된다. likeCount 정합성 관리가 단순하다.
 
 ### likeCount 역정규화 ↔ decrementStock 비관적 락
 둘 다 `ProductModel`의 같은 row를 업데이트한다. 주문(`SELECT ... FOR UPDATE`)과 좋아요(`UPDATE like_count = like_count ± 1`)가 같은 상품에 동시에 발생하면 likeCount UPDATE가 락 해제를 기다려야 한다. 기능상 문제는 없지만 주문이 많은 상품일수록 좋아요 응답도 같이 느려질 수 있다.
+
+---
+
+## 소프트 딜리트로 변경 시 수정 사항
+
+### 클래스 다이어그램
+- LikeModel 취소 시 `delete()` 호출 (deletedAt 설정)
+- 재좋아요 시 `restore()`로 기존 deleted 레코드 복원
+
+### ERD
+- `likes` 테이블에 `deleted_at` 컬럼 유지
+- `(user_id, product_id)` 유니크 제약이 soft-deleted 레코드와 충돌한다. MySQL은 partial unique index를 지원하지 않으므로 DB 레벨 단순 유니크 제약 대신 애플리케이션 레벨에서 중복 검증을 처리해야 한다.
+
+### Service 로직
+- 좋아요 등록 시: 기존 deleted 레코드 존재 여부 확인 후 `restore()` 또는 신규 INSERT 분기 필요
+- likeCount 연동: `delete()` 시 `likeRemoved()`, `restore()` 시 `likeAdded()` 명시적 호출 필요. BaseEntity가 likeCount를 모르므로 Service에서 항상 짝으로 챙겨야 하며, 누락 시 정합성이 깨진다.
