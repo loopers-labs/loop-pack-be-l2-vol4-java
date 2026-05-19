@@ -30,13 +30,23 @@ classDiagram
         +String name
         +Long price
         +String description
+        +Long likeCount
         +Brand brand
+        +List~ProductOption~ options
+    }
+
+    class ProductOption {
+        +Long id
+        +Long productId
+        +String optionName
+        +Long additionalPrice
         +Stock stock
+        +actualPrice() Long
     }
 
     class Stock {
         +Long id
-        +Long productId
+        +Long productOptionId
         +int totalQuantity
         +int reservedQuantity
         +availableQuantity() int
@@ -67,6 +77,9 @@ classDiagram
         +Long id
         +Long orderId
         +Long productId
+        +Long productOptionId
+        +String productName
+        +String optionName
         +int quantity
         +Long price
     }
@@ -87,13 +100,6 @@ classDiagram
         +Long amount
     }
 
-    class OrderStatus {
-        <<enumeration>>
-        PENDING
-        CONFIRMED
-        FAILED
-    }
-
     class PaymentStatus {
         <<enumeration>>
         SUCCESS
@@ -104,10 +110,20 @@ classDiagram
         <<enumeration>>
         EARN
         USE
+        REFUND
+    }
+
+    class OrderStatus {
+        <<enumeration>>
+        PENDING
+        CONFIRMED
+        FAILED
+        CANCELLED
     }
 
     Product --> Brand
-    Product --> Stock
+    Product --> ProductOption
+    ProductOption --> Stock
     Order --> OrderItem
     Order --> OrderStatus
     Order --> Payment
@@ -129,8 +145,11 @@ classDiagram
 - 독립 엔티티. 상품이 Brand를 참조하는 방향
 - 브랜드 정보 변경이 상품에 영향을 주지 않도록 분리
 
-### Product / Stock
-- Stock은 Product와 1:1 관계
+### Product / ProductOption / Stock
+- Product는 ProductOption을 1:N으로 가짐
+- 옵션 없는 상품은 `optionName = "기본"`, `additionalPrice = 0` 인 옵션 1개 자동 생성
+- `actualPrice() = product.price + additionalPrice`
+- Stock은 ProductOption과 1:1 관계 (옵션당 재고 1개)
 - 재고 상태 변경(`reserve`, `confirm`, `release`)은 Stock이 단독으로 책임
 - `availableQuantity() = totalQuantity - reservedQuantity`
 
@@ -139,8 +158,8 @@ classDiagram
 - 토글 동작은 LikeFacade가 조회 후 분기
 
 ### Order / OrderItem
-- Order가 상태 전이 메서드(`confirm`, `fail`)를 직접 보유
-- OrderItem은 주문 시점의 가격을 스냅샷으로 저장 (상품 가격 변경에 영향 없음)
+- Order가 상태 전이 메서드(`confirm`, `fail`, `cancel`)를 직접 보유
+- OrderItem은 주문 시점의 상품명, 옵션명, 가격을 스냅샷으로 저장
 
 ### Payment
 - PG 트랜잭션 ID와 결제 상태를 보관
@@ -148,7 +167,7 @@ classDiagram
 
 ### PointHistory
 - append-only 이력 테이블
-- `type = USE` → 차감, `type = EARN` → 적립
+- `type = USE` → 차감, `type = EARN` → 적립, `type = REFUND` → 취소 환불
 
 ## 의존 방향 원칙
 - 상위 도메인(Order, Payment)이 하위 도메인(Stock, Point)을 참조하는 방향

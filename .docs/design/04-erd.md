@@ -35,9 +35,17 @@ erDiagram
         datetime created_at
     }
 
+    product_options {
+        bigint id PK
+        bigint product_id FK
+        varchar option_name
+        bigint additional_price
+        datetime created_at
+    }
+
     stocks {
         bigint id PK
-        bigint product_id FK UK
+        bigint product_option_id FK UK
         int total_quantity
         int reserved_quantity
         datetime updated_at
@@ -69,7 +77,9 @@ erDiagram
         bigint id PK
         bigint order_id FK
         bigint product_id FK
+        bigint product_option_id FK
         varchar product_name
+        varchar option_name
         int quantity
         bigint price
     }
@@ -96,9 +106,11 @@ erDiagram
     users ||--o{ likes : ""
     users ||--o{ point_histories : ""
     brands ||--o{ products : ""
-    products ||--|| stocks : ""
+    products ||--o{ product_options : ""
+    product_options ||--|| stocks : ""
     products ||--o{ likes : ""
     products ||--o{ order_items : ""
+    product_options ||--o{ order_items : ""
     orders ||--o{ order_items : ""
     orders ||--o| payments : ""
     orders ||--o{ point_histories : ""
@@ -122,8 +134,13 @@ erDiagram
   - 정합성 보정: 주기적 배치로 `COUNT(*) FROM likes` 와 동기화
 - 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
 
+### product_options
+- `option_name`: 옵션명 (ex. "기본", "흰색/S", "검정/M")
+- `additional_price`: 옵션 추가금액 (기본 0원). 실제 가격 = `products.price + additional_price`
+- 옵션 없는 상품은 `option_name = "기본"`, `additional_price = 0` 인 옵션 1개 자동 생성
+
 ### stocks
-- `product_id`: UK — 상품당 재고 1개
+- `product_option_id`: UK — 옵션당 재고 1개 (product_id → product_option_id로 변경)
 - `total_quantity`: 실제 보유 재고 (결제 확정 시 차감)
 - `reserved_quantity`: 예약 중인 수량 (주문 생성 시 증가)
 - 가용 재고 = `total_quantity - reserved_quantity`
@@ -144,8 +161,9 @@ erDiagram
 
 ### order_items
 - 주문 생성 시점에 INSERT되는 라인 아이템 테이블
-- `product_name`: 당시 상품명 스냅샷 → 상품명 변경/삭제 후에도 주문 이력 보존
-- `price`: 당시 단가 스냅샷 → 상품 가격 변경 후에도 주문 이력 보존
+- `product_name`: 당시 상품명 스냅샷
+- `option_name`: 당시 옵션명 스냅샷 (ex. "기본", "흰색/S")
+- `price`: 당시 단가 스냅샷 (`products.price + additional_price` 계산값)
 
 ### payments
 - `order_id`: UK — 주문당 결제 1건 (재시도 없음)
@@ -163,7 +181,7 @@ erDiagram
 | 테이블 | 제약 | 목적 |
 |---|---|---|
 | users.login_id | UNIQUE | 중복 가입 방지 |
-| stocks.product_id | UNIQUE | 상품당 재고 1개 보장 |
+| stocks.product_option_id | UNIQUE | 옵션당 재고 1개 보장 |
 | likes.(user_id, product_id) | 복합 UNIQUE | 중복 좋아요 방지 |
 | payments.order_id | UNIQUE | 주문당 결제 1건 |
 | payments.pg_transaction_id | UNIQUE | PG 트랜잭션 중복 방지 |
