@@ -6,13 +6,13 @@
 
 | 구분 | 기본 방향 |
 | --- | --- |
-| 주문 생성 | 상품 판매 상태와 재고를 검증하고 재고를 차감한 뒤 `PAYMENT_PENDING` 주문을 생성한다. |
+| 주문 생성 | 상품 판매 상태와 재고를 검증하고 재고를 차감한 뒤 `PAYMENT_PENDING` 주문과 `REQUESTED` 결제 row를 같은 DB 트랜잭션에서 생성한다. |
 | 결제 요청 | 주문 생성 API는 `PAYMENT_PENDING`을 반환하고, 결제 요청은 내부 비동기로 처리한다. 외부 결제 시스템은 `auth/capture/void`를 지원한다고 가정한다. |
 | 결제 대기 | 결제 대기 시간은 주문 생성 시각 기준 최대 1분으로 제한한다. |
 | 결제 대기 만료 | 소스 레벨에서 1분 초과를 판정하고 `PAYMENT_FAILED`와 실패 사유 `TIMEOUT`으로 처리한다. |
 | 결제 실패/취소/타임아웃 | 결제 결과 기록, 주문 상태 전이, 재고 복구를 하나의 DB 트랜잭션으로 처리한다. |
 | 결제 결과 확인 | 사용자는 주문 상태 조회 API로 결제 결과를 확인한다. |
-| 중복 결제 처리 | 결제 worker는 `payment` row를 먼저 생성해 처리 권한을 선점하고, 외부 결제 요청에는 `orderId` 기반 idempotency key를 사용한다. |
+| 중복 결제 처리 | 주문 생성 시 `payment` row를 먼저 만들고, 결제 worker는 `REQUESTED` 상태와 `orderId` 기반 idempotency key로 중복 외부 결제를 막는다. |
 | 외부 데이터 플랫폼 | 주문 성공 이벤트를 outbox에 저장한 뒤 `EventRelayWorker`가 별도로 전송하고 재시도한다. |
 | 좋아요 | 판매 가능한 상품에만 새 좋아요를 등록하고, `product_like`와 `product.like_count`를 같은 트랜잭션에서 갱신한다. |
 | 상품 조회 | 판매 중지/품절 상품은 목록과 상세 조회에 노출하지 않는다. |
@@ -43,20 +43,24 @@
 포함 범위:
 
 - 상품 목록 조회
+- 상품 목록 필터, 정렬, 페이징
 - 상품 상세 조회
 - 브랜드 조회
 - 상품 좋아요 등록/취소
 - 내 좋아요 목록 조회
 - 좋아요 멱등 처리
 - 주문 생성
+- 주문 목록 조회
 - 주문 시 재고 차감
 - 결제 요청 및 결과 반영
 - 주문/결제 흐름에서 필요한 외부 시스템 연동
+- 브랜드/상품/주문 ADMIN API
+- 랭킹/추천 확장을 위한 사용자 행동 기록 기준
 
 제외 범위:
 
-- 회원가입
-- 내 정보 조회
+- 회원가입, 내 정보 조회, 비밀번호 변경은 `service.md`의 전체 서비스 API에 존재하지만 1주차 `identity` 기능으로 보고 volume-2 신규 도메인 설계에서는 제외한다.
+- 쿠폰 발급/사용은 `service.md`의 서비스 흐름에는 등장하지만 구체 API와 정책이 없으므로 이번 설계에서는 주문 도메인의 향후 확장 포인트로만 둔다.
 
 ## 기본 설계 가정
 
@@ -65,6 +69,9 @@
 - 사용자는 기존 회원 시스템의 `userId`로 식별한다.
 - `User`는 volume-2의 새 도메인이 아니며, 기존 `identity` 모듈의 `userId` 참조로만 다룬다.
 - volume-2 ERD에서는 `User` 내부 테이블과 필드를 상세 설계하지 않는다.
+- 유저 로그인이 필요한 API는 `X-Loopers-LoginId`, `X-Loopers-LoginPw` 헤더를 받는다.
+- volume-2 설계에서는 `X-Loopers-LoginId`를 `userId`로 참조하고, `X-Loopers-LoginPw`는 기존 `identity` 인증 경계의 입력으로만 본다.
+- ADMIN API는 `/api-admin/v1` prefix와 `X-Loopers-Ldap: loopers.admin` 헤더를 사용한다.
 - 상품은 하나의 브랜드에 속한다.
 - 상품 상태는 `ON_SALE`, `SOLD_OUT`, `STOPPED`로 구분한다.
 - 상품 목록과 상세 조회에는 판매 가능한 상품만 노출하며, `SOLD_OUT`/`STOPPED` 상품은 제외한다.
@@ -78,7 +85,8 @@
 - 좋아요 등록/취소와 `product.like_count` 증감은 같은 DB 트랜잭션에서 처리한다.
 - `product_like(user_id, product_id)` 유니크 제약으로 중복 등록을 방지한다.
 - 주문 생성 시 상품 판매 상태와 재고를 검증하고, 재고는 내부 DB 트랜잭션에서 먼저 차감한다.
-- 주문 생성 API는 주문을 `PAYMENT_PENDING` 상태로 저장한 뒤 사용자에게 먼저 응답한다.
+- 주문 생성 API는 주문을 `PAYMENT_PENDING` 상태로 저장하고, 같은 DB 트랜잭션에서 `payment(order_id, status=REQUESTED)` row를 생성한 뒤 사용자에게 먼저 응답한다.
+- 주문 목록/상세 응답의 `paymentStatus`는 항상 존재하며, 주문 생성 직후에는 `REQUESTED`로 반환한다.
 - 결제 요청은 주문 생성 트랜잭션 이후 서버 내부 비동기 흐름에서 외부 결제 시스템에 요청한다.
 - 외부 결제 시스템은 `auth`, `capture`, `void`를 지원한다고 가정한다.
 - 결제 대기 시간은 주문 생성 시각 기준 최대 1분으로 제한한다.
@@ -89,9 +97,8 @@
 - 외부 결제 실패, 취소, 타임아웃 시 주문은 실패/취소 상태가 되고, 차감된 재고는 즉시 복구한다.
 - 외부 결제 실패, 취소, 타임아웃 처리에서는 결제 결과 기록, 주문 상태 전이, 재고 복구를 하나의 DB 트랜잭션으로 처리한다.
 - 사용자는 주문 상태 조회 API로 결제 성공/실패/취소 결과를 확인한다.
-- 결제 worker는 외부 결제 요청 전에 `payment(order_id, status=REQUESTED)` row를 먼저 생성한다.
 - `payment.order_id` unique 제약으로 같은 주문의 결제 row는 하나만 생성한다.
-- `payment` row 생성에 성공한 worker만 외부 결제 요청을 수행한다.
+- 결제 worker는 `REQUESTED` 상태의 `payment` row를 외부 결제 요청 대상으로 처리한다.
 - 외부 결제 요청에는 `orderId` 기반 idempotency key를 사용한다.
 - worker는 `PAYMENT_PENDING` 주문과 `REQUESTED` 결제를 스캔해 1분 초과 건을 `PAYMENT_FAILED/TIMEOUT`으로 전이한다.
 - 외부 결제 요청 후 응답이 지연되거나 worker가 중단되어도 주문 생성 시각 기준 1분을 넘기면 만료 처리한다.
@@ -114,14 +121,22 @@
 | 좋아요 카운터 기준 | 확정 | `product_like`를 기준 데이터로 두고 `product.like_count`를 조회용 카운터로 둔다. |
 | 좋아요 등록 허용 범위 | 확정 | 판매 가능한 상품에만 새 좋아요를 등록할 수 있다. |
 | 내 좋아요 목록 노출 | 확정 | 예전에 좋아요한 판매 중지/품절 상품도 내 좋아요 목록에는 노출한다. |
+| 내 좋아요 목록 API 경로 | 확정 | `service.md` 원문을 따라 `GET /api/v1/users/{userId}/likes`를 사용한다. 단, `X-Loopers-LoginId`와 path `userId`가 같아야 한다. |
+| 상품 목록 페이징/정렬 | 확정 | `service.md` 기준으로 `page=0`, `size=20`, `sort=latest/price_asc/likes_desc`를 사용한다. |
+| ADMIN API | 확정 | `service.md` 기준으로 브랜드/상품/주문 ADMIN API를 `/api-admin/v1` 하위에 둔다. |
+| ADMIN 브랜드 삭제 | 확정 | 브랜드 row는 보존하고 `deletedAt`을 표시하며, 해당 브랜드 상품은 `ProductStatus.STOPPED`으로 전환한다. |
+| ADMIN 상품 삭제 | 확정 | 과거 주문 이력 보호를 위해 물리 삭제하지 않고 `ProductStatus.STOPPED`으로 전환한다. |
+| 인증 헤더 | 확정 | 유저 API는 `X-Loopers-LoginId`, `X-Loopers-LoginPw`, ADMIN API는 `X-Loopers-Ldap`를 사용한다. |
+| 쿠폰 | 확정 | `service.md`에 구체 API가 없으므로 이번 설계에서는 주문 확장 포인트로만 기록하고 요청 DTO에는 포함하지 않는다. |
 | 주문 생성 시 재고 차감 | 비관적 락 확정 | 내부 정합성이 필요하므로 재고 행을 잠근 뒤 DB 트랜잭션 안에서 처리한다. |
+| 주문 생성 시 결제 row 생성 | 확정 | 주문 생성 트랜잭션에서 `payment(order_id, status=REQUESTED)`를 함께 저장해 주문 조회 응답의 `paymentStatus`를 항상 제공한다. |
 | 주문/결제 처리 방식 | 확정 | 단일 주문 API로 `PAYMENT_PENDING`을 반환하고 내부 비동기로 결제를 처리한다. |
 | 외부 결제 호출 위치 | 확정 | 주문 생성 트랜잭션 밖에서 호출하고, PG는 `auth/capture/void`를 지원한다고 가정한다. |
 | 결제 대기 시간 | 확정 | 주문 생성 시각 기준 최대 1분으로 제한한다. |
 | 결제 대기 만료 처리 | 확정 | 외부 요청 전/후와 worker 재시작 여부와 관계없이 1분 초과 건을 `PAYMENT_FAILED` 상태와 실패 사유 값 `TIMEOUT`으로 처리한다. |
 | 결제 실패/취소/타임아웃 보상 방식 | 확정 | 결제 결과 기록, 주문 상태 전이, 재고 복구를 하나의 DB 트랜잭션으로 처리한다. |
 | 결제 결과 확인 | 확정 | 주문 상태 조회 API로 확인한다. |
-| 중복 결제 요청 처리 | 확정 | `payment` row 선생성과 `payment.order_id` unique 제약으로 worker 처리 권한을 선점하고, 외부 결제에는 `orderId` idempotency key를 사용한다. |
+| 중복 결제 요청 처리 | 확정 | 주문 생성 트랜잭션의 `payment` row 선생성, `payment.order_id` unique 제약, 외부 결제 `orderId` idempotency key를 함께 사용한다. |
 | 품절/판매 중지 상품 조회 | 확정 | 목록과 상세 조회 모두 노출하지 않는다. |
 
 ## 상태 전이 정책
@@ -130,7 +145,7 @@
 
 | 현재 상태 | 이벤트 | 다음 상태 | 처리 |
 | --- | --- | --- | --- |
-| - | 주문 생성 성공 | `PAYMENT_PENDING` | 재고 차감과 주문 저장을 완료하고 사용자에게 먼저 응답한다. |
+| - | 주문 생성 성공 | `PAYMENT_PENDING` | 재고 차감, 주문 저장, `Payment(REQUESTED)` 저장을 완료하고 사용자에게 먼저 응답한다. |
 | `PAYMENT_PENDING` | 결제 성공 | `PAID` | 결제 성공 기록과 주문 완료 이벤트 저장을 같은 DB 트랜잭션에 묶는다. |
 | `PAYMENT_PENDING` | 결제 실패 | `PAYMENT_FAILED` | 결제 실패 기록, 주문 상태 전이, 재고 복구를 같은 DB 트랜잭션에 묶는다. |
 | `PAYMENT_PENDING` | 결제 대기 1분 초과 | `PAYMENT_FAILED` | 실패 사유 값은 `TIMEOUT`으로 기록하고 재고를 복구한다. |
@@ -143,7 +158,7 @@
 
 | 현재 상태 | 이벤트 | 다음 상태 | 처리 |
 | --- | --- | --- | --- |
-| - | worker 처리권 선점 | `REQUESTED` | 외부 결제 요청 전에 `payment(order_id, REQUESTED)`를 먼저 저장한다. |
+| - | 주문 생성 성공 | `REQUESTED` | 주문 생성 트랜잭션에서 `payment(order_id, REQUESTED)`를 함께 저장한다. |
 | `REQUESTED` | 외부 승인/매입 성공 | `SUCCESS` | `transactionKey`를 저장하고 주문을 `PAID`로 전이한다. |
 | `REQUESTED` | 외부 결제 실패 | `FAILED` | 실패 사유를 저장하고 주문 실패 및 재고 복구를 수행한다. |
 | `REQUESTED` | 외부 결제 취소 | `CANCELED` | 취소 사유를 저장하고 주문 취소 및 재고 복구를 수행한다. |
@@ -166,6 +181,9 @@
 
 - 사용자는 판매 가능한 상품 목록을 조회할 수 있다.
 - 상품 목록에는 상품 ID, 상품명, 가격, 상품 상태, 브랜드명, 좋아요 수를 포함한다.
+- 상품 목록은 `brandId`로 특정 브랜드 상품만 필터링할 수 있다.
+- 상품 목록은 `sort`로 정렬하며 허용 값은 `latest`, `price_asc`, `likes_desc`다.
+- 상품 목록의 기본 페이지 조건은 `page=0`, `size=20`이다.
 - 판매 중지/품절 상품은 상품 목록과 상세 조회에 노출하지 않는다.
 - 내 좋아요 목록은 일반 상품 목록과 별도로 보며, 예전에 좋아요한 판매 중지/품절 상품도 포함한다.
 - 사용자는 상품 상세를 조회할 수 있다.
@@ -176,6 +194,25 @@
 - 브랜드는 상품의 소유 또는 제조 주체를 표현한다.
 - 브랜드 조회 시 브랜드 ID, 브랜드명, 설명을 반환한다.
 - 상품은 반드시 하나의 브랜드를 가진다는 기본안을 둔다.
+- 삭제된 브랜드는 대고객 브랜드 조회와 신규 상품 등록 대상에서 제외한다.
+
+### ADMIN
+
+- ADMIN API는 `/api-admin/v1` prefix를 사용한다.
+- ADMIN API는 `X-Loopers-Ldap: loopers.admin` 헤더를 통해 어드민을 식별한다.
+- 어드민은 등록된 브랜드 목록과 브랜드 상세를 조회할 수 있다.
+- 어드민은 브랜드를 등록, 수정, 삭제할 수 있다.
+- 브랜드 삭제 API는 브랜드 row를 물리 삭제하지 않고 `deletedAt`을 표시한다.
+- 브랜드 제거 시 해당 브랜드의 상품들도 물리 삭제하지 않고 `STOPPED` 상태로 전환한다.
+- 삭제된 브랜드는 대고객 브랜드 조회, ADMIN 기본 목록, 신규 상품 등록 대상에서 제외한다.
+- 어드민은 등록된 상품 목록과 상품 상세를 조회할 수 있다.
+- 상품 ADMIN 목록은 `page`, `size`, `brandId` 조건을 받을 수 있다.
+- 어드민은 상품을 등록, 수정, 삭제할 수 있다.
+- 상품 등록 시 상품의 브랜드는 이미 등록된 브랜드여야 한다.
+- 상품 정보 수정 시 상품의 브랜드는 수정할 수 없다.
+- 상품 삭제 API는 상품 row를 물리 삭제하지 않고 `STOPPED` 상태로 전환한다.
+- `STOPPED` 상품은 대고객 상품 목록/상세, 주문, 신규 좋아요 등록 대상에서 제외한다.
+- 어드민은 주문 목록과 단일 주문 상세를 조회할 수 있다.
 
 ### 좋아요
 
@@ -199,10 +236,14 @@
 
 - 사용자는 상품과 수량을 지정해 주문을 생성할 수 있다.
 - 주문 생성 시 상품 판매 가능 여부와 재고를 검증한다.
-- 주문 생성 성공 시 주문 상태는 `PAYMENT_PENDING`이 된다.
+- 주문 생성 성공 시 주문 상태는 `PAYMENT_PENDING`, 결제 상태는 `REQUESTED`가 된다.
 - 주문 생성 API는 `orderId`와 `PAYMENT_PENDING` 상태를 응답한다.
+- 주문 목록/상세 조회의 `paymentStatus`는 주문 생성 직후에도 `REQUESTED`로 채워진다.
 - 재고가 부족하면 주문은 생성하지 않는다.
 - 주문 항목에는 주문 당시 상품명과 가격을 저장한다.
+- 사용자는 `startAt`, `endAt` 기간 조건으로 본인의 주문 목록을 조회할 수 있다.
+- 주문 목록 조회는 `X-Loopers-LoginId` 기준 본인 주문만 반환한다.
+- 주문 목록 응답에는 주문 ID, 주문 상태, 결제 상태, 총액, 주문 생성 시각을 포함한다.
 
 ### 재고
 
@@ -223,8 +264,8 @@
 - 결제 실패, 취소, 타임아웃 시 차감한 재고를 즉시 복구한다.
 - 결제 실패, 취소, 타임아웃 처리 시 결제 결과 기록, 주문 상태 전이, 재고 복구는 하나의 DB 트랜잭션으로 처리한다.
 - 사용자는 주문 상태 조회 API로 결제 결과를 확인한다.
-- 결제 worker는 외부 결제 요청 전에 `payment(order_id, status=REQUESTED)` row를 먼저 생성한다.
-- `payment` row 생성에 성공한 worker만 외부 결제 요청을 보낸다.
+- 주문 생성 트랜잭션에서 `payment(order_id, status=REQUESTED)` row를 먼저 생성한다.
+- 결제 worker는 `REQUESTED` 상태의 결제 row를 외부 결제 요청 대상으로 처리한다.
 - 외부 결제 요청에는 `orderId` 기반 idempotency key를 사용한다.
 - 결제 worker는 `PAYMENT_PENDING` 주문과 `REQUESTED` 결제를 스캔해 1분 초과 건을 만료 처리한다.
 - 외부 결제 요청 후 응답이 지연되거나 worker가 중단되어도 주문 생성 시각 기준 1분을 넘기면 `PAYMENT_FAILED/TIMEOUT`으로 전이한다.
@@ -238,6 +279,9 @@
 - 외부 시스템 실패는 내부 주문 정합성과 분리해 재시도 또는 보상 대상으로 관리한다.
 - PG는 `auth/capture/void` 계약을 제공한다고 가정한다.
 - 주문 완료 이벤트는 outbox에 먼저 저장하고, 실제 전송은 별도 worker가 처리한다.
+- 사용자 행동 데이터는 이후 랭킹/추천으로 확장될 수 있게 기록 기준을 둔다.
+- 좋아요 행동은 `product_like`, 주문 행동은 `orders`/`order_line`과 `order_event_outbox`를 기준으로 남긴다.
+- 상품 조회 행동 이벤트는 `event` 모듈의 향후 확장 포인트로 두며, 이번 제출 설계에서는 별도 조회 이벤트 테이블을 만들지 않는다.
 
 ## API 계약 초안
 
@@ -245,22 +289,63 @@
 
 - 응답은 현재 코드 패턴과 맞춰 `ApiResponse<T>` 형태로 감싼다.
 - 성공 응답은 `meta.result=SUCCESS`, 실패 응답은 `meta.result=FAIL`을 사용한다.
-- 사용자 식별이 필요한 API는 `X-Loopers-LoginId` 헤더를 필수로 받는다.
+- 대고객 API는 `/api/v1` prefix를 사용한다.
+- ADMIN API는 `/api-admin/v1` prefix를 사용한다.
+- 사용자 식별이 필요한 API는 `X-Loopers-LoginId`, `X-Loopers-LoginPw` 헤더를 필수로 받는다.
 - `X-Loopers-LoginId`는 기존 `identity` 모듈의 `userId` 참조이며, volume-2에서는 회원 내부 필드를 검증하지 않는다.
+- `X-Loopers-LoginPw`는 기존 `identity` 인증 경계의 입력으로 보고, volume-2 신규 도메인 모델에는 저장하지 않는다.
+- ADMIN API는 `X-Loopers-Ldap` 헤더 값이 `loopers.admin`이어야 한다.
+- path에 `userId`가 있는 사용자 전용 API는 `X-Loopers-LoginId`와 path `userId`가 같아야 한다. 다르면 타 유저 직접 접근으로 보고 거부한다.
 - 상품 목록과 상품 상세 조회는 공개 API로 두되, 로그인 사용자의 좋아요 여부가 필요한 경우 `X-Loopers-LoginId`를 선택적으로 받을 수 있다.
 
-### 공개 API
+### 기존 identity API 참조
+
+아래 API는 `service.md`의 전체 서비스 API에 포함되지만, 1주차 `identity` 기능으로 보고 volume-2 신규 설계 대상에서는 제외한다.
+
+| 기능 | Method | Path | Header | 처리 |
+| --- | --- | --- | --- | --- |
+| 회원가입 | POST | `/api/v1/users` | 없음 | 기존 `identity` 모듈 책임 |
+| 내 정보 조회 | GET | `/api/v1/users/me` | `X-Loopers-LoginId`, `X-Loopers-LoginPw` | 기존 `identity` 모듈 책임 |
+| 비밀번호 변경 | PUT | `/api/v1/users/password` | `X-Loopers-LoginId`, `X-Loopers-LoginPw` | 기존 `identity` 모듈 책임 |
+
+### 대고객 API
 
 | 기능 | Method | Path | Header | Request | Response |
 | --- | --- | --- | --- | --- | --- |
-| 상품 목록 조회 | GET | `/api/v1/products` | 선택: `X-Loopers-LoginId` | query: `brandId`, `page`, `size` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
+| 상품 목록 조회 | GET | `/api/v1/products` | 선택: `X-Loopers-LoginId` | query: `brandId`, `sort=latest`, `page=0`, `size=20` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
 | 상품 상세 조회 | GET | `/api/v1/products/{productId}` | 선택: `X-Loopers-LoginId` | path: `productId` | `productId`, `name`, `description`, `price`, `status`, `stockQuantity`, `brand`, `likeCount`, `liked` |
 | 브랜드 조회 | GET | `/api/v1/brands/{brandId}` | 없음 | path: `brandId` | `brandId`, `name`, `description` |
-| 좋아요 등록 | POST | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId` | path: `productId` | `productId`, `liked=true`, `likeCount` |
-| 좋아요 취소 | DELETE | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId` | path: `productId` | `productId`, `liked=false`, `likeCount` |
-| 내 좋아요 목록 조회 | GET | `/api/v1/product-likes/me` | 필수: `X-Loopers-LoginId` | query: `page`, `size` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
-| 주문 생성 | POST | `/api/v1/orders` | 필수: `X-Loopers-LoginId` | body: `items[].{productId,quantity}` | `orderId`, `orderStatus=PAYMENT_PENDING`, `totalAmount` |
-| 주문 상태 조회 | GET | `/api/v1/orders/{orderId}` | 필수: `X-Loopers-LoginId` | path: `orderId` | `orderId`, `orderStatus`, `paymentStatus`, `failureReason`, `totalAmount`, `items[]` |
+| 좋아요 등록 | POST | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | path: `productId` | `productId`, `liked=true`, `likeCount` |
+| 좋아요 취소 | DELETE | `/api/v1/products/{productId}/likes` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | path: `productId` | `productId`, `liked=false`, `likeCount` |
+| 내 좋아요 목록 조회 | GET | `/api/v1/users/{userId}/likes` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | path: `userId`, query: `page=0`, `size=20` | `products[].{productId,name,price,status,brandName,likeCount}`, `page` |
+| 주문 생성 | POST | `/api/v1/orders` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | body: `items[].{productId,quantity}` | `orderId`, `orderStatus=PAYMENT_PENDING`, `totalAmount` |
+| 주문 목록 조회 | GET | `/api/v1/orders` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | query: `startAt`, `endAt` | `orders[].{orderId,orderStatus,paymentStatus,totalAmount,createdAt}` |
+| 주문 상태 조회 | GET | `/api/v1/orders/{orderId}` | 필수: `X-Loopers-LoginId`, `X-Loopers-LoginPw` | path: `orderId` | `orderId`, `orderStatus`, `paymentStatus`, `failureReason`, `totalAmount`, `items[]` |
+
+### ADMIN API
+
+| 기능 | Method | Path | Header | Request | Response |
+| --- | --- | --- | --- | --- | --- |
+| 브랜드 목록 조회 | GET | `/api-admin/v1/brands` | 필수: `X-Loopers-Ldap` | query: `page=0`, `size=20` | `brands[].{brandId,name,description}`, `page` |
+| 브랜드 상세 조회 | GET | `/api-admin/v1/brands/{brandId}` | 필수: `X-Loopers-Ldap` | path: `brandId` | `brandId`, `name`, `description` |
+| 브랜드 등록 | POST | `/api-admin/v1/brands` | 필수: `X-Loopers-Ldap` | body: `name`, `description` | `brandId`, `name`, `description` |
+| 브랜드 정보 수정 | PUT | `/api-admin/v1/brands/{brandId}` | 필수: `X-Loopers-Ldap` | path: `brandId`, body: `name`, `description` | `brandId`, `name`, `description` |
+| 브랜드 삭제 | DELETE | `/api-admin/v1/brands/{brandId}` | 필수: `X-Loopers-Ldap` | path: `brandId` | 없음. 내부적으로 `Brand.deletedAt` 표시와 관련 상품 `STOPPED` 전환 |
+| 상품 목록 조회 | GET | `/api-admin/v1/products` | 필수: `X-Loopers-Ldap` | query: `page=0`, `size=20`, `brandId` | `products[].{productId,name,price,status,brandId,stockQuantity,likeCount}`, `page` |
+| 상품 상세 조회 | GET | `/api-admin/v1/products/{productId}` | 필수: `X-Loopers-Ldap` | path: `productId` | `productId`, `name`, `description`, `price`, `status`, `brandId`, `stockQuantity`, `likeCount` |
+| 상품 등록 | POST | `/api-admin/v1/products` | 필수: `X-Loopers-Ldap` | body: `brandId`, `name`, `description`, `price`, `stockQuantity`, `status` | `productId` |
+| 상품 정보 수정 | PUT | `/api-admin/v1/products/{productId}` | 필수: `X-Loopers-Ldap` | path: `productId`, body: `name`, `description`, `price`, `stockQuantity`, `status` | `productId` |
+| 상품 삭제 | DELETE | `/api-admin/v1/products/{productId}` | 필수: `X-Loopers-Ldap` | path: `productId` | 없음. 내부적으로 `Product.status=STOPPED` 전환 |
+| 주문 목록 조회 | GET | `/api-admin/v1/orders` | 필수: `X-Loopers-Ldap` | query: `page=0`, `size=20` | `orders[].{orderId,userId,orderStatus,paymentStatus,totalAmount,createdAt}`, `page` |
+| 주문 상세 조회 | GET | `/api-admin/v1/orders/{orderId}` | 필수: `X-Loopers-Ldap` | path: `orderId` | `orderId`, `userId`, `orderStatus`, `paymentStatus`, `failureReason`, `totalAmount`, `items[]` |
+
+현재 구현과 목표 API 차이:
+
+- 현재 `ProductV1Controller`는 상품 등록, 수정, 삭제를 `/api/v1/products` 아래에 둔다.
+- 목표 설계에서는 상품 등록, 수정, 삭제를 ADMIN API인 `/api-admin/v1/products` 아래로 둔다.
+- 구현 단계에서는 기존 public 상품 CRUD를 ADMIN 경계로 이동하거나, 호환 기간 동안 public mutation API를 제거 대상으로 표시한다.
+- 브랜드 삭제는 `product.brand_id` FK와 과거 주문 이력을 보호하기 위해 브랜드 row를 보존하고 `deletedAt`만 표시한다.
+- 상품 삭제는 과거 주문의 `order_line.product_id` 참조와 상품 스냅샷을 보호하기 위해 물리 삭제가 아니라 `STOPPED` 상태 전환으로 처리한다.
 
 ### 내부/외부 계약
 
@@ -275,9 +360,11 @@
 
 | 상황 | HTTP | `errorCode` | 처리 기준 |
 | --- | --- | --- | --- |
-| 필수 헤더 누락, 요청 값 누락, 수량 0 이하 | 400 | `Bad Request` | `BAD_REQUEST` |
-| 판매 중지/품절 상품 상세 조회 | 404 | `Not Found` | 공개 조회에서는 노출하지 않는 리소스로 본다. |
+| 필수 헤더 누락, 요청 값 누락, 수량 0 이하, 잘못된 기간 조건, 잘못된 정렬 기준 | 400 | `Bad Request` | `BAD_REQUEST` |
+| `X-Loopers-Ldap` 누락 또는 `loopers.admin` 불일치 | 400 | `Bad Request` | 현재 공통 에러 타입 기준으로 `BAD_REQUEST`로 매핑한다. |
+| 판매 중지/품절 상품 상세 조회, 삭제된 브랜드 조회 | 404 | `Not Found` | 공개 조회에서는 노출하지 않는 리소스로 본다. |
 | 상품/브랜드/주문이 존재하지 않음 | 404 | `Not Found` | `NOT_FOUND` |
+| path `userId`와 로그인 사용자 불일치 | 400 | `Bad Request` | 타 유저 직접 접근 요청으로 본다. |
 | 판매 중지/품절 상품 좋아요 등록 | 400 | `Bad Request` | 정책 위반으로 본다. |
 | 재고 부족 주문 | 400 | `Bad Request` | 주문은 생성하지 않는다. |
 | 중복 좋아요 등록/취소 | 200 | - | 멱등 성공으로 응답한다. |
@@ -298,9 +385,8 @@
 ### 확장 질문
 
 1. 여러 상품을 한 주문에 담는 장바구니형 주문을 지원할 예정인가?
-2. 쿠폰, 할인, 배송비가 추가될 가능성이 있는가?
-3. 카드/간편결제 같은 복수 결제 수단을 지원할 예정인가?
-4. 좋아요 기반 정렬이 필요해질 가능성이 있는가?
+2. 카드/간편결제 같은 복수 결제 수단을 지원할 예정인가?
+3. 상품 조회 행동까지 외부 데이터 플랫폼으로 전송할 예정인가?
 
 ## 선택지와 영향
 
@@ -316,6 +402,7 @@
 | 좋아요 수 | 이력 테이블 실시간 집계 | 정합성은 단순하지만 조회 비용 증가 |
 | 좋아요 등록 정책 | 판매 가능한 상품만 허용 | 탐색에서 숨긴 상품에 새 좋아요가 생기지 않음 |
 | 내 좋아요 목록 | 과거 좋아요 이력 기준 조회 | 판매 중지/품절 상품도 사용자가 남긴 이력으로 확인 가능 |
+| 상품 목록 정렬 | `latest`, `price_asc`, `likes_desc` | `service.md` 기준. 기본 정렬은 `latest`로 둔다. |
 
 ## 개념 모델
 
@@ -358,7 +445,8 @@
 10. 결제 성공 시 주문을 결제 완료 상태로 변경한다.
 11. 결제 실패, 취소, 타임아웃 시 결제 결과 기록, 주문 상태 전이, 재고 복구를 하나의 DB 트랜잭션으로 처리한다.
 12. 사용자는 주문 상태 조회 API로 결제 결과를 확인한다.
-13. 주문 완료 이벤트는 outbox에 저장되고, 별도 worker가 외부 데이터 플랫폼으로 전송한다.
+13. 사용자는 기간 조건으로 본인의 주문 목록을 조회한다.
+14. 주문 완료 이벤트는 outbox에 저장되고, 별도 worker가 외부 데이터 플랫폼으로 전송한다.
 
 ## 설계 리스크
 
@@ -378,10 +466,15 @@
 - `PAYMENT_PENDING` 1분 초과 시 `PAYMENT_FAILED/TIMEOUT`으로 전이되는지
 - 외부 결제 요청 후 응답 지연 또는 worker 중단 상황에서도 1분 초과 건이 스캔되어 만료 처리되는지
 - 결제 실패/취소/타임아웃 시 결제 결과 기록, 주문 상태 전이, 재고 복구가 하나의 DB 트랜잭션으로 묶였는지
-- 외부 결제 요청 전에 `payment(order_id, status=REQUESTED)` row 선생성이 수행되는지
+- 주문 생성 트랜잭션에서 `payment(order_id, status=REQUESTED)` row 선생성이 수행되는지
 - 외부 결제 요청에 `orderId` 기반 idempotency key가 포함되는지
 - 결제 성공 시 `PaymentService`가 `DataPlatformClient`를 직접 호출하지 않고 outbox 저장만 요청하는지
 - 좋아요 등록/취소와 `like_count` 증감이 같은 트랜잭션으로 묶였는지
 - `product_like(user_id, product_id)` 유니크 제약과 `like_count >= 0` 방어가 있는지
 - 판매 중지/품절 상품에는 새 좋아요 등록이 불가능한지
 - 내 좋아요 목록에는 예전에 좋아요한 판매 중지/품절 상품이 포함되는지
+- 상품 목록이 `page=0`, `size=20`, `sort=latest/price_asc/likes_desc` 기준을 따르는지
+- 브랜드/상품/주문 ADMIN API가 `/api-admin/v1`과 `X-Loopers-Ldap` 경계를 따르는지
+- 상품 등록/수정/삭제가 public API가 아니라 ADMIN API에만 노출되는지
+- 상품 삭제가 물리 삭제가 아니라 `STOPPED` 상태 전환으로 처리되는지
+- 유저 API가 `X-Loopers-LoginId`, `X-Loopers-LoginPw` 헤더 계약을 따르는지
