@@ -1,13 +1,17 @@
-package com.loopers.interfaces.api;
+package com.loopers.interfaces.api.common.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,10 +27,27 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class ApiControllerAdvice {
+
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handle(CoreException e) {
         log.warn("CoreException : {}", e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage(), e);
         return failureResponse(e.getErrorType(), e.getCustomMessage());
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleBadRequest(ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+            .map(cv -> cv.getMessage())
+            .collect(Collectors.joining(", "));
+        return failureResponse(ErrorType.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleBadRequest(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+            .map(fe -> String.format("'%s' %s", fe.getField(), fe.getDefaultMessage()))
+            .collect(Collectors.joining(", "));
+        return failureResponse(ErrorType.BAD_REQUEST, message);
     }
 
     @ExceptionHandler
@@ -35,6 +56,12 @@ public class ApiControllerAdvice {
         String type = e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "unknown";
         String value = e.getValue() != null ? e.getValue().toString() : "null";
         String message = String.format("요청 파라미터 '%s' (타입: %s)의 값 '%s'이(가) 잘못되었습니다.", name, type, value);
+        return failureResponse(ErrorType.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleBadRequest(MissingRequestHeaderException e) {
+        String message = String.format("필수 요청 헤더 '%s'가 누락되었습니다.", e.getHeaderName());
         return failureResponse(ErrorType.BAD_REQUEST, message);
     }
 

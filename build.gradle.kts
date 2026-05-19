@@ -82,7 +82,8 @@ subprojects {
         useJUnitPlatform()
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
-        jvmArgs("-Xshare:off")
+        jvmArgs("-Xshare:off", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+        environment("TESTCONTAINERS_RYUK_DISABLED", "true")
     }
 
     tasks.withType<JacocoReport> {
