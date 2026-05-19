@@ -1,5 +1,7 @@
 package com.loopers.domain.user;
 
+import java.util.Optional;
+
 public class FakePasswordEncoder implements PasswordEncoder {
 
     private static final String PREFIX = "encoded:";
@@ -11,6 +13,8 @@ public class FakePasswordEncoder implements PasswordEncoder {
 
     @Override
     public boolean matches(String raw, String encoded) {
-        return encoded.equals(PREFIX+raw);
+        return Optional.ofNullable(encoded)
+                .map(value -> value.equals(PREFIX + raw))
+                .orElse(false);
     }
 }
