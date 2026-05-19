@@ -26,95 +26,95 @@
 ```mermaid
 erDiagram
     users["회원 (users)"] {
-        bigint id PK "회원 고유 ID"
-        varchar login_id UK "로그인 아이디 (영문/숫자 1~10자)"
+        bigint id PK "회원 고유 ID | PK"
+        varchar login_id UK "로그인 아이디 (영문/숫자 1~10자) | UNIQUE"
         varchar password "암호화된 비밀번호 (BCrypt)"
         varchar name "회원 이름"
         varchar email "이메일 주소"
         varchar birth "생년월일 (YYYY-MM-DD)"
-        bigint point "포인트 잔액 (atomic UPDATE로 동시성 보장)"
+        bigint point "포인트 잔액 | atomic UPDATE (WHERE point >= ?)"
         datetime created_at "가입일시"
     }
 
     brands["브랜드 (brands)"] {
-        bigint id PK "브랜드 고유 ID"
+        bigint id PK "브랜드 고유 ID | PK"
         varchar name "브랜드명"
         varchar description "브랜드 설명"
         datetime created_at "등록일시"
     }
 
     products["상품 (products)"] {
-        bigint id PK "상품 고유 ID"
-        bigint brand_id FK "브랜드 ID"
+        bigint id PK "상품 고유 ID | PK"
+        bigint brand_id FK "브랜드 ID | FK → brands.id"
         varchar name "상품명"
         bigint price "기본 판매가 (원)"
         text description "상품 설명"
-        bigint like_count "좋아요 수 (카운터 캐시, 비정규화)"
+        bigint like_count "좋아요 수 | 카운터 캐시, 배치로 주기적 보정"
         datetime created_at "등록일시"
     }
 
     product_options["상품 옵션 (product_options)"] {
-        bigint id PK "옵션 고유 ID"
-        bigint product_id FK "상품 ID"
+        bigint id PK "옵션 고유 ID | PK"
+        bigint product_id FK "상품 ID | FK → products.id"
         varchar option_name "옵션명 (예: 기본 / 흰색-S / 검정-M)"
         bigint additional_price "옵션 추가금액 (기본 0원)"
         datetime created_at "등록일시"
     }
 
     stocks["재고 (stocks)"] {
-        bigint id PK "재고 고유 ID"
-        bigint product_option_id FK "상품 옵션 ID (UK, 옵션당 1개)"
+        bigint id PK "재고 고유 ID | PK"
+        bigint product_option_id FK "상품 옵션 ID | FK + UNIQUE"
         int total_quantity "실제 보유 수량 (결제 확정 시 차감)"
         int reserved_quantity "예약 중 수량 (주문 생성 시 증가)"
         datetime updated_at "최종 수정일시"
     }
 
     likes["좋아요 (likes)"] {
-        bigint id PK "좋아요 고유 ID"
-        bigint user_id FK "회원 ID"
-        bigint product_id FK "상품 ID"
+        bigint id PK "좋아요 고유 ID | PK"
+        bigint user_id FK "회원 ID | FK → users.id"
+        bigint product_id FK "상품 ID | FK → products.id, 복합 UNIQUE (user_id, product_id)"
         datetime created_at "좋아요 등록일시"
     }
 
     orders["주문 (orders)"] {
-        bigint id PK "주문 고유 ID"
-        bigint user_id FK "회원 ID"
-        varchar status "주문 상태 (PENDING/CONFIRMED/FAILED/CANCELLED)"
+        bigint id PK "주문 고유 ID | PK"
+        bigint user_id FK "회원 ID | FK → users.id"
+        varchar status "PENDING/CONFIRMED/FAILED/CANCELLED | INDEX (status, created_at)"
         bigint total_amount "총 주문금액 (point_amount + pg_amount)"
         bigint point_amount "포인트로 결제한 금액"
         bigint pg_amount "PG로 결제한 금액"
-        varchar receiver_name "수령인 이름 (주문 시점 스냅샷)"
-        varchar receiver_phone "수령인 연락처 (주문 시점 스냅샷)"
-        varchar zip_code "우편번호 (주문 시점 스냅샷)"
-        varchar address "기본 주소 (주문 시점 스냅샷)"
-        varchar detail_address "상세 주소 (주문 시점 스냅샷)"
-        datetime created_at "주문일시"
+        varchar receiver_name "수령인 이름 | 주문 시점 스냅샷"
+        varchar receiver_phone "수령인 연락처 | 주문 시점 스냅샷"
+        varchar zip_code "우편번호 | 주문 시점 스냅샷"
+        varchar address "기본 주소 | 주문 시점 스냅샷"
+        varchar detail_address "상세 주소 | 주문 시점 스냅샷"
+        datetime created_at "주문일시 | INDEX (status, created_at)"
     }
 
     order_items["주문 상품 (order_items)"] {
-        bigint id PK "주문 상품 고유 ID"
-        bigint order_id FK "주문 ID"
-        bigint product_id FK "상품 ID"
-        bigint product_option_id FK "상품 옵션 ID"
-        varchar product_name "상품명 (주문 시점 스냅샷)"
-        varchar option_name "옵션명 (주문 시점 스냅샷)"
+        bigint id PK "주문 상품 고유 ID | PK"
+        bigint order_id FK "주문 ID | FK → orders.id"
+        bigint product_id FK "상품 ID | FK → products.id"
+        bigint product_option_id FK "상품 옵션 ID | FK → product_options.id"
+        varchar product_name "상품명 | 주문 시점 스냅샷"
+        varchar option_name "옵션명 | 주문 시점 스냅샷"
         int quantity "주문 수량"
-        bigint price "단가 (price + additional_price, 주문 시점 스냅샷)"
+        bigint price "단가 (price + additional_price) | 주문 시점 스냅샷"
     }
 
     payments["결제 (payments)"] {
-        bigint id PK "결제 고유 ID"
-        bigint order_id FK "주문 ID (UK, 주문당 1건)"
-        varchar pg_transaction_id UK "PG 트랜잭션 ID (중복 방지)"
+        bigint id PK "결제 고유 ID | PK"
+        bigint order_id FK "주문 ID | FK + UNIQUE (주문당 1건)"
+        varchar pg_transaction_id UK "PG 트랜잭션 ID | UNIQUE"
         varchar status "결제 상태 (SUCCESS/FAILED)"
         bigint amount "결제 금액"
         datetime created_at "결제일시"
     }
 
     point_histories["포인트 이력 (point_histories)"] {
-        bigint id PK "이력 고유 ID"
-        bigint user_id FK "회원 ID"
-        bigint order_id FK "주문 ID"
+        bigint id PK "이력 고유 ID | PK"
+        bigint user_id FK "회원 ID | FK → users.id"
+        bigint order_id FK "주문 ID | FK → orders.id"
         varchar type "변경 유형 (EARN/USE/REFUND)"
         bigint amount "변경 금액 (양수: 적립/환불, 음수: 사용)"
         datetime created_at "변경일시"
