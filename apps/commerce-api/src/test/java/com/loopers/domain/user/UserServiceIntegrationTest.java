@@ -6,7 +6,6 @@ import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.concurrent.CountDownLatch;
@@ -27,7 +26,8 @@ class UserServiceIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -62,12 +62,13 @@ class UserServiceIntegrationTest {
         @Test
         void onlyOneSucceeds_whenConcurrentRegistrationWithSameUserid() throws InterruptedException {
             // act
-            int successCount = runConcurrent(5, () ->
-                    userService.register(DEFAULT_USERID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL)
+            ConcurrentResult result = runConcurrent(5, () ->
+                    userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL))
             );
 
             // assert
-            assertThat(successCount).isEqualTo(1);
+            assertThat(result.successCount()).isEqualTo(1);
+            assertThat(result.failureCount()).isEqualTo(4);
         }
 
         @DisplayName("이미 존재하는 아이디로 가입하면, CONFLICT 예외가 발생한다.")
@@ -86,11 +87,14 @@ class UserServiceIntegrationTest {
         }
     }
 
-    private int runConcurrent(int threadCount, Runnable task) throws InterruptedException {
+    record ConcurrentResult(int successCount, int failureCount) {}
+
+    private ConcurrentResult runConcurrent(int threadCount, Runnable task) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(threadCount);
         AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
 
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
@@ -98,7 +102,11 @@ class UserServiceIntegrationTest {
                     startLatch.await();
                     task.run();
                     successCount.incrementAndGet();
-                } catch (Exception ignored) {
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    failureCount.incrementAndGet();
+                } catch (Throwable t) {
+                    failureCount.incrementAndGet();
                 } finally {
                     doneLatch.countDown();
                 }
@@ -107,8 +115,8 @@ class UserServiceIntegrationTest {
 
         startLatch.countDown();
         doneLatch.await(10, TimeUnit.SECONDS);
-        executor.shutdown();
-        return successCount.get();
+        executor.shutdownNow();
+        return new ConcurrentResult(successCount.get(), failureCount.get());
     }
 
     @DisplayName("회원조회 시,")
