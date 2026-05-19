@@ -5,11 +5,14 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.util.regex.Pattern;
 
 @Entity
-@Table(name = "user")
+@Table(name = "user", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_userid", columnNames = {"userid"})
+})
 public class UserModel extends BaseEntity {
 
     private String userid;
@@ -24,7 +27,7 @@ public class UserModel extends BaseEntity {
             Pattern.compile("^[a-zA-Z0-9]+$");
 
     private static final Pattern PASSWORD_PATTERN =
-            Pattern.compile("^[a-zA-Z0-9!@#$%^&*()_+\\-=]{8,16}$");
+            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=])[a-zA-Z0-9!@#$%^&*()_+\\-=]{8,16}$");
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile(
@@ -34,6 +37,10 @@ public class UserModel extends BaseEntity {
     private static final Pattern BIRTHDAY_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
 
     public static void validatePassword(String rawPassword, String birthDay) {
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 빈값이 들어올 수 없습니다.");
+        }
+        
         if (!PASSWORD_PATTERN.matcher(rawPassword).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
         }
@@ -69,12 +76,20 @@ public class UserModel extends BaseEntity {
     }
 
     private void validateBirthDay(String birthDay) {
+        if (birthDay == null || birthDay.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 빈값이 들어올 수 없습니다.");
+        }
+        
         if (!BIRTHDAY_PATTERN.matcher(birthDay).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식에 맞춰 주세요.");
         }
     }
 
     private void validateEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 빈값이 들어올 수 없습니다.");
+        }
+        
         if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
         }
