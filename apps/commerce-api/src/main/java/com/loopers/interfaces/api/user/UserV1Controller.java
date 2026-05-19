@@ -49,7 +49,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         @RequestHeader("X-Loopers-LoginId")
         @Pattern(regexp = "^[A-Za-z0-9]{1,10}$", message = "로그인 ID는 영문/숫자 1~10자여야 합니다.") String loginId,
         @RequestHeader("X-Loopers-LoginPw") String password,
-        @RequestBody UserV1Dto.ChangePasswordRequest request
+        @RequestBody @Valid UserV1Dto.ChangePasswordRequest request
     ) {
         userFacade.changePassword(loginId, password, request.newPassword());
         return ApiResponse.success(null);

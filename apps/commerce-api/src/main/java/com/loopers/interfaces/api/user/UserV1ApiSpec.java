@@ -22,6 +22,6 @@ public interface UserV1ApiSpec {
     ApiResponse<Void> changePassword(
         @Pattern(regexp = "^[A-Za-z0-9]{1,10}$", message = "로그인 ID는 영문/숫자 1~10자여야 합니다.") String loginId,
         String password,
-        UserV1Dto.ChangePasswordRequest request
+        @Valid UserV1Dto.ChangePasswordRequest request
     );
 }
