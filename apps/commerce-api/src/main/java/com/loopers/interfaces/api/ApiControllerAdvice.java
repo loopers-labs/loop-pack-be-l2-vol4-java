@@ -18,10 +18,12 @@ import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.hibernate.exception.ConstraintViolationException;
+
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestControllerAdvice
 @Slf4j
@@ -34,10 +36,14 @@ public class ApiControllerAdvice {
 
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handleValidation(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getFieldErrors().stream()
-                .map(error -> String.format("'%s': %s", error.getField(), error.getDefaultMessage()))
-                .collect(Collectors.joining(", "));
-        return failureResponse(ErrorType.BAD_REQUEST, message);
+        String message = Stream.concat(
+                e.getBindingResult().getFieldErrors().stream()
+                        .map(error -> String.format("'%s': %s", error.getField(), error.getDefaultMessage())),
+                e.getBindingResult().getGlobalErrors().stream()
+                        .map(error -> error.getDefaultMessage() == null ? "요청 값이 유효하지 않습니다." : error.getDefaultMessage())
+        ).collect(Collectors.joining(", "));
+
+        return failureResponse(ErrorType.BAD_REQUEST, message.isBlank() ? ErrorType.BAD_REQUEST.getMessage() : message);
     }
 
     @ExceptionHandler
@@ -115,9 +121,14 @@ public class ApiControllerAdvice {
 
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handleConflict(DataIntegrityViolationException e) {
-        if (e.getCause() instanceof ConstraintViolationException constraintEx) {
+        Throwable cause = e.getCause();
+        while (cause != null && !(cause instanceof ConstraintViolationException)) {
+            cause = cause.getCause();
+        }
+
+        if (cause instanceof ConstraintViolationException constraintEx) {
             String constraintName = constraintEx.getConstraintName();
-            if (constraintName != null && constraintName.contains("uq_")) {
+            if (constraintName != null && constraintName.toLowerCase().contains("uq_")) {
                 return failureResponse(ErrorType.CONFLICT, null);
             }
         }
