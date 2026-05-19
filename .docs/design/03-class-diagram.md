@@ -11,6 +11,10 @@ classDiagram
         +Long id
         +LocalDateTime createdAt
         +LocalDateTime updatedAt
+    }
+
+    class SoftDeletableEntity {
+        <<abstract>>
         +LocalDateTime deletedAt
         +delete() void
         +restore() void
@@ -66,9 +70,10 @@ classDiagram
         +OrderItemModel(orderId, productId, productName, price, quantity)
     }
 
-    BaseEntity <|-- UserModel
-    BaseEntity <|-- BrandModel
-    BaseEntity <|-- ProductModel
+    BaseEntity <|-- SoftDeletableEntity
+    SoftDeletableEntity <|-- UserModel
+    SoftDeletableEntity <|-- BrandModel
+    SoftDeletableEntity <|-- ProductModel
     BaseEntity <|-- LikeModel
     BaseEntity <|-- OrderModel
     BaseEntity <|-- OrderItemModel

@@ -50,7 +50,6 @@ erDiagram
         BIGINT user_id FK
         DATETIME created_at
         DATETIME updated_at
-        DATETIME deleted_at
     }
 
     order_items {
@@ -62,7 +61,6 @@ erDiagram
         INT quantity
         DATETIME created_at
         DATETIME updated_at
-        DATETIME deleted_at
     }
 
     users ||--o{ likes : ""
@@ -75,6 +73,16 @@ erDiagram
 ---
 
 ## 설계 결정 사항
+
+### BaseEntity / SoftDeletableEntity 분리
+`BaseEntity`는 `id`, `created_at`, `updated_at`만 담당한다. 소프트 딜리트가 필요한 엔티티만 `SoftDeletableEntity`(extends BaseEntity)를 상속해 `deleted_at`, `delete()`, `restore()`를 갖는다.
+
+| 상속 | 테이블 |
+|------|--------|
+| SoftDeletableEntity | users, brands, products |
+| BaseEntity | likes, orders, order_items |
+
+`orders`와 `order_items`는 삭제 시나리오가 없고, 추후 주문 취소가 생기더라도 `deleted_at`이 아닌 `status` 필드로 상태를 표현하는 게 적합하다.
 
 ### likes — deleted_at 없음
 하드 딜리트로 결정했으므로 `deleted_at` 컬럼을 두지 않는다. `BaseEntity`의 `id`, `created_at`, `updated_at`만 상속한다.
