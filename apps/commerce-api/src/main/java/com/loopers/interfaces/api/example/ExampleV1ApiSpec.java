@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.example;
 
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;

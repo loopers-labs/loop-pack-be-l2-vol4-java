@@ -1,4 +1,4 @@
-package com.loopers.interfaces.api;
+package com.loopers.interfaces.api.common.interceptor;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.regex.Pattern;
@@ -26,13 +27,13 @@ public class AuthInterceptor implements HandlerInterceptor {
         String loginId = request.getHeader("X-Loopers-LoginId");
         String password = request.getHeader("X-Loopers-LoginPw");
 
-        if (loginId == null) {
+        if (!StringUtils.hasText(loginId)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "필수 요청 헤더 'X-Loopers-LoginId'가 누락되었습니다.");
         }
         if (!LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 영문/숫자 1~10자여야 합니다.");
         }
-        if (password == null) {
+        if (!StringUtils.hasText(password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "필수 요청 헤더 'X-Loopers-LoginPw'가 누락되었습니다.");
         }
 

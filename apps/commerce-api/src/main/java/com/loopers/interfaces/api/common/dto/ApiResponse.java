@@ -1,4 +1,4 @@
-package com.loopers.interfaces.api;
+package com.loopers.interfaces.api.common.dto;
 
 public record ApiResponse<T>(Metadata meta, T data) {
     public record Metadata(Result result, String errorCode, String message) {

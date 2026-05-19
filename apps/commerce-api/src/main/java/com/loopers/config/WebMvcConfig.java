@@ -1,6 +1,6 @@
 package com.loopers.config;
 
-import com.loopers.interfaces.api.AuthInterceptor;
+import com.loopers.interfaces.api.common.interceptor.AuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
