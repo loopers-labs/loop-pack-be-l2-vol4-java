@@ -1,6 +1,6 @@
 # 02. 시퀀스 다이어그램
 
-각 유스케이스(`01-requirements.md` §5 참조)의 흐름을 레이어별 참여자 기준으로 시각화한다. 다이어그램은 Mermaid `sequenceDiagram` 문법으로 작성하며, 흐름 분기·조건은 `alt`/`opt` 블록으로 표현한다.
+각 유스케이스(`01-requirements.md` §6 참조)의 흐름을 레이어별 참여자 기준으로 시각화한다. 다이어그램은 Mermaid `sequenceDiagram` 문법으로 작성하며, 흐름 분기·조건은 `alt`/`opt` 블록으로 표현한다.
 
 ## 0. 표기 규칙
 
@@ -32,7 +32,7 @@
 ### 0.3 생략 규칙
 
 - 인증 헤더 검증(`AuthInterceptor` 류) 같은 횡단 관심사는 다이어그램에서 별도 표기하지 않고 Controller 진입을 인증 성공 전제로 시작한다. 인증 실패는 §0.4 공통 에러로 위임.
-- 행동 로깅(`§8.4 audit`)은 메인 흐름 마지막에 비동기 `--)` 한 줄로 표현하고 상세는 생략.
+- 행동 로깅(01 §7.7 활동 기록)은 메인 흐름 마지막에 비동기 `--)` 한 줄로 표현하고 상세는 생략.
 - 응답 변환(`Model → Info → Dto`) 단계는 다이어그램에서 한 줄로 압축한다.
 
 ### 0.4 공통 에러 (모든 UC 공통)
@@ -109,7 +109,7 @@ sequenceDiagram
 
 ## UC-03. 상품 목록 둘러보기
 
-`likedByMe`는 페이지 내 productId 집합에 대해 **단일 IN 쿼리 1회**로 일괄 조회 (N+1 회피, §7.4).
+`likedByMe`는 페이지 내 productId 집합에 대해 **단일 IN 쿼리 1회**로 일괄 조회 (N+1 회피 — 04 §3 인덱스 전략).
 
 ```mermaid
 sequenceDiagram
@@ -124,7 +124,7 @@ sequenceDiagram
     C->>Ctrl: GET /api/v1/products?brandId=&sort=&page=&size=
     Ctrl->>Fac: getProducts(query, userId?)
     Fac->>PSvc: findPage(brandId, sort, page, size)
-    PSvc->>PRepo: findActivePage(brandId, sort, pageable)
+    PSvc->>PRepo: findActivePage(brandId, sort, pageable)/
     PRepo-->>PSvc: Page<ProductModel>
     PSvc-->>Fac: Page<ProductModel>
     alt userId 존재 (인증)
@@ -141,7 +141,7 @@ sequenceDiagram
 ```
 
 **비고**
-- `likes_desc` 정렬은 `products.likesCount` 비정규화 컬럼 기준 (실시간 COUNT 금지, §8.3)
+- `likes_desc` 정렬은 `products.likesCount` 비정규화 컬럼 기준 (실시간 COUNT 금지 — 01 §7.3 좋아요 수 표시, 04 §2.3)
 - 정렬 안정성을 위해 모든 정렬에 `productId DESC` tiebreaker 적용
 
 ---
@@ -181,7 +181,7 @@ sequenceDiagram
 
 ## UC-05. 상품 좋아요 등록
 
-기존 행이 있고 `deleted=true`면 INSERT 대신 **reactivate**(UPDATE). MariaDB 부분 인덱스 미지원 회피 — `UNIQUE(userId, productId)` 제약과 양립 (§8.2).
+기존 행이 있고 `deleted=true`면 INSERT 대신 **reactivate**(UPDATE). MariaDB 부분 인덱스 미지원 회피 — `UNIQUE(userId, productId)` 제약과 양립 (01 §7.5 비활성 처리·전파, 04 §4.4).
 
 ```mermaid
 sequenceDiagram
@@ -321,19 +321,16 @@ sequenceDiagram
     participant Ctrl as OrderV1Controller
     participant Fac as OrderFacade
     participant PSvc as ProductService
-    participant USvc as UserService
     participant OSvc as OrderService
     participant P as ProductModel
-    participant U as UserModel
     participant O as OrderModel
     participant PRepo as ProductRepository
-    participant URepo as UserRepository
     participant ORepo as OrderRepository
     participant PG as PaymentGateway
 
-    C->>Ctrl: POST /api/v1/orders {items, usedPoint, paymentMethod}
+    C->>Ctrl: POST /api/v1/orders {items, paymentMethod}
     Ctrl->>Fac: placeOrder(userId, command)
-    Fac->>Fac: 입력 검증 (items 1+, qty 1+, productId 중복, usedPoint≥0)
+    Fac->>Fac: 입력 검증 (items 1+, qty 1+, productId 중복)
 
     Note over Fac,ORepo: @Transactional 시작
     Fac->>PSvc: deductStocks(items)
@@ -344,20 +341,14 @@ sequenceDiagram
     end
     PSvc-->>Fac: 단가 포함 priced items
 
-    Fac->>USvc: usePoint(userId, usedPoint)
-    USvc->>U: usePoint(usedPoint)
-    Note over U: 원자 UPDATE\nWHERE point >= usedPoint
-    U-->>USvc: ok | INSUFFICIENT_POINT
-    USvc-->>Fac: ok
-
-    Fac->>OSvc: create(userId, pricedItems, usedPoint, paymentMethod)
+    Fac->>OSvc: create(userId, pricedItems, paymentMethod)
     OSvc->>O: new OrderModel(... status=PENDING)
     OSvc->>ORepo: save(order)
     ORepo-->>OSvc: OrderModel (orderId)
     OSvc-->>Fac: OrderModel
     Note over Fac,ORepo: 커밋
 
-    Fac->>PG: pay(orderId, paidAmount, paymentMethod)
+    Fac->>PG: pay(orderId, totalAmount, paymentMethod)
     PG-->>Fac: PaymentResult(SUCCESS)
 
     Note over Fac: @Transactional (보조)
@@ -375,7 +366,7 @@ sequenceDiagram
 
 ## UC-08b. 상품 주문·결제 — PG 실패 (보상 트랜잭션)
 
-PG 호출 결과가 실패면 **보상 트랜잭션**으로 재고/포인트 원복 + `Order.status=FAILED`.
+PG 호출 결과가 실패면 **보상 트랜잭션**으로 재고 원복 + `Order.status=FAILED`.
 
 ```mermaid
 sequenceDiagram
@@ -383,15 +374,13 @@ sequenceDiagram
     participant Ctrl as OrderV1Controller
     participant Fac as OrderFacade
     participant PSvc as ProductService
-    participant USvc as UserService
     participant OSvc as OrderService
     participant P as ProductModel
-    participant U as UserModel
     participant O as OrderModel
     participant PG as PaymentGateway
 
-    Note over C,O: UC-08a Main Flow와 동일하게 재고·포인트 차감 + Order(PENDING) 커밋까지 진행
-    Fac->>PG: pay(orderId, paidAmount, paymentMethod)
+    Note over C,O: UC-08a Main Flow와 동일하게 재고 차감 + Order(PENDING) 커밋까지 진행
+    Fac->>PG: pay(orderId, totalAmount, paymentMethod)
     PG-->>Fac: PaymentResult(FAILED, reason)
 
     Note over Fac: 보상 @Transactional 시작
@@ -400,9 +389,6 @@ sequenceDiagram
         PSvc->>P: restoreStock(qty)
         Note over P: SET stock = stock + qty
     end
-    Fac->>USvc: restorePoint(userId, usedPoint)
-    USvc->>U: restorePoint(usedPoint)
-    Note over U: SET point = point + usedPoint
     Fac->>OSvc: markFailed(orderId, reason)
     OSvc->>O: markFailed(reason)
     Note over O: status=FAILED, failureReason=reason
@@ -415,13 +401,12 @@ sequenceDiagram
 
 **비고**
 - 보상 트랜잭션 자체가 실패하면 `Order.status=PENDING` 잔존 → reconcile job이 후처리 (UC-08c와 동일 경로)
-- `usedPoint=0`이면 포인트 복원 단계 생략
 
 ---
 
 ## UC-08c. 상품 주문·결제 — PG 타임아웃 (PENDING + Reconcile)
 
-PG 응답이 없거나 타임아웃이면 **재고/포인트 차감 상태 유지** + `Order=PENDING`. 비동기 reconcile job이 최종 상태 확정.
+PG 응답이 없거나 타임아웃이면 **재고 차감 상태 유지** + `Order=PENDING`. 비동기 reconcile job이 최종 상태 확정.
 
 ```mermaid
 sequenceDiagram
@@ -432,13 +417,13 @@ sequenceDiagram
     participant PG as PaymentGateway
     participant Recon as ReconcileJob
 
-    Note over C,Fac: UC-08a Main Flow와 동일하게 재고·포인트 차감 + Order(PENDING) 커밋
+    Note over C,Fac: UC-08a Main Flow와 동일하게 재고 차감 + Order(PENDING) 커밋
 
-    Fac->>PG: pay(orderId, paidAmount, paymentMethod)
+    Fac->>PG: pay(orderId, totalAmount, paymentMethod)
     Note over PG: 타임아웃 (응답 없음)
     PG--xFac: TimeoutException
 
-    Note over Fac: 추가 보상 없이 PENDING 유지\n(재고·포인트는 차감 상태)
+    Note over Fac: 추가 보상 없이 PENDING 유지\n(재고는 차감 상태)
     Fac-->>C: 202 ACCEPTED + OrderDto (status=PENDING)
 
     rect rgb(245, 245, 245)
@@ -451,7 +436,7 @@ sequenceDiagram
         else PG 결과 FAILED
             PG-->>Recon: FAILED
             Recon->>OSvc: markFailedAndCompensate(orderId)
-            Note over OSvc: 재고/포인트 복원 + status=FAILED
+            Note over OSvc: 재고 복원 + status=FAILED
         else PG 여전히 미확정 또는 미응답
             Recon-->>Recon: 다음 사이클까지 보류
         end
@@ -486,13 +471,13 @@ sequenceDiagram
 ```
 
 **비고**
-- 타인 주문 요청도 동일하게 `404` 반환 — orderId 존재 여부 누설 방지 (§8.5)
+- 타인 주문 요청도 동일하게 `404` 반환 — orderId 존재 여부 누설 방지 (01 §7.4 본인 자원 접근 정책)
 
 ---
 
 ## UC-10. (Admin) 브랜드 삭제 — Cascade
 
-Brand → Product → Like cascade soft delete. Order/OrderItem은 영향 없음 (§8.2).
+Brand → Product → Like cascade soft delete. Order/OrderItem은 영향 없음 (01 §7.5).
 
 ```mermaid
 sequenceDiagram
@@ -601,17 +586,17 @@ sequenceDiagram
 
 | 다이어그램 | 요구사항 UC | 핵심 분기·메모 |
 | --- | --- | --- |
-| UC-01 | §5 UC-01 | 인증 헤더가 현재 비번 확인 매개체 |
-| UC-02 | §5 UC-02 | soft delete cascade 검사 |
-| UC-03 | §5 UC-03 | likedByMe IN 쿼리 일괄 조회 (N+1 회피) |
-| UC-04 | §5 UC-04 | 인증 시에만 like 조회 |
-| UC-05 | §5 UC-05 | reactivate 분기, likesCount 원자 UPDATE |
-| UC-06 | §5 UC-06 | softDelete 분기, likesCount 음수 방지 |
-| UC-07 | §5 UC-07 | 좋아요 시점순, cascade 자동 제외 |
-| UC-08a | §5 UC-08 Main | PG는 트랜잭션 커밋 후 |
-| UC-08b | §5 UC-08 E10 | 보상 트랜잭션 |
-| UC-08c | §5 UC-08 E11 | PENDING + reconcile job |
-| UC-09 | §5 UC-09 | 본인 외 = 404 |
-| UC-10 | §5 UC-10 | Brand→Product→Like cascade |
-| UC-11 | §5 UC-11 | Product→Like cascade |
-| UC-12 | §5 UC-12 | 본인 격리 미적용, audit 필수 |
+| UC-01 | §6 UC-01 | 인증 헤더가 현재 비번 확인 매개체 |
+| UC-02 | §6 UC-02 | soft delete cascade 검사 |
+| UC-03 | §6 UC-03 | likedByMe IN 쿼리 일괄 조회 (N+1 회피) |
+| UC-04 | §6 UC-04 | 인증 시에만 like 조회 |
+| UC-05 | §6 UC-05 | reactivate 분기, likesCount 원자 UPDATE |
+| UC-06 | §6 UC-06 | softDelete 분기, likesCount 음수 방지 |
+| UC-07 | §6 UC-07 | 좋아요 시점순, cascade 자동 제외 |
+| UC-08a | §6 UC-08 정상 흐름 | PG는 트랜잭션 커밋 후 |
+| UC-08b | §6 UC-08 결제 실패 | 보상 트랜잭션 |
+| UC-08c | §6 UC-08 응답 지연 | PENDING + reconcile job |
+| UC-09 | §6 UC-09 | 본인 외 = 404 |
+| UC-10 | §6 UC-10 | Brand→Product→Like cascade |
+| UC-11 | §6 UC-11 | Product→Like cascade |
+| UC-12 | §6 UC-12 | 본인 격리 미적용, audit 필수 |
