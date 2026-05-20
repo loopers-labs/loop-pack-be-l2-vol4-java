@@ -9,6 +9,9 @@ classDiagram
     class ProductModel {
         +Long brandId
         +Long price
+        +Long likeCount
+        +increaseLike()
+        +decreaseLike()
     }
 
     class StockModel {
