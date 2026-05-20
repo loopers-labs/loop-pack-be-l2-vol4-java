@@ -18,10 +18,7 @@ public class UserV1Dto {
     ) {}
 
     public record ChangeUserPasswordRequest(
-        @NotBlank @Pattern(
-            regexp = "^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]{8,16}$",
-            message = "비밀번호 생성 규칙 위반 : 8 ~ 16자의 영문 대소문자, 숫자, 특수문자만 가능합니다"
-        ) String oldPassword,
+        @NotBlank String oldPassword,
         @NotBlank @Pattern(
             regexp = "^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]{8,16}$",
             message = "비밀번호 생성 규칙 위반 : 8 ~ 16자의 영문 대소문자, 숫자, 특수문자만 가능합니다"

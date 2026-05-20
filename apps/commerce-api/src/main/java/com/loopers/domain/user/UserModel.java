@@ -12,6 +12,9 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
+import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -61,6 +64,10 @@ public class UserModel extends BaseEntity {
     }
 
     public void validPasswordChange(String oldPassword, String targetPassword, PasswordMatcher matcher) {
+        Objects.requireNonNull(matcher, "PasswordMatcher 초기화가 되지 않았습니다.");
+        if (oldPassword == null || targetPassword == null) {
+            throw new IllegalArgumentException("비밀번호는 null일 수 없습니다.");
+        }
         if (!matcher.matches(oldPassword, this.password)) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
@@ -71,6 +78,9 @@ public class UserModel extends BaseEntity {
     }
 
     private static void validatePassword(String rawPassword, BirthVO birthVO) {
+        if (rawPassword == null || birthVO == null) {
+            throw new IllegalArgumentException("비밀번호와 생년월일은 null일 수 없습니다.");
+        }
         if (!PATTERN.matcher(rawPassword).matches()) {
             throw new IllegalArgumentException("비밀번호 생성 규칙 위반 : 8 ~ 16자의 영문 대소문자, 숫자, 특수문자만 가능합니다");
         }

@@ -1,7 +1,5 @@
 package com.loopers.domain.user;
 
-import com.loopers.domain.value.BirthVO;
-import com.loopers.domain.value.EmailVO;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +14,7 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public UserModel createUserModel(String loginId, String name, String password, BirthVO birthVO, EmailVO emailVO) {
-        UserModel userModel = UserModel.of(loginId, name, password, birthVO, emailVO);
+    public UserModel createUserModel(UserModel userModel) {
         return userRepository.save(userModel);
     }
 

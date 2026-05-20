@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +36,7 @@ public class UserV1Controller implements UserV1ApiSpec {
     @PatchMapping("/{id}")
     @Override
     public ApiResponse<Object> updateUserPassword(
-        @PathVariable Long id,
+        @PathVariable @Positive Long id,
         @RequestBody @Valid UserV1Dto.ChangeUserPasswordRequest request
     ) {
         userFacade.changePassword(id, request.oldPassword(), request.targetPassword());
@@ -45,7 +46,7 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @GetMapping("/{id}")
     @Override
-    public ApiResponse<UserV1Dto.UserResponse> getUserResponse(@PathVariable Long id) {
+    public ApiResponse<UserV1Dto.UserResponse> getUserResponse(@PathVariable @Positive Long id) {
         UserInfo userInfo = userFacade.getUserInfo(id);
 
         UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(userInfo);

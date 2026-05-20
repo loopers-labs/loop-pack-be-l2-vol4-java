@@ -20,7 +20,7 @@ class UserServiceTest {
         UserModelFixture defaults = UserModelFixture.defaults();
 
         // when
-        var result = userService.createUserModel(defaults.loginId(), defaults.name(), defaults.password(), new BirthVO(defaults.birth()), new EmailVO(defaults.email()));
+        var result = userService.createUserModel(defaults.toModel());
 
         // then
         Assertions.assertNotNull(result);

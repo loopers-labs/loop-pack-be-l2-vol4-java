@@ -21,8 +21,8 @@ public interface UserV1ApiSpec {
     );
 
     @Operation(
-        summary = "유저 생성",
-        description = "CreateUserRequest로 유저를 생성합니다."
+        summary = "유저 비밀번호 변경",
+        description = "ChangeUserPasswordRequest로 유저 비밀번호를 변경합니다."
     )
     ApiResponse<Object> updateUserPassword(
         @Schema(name = "유저 ID", description = "조회할 유저의 ID")
