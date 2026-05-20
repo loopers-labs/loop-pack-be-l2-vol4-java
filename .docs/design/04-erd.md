@@ -48,6 +48,7 @@ erDiagram
     orders {
         BIGINT id PK
         BIGINT user_id
+        VARCHAR status
         DATETIME created_at
         DATETIME updated_at
     }

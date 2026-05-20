@@ -19,8 +19,8 @@ sequenceDiagram
     Facade->>+Service: findProducts(sort, brandId, page)
     Service->>+DB: SELECT products (filter + sort + pagination)
     DB-->>-Service: product list
-    Service-->>-Facade: product list
-    Facade-->>-Controller: product list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Client: 200
 ```
 
@@ -41,15 +41,16 @@ sequenceDiagram
     Facade->>+Service: getProduct(productId)
     Service->>+DB: SELECT product WHERE id = productId
     DB-->>-Service: product | null
-    Service-->>-Facade: product | null
+    deactivate Service
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Client: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Client: 404
     else 상품 존재
-        Facade-->>-Controller: product
-        Controller-->>-Client: 200
+        Controller-->>Client: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -69,15 +70,16 @@ sequenceDiagram
     Facade->>+Service: getBrand(brandId)
     Service->>+DB: SELECT brand WHERE id = brandId
     DB-->>-Service: brand | null
-    Service-->>-Facade: brand | null
+    deactivate Service
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Client: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Client: 404
     else 브랜드 존재
-        Facade-->>-Controller: brand
-        Controller-->>-Client: 200
+        Controller-->>Client: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -102,7 +104,7 @@ sequenceDiagram
     Facade->>+Service: getProduct(productId)
     Service->>+DB: SELECT product WHERE id = productId
     DB-->>-Service: product | null
-    Service-->>-Facade: product | null
+    deactivate Service
 
     alt 상품 없음 또는 삭제됨
         Facade-->>Controller: CoreException(NOT_FOUND)
@@ -111,17 +113,16 @@ sequenceDiagram
         Facade->>+Service: findLike(userId, productId)
         Service->>+DB: SELECT like WHERE userId AND productId
         DB-->>-Service: like | null
-        Service-->>-Facade: like | null
+        deactivate Service
 
         alt 이미 좋아요한 상품
             Facade-->>Controller: CoreException(CONFLICT)
             Controller-->>Client: 409
         else 좋아요 없음
             Facade->>+Service: createLike(userId, productId)
-            Service->>+DB: INSERT like
-            DB-->>-Service: ok
-            Service-->>-Facade: ok
-            Facade-->>Controller: ok
+            Service->>DB: INSERT like
+            Service->>DB: UPDATE products SET like_count = like_count + 1
+            deactivate Service
             Controller-->>Client: 200
         end
     end
@@ -145,19 +146,20 @@ sequenceDiagram
     Facade->>+Service: findLike(userId, productId)
     Service->>+DB: SELECT like WHERE userId AND productId
     DB-->>-Service: like | null
-    Service-->>-Facade: like | null
+    deactivate Service
 
     alt 좋아요 없음
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Client: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Client: 404
     else 좋아요 존재
         Facade->>+Service: deleteLike(like)
-        Service->>+DB: DELETE like
-        DB-->>-Service: ok
-        Service-->>-Facade: ok
-        Facade-->>-Controller: ok
-        Controller-->>-Client: 200
+        Service->>DB: DELETE like
+        Service->>DB: UPDATE products SET like_count = like_count - 1
+        deactivate Service
+        Controller-->>Client: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 4-3. 내 좋아요 목록 조회
@@ -175,8 +177,8 @@ sequenceDiagram
     Facade->>+Service: findLikes(userId)
     Service->>+DB: SELECT likes WHERE userId
     DB-->>-Service: like list
-    Service-->>-Facade: like list
-    Facade-->>-Controller: like list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Client: 200
 ```
 
@@ -206,12 +208,10 @@ sequenceDiagram
             Service->>+DB: SELECT product
             DB-->>-Service: product | null
             alt 상품 없음 또는 삭제됨
-                Service-->>-Facade: CoreException(NOT_FOUND)
                 Facade-->>Controller: CoreException(NOT_FOUND)
                 Controller-->>Client: 404
-            else 상품 존재
-                Service-->>-Facade: product
             end
+            deactivate Service
         end
 
         Note over Service,DB: 비관적 락 (PESSIMISTIC_WRITE)
@@ -220,22 +220,18 @@ sequenceDiagram
             Service->>+DB: SELECT product FOR UPDATE
             DB-->>-Service: product (locked)
             alt 재고 부족
-                Service-->>-Facade: CoreException(BAD_REQUEST)
                 Facade-->>Controller: CoreException(BAD_REQUEST)
                 Controller-->>Client: 400
             else 재고 충분
-                Service->>+DB: UPDATE stock -= quantity
-                DB-->>-Service: ok
-                Service-->>-Facade: ok
+                Service->>DB: UPDATE stock -= quantity
             end
+            deactivate Service
         end
 
         Facade->>+Service: createOrder(userId, snapshots)
         Note right of Service: 상품명·가격 스냅샷 저장
-        Service->>+DB: INSERT order + orderItems
-        DB-->>-Service: ok
-        Service-->>-Facade: order
-        Facade-->>Controller: order
+        Service->>DB: INSERT order + orderItems
+        deactivate Service
         Controller-->>Client: 201
     end
     deactivate Facade
@@ -261,8 +257,8 @@ sequenceDiagram
     Facade->>+Service: findOrders(userId, startAt, endAt)
     Service->>+DB: SELECT orders WHERE userId AND createdAt BETWEEN startAt AND endAt
     DB-->>-Service: order list
-    Service-->>-Facade: order list
-    Facade-->>-Controller: order list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Client: 200
 ```
 
@@ -281,7 +277,7 @@ sequenceDiagram
     Facade->>+Service: getOrder(orderId)
     Service->>+DB: SELECT order WHERE id = orderId
     DB-->>-Service: order | null
-    Service-->>-Facade: order | null
+    deactivate Service
 
     alt 주문 없음
         Facade-->>Controller: CoreException(NOT_FOUND)
@@ -291,7 +287,6 @@ sequenceDiagram
             Facade-->>Controller: CoreException(FORBIDDEN)
             Controller-->>Client: 403
         else 본인의 주문
-            Facade-->>Controller: order
             Controller-->>Client: 200
         end
     end
@@ -317,16 +312,16 @@ sequenceDiagram
     Controller->>+Facade: createBrand(name, ...)
 
     alt 브랜드명 없음
-        Facade-->>-Controller: CoreException(BAD_REQUEST)
-        Controller-->>-Admin: 400
+        Facade-->>Controller: CoreException(BAD_REQUEST)
+        Controller-->>Admin: 400
     else 유효한 입력
         Facade->>+Service: createBrand(name, ...)
-        Service->>+DB: INSERT brand
-        DB-->>-Service: ok
-        Service-->>-Facade: brand
-        Facade-->>-Controller: brand
-        Controller-->>-Admin: 201
+        Service->>DB: INSERT brand
+        deactivate Service
+        Controller-->>Admin: 201
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 7-2. 브랜드 목록 조회
@@ -344,8 +339,8 @@ sequenceDiagram
     Facade->>+Service: findBrands(page, size)
     Service->>+DB: SELECT brands (pagination)
     DB-->>-Service: brand list
-    Service-->>-Facade: brand list
-    Facade-->>-Controller: brand list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Admin: 200
 ```
 
@@ -364,15 +359,16 @@ sequenceDiagram
     Facade->>+Service: getBrand(brandId)
     Service->>+DB: SELECT brand WHERE id = brandId
     DB-->>-Service: brand | null
-    Service-->>-Facade: brand | null
+    deactivate Service
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 브랜드 존재
-        Facade-->>-Controller: brand
-        Controller-->>-Admin: 200
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 7-4. 브랜드 수정
@@ -390,19 +386,19 @@ sequenceDiagram
     Facade->>+Service: getBrand(brandId)
     Service->>+DB: SELECT brand WHERE id = brandId
     DB-->>-Service: brand | null
-    Service-->>-Facade: brand | null
+    deactivate Service
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 브랜드 존재
         Facade->>+Service: updateBrand(brand, name, ...)
-        Service->>+DB: UPDATE brand
-        DB-->>-Service: ok
-        Service-->>-Facade: brand
-        Facade-->>-Controller: brand
-        Controller-->>-Admin: 200
+        Service->>DB: UPDATE brand
+        deactivate Service
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 7-5. 브랜드 삭제
@@ -423,22 +419,21 @@ sequenceDiagram
     Facade->>+Service: getBrand(brandId)
     Service->>+DB: SELECT brand WHERE id = brandId
     DB-->>-Service: brand | null
-    Service-->>-Facade: brand | null
+    deactivate Service
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 브랜드 존재
         Facade->>+Service: deleteBrand(brand)
         Note over Service,DB: @Transactional
-        Service->>+DB: soft delete products WHERE brandId
-        DB-->>-Service: ok
-        Service->>+DB: soft delete brand
-        DB-->>-Service: ok
-        Service-->>-Facade: ok
-        Facade-->>-Controller: ok
-        Controller-->>-Admin: 200
+        Service->>DB: soft delete products WHERE brandId
+        Service->>DB: soft delete brand
+        deactivate Service
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -465,17 +460,15 @@ sequenceDiagram
         Facade->>+Service: getBrand(brandId)
         Service->>+DB: SELECT brand WHERE id = brandId
         DB-->>-Service: brand | null
-        Service-->>-Facade: brand | null
+        deactivate Service
 
         alt 브랜드 없음 또는 삭제됨
             Facade-->>Controller: CoreException(NOT_FOUND)
             Controller-->>Admin: 404
         else 브랜드 존재
             Facade->>+Service: createProduct(brand, name, price, stock, description)
-            Service->>+DB: INSERT product
-            DB-->>-Service: ok
-            Service-->>-Facade: product
-            Facade-->>Controller: product
+            Service->>DB: INSERT product
+            deactivate Service
             Controller-->>Admin: 201
         end
     end
@@ -498,8 +491,8 @@ sequenceDiagram
     Facade->>+Service: findProducts(page, size, brandId)
     Service->>+DB: SELECT products (filter + pagination)
     DB-->>-Service: product list
-    Service-->>-Facade: product list
-    Facade-->>-Controller: product list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Admin: 200
 ```
 
@@ -518,15 +511,16 @@ sequenceDiagram
     Facade->>+Service: getProduct(productId)
     Service->>+DB: SELECT product WHERE id = productId
     DB-->>-Service: product | null
-    Service-->>-Facade: product | null
+    deactivate Service
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 상품 존재
-        Facade-->>-Controller: product
-        Controller-->>-Admin: 200
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 8-4. 상품 수정
@@ -544,7 +538,7 @@ sequenceDiagram
     Facade->>+Service: getProduct(productId)
     Service->>+DB: SELECT product WHERE id = productId
     DB-->>-Service: product | null
-    Service-->>-Facade: product | null
+    deactivate Service
 
     alt 상품 없음 또는 삭제됨
         Facade-->>Controller: CoreException(NOT_FOUND)
@@ -555,10 +549,8 @@ sequenceDiagram
             Controller-->>Admin: 400
         else 브랜드 변경 없음
             Facade->>+Service: updateProduct(product, name, price, stock, description)
-            Service->>+DB: UPDATE product
-            DB-->>-Service: ok
-            Service-->>-Facade: product
-            Facade-->>Controller: product
+            Service->>DB: UPDATE product
+            deactivate Service
             Controller-->>Admin: 200
         end
     end
@@ -581,19 +573,19 @@ sequenceDiagram
     Facade->>+Service: getProduct(productId)
     Service->>+DB: SELECT product WHERE id = productId
     DB-->>-Service: product | null
-    Service-->>-Facade: product | null
+    deactivate Service
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 상품 존재
         Facade->>+Service: deleteProduct(product)
-        Service->>+DB: soft delete product
-        DB-->>-Service: ok
-        Service-->>-Facade: ok
-        Facade-->>-Controller: ok
-        Controller-->>-Admin: 200
+        Service->>DB: soft delete product
+        deactivate Service
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -615,8 +607,8 @@ sequenceDiagram
     Facade->>+Service: findAllOrders(page, size)
     Service->>+DB: SELECT orders (pagination)
     DB-->>-Service: order list
-    Service-->>-Facade: order list
-    Facade-->>-Controller: order list
+    deactivate Service
+    deactivate Facade
     Controller-->>-Admin: 200
 ```
 
@@ -635,13 +627,14 @@ sequenceDiagram
     Facade->>+Service: getOrder(orderId)
     Service->>+DB: SELECT order WHERE id = orderId
     DB-->>-Service: order | null
-    Service-->>-Facade: order | null
+    deactivate Service
 
     alt 주문 없음
-        Facade-->>-Controller: CoreException(NOT_FOUND)
-        Controller-->>-Admin: 404
+        Facade-->>Controller: CoreException(NOT_FOUND)
+        Controller-->>Admin: 404
     else 주문 존재
-        Facade-->>-Controller: order
-        Controller-->>-Admin: 200
+        Controller-->>Admin: 200
     end
+    deactivate Facade
+    deactivate Controller
 ```

@@ -57,6 +57,7 @@ classDiagram
 
     class OrderModel {
         +Long userId
+        +OrderStatus status
         +List~OrderItemModel~ items
         +OrderModel(userId, items)
     }
