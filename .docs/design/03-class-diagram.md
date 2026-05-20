@@ -121,18 +121,3 @@ classDiagram
 ### likeCount 역정규화 ↔ decrementStock 비관적 락
 둘 다 `ProductModel`의 같은 row를 업데이트한다. 주문(`SELECT ... FOR UPDATE`)과 좋아요(`UPDATE like_count = like_count ± 1`)가 같은 상품에 동시에 발생하면 likeCount UPDATE가 락 해제를 기다려야 한다. 기능상 문제는 없지만 주문이 많은 상품일수록 좋아요 응답도 같이 느려질 수 있다.
 
----
-
-## 소프트 딜리트로 변경 시 수정 사항
-
-### 클래스 다이어그램
-- LikeModel 취소 시 `delete()` 호출 (deletedAt 설정)
-- 재좋아요 시 `restore()`로 기존 deleted 레코드 복원
-
-### ERD
-- `likes` 테이블에 `deleted_at` 컬럼 유지
-- `(user_id, product_id)` 유니크 제약이 soft-deleted 레코드와 충돌한다. MySQL은 partial unique index를 지원하지 않으므로 DB 레벨 단순 유니크 제약 대신 애플리케이션 레벨에서 중복 검증을 처리해야 한다.
-
-### Service 로직
-- 좋아요 등록 시: 기존 deleted 레코드 존재 여부 확인 후 `restore()` 또는 신규 INSERT 분기 필요
-- likeCount 연동: `delete()` 시 `likeRemoved()`, `restore()` 시 `likeAdded()` 명시적 호출 필요. BaseEntity가 likeCount를 모르므로 Service에서 항상 짝으로 챙겨야 하며, 누락 시 정합성이 깨진다.

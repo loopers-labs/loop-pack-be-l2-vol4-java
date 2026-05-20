@@ -113,10 +113,11 @@ erDiagram
 
 | 테이블 | 인덱스명 | 컬럼 | 목적 |
 |--------|----------|------|------|
-| products | idx_products_brand_id | brand_id | 브랜드 필터 |
-| products | idx_products_like_count | like_count DESC | likes_desc 정렬 |
-| products | idx_products_price | price ASC | price_asc 정렬 |
+| products | idx_products_brand_deleted | (brand_id, deleted_at) | 브랜드 필터 |
+| products | idx_products_deleted_likes | (deleted_at, like_count) | likes_desc 정렬 |
+| products | idx_products_deleted_price | (deleted_at, price) | price_asc 정렬 |
+| products | idx_products_deleted_created | (deleted_at, created_at) | latest 정렬 |
 | likes | uk_likes_user_product | (user_id, product_id) | 중복 체크 (UK가 인덱스 겸용) |
 | likes | idx_likes_user_id | user_id | 내 좋아요 목록 조회 |
 | orders | idx_orders_user_created | (user_id, created_at) | 날짜 범위 주문 목록 조회 |
-| order_items | idx_order_items_order_id | order_id | 주문 항목 조회 (FK 인덱스 겸용) |
+| order_items | idx_order_items_order_id | order_id | 주문 항목 조회 |
