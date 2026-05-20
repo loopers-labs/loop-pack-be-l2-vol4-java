@@ -5,24 +5,24 @@
 
 ## 읽는 법
 
-| 관계 기호 | 의미 |
-|---------|------|
-| `*--` | 컴포지션 — 생명주기 공유 (부모 없으면 자식도 없음) |
-| `o--` | 어그리게이션 — 느슨한 포함 |
-| `-->` | 연관 — 객체 참조 보유 |
-| `..>` | 의존 — 메서드 호출·파라미터로만 사용 |
-| `..|>` | 구현 — 인터페이스 실체화 |
+| 관계 기호 | 의미                                               |                          |
+|-----------|----------------------------------------------------|--------------------------|
+| `*--`     | 컴포지션 — 생명주기 공유 (부모 없으면 자식도 없음) |                          |
+| `o--`     | 어그리게이션 — 느슨한 포함                         |                          |
+| `-->`     | 연관 — 객체 참조 보유                              |                          |
+| `..>`     | 의존 — 메서드 호출·파라미터로만 사용               |                          |
+| `..       | >`                                                 | 구현 — 인터페이스 실체화 |
 
-| 스테레오타입 | 의미 |
-|------------|------|
-| `<<AggregateRoot>>` | 집합체 루트 — 외부 접근의 유일한 진입점 |
-| `<<Entity>>` | 엔티티 — 식별자가 있는 객체, 애그리거트 내부 |
-| `<<ValueObject>>` | 값 객체 — 불변, 동등성은 값으로 판단 |
-| `<<enumeration>>` | 열거형 |
-| `<<Service>>` | 도메인 서비스 |
-| `<<Repository>>` | 레포지토리 인터페이스 (domain 레이어) |
-| `<<Facade>>` | 퍼사드 — 여러 Service 조율 (application 레이어) |
-| `<<DTO>>` | 레이어 간 데이터 전달 객체 |
+| 스테레오타입        | 의미                                            |
+|---------------------|-------------------------------------------------|
+| `<<AggregateRoot>>` | 집합체 루트 — 외부 접근의 유일한 진입점         |
+| `<<Entity>>`        | 엔티티 — 식별자가 있는 객체, 애그리거트 내부    |
+| `<<ValueObject>>`   | 값 객체 — 불변, 동등성은 값으로 판단            |
+| `<<enumeration>>`   | 열거형                                          |
+| `<<Service>>`       | 도메인 서비스                                   |
+| `<<Repository>>`    | 레포지토리 인터페이스 (domain 레이어)           |
+| `<<Facade>>`        | 퍼사드 — 여러 Service 조율 (application 레이어) |
+| `<<DTO>>`           | 레이어 간 데이터 전달 객체                      |
 
 ---
 
@@ -425,6 +425,11 @@ classDiagram
 담당: 관심 상품 표시. `(userId, productId)` 복합키가 Like의 식별자.  
 Like 등록·취소 시 `Product.likeCount` 변경 — `LikeFacade`가 `LikeService`와 `ProductService` 두 Service를 조율한다.
 
+**멱등성 정책 (완전 멱등):**
+- `POST` (등록): 신규 시 `201 Created`, 중복 시 `200 OK` (likeCount 증분 없이 no-op)
+- `DELETE` (취소): 삭제 성공 시 `204 No Content`, 미존재 시 `204 No Content` (likeCount 감소 없이 no-op)
+- 좋아요는 상태 표현(Binary State Toggle) → REST PUT 시맨틱. 자원 최종 상태가 동일하면 동일 응답.
+
 ```mermaid
 classDiagram
     direction TB
@@ -444,9 +449,11 @@ classDiagram
     class LikeService {
         <<Service>>
         -likeRepository: LikeRepository
-        +checkDuplicateLike(userId, productId) void
+        +checkLikeExists(userId, productId) boolean
+        선제 검사 멱등 분기용
         +createLike(userId, productId) LikeModel
-        +getLikeModel(userId, productId) LikeModel
+        +findLikeModel(userId, productId) Optional~LikeModel~
+        미존재시 멱등 no-op 분기용
         +deleteLike(likeModel) void
         +findLikesByUserId(userId) List~LikeModel~
         +softDeleteByProductIds(productIds) void
@@ -467,8 +474,10 @@ classDiagram
         <<Facade>>
         -likeService: LikeService
         -productService: ProductService
-        +addLike(userId, productId) void
+        +addLike(userId, productId) LikeResult
+        신규 201 중복 200 멱등 no-op
         +removeLike(userId, productId) void
+        미존재시에도 204 멱등 no-op
         +findLikes(requestUserId, pathUserId) List~LikedProductInfo~
     }
 
@@ -750,15 +759,15 @@ classDiagram
 
 ## 설계 요점
 
-| 항목 | 결정 내용 |
-|------|---------|
-| 크로스 애그리거트 참조 | ID(Long)로만 참조. `Product.brandId`, `OrderItem.productId`, `LikeModel.userId·productId` 모두 값 참조. 직접 객체 참조 금지 |
-| Brand·Product 분리 | 두 개의 독립 Aggregate. `Product.reduceStock()`·`incrementLikeCount()`는 Brand 불필요. cascade 삭제는 `AdminBrandFacade`가 Facade 레이어에서 조율 |
-| `Price` 공유 | Brand·Product 컨텍스트와 Order 컨텍스트가 공유하는 값 객체 |
-| `likeCount` 변경 책임 | Like 컨텍스트 소유. `LikeFacade`가 `LikeService` + `ProductService` 두 Service를 조율 |
-| `stock` 차감 책임 | `ProductModel`이 보유하나 차감 호출은 `OrderFacade`가 `ProductService`를 통해 수행 |
-| 스냅샷 | `OrderItemModel`이 `productNameSnapshot` · `unitPriceSnapshot`을 직접 보유. 이후 `ProductModel` 변경 무관 |
-| 소프트 삭제 정책 | Brand·Product: `DELETED` + `deletedAt` 소프트 삭제 후 주기적 하드 삭제. User: `WITHDRAWN` + `withdrawnAt` + 즉시 PII 익명화. Like: 유저 토글은 하드 삭제·cascade는 소프트 삭제. Order·OrderItem: 삭제 불가(영구 보존) |
+| 항목                   | 결정 내용                                                                                                                                                                                                             |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 크로스 애그리거트 참조 | ID(Long)로만 참조. `Product.brandId`, `OrderItem.productId`, `LikeModel.userId·productId` 모두 값 참조. 직접 객체 참조 금지                                                                                           |
+| Brand·Product 분리     | 두 개의 독립 Aggregate. `Product.reduceStock()`·`incrementLikeCount()`는 Brand 불필요. cascade 삭제는 `AdminBrandFacade`가 Facade 레이어에서 조율                                                                     |
+| `Price` 공유           | Brand·Product 컨텍스트와 Order 컨텍스트가 공유하는 값 객체                                                                                                                                                            |
+| `likeCount` 변경 책임  | Like 컨텍스트 소유. `LikeFacade`가 `LikeService` + `ProductService` 두 Service를 조율                                                                                                                                 |
+| `stock` 차감 책임      | `ProductModel`이 보유하나 차감 호출은 `OrderFacade`가 `ProductService`를 통해 수행                                                                                                                                    |
+| 스냅샷                 | `OrderItemModel`이 `productNameSnapshot` · `unitPriceSnapshot`을 직접 보유. 이후 `ProductModel` 변경 무관                                                                                                             |
+| 소프트 삭제 정책       | Brand·Product: `DELETED` + `deletedAt` 소프트 삭제 후 주기적 하드 삭제. User: `WITHDRAWN` + `withdrawnAt` + 즉시 PII 익명화. Like: 유저 토글은 하드 삭제·cascade는 소프트 삭제. Order·OrderItem: 삭제 불가(영구 보존) |
 
 ---
 
@@ -767,13 +776,13 @@ classDiagram
 이커머스 특성상 삭제 데이터는 주문 이력·정산·감사 목적으로 일정 기간 유지가 필요하다.
 엔티티 성격에 따라 삭제 방식과 보존 주기를 구분한다.
 
-| 엔티티 | 삭제 방식 | 추가 필드 | 주기적 처리 | 근거 |
-|--------|---------|----------|-----------|------|
-| `BrandModel` | 소프트 삭제 | `status=DELETED` + `deletedAt` | 연결된 Order 없을 때 하드 삭제 | 과거 주문 브랜드 출처 추적 |
-| `ProductModel` | 소프트 삭제 | `status=DELETED` + `deletedAt` | 연결된 Order 없을 때 하드 삭제 | 주문 스냅샷 참조 무결성 |
-| `UserModel` | 소프트 삭제 (탈퇴) | `status=WITHDRAWN` + `withdrawnAt` | 즉시 PII 익명화, `userId`는 Order 참조용 보존 | 개인정보보호법 준수 |
-| `LikeModel` | 유저 토글: **하드 삭제** / cascade: **소프트 삭제** | cascade 시 `deletedAt` 세팅 | 유저 탈퇴·상품 삭제 시 일괄 처리 | 집계 정합성 유지 |
-| `OrderModel` / `OrderItemModel` | **삭제 불가** | — | 영구 보존 | 회계·법적 증거 자료 |
+| 엔티티                          | 삭제 방식                                           | 추가 필드                          | 주기적 처리                                   | 근거                       |
+|---------------------------------|-----------------------------------------------------|------------------------------------|-----------------------------------------------|----------------------------|
+| `BrandModel`                    | 소프트 삭제                                         | `status=DELETED` + `deletedAt`     | 연결된 Order 없을 때 하드 삭제                | 과거 주문 브랜드 출처 추적 |
+| `ProductModel`                  | 소프트 삭제                                         | `status=DELETED` + `deletedAt`     | 연결된 Order 없을 때 하드 삭제                | 주문 스냅샷 참조 무결성    |
+| `UserModel`                     | 소프트 삭제 (탈퇴)                                  | `status=WITHDRAWN` + `withdrawnAt` | 즉시 PII 익명화, `userId`는 Order 참조용 보존 | 개인정보보호법 준수        |
+| `LikeModel`                     | 유저 토글: **하드 삭제** / cascade: **소프트 삭제** | cascade 시 `deletedAt` 세팅        | 유저 탈퇴·상품 삭제 시 일괄 처리              | 집계 정합성 유지           |
+| `OrderModel` / `OrderItemModel` | **삭제 불가**                                       | —                                  | 영구 보존                                     | 회계·법적 증거 자료        |
 
 ### cascade 삭제 흐름 (소프트)
 
