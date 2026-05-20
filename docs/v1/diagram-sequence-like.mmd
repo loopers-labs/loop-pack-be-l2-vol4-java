@@ -1,0 +1,91 @@
+sequenceDiagram
+    actor User
+    participant Controller as LikeV1Controller
+    participant Facade as LikeFacade
+    participant UserService
+    participant ProductService
+    participant LikeService
+    participant DB
+
+    %% 좋아요 등록
+    Note over User, DB: POST /api/v1/products/{productId}/likes (좋아요 등록)
+
+    User->>Controller: POST /api/v1/products/{productId}/likes
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 userId 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: like(userId, productId)
+    Facade->>ProductService: getProduct(productId)
+    ProductService->>DB: SELECT products WHERE id = productId
+
+    alt 상품 없음
+        ProductService-->>Facade: CoreException(NOT_FOUND)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 404 Not Found
+    end
+
+    Facade->>LikeService: like(userId, productId)
+    LikeService->>DB: SELECT likes WHERE user_id = ? AND product_id = ?
+
+    alt 이미 좋아요한 상품
+        LikeService-->>Facade: CoreException(CONFLICT)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 409 Conflict
+    end
+
+    LikeService->>DB: INSERT likes
+    LikeService->>DB: UPDATE products SET like_count = like_count + 1
+    LikeService-->>Facade: LikeModel
+    Facade-->>Controller: LikeInfo
+    Controller-->>User: 201 Created
+
+    %% 좋아요 취소
+    Note over User, DB: DELETE /api/v1/products/{productId}/likes (좋아요 취소)
+
+    User->>Controller: DELETE /api/v1/products/{productId}/likes
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 userId 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: unlike(userId, productId)
+    Facade->>LikeService: unlike(userId, productId)
+    LikeService->>DB: SELECT likes WHERE user_id = ? AND product_id = ?
+
+    alt 좋아요하지 않은 상품
+        LikeService-->>Facade: CoreException(NOT_FOUND)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 404 Not Found
+    end
+
+    LikeService->>DB: DELETE likes WHERE user_id = ? AND product_id = ?
+    LikeService->>DB: UPDATE products SET like_count = like_count - 1
+    LikeService-->>Facade: void
+    Facade-->>Controller: void
+    Controller-->>User: 200 OK
+
+    %% 내가 좋아요한 상품 목록
+    Note over User, DB: GET /api/v1/users/{userId}/likes (좋아요 목록 조회)
+
+    User->>Controller: GET /api/v1/users/{userId}/likes
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 userId 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: getMyLikes(requestUserId, pathUserId)
+    alt 헤더 userId ≠ path userId
+        Facade-->>Controller: CoreException(FORBIDDEN)
+        Controller-->>User: 403 Forbidden
+    end
+
+    Facade->>LikeService: getLikedProducts(userId)
+    LikeService->>DB: SELECT products JOIN likes WHERE likes.user_id = ?
+    LikeService-->>Facade: List~ProductModel~
+    Facade-->>Controller: List~ProductInfo~
+    Controller-->>User: 200 OK ApiResponse(List~ProductResponse~)

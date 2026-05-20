@@ -1,0 +1,85 @@
+sequenceDiagram
+    actor User
+    participant Controller as UserV1Controller
+    participant Facade as UserFacade
+    participant UserService
+    participant DB
+
+    %% 회원가입
+    Note over User, DB: POST /api/v1/users (회원가입)
+
+    User->>Controller: POST /api/v1/users (loginId, password, name, birthDate, email)
+    Controller->>Facade: register(request)
+    Facade->>UserService: register(loginId, password, name, birthDate, email)
+
+    Note over UserService: UserModel 생성 시 도메인 규칙 검증
+    alt 형식 검증 실패 (loginId·name·email·password·birthDate 규칙 위반)
+        UserService-->>Facade: CoreException(BAD_REQUEST)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 400 Bad Request
+    end
+
+    UserService->>DB: SELECT users WHERE user_id = loginId
+    alt 중복 loginId
+        UserService-->>Facade: CoreException(CONFLICT)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 409 Conflict
+    end
+
+    UserService->>UserService: BCrypt 암호화(password)
+    UserService->>DB: INSERT users
+    UserService-->>Facade: UserModel
+    Facade-->>Controller: UserInfo
+    Controller-->>User: 201 Created
+
+    %% 내 정보 조회
+    Note over User, DB: GET /api/v1/users/me (내 정보 조회)
+
+    User->>Controller: GET /api/v1/users/me
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 UserModel 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: getMe(userId)
+    Facade->>UserService: getUser(userId)
+    UserService->>DB: SELECT users WHERE id = userId
+    UserService-->>Facade: UserModel
+    Note over Facade: 이름 마지막 글자 * 마스킹
+    Facade-->>Controller: UserInfo
+    Controller-->>User: 200 OK ApiResponse(UserResponse)
+
+    %% 비밀번호 변경
+    Note over User, DB: PUT /api/v1/users/password (비밀번호 변경)
+
+    User->>Controller: PUT /api/v1/users/password (currentPassword, newPassword)
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 UserModel 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: changePassword(userId, currentPassword, newPassword)
+    Facade->>UserService: changePassword(userId, currentPassword, newPassword)
+    UserService->>DB: SELECT users WHERE id = userId
+
+    alt 현재 비밀번호 불일치
+        UserService-->>Facade: CoreException(BAD_REQUEST)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 400 Bad Request
+    else 새 비밀번호 = 현재 비밀번호
+        UserService-->>Facade: CoreException(BAD_REQUEST)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 400 Bad Request
+    else 비밀번호 규칙 위반 (길이·생년월일 포함)
+        UserService-->>Facade: CoreException(BAD_REQUEST)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 400 Bad Request
+    end
+
+    UserService->>UserService: BCrypt 암호화(newPassword)
+    UserService->>DB: UPDATE users SET password = ?
+    UserService-->>Facade: UserModel
+    Facade-->>Controller: UserInfo
+    Controller-->>User: 200 OK

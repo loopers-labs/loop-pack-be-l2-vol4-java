@@ -1,0 +1,39 @@
+sequenceDiagram
+    actor User
+    participant Controller as OrderV1Controller
+    participant Facade as OrderFacade
+    participant ProductService
+    participant OrderService
+    participant DB
+
+    User->>Controller: POST /api/v1/orders (items)
+    Note over Controller: Interceptor에서 loginId/loginPw 검증 후 userId 주입
+    Controller->>Facade: createOrder(userId, items)
+
+    Facade->>ProductService: validateAndGetProducts(items)
+    ProductService->>DB: SELECT products + product_stocks WHERE id IN (...)
+
+    alt 존재하지 않는 상품 포함
+        ProductService-->>Facade: CoreException(NOT_FOUND)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 404 Not Found
+    else 재고 부족
+        ProductService-->>Facade: CoreException(BAD_REQUEST)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 400 Bad Request
+    else 정상
+        ProductService-->>Facade: List~ProductModel~ (스냅샷용)
+    end
+
+    Facade->>OrderService: createOrder(userId, snapshotItems)
+    OrderService->>DB: INSERT orders (status = ORDERED)
+    OrderService->>DB: INSERT order_items (productName, unitPrice 스냅샷)
+    OrderService-->>Facade: OrderModel
+
+    loop 각 item
+        Facade->>ProductService: decreaseStock(productId, quantity)
+        ProductService->>DB: UPDATE product_stocks SET quantity = quantity - ?
+    end
+
+    Facade-->>Controller: OrderInfo
+    Controller-->>User: 201 Created ApiResponse(OrderResponse)

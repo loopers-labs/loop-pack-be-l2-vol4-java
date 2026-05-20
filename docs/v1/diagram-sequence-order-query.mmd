@@ -1,0 +1,52 @@
+sequenceDiagram
+    actor User
+    participant Controller as OrderV1Controller
+    participant Facade as OrderFacade
+    participant OrderService
+    participant DB
+
+    %% 주문 목록 조회
+    Note over User, DB: GET /api/v1/orders?startAt=&endAt= (주문 목록 조회)
+
+    User->>Controller: GET /api/v1/orders?startAt=&endAt=
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 userId 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: getOrders(userId, startAt, endAt)
+    Facade->>OrderService: getOrders(userId, startAt, endAt)
+    OrderService->>DB: SELECT orders WHERE user_id = ? AND created_at BETWEEN ? AND ?
+    OrderService-->>Facade: List~OrderModel~
+    Facade-->>Controller: List~OrderInfo~
+    Controller-->>User: 200 OK ApiResponse(List~OrderResponse~)
+
+    %% 주문 상세 조회
+    Note over User, DB: GET /api/v1/orders/{orderId} (주문 상세 조회)
+
+    User->>Controller: GET /api/v1/orders/{orderId}
+    Note over Controller: Interceptor — loginId/loginPw 검증 후 userId 주입
+
+    alt 유저 없음 또는 비밀번호 불일치
+        Controller-->>User: 401 Unauthorized
+    end
+
+    Controller->>Facade: getOrder(userId, orderId)
+    Facade->>OrderService: getOrder(orderId)
+    OrderService->>DB: SELECT orders + order_items WHERE orders.id = ?
+
+    alt 주문 없음
+        OrderService-->>Facade: CoreException(NOT_FOUND)
+        Facade-->>Controller: CoreException
+        Controller-->>User: 404 Not Found
+    end
+
+    alt 본인 주문 아님 (order.userId ≠ 요청 userId)
+        Facade-->>Controller: CoreException(FORBIDDEN)
+        Controller-->>User: 403 Forbidden
+    end
+
+    OrderService-->>Facade: OrderModel
+    Facade-->>Controller: OrderInfo
+    Controller-->>User: 200 OK ApiResponse(OrderResponse)

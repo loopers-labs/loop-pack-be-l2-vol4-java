@@ -1,0 +1,78 @@
+erDiagram
+    users {
+        BIGINT id PK
+        VARCHAR user_id UK
+        VARCHAR name
+        VARCHAR email
+        VARCHAR password
+        DATE birth_date
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    brands {
+        BIGINT id PK
+        VARCHAR name
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    products {
+        BIGINT id PK
+        BIGINT brand_id FK
+        VARCHAR name
+        TEXT description
+        BIGINT price
+        INT like_count
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    product_stocks {
+        BIGINT id PK
+        BIGINT product_id FK "UK"
+        INT quantity
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    likes {
+        BIGINT id PK
+        BIGINT user_id FK
+        BIGINT product_id FK
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    orders {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR status "ORDERED | PAID | CANCELLED"
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    order_items {
+        BIGINT id PK
+        BIGINT order_id FK
+        BIGINT product_id
+        VARCHAR product_name
+        BIGINT unit_price
+        INT quantity
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    users ||--o{ likes : "좋아요"
+    users ||--o{ orders : "주문"
+    brands ||--o{ products : "보유"
+    products ||--|| product_stocks : "재고"
+    products ||--o{ likes : "받음"
+    orders ||--o{ order_items : "포함"
