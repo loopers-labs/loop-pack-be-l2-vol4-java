@@ -4,46 +4,7 @@
 
 ## 1. 유저 (Users)
 
-### 1-1. 회원가입
-
-```mermaid
-sequenceDiagram
-    actor Client
-    participant Server
-
-    Client->>Server: POST /api/v1/users
-    Server->>Server: loginId 중복 확인
-    alt loginId 중복
-        Server-->>Client: 409 Conflict
-    else 필수 값 누락/형식 오류
-        Server-->>Client: 400 Bad Request
-    else 정상
-        Server->>Server: 비밀번호 암호화 후 저장
-        Server-->>Client: 201 Created
-    end
-```
-
----
-
-### 1-2. 내 정보 조회
-
-```mermaid
-sequenceDiagram
-    actor Client
-    participant Server
-
-    Client->>Server: GET /api/v1/users/me (X-Loopers-LoginId, X-Loopers-LoginPw)
-    Server->>Server: 헤더에서 loginId, password 추출
-    alt 헤더 누락 또는 인증 실패
-        Server-->>Client: 401 Unauthorized
-    else 정상
-        Server-->>Client: 200 OK (유저 정보)
-    end
-```
-
----
-
-### 1-3. 비밀번호 변경
+### 1-1. 비밀번호 변경
 
 ```mermaid
 sequenceDiagram
@@ -75,11 +36,17 @@ sequenceDiagram
     actor Client
     participant Server
 
-    Client->>Server: GET /api/v1/products?brandId=&sort=&page=&size=
+    Client->>Server: GET /api/v1/products?productName=&brandName=&categoryLarge=&categoryMiddle=&categorySmall=&brandId=&sort=&page=&size=
+    Server->>Server: sort 값 검증
     alt 지원하지 않는 sort 값
         Server-->>Client: 400 Bad Request
+    else 카테고리 대/중/소 계층 불일치
+        Server-->>Client: 400 Bad Request
     else 정상
-        Server->>Server: brandId 필터링 (없으면 전체)
+        Server->>Server: productName like 검색 적용 (있는 경우)
+        Server->>Server: brandName like 검색 적용 (있는 경우)
+        Server->>Server: 카테고리(대/중/소) 필터링 (있는 경우)
+        Server->>Server: brandId 필터링 (있는 경우)
         Server->>Server: sort 기준 정렬 (기본: latest)
         Server->>Server: 페이지네이션 적용
         Server-->>Client: 200 OK (상품 목록)
