@@ -40,23 +40,24 @@ erDiagram
 
     stocks {
         bigint id PK
-        bigint product_id FK "UK"
+        bigint product_id "UK, FK"
         int quantity
         bigint version
+        datetime created_at
         datetime updated_at
     }
 
     likes {
         bigint id PK
-        bigint user_id
-        bigint product_id
+        bigint user_id "UK with product_id"
+        bigint product_id "UK with user_id"
         datetime created_at
     }
 
     orders {
         bigint id PK
         bigint user_id FK
-        varchar status
+        varchar status "PENDING|COMPLETED|CANCELLED"
         bigint total_price
         datetime ordered_at
         datetime created_at
@@ -66,20 +67,23 @@ erDiagram
     order_items {
         bigint id PK
         bigint order_id FK
-        bigint product_id
-        varchar product_name
-        bigint product_price
+        bigint product_id "FK 없음, 참조용"
+        varchar product_name "스냅샷"
+        bigint product_price "스냅샷"
         int quantity
-        bigint discount_amount "default 0, 할인 금액"
-        bigint coupon_id "nullable, FK to future coupons table"
     }
 
-    order_status_histories {
+    payments {
         bigint id PK
-        bigint order_id FK
-        varchar from_status "nullable"
-        varchar to_status
-        datetime changed_at
+        bigint order_id "UK, FK"
+        varchar pg_transaction_id "nullable, 성공 시 PG가 발급한 거래번호"
+        varchar status "REQUESTED|SUCCESS|FAILED"
+        bigint amount
+        varchar failure_reason "nullable"
+        datetime requested_at
+        datetime responded_at "nullable"
+        datetime created_at
+        datetime updated_at
     }
 
     users ||--o{ likes : ""
@@ -88,40 +92,70 @@ erDiagram
     products ||--|| stocks : ""
     products ||--o{ likes : ""
     orders ||--o{ order_items : ""
-    orders ||--o{ order_status_histories : ""
+    orders ||--|| payments : ""
 ```
 
 **읽는 포인트**
 - `stocks`는 `products`와 1:1로 분리된 테이블이다. 주문마다 갱신되는 `quantity`를 `products`에서 분리해 락 경쟁 범위를 최소화한다. `products` row는 캐싱 가능한 상태를 유지한다.
-- `stocks.version`은 낙관적 락용 컬럼이다. 동시 주문이 같은 재고를 차감할 때 충돌을 감지한다. (JPA `@Version` 활용)
+- `stocks.version`은 낙관적 락(`@Version`)용 컬럼이다. 동시 주문이 같은 재고를 차감할 때 충돌을 감지한다.
 - `stocks.product_id`는 UK 제약으로 1:1 관계를 DB 레벨에서 보장한다.
 - `brands`, `products` 모두 `deleted_at` 컬럼 보유. 브랜드 삭제 시 연관 상품의 `deleted_at`도 함께 채운다. 조회 시 `deleted_at IS NULL` 조건 필수.
 - `order_items.product_id`는 FK 제약 없음. 상품이 삭제되어도 주문 내역은 `product_name`, `product_price` 스냅샷으로 독립 보존된다.
-- `likes`는 `(user_id, product_id)` 복합 UK 제약으로 DB 레벨에서 중복 좋아요 방지.
-- 가격 관련 컬럼(`price`, `total_price`, `product_price`)은 `bigint`로 선언한다. `int` 범위(약 21억)를 초과하는 경우를 대비한다.
-- `order_status_histories`: 주문 상태 전이 이력. 언제 취소됐는지, 처리 시간이 얼마나 걸렸는지 추적 가능.
-- `order_items.discount_amount`: 쿠폰/포인트 적용 시 할인 금액. 현재는 0이 기본값이며, 향후 쿠폰 도메인 연동 시 활용.
-- `order_items.coupon_id`: 적용된 쿠폰 ID. FK 제약 없이 참조용으로만 보유 (쿠폰 도메인은 추후 추가 예정).
+- `likes`는 `(user_id, product_id)` 복합 UK 제약으로 DB 레벨에서 중복 좋아요 방지. 좋아요 등록 시 애플리케이션 사전 체크 + DB UK가 이중 방어선이며, UK 위반 예외는 멱등 응답으로 변환한다.
+- `payments`는 `order_id`에 UK 제약을 두어 1주문 1결제 관계를 보장한다. 결제 시도/결과를 모두 기록하여 PG 대조와 감사 추적에 사용한다.
+- 가격 관련 컬럼(`price`, `total_price`, `product_price`, `amount`)은 `bigint`로 선언한다. `int` 범위(약 21억)를 초과하는 경우를 대비한다.
+
+---
+
+## 인덱스
+
+성능에 영향을 주는 주요 인덱스를 명시한다. 컬럼 순서는 카디널리티가 높은 쪽이 앞에 온다.
+
+| 테이블 | 인덱스 | 용도 |
+|---|---|---|
+| `users` | `UNIQUE (login_id)` | 로그인, 회원가입 중복 체크 |
+| `brands` | `(deleted_at)` | 브랜드 목록 조회 (삭제 제외) |
+| `products` | `(brand_id, deleted_at)` | 상품 목록 브랜드 필터 |
+| `products` | `(deleted_at, created_at DESC)` | 최신순 정렬 |
+| `products` | `(deleted_at, price)` | 가격 오름차순 정렬 |
+| `stocks` | `UNIQUE (product_id)` | 상품-재고 1:1 보장, 재고 조회 |
+| `likes` | `UNIQUE (user_id, product_id)` | 중복 좋아요 방지, 내 좋아요 목록 |
+| `likes` | `(product_id)` | 좋아요 수 COUNT 집계 |
+| `orders` | `(user_id, ordered_at DESC)` | 사용자 주문 목록 날짜 범위 조회 |
+| `orders` | `(ordered_at DESC)` | 어드민 전체 주문 목록 |
+| `order_items` | `(order_id)` | 주문 항목 조회 (FK 자동 생성) |
+| `payments` | `UNIQUE (order_id)` | 1주문 1결제 |
+| `payments` | `(status, requested_at)` | 결제 실패 모니터링/배치 처리 |
 
 ---
 
 ## 테이블별 설계 설명
 
+### users
+- `login_id`: 영문 + 숫자 5~20자. UK 제약으로 중복 가입 방지.
+- `password`: 인코딩된 값만 저장. 평문 노출 금지.
+- `name`: 한글 2~10자. 응답 시 마지막 글자를 `*`로 마스킹.
+- `birth_date`: yyyy-MM-dd. API는 yyyyMMdd 문자열로 받아 파싱.
+- `email`: 이메일 형식 검증만 수행. UK 제약 없음 (정책상 중복 허용).
+
 ### brands
 - `deleted_at`: soft delete 컬럼. null이면 활성, 값이 있으면 삭제 처리.
+- `description`: 필수, 공백 불가.
 
 ### products
-- `brand_id`: 브랜드 FK. 상품 수정 시 변경 불가.
+- `brand_id`: 브랜드 FK. 상품 수정 시 변경 불가 (수정 요청 DTO에 필드 자체가 없음).
 - `status`: 상품 상태. `ON_SALE`(판매중) / `SOLD_OUT`(품절) / `HIDDEN`(숨김) / `DELETED`(삭제). 기본값 `ON_SALE`.
 - `deleted_at`: 브랜드 삭제 시 연관 상품에도 함께 채워진다. 삭제 시 `status = DELETED`로 함께 변경.
+- `price`: `bigint`. 0 이상.
 
 ### stocks
-- `product_id`: UK 제약으로 products와 1:1 관계를 보장한다.
+- `product_id`: UK 제약으로 `products`와 1:1 관계 보장. FK로 참조 무결성도 보장.
 - `quantity`: 주문 시 차감되는 재고 수량. 사용자에게는 10개 이하일 때만 수량 노출 ("3개 남음"), 10개 초과 시 재고 유무(`inStock`)만 노출.
-- `version`: 낙관적 락용 컬럼. JPA `@Version`과 연동하여 동시 주문 시 충돌을 감지한다.
+- `version`: 낙관적 락용. JPA `@Version`과 연동.
 
 ### likes
-- `(user_id, product_id)` 복합 UK 제약으로 중복 좋아요 방지.
+- `(user_id, product_id)` 복합 UK 제약으로 중복 좋아요 방지. 좋아요 등록 시 멱등성의 최후 방어선.
+- `user_id`, `product_id`는 FK 제약 없이 Long 값으로만 보유. User/Product 삭제와 무관하게 독립적으로 존재.
 - 좋아요 수는 별도 컬럼 없이 COUNT 집계로 처리. 성능 이슈 발생 시 `products.like_count` 캐시 컬럼 도입 검토.
 
 ### orders
@@ -132,23 +166,37 @@ erDiagram
 ### order_items
 - `product_name`, `product_price`: 주문 당시 상품 정보 스냅샷. `product_id`가 가리키는 상품이 변경/삭제되어도 주문 내역은 영향받지 않는다.
 - `product_id`: FK 제약 없이 참조용으로만 보유.
-- `discount_amount`: 쿠폰/포인트 적용 시 할인 금액. 현재는 0이 기본값이며, 향후 쿠폰 도메인 연동 시 활용.
-- `coupon_id`: 적용된 쿠폰 ID. FK 제약 없이 참조용으로만 보유 (쿠폰 도메인은 추후 추가 예정).
+- 할인 금액, 쿠폰 등의 컬럼은 현재 요구사항에 없어 포함하지 않는다. 도입 시점에 별도 테이블 또는 컬럼 추가로 확장.
 
-### order_status_histories
-- `order_id`: FK. 어떤 주문의 상태 전이 이력인지 참조.
-- `from_status`: 이전 상태. 최초 생성 시 null (PENDING이 첫 상태이므로 이전 상태 없음).
-- `to_status`: 변경된 상태.
-- `changed_at`: 상태 전이 발생 시각. 언제 취소됐는지, 처리 시간이 얼마나 걸렸는지 추적 가능.
+### payments
+- `order_id`: UK + FK. 1주문 1결제 관계를 보장.
+- `status`: `REQUESTED`(PG 호출 직전) → `SUCCESS` / `FAILED`. 결제 시도 기록 자체가 의미 있으므로 결제 시작 시점에도 row를 생성한다.
+- `pg_transaction_id`: PG가 발급한 거래번호. 성공 시에만 값이 채워짐. PG 측 대조 조회에 사용.
+- `failure_reason`: 실패 시에만 채워짐. 타임아웃, 한도 초과 등 사유 기록.
+- `requested_at`, `responded_at`: 외부 호출 지연 측정 및 모니터링에 사용.
 
 ---
 
 ## 설계 고민
 
-**좋아요 수 정렬 (`likes_desc`)**
-- 현재: `likes` 테이블 COUNT JOIN으로 집계 → 항상 정확하지만 상품 수가 많아지면 느려질 수 있음
-- 추후: `products.like_count` 캐시 컬럼 도입 → 빠르지만 좋아요 등록/취소 시 동기화 필요, 동시성 문제 고려 필요
+### 좋아요 수 정렬 (`likes_desc`)
+- 현재: `likes` 테이블 COUNT JOIN으로 집계 → 항상 정확하지만 상품 수가 많아지면 느려질 수 있음.
+- 추후: `products.like_count` 캐시 컬럼 도입 → 빠르지만 좋아요 등록/취소 시 동기화 필요, 동시성 문제 고려 필요.
 
-**`order_items.product_id` FK 제약**
-- FK 제약을 걸면 상품 물리 삭제 시 주문 내역도 영향받음
-- soft delete 방식을 쓰더라도 FK 제약 없이 참조용으로만 두는 것이 안전
+### `order_items.product_id` FK 제약
+- FK 제약을 걸면 상품 물리 삭제 시 주문 내역도 영향받음.
+- soft delete 방식을 쓰더라도 FK 제약 없이 참조용으로만 두는 것이 안전.
+
+### 결제 정보를 별도 테이블로 분리한 이유
+- 대안 A: `orders` 테이블에 `pg_transaction_id`, `paid_at`, `failure_reason` 컬럼 추가.
+- 대안 B: `payments` 별도 테이블 (현재 결정).
+- 선택 이유: 결제 시도 자체를 기록(`REQUESTED` 상태)해두면 외부 호출 실패/타임아웃 같은 모호한 상태를 추적할 수 있다. 추후 결제 수단(카드/페이/포인트)이 늘어날 때 컬럼 폭증 없이 확장 가능.
+
+### `stocks.version` 낙관 락 vs 비관 락
+- 낙관 락(현재 결정): 충돌 시 예외 → 재시도. 동시 주문 빈도가 낮을 때 효율적.
+- 비관 락(`SELECT ... FOR UPDATE`): 락 잡고 시작. 충돌 빈도가 높을 때 유리하지만 처리량 제한.
+- 트래픽 패턴 측정 후 전환 검토.
+
+### `payments.order_id` UK 제약과 결제 재시도
+- 현재 1주문 1결제 제약. 결제 실패 시 주문 자체를 `CANCELLED`로 처리하고 종료.
+- 추후 "결제 재시도" 기능 도입 시 UK 제약을 해제하고 `status`로 최신 결제 시도 식별 필요.
