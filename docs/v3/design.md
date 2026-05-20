@@ -304,3 +304,5 @@ DELETE → userId + productId 조합 없으면 404 Not Found
 | ADR-005 | @ManyToOne FK 제약조건 제거 | `adr/005-jpa-no-fk-constraint.md` |
 | ADR-006 | 재고 별도 테이블 분리 | `adr/006-product-stock-table.md` |
 | ADR-007 | 주문 생성 흐름 설계 | `adr/007-order-creation-flow.md` |
+| ADR-008 | likes 테이블 UNIQUE 제약 | `adr/008-likes-unique-constraint.md` |
+| ADR-009 | 좋아요 목록 소유권 검증 | `adr/009-likes-ownership-check.md` |
