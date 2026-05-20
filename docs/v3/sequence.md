@@ -353,21 +353,20 @@ sequenceDiagram
 
     Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — 하나라도 부족하면 400 Bad Request
 
-    rect rgb(100, 180, 100)
-        Note over OrderFacade,OrderRepository: @Transactional 시작
-        OrderFacade->>OrderService: createOrder(userId, items + snapshot)
-        OrderService->>OrderRepository: save(OrderModel + OrderItemModel)
-        OrderRepository-->>OrderService: OrderModel
-        OrderService-->>OrderFacade: OrderModel
+    Note over OrderFacade,OrderRepository: ── @Transactional 시작 ──
 
-        loop 상품별
-            OrderFacade->>ProductService: deductStock(productId, quantity)
-            ProductService->>ProductStockRepository: findByProductId (FOR UPDATE)
-            ProductService->>ProductService: productStock.deduct(quantity)
-        end
+    OrderFacade->>OrderService: createOrder(userId, items + snapshot)
+    OrderService->>OrderRepository: save(OrderModel + OrderItemModel)
+    OrderRepository-->>OrderService: OrderModel
+    OrderService-->>OrderFacade: OrderModel
 
-        Note over OrderFacade,OrderRepository: 성공 시 Commit / 재고 부족 시 전체 Rollback
+    loop 상품별
+        OrderFacade->>ProductService: deductStock(productId, quantity)
+        ProductService->>ProductStockRepository: findByProductId (FOR UPDATE)
+        ProductService->>ProductService: productStock.deduct(quantity)
     end
+
+    Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 재고 부족 시 전체 Rollback ──
 
     OrderFacade-->>OrderV1Controller: OrderInfo
 ```
