@@ -154,17 +154,11 @@ sequenceDiagram
     participant DB
 
     Client->>Controller: GET /api/v1/users/{userId}/likes
-    Controller->>Facade: getLikes(requestUserId, userId)
-
-    alt 타인의 좋아요 목록 접근
-        Facade-->>Controller: CoreException(FORBIDDEN)
-        Controller-->>Client: 403
-    else 본인 요청
-        Facade->>Service: findLikes(userId)
-        Service->>DB: SELECT likes WHERE userId
-        DB-->>Service: like list
-        Controller-->>Client: 200
-    end
+    Controller->>Facade: getLikes(userId)
+    Facade->>Service: findLikes(userId)
+    Service->>DB: SELECT likes WHERE userId
+    DB-->>Service: like list
+    Controller-->>Client: 200
 ```
 
 ---
