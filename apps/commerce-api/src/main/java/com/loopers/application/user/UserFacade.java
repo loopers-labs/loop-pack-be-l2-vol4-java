@@ -24,7 +24,7 @@ public class UserFacade {
         userService.checkLoginIdDuplication(loginId);
         UserModel userModel = UserModel.of(loginId, name, password, birthVO, emailVO);
         String encrypted = bCryptPasswordEncoder.encode(password);
-        userService.changePassword(userModel, encrypted);
+        userModel.changePassword(encrypted);
         userService.createUserModel(userModel);
 
         return UserInfo.from(userModel);
