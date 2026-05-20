@@ -141,12 +141,11 @@ sequenceDiagram
     ProductRepository-->>ProductService: Page~ProductModel~
     ProductService-->>ProductFacade: Page~ProductModel~
 
-    loop 상품별
-        ProductFacade->>LikeService: countByProductId(productId)
-        LikeService->>LikeRepository: countByProductId(productId)
-        LikeRepository-->>LikeService: likeCount
-        LikeService-->>ProductFacade: likeCount
-    end
+    ProductFacade->>LikeService: countByProductIds(productIds)
+    LikeService->>LikeRepository: countByProductIdIn(productIds)
+    Note over LikeRepository: GROUP BY product_id → Map(productId, count)
+    LikeRepository-->>LikeService: Map~Long, Long~
+    LikeService-->>ProductFacade: Map~Long, Long~
 
     ProductFacade-->>ProductV1Controller: Page~ProductInfo~
 ```
@@ -323,10 +322,11 @@ sequenceDiagram
     ProductRepository-->>ProductService: List~ProductModel~
     ProductService-->>LikeFacade: List~ProductModel~
 
-    loop 상품별
-        LikeFacade->>LikeService: countByProductId(productId)
-        LikeService-->>LikeFacade: likeCount
-    end
+    LikeFacade->>LikeService: countByProductIds(productIds)
+    LikeService->>LikeRepository: countByProductIdIn(productIds)
+    Note over LikeRepository: GROUP BY product_id → Map(productId, count)
+    LikeRepository-->>LikeService: Map~Long, Long~
+    LikeService-->>LikeFacade: Map~Long, Long~
 
     LikeFacade-->>LikeV1Controller: List~ProductInfo~
 ```

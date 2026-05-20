@@ -5,7 +5,10 @@
 
 ## 결정
 
-상품의 좋아요 수(`likeCount`)는 `Product` 테이블에 별도 컬럼을 두지 않고, `LikeRepository.countByProductId(productId)` COUNT 쿼리로 계산한다.
+상품의 좋아요 수(`likeCount`)는 `Product` 테이블에 별도 컬럼을 두지 않고 COUNT 쿼리로 계산한다.
+
+- **단건 조회**: `LikeRepository.countByProductId(productId)` — COUNT 1회
+- **목록 조회**: `LikeRepository.countByProductIdIn(List<Long> productIds)` — `SELECT product_id, COUNT(*) … GROUP BY product_id` 1회로 `Map<productId, count>` 반환. N+1 쿼리 방지.
 
 ## 근거
 

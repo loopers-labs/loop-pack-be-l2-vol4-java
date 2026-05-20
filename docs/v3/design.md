@@ -249,7 +249,9 @@ POST  → userId + productId 조합 중복 확인 → 존재하면 409 Conflict
 DELETE → userId + productId 조합 없으면 404 Not Found
 ```
 
-좋아요 수: `LikeRepository.countByProductId(productId)` COUNT 쿼리 사용
+좋아요 수:
+- **단건 조회**: `LikeRepository.countByProductId(productId)` COUNT 쿼리 1회
+- **목록 조회**: `LikeRepository.countByProductIdIn(productIds)` GROUP BY 쿼리 1회 → `Map<productId, count>` 반환 (N+1 방지)
 
 ### 주문 생성
 
