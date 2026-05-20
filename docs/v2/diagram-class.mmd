@@ -1,0 +1,68 @@
+classDiagram
+    class UserModel {
+        -Long id
+        -String userId
+        -String name
+        -String email
+        -LocalDate birthDate
+    }
+
+    class BrandModel {
+        -Long id
+        -String name
+        +update(name)
+        +delete()
+    }
+
+    class ProductModel {
+        -Long id
+        -Long brandId
+        -String name
+        -String description
+        -Long price
+        +update(name, description, price)
+        +delete()
+    }
+
+    class StockModel {
+        -Long id
+        -Long productId
+        -Integer quantity
+        +decrease(quantity) void
+        +isEnough(quantity) boolean
+    }
+
+    class LikeModel {
+        -Long id
+        -Long userId
+        -Long productId
+    }
+
+    class OrderModel {
+        -Long id
+        -Long userId
+        -OrderStatus status
+    }
+
+    class OrderItemModel {
+        -Long id
+        -Long orderId
+        -String productName
+        -Long unitPrice
+        -Integer quantity
+    }
+
+    class OrderStatus {
+        <<enumeration>>
+        ORDERED
+        PAID
+        CANCELLED
+    }
+
+    ProductModel --> BrandModel : brandId 참조
+    ProductModel "1" *-- "1" StockModel : Aggregate 내부
+    LikeModel --> UserModel : userId 참조
+    LikeModel --> ProductModel : productId 참조
+    OrderModel --> UserModel : userId 참조
+    OrderModel "1" *-- "N" OrderItemModel : 스냅샷 포함
+    OrderModel --> OrderStatus

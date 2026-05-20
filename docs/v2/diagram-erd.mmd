@@ -1,0 +1,75 @@
+erDiagram
+    users {
+        BIGINT id PK
+        VARCHAR user_id UK
+        VARCHAR name
+        VARCHAR email
+        VARCHAR password
+        DATE birth_date
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    brands {
+        BIGINT id PK
+        VARCHAR name
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    products {
+        BIGINT id PK
+        BIGINT brand_id FK
+        VARCHAR name
+        TEXT description
+        BIGINT price
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    product_stocks {
+        BIGINT id PK
+        BIGINT product_id FK "UK"
+        INT quantity
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    likes {
+        BIGINT id PK
+        BIGINT user_id FK "UK(user_id, product_id)"
+        BIGINT product_id FK "UK(user_id, product_id)"
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    orders {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR status "ORDERED"
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    order_items {
+        BIGINT id PK
+        BIGINT order_id FK
+        BIGINT product_id "FK 아님, 참조용"
+        VARCHAR product_name "스냅샷"
+        BIGINT unit_price "스냅샷"
+        INT quantity
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    users ||--o{ likes : ""
+    users ||--o{ orders : ""
+    brands ||--o{ products : ""
+    products ||--|| product_stocks : ""
+    products ||--o{ likes : ""
+    orders ||--o{ order_items : ""
