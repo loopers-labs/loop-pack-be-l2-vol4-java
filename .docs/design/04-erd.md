@@ -8,7 +8,7 @@ erDiagram
         BIGINT id PK
         VARCHAR login_id UK
         VARCHAR password
-        VARCHAR email
+        VARCHAR email UK
         VARCHAR gender
         DATETIME created_at
         DATETIME updated_at
@@ -17,7 +17,7 @@ erDiagram
 
     brands {
         BIGINT id PK
-        VARCHAR name
+        VARCHAR name UK
         VARCHAR description
         DATETIME created_at
         DATETIME updated_at
@@ -100,6 +100,8 @@ erDiagram
 | 테이블 | 종류 | 대상 컬럼 |
 |--------|------|-----------|
 | users | UK | login_id |
+| users | UK | email |
+| brands | UK | name |
 | likes | UK | (user_id, product_id) |
 | products | FK | brand_id → brands.id |
 | likes | FK | user_id → users.id |
