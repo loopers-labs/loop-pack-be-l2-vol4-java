@@ -4,28 +4,20 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "products")
+@Table(name = "product")
 public class ProductModel extends BaseEntity {
 
-    private Long brandId;
     private String name;
     private String description;
     private Long price;
-
-    @Enumerated(EnumType.STRING)
-    private ProductStatus status;
+    private Integer stock;
 
     protected ProductModel() {}
 
-    public ProductModel(Long brandId, String name, String description, Long price) {
-        if (brandId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
-        }
+    public ProductModel(String name, String description, Long price, Integer stock) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -35,16 +27,14 @@ public class ProductModel extends BaseEntity {
         if (price == null || price < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
+        if (stock == null || stock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
 
-        this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
-        this.status = ProductStatus.ON_SALE;
-    }
-
-    public Long getBrandId() {
-        return brandId;
+        this.stock = stock;
     }
 
     public String getName() {
@@ -59,18 +49,8 @@ public class ProductModel extends BaseEntity {
         return price;
     }
 
-    public ProductStatus getStatus() {
-        return status;
-    }
-
-    public boolean isDeleted() {
-        return getDeletedAt() != null;
-    }
-
-    @Override
-    public void delete() {
-        super.delete();
-        this.status = ProductStatus.DELETED;
+    public Integer getStock() {
+        return stock;
     }
 
     public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
@@ -83,9 +63,13 @@ public class ProductModel extends BaseEntity {
         if (newPrice == null || newPrice < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
+        if (newStock == null || newStock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
 
         this.name = newName;
         this.description = newDescription;
         this.price = newPrice;
+        this.stock = newStock;
     }
 }
