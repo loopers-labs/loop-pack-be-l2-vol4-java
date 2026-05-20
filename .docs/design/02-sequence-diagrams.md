@@ -14,12 +14,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/products?sort=latest&brandId=1&page=0
-    Controller->>Facade: getProducts(sort, brandId, page)
-    Facade->>Service: findProducts(sort, brandId, page)
-    Service->>DB: SELECT products (filter + sort + pagination)
-    DB-->>Service: product list
-    Controller-->>Client: 200
+    Client->>+Controller: GET /api/v1/products?sort=latest&brandId=1&page=0
+    Controller->>+Facade: getProducts(sort, brandId, page)
+    Facade->>+Service: findProducts(sort, brandId, page)
+    Service->>+DB: SELECT products (filter + sort + pagination)
+    DB-->>-Service: product list
+    Service-->>-Facade: product list
+    Facade-->>-Controller: product list
+    Controller-->>-Client: 200
 ```
 
 ---
@@ -34,17 +36,19 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/products/{productId}
-    Controller->>Facade: getProduct(productId)
-    Facade->>Service: getProduct(productId)
-    Service->>DB: SELECT product WHERE id = productId
-    DB-->>Service: product | null
+    Client->>+Controller: GET /api/v1/products/{productId}
+    Controller->>+Facade: getProduct(productId)
+    Facade->>+Service: getProduct(productId)
+    Service->>+DB: SELECT product WHERE id = productId
+    DB-->>-Service: product | null
+    Service-->>-Facade: product | null
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Client: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Client: 404
     else 상품 존재
-        Controller-->>Client: 200
+        Facade-->>-Controller: product
+        Controller-->>-Client: 200
     end
 ```
 
@@ -60,17 +64,19 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/brands/{brandId}
-    Controller->>Facade: getBrand(brandId)
-    Facade->>Service: getBrand(brandId)
-    Service->>DB: SELECT brand WHERE id = brandId
-    DB-->>Service: brand | null
+    Client->>+Controller: GET /api/v1/brands/{brandId}
+    Controller->>+Facade: getBrand(brandId)
+    Facade->>+Service: getBrand(brandId)
+    Service->>+DB: SELECT brand WHERE id = brandId
+    DB-->>-Service: brand | null
+    Service-->>-Facade: brand | null
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Client: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Client: 404
     else 브랜드 존재
-        Controller-->>Client: 200
+        Facade-->>-Controller: brand
+        Controller-->>-Client: 200
     end
 ```
 
@@ -90,30 +96,37 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: POST /api/v1/products/{productId}/likes
-    Controller->>Facade: registerLike(userId, productId)
+    Client->>+Controller: POST /api/v1/products/{productId}/likes
+    Controller->>+Facade: registerLike(userId, productId)
 
-    Facade->>Service: getProduct(productId)
-    Service->>DB: SELECT product WHERE id = productId
-    DB-->>Service: product | null
+    Facade->>+Service: getProduct(productId)
+    Service->>+DB: SELECT product WHERE id = productId
+    DB-->>-Service: product | null
+    Service-->>-Facade: product | null
 
     alt 상품 없음 또는 삭제됨
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Client: 404
     else 상품 존재
-        Facade->>Service: findLike(userId, productId)
-        Service->>DB: SELECT like WHERE userId AND productId
-        DB-->>Service: like | null
+        Facade->>+Service: findLike(userId, productId)
+        Service->>+DB: SELECT like WHERE userId AND productId
+        DB-->>-Service: like | null
+        Service-->>-Facade: like | null
 
         alt 이미 좋아요한 상품
             Facade-->>Controller: CoreException(CONFLICT)
             Controller-->>Client: 409
         else 좋아요 없음
-            Facade->>Service: createLike(userId, productId)
-            Service->>DB: INSERT like
+            Facade->>+Service: createLike(userId, productId)
+            Service->>+DB: INSERT like
+            DB-->>-Service: ok
+            Service-->>-Facade: ok
+            Facade-->>Controller: ok
             Controller-->>Client: 200
         end
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 4-2. 좋아요 취소
@@ -126,20 +139,24 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: DELETE /api/v1/products/{productId}/likes
-    Controller->>Facade: cancelLike(userId, productId)
+    Client->>+Controller: DELETE /api/v1/products/{productId}/likes
+    Controller->>+Facade: cancelLike(userId, productId)
 
-    Facade->>Service: findLike(userId, productId)
-    Service->>DB: SELECT like WHERE userId AND productId
-    DB-->>Service: like | null
+    Facade->>+Service: findLike(userId, productId)
+    Service->>+DB: SELECT like WHERE userId AND productId
+    DB-->>-Service: like | null
+    Service-->>-Facade: like | null
 
     alt 좋아요 없음
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Client: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Client: 404
     else 좋아요 존재
-        Facade->>Service: deleteLike(like)
-        Service->>DB: DELETE like
-        Controller-->>Client: 200
+        Facade->>+Service: deleteLike(like)
+        Service->>+DB: DELETE like
+        DB-->>-Service: ok
+        Service-->>-Facade: ok
+        Facade-->>-Controller: ok
+        Controller-->>-Client: 200
     end
 ```
 
@@ -153,12 +170,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/users/{userId}/likes
-    Controller->>Facade: getLikes(userId)
-    Facade->>Service: findLikes(userId)
-    Service->>DB: SELECT likes WHERE userId
-    DB-->>Service: like list
-    Controller-->>Client: 200
+    Client->>+Controller: GET /api/v1/users/{userId}/likes
+    Controller->>+Facade: getLikes(userId)
+    Facade->>+Service: findLikes(userId)
+    Service->>+DB: SELECT likes WHERE userId
+    DB-->>-Service: like list
+    Service-->>-Facade: like list
+    Facade-->>-Controller: like list
+    Controller-->>-Client: 200
 ```
 
 ---
@@ -175,41 +194,52 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: POST /api/v1/orders
-    Controller->>Facade: placeOrder(userId, orderItems)
+    Client->>+Controller: POST /api/v1/orders
+    Controller->>+Facade: placeOrder(userId, orderItems)
 
     alt 주문 항목 없음
         Facade-->>Controller: CoreException(BAD_REQUEST)
         Controller-->>Client: 400
     else 항목 있음
         loop 각 주문 항목
-            Facade->>Service: getProduct(productId)
-            Service->>DB: SELECT product
-            DB-->>Service: product | null
+            Facade->>+Service: getProduct(productId)
+            Service->>+DB: SELECT product
+            DB-->>-Service: product | null
             alt 상품 없음 또는 삭제됨
+                Service-->>-Facade: CoreException(NOT_FOUND)
                 Facade-->>Controller: CoreException(NOT_FOUND)
                 Controller-->>Client: 404
+            else 상품 존재
+                Service-->>-Facade: product
             end
         end
 
         Note over Service,DB: 비관적 락 (PESSIMISTIC_WRITE)
         loop 각 주문 항목
-            Facade->>Service: decrementStock(productId, quantity)
-            Service->>DB: SELECT product FOR UPDATE
-            DB-->>Service: product (locked)
+            Facade->>+Service: decrementStock(productId, quantity)
+            Service->>+DB: SELECT product FOR UPDATE
+            DB-->>-Service: product (locked)
             alt 재고 부족
+                Service-->>-Facade: CoreException(BAD_REQUEST)
                 Facade-->>Controller: CoreException(BAD_REQUEST)
                 Controller-->>Client: 400
             else 재고 충분
-                Service->>DB: UPDATE stock -= quantity
+                Service->>+DB: UPDATE stock -= quantity
+                DB-->>-Service: ok
+                Service-->>-Facade: ok
             end
         end
 
-        Facade->>Service: createOrder(userId, snapshots)
+        Facade->>+Service: createOrder(userId, snapshots)
         Note right of Service: 상품명·가격 스냅샷 저장
-        Service->>DB: INSERT order + orderItems
+        Service->>+DB: INSERT order + orderItems
+        DB-->>-Service: ok
+        Service-->>-Facade: order
+        Facade-->>Controller: order
         Controller-->>Client: 201
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -226,12 +256,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/orders?startAt=2026-01-01&endAt=2026-01-31
-    Controller->>Facade: getOrders(userId, startAt, endAt)
-    Facade->>Service: findOrders(userId, startAt, endAt)
-    Service->>DB: SELECT orders WHERE userId AND createdAt BETWEEN startAt AND endAt
-    DB-->>Service: order list
-    Controller-->>Client: 200
+    Client->>+Controller: GET /api/v1/orders?startAt=2026-01-01&endAt=2026-01-31
+    Controller->>+Facade: getOrders(userId, startAt, endAt)
+    Facade->>+Service: findOrders(userId, startAt, endAt)
+    Service->>+DB: SELECT orders WHERE userId AND createdAt BETWEEN startAt AND endAt
+    DB-->>-Service: order list
+    Service-->>-Facade: order list
+    Facade-->>-Controller: order list
+    Controller-->>-Client: 200
 ```
 
 ### 6-2. 주문 상세 조회
@@ -244,11 +276,12 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Client->>Controller: GET /api/v1/orders/{orderId}
-    Controller->>Facade: getOrder(requestUserId, orderId)
-    Facade->>Service: getOrder(orderId)
-    Service->>DB: SELECT order WHERE id = orderId
-    DB-->>Service: order | null
+    Client->>+Controller: GET /api/v1/orders/{orderId}
+    Controller->>+Facade: getOrder(requestUserId, orderId)
+    Facade->>+Service: getOrder(orderId)
+    Service->>+DB: SELECT order WHERE id = orderId
+    DB-->>-Service: order | null
+    Service-->>-Facade: order | null
 
     alt 주문 없음
         Facade-->>Controller: CoreException(NOT_FOUND)
@@ -258,9 +291,12 @@ sequenceDiagram
             Facade-->>Controller: CoreException(FORBIDDEN)
             Controller-->>Client: 403
         else 본인의 주문
+            Facade-->>Controller: order
             Controller-->>Client: 200
         end
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ---
@@ -277,16 +313,19 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: POST /api-admin/v1/brands
-    Controller->>Facade: createBrand(name, ...)
+    Admin->>+Controller: POST /api-admin/v1/brands
+    Controller->>+Facade: createBrand(name, ...)
 
     alt 브랜드명 없음
-        Facade-->>Controller: CoreException(BAD_REQUEST)
-        Controller-->>Admin: 400
+        Facade-->>-Controller: CoreException(BAD_REQUEST)
+        Controller-->>-Admin: 400
     else 유효한 입력
-        Facade->>Service: createBrand(name, ...)
-        Service->>DB: INSERT brand
-        Controller-->>Admin: 201
+        Facade->>+Service: createBrand(name, ...)
+        Service->>+DB: INSERT brand
+        DB-->>-Service: ok
+        Service-->>-Facade: brand
+        Facade-->>-Controller: brand
+        Controller-->>-Admin: 201
     end
 ```
 
@@ -300,12 +339,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/brands?page=0&size=20
-    Controller->>Facade: getBrands(page, size)
-    Facade->>Service: findBrands(page, size)
-    Service->>DB: SELECT brands (pagination)
-    DB-->>Service: brand list
-    Controller-->>Admin: 200
+    Admin->>+Controller: GET /api-admin/v1/brands?page=0&size=20
+    Controller->>+Facade: getBrands(page, size)
+    Facade->>+Service: findBrands(page, size)
+    Service->>+DB: SELECT brands (pagination)
+    DB-->>-Service: brand list
+    Service-->>-Facade: brand list
+    Facade-->>-Controller: brand list
+    Controller-->>-Admin: 200
 ```
 
 ### 7-3. 브랜드 상세 조회
@@ -318,17 +359,19 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/brands/{brandId}
-    Controller->>Facade: getBrand(brandId)
-    Facade->>Service: getBrand(brandId)
-    Service->>DB: SELECT brand WHERE id = brandId
-    DB-->>Service: brand | null
+    Admin->>+Controller: GET /api-admin/v1/brands/{brandId}
+    Controller->>+Facade: getBrand(brandId)
+    Facade->>+Service: getBrand(brandId)
+    Service->>+DB: SELECT brand WHERE id = brandId
+    DB-->>-Service: brand | null
+    Service-->>-Facade: brand | null
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 브랜드 존재
-        Controller-->>Admin: 200
+        Facade-->>-Controller: brand
+        Controller-->>-Admin: 200
     end
 ```
 
@@ -342,19 +385,23 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: PUT /api-admin/v1/brands/{brandId}
-    Controller->>Facade: updateBrand(brandId, name, ...)
-    Facade->>Service: getBrand(brandId)
-    Service->>DB: SELECT brand WHERE id = brandId
-    DB-->>Service: brand | null
+    Admin->>+Controller: PUT /api-admin/v1/brands/{brandId}
+    Controller->>+Facade: updateBrand(brandId, name, ...)
+    Facade->>+Service: getBrand(brandId)
+    Service->>+DB: SELECT brand WHERE id = brandId
+    DB-->>-Service: brand | null
+    Service-->>-Facade: brand | null
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 브랜드 존재
-        Facade->>Service: updateBrand(brand, name, ...)
-        Service->>DB: UPDATE brand
-        Controller-->>Admin: 200
+        Facade->>+Service: updateBrand(brand, name, ...)
+        Service->>+DB: UPDATE brand
+        DB-->>-Service: ok
+        Service-->>-Facade: brand
+        Facade-->>-Controller: brand
+        Controller-->>-Admin: 200
     end
 ```
 
@@ -370,22 +417,27 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: DELETE /api-admin/v1/brands/{brandId}
-    Controller->>Facade: deleteBrand(brandId)
+    Admin->>+Controller: DELETE /api-admin/v1/brands/{brandId}
+    Controller->>+Facade: deleteBrand(brandId)
 
-    Facade->>Service: getBrand(brandId)
-    Service->>DB: SELECT brand WHERE id = brandId
-    DB-->>Service: brand | null
+    Facade->>+Service: getBrand(brandId)
+    Service->>+DB: SELECT brand WHERE id = brandId
+    DB-->>-Service: brand | null
+    Service-->>-Facade: brand | null
 
     alt 브랜드 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 브랜드 존재
-        Facade->>Service: deleteBrand(brand)
+        Facade->>+Service: deleteBrand(brand)
         Note over Service,DB: @Transactional
-        Service->>DB: soft delete products WHERE brandId
-        Service->>DB: soft delete brand
-        Controller-->>Admin: 200
+        Service->>+DB: soft delete products WHERE brandId
+        DB-->>-Service: ok
+        Service->>+DB: soft delete brand
+        DB-->>-Service: ok
+        Service-->>-Facade: ok
+        Facade-->>-Controller: ok
+        Controller-->>-Admin: 200
     end
 ```
 
@@ -403,26 +455,32 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: POST /api-admin/v1/products
-    Controller->>Facade: createProduct(brandId, name, price, stock, description)
+    Admin->>+Controller: POST /api-admin/v1/products
+    Controller->>+Facade: createProduct(brandId, name, price, stock, description)
 
     alt 필수 입력값 누락 또는 가격·재고 < 0
         Facade-->>Controller: CoreException(BAD_REQUEST)
         Controller-->>Admin: 400
     else 유효한 입력
-        Facade->>Service: getBrand(brandId)
-        Service->>DB: SELECT brand WHERE id = brandId
-        DB-->>Service: brand | null
+        Facade->>+Service: getBrand(brandId)
+        Service->>+DB: SELECT brand WHERE id = brandId
+        DB-->>-Service: brand | null
+        Service-->>-Facade: brand | null
 
         alt 브랜드 없음 또는 삭제됨
             Facade-->>Controller: CoreException(NOT_FOUND)
             Controller-->>Admin: 404
         else 브랜드 존재
-            Facade->>Service: createProduct(brand, name, price, stock, description)
-            Service->>DB: INSERT product
+            Facade->>+Service: createProduct(brand, name, price, stock, description)
+            Service->>+DB: INSERT product
+            DB-->>-Service: ok
+            Service-->>-Facade: product
+            Facade-->>Controller: product
             Controller-->>Admin: 201
         end
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 8-2. 상품 목록 조회
@@ -435,12 +493,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/products?page=0&size=20&brandId={brandId}
-    Controller->>Facade: getProducts(page, size, brandId)
-    Facade->>Service: findProducts(page, size, brandId)
-    Service->>DB: SELECT products (filter + pagination)
-    DB-->>Service: product list
-    Controller-->>Admin: 200
+    Admin->>+Controller: GET /api-admin/v1/products?page=0&size=20&brandId={brandId}
+    Controller->>+Facade: getProducts(page, size, brandId)
+    Facade->>+Service: findProducts(page, size, brandId)
+    Service->>+DB: SELECT products (filter + pagination)
+    DB-->>-Service: product list
+    Service-->>-Facade: product list
+    Facade-->>-Controller: product list
+    Controller-->>-Admin: 200
 ```
 
 ### 8-3. 상품 상세 조회
@@ -453,17 +513,19 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/products/{productId}
-    Controller->>Facade: getProduct(productId)
-    Facade->>Service: getProduct(productId)
-    Service->>DB: SELECT product WHERE id = productId
-    DB-->>Service: product | null
+    Admin->>+Controller: GET /api-admin/v1/products/{productId}
+    Controller->>+Facade: getProduct(productId)
+    Facade->>+Service: getProduct(productId)
+    Service->>+DB: SELECT product WHERE id = productId
+    DB-->>-Service: product | null
+    Service-->>-Facade: product | null
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 상품 존재
-        Controller-->>Admin: 200
+        Facade-->>-Controller: product
+        Controller-->>-Admin: 200
     end
 ```
 
@@ -477,11 +539,12 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: PUT /api-admin/v1/products/{productId}
-    Controller->>Facade: updateProduct(productId, name, price, stock, description, brandId)
-    Facade->>Service: getProduct(productId)
-    Service->>DB: SELECT product WHERE id = productId
-    DB-->>Service: product | null
+    Admin->>+Controller: PUT /api-admin/v1/products/{productId}
+    Controller->>+Facade: updateProduct(productId, name, price, stock, description, brandId)
+    Facade->>+Service: getProduct(productId)
+    Service->>+DB: SELECT product WHERE id = productId
+    DB-->>-Service: product | null
+    Service-->>-Facade: product | null
 
     alt 상품 없음 또는 삭제됨
         Facade-->>Controller: CoreException(NOT_FOUND)
@@ -491,11 +554,16 @@ sequenceDiagram
             Facade-->>Controller: CoreException(BAD_REQUEST)
             Controller-->>Admin: 400
         else 브랜드 변경 없음
-            Facade->>Service: updateProduct(product, name, price, stock, description)
-            Service->>DB: UPDATE product
+            Facade->>+Service: updateProduct(product, name, price, stock, description)
+            Service->>+DB: UPDATE product
+            DB-->>-Service: ok
+            Service-->>-Facade: product
+            Facade-->>Controller: product
             Controller-->>Admin: 200
         end
     end
+    deactivate Facade
+    deactivate Controller
 ```
 
 ### 8-5. 상품 삭제
@@ -508,19 +576,23 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: DELETE /api-admin/v1/products/{productId}
-    Controller->>Facade: deleteProduct(productId)
-    Facade->>Service: getProduct(productId)
-    Service->>DB: SELECT product WHERE id = productId
-    DB-->>Service: product | null
+    Admin->>+Controller: DELETE /api-admin/v1/products/{productId}
+    Controller->>+Facade: deleteProduct(productId)
+    Facade->>+Service: getProduct(productId)
+    Service->>+DB: SELECT product WHERE id = productId
+    DB-->>-Service: product | null
+    Service-->>-Facade: product | null
 
     alt 상품 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 상품 존재
-        Facade->>Service: deleteProduct(product)
-        Service->>DB: soft delete product
-        Controller-->>Admin: 200
+        Facade->>+Service: deleteProduct(product)
+        Service->>+DB: soft delete product
+        DB-->>-Service: ok
+        Service-->>-Facade: ok
+        Facade-->>-Controller: ok
+        Controller-->>-Admin: 200
     end
 ```
 
@@ -538,12 +610,14 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/orders?page=0&size=20
-    Controller->>Facade: getAllOrders(page, size)
-    Facade->>Service: findAllOrders(page, size)
-    Service->>DB: SELECT orders (pagination)
-    DB-->>Service: order list
-    Controller-->>Admin: 200
+    Admin->>+Controller: GET /api-admin/v1/orders?page=0&size=20
+    Controller->>+Facade: getAllOrders(page, size)
+    Facade->>+Service: findAllOrders(page, size)
+    Service->>+DB: SELECT orders (pagination)
+    DB-->>-Service: order list
+    Service-->>-Facade: order list
+    Facade-->>-Controller: order list
+    Controller-->>-Admin: 200
 ```
 
 ### 9-2. 주문 상세 조회
@@ -556,16 +630,18 @@ sequenceDiagram
     participant Service
     participant DB
 
-    Admin->>Controller: GET /api-admin/v1/orders/{orderId}
-    Controller->>Facade: getOrder(orderId)
-    Facade->>Service: getOrder(orderId)
-    Service->>DB: SELECT order WHERE id = orderId
-    DB-->>Service: order | null
+    Admin->>+Controller: GET /api-admin/v1/orders/{orderId}
+    Controller->>+Facade: getOrder(orderId)
+    Facade->>+Service: getOrder(orderId)
+    Service->>+DB: SELECT order WHERE id = orderId
+    DB-->>-Service: order | null
+    Service-->>-Facade: order | null
 
     alt 주문 없음
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
+        Facade-->>-Controller: CoreException(NOT_FOUND)
+        Controller-->>-Admin: 404
     else 주문 존재
-        Controller-->>Admin: 200
+        Facade-->>-Controller: order
+        Controller-->>-Admin: 200
     end
 ```
