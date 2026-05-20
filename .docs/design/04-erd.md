@@ -26,7 +26,7 @@ erDiagram
 
     products {
         BIGINT id PK
-        BIGINT brand_id FK
+        BIGINT brand_id
         VARCHAR name
         BIGINT price
         INT stock
@@ -39,22 +39,22 @@ erDiagram
 
     likes {
         BIGINT id PK
-        BIGINT user_id FK
-        BIGINT product_id FK
+        BIGINT user_id
+        BIGINT product_id
         DATETIME created_at
         DATETIME updated_at
     }
 
     orders {
         BIGINT id PK
-        BIGINT user_id FK
+        BIGINT user_id
         DATETIME created_at
         DATETIME updated_at
     }
 
     order_items {
         BIGINT id PK
-        BIGINT order_id FK
+        BIGINT order_id
         BIGINT product_id
         VARCHAR product_name
         BIGINT price
@@ -87,6 +87,9 @@ erDiagram
 ### likes — deleted_at 없음
 하드 딜리트로 결정했으므로 `deleted_at` 컬럼을 두지 않는다. `BaseEntity`의 `id`, `created_at`, `updated_at`만 상속한다.
 
+### FK 미사용
+모든 테이블 간 관계는 DB 레벨 FK 없이 애플리케이션 레벨에서 검증한다. 시퀀스 다이어그램에 명시된 대로 각 유스케이스에서 참조 대상의 존재 여부를 사전 확인한다. ERD의 관계선은 논리적 참조를 나타낼 뿐 물리적 제약이 아니다.
+
 ### order_items — product_id 논리 참조
 `product_id`는 스냅샷 참조용으로만 보관한다. 주문 이후 상품이 삭제되어도 주문 기록이 유지되어야 하므로 FK 제약을 걸지 않는다.
 
@@ -103,11 +106,6 @@ erDiagram
 | users | UK | email |
 | brands | UK | name |
 | likes | UK | (user_id, product_id) |
-| products | FK | brand_id → brands.id |
-| likes | FK | user_id → users.id |
-| likes | FK | product_id → products.id |
-| orders | FK | user_id → users.id |
-| order_items | FK | order_id → orders.id |
 
 ---
 
