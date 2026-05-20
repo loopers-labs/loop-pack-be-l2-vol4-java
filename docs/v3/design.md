@@ -53,7 +53,15 @@ erDiagram
         varchar name
         text description
         bigint price
-        int stock
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    PRODUCT_STOCK {
+        bigint id PK
+        bigint product_id
+        int quantity
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -102,10 +110,12 @@ erDiagram
     }
 
     BRAND ||--o{ PRODUCT : "has"
+    PRODUCT ||--|| PRODUCT_STOCK : "has"
     ORDERS ||--|{ ORDER_ITEM : "contains"
 ```
 
 > - `brand_id` (PRODUCT): FK 컬럼은 존재하나 DB 레벨 FK 제약조건 없음 (soft delete 환경 일관성 유지, ADR-005 참고)
+> - `product_id` (PRODUCT_STOCK): 1:1 관계, ID만 저장, JPA 관계 없음 (ADR-006 참고)
 > - `user_id` (LIKES / ORDERS): ID만 저장, JPA 관계 없음
 > - `product_id` (LIKES / ORDER_ITEM): ID만 저장, JPA 관계 없음
 
@@ -135,9 +145,14 @@ classDiagram
         +String name
         +String description
         +Long price
-        +Integer stock
-        +update(name, description, price, stock)
-        +deductStock(quantity)
+        +update(name, description, price)
+    }
+
+    class ProductStockModel {
+        +Long productId
+        +Integer quantity
+        +deduct(amount)
+        +validate(amount)
     }
 
     class LikeModel {
@@ -166,10 +181,12 @@ classDiagram
 
     BaseEntity <|-- BrandModel
     BaseEntity <|-- ProductModel
+    BaseEntity <|-- ProductStockModel
     BaseEntity <|-- LikeModel
     BaseEntity <|-- OrderModel
     BaseEntity <|-- OrderItemModel
     ProductModel --> BrandModel : "@ManyToOne"
+    ProductStockModel ..> ProductModel : "productId (ID 참조)"
     OrderModel --> OrderItemModel : "@OneToMany"
     OrderItemModel --> OrderModel : "@ManyToOne"
     OrderModel ..> OrderStatus
@@ -207,13 +224,15 @@ application/
 
 domain/
 ├── brand/   BrandModel, BrandRepository, BrandService
-├── product/ ProductModel, ProductRepository, ProductService
+├── product/ ProductModel, ProductStockModel,
+│            ProductRepository, ProductStockRepository, ProductService
 ├── like/    LikeModel, LikeRepository, LikeService
 └── order/   OrderModel, OrderItemModel, OrderRepository, OrderService
 
 infrastructure/
 ├── brand/   BrandJpaRepository, BrandRepositoryImpl
-├── product/ ProductJpaRepository, ProductRepositoryImpl
+├── product/ ProductJpaRepository, ProductRepositoryImpl,
+│            ProductStockJpaRepository, ProductStockRepositoryImpl
 ├── like/    LikeJpaRepository, LikeRepositoryImpl
 └── order/   OrderJpaRepository, OrderRepositoryImpl
 ```
@@ -384,12 +403,16 @@ DELETE → userId + productId 조합 없으면 404 Not Found
 
 ```
 1. 유저 인증 (X-Loopers-LoginId / LoginPw)
-2. 요청 상품 목록 전체 조회
-3. 각 상품 재고 확인 → 하나라도 부족하면 전체 실패 (400 Bad Request)
-4. 재고 차감 (product.deductStock(quantity))
+2. 요청 상품 목록 전체 조회 (product 테이블)
+3. 각 상품의 ProductStock 조회 → 재고 확인
+   → 하나라도 부족하면 전체 실패 (400 Bad Request)
+4. 재고 차감 (productStock.deduct(quantity)) — product_stock 테이블에만 락
 5. OrderModel + OrderItemModel 생성 (productName, productPrice 스냅샷)
 6. @Transactional로 3~5 원자적 처리
 ```
+
+> product 테이블과 product_stock 테이블이 분리되어 있으므로,
+> 재고 차감 락이 상품 조회(product 테이블)에 영향을 주지 않는다.
 
 ### 어드민 인증
 
@@ -421,10 +444,16 @@ sequenceDiagram
         ProductService-->>OrderFacade: ProductModel
     end
 
+    loop 상품별
+        OrderFacade->>ProductService: getStock(productId)
+        ProductService-->>OrderFacade: ProductStockModel
+    end
+
     OrderFacade->>OrderFacade: 재고 확인 (전체)\n부족 시 400 Bad Request
 
     loop 상품별
-        OrderFacade->>ProductService: deductStock(product, quantity)
+        OrderFacade->>ProductService: deductStock(productId, quantity)
+        Note over ProductService: product_stock 테이블에만 락
     end
 
     OrderFacade->>OrderService: createOrder(userId, items + snapshot)
@@ -510,3 +539,4 @@ sequenceDiagram
 | ADR-003 | 좋아요 수 COUNT 쿼리 | `adr/003-like-count-query.md` |
 | ADR-004 | 상품 응답에 브랜드명 포함 | `adr/004-product-brand-response.md` |
 | ADR-005 | @ManyToOne FK 제약조건 제거 | `adr/005-jpa-no-fk-constraint.md` |
+| ADR-006 | 재고 별도 테이블 분리 | `adr/006-product-stock-table.md` |
