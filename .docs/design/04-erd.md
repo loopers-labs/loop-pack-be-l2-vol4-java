@@ -37,6 +37,7 @@ erDiagram
         VARCHAR name
         VARCHAR description
         BIGINT price
+        BIGINT like_count
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
