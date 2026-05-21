@@ -167,5 +167,3 @@ erDiagram
 
     member |o--o{ user_action_log : "user_action_log.member_id"
 ```
-- 주문당 결제 1건으로 충분한지, 결제 재시도 이력을 보존하기 위해 `payment` 를 주문당 N건으로 열어둘지 확정해야 한다.
-- `order_item.product_id` 는 원 상품 추적을 위한 FK 로 두었지만, 주문 응답은 반드시 스냅샷 컬럼 기준으로 구성해야 한다.
