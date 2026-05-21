@@ -307,7 +307,46 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 11. API 엔드포인트
+## 11. 페이지네이션 공통 정책
+
+### 기본값
+
+| 파라미터 | 기본값 | 설명 |
+|---|---|---|
+| `page` | `0` | 0-based 페이지 번호. 미전달 시 첫 번째 페이지 |
+| `size` | `20` | 페이지당 항목 수. 미전달 시 20개 |
+
+### 응답 구조
+
+페이지네이션이 적용된 모든 목록 조회 API는 아래 구조로 통일한다.
+
+```json
+{
+  "content": [ ... ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 100
+}
+```
+
+### 적용 API 목록
+
+| API | 비고 |
+|---|---|
+| `GET /api-admin/v1/brands` | |
+| `GET /api/v1/products` | `sort` 파라미터 추가 (섹션 12 참고) |
+| `GET /api-admin/v1/products` | |
+| `GET /api/v1/users/{userId}/likes` | |
+| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 (ADR-010) |
+| `GET /api-admin/v1/orders` | |
+
+### 예외
+
+단건 조회, 생성(POST), 수정(PUT), 삭제(DELETE) API는 페이지네이션을 적용하지 않는다.
+
+---
+
+## 12. API 엔드포인트
 
 ### Brand
 
@@ -386,7 +425,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 12. 응답 DTO 스펙
+## 13. 응답 DTO 스펙
 
 > **HTTP 상태 코드 기준**
 > - 단건/목록 조회 (GET): `200 OK`
@@ -628,7 +667,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 13. 핵심 비즈니스 로직
+## 14. 핵심 비즈니스 로직
 
 ### Brand 삭제
 
@@ -697,13 +736,13 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ---
 
-## 14. 시퀀스 다이어그램
+## 15. 시퀀스 다이어그램
 
 → [`docs/v3/sequence.md`](./sequence.md) 참고 (전체 API 시퀀스 다이어그램)
 
 ---
 
-## 15. 에러 처리
+## 16. 에러 처리
 
 | 상황 | ErrorType | HTTP |
 |---|---|---|
@@ -719,7 +758,7 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ---
 
-## 16. ADR 목록
+## 17. ADR 목록
 
 | 번호 | 제목 | 파일 |
 |---|---|---|
