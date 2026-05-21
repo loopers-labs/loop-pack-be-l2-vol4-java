@@ -179,17 +179,15 @@ sequenceDiagram
     LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
     Note over LikeRepository: deleted_at 포함 전체 조회
     LikeRepository-->>LikeService: Optional~LikeModel~
+    Note over LikeService: active(deleted_at=null) 존재 → 409 Conflict
 
-    alt active(deleted_at=null) 존재
-        LikeService-->>LikeV1Controller: 409 Conflict
-    else soft-deleted 존재
+    alt soft-deleted 존재
         LikeService->>LikeService: like.restore() [deleted_at=null]
-        LikeService-->>LikeFacade: void
-    else 없음
+    else 없음 (신규)
         LikeService->>LikeRepository: save(new LikeModel)
         LikeRepository-->>LikeService: LikeModel
-        LikeService-->>LikeFacade: void
     end
+    LikeService-->>LikeFacade: void
 
     LikeFacade->>ProductService: incrementLikeCount(productId)
     ProductService->>ProductRepository: UPDATE like_count = like_count + 1
