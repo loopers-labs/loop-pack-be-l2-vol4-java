@@ -471,6 +471,22 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
+### Order
+
+| 필드 | Customer 목록 | Customer 단건 | Admin 목록 | Admin 단건 |
+|---|:---:|:---:|:---:|:---:|
+| orderId | ✅ | ✅ | ✅ | ✅ |
+| userId | ❌ | ❌ | ✅ | ✅ |
+| status | ✅ | ✅ | ✅ | ✅ |
+| totalAmount | ✅ | ✅ | ✅ | ✅ |
+| items | ✅ | ✅ | ✅ | ✅ |
+| createdAt | ✅ | ✅ | ✅ | ✅ |
+
+> Customer: `userId` 미노출 — 자신의 주문만 조회 가능하므로 불필요
+> Admin: `userId` 포함 — 전체 주문 관리 목적
+
+---
+
 ## 14. 핵심 비즈니스 로직
 
 ### Brand 삭제
