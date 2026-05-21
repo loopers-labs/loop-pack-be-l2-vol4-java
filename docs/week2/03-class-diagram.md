@@ -24,6 +24,7 @@ classDiagram
     class BrandModel {
         <<Aggregate Root>>
         BrandStatus status
+        changeInfo()
         softDelete()
         isVisible()
     }
@@ -35,6 +36,9 @@ classDiagram
         int likeCount
         ProductStatus status
         isOrderable()
+        changeSaleInfo()
+        changeStatus(ProductStatus status)
+        changeStock(int stock)
         deductStock(int quantity)
         releaseStock(int quantity)
         increaseLikeCount()
@@ -142,8 +146,8 @@ classDiagram
 
 | 객체 | 책임 |
 | --- | --- |
-| `BrandModel` | 브랜드의 노출 가능 여부와 소프트 삭제 상태를 관리한다. |
-| `ProductModel` | 상품 판매 가능 여부, 재고 차감/해제, 좋아요 수 변경, 소프트 삭제를 관리한다. |
+| `BrandModel` | 브랜드 정보, 노출 가능 여부, 소프트 삭제 상태를 관리한다. |
+| `ProductModel` | 상품 정보, 판매 가능 여부, 재고 변경/차감/해제, 좋아요 수 변경, 소프트 삭제를 관리한다. |
 | `LikeModel` | 사용자와 상품의 좋아요 관계를 표현한다. 중복 방지는 Repository 유니크 제약과 함께 보장한다. |
 | `OrderModel` | 주문 상태, 주문 항목, 실패 항목, 총 결제 금액을 관리한다. |
 | `OrderItemModel` | 주문 당시 상품 정보를 스냅샷으로 보관한다. |
@@ -157,13 +161,16 @@ classDiagram
 - `BrandModel`은 독립 애그리거트다.
 - `ProductModel`은 `brandId`로 브랜드를 참조한다.
 - 브랜드 삭제는 소프트 삭제이며, 사용자 조회에서는 제외된다.
+- 브랜드 정보 변경은 이후 상품 조회에는 반영될 수 있지만, 기존 주문 항목 스냅샷은 변경하지 않는다.
 
 ### Product
 
 - `ProductModel`은 상품 애그리거트 루트다.
+- 관리자 상품 정보, 판매 상태, 재고 변경은 `ProductModel`의 행위로 둔다.
 - 재고 차감과 재고 해제는 `ProductModel`의 행위로 둔다.
 - 좋아요 수는 `Product.likeCount`에 캐시하지만, 원본 데이터는 `LikeModel`이다.
 - 좋아요 수 변경은 좋아요 생성/삭제 결과에 따라 수행되어야 한다.
+- 삭제되거나 숨김 처리된 상품은 사용자 조회와 주문 가능 여부 판단에서 제외한다.
 
 ### Like
 
@@ -203,9 +210,28 @@ classDiagram
         requestPayment(loginUser, orderId)
     }
 
+    class AdminBrandFacade {
+        createBrand(adminUser, command)
+        updateBrand(adminUser, brandId, command)
+        deleteBrand(adminUser, brandId)
+    }
+
+    class AdminProductFacade {
+        createProduct(adminUser, command)
+        updateProduct(adminUser, productId, command)
+        deleteProduct(adminUser, productId)
+    }
+
+    class BrandService {
+        getVisibleBrand(brandId)
+        getEditableBrand(brandId)
+        save(BrandModel brand)
+    }
+
     class ProductService {
         getLikeableProduct(productId)
         getOrderableProduct(productId)
+        getEditableProduct(productId)
         save(ProductModel product)
     }
 
@@ -235,6 +261,12 @@ classDiagram
         save(product)
     }
 
+    class BrandRepository {
+        <<interface>>
+        find(brandId)
+        save(brand)
+    }
+
     class LikeRepository {
         <<interface>>
         find(userId, productId)
@@ -261,6 +293,10 @@ classDiagram
     PaymentFacade --> OrderService
     PaymentFacade --> PaymentService
     PaymentFacade --> CompensationService
+    AdminBrandFacade --> BrandService
+    AdminProductFacade --> BrandService
+    AdminProductFacade --> ProductService
+    BrandService --> BrandRepository
     CompensationService --> ProductService
     ProductService --> ProductRepository
     LikeService --> LikeRepository
@@ -273,6 +309,8 @@ classDiagram
 - `LikeFacade`는 좋아요 생성/삭제 결과에 따라 `ProductModel.likeCount` 변경을 조율한다.
 - `OrderFacade`는 상품 조회/재고 차감과 주문 생성의 순서를 조율한다.
 - `PaymentFacade`는 결제 결과에 따라 주문 상태 변경과 보상 요청을 조율한다.
+- `AdminBrandFacade`는 관리자 브랜드 생성, 수정, 삭제 유스케이스를 조율한다.
+- `AdminProductFacade`는 관리자 상품 생성, 수정, 삭제, 상태/재고 변경 유스케이스를 조율한다.
 - `CompensationService`는 재고 해제를 상품 도메인에 위임한다.
 - 도메인 Service는 infrastructure 구현체가 아니라 domain Repository 인터페이스에만 의존한다.
 
@@ -282,3 +320,4 @@ classDiagram
 - 부분 주문을 허용하므로 `OrderModel`은 성공 항목과 실패 항목을 명확히 표현해야 한다.
 - 결제 실패와 타임아웃 보상 처리는 비동기 재시도가 필요할 수 있다.
 - 외부 결제 장애를 별도 대기 상태로 둘지, 실패 상태로 기록할지는 결제 장애 처리 정책을 구체화하면서 결정한다.
+- 관리자 재고 변경과 사용자 주문 생성이 동시에 발생할 수 있다. 구현 단계에서는 상품 애그리거트 저장 시 동시성 제어가 필요하다.

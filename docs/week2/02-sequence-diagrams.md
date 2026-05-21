@@ -4,6 +4,7 @@
 
 이 문서는 `01-requirements.md`에서 정의한 요구사항 중 도메인 책임, 유스케이스 조율, 계층 간 의존 방향이 중요한 흐름을 시퀀스 다이어그램으로 정리한다.
 단순 조회처럼 요구사항 명세만으로 충분히 이해되는 흐름은 제외한다.
+관리자 브랜드/상품 등록처럼 단순한 저장 흐름은 제외하되, 사용자 주문 가능 여부와 재고 정합성에 영향을 주는 관리자 상품 변경 흐름은 포함한다.
 
 ## 작성 기준
 
@@ -249,3 +250,57 @@ sequenceDiagram
 - 주문 상태 변경은 `OrderModel.markPaid`, `markPaymentFailed`, `markCanceledByPaymentTimeout` 같은 도메인 행위로 표현한다.
 - 보상 처리는 `CompensationService`가 조율하고, 실제 재고 해제는 `ProductService`를 통해 상품 도메인에 위임한다.
 - 결제 장애 시 `PENDING` 상태를 명시적으로 둘지, 곧바로 실패로 둘지는 후속 설계에서 더 구체화해야 한다.
+
+---
+
+## 4. 관리자 상품 상태/재고 변경
+
+### 설계 의도
+
+관리자 상품 변경은 단순 CRUD처럼 보이지만, 사용자 상품 조회와 주문 가능 여부에 직접 영향을 준다.
+따라서 상품 상태, 노출 여부, 재고 변경은 `ProductModel`의 행위로 표현하고, 사용자 주문 생성과 같은 상품 애그리거트 경계를 공유한다.
+관리자 유스케이스도 상품 저장소를 직접 다루지 않고 `AdminProductFacade`와 `ProductService`를 통해 조율한다.
+
+### 시퀀스
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Admin as 어드민
+    participant Controller as AdminProductV1Controller
+    participant Facade as AdminProductFacade
+    participant ProductService as ProductService
+    participant Product as ProductModel
+    participant ProductRepository as ProductRepository
+
+    Admin->>Controller: PUT /api-admin/v1/products/{productId}
+    Controller->>Facade: updateProduct(adminUser, productId, command)
+    Facade->>ProductService: getEditableProduct(productId)
+    ProductService->>ProductRepository: find(productId)
+    ProductRepository-->>ProductService: ProductModel
+    ProductService-->>Facade: product
+
+    alt 상품 기본 정보 변경
+        Facade->>Product: changeSaleInfo(name, price)
+    else 판매/노출 상태 변경
+        Facade->>Product: changeStatus(status)
+    else 재고 변경
+        Facade->>Product: changeStock(stock)
+    else 삭제 처리
+        Facade->>Product: softDelete()
+    end
+
+    Facade->>ProductService: save(product)
+    ProductService->>ProductRepository: save(product)
+    ProductRepository-->>ProductService: saved product
+    ProductService-->>Facade: saved product
+    Facade-->>Controller: productId, status, stock
+    Controller-->>Admin: ApiResponse
+```
+
+### 논의 포인트
+
+- 관리자 상품 변경과 사용자 주문 생성은 같은 `ProductModel`의 상태를 변경한다. 구현 단계에서는 재고 차감과 재고 변경의 동시성 제어가 필요하다.
+- 상품 삭제와 숨김 처리는 사용자 조회와 주문 가능 여부 판단에서 항상 제외되어야 한다.
+- 상품명이나 가격이 변경되어도 기존 `OrderItemModel`의 스냅샷은 변경하지 않는다.
+- 관리자 권한 인증은 Controller/API 경계에서 처리하고, 상품 상태 변경 규칙은 도메인 모델에 둔다.

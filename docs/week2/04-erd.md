@@ -111,16 +111,20 @@ erDiagram
 ### brands
 
 - 브랜드 정보를 저장한다.
+- 어드민 브랜드 등록/수정/삭제의 대상 테이블이다.
 - 삭제는 물리 삭제가 아니라 `deleted_at` 또는 `status = DELETED`로 처리한다.
 - 사용자 조회에서는 삭제된 브랜드를 제외한다.
+- 브랜드 정보가 수정되어도 기존 주문 항목에 저장된 브랜드명 스냅샷은 변경하지 않는다.
 
 ### products
 
 - 상품 정보를 저장한다.
+- 어드민 상품 등록/수정/삭제, 판매 상태 변경, 재고 변경의 대상 테이블이다.
 - `brand_id`로 브랜드를 참조한다.
 - `stock`은 주문 가능 수량이다.
 - `like_count`는 `likes` 테이블을 원본으로 하는 파생 값이며, 상품 목록의 `likes_desc` 정렬에 사용한다.
 - 삭제는 물리 삭제가 아니라 `deleted_at` 또는 `status = DELETED`로 처리한다.
+- 상품 정보가 수정되어도 기존 주문 항목의 상품명, 브랜드명, 가격 스냅샷은 변경하지 않는다.
 
 ### likes
 
@@ -163,6 +167,8 @@ erDiagram
 | --- | --- | --- |
 | `users` | `UK(login_id)` | 로그인 ID는 사용자 식별자이므로 유일해야 한다. |
 | `products` | `FK(brand_id) -> brands(id)` | 상품은 반드시 하나의 브랜드에 속한다. |
+| `products` | `CHECK(stock >= 0)` | 재고는 음수가 될 수 없다. |
+| `products` | `CHECK(price >= 0)` | 상품 가격은 음수가 될 수 없다. |
 | `likes` | `FK(user_id) -> users(id)` | 좋아요는 사용자 기준으로 생성된다. |
 | `likes` | `FK(product_id) -> products(id)` | 좋아요는 상품 기준으로 생성된다. |
 | `likes` | `UK(user_id, product_id)` | 같은 사용자는 같은 상품에 좋아요를 하나만 가질 수 있다. |
@@ -175,7 +181,8 @@ erDiagram
 
 | 테이블 | 인덱스 | 목적 |
 | --- | --- | --- |
-| `products` | `(brand_id, deleted_at)` | 브랜드별 상품 목록 조회 |
+| `brands` | `(status, deleted_at)` | 사용자 브랜드 조회에서 삭제/비노출 브랜드 제외 |
+| `products` | `(brand_id, status, deleted_at)` | 브랜드별 상품 목록 조회와 삭제/비노출 상품 제외 |
 | `products` | `(created_at)` | `latest` 정렬 |
 | `products` | `(price)` | `price_asc` 정렬 |
 | `products` | `(like_count)` | `likes_desc` 정렬 |
@@ -191,3 +198,5 @@ erDiagram
 - `order_failed_items`는 요구사항상 사용자에게 실패 항목을 알려야 하므로 별도 테이블로 둔다. 단순 응답 전용으로만 처리할 경우 영속화하지 않는 선택지도 가능하다.
 - `payments`는 1:N 구조로 두어 결제 재시도와 실패 이력을 보존할 수 있게 한다.
 - 소프트 삭제된 브랜드/상품은 사용자 조회에서 항상 제외되어야 한다.
+- 관리자 상품 변경은 기존 `brands`, `products` 테이블을 사용한다. 별도 관리자 변경 이력 테이블은 이번 설계 범위에 포함하지 않는다.
+- 관리자 재고 변경과 사용자 주문 생성의 동시성 제어는 구현 단계에서 낙관적 락 또는 조건부 업데이트 방식으로 구체화한다.
