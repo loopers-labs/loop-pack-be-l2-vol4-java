@@ -775,3 +775,4 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 | ADR-011 | 인증 인터셉터 위치 — support/auth | `adr/011-auth-interceptor-location.md` |
 | ADR-012 | 트랜잭션 경계 원칙 | `adr/012-transaction-boundary.md` |
 | ADR-013 | 연쇄 삭제 정책 — Facade 오케스트레이션 + Like 연쇄 Soft Delete | `adr/013-cascade-soft-delete.md` |
+| ADR-014 | 배치 IN 쿼리 + 재고 차감 락 순서 정렬 | `adr/014-batch-query-and-lock-ordering.md` |
