@@ -30,14 +30,12 @@ sequenceDiagram
     BrandFacade->>BrandService: delete(brandId)
     BrandService-->>BrandFacade: (없으면 404)
 
-    BrandFacade->>ProductService: findAllByBrand(brandId)
-    ProductService-->>BrandFacade: List~ProductModel~
+    BrandFacade->>ProductService: findIdsByBrand(brandId)
+    ProductService-->>BrandFacade: List~productId~
 
-    loop 상품별
-        BrandFacade->>ProductService: delete(product)
-        BrandFacade->>ProductInventoryService: deleteByProduct(productId)
-        BrandFacade->>LikeService: deleteAllByProduct(productId)
-    end
+    BrandFacade->>ProductService: deleteAll(productIds)
+    BrandFacade->>ProductInventoryService: deleteAllByProducts(productIds)
+    BrandFacade->>LikeService: deleteAllByProducts(productIds)
 
     BrandFacade-->>BrandAdminV1Controller: void
 ```
@@ -276,13 +274,11 @@ sequenceDiagram
 
     Note over OrderFacade,ProductRepository: [ 트랜잭션 외부 — 읽기 전용 ]
 
-    loop 상품별
-        OrderFacade->>ProductService: getProduct(productId)
-        ProductService->>ProductRepository: findById(productId)
-        Note over ProductRepository: PRODUCT JOIN PRODUCT_INVENTORY → quantity 포함
-        ProductRepository-->>ProductService: ProductModel (없으면 404)
-        ProductService-->>OrderFacade: ProductModel (quantity 포함)
-    end
+    OrderFacade->>ProductService: getProducts(productIds)
+    ProductService->>ProductRepository: findAllByIds(productIds)
+    Note over ProductRepository: WHERE id IN (...) + PRODUCT_INVENTORY JOIN → quantity 포함
+    ProductRepository-->>ProductService: List~ProductModel~ (없는 상품 있으면 404)
+    ProductService-->>OrderFacade: List~ProductModel~
 
     Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
 
@@ -293,11 +289,11 @@ sequenceDiagram
     OrderRepository-->>OrderService: OrderModel
     OrderService-->>OrderFacade: OrderModel
 
-    loop 상품별
-        OrderFacade->>ProductService: deductInventory(productId, quantity)
-        ProductService->>ProductInventoryRepository: findByProductId (FOR UPDATE)
-        ProductService->>ProductService: productInventory.deduct(quantity)
-    end
+    OrderFacade->>ProductService: deductInventories(productId-quantity 쌍)
+    Note over ProductService: productId 오름차순 정렬 (데드락 방어)
+    ProductService->>ProductInventoryRepository: findAllByProductIds(productIds) FOR UPDATE
+    Note over ProductInventoryRepository: WHERE product_id IN (...) FOR UPDATE
+    ProductService->>ProductService: 각 inventory.deduct(quantity)
 
     Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 재고 부족 시 전체 Rollback ──
 
