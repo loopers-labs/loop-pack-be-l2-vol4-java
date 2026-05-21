@@ -27,7 +27,7 @@
 
 - 실제 설계 산출물은 `.docs/design/` 하위에 작성한다.
 - `.claude/skills/` 에는 작업 방식과 참조 규칙만 작성한다.
-- 설계 산출물 작성 위치, 표준 파일 구조, PlantUML 관리 규칙은 `.claude/rules/design-docs.md` 를 따른다.
+- 설계 산출물 작성 위치, 표준 파일 구조, Mermaid 다이어그램 관리 규칙은 `.claude/rules/design-docs.md` 를 따른다.
 - 구현 단계로 넘기기 전에 설계 산출물의 누락/불일치 항목을 확인 필요 항목으로 분리한다.
 
 ## 작업 전 확인

@@ -42,4 +42,4 @@
 
 - 패키지/레이어 책임과 테스트 원칙은 `.claude/rules/code-conventions.md` 를 따른다.
 - 모듈 책임과 공통 모듈 수정 기준은 `.claude/rules/module-structure.md` 를 따른다.
-- 설계 산출물 작성 위치와 PlantUML 규칙은 `.claude/rules/design-docs.md` 를 따른다.
+- 설계 산출물 작성 위치와 Mermaid 다이어그램 규칙은 `.claude/rules/design-docs.md` 를 따른다.
