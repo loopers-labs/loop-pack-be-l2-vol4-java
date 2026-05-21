@@ -566,3 +566,4 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 | ADR-008 | likes 테이블 UNIQUE 제약 | `adr/008-likes-unique-constraint.md` |
 | ADR-009 | 좋아요 목록 소유권 검증 | `adr/009-likes-ownership-check.md` |
 | ADR-010 | 내 주문 목록 조회 — 날짜 필터 + 페이지네이션 | `adr/010-order-list-query-spec.md` |
+| ADR-011 | 인증 인터셉터 위치 — support/auth | `adr/011-auth-interceptor-location.md` |
