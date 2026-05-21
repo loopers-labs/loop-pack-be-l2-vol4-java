@@ -133,6 +133,7 @@ erDiagram
   - 좋아요 등록 시 likes INSERT + like_count +1 (같은 트랜잭션)
   - 좋아요 취소 시 likes DELETE + like_count -1 (같은 트랜잭션)
   - 정합성 보정: 주기적 배치로 `COUNT(*) FROM likes` 와 동기화
+  - 삭제(소프트 딜리트)된 상품은 노출되지 않으므로 좋아요 비동기 물리삭제 시 `like_count`를 보정하지 않는다 (보정 대상 아님)
 - 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
 - `deleted_at`: 소프트 딜리트. 상품/브랜드 삭제 시 기록. 복구 대상(브랜드 복구 시 함께 복구)
 - `likes_purged`: 삭제된 상품의 좋아요(고용량, 복구 가치 없음)를 비동기 배치로 청크 삭제하기 위한 마킹
@@ -165,7 +166,7 @@ erDiagram
 - `pg_amount`: PG 결제 금액. 포인트 제거로 주문 총액 = PG 결제 금액 단일 컬럼으로 통합
   - 주문 총액은 order_items의 `SUM(price × quantity)` 와 일치
 - 배송지 컬럼 (`receiver_name`, `receiver_phone`, `zip_code`, `address`, `detail_address`): 주문 시점 스냅샷
-- `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준으로 만료 판단)
+- `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준 **15분 초과** 시 만료 판단)
 - 인덱스: `(status, created_at)` → 스케줄러의 만료 PENDING 주문 조회 성능 보장
 
 ### order_items

@@ -69,8 +69,14 @@ sequenceDiagram
     participant StockService
     participant OrderService
 
-    ExternalPG->>API: POST /api/v1/payments/confirm (pgTransactionId, orderId, status)
-    API->>PaymentFacade: confirmPayment(pgTransactionId, orderId)
+    ExternalPG->>API: POST /api/v1/payments/confirm (pgTransactionId, orderId, status, signature)
+    API->>PaymentFacade: confirmPayment(payload, signature)
+
+    PaymentFacade->>PaymentFacade: 콜백 서명 검증 (공유 시크릿/HMAC)
+    alt 서명 불일치 (위조 콜백)
+        PaymentFacade-->>API: CoreException(UNAUTHORIZED)
+        API-->>ExternalPG: 401 Unauthorized
+    end
 
     PaymentFacade->>PGClient: verifyPayment(pgTransactionId)
     PGClient->>ExternalPG: 결제 검증 요청
@@ -78,7 +84,13 @@ sequenceDiagram
     PGClient-->>PaymentFacade: verified (approvedAmount, status)
 
     PaymentFacade->>OrderService: findOrder(orderId)
-    OrderService-->>PaymentFacade: Order (pg_amount)
+    OrderService-->>PaymentFacade: Order (status, pg_amount)
+
+    alt 주문이 PENDING 아님 (이미 처리된 콜백)
+        Note over PaymentFacade: 멱등 처리 — 재고/상태 변경 없이 종료
+        PaymentFacade-->>API: ok
+        API-->>ExternalPG: 200 OK
+    end
 
     alt 결제 성공 AND approvedAmount == orders.pg_amount
         Note over PaymentFacade, OrderService: 단일 트랜잭션 시작
@@ -106,6 +118,8 @@ sequenceDiagram
 ```
 
 **읽는 포인트**
+- **콜백 서명 검증**: 외부에서 호출되는 웹훅이므로, 진짜 PG가 보낸 콜백인지 공유 시크릿 기반 서명(HMAC 등)으로 먼저 검증한다. 위조 콜백은 PG 재조회 전에 차단된다. (PG 재조회 `verifyPayment`가 2차 방어)
+- **멱등 처리**: PG가 콜백을 중복 전송해도 주문이 이미 PENDING이 아니면 재고/상태를 건드리지 않고 종료한다. 재고 이중 차감을 방지한다.
 - PG 승인 금액(`approvedAmount`)이 우리 `orders.pg_amount`와 일치하는지 검증한 뒤에야 확정으로 넘어간다. 금액 위·변조나 계산 버그를 결제 확정 직전에 차단한다.
 - 금액 불일치는 결제 실패와 동일하게 처리한다(재고 예약 해제 + 주문 FAILED). "5만원 주문이 5천원에 확정"되는 사고를 막는다.
 - 결제 성공 시 모든 상품의 재고 확정 → 주문 확정이 단일 트랜잭션으로 묶인다. 하나라도 실패하면 전체 롤백된다.
@@ -185,7 +199,7 @@ sequenceDiagram
 **읽는 포인트**
 - 스케줄러는 조회와 위임만 한다. 실제 재고 해제는 StockService, 상태 전이는 OrderService가 책임진다.
 - 복수 상품 주문이므로 주문 1건당 포함된 모든 상품 라인의 예약을 해제한다.
-- 만료 기준은 주문 생성 시간 기준으로 설정한다. (ex. 생성 후 30분 초과 PENDING)
+- 만료 기준은 주문 생성 시간 기준 **15분**으로 한다. (생성 후 15분 초과 PENDING → 만료)
 
 ---
 
