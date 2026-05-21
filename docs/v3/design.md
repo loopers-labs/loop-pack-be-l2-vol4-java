@@ -162,20 +162,66 @@ infrastructure/
 
 ## 7. 응답 DTO 스펙
 
+> **HTTP 상태 코드 기준**
+> - 단건/목록 조회 (GET): `200 OK`
+> - 생성 (POST): `201 Created`
+> - 수정 (PUT): `200 OK`
+> - 삭제 (DELETE): `204 No Content`
+> - 좋아요 등록 (POST): `204 No Content` (body 없음)
+
+---
+
 ### Brand
 
 ```json
-// GET /api/v1/brands/{brandId}
+// GET /api/v1/brands/{brandId}  →  200
 { "id": 1, "name": "Nike", "description": "나이키입니다" }
 
-// GET /api-admin/v1/brands/{brandId}
+// GET /api-admin/v1/brands  →  200
+{
+  "content": [
+    { "id": 1, "name": "Nike", "description": "나이키입니다", "createdAt": "2026-05-20T10:00:00" }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1
+}
+
+// GET /api-admin/v1/brands/{brandId}  →  200
 { "id": 1, "name": "Nike", "description": "나이키입니다", "createdAt": "2026-05-20T10:00:00" }
+
+// POST /api-admin/v1/brands  →  201
+{ "id": 1, "name": "Nike", "description": "나이키입니다", "createdAt": "2026-05-20T10:00:00" }
+
+// PUT /api-admin/v1/brands/{brandId}  →  200
+{ "id": 1, "name": "Nike", "description": "나이키입니다", "createdAt": "2026-05-20T10:00:00" }
+
+// DELETE /api-admin/v1/brands/{brandId}  →  204  (body 없음)
 ```
+
+---
 
 ### Product
 
 ```json
-// GET /api/v1/products/{productId}  |  GET /api-admin/v1/products/{productId}
+// GET /api/v1/products  →  200
+{
+  "content": [
+    {
+      "id": 1,
+      "brandId": 2,
+      "brandName": "Nike",
+      "name": "에어맥스",
+      "price": 150000,
+      "likeCount": 42
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 100
+}
+
+// GET /api/v1/products/{productId}  →  200
 {
   "id": 1,
   "brandId": 2,
@@ -186,21 +232,88 @@ infrastructure/
   "quantity": 10,
   "likeCount": 42
 }
+
+// GET /api-admin/v1/products  →  200
+{
+  "content": [
+    {
+      "id": 1,
+      "brandId": 2,
+      "brandName": "Nike",
+      "name": "에어맥스",
+      "price": 150000,
+      "quantity": 10,
+      "likeCount": 42,
+      "createdAt": "2026-05-20T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 100
+}
+
+// GET /api-admin/v1/products/{productId}  →  200
+{
+  "id": 1,
+  "brandId": 2,
+  "brandName": "Nike",
+  "name": "에어맥스",
+  "description": "편안한 러닝화",
+  "price": 150000,
+  "quantity": 10,
+  "likeCount": 42,
+  "createdAt": "2026-05-20T10:00:00"
+}
+
+// POST /api-admin/v1/products  →  201
+{
+  "id": 1,
+  "brandId": 2,
+  "brandName": "Nike",
+  "name": "에어맥스",
+  "description": "편안한 러닝화",
+  "price": 150000,
+  "quantity": 10,
+  "likeCount": 0,
+  "createdAt": "2026-05-20T10:00:00"
+}
+
+// PUT /api-admin/v1/products/{productId}  →  200  (POST와 동일 구조)
+// DELETE /api-admin/v1/products/{productId}  →  204  (body 없음)
 ```
+
+> **Customer vs Admin 응답 차이**
+> - Customer 목록: `description`, `quantity`, `createdAt` 제외 (탐색용 요약 정보)
+> - Customer 단건: `createdAt` 제외
+> - Admin: 전체 필드 제공
+
+---
 
 ### Like
 
 ```json
-// GET /api/v1/users/{userId}/likes
+// POST /api/v1/products/{productId}/likes  →  204  (body 없음)
+// DELETE /api/v1/products/{productId}/likes  →  204  (body 없음)
+
+// GET /api/v1/users/{userId}/likes  →  200
 {
   "content": [
-    { "id": 1, "brandId": 2, "brandName": "Nike", "name": "에어맥스", "price": 150000, "likeCount": 42 }
+    {
+      "id": 1,
+      "brandId": 2,
+      "brandName": "Nike",
+      "name": "에어맥스",
+      "price": 150000,
+      "likeCount": 42
+    }
   ],
   "page": 0,
   "size": 20,
-  "totalElements": 1
+  "totalElements": 5
 }
 ```
+
+---
 
 ### Order
 
@@ -213,16 +326,79 @@ infrastructure/
   ]
 }
 
-// GET /api/v1/orders/{orderId} 응답
+// POST /api/v1/orders  →  201
 {
   "orderId": 10,
   "status": "COMPLETED",
   "items": [
-    { "productId": 1, "productName": "에어맥스", "productPrice": 150000, "quantity": 2 }
+    { "productId": 1, "productName": "에어맥스", "productPrice": 150000, "quantity": 2 },
+    { "productId": 3, "productName": "런닝화", "productPrice": 80000, "quantity": 1 }
   ],
+  "totalAmount": 380000,
+  "createdAt": "2026-05-20T10:00:00"
+}
+
+// GET /api/v1/orders  →  200
+{
+  "content": [
+    {
+      "orderId": 10,
+      "status": "COMPLETED",
+      "totalAmount": 380000,
+      "createdAt": "2026-05-20T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 3
+}
+
+// GET /api/v1/orders/{orderId}  →  200
+{
+  "orderId": 10,
+  "status": "COMPLETED",
+  "items": [
+    { "productId": 1, "productName": "에어맥스", "productPrice": 150000, "quantity": 2 },
+    { "productId": 3, "productName": "런닝화", "productPrice": 80000, "quantity": 1 }
+  ],
+  "totalAmount": 380000,
+  "createdAt": "2026-05-20T10:00:00"
+}
+
+// GET /api-admin/v1/orders  →  200
+{
+  "content": [
+    {
+      "orderId": 10,
+      "userId": 5,
+      "status": "COMPLETED",
+      "totalAmount": 380000,
+      "createdAt": "2026-05-20T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 50
+}
+
+// GET /api-admin/v1/orders/{orderId}  →  200
+{
+  "orderId": 10,
+  "userId": 5,
+  "status": "COMPLETED",
+  "items": [
+    { "productId": 1, "productName": "에어맥스", "productPrice": 150000, "quantity": 2 },
+    { "productId": 3, "productName": "런닝화", "productPrice": 80000, "quantity": 1 }
+  ],
+  "totalAmount": 380000,
   "createdAt": "2026-05-20T10:00:00"
 }
 ```
+
+> **Customer vs Admin 주문 응답 차이**
+> - Customer: `userId` 미노출 (자신의 주문만 조회 가능)
+> - Admin 목록: `userId` 포함 (전체 주문 관리)
+> - Admin 단건: `userId` 포함 + 전체 items
 
 ---
 
