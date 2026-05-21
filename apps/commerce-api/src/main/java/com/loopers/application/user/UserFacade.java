@@ -1,0 +1,41 @@
+package com.loopers.application.user;
+
+import com.loopers.domain.user.BirthDate;
+import com.loopers.domain.user.Email;
+import com.loopers.domain.user.LoginId;
+import com.loopers.domain.user.Password;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class UserFacade {
+
+    private final UserService userService;
+
+    public UserInfo.User signUp(UserCommand.SignUp command) {
+        UserModel user = userService.signUp(
+            LoginId.of(command.loginId()),
+            Password.of(command.password()),
+            command.name(),
+            BirthDate.of(command.birthDate()),
+            Email.of(command.email())
+        );
+        return UserInfo.User.from(user);
+    }
+
+    public UserInfo.User getMe(Long userId) {
+        UserModel user = userService.getUser(userId);
+        return UserInfo.User.from(user);
+    }
+
+    public void changePassword(Long userId, UserCommand.ChangePassword command) {
+        userService.changePassword(
+            userId,
+            command.currentPassword(),
+            Password.of(command.newPassword())
+        );
+    }
+}
