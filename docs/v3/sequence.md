@@ -116,15 +116,24 @@ sequenceDiagram
     participant ProductAdminV1Controller
     participant ProductFacade
     participant ProductService
+    participant ProductInventoryService
     participant ProductRepository
+    participant ProductInventoryRepository
 
-    ProductAdminV1Controller->>ProductFacade: updateProduct(productId, name, description, price)
+    ProductAdminV1Controller->>ProductFacade: updateProduct(productId, name, description, price, quantity)
     ProductFacade->>ProductService: update(productId, name, description, price)
     ProductService->>ProductRepository: findById(productId)
     ProductRepository-->>ProductService: ProductModel (없으면 404)
     Note over ProductService: brand 필드는 수정 대상에서 제외
     ProductService->>ProductService: product.update(name, description, price)
     ProductService-->>ProductFacade: ProductModel
+
+    ProductFacade->>ProductInventoryService: updateQuantity(productId, quantity)
+    ProductInventoryService->>ProductInventoryRepository: findByProductId(productId)
+    ProductInventoryRepository-->>ProductInventoryService: ProductInventoryModel
+    ProductInventoryService->>ProductInventoryService: inventory.updateQuantity(quantity)
+    ProductInventoryService-->>ProductFacade: void
+
     ProductFacade-->>ProductAdminV1Controller: ProductInfo
 ```
 

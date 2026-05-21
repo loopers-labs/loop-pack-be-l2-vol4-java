@@ -393,7 +393,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 | GET | `/api-admin/v1/products?brandId=&page=0&size=20` | 상품 목록 |
 | GET | `/api-admin/v1/products/{productId}` | 상품 단건 조회 |
 | POST | `/api-admin/v1/products` | 상품 등록 (브랜드 존재 검증) |
-| PUT | `/api-admin/v1/products/{productId}` | 상품 수정 (브랜드 변경 불가) |
+| PUT | `/api-admin/v1/products/{productId}` | 상품 수정 (브랜드 변경 불가, 재고 수량 수정 포함) |
 | DELETE | `/api-admin/v1/products/{productId}` | 상품 삭제 |
 
 ### Like
