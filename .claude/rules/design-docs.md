@@ -29,8 +29,8 @@
 
 ## UML 도구
 
-- 시퀀스 다이어그램, 클래스 다이어그램, ERD 는 PlantUML 기반으로 작성한다.
-- Mermaid 로 작성하라는 외부 요구가 있더라도, 프로젝트 표준은 PlantUML 을 우선한다.
+- 클래스 다이어그램, ERD 는 PlantUML 기반으로 작성한다.
+- Mermaid 로 작성하라는 외부 요구가 있더라도, 프로젝트 표준은 PlantUML 을 우선한다. (단, 시퀀스 다이어그램은 Mermaid로 작성한다.)  
 - Markdown 문서에는 PlantUML 원본 링크를 반드시 포함한다.
 - 렌더링 이미지가 필요한 경우 `.docs/design/assets/` 하위에 `svg` 또는 `png` 로 저장하고 Markdown 에서 참조한다.
 
