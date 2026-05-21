@@ -301,7 +301,61 @@ sequenceDiagram
 
 ---
 
-## SD-10. 어드민 브랜드 관리
+## SD-10. 어드민 브랜드 등록
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant BrandController
+    participant BrandFacade
+    participant BrandService
+    participant BrandRepository
+
+    Admin->>+BrandController: POST /api-admin/v1/brands
+    BrandController->>+BrandFacade: createBrand(request)
+    BrandFacade->>+BrandService: createBrand(request)
+    BrandService->>+BrandRepository: save(brand)
+    BrandRepository-->>-BrandService: savedBrand
+    BrandService-->>-BrandFacade: brandResponse
+    BrandFacade-->>-BrandController: brandResponse
+    BrandController-->>-Admin: 200 OK
+```
+
+---
+
+## SD-11. 어드민 브랜드 수정
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant BrandController
+    participant BrandFacade
+    participant BrandService
+    participant BrandRepository
+
+    Admin->>+BrandController: PUT /api-admin/v1/brands/{brandId}
+    BrandController->>+BrandFacade: updateBrand(brandId, request)
+    BrandFacade->>+BrandService: updateBrand(brandId, request)
+    BrandService->>+BrandRepository: findById(brandId)
+
+    alt 브랜드 없음
+        BrandRepository-->>-BrandService: null
+        BrandService-->>-BrandFacade: 404 Not Found
+        BrandFacade-->>-BrandController: 404 Not Found
+        BrandController-->>-Admin: 404 Not Found
+    else 브랜드 존재
+        BrandRepository-->>-BrandService: brand
+        BrandService->>+BrandRepository: update(brand)
+        BrandRepository-->>-BrandService: updatedBrand
+        BrandService-->>-BrandFacade: brandResponse
+        BrandFacade-->>-BrandController: brandResponse
+        BrandController-->>-Admin: 200 OK
+    end
+```
+
+---
+
+## SD-12. 어드민 브랜드 삭제 (소프트 딜리트 cascade)
 
 ```mermaid
 sequenceDiagram
@@ -313,33 +367,17 @@ sequenceDiagram
     participant BrandRepository
     participant ProductRepository
 
-    alt 브랜드 등록
-        Admin->>+BrandController: POST /api-admin/v1/brands
-        BrandController->>+BrandFacade: createBrand(request)
-        BrandFacade->>+BrandService: createBrand(request)
-        BrandService->>+BrandRepository: save(brand)
-        BrandRepository-->>-BrandService: savedBrand
-        BrandService-->>-BrandFacade: brandResponse
-        BrandFacade-->>-BrandController: brandResponse
-        BrandController-->>-Admin: 200 OK
+    Admin->>+BrandController: DELETE /api-admin/v1/brands/{brandId}
+    BrandController->>+BrandFacade: deleteBrand(brandId)
+    BrandFacade->>+BrandService: deleteBrand(brandId)
+    BrandService->>+BrandRepository: findById(brandId)
 
-    else 브랜드 수정
-        Admin->>+BrandController: PUT /api-admin/v1/brands/{brandId}
-        BrandController->>+BrandFacade: updateBrand(brandId, request)
-        BrandFacade->>+BrandService: updateBrand(brandId, request)
-        BrandService->>+BrandRepository: findById(brandId)
-        BrandRepository-->>-BrandService: brand
-        BrandService->>+BrandRepository: update(brand)
-        BrandRepository-->>-BrandService: updatedBrand
-        BrandService-->>-BrandFacade: brandResponse
-        BrandFacade-->>-BrandController: brandResponse
-        BrandController-->>-Admin: 200 OK
-
-    else 브랜드 삭제
-        Admin->>+BrandController: DELETE /api-admin/v1/brands/{brandId}
-        BrandController->>+BrandFacade: deleteBrand(brandId)
-        BrandFacade->>+BrandService: deleteBrand(brandId)
-        BrandService->>+BrandRepository: findById(brandId)
+    alt 브랜드 없음
+        BrandRepository-->>-BrandService: null
+        BrandService-->>-BrandFacade: 404 Not Found
+        BrandFacade-->>-BrandController: 404 Not Found
+        BrandController-->>-Admin: 404 Not Found
+    else 브랜드 존재
         BrandRepository-->>-BrandService: brand
         BrandService->>+BrandRepository: softDelete(brandId)
         BrandRepository-->>-BrandService: done
@@ -359,7 +397,7 @@ sequenceDiagram
 
 ---
 
-## SD-11. 어드민 상품 관리
+## SD-13. 어드민 상품 등록
 
 ```mermaid
 sequenceDiagram
@@ -370,42 +408,83 @@ sequenceDiagram
     participant BrandService
     participant ProductRepository
 
-    alt 상품 등록
-        Admin->>+ProductController: POST /api-admin/v1/products
-        ProductController->>+ProductFacade: createProduct(request)
-        ProductFacade->>+BrandService: getBrand(brandId)
+    Admin->>+ProductController: POST /api-admin/v1/products
+    ProductController->>+ProductFacade: createProduct(request)
+    ProductFacade->>+BrandService: getBrand(brandId)
 
-        alt 브랜드 없음 or 삭제됨
-            BrandService-->>-ProductFacade: 400 Bad Request
-            ProductFacade-->>-ProductController: 400 Bad Request
-            ProductController-->>-Admin: 400 Bad Request
-        else 브랜드 존재
-            BrandService-->>-ProductFacade: brand
-            ProductFacade->>+ProductService: createProduct(request)
-            ProductService->>+ProductRepository: save(product)
-            ProductRepository-->>-ProductService: savedProduct
-            ProductService-->>-ProductFacade: productResponse
-            ProductFacade-->>-ProductController: productResponse
-            ProductController-->>-Admin: 200 OK
-        end
+    alt 브랜드 없음 or 삭제됨
+        BrandService-->>-ProductFacade: 400 Bad Request
+        ProductFacade-->>-ProductController: 400 Bad Request
+        ProductController-->>-Admin: 400 Bad Request
+    else 브랜드 존재
+        BrandService-->>-ProductFacade: brand
+        ProductFacade->>+ProductService: createProduct(request)
+        ProductService->>+ProductRepository: save(product)
+        ProductRepository-->>-ProductService: savedProduct
+        ProductService-->>-ProductFacade: productResponse
+        ProductFacade-->>-ProductController: productResponse
+        ProductController-->>-Admin: 200 OK
+    end
+```
 
-    else 상품 수정
-        Admin->>+ProductController: PUT /api-admin/v1/products/{productId}
-        ProductController->>+ProductFacade: updateProduct(productId, request)
-        ProductFacade->>+ProductService: updateProduct(productId, request)
-        ProductService->>+ProductRepository: findById(productId)
+---
+
+## SD-14. 어드민 상품 수정
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant ProductController
+    participant ProductFacade
+    participant ProductService
+    participant ProductRepository
+
+    Admin->>+ProductController: PUT /api-admin/v1/products/{productId}
+    ProductController->>+ProductFacade: updateProduct(productId, request)
+    ProductFacade->>+ProductService: updateProduct(productId, request)
+    ProductService->>+ProductRepository: findById(productId)
+
+    alt 상품 없음
+        ProductRepository-->>-ProductService: null
+        ProductService-->>-ProductFacade: 404 Not Found
+        ProductFacade-->>-ProductController: 404 Not Found
+        ProductController-->>-Admin: 404 Not Found
+    else 상품 존재
         ProductRepository-->>-ProductService: product
         ProductService->>+ProductRepository: update(product)
         ProductRepository-->>-ProductService: updatedProduct
         ProductService-->>-ProductFacade: productResponse
         ProductFacade-->>-ProductController: productResponse
         ProductController-->>-Admin: 200 OK
+    end
+```
 
-    else 상품 삭제
-        Admin->>+ProductController: DELETE /api-admin/v1/products/{productId}
-        ProductController->>+ProductFacade: deleteProduct(productId)
-        ProductFacade->>+ProductService: deleteProduct(productId)
-        ProductService->>+ProductRepository: findById(productId)
+**읽는 포인트**
+- 상품 수정 시 브랜드 변경은 허용하지 않으므로 request에서 brandId를 받지 않는다.
+
+---
+
+## SD-15. 어드민 상품 삭제
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant ProductController
+    participant ProductFacade
+    participant ProductService
+    participant ProductRepository
+
+    Admin->>+ProductController: DELETE /api-admin/v1/products/{productId}
+    ProductController->>+ProductFacade: deleteProduct(productId)
+    ProductFacade->>+ProductService: deleteProduct(productId)
+    ProductService->>+ProductRepository: findById(productId)
+
+    alt 상품 없음
+        ProductRepository-->>-ProductService: null
+        ProductService-->>-ProductFacade: 404 Not Found
+        ProductFacade-->>-ProductController: 404 Not Found
+        ProductController-->>-Admin: 404 Not Found
+    else 상품 존재
         ProductRepository-->>-ProductService: product
         ProductService->>+ProductRepository: softDelete(productId)
         ProductRepository-->>-ProductService: done
@@ -415,13 +494,9 @@ sequenceDiagram
     end
 ```
 
-**읽는 포인트**
-- 상품 등록 시 브랜드 존재 여부를 Facade에서 먼저 검증한다.
-- 상품 수정 시 브랜드 변경은 허용하지 않으므로 request에서 brandId를 받지 않는다.
-
 ---
 
-## SD-12. 어드민 주문 조회
+## SD-16. 어드민 주문 목록 조회
 
 ```mermaid
 sequenceDiagram
@@ -431,32 +506,42 @@ sequenceDiagram
     participant OrderService
     participant OrderRepository
 
-    alt 주문 목록 조회
-        Admin->>+OrderController: GET /api-admin/v1/orders?page=&size=
-        OrderController->>+OrderFacade: getOrders(page, size)
-        OrderFacade->>+OrderService: getOrders(page, size)
-        OrderService->>+OrderRepository: findAll(pageable)
-        OrderRepository-->>-OrderService: orders
-        OrderService-->>-OrderFacade: orders
-        OrderFacade-->>-OrderController: orderListResponse
+    Admin->>+OrderController: GET /api-admin/v1/orders?page=&size=
+    OrderController->>+OrderFacade: getOrders(page, size)
+    OrderFacade->>+OrderService: getOrders(page, size)
+    OrderService->>+OrderRepository: findAll(pageable)
+    OrderRepository-->>-OrderService: orders
+    OrderService-->>-OrderFacade: orders
+    OrderFacade-->>-OrderController: orderListResponse
+    OrderController-->>-Admin: 200 OK
+```
+
+---
+
+## SD-17. 어드민 주문 상세 조회
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
+    participant OrderRepository
+
+    Admin->>+OrderController: GET /api-admin/v1/orders/{orderId}
+    OrderController->>+OrderFacade: getOrder(orderId)
+    OrderFacade->>+OrderService: getOrder(orderId)
+    OrderService->>+OrderRepository: findById(orderId)
+
+    alt 주문 없음
+        OrderRepository-->>-OrderService: null
+        OrderService-->>-OrderFacade: 404 Not Found
+        OrderFacade-->>-OrderController: 404 Not Found
+        OrderController-->>-Admin: 404 Not Found
+    else 주문 존재
+        OrderRepository-->>-OrderService: order
+        OrderService-->>-OrderFacade: orderDetail
+        OrderFacade-->>-OrderController: orderDetailResponse
         OrderController-->>-Admin: 200 OK
-
-    else 주문 상세 조회
-        Admin->>+OrderController: GET /api-admin/v1/orders/{orderId}
-        OrderController->>+OrderFacade: getOrder(orderId)
-        OrderFacade->>+OrderService: getOrder(orderId)
-        OrderService->>+OrderRepository: findById(orderId)
-
-        alt 주문 없음
-            OrderRepository-->>-OrderService: null
-            OrderService-->>-OrderFacade: 404 Not Found
-            OrderFacade-->>-OrderController: 404 Not Found
-            OrderController-->>-Admin: 404 Not Found
-        else 주문 존재
-            OrderRepository-->>-OrderService: order
-            OrderService-->>-OrderFacade: orderDetail
-            OrderFacade-->>-OrderController: orderDetailResponse
-            OrderController-->>-Admin: 200 OK
-        end
     end
 ```
