@@ -1,7 +1,7 @@
 # 03. 클래스 다이어그램
 
 > 도메인 모델의 구조와 책임을 검증하는 다이어그램입니다.
-> Aggregate 경계, Entity/Value Object 구분, 도메인 메서드 위치를 확인합니다.
+> 클래스, 인터페이스, 기능, 제약조건, 연관관계, 일반화, 의존성을 포함합니다.
 
 ---
 
@@ -15,90 +15,99 @@
 
 ---
 
-## 도메인 클래스 다이어그램
+## 1. 도메인 모델
+
+일반화(상속) 구조, Aggregate 내부/간 연관관계, 제약조건을 표현합니다.
 
 ```mermaid
 classDiagram
     %% ─────────────────────────────
+    %% 일반화 (Generalization)
+    %% ─────────────────────────────
+    class BaseEntity {
+        <<abstract>>
+        +Long id
+        +LocalDateTime createdAt
+        +LocalDateTime updatedAt
+    }
+
+    class SoftDeletableEntity {
+        <<abstract>>
+        +LocalDateTime deletedAt
+        +softDelete()
+        +isDeleted() bool
+    }
+
+    SoftDeletableEntity --|> BaseEntity
+
+    %% ─────────────────────────────
     %% User Aggregate
     %% ─────────────────────────────
     class User {
-        +Long id
         +String email
         +String name
-        +LocalDateTime createdAt
     }
+    User --|> BaseEntity
 
     %% ─────────────────────────────
     %% Brand Aggregate
     %% ─────────────────────────────
     class Brand {
-        +Long id
         +String name
-        +LocalDateTime createdAt
-        +LocalDateTime deletedAt
-        +softDelete()
-        +isDeleted() bool
     }
+    Brand --|> SoftDeletableEntity
 
     %% ─────────────────────────────
     %% Product Aggregate
     %% ─────────────────────────────
     class Product {
-        +Long id
         +Long brandId
         +String name
         +Long price
         +int likeCount
-        +LocalDateTime createdAt
-        +LocalDateTime deletedAt
-        +softDelete()
-        +isDeleted() bool
         +incrementLikeCount()
         +decrementLikeCount()
     }
+    Product --|> SoftDeletableEntity
 
     class Stock {
-        +Long id
         +Long productId
         +int quantity
         +deduct(int quantity) bool
         +isAvailable(int quantity) bool
     }
-
-    Product "1" --> "1" Stock : owns
+    Stock --|> BaseEntity
 
     %% ─────────────────────────────
     %% Like Aggregate
     %% ─────────────────────────────
     class Like {
-        +Long id
         +Long userId
         +Long productId
-        +LocalDateTime createdAt
     }
+    Like --|> BaseEntity
 
     %% ─────────────────────────────
     %% Order Aggregate
     %% ─────────────────────────────
     class Order {
-        +Long id
         +Long userId
         +LocalDateTime orderedAt
         +addItem(OrderItem item)
     }
+    Order --|> BaseEntity
 
     class OrderItem {
-        +Long id
         +Long productId
         +int quantity
         +OrderItemStatus status
         +isOrdered() bool
         +isSkipped() bool
+        +cancel()
     }
+    OrderItem --|> BaseEntity
 
     class OrderItemSnapshot {
-        +Long id
         +Long orderItemId
         +String productName
         +String brandName
@@ -112,28 +121,162 @@ classDiagram
         CANCELLED
     }
 
+    %% ─────────────────────────────
+    %% Aggregate 내부 연관관계 (Composition)
+    %% ─────────────────────────────
+    Product "1" *-- "1" Stock : owns
     Order "1" *-- "1..*" OrderItem : contains
     OrderItem "1" *-- "1" OrderItemSnapshot : has
     OrderItem --> OrderItemStatus : uses
+
+    %% ─────────────────────────────
+    %% Aggregate 간 연관관계 (ID 참조 — 점선)
+    %% ─────────────────────────────
+    Brand "1" ..> "0..*" Product : brandId
+    User "1" ..> "0..*" Order : userId
+    User "1" ..> "0..*" Like : userId
+    Product "1" ..> "0..*" Like : productId
+```
+
+### 제약조건 (Constraints)
+
+| 클래스 | 필드 | 제약조건 | 이유 |
+|---|---|---|---|
+| Like | (userId, productId) | UNIQUE | 좋아요 멱등성 보장 |
+| Stock | quantity | >= 0 | 음수 재고 방지 |
+| Product | price | > 0 | 유효한 가격만 허용 |
+| Product | likeCount | >= 0 | 음수 좋아요 방지 |
+| Order | orderItems | ORDERED 항목 >= 1 | 전부 SKIPPED면 주문 불가 |
+| OrderItemSnapshot | (productName, brandName, price) | NOT NULL | 스냅샷은 주문 당시 정보 보존 필수 |
+
+---
+
+## 2. Repository 인터페이스
+
+도메인 레이어가 인프라에 의존하지 않도록 Repository 인터페이스를 도메인 레이어에 정의합니다.  
+구현체(`JpaXxxRepository`)는 infrastructure 레이어에 위치합니다.
+
+```mermaid
+classDiagram
+    class BrandRepository {
+        <<interface>>
+        +findById(Long id) Brand
+        +save(Brand brand) Brand
+        +softDeleteById(Long id)
+    }
+
+    class ProductRepository {
+        <<interface>>
+        +findById(Long id) Product
+        +findAll(Long brandId, Sort sort, Pageable pageable) Page~Product~
+        +save(Product product) Product
+        +softDeleteById(Long id)
+        +softDeleteAllByBrandId(Long brandId)
+    }
+
+    class StockRepository {
+        <<interface>>
+        +findByProductId(Long productId) Stock
+        +save(Stock stock) Stock
+    }
+
+    class LikeRepository {
+        <<interface>>
+        +existsByUserIdAndProductId(Long userId, Long productId) bool
+        +findAllByUserId(Long userId) List~Like~
+        +save(Like like) Like
+        +deleteByUserIdAndProductId(Long userId, Long productId)
+    }
+
+    class OrderRepository {
+        <<interface>>
+        +findById(Long id) Order
+        +findAllByUserIdAndDateRange(Long userId, LocalDate start, LocalDate end) List~Order~
+        +findAll(Pageable pageable) Page~Order~
+        +save(Order order) Order
+    }
+
+    BrandRepository ..> Brand : returns
+    ProductRepository ..> Product : returns
+    StockRepository ..> Stock : returns
+    LikeRepository ..> Like : returns
+    OrderRepository ..> Order : returns
+```
+
+---
+
+## 3. 서비스 의존성
+
+서비스 간 의존 방향과 Repository 인터페이스 의존성을 표현합니다.
+
+```mermaid
+classDiagram
+    class BrandService {
+        +getBrand(Long brandId) Brand
+        +createBrand(request) Brand
+        +updateBrand(Long brandId, request) Brand
+        +deleteBrand(Long brandId)
+    }
+
+    class ProductService {
+        +getProduct(Long productId) Product
+        +getProducts(Long brandId, sort, pageable) Page~Product~
+        +createProduct(request) Product
+        +updateProduct(Long productId, request) Product
+        +deleteProduct(Long productId)
+        +incrementLikeCount(Long productId)
+        +decrementLikeCount(Long productId)
+        +softDeleteByBrandId(Long brandId)
+    }
+
+    class StockService {
+        +deductIfAvailable(Long productId, int quantity) OrderItemStatus
+    }
+
+    class LikeService {
+        +getLikes(Long requestUserId, Long userId) List~Like~
+        +addLike(Long userId, Long productId)
+        +removeLike(Long userId, Long productId)
+    }
+
+    class OrderService {
+        +getOrders(Long userId, LocalDate startAt, LocalDate endAt) List~Order~
+        +getOrder(Long userId, Long orderId) Order
+        +createOrder(Long userId, orderedItems, skippedItems) Order
+    }
+
+    %% 서비스 간 의존성
+    LikeService ..> ProductService : likeCount 위임
+    BrandService ..> ProductService : cascade 소프트 딜리트
+
+    %% Repository 의존성
+    BrandService ..> BrandRepository
+    ProductService ..> ProductRepository
+    StockService ..> StockRepository
+    LikeService ..> LikeRepository
+    OrderService ..> OrderRepository
 ```
 
 ---
 
 ## 읽는 포인트
 
-### 1. Product ↔ Stock 분리 이유
-`stock`을 Product의 컬럼으로 두면, 관리자가 상품명/가격을 수정하는 동안 주문으로 인한 재고 차감이 동일 row를 잠금(row lock)합니다.
-Stock을 별도 Entity로 분리하면 두 작업이 **서로 다른 row를 잠금**하므로 블로킹이 발생하지 않습니다.
+### 1. 일반화 구조 (SoftDeletableEntity)
+`Brand`, `Product`만 `SoftDeletableEntity`를 상속합니다.
+나머지는 `BaseEntity`를 상속합니다. `Like`는 하드 딜리트이므로 `deletedAt` 없음.
 
-### 2. Aggregate 간 참조는 ID만
-`OrderItem`은 상품 정보를 `productId`로만 참조합니다.
-주문 시점의 실제 상품 정보(이름, 가격, 브랜드명)는 `OrderItemSnapshot`에 별도 저장합니다.
-이후 상품이 수정/삭제되어도 주문 내역은 **주문 당시 정보를 그대로 보존**합니다.
+### 2. Aggregate 간 참조는 점선(`..>`)으로 표현
+직접 객체 참조가 아닌 ID 참조임을 시각적으로 구분했습니다.
+`Product.brandId`, `Order.userId`, `Like.userId`, `Like.productId`가 그 예입니다.
 
-### 3. likeCount 위치
-`likeCount`는 Product가 소유합니다.
-LikeService가 좋아요를 등록/취소할 때 ProductService를 통해 위임하며, Product 도메인 메서드(`incrementLikeCount`, `decrementLikeCount`)가 직접 변경합니다.
+### 3. Repository는 인터페이스 — 의존 역전
+Service는 `BrandRepository` 인터페이스에만 의존합니다.
+`JpaBrandRepository` 구현체는 infrastructure 레이어에 위치하며, Service는 구현체를 모릅니다.
 
-### 4. 소프트 딜리트 vs 하드 딜리트
-- **Brand, Product**: `deletedAt`으로 소프트 딜리트 — 주문 이력/스냅샷 참조 무결성 유지
-- **Like**: 하드 딜리트 — 취소는 영구적이며 이력 보관 불필요
+### 4. LikeService → ProductService 의존
+`likeCount` 변경의 책임은 Product 도메인에 있습니다.
+LikeService가 직접 Product 테이블을 건드리지 않고, ProductService를 통해 위임합니다.
+
+### 5. OrderItem.cancel()
+`CANCELLED` 상태 전환은 OrderItem의 도메인 메서드가 담당합니다.
+외부에서 상태 필드를 직접 변경하지 않으며, 비즈니스 의도가 메서드 이름에 드러납니다.
