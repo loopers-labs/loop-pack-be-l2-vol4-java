@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"$content = [System.IO.File]::ReadAllText('C:\\Users\\Sooche\\Desktop\\workspace\\tddstudy\\CLAUDE.md', [System.Text.Encoding]::UTF8); $out = [pscustomobject]@{hookSpecificOutput = [pscustomobject]@{hookEventName = 'PreToolUse'; additionalContext = $content}}; $out | ConvertTo-Json -Compress\"",
+            "shell": "powershell",
+            "statusMessage": "CLAUDE.md 읽는 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

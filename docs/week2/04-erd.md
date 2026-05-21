@@ -1,173 +1,103 @@
-# 04. ERD
+# 04. ERD 및 리스크
 
-> 기준 문서: [01-requirements.md](01-requirements.md), [02-sequence-diagrams.md](02-sequence-diagrams.md), [03-class-diagram.md](03-class-diagram.md)  
-> 목적: 감성 이커머스의 전체 테이블 구조와 핵심 관계를 한눈에 확인한다.
+> 영속성 구조, 관계의 주인, 정규화 여부를 검증하기 위한 테이블 설계 (Mermaid)
 
-## 1. ERD 설계 기준
+---
 
-| 설계 결정 | ERD 반영 |
-| --- | --- |
-| 사용자는 기존 도메인을 사용한다 | `users`는 주문/좋아요의 참조 대상만 표현한다 |
-| 브랜드와 상품은 soft delete 한다 | `brands.deleted_at`, `products.deleted_at`으로 삭제 상태를 표현한다 |
-| 상품 기본 정보와 재고를 분리한다 | `products`와 `product_stocks`를 1:1로 분리한다 |
-| 주문은 당시 상품 정보를 보존한다 | `order_items`에 브랜드/상품 ID와 이름, 가격 스냅샷을 함께 저장한다 |
-| 좋아요는 현재 상태 토글이다 | `likes`는 취소 시 hard delete 하고, `(user_id, product_id)` unique로 중복을 막는다 |
-| 주문 재고 차감은 동시성 안전해야 한다 | `product_stocks` row를 `product_id` 오름차순으로 비관적 락 조회한다 |
-| 물리 FK는 명시하지 않는다 | 관계선과 `*_id` 컬럼은 논리 참조를 의미하며, DB `FOREIGN KEY` 제약을 뜻하지 않는다 |
-
-## 2. 회원과 어드민 설계
-
-이번 범위에서 고객과 어드민은 같은 성격의 계정으로 보지 않는다.
-
-| 주체 | 설계 방향 | 이유 |
-| --- | --- | --- |
-| 고객 | `users` 테이블로 관리 | 주문, 좋아요처럼 고객이 직접 소유하는 데이터가 있다 |
-| 어드민 | 별도 테이블 없이 운영 인증 주체로 취급 | 브랜드/상품/주문을 관리하는 행위자지만, 이번 범위에서 어드민 가입/권한/이력 관리가 없다 |
-
-어드민 API는 `/api-admin/v1` prefix와 어드민 인증 헤더로 접근을 제한한다. 즉, ERD에는 `admins`를 추가하지 않고, 어드민은 시스템 밖의 운영 인증 주체로 표현한다.
-
-추후 어드민별 작업 이력, 권한 그룹, 계정 비활성화가 필요해지면 `admin_users`, `admin_roles`, `admin_audit_logs`를 별도 운영 도메인으로 추가하는 편이 좋다. 고객 `users`에 `role`만 추가해 어드민을 섞는 방식은 고객 계정과 운영자 계정의 생명주기와 보안 정책이 달라질 가능성이 커서 이번 설계에서는 제외한다.
-
-## 3. 전체 ERD
+## 왜 이 다이어그램이 필요한가
+주문은 상품 정보를 스냅샷으로 보관해야 하고, 좋아요는 (사용자, 상품) 단위로 중복이 없어야 한다. FK가 어느 테이블에 위치하는지, 어떤 컬럼에 유니크 제약이 필요한지, 정규화/비정규화 결정이 타당한지 검증한다.
 
 ```mermaid
 erDiagram
-    USERS ||--o{ LIKES : user_likes
-    USERS ||--o{ ORDERS : user_orders
+    BRAND ||--o{ PRODUCT : "has"
+    PRODUCT ||--o{ LIKE : "receives"
+    ORDERS ||--|{ ORDER_ITEM : "contains"
 
-    BRANDS ||--o{ PRODUCTS : brand_products
-    PRODUCTS ||--|| PRODUCT_STOCKS : product_stock
-    PRODUCTS ||--o{ LIKES : product_likes
-
-    ORDERS ||--|{ ORDER_ITEMS : order_items
-    BRANDS ||--o{ ORDER_ITEMS : item_brand
-    PRODUCTS ||--o{ ORDER_ITEMS : item_product
-
-    USERS {
-        BIGINT id PK
-        VARCHAR login_id
-        VARCHAR password
-        VARCHAR name
-        DATE birth_date
-        VARCHAR email
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
+    BRAND {
+        bigint id PK
+        varchar name
+        varchar description
+        boolean deleted
+        datetime created_at
+        datetime updated_at
     }
 
-    BRANDS {
-        BIGINT id PK
-        VARCHAR name
-        TEXT description
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
+    PRODUCT {
+        bigint id PK
+        bigint brand_id FK
+        varchar name
+        int price
+        int stock
+        bigint like_count
+        boolean deleted
+        datetime created_at
+        datetime updated_at
     }
 
-    PRODUCTS {
-        BIGINT id PK
-        BIGINT brand_id
-        VARCHAR name
-        TEXT description
-        BIGINT price
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
-    }
-
-    PRODUCT_STOCKS {
-        BIGINT id PK
-        BIGINT product_id
-        INT quantity
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
-    }
-
-    LIKES {
-        BIGINT id PK
-        BIGINT user_id
-        BIGINT product_id
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
+    LIKE {
+        bigint id PK
+        bigint user_id
+        bigint product_id FK
+        datetime created_at
     }
 
     ORDERS {
-        BIGINT id PK
-        BIGINT user_id
-        BIGINT order_total_price
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
+        bigint id PK
+        bigint user_id
+        varchar status
+        int total_amount
+        datetime created_at
+        datetime updated_at
     }
 
-    ORDER_ITEMS {
-        BIGINT id PK
-        BIGINT order_id
-        BIGINT brand_id
-        VARCHAR brand_name
-        BIGINT product_id
-        VARCHAR product_name
-        BIGINT unit_price
-        INT quantity
-        BIGINT total_price
-        DATETIME created_at
-        DATETIME updated_at
-        DATETIME deleted_at
+    ORDER_ITEM {
+        bigint id PK
+        bigint order_id FK
+        bigint product_id
+        varchar product_name_snapshot
+        int price_snapshot
+        int quantity
     }
 ```
 
-> Mermaid `erDiagram`은 관계 라벨에 한글을 넣으면 파싱 오류가 발생할 수 있어, 다이어그램 안에서는 ASCII 라벨을 사용한다. 한글 비즈니스 관계명은 아래 관계 요약 표에서 확인한다.
-> 관계선은 논리 참조 관계를 보여주기 위한 표현이며, 물리 DB `FOREIGN KEY` 제약을 의미하지 않는다.
+---
 
-> `created_at`, `updated_at`, `deleted_at`은 현재 프로젝트의 `BaseEntity` 공통 컬럼이다. 다만 비즈니스 삭제 정책으로 `deleted_at`을 사용하는 도메인은 브랜드와 상품이다. 좋아요는 취소 시 row를 hard delete 하므로 `deleted_at`을 좋아요 상태 판단에 사용하지 않는다.
+## 이 구조에서 특히 봐야 할 포인트
 
-## 4. 관계 요약
+- **포인트 1 (관계의 주인 — FK 위치)**: `PRODUCT.brand_id`, `LIKE.product_id`, `ORDER_ITEM.order_id`는 모두 1:N 관계의 N쪽 테이블에 FK를 둔다. 정석적인 1:N FK 배치다.
 
-| 관계 | 설명 |
-| --- | --- |
-| `users` 1 : N `likes` | 한 사용자는 여러 상품에 좋아요를 누를 수 있다 |
-| `users` 1 : N `orders` | 한 사용자는 여러 주문을 생성할 수 있다 |
-| `brands` 1 : N `products` | 한 브랜드는 여러 상품을 가질 수 있다 |
-| `products` 1 : 1 `product_stocks` | 한 상품은 하나의 현재 재고 row를 가진다 |
-| `products` 1 : N `likes` | 한 상품은 여러 사용자에게 좋아요를 받을 수 있다 |
-| `orders` 1 : N `order_items` | 한 주문은 하나 이상의 주문 항목을 가진다 |
-| `brands/products` 1 : N `order_items` | 주문 항목은 원본 브랜드/상품 ID와 주문 당시 스냅샷 값을 함께 보존한다 |
+- **포인트 2 (멱등성 보장 — 유니크 제약)**: `LIKE` 테이블에 **`(user_id, product_id)` 복합 유니크 제약**을 둔다. 애플리케이션의 `existsBy` 체크와 동시 요청이 경합해도 DB 레벨에서 중복 좋아요가 막힌다. 멱등성의 최종 방어선.
 
-## 5. 테이블별 핵심 제약
+- **포인트 3 (의도적 비정규화 — 스냅샷)**: `ORDER_ITEM`은 `product_id`를 가지면서도 FK 제약을 걸지 않고 `product_name_snapshot`, `price_snapshot`을 별도 보관한다. 정규화 관점에서는 중복이지만, 주문 시점 정보 보존이라는 요구사항 때문에 의도적으로 비정규화한다. 상품이 삭제(soft delete)되어도 과거 주문 내역이 깨지지 않는다.
 
-| 테이블 | 논리 참조와 제약 |
-| --- | --- |
-| `users` | `login_id` unique. 기존 사용자 도메인 테이블이며 신규 설계 범위에서는 참조만 한다 |
-| `brands` | `name`은 비어 있을 수 없다. 삭제는 `deleted_at`으로 soft delete 한다 |
-| `products` | `brand_id`는 `brands.id`를 논리적으로 가리킨다. `price >= 0`. 삭제는 `deleted_at`으로 soft delete 한다 |
-| `product_stocks` | `product_id`는 `products.id`를 논리적으로 가리키며 unique다. `quantity >= 0` |
-| `likes` | `user_id`, `product_id`는 논리 참조다. `(user_id, product_id)` unique. 좋아요 취소 시 row를 hard delete 한다 |
-| `orders` | `user_id`는 `users.id`를 논리적으로 가리킨다. `order_total_price = sum(order_items.total_price)` |
-| `order_items` | `order_id`는 `orders.id`를 논리적으로 가리킨다. `brand_id`, `product_id`는 주문 당시 원본 식별자다. `quantity >= 1`, `unit_price >= 0`, `total_price = unit_price * quantity` |
+- **포인트 4 (집계 비정규화 — like_count)**: `PRODUCT.like_count`는 `LIKE` 행을 세면 도출 가능한 파생 데이터지만, `likes_desc` 정렬 성능을 위해 비정규화 컬럼으로 둔다. 정합성 유지 책임은 좋아요 등록/취소 트랜잭션에 있다.
 
-## 6. 삭제와 보존 정책
+> 정규화 주석: `LIKE.user_id`와 `ORDERS.user_id`는 USER 테이블 참조이나, 회원 도메인이 설계 범위에서 제외되어 FK 없이 식별자만 보관한다. 회원 도메인 합류 시 FK 제약 추가를 검토한다.
 
-| 도메인 | 정책 |
-| --- | --- |
-| 브랜드 | soft delete. 브랜드 삭제 시 소속 상품도 같은 트랜잭션에서 soft delete 한다 |
-| 상품 | soft delete. 고객 상품 목록/상세와 신규 주문 대상에서 제외한다 |
-| 재고 | 상품과 1:1로 유지한다. 별도 삭제 API는 두지 않고 상품 상태를 기준으로 노출 여부를 판단한다 |
-| 좋아요 | hard delete. 이력이 아니라 현재 좋아요 상태만 관리한다 |
-| 주문 | 삭제하지 않는다. 주문 당시 스냅샷을 기준으로 계속 조회할 수 있어야 한다 |
-| 주문 항목 | 삭제하지 않는다. 상품/브랜드가 이후 수정 또는 삭제되어도 주문 당시 값을 유지한다 |
+---
 
-## 7. 향후 인덱스 고려 사항
+# 리스크 및 대안
 
-현재는 트래픽이 많지 않은 초기 단계로 보고, 성능 최적화 목적의 별도 인덱스는 이번 ERD에서 확정하지 않는다. 다만 데이터가 늘거나 특정 조회가 느려지면 아래 인덱스를 우선 검토할 수 있다.
+## 리스크 1: 재고 차감과 외부 결제 사이의 정합성 공백
 
-| 상황 | 향후 고려할 수 있는 인덱스 |
-| --- | --- |
-| 브랜드별 상품 목록 | `products(brand_id, deleted_at, created_at)` |
-| 최신 상품 목록 | `products(deleted_at, created_at)` |
-| 내가 좋아요한 상품 목록 | `likes(user_id, created_at)` |
-| 내 주문 목록 | `orders(user_id, created_at)` |
-| 주문 상세 항목 조회 | `order_items(order_id)` |
+- **현재 설계의 문제점**: 재고 차감(트랜잭션 1)을 먼저 커밋하고 외부 PG를 호출한다. PG 호출 직후 애플리케이션이 다운되면, 재고는 차감됐는데 주문이 `PENDING`에 멈춰 재고가 영원히 묶일 수 있다.
+- **대안**: (a) 재고 차감과 PG 호출을 한 트랜잭션에 묶기, (b) PENDING 주문을 일정 시간 후 자동 복구하는 배치/스케줄러 도입.
+- **현재 방법을 선택한 이유**: (a)는 외부 호출을 DB 트랜잭션에 넣어 커넥션 장기 점유·전체 처리량 저하를 유발하므로 부적합. 트랜잭션을 분리하고, 잔여 리스크는 (b) 보상 배치로 흡수하는 것이 트레이드오프상 유리하다. 이번 범위에서는 동기 보상(실패 시 즉시 복구)까지 구현하고, 비정상 종료 대비 배치는 확장 항목으로 남긴다.
 
-> `product_stocks(product_id)` unique와 `likes(user_id, product_id)` unique는 조회 성능 목적의 인덱스가 아니라 데이터 무결성 제약이다. 주문 생성 시 여러 상품의 재고를 차감할 때는 `product_stocks.product_id` 오름차순으로 row lock을 획득한다.
+## 리스크 2: 좋아요 수 비정규화 컬럼의 정합성 드리프트
+
+- **현재 설계의 문제점**: `PRODUCT.like_count`는 `LIKE` 행 수와 항상 일치해야 하나, 동시성·예외 상황에서 실제 행 수와 어긋날 수 있다.
+- **대안**: (a) 정렬 시마다 `COUNT(*)` 실시간 집계(컬럼 제거), (b) 주기적 재집계 배치로 보정.
+- **현재 방법을 선택한 이유**: (a)는 데이터가 커질수록 `likes_desc` 정렬 비용이 급증해 비현실적. 비정규화 컬럼 + (b) 재집계 배치로 정확도와 성능을 함께 확보하는 것이 트레이드오프상 낫다. 단건 증감은 좋아요 트랜잭션 내에서 함께 처리해 드리프트 발생 빈도를 최소화한다.
+
+## 리스크 3: 동시 주문 시 재고 초과 판매
+
+- **현재 설계의 문제점**: 여러 사용자가 같은 상품을 동시에 주문하면 재고 확인과 차감 사이에 경합이 발생해 재고가 음수가 되거나 초과 판매될 수 있다.
+- **대안**: (a) 비관적 락(SELECT ... FOR UPDATE), (b) 낙관적 락(version 컬럼), (c) `UPDATE ... SET stock = stock - n WHERE stock >= n` 조건부 차감.
+- **현재 방법을 선택한 이유**: (c) 조건부 차감은 별도 락 없이 한 문장으로 원자성을 보장하고, 영향 행 수가 0이면 재고 부족으로 판단할 수 있어 구현이 단순하고 성능이 좋다. 고경합 인기 상품에 한해 (a)/(b)를 선택 적용하는 것을 확장 항목으로 둔다.
+
+## 리스크 4: 사용자 식별이 헤더에만 의존
+
+- **현재 설계의 문제점**: 인증/인가가 범위 밖이라 `X-Loopers-LoginId` 헤더 값만으로 사용자를 식별한다. 헤더 위조 시 타 유저의 주문/좋아요에 접근할 여지가 있다.
+- **대안**: (a) 본격 인증(JWT/세션) 도입, (b) 최소한의 본인 리소스 검증(요청 헤더의 사용자와 리소스 소유자 일치 확인)만 적용.
+- **현재 방법을 선택한 이유**: 인증은 명시적으로 범위 밖이므로 (a)는 과하다. 대신 (b)를 적용해 "타 유저 정보 직접 접근 불가" 요구사항을 충족한다. 즉 인증은 생략하되 인가(소유권 검증)는 최소 수준으로 유지하는 절충이다.
