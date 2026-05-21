@@ -108,6 +108,7 @@ sequenceDiagram
     participant LikeController
     participant LikeFacade
     participant LikeService
+    participant ProductService
     participant LikeRepository
 
     User->>+LikeController: POST /api/v1/products/{productId}/likes
@@ -120,7 +121,8 @@ sequenceDiagram
     else 좋아요 없음
         LikeRepository-->>LikeService: false
         LikeService->>LikeRepository: save(like)
-        LikeService->>LikeRepository: incrementLikeCount(productId)
+        LikeService->>+ProductService: incrementLikeCount(productId)
+        ProductService-->>-LikeService: done
     end
 
     deactivate LikeRepository
@@ -131,7 +133,7 @@ sequenceDiagram
 
 **읽는 포인트**
 - 이미 좋아요가 존재하면 저장 없이 200 OK를 반환한다. like_count는 변경되지 않는다.
-- like_count 증감은 LikeService가 담당하며 Product 도메인에 위임한다.
+- like_count 증감은 Product 도메인의 책임이므로 LikeService → ProductService로 위임한다.
 
 ---
 
@@ -143,6 +145,7 @@ sequenceDiagram
     participant LikeController
     participant LikeFacade
     participant LikeService
+    participant ProductService
     participant LikeRepository
 
     User->>+LikeController: DELETE /api/v1/products/{productId}/likes
@@ -155,7 +158,8 @@ sequenceDiagram
     else 좋아요 존재
         LikeRepository-->>LikeService: true
         LikeService->>LikeRepository: delete(userId, productId)
-        LikeService->>LikeRepository: decrementLikeCount(productId)
+        LikeService->>+ProductService: decrementLikeCount(productId)
+        ProductService-->>-LikeService: done
     end
 
     deactivate LikeRepository
@@ -178,19 +182,21 @@ sequenceDiagram
 
     User->>+LikeController: GET /api/v1/users/{userId}/likes
     LikeController->>+LikeFacade: getLikes(requestUserId, userId)
+    LikeFacade->>+LikeService: getLikes(requestUserId, userId)
 
     alt 요청자 != 조회 대상 유저
+        LikeService-->>LikeFacade: 403 Forbidden
         LikeFacade-->>LikeController: 403 Forbidden
         LikeController-->>User: 403 Forbidden
     else 본인 요청
-        LikeFacade->>+LikeService: getLikes(userId)
         LikeService->>+LikeRepository: findAllByUserId(userId)
         LikeRepository-->>-LikeService: likes
-        LikeService-->>-LikeFacade: likedProducts
+        LikeService-->>LikeFacade: likedProducts
         LikeFacade-->>LikeController: likeListResponse
         LikeController-->>User: 200 OK
     end
 
+    deactivate LikeService
     deactivate LikeFacade
     deactivate LikeController
 ```
@@ -261,19 +267,21 @@ sequenceDiagram
 
     User->>+OrderController: GET /api/v1/orders?startAt=&endAt=
     OrderController->>+OrderFacade: getOrders(userId, startAt, endAt)
+    OrderFacade->>+OrderService: getOrders(userId, startAt, endAt)
 
     alt startAt > endAt
+        OrderService-->>OrderFacade: 400 Bad Request
         OrderFacade-->>OrderController: 400 Bad Request
         OrderController-->>User: 400 Bad Request
     else 유효한 날짜 범위
-        OrderFacade->>+OrderService: getOrders(userId, startAt, endAt)
         OrderService->>+OrderRepository: findAllByUserIdAndDateRange(userId, startAt, endAt)
         OrderRepository-->>-OrderService: orders
-        OrderService-->>-OrderFacade: orders
+        OrderService-->>OrderFacade: orders
         OrderFacade-->>OrderController: orderListResponse
         OrderController-->>User: 200 OK
     end
 
+    deactivate OrderService
     deactivate OrderFacade
     deactivate OrderController
 ```
