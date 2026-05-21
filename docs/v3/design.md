@@ -131,7 +131,7 @@ infrastructure/
 > | `like_asc` | 좋아요 수 오름차순 |
 > | `like_desc` | 좋아요 수 내림차순 |
 >
-> sort 파라미터가 없거나 알 수 없는 값인 경우 `latest`로 대체한다.
+> sort 파라미터가 없는 경우 `latest`로 대체한다. 알 수 없는 값인 경우 `400 Bad Request`를 반환한다.
 
 **Admin**
 
@@ -499,7 +499,7 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 | 브랜드 변경 시도 (상품 수정) | `BAD_REQUEST` | 400 |
 | 어드민 헤더 불일치 | `FORBIDDEN` | 403 |
 | 타인의 좋아요 목록 조회 시도 | `FORBIDDEN` | 403 |
-| 알 수 없는 sort 파라미터 | — | `latest`로 대체 (에러 아님) |
+| 알 수 없는 sort 파라미터 값 | `BAD_REQUEST` | 400 |
 
 > `FORBIDDEN` ErrorType 추가 필요
 
