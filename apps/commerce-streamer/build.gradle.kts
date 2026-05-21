@@ -12,7 +12,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // querydsl
-    annotationProcessor("com.querydsl:querydsl-apt::jakarta")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["openFeignQuerydslVersion"]}:jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 

@@ -38,3 +38,8 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Claude Code ###
+.claude/settings.local.json
+.claude/conversation-history/
+
