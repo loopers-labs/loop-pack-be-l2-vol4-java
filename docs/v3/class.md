@@ -25,6 +25,7 @@ classDiagram
         +String description
         +Long price
         +Long likeCount
+        +Integer quantity
         +update(name, description, price)
         +incrementLikeCount()
         +decrementLikeCount()
@@ -33,7 +34,6 @@ classDiagram
     class ProductInventoryModel {
         +Long productId
         +Integer quantity
-        +isSufficientFor(amount) boolean
         +deduct(amount)
     }
 
@@ -87,7 +87,7 @@ classDiagram
 | `ProductModel` | `update(name, description, price)` | 상품 정보 수정 — 브랜드는 변경 불가 |
 | `ProductModel` | `incrementLikeCount()` | 좋아요 등록 시 호출, SQL 원자적 UPDATE로 위임 |
 | `ProductModel` | `decrementLikeCount()` | 좋아요 취소 시 호출, SQL 원자적 UPDATE로 위임 |
-| `ProductInventoryModel` | `isSufficientFor(amount)` | `quantity >= amount` 확인 — 주문 fast-fail 용도 (락 없음) |
+| `ProductModel` | `quantity` | `PRODUCT_INVENTORY` JOIN으로 채워지는 필드 — DB 컬럼 아님. 상품 조회 시 재고 포함 반환 (품절 여부 노출) |
 | `ProductInventoryModel` | `deduct(amount)` | 재고 확인 + 차감 원자 수행 — `FOR UPDATE` 락 획득 후 호출 (ADR-006) |
 | `OrderModel` | `calculateTotalAmount()` | `items.sum { subtotal() }` 총 주문 금액 계산 |
 | `OrderModel` | `isOwnedBy(userId)` | `this.userId == userId` 소유권 검증 — 불일치 시 404 |

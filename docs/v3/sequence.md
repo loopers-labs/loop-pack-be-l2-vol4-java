@@ -155,7 +155,7 @@ sequenceDiagram
     ProductV1Controller->>ProductFacade: getProducts(brandId, sort, page, size)
     ProductFacade->>ProductService: getProducts(brandId, sort, page, size)
     ProductService->>ProductRepository: findAll(brandId, sort, pageable)
-    Note over ProductRepository: Brand JOIN으로 brandName 함께 조회
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: Page~ProductModel~
     Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: Page~ProductModel~
@@ -176,7 +176,7 @@ sequenceDiagram
     ProductV1Controller->>ProductFacade: getProduct(productId)
     ProductFacade->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
-    Note over ProductRepository: Brand JOIN으로 brandName 함께 조회
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: ProductModel (없으면 404)
     Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: ProductModel
@@ -198,7 +198,7 @@ sequenceDiagram
     ProductAdminV1Controller->>ProductFacade: getProducts(brandId, page, size)
     ProductFacade->>ProductService: getProducts(brandId, page, size)
     ProductService->>ProductRepository: findAll(brandId, pageable)
-    Note over ProductRepository: Brand JOIN으로 brandName 함께 조회
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: Page~ProductModel~
     Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: Page~ProductModel~
@@ -220,7 +220,7 @@ sequenceDiagram
     ProductAdminV1Controller->>ProductFacade: getProduct(productId)
     ProductFacade->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
-    Note over ProductRepository: Brand JOIN으로 brandName 함께 조회
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: ProductModel (없으면 404)
     Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: ProductModel
@@ -379,7 +379,7 @@ sequenceDiagram
 
     LikeFacade->>ProductService: findAllByIds(productIds)
     ProductService->>ProductRepository: findAllById(productIds)
-    Note over ProductRepository: Brand JOIN으로 brandName 함께 조회
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: List~ProductModel~
     ProductService-->>LikeFacade: List~ProductModel~
 
@@ -394,8 +394,9 @@ sequenceDiagram
 
 ### POST /api/v1/orders — 주문 생성 `🔐 User`
 
-> 흐름: 제품 조회 → 재고 확인(fast fail) → 주문 생성 → 재고 차감
-> 재고 확인은 명백한 재고 부족을 조기 차단하는 역할이며, 실제 원자성은 재고 차감 단계의 FOR UPDATE 락이 보장한다.
+> 흐름: 상품 조회(재고 포함) → 재고 확인(fast fail) → 주문 생성 → 재고 차감
+> 상품 조회 시 PRODUCT_INVENTORY JOIN으로 quantity를 함께 가져오므로 별도 재고 조회 불필요.
+> fast-fail은 명백한 재고 부족을 조기 차단하는 역할이며, 실제 원자성은 재고 차감 단계의 FOR UPDATE 락이 보장한다.
 > 재고 차감 실패 시 @Transactional로 주문 생성까지 전체 롤백된다.
 
 ```mermaid
@@ -416,18 +417,12 @@ sequenceDiagram
     loop 상품별
         OrderFacade->>ProductService: getProduct(productId)
         ProductService->>ProductRepository: findById(productId)
+        Note over ProductRepository: PRODUCT JOIN PRODUCT_INVENTORY → quantity 포함
         ProductRepository-->>ProductService: ProductModel (없으면 404)
-        ProductService-->>OrderFacade: ProductModel
+        ProductService-->>OrderFacade: ProductModel (quantity 포함)
     end
 
-    loop 상품별
-        OrderFacade->>ProductService: getInventory(productId)
-        ProductService->>ProductInventoryRepository: findByProductId(productId)
-        ProductInventoryRepository-->>ProductService: ProductInventoryModel
-        ProductService-->>OrderFacade: ProductInventoryModel
-    end
-
-    Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — 하나라도 부족하면 400 Bad Request
+    Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
 
     Note over OrderFacade,OrderRepository: ── @Transactional 시작 ──
 

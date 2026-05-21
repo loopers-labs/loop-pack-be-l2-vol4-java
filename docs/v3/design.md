@@ -26,6 +26,7 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 |---|---|---|
 | Product → Brand | `@ManyToOne` (NO_CONSTRAINT) | 상품 조회 시 브랜드명 JOIN 필요 |
 | Product.likeCount | DB 비정규화 컬럼 | SQL 원자적 증감으로 COUNT 쿼리 제거 (ADR-003) |
+| Product.quantity | PRODUCT_INVENTORY JOIN 필드 | 상품 조회 시 재고 포함 반환 — 별도 재고 조회 불필요, 품절 여부 노출 |
 | Like → User / Product | `userId`, `productId` Long | 존재 여부 확인만 필요, JPA 관계 불필요 |
 | OrderItem → Order | `@ManyToOne` | 동일 Aggregate, 생명주기 공유 |
 | OrderItem → Product | `productId` + 스냅샷 컬럼 | 주문 시점 정보 보존 (요구사항 명시) |
@@ -435,13 +436,14 @@ DELETE → userId + productId 조합 없으면 404 Not Found
 ### 주문 생성
 
 ```
-1. 상품 목록 전체 조회 (product 테이블, 스냅샷 데이터 수집)
-2. 재고 확인 (fast fail, 락 없음) — 하나라도 부족하면 400 Bad Request
+1. 상품 조회 — PRODUCT JOIN PRODUCT_INVENTORY → ProductModel (quantity 포함, 스냅샷 데이터 수집)
+2. 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
 3. 주문 생성 — OrderModel + OrderItemModel INSERT (스냅샷 포함)
 4. 재고 차감 — SELECT ... FOR UPDATE → productInventory.deduct(quantity)
    → 실패 시 @Transactional 전체 롤백 (주문 생성 포함)
 ```
 
+> - 상품 조회 시 PRODUCT_INVENTORY JOIN으로 quantity를 함께 가져오므로 별도 재고 조회 불필요
 > - 2번 재고 확인은 명백한 재고 부족을 주문 INSERT 이전에 조기 차단하는 역할 (fast fail)
 > - 실제 동시성 보장은 4번의 FOR UPDATE 락이 담당
 > - product_inventory 테이블에만 락이 걸리므로 상품 조회 성능에 영향 없음 (ADR-006 참고)
