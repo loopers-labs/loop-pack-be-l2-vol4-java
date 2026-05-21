@@ -1,11 +1,5 @@
 # 시퀀스 다이어그램
 
-> 레이어 표기 규칙
-> - **Controller**: interfaces/api 레이어
-> - **Facade**: application 레이어
-> - **Service**: domain 레이어
-> - **DB**: infrastructure(Repository) 레이어
-
 ---
 
 ## UC-004: 상품 찜 / 찜 취소
@@ -17,43 +11,49 @@ sequenceDiagram
     participant WishlistFacade
     participant ProductService
     participant WishlistService
-    participant DB
+    participant ProductRepository
+    participant WishlistRepository
 
     User->>Controller: POST /wishlists/{productId}
-    Controller->>WishlistFacade: toggleWishlist(userId, productId)
 
-    WishlistFacade->>ProductService: getProduct(productId)
-    ProductService->>DB: findById(productId)
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 로그인
+        Controller->>WishlistFacade: toggleWishlist(userId, productId)
 
-    alt 상품 없음
-        DB-->>ProductService: null
-        ProductService-->>WishlistFacade: CoreException(PRODUCT_NOT_FOUND)
-        WishlistFacade-->>Controller: 404 NOT_FOUND
-    else 상품 존재
-        DB-->>ProductService: Product
-        ProductService-->>WishlistFacade: Product
+        WishlistFacade->>ProductService: getProduct(productId)
+        ProductService->>ProductRepository: findById(productId)
 
-        WishlistFacade->>WishlistService: toggle(userId, productId)
-        WishlistService->>DB: findByUserIdAndProductId(userId, productId)
+        alt 상품 없음
+            ProductRepository-->>ProductService: null
+            ProductService-->>WishlistFacade: CoreException(PRODUCT_NOT_FOUND)
+            WishlistFacade-->>Controller: 404 NOT_FOUND
+        else 상품 존재
+            ProductRepository-->>ProductService: Product
+            ProductService-->>WishlistFacade: Product
 
-        alt 찜 이력 있음
-            DB-->>WishlistService: Wishlist
-            WishlistService->>DB: delete(wishlist)
-            WishlistService-->>WishlistFacade: CANCELLED
-        else 찜 이력 없음
-            DB-->>WishlistService: null
-            WishlistService->>DB: save(new Wishlist)
-            WishlistService-->>WishlistFacade: ADDED
+            WishlistFacade->>WishlistService: toggle(userId, productId)
+            WishlistService->>WishlistRepository: findByUserIdAndProductId(userId, productId)
+
+            alt 찜 이력 있음
+                WishlistRepository-->>WishlistService: Wishlist
+                WishlistService->>WishlistRepository: delete(wishlist)
+                WishlistService-->>WishlistFacade: CANCELLED
+            else 찜 이력 없음
+                WishlistRepository-->>WishlistService: null
+                WishlistService->>WishlistRepository: save(new Wishlist)
+                WishlistService-->>WishlistFacade: ADDED
+            end
+
+            WishlistFacade-->>Controller: WishlistInfo
+            Controller-->>User: 200 OK
         end
-
-        WishlistFacade-->>Controller: WishlistInfo
-        Controller-->>User: 200 OK
     end
 ```
 
 ---
 
-## UC-006: 주문 요청
+## UC-006: 주문 및 결제 요청
 
 ```mermaid
 sequenceDiagram
@@ -62,51 +62,63 @@ sequenceDiagram
     participant OrderFacade
     participant ProductService
     participant OrderService
-    participant DB
+    participant PaymentService
+    participant ProductRepository
+    participant OrderRepository
+    participant OrderItemRepository
+    participant PaymentRepository
 
-    User->>Controller: POST /orders {productId, quantity}
+    User->>Controller: POST /orders {items: [{productId, quantity}]}
 
-    alt 주문 수량 < 1
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 상품 목록이 비어있음
         Controller-->>User: 400 BAD_REQUEST
-    else 수량 유효
-        Controller->>OrderFacade: placeOrder(userId, productId, quantity)
+    else 수량 < 1인 항목 있음
+        Controller-->>User: 400 BAD_REQUEST
+    else 유효
+        Controller->>OrderFacade: placeOrder(userId, items)
 
-        OrderFacade->>ProductService: getProduct(productId)
-        ProductService->>DB: findById(productId)
+        loop 상품 목록 각각
+            OrderFacade->>ProductService: getProduct(productId)
+            ProductService->>ProductRepository: findById(productId)
 
-        alt 상품 없음
-            DB-->>ProductService: null
-            ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_FOUND)
-            OrderFacade-->>Controller: 404 NOT_FOUND
-        else 상품이 ACTIVE 아님
-            DB-->>ProductService: Product(INACTIVE | DELETED)
-            ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_ORDERABLE)
-            OrderFacade-->>Controller: 400 BAD_REQUEST
-        else 상품 정상
-            DB-->>ProductService: Product(ACTIVE)
-            ProductService-->>OrderFacade: Product
-
-            OrderFacade->>ProductService: validateStock(productId, quantity)
-
-            alt 재고 부족
+            alt 상품 없음
+                ProductRepository-->>ProductService: null
+                ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_FOUND)
+                OrderFacade-->>Controller: 404 NOT_FOUND
+            else 상품이 ACTIVE 아님
+                ProductRepository-->>ProductService: Product(INACTIVE)
+                ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_ORDERABLE)
+                OrderFacade-->>Controller: 400 BAD_REQUEST
+            else 재고 부족
+                ProductRepository-->>ProductService: Product(ACTIVE)
                 ProductService-->>OrderFacade: CoreException(STOCK_NOT_ENOUGH)
                 OrderFacade-->>Controller: 400 BAD_REQUEST
-            else 재고 충분
-                ProductService-->>OrderFacade: ok
-
-                OrderFacade->>OrderService: createOrder(userId, productId, quantity)
-                OrderService->>DB: save(new Order)
-                DB-->>OrderService: Order
-                OrderService-->>OrderFacade: Order
-
-                OrderFacade->>ProductService: decreaseStock(productId, quantity)
-                ProductService->>DB: update stock
-                DB-->>ProductService: ok
-
-                OrderFacade-->>Controller: OrderInfo
-                Controller-->>User: 200 OK
+            else 정상
+                ProductRepository-->>ProductService: Product(ACTIVE)
+                ProductService-->>OrderFacade: Product
             end
         end
+
+        OrderFacade->>ProductService: decreaseStock(items)
+        ProductService->>ProductRepository: update stocks
+        ProductRepository-->>ProductService: ok
+
+        OrderFacade->>OrderService: createOrder(userId, items)
+        OrderService->>OrderRepository: save(new Order) REQUESTED
+        OrderRepository-->>OrderService: Order
+        OrderService->>OrderItemRepository: save(OrderItems with snapshot)
+        OrderItemRepository-->>OrderService: OrderItems
+        OrderService-->>OrderFacade: Order
+
+        OrderFacade->>PaymentService: createPayment(orderId, totalAmount)
+        PaymentService->>PaymentRepository: save(new Payment) PENDING
+        PaymentRepository-->>PaymentService: Payment
+        PaymentService-->>OrderFacade: Payment
+
+        OrderFacade-->>Controller: PaymentInfo
+        Controller-->>User: 200 OK
     end
 ```
 
@@ -121,34 +133,40 @@ sequenceDiagram
     participant BrandFacade
     participant BrandService
     participant ProductService
-    participant DB
+    participant BrandRepository
+    participant ProductRepository
 
     Admin->>Controller: DELETE /admin/brands/{brandId}
-    Controller->>BrandFacade: deleteBrand(brandId)
 
-    BrandFacade->>BrandService: getBrand(brandId)
-    BrandService->>DB: findById(brandId)
+    alt 비관리자
+        Controller-->>Admin: 403 FORBIDDEN
+    else 관리자
+        Controller->>BrandFacade: deleteBrand(brandId)
 
-    alt 브랜드 없음
-        DB-->>BrandService: null
-        BrandService-->>BrandFacade: CoreException(BRAND_NOT_FOUND)
-        BrandFacade-->>Controller: 404 NOT_FOUND
-    else 브랜드 존재
-        DB-->>BrandService: Brand
-        BrandService-->>BrandFacade: Brand
+        BrandFacade->>BrandService: getBrand(brandId)
+        BrandService->>BrandRepository: findById(brandId)
 
-        Note over BrandFacade,DB: 소속 상품 판매중지 처리 (찜 이력은 건드리지 않음)
-        BrandFacade->>ProductService: suspendAllByBrand(brandId)
-        ProductService->>DB: updateStatusByBrandId(brandId, INACTIVE)
-        DB-->>ProductService: ok
-        ProductService-->>BrandFacade: ok
+        alt 브랜드 없음
+            BrandRepository-->>BrandService: null
+            BrandService-->>BrandFacade: CoreException(BRAND_NOT_FOUND)
+            BrandFacade-->>Controller: 404 NOT_FOUND
+        else 브랜드 존재
+            BrandRepository-->>BrandService: Brand
+            BrandService-->>BrandFacade: Brand
 
-        BrandFacade->>BrandService: delete(brandId)
-        BrandService->>DB: delete(brand)
-        DB-->>BrandService: ok
+            Note over BrandFacade,ProductRepository: 소속 상품 판매중지 (찜 이력은 보존)
+            BrandFacade->>ProductService: suspendAllByBrand(brandId)
+            ProductService->>ProductRepository: updateStatusByBrandId(brandId, INACTIVE)
+            ProductRepository-->>ProductService: ok
+            ProductService-->>BrandFacade: ok
 
-        BrandFacade-->>Controller: ok
-        Controller-->>Admin: 200 OK
+            BrandFacade->>BrandService: delete(brandId)
+            BrandService->>BrandRepository: updateStatus(brandId, INACTIVE)
+            BrandRepository-->>BrandService: ok
+
+            BrandFacade-->>Controller: ok
+            Controller-->>Admin: 200 OK
+        end
     end
 ```
 
@@ -156,115 +174,49 @@ sequenceDiagram
 
 ## UC-A005: 상품 수정
 
-### Main Flow — 정보 수정 (이름 / 가격)
-
 ```mermaid
 sequenceDiagram
     actor Admin
     participant Controller
     participant ProductFacade
     participant ProductService
-    participant DB
+    participant ProductRepository
 
-    Admin->>Controller: PATCH /admin/products/{productId} {name, price, brandId?}
-    Controller->>ProductFacade: updateProductInfo(productId, request)
+    Admin->>Controller: PATCH /admin/products/{productId} {name?, price?, stockQuantity?}
+    Note over Admin,Controller: 키가 있는 필드만 수정. stockQuantity 양수(추가) / 음수(차감)
 
-    ProductFacade->>ProductService: getProduct(productId)
-    ProductService->>DB: findById(productId)
-
-    alt 상품 없음
-        DB-->>ProductService: null
-        ProductService-->>ProductFacade: CoreException(PRODUCT_NOT_FOUND)
-        ProductFacade-->>Controller: 404 NOT_FOUND
-    else 상품 존재
-        DB-->>ProductService: Product
-        ProductService-->>ProductFacade: Product
-
-        alt 브랜드 변경 시도
-            ProductFacade-->>Controller: CoreException(BRAND_CHANGE_NOT_ALLOWED) 400
-        else 브랜드 변경 없음
-            ProductFacade->>ProductService: update(productId, name, price)
-            ProductService->>DB: update(product)
-            DB-->>ProductService: ok
-            ProductFacade-->>Controller: ProductInfo
-            Controller-->>Admin: 200 OK
-        end
-    end
-```
-
-### Alternate Flow A — 재고 추가
-
-```mermaid
-sequenceDiagram
-    actor Admin
-    participant Controller
-    participant ProductFacade
-    participant ProductService
-    participant DB
-
-    Admin->>Controller: POST /admin/products/{productId}/stock/increase {quantity}
-
-    alt 수량 < 1
+    alt 비관리자
+        Controller-->>Admin: 403 FORBIDDEN
+    else name 키 있고 2글자 미만
         Controller-->>Admin: 400 BAD_REQUEST
-    else 수량 유효
-        Controller->>ProductFacade: increaseStock(productId, quantity)
+    else stockQuantity 키 있고 값이 0
+        Controller-->>Admin: 400 BAD_REQUEST
+    else 관리자
+        Controller->>ProductFacade: updateProduct(productId, request)
 
         ProductFacade->>ProductService: getProduct(productId)
-        ProductService->>DB: findById(productId)
+        ProductService->>ProductRepository: findById(productId)
 
         alt 상품 없음
-            DB-->>ProductService: null
+            ProductRepository-->>ProductService: null
             ProductService-->>ProductFacade: CoreException(PRODUCT_NOT_FOUND)
             ProductFacade-->>Controller: 404 NOT_FOUND
-        else 상품 존재
-            DB-->>ProductService: Product
+        else 브랜드 변경 시도
+            ProductRepository-->>ProductService: Product
+            ProductService-->>ProductFacade: CoreException(BRAND_CHANGE_NOT_ALLOWED)
+            ProductFacade-->>Controller: 400 BAD_REQUEST
+        else stockQuantity 키 있고 수정 후 재고 < 0
+            ProductRepository-->>ProductService: Product
+            ProductService-->>ProductFacade: CoreException(STOCK_UNDERFLOW)
+            ProductFacade-->>Controller: 400 BAD_REQUEST
+        else 정상
+            ProductRepository-->>ProductService: Product
             ProductService-->>ProductFacade: Product
-            ProductFacade->>ProductService: increaseStock(productId, quantity)
-            ProductService->>DB: update stock + quantity
-            DB-->>ProductService: ok
+            ProductFacade->>ProductService: update(productId, request)
+            ProductService->>ProductRepository: save(product)
+            ProductRepository-->>ProductService: ok
             ProductFacade-->>Controller: ProductInfo
             Controller-->>Admin: 200 OK
-        end
-    end
-```
-
-### Alternate Flow B — 재고 차감
-
-```mermaid
-sequenceDiagram
-    actor Admin
-    participant Controller
-    participant ProductFacade
-    participant ProductService
-    participant DB
-
-    Admin->>Controller: POST /admin/products/{productId}/stock/decrease {quantity}
-
-    alt 수량 < 1
-        Controller-->>Admin: 400 BAD_REQUEST
-    else 수량 유효
-        Controller->>ProductFacade: decreaseStock(productId, quantity)
-
-        ProductFacade->>ProductService: getProduct(productId)
-        ProductService->>DB: findById(productId)
-
-        alt 상품 없음
-            DB-->>ProductService: null
-            ProductService-->>ProductFacade: CoreException(PRODUCT_NOT_FOUND)
-            ProductFacade-->>Controller: 404 NOT_FOUND
-        else 상품 존재
-            DB-->>ProductService: Product
-            ProductService-->>ProductFacade: Product
-
-            alt 차감 후 재고 < 0
-                ProductFacade-->>Controller: CoreException(STOCK_UNDERFLOW) 400
-            else 재고 충분
-                ProductFacade->>ProductService: decreaseStock(productId, quantity)
-                ProductService->>DB: update stock - quantity
-                DB-->>ProductService: ok
-                ProductFacade-->>Controller: ProductInfo
-                Controller-->>Admin: 200 OK
-            end
         end
     end
 ```
