@@ -1,5 +1,338 @@
 # 02. 시퀀스 다이어그램
 
+> 이 문서는 두 가지 수준의 다이어그램을 제공합니다.
+> - **비즈니스 레벨**: 도메인 단위로 추상화. 비개발자도 흐름을 파악할 수 있는 수준.
+> - **기술 레벨**: 레이어(Controller → Facade → Service → Repository) 단위 상세 흐름.
+
+---
+
+## 비즈니스 레벨 (Business Level)
+
+내부 구현을 숨기고 **어떤 주체가 어떤 행위를 하는가**에 집중합니다.
+
+---
+
+### SDB-01. 브랜드 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 브랜드도메인
+
+    회원->>+브랜드도메인: 브랜드 조회 요청
+    alt 존재하지 않는 브랜드
+        브랜드도메인-->>회원: 존재하지 않음 (404)
+    else 정상
+        브랜드도메인-->>회원: 브랜드 정보 반환
+    end
+    deactivate 브랜드도메인
+```
+
+---
+
+### SDB-02. 상품 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 상품도메인
+
+    회원->>+상품도메인: 상품 목록 조회 (브랜드 필터, 정렬, 페이지)
+    상품도메인-->>-회원: 삭제되지 않은 상품 목록 반환
+```
+
+---
+
+### SDB-03. 상품 상세 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 상품도메인
+
+    회원->>+상품도메인: 상품 상세 조회 요청
+    alt 존재하지 않는 상품
+        상품도메인-->>회원: 존재하지 않음 (404)
+    else 정상
+        상품도메인-->>회원: 상품 상세 정보 반환
+    end
+    deactivate 상품도메인
+```
+
+---
+
+### SDB-04. 좋아요 등록
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 좋아요도메인
+    participant 상품도메인
+
+    회원->>+좋아요도메인: 좋아요 등록 요청
+    alt 이미 좋아요한 상품
+        좋아요도메인-->>회원: 중복 무시 후 성공 반환 (멱등)
+    else 신규 좋아요
+        좋아요도메인->>+상품도메인: 좋아요 수 증가 요청
+        상품도메인-->>-좋아요도메인: 완료
+        좋아요도메인-->>회원: 성공
+    end
+    deactivate 좋아요도메인
+```
+
+---
+
+### SDB-05. 좋아요 취소
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 좋아요도메인
+    participant 상품도메인
+
+    회원->>+좋아요도메인: 좋아요 취소 요청
+    alt 좋아요 내역 없음
+        좋아요도메인-->>회원: 없음 무시 후 성공 반환 (멱등)
+    else 좋아요 존재
+        좋아요도메인->>+상품도메인: 좋아요 수 감소 요청
+        상품도메인-->>-좋아요도메인: 완료
+        좋아요도메인-->>회원: 성공
+    end
+    deactivate 좋아요도메인
+```
+
+---
+
+### SDB-06. 내 좋아요 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 좋아요도메인
+
+    회원->>+좋아요도메인: 내 좋아요 목록 조회 요청
+    alt 타인의 목록 조회 시도
+        좋아요도메인-->>회원: 접근 거부 (403)
+    else 본인 요청
+        좋아요도메인-->>회원: 좋아요한 상품 목록 반환
+    end
+    deactivate 좋아요도메인
+```
+
+---
+
+### SDB-07. 주문 생성
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 주문도메인
+    participant 재고도메인
+
+    회원->>+주문도메인: 주문 요청 (상품 목록)
+    loop 각 상품
+        주문도메인->>+재고도메인: 재고 확인 및 차감
+        alt 재고 부족
+            재고도메인-->>주문도메인: 주문 불가 (SKIPPED)
+        else 재고 충분
+            재고도메인-->>주문도메인: 차감 완료 (ORDERED)
+        end
+        deactivate 재고도메인
+    end
+    alt 주문 가능한 상품 없음
+        주문도메인-->>회원: 주문 실패 (400)
+    else 부분 또는 전체 주문 가능
+        주문도메인-->>회원: 주문 완료 (처리된 항목 + 건너뛴 항목)
+    end
+    deactivate 주문도메인
+```
+
+---
+
+### SDB-08. 주문 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 주문도메인
+
+    회원->>+주문도메인: 주문 목록 조회 (기간 필터)
+    alt 유효하지 않은 기간
+        주문도메인-->>회원: 잘못된 요청 (400)
+    else 정상
+        주문도메인-->>회원: 기간 내 주문 목록 반환
+    end
+    deactivate 주문도메인
+```
+
+---
+
+### SDB-09. 주문 상세 조회
+
+```mermaid
+sequenceDiagram
+    participant 회원
+    participant 주문도메인
+
+    회원->>+주문도메인: 주문 상세 조회 요청
+    alt 존재하지 않는 주문
+        주문도메인-->>회원: 존재하지 않음 (404)
+    else 타인의 주문
+        주문도메인-->>회원: 접근 거부 (403)
+    else 본인 주문
+        주문도메인-->>회원: 주문 상세 정보 반환 (스냅샷 포함)
+    end
+    deactivate 주문도메인
+```
+
+---
+
+### SDB-10. 어드민 브랜드 등록
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 브랜드도메인
+
+    관리자->>+브랜드도메인: 브랜드 등록 요청
+    브랜드도메인-->>-관리자: 등록된 브랜드 정보 반환
+```
+
+---
+
+### SDB-11. 어드민 브랜드 수정
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 브랜드도메인
+
+    관리자->>+브랜드도메인: 브랜드 수정 요청
+    alt 존재하지 않는 브랜드
+        브랜드도메인-->>관리자: 존재하지 않음 (404)
+    else 정상
+        브랜드도메인-->>관리자: 수정된 브랜드 정보 반환
+    end
+    deactivate 브랜드도메인
+```
+
+---
+
+### SDB-12. 어드민 브랜드 삭제
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 브랜드도메인
+    participant 상품도메인
+
+    관리자->>+브랜드도메인: 브랜드 삭제 요청
+    alt 존재하지 않는 브랜드
+        브랜드도메인-->>관리자: 존재하지 않음 (404)
+    else 정상
+        브랜드도메인->>+상품도메인: 해당 브랜드의 상품 일괄 삭제 요청
+        상품도메인-->>-브랜드도메인: 완료
+        브랜드도메인-->>관리자: 삭제 완료
+    end
+    deactivate 브랜드도메인
+```
+
+---
+
+### SDB-13. 어드민 상품 등록
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 상품도메인
+    participant 브랜드도메인
+
+    관리자->>+상품도메인: 상품 등록 요청
+    상품도메인->>+브랜드도메인: 브랜드 유효성 확인
+    alt 존재하지 않거나 삭제된 브랜드
+        브랜드도메인-->>상품도메인: 유효하지 않음
+        상품도메인-->>관리자: 잘못된 요청 (400)
+    else 정상
+        브랜드도메인-->>상품도메인: 유효
+        상품도메인-->>관리자: 등록된 상품 정보 반환
+    end
+    deactivate 브랜드도메인
+    deactivate 상품도메인
+```
+
+---
+
+### SDB-14. 어드민 상품 수정
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 상품도메인
+
+    관리자->>+상품도메인: 상품 수정 요청 (브랜드 변경 불가)
+    alt 존재하지 않는 상품
+        상품도메인-->>관리자: 존재하지 않음 (404)
+    else 정상
+        상품도메인-->>관리자: 수정된 상품 정보 반환
+    end
+    deactivate 상품도메인
+```
+
+---
+
+### SDB-15. 어드민 상품 삭제
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 상품도메인
+
+    관리자->>+상품도메인: 상품 삭제 요청
+    alt 존재하지 않는 상품
+        상품도메인-->>관리자: 존재하지 않음 (404)
+    else 정상
+        상품도메인-->>관리자: 삭제 완료
+    end
+    deactivate 상품도메인
+```
+
+---
+
+### SDB-16. 어드민 주문 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 주문도메인
+
+    관리자->>+주문도메인: 전체 주문 목록 조회 (페이지)
+    주문도메인-->>-관리자: 전체 주문 목록 반환
+```
+
+---
+
+### SDB-17. 어드민 주문 상세 조회
+
+```mermaid
+sequenceDiagram
+    participant 관리자
+    participant 주문도메인
+
+    관리자->>+주문도메인: 주문 상세 조회 요청
+    alt 존재하지 않는 주문
+        주문도메인-->>관리자: 존재하지 않음 (404)
+    else 정상
+        주문도메인-->>관리자: 주문 상세 정보 반환
+    end
+    deactivate 주문도메인
+```
+
+---
+
+## 기술 레벨 (Technical Level)
+
+레이어(Controller → Facade → Service → Repository) 단위의 상세 호출 흐름입니다.
+
 ---
 
 ## SD-01. 브랜드 조회
