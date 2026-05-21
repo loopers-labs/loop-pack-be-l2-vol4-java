@@ -15,7 +15,6 @@ classDiagram
         +String name
         +String email
         +String birth
-        +Long point
         +authenticate(password) boolean
     }
 
@@ -23,6 +22,8 @@ classDiagram
         +Long id
         +String name
         +String description
+        +LocalDateTime deletedAt
+        +softDelete() void
     }
 
     class Product {
@@ -31,8 +32,12 @@ classDiagram
         +Long price
         +String description
         +Long likeCount
+        +LocalDateTime deletedAt
+        +boolean likesPurged
         +Brand brand
         +List~ProductOption~ options
+        +softDelete() void
+        +restore() void
     }
 
     class ProductOption {
@@ -53,6 +58,7 @@ classDiagram
         +reserve(qty) void
         +confirm(qty) void
         +release(qty) void
+        +restore(qty) void
     }
 
     class Like {
@@ -65,12 +71,12 @@ classDiagram
         +Long id
         +Long userId
         +OrderStatus status
-        +Long totalAmount
-        +Long pointAmount
         +Long pgAmount
         +List~OrderItem~ items
         +confirm() void
         +fail() void
+        +cancel() void
+        +totalAmount() Long
     }
 
     class OrderItem {
@@ -82,6 +88,7 @@ classDiagram
         +String optionName
         +int quantity
         +Long price
+        +subtotal() Long
     }
 
     class Payment {
@@ -92,25 +99,10 @@ classDiagram
         +Long amount
     }
 
-    class PointHistory {
-        +Long id
-        +Long userId
-        +Long orderId
-        +PointType type
-        +Long amount
-    }
-
     class PaymentStatus {
         <<enumeration>>
         SUCCESS
         FAILED
-    }
-
-    class PointType {
-        <<enumeration>>
-        EARN
-        USE
-        REFUND
     }
 
     class OrderStatus {
@@ -128,8 +120,6 @@ classDiagram
     Order --> OrderStatus
     Order --> Payment
     Payment --> PaymentStatus
-    PointHistory --> PointType
-    PointHistory --> User
     Like --> User
     Like --> Product
 ```
@@ -138,20 +128,22 @@ classDiagram
 
 ### User
 - 인증 (`authenticate`) 로직을 직접 보유
-- `point` 잔액 컬럼 보유 → atomic UPDATE로 동시성 보장
-- 포인트 이력은 `PointHistory`에 위임
+- 포인트 기능 제거로 잔액/이력 관련 책임 없음
 
 ### Brand
 - 독립 엔티티. 상품이 Brand를 참조하는 방향
 - 브랜드 정보 변경이 상품에 영향을 주지 않도록 분리
+- `deletedAt`으로 소프트 딜리트. 삭제 시 소속 상품도 함께 소프트 딜리트 (cascade)
 
 ### Product / ProductOption / Stock
 - Product는 ProductOption을 1:N으로 가짐
 - 옵션 없는 상품은 `optionName = "기본"`, `additionalPrice = 0` 인 옵션 1개 자동 생성
 - `actualPrice() = product.price + additionalPrice`
 - Stock은 ProductOption과 1:1 관계 (옵션당 재고 1개)
-- 재고 상태 변경(`reserve`, `confirm`, `release`)은 Stock이 단독으로 책임
+- 재고 상태 변경(`reserve`, `confirm`, `release`, `restore`)은 Stock이 단독으로 책임
 - `availableQuantity() = totalQuantity - reservedQuantity`
+- Product는 `deletedAt`으로 소프트 딜리트(복구 가능). 옵션·재고는 상품을 통해 조회되므로 별도 삭제 플래그 불필요 — 상품 삭제 시 자동 숨김, 복구 시 자동 복구
+- `likesPurged`: 삭제된 상품의 좋아요(고용량, 복구 제외)를 비동기 배치가 청크 삭제했는지 마킹
 
 ### Like
 - `userId + productId` 복합키로 중복 방지
@@ -159,17 +151,17 @@ classDiagram
 
 ### Order / OrderItem
 - Order가 상태 전이 메서드(`confirm`, `fail`, `cancel`)를 직접 보유
-- OrderItem은 주문 시점의 상품명, 옵션명, 가격을 스냅샷으로 저장
+- Order는 1개 이상의 OrderItem을 가짐 (복수 상품 주문)
+- 포인트 제거로 금액은 `pgAmount` 하나만 보유. `totalAmount()`는 주문 라인 합계 = pgAmount
+- OrderItem은 주문 시점의 상품명, 옵션명, 단가, 수량을 스냅샷으로 저장
+- 상품이 소프트 딜리트되어도 OrderItem 스냅샷은 보존되어 과거 주문 조회에 영향 없음
 
 ### Payment
 - PG 트랜잭션 ID와 결제 상태를 보관
 - Order와 1:1 관계 (재시도 없음)
 
-### PointHistory
-- append-only 이력 테이블
-- `type = USE` → 차감, `type = EARN` → 적립, `type = REFUND` → 취소 환불
-
 ## 의존 방향 원칙
-- 상위 도메인(Order, Payment)이 하위 도메인(Stock, Point)을 참조하는 방향
+- 상위 도메인(Order, Payment)이 하위 도메인(Stock)을 참조하는 방향
 - 각 Service는 Facade에서만 호출, Service 간 직접 참조 금지
   → 추후 이벤트 기반으로 전환 시 영향 범위를 Facade 한 곳으로 제한하기 위함
+- 관리자 기능(Brand/Product CRUD)은 동일 도메인 Service를 재사용하며, LDAP 인증은 인터페이스 계층(Interceptor)에서 게이트로 처리하고 도메인은 인증을 알지 못함

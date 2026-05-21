@@ -32,15 +32,15 @@ erDiagram
         varchar name "회원 이름"
         varchar email "이메일 주소"
         varchar birth "생년월일 (YYYY-MM-DD)"
-        bigint point "포인트 잔액 | atomic UPDATE (WHERE point >= ?)"
         datetime created_at "가입일시"
     }
 
     brands["브랜드 (brands)"] {
         bigint id PK "브랜드 고유 ID | PK"
-        varchar name "브랜드명"
+        varchar name UK "브랜드명 | UNIQUE (삭제 후에도 재등록 불가)"
         varchar description "브랜드 설명"
         datetime created_at "등록일시"
+        datetime deleted_at "삭제일시 | 소프트 딜리트 (NULL = 활성)"
     }
 
     products["상품 (products)"] {
@@ -51,6 +51,8 @@ erDiagram
         text description "상품 설명"
         bigint like_count "좋아요 수 | 카운터 캐시, 배치로 주기적 보정"
         datetime created_at "등록일시"
+        datetime deleted_at "삭제일시 | 소프트 딜리트 (NULL = 활성), 브랜드 삭제 시 함께 처리"
+        boolean likes_purged "좋아요 정리 완료 여부 | 삭제된 상품의 좋아요 비동기 청크 삭제용 마킹"
     }
 
     product_options["상품 옵션 (product_options)"] {
@@ -80,9 +82,7 @@ erDiagram
         bigint id PK "주문 고유 ID | PK"
         bigint user_id FK "회원 ID | FK → users.id"
         varchar status "PENDING/CONFIRMED/FAILED/CANCELLED | INDEX (status, created_at)"
-        bigint total_amount "총 주문금액 (point_amount + pg_amount)"
-        bigint point_amount "포인트로 결제한 금액"
-        bigint pg_amount "PG로 결제한 금액"
+        bigint pg_amount "PG 결제 금액 (= 주문 총액, 포인트 제거로 단일 금액)"
         varchar receiver_name "수령인 이름 | 주문 시점 스냅샷"
         varchar receiver_phone "수령인 연락처 | 주문 시점 스냅샷"
         varchar zip_code "우편번호 | 주문 시점 스냅샷"
@@ -111,18 +111,8 @@ erDiagram
         datetime created_at "결제일시"
     }
 
-    point_histories["포인트 이력 (point_histories)"] {
-        bigint id PK "이력 고유 ID | PK"
-        bigint user_id FK "회원 ID | FK → users.id"
-        bigint order_id FK "주문 ID | FK → orders.id"
-        varchar type "변경 유형 (EARN/USE/REFUND)"
-        bigint amount "변경 금액 (양수: 적립/환불, 음수: 사용)"
-        datetime created_at "변경일시"
-    }
-
     users ||--o{ orders : "회원은 주문을 여러 개 할 수 있다"
     users ||--o{ likes : "회원은 좋아요를 여러 개 누를 수 있다"
-    users ||--o{ point_histories : "회원의 포인트 변경 이력"
     brands ||--o{ products : "브랜드는 상품을 여러 개 가진다"
     products ||--o{ product_options : "상품은 옵션을 1개 이상 가진다"
     product_options ||--|| stocks : "옵션당 재고는 반드시 1개"
@@ -131,18 +121,22 @@ erDiagram
     product_options ||--o{ order_items : "옵션 단위로 주문에 담긴다"
     orders ||--o{ order_items : "주문은 상품을 1개 이상 포함한다"
     orders ||--o| payments : "주문당 결제는 최대 1건"
-    orders ||--o{ point_histories : "주문으로 인한 포인트 변경 이력"
 ```
 
 ## 테이블 설계 상세
 
 ### users
-- `point`: 포인트 잔액. `UPDATE ... WHERE point >= ?` atomic UPDATE로 동시성 보장
 - `login_id`: 유니크 제약. 중복 가입 방지
+- 포인트 기능 제거로 `point` 컬럼 및 `point_histories` 테이블 삭제됨
 
 ### brands
 - 상품과 독립된 엔티티. 브랜드 단독 조회 가능
 - 상품이 brand_id를 외래키로 참조
+- `name`: UNIQUE. 활성 브랜드명 중복 금지 + **삭제(소프트 딜리트)된 브랜드명도 재등록 불가**
+  - 정책: 삭제된 브랜드명을 제3자가 재등록하면 브랜드 사칭/이미지 편승 위험 → 영구 차단
+  - 삭제 행이 유니크 슬롯을 점유하는 것이 의도된 동작 (deleted_seq 트릭/아카이브 테이블 불필요)
+- `deleted_at`: 소프트 딜리트. 브랜드 삭제 시 기록하며, 조회는 `deleted_at IS NULL` 조건으로 필터링
+- 브랜드 삭제 시 소속 상품도 함께 소프트 딜리트 (cascade)
 
 ### products
 - `brand_id`: brands 테이블 외래키
@@ -151,14 +145,25 @@ erDiagram
   - 좋아요 취소 시 likes DELETE + like_count -1 (같은 트랜잭션)
   - 정합성 보정: 주기적 배치로 `COUNT(*) FROM likes` 와 동기화
 - 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
+- `deleted_at`: 소프트 딜리트. 상품/브랜드 삭제 시 기록. 복구 대상(브랜드 복구 시 함께 복구)
+- `likes_purged`: 삭제된 상품의 좋아요(고용량, 복구 가치 없음)를 비동기 배치로 청크 삭제하기 위한 마킹
+  - 대상 조회: `deleted_at IS NOT NULL AND likes_purged = false`
+  - 배치가 `likes.product_id` 단위로 청크 DELETE 후 `likes_purged = true`로 마킹 (반복 스캔 방지)
+
+### 삭제·복구 정책 (요약)
+- **소프트 딜리트 (복구 가능)**: brands, products — 저용량, 복구 가치 있음
+- **상품에 종속되어 자동 처리**: product_options, stocks — 플래그 없음. 상품 삭제 시 자동으로 도달 불가(숨김), 상품 복구 시 자동으로 도달 가능(복구). 저용량이라 정리 불필요
+- **비동기 물리 삭제 (복구 제외)**: likes — 고용량(수천만~수억), 삭제된 상품의 좋아요는 의미 없음 → 배치 청크 삭제
+- 브랜드 삭제 트랜잭션은 brands/products의 `deleted_at`만 기록(즉시 노출 차단). 좋아요 대량 삭제는 비동기 배치가 수행
 
 ### product_options
 - `option_name`: 옵션명 (ex. "기본", "흰색/S", "검정/M")
 - `additional_price`: 옵션 추가금액 (기본 0원). 실제 가격 = `products.price + additional_price`
 - 옵션 없는 상품은 `option_name = "기본"`, `additional_price = 0` 인 옵션 1개 자동 생성
+- 상품 등록/수정 시 옵션·재고를 함께 등록 (관리자 API)
 
 ### stocks
-- `product_option_id`: UK — 옵션당 재고 1개 (product_id → product_option_id로 변경)
+- `product_option_id`: UK — 옵션당 재고 1개
 - `total_quantity`: 실제 보유 재고 (결제 확정 시 차감)
 - `reserved_quantity`: 예약 중인 수량 (주문 생성 시 증가)
 - 가용 재고 = `total_quantity - reserved_quantity`
@@ -170,35 +175,30 @@ erDiagram
 
 ### orders
 - `status`: PENDING / CONFIRMED / FAILED / CANCELLED
-- `total_amount`: 총 결제 금액 (point_amount + pg_amount)
-- `point_amount`: 포인트로 결제한 금액
-- `pg_amount`: PG로 결제한 금액
+- `pg_amount`: PG 결제 금액. 포인트 제거로 주문 총액 = PG 결제 금액 단일 컬럼으로 통합
+  - 주문 총액은 order_items의 `SUM(price × quantity)` 와 일치
 - 배송지 컬럼 (`receiver_name`, `receiver_phone`, `zip_code`, `address`, `detail_address`): 주문 시점 스냅샷
 - `expires_at` 없음 (재시도 없음, 스케줄러가 created_at 기준으로 만료 판단)
 - 인덱스: `(status, created_at)` → 스케줄러의 만료 PENDING 주문 조회 성능 보장
 
 ### order_items
-- 주문 생성 시점에 INSERT되는 라인 아이템 테이블
+- 주문 생성 시점에 INSERT되는 라인 아이템 테이블 (한 주문에 1개 이상)
 - `product_name`: 당시 상품명 스냅샷
 - `option_name`: 당시 옵션명 스냅샷 (ex. "기본", "흰색/S")
 - `price`: 당시 단가 스냅샷 (`products.price + additional_price` 계산값)
+- 상품이 소프트 딜리트되어도 스냅샷이 보존되어 과거 주문 조회에 영향 없음
 
 ### payments
 - `order_id`: UK — 주문당 결제 1건 (재시도 없음)
 - `pg_transaction_id`: UK — PG 트랜잭션 ID 중복 방지
 - `status`: SUCCESS / FAILED
 
-### point_histories
-- append-only 이력 테이블
-- `type`: EARN (적립) / USE (사용) / REFUND (환불)
-- `amount`: 양수(적립/환불) / 음수(사용)
-- `order_id`: 주문으로 인한 포인트 변경 추적
-
 ## 제약 조건 요약
 
 | 테이블 | 제약 | 목적 |
 |---|---|---|
 | users.login_id | UNIQUE | 중복 가입 방지 |
+| brands.name | UNIQUE | 브랜드명 중복 방지 (삭제 후 재등록도 차단) |
 | stocks.product_option_id | UNIQUE | 옵션당 재고 1개 보장 |
 | likes.(user_id, product_id) | 복합 UNIQUE | 중복 좋아요 방지 |
 | payments.order_id | UNIQUE | 주문당 결제 1건 |
@@ -209,3 +209,5 @@ erDiagram
 | 테이블 | 인덱스 | 목적 |
 |---|---|---|
 | orders | `(status, created_at)` | 스케줄러의 만료 PENDING 주문 조회 풀스캔 방지 |
+| products | `(brand_id, deleted_at)` | 관리자 브랜드별 상품 목록 조회 + 활성 상품 필터 |
+| brands | `(deleted_at)` | 활성 브랜드 목록 조회 필터 |
