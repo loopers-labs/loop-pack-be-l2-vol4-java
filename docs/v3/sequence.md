@@ -44,44 +44,6 @@ sequenceDiagram
 
 ## Product
 
-### GET /api/v1/products — 상품 목록 조회
-
-```mermaid
-sequenceDiagram
-    participant ProductV1Controller
-    participant ProductFacade
-    participant ProductService
-    participant ProductRepository
-
-    ProductV1Controller->>ProductFacade: getProducts(brandId, sort, page, size)
-    ProductFacade->>ProductService: getProducts(brandId, sort, page, size)
-    ProductService->>ProductRepository: findAll(brandId, sort, pageable)
-    ProductRepository-->>ProductService: Page~ProductModel~
-    ProductService-->>ProductFacade: Page~ProductModel~
-    ProductFacade-->>ProductV1Controller: Page~ProductInfo~
-```
-
----
-
-### GET /api/v1/products/{productId} — 상품 단건 조회
-
-```mermaid
-sequenceDiagram
-    participant ProductV1Controller
-    participant ProductFacade
-    participant ProductService
-    participant ProductRepository
-
-    ProductV1Controller->>ProductFacade: getProduct(productId)
-    ProductFacade->>ProductService: getProduct(productId)
-    ProductService->>ProductRepository: findById(productId)
-    ProductRepository-->>ProductService: ProductModel (없으면 404)
-    ProductService-->>ProductFacade: ProductModel
-    ProductFacade-->>ProductV1Controller: ProductInfo
-```
-
----
-
 ### POST /api-admin/v1/products — 상품 등록 `🔐 Admin`
 
 ```mermaid

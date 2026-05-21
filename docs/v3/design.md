@@ -157,7 +157,22 @@ infrastructure/
   → request attribute에 userId 저장
 ```
 
-Controller는 request attribute에서 `userId`를 꺼내 사용한다.
+Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `LoginUserArgumentResolver`가 request attribute에서 `userId`를 꺼내 메서드 파라미터로 바인딩한다.
+
+```java
+// 커스텀 어노테이션
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LoginUser {}
+
+// Controller 사용 예시
+public ApiResponse<OrderInfo> createOrder(
+    @LoginUser Long userId,
+    @RequestBody OrderV1Dto.CreateRequest request
+) { ... }
+```
+
+`LoginUserArgumentResolver`와 인터셉터는 모두 `support/auth/` 패키지에 위치하며, `WebMvcConfig`에서 함께 등록한다.
 
 ### Admin 인증 — `AdminAuthInterceptor`
 
@@ -220,7 +235,35 @@ public OrderInfo createOrder(...) {
 
 ---
 
-## 9. 연쇄 삭제 정책
+## 9. 유효성 검증 레이어 원칙
+
+검증 책임은 두 레이어로 분리한다.
+
+| 레이어 | 담당 | 예시 |
+|---|---|---|
+| Controller (`@Valid`) | 입력 형식 검증 | `@NotBlank`, `@Min(0)`, `@Size(max=100)`, null 체크 |
+| Domain Model 생성자·메서드 | 비즈니스 규칙 검증 | 중복 불가, 상태 전이, 재고 부족 → `CoreException` throw |
+
+```java
+// Controller — 형식 검증
+public record CreateRequest(
+    @NotBlank @Size(max = 100) String name,
+    @Min(0) int quantity
+) {}
+
+// Domain Model — 비즈니스 규칙
+public BrandModel(String name, String description) {
+    if (name == null || name.isBlank()) throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 필수입니다.");
+    this.name = name;
+    this.description = description;
+}
+```
+
+> `@Valid`를 통과한 요청도 도메인 규칙에 위반되면 `CoreException`이 발생하며, `ApiControllerAdvice`가 처리한다.
+
+---
+
+## 10. 연쇄 삭제 정책
 
 모든 삭제는 Soft Delete(`deleted_at = now()`)이며, 연쇄 삭제는 **Facade** 레이어에서 오케스트레이션한다. JPA Cascade는 사용하지 않는다 — Like는 `productId`(Long) ID 참조 방식이라 JPA 관계가 없고, Like와 Product는 서로 다른 Aggregate이므로 ID 참조를 유지한다.
 
@@ -229,10 +272,10 @@ public OrderInfo createOrder(...) {
 ```
 BrandFacade.deleteBrand(brandId)
   ├── BrandService.delete(brandId)
-  └── ProductService.findAllByBrand(brandId) → 각 product에 대해
-        ├── ProductService.delete(product)
-        ├── ProductInventoryService.deleteByProduct(productId)
-        └── LikeService.deleteAllByProduct(productId)
+  ├── ProductService.findIdsByBrand(brandId) → List<productId>
+  ├── ProductService.deleteAll(productIds)
+  ├── ProductInventoryService.deleteAllByProducts(productIds)
+  └── LikeService.deleteAllByProducts(productIds)
 ```
 
 ### Product 삭제
@@ -255,7 +298,7 @@ LikeFacade.removeLike(userId, productId)
 
 ---
 
-## 10. Soft Delete 범위 및 조회 정책
+## 11. Soft Delete 범위 및 조회 정책
 
 ### 적용 범위
 
@@ -307,7 +350,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 11. 페이지네이션 공통 정책
+## 12. 페이지네이션 공통 정책
 
 ### 기본값
 
@@ -346,7 +389,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 12. API 엔드포인트
+## 13. API 엔드포인트
 
 ### Brand
 
@@ -385,6 +428,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 > | `like_desc` | 좋아요 수 내림차순 |
 >
 > sort 파라미터가 없는 경우 `latest`로 대체한다. 알 수 없는 값인 경우 `400 Bad Request`를 반환한다.
+> 위 5가지 값 모두 구현 필수 범위다.
 
 **Admin**
 
@@ -404,7 +448,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 |---|---|---|
 | POST | `/api/v1/products/{productId}/likes` | 좋아요 등록 |
 | DELETE | `/api/v1/products/{productId}/likes` | 좋아요 취소 |
-| GET | `/api/v1/users/{userId}/likes` | 내가 좋아요한 상품 목록 |
+| GET | `/api/v1/users/{userId}/likes` | 내가 좋아요한 상품 목록 (응답 필드: Customer Product PLP와 동일) |
 
 ### Order
 
@@ -425,7 +469,52 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 13. 제공 정보 정책
+## 14. 공통 응답 구조
+
+모든 API 응답은 `ApiResponse<T>`로 감싸서 반환한다.
+
+### 성공 응답
+
+```json
+// 단건/목록 조회 (GET 200, POST 201)
+{
+  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+  "data": { ... }
+}
+
+// 수정/삭제/좋아요 등록·취소 (204 No Content — body 없음)
+```
+
+### 페이지네이션 응답
+
+페이지네이션이 적용된 API는 `data` 안에 아래 구조가 중첩된다.
+
+```json
+{
+  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+  "data": {
+    "content": [ ... ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 100
+  }
+}
+```
+
+### 에러 응답
+
+```json
+{
+  "meta": { "result": "FAIL", "errorCode": "NOT_FOUND", "message": "주문을 찾을 수 없습니다." },
+  "data": null
+}
+```
+
+> `errorCode`는 `ErrorType` enum의 code 값 (예: `NOT_FOUND`, `BAD_REQUEST`, `FORBIDDEN`, `CONFLICT`)
+
+---
+
+## 15. 제공 정보 정책
 
 > **HTTP 상태 코드 기준**
 > - 단건/목록 조회 (GET): `200 OK`
@@ -433,6 +522,23 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 > - 수정 (PUT): `204 No Content` (body 없음)
 > - 삭제 (DELETE): `204 No Content` (body 없음)
 > - 좋아요 등록/취소 (POST/DELETE): `204 No Content` (body 없음)
+
+---
+
+### Like 목록 (`GET /api/v1/users/{userId}/likes`)
+
+좋아요한 상품 목록은 Customer Product PLP와 동일한 필드셋을 반환한다.
+
+| 필드 | 반환 여부 |
+|---|:---:|
+| id | ✅ |
+| brandId | ✅ |
+| brandName | ✅ |
+| name | ✅ |
+| price | ✅ |
+| likeCount | ✅ |
+
+> 삭제된 상품의 Like는 연쇄 Soft Delete로 제거되므로 별도 필터링 불필요 (ADR-013)
 
 ---
 
@@ -487,7 +593,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 14. 핵심 비즈니스 로직
+## 16. 핵심 비즈니스 로직
 
 ### Brand 삭제
 
@@ -496,7 +602,10 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 ```
 BrandFacade.deleteBrand(brandId)
   ├── BrandService.delete(brandId) → brand 조회 후 brand.delete()
-  └── ProductService.deleteAllByBrand(brandId) → 연관 상품 각각 product.delete()
+  ├── ProductService.findIdsByBrand(brandId) → List<productId>
+  ├── ProductService.deleteAll(productIds)
+  ├── ProductInventoryService.deleteAllByProducts(productIds)
+  └── LikeService.deleteAllByProducts(productIds)
 ```
 
 ### 상품 삭제
@@ -511,10 +620,19 @@ ProductFacade.deleteProduct(productId)
 
 > 상품이 soft delete되면 ProductInventory도 동일하게 soft delete한다. 이후 재고 조회 시 `deleted_at IS NULL` 필터로 제외된다.
 
+### Brand 등록 / 수정 검증
+
+| 필드 | 규칙 |
+|---|---|
+| `name` | 필수, 빈 문자열 불가, 최대 100자, **중복 불가 (409 Conflict)** |
+| `description` | 선택(nullable), 최대 500자 |
+
 ### 상품 등록 / 수정
 
 - 등록: `brandId`로 Brand 존재 여부 검증 후 ProductModel 생성, ProductInventoryModel도 함께 생성
 - 수정: 브랜드 변경 불가 — `brand` 필드는 update 메서드에서 제외
+- `quantity` 검증: 0 이상 정수만 허용. 0은 품절 상태로 허용, 음수는 `400 Bad Request`
+- 품절 상품(`quantity = 0`)은 Customer 목록/단건 조회에 정상 노출. 주문 시 재고 부족으로 `400 Bad Request` 처리
 
 ### 좋아요 등록 / 취소
 
@@ -537,8 +655,14 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ### 주문 생성
 
+요청 유효성 검증 (Facade 진입 전):
+- `items` 빈 배열 → `400 Bad Request`
+- 개별 item `quantity` ≤ 0 → `400 Bad Request`
+- `items` 내 중복 `productId` → `400 Bad Request`
+
 ```
 1. 상품 조회 — PRODUCT JOIN PRODUCT_INVENTORY → ProductModel (quantity 포함, 스냅샷 데이터 수집)
+   → 존재하지 않는 productId 포함 시 404 Not Found
 2. 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
 3. 주문 생성 — OrderModel + OrderItemModel INSERT (스냅샷 포함)
 4. 재고 차감 — SELECT ... FOR UPDATE → productInventory.deduct(quantity)
@@ -556,29 +680,35 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ---
 
-## 15. 시퀀스 다이어그램
+## 17. 시퀀스 다이어그램
 
 → [`docs/v3/sequence.md`](./sequence.md) 참고 (전체 API 시퀀스 다이어그램)
 
 ---
 
-## 16. 에러 처리
+## 18. 에러 처리
 
 | 상황 | ErrorType | HTTP |
 |---|---|---|
 | 브랜드/상품/주문 없음 | `NOT_FOUND` | 404 |
+| 타인의 주문 단건 조회 시도 | `NOT_FOUND` | 404 |
 | 이미 좋아요한 상품 재등록 | `CONFLICT` | 409 |
+| 브랜드명 중복 등록 | `CONFLICT` | 409 |
 | 재고 부족 | `BAD_REQUEST` | 400 |
 | 브랜드 변경 시도 (상품 수정) | `BAD_REQUEST` | 400 |
+| quantity 음수 | `BAD_REQUEST` | 400 |
+| 주문 items 빈 배열 | `BAD_REQUEST` | 400 |
+| 주문 item quantity ≤ 0 | `BAD_REQUEST` | 400 |
+| 주문 items 내 중복 productId | `BAD_REQUEST` | 400 |
 | 어드민 헤더 불일치 | `FORBIDDEN` | 403 |
 | 타인의 좋아요 목록 조회 시도 | `FORBIDDEN` | 403 |
 | 알 수 없는 sort 파라미터 값 | `BAD_REQUEST` | 400 |
 
-> `FORBIDDEN` ErrorType 추가 필요
+> `FORBIDDEN` / `CONFLICT` ErrorType 추가 필요
 
 ---
 
-## 17. ADR 목록
+## 19. ADR 목록
 
 | 번호 | 제목 | 파일 |
 |---|---|---|
@@ -598,3 +728,4 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 | ADR-014 | 재고 차감 락 순서 정렬 — IN FOR UPDATE + Service 정렬 | `adr/014-batch-query-and-lock-ordering.md` |
 | ADR-015 | orderStatus (보류) | `adr/015-order-status-single-value.md` |
 | ADR-016 | Admin 인증 — 테이블 미생성, 헤더 고정값 검증 | `adr/016-admin-auth-header.md` |
+| ADR-017 | 타인의 주문 접근 — 404 반환 정책 | `adr/017-order-ownership-check.md` |

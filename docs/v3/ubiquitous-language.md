@@ -102,12 +102,12 @@
 - **정의**: DB에서 행을 물리적으로 제거하지 않고 `deleted_at` 컬럼에 삭제 시각을 기록해 논리적으로 삭제하는 방식.
 - **코드 표현**: `BaseEntity.delete()` 호출 → `deletedAt = now()`.
 - **조회 필터**: 모든 조회 쿼리는 `deleted_at IS NULL` 조건을 적용한다.
-- **적용 대상**: `Brand`, `Product`, `ProductInventory`, `Order`, `OrderItem`.
+- **적용 대상**: `Brand`, `Product`, `ProductInventory`, `Like`, `Order`, `OrderItem`.
 - **좋아요**: `Like` 는 Soft Delete + Restore 패턴 적용.
   취소 시 `deleted_at` 설정, 재등록 시 기존 레코드를 `restore()` 하여 UNIQUE 제약 유지 (ADR-008).
 
 ### 연쇄 삭제 (Cascade Soft Delete)
-- **정의**: 브랜드 삭제 시 해당 브랜드의 모든 상품도 함께 Soft Delete 처리.
-- **코드 표현**: `BrandFacade.deleteBrand()` → `BrandService.delete()` + `ProductService.deleteAllByBrand()`.
-- **주의**: JPA `CascadeType` 미사용. Facade 레이어가 오케스트레이션 담당.
-- **좋아요**: 삭제된 상품의 좋아요 기록은 별도 삭제하지 않는다 (주문 이력과 동일하게 데이터 보존).
+- **정의**: 브랜드 삭제 시 해당 브랜드의 모든 상품 및 연관 Like, ProductInventory도 함께 Soft Delete 처리.
+- **코드 표현**: `BrandFacade.deleteBrand()` → bulk 처리 (`productIds` 일괄 조회 → `ProductService.deleteAll()` + `ProductInventoryService.deleteAllByProducts()` + `LikeService.deleteAllByProducts()`).
+- **주의**: JPA `CascadeType` 미사용. Facade 레이어가 오케스트레이션 담당 (ADR-013).
+- **좋아요**: Brand/Product 삭제 시 연관 Like도 연쇄 Soft Delete한다. 좋아요 취소 시에는 `like_count`를 차감하지만, 연쇄 삭제 시에는 `like_count` 차감을 수행하지 않는다.
