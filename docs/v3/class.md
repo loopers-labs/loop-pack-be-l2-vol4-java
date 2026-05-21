@@ -25,7 +25,7 @@ classDiagram
         +String description
         +Long price
         +Long likeCount
-        +Integer quantity
+        +ProductInventoryModel inventory
         +update(name, description, price)
         +incrementLikeCount()
         +decrementLikeCount()
@@ -71,7 +71,7 @@ classDiagram
     BaseEntity <|-- OrderModel
     BaseEntity <|-- OrderItemModel
     ProductModel --> BrandModel : "@ManyToOne"
-    ProductInventoryModel ..> ProductModel : "productId (ID 참조)"
+    ProductModel --> ProductInventoryModel : "@OneToOne(readOnly)"
     OrderModel --> OrderItemModel : "@OneToMany"
     OrderItemModel --> OrderModel : "@ManyToOne"
     OrderModel ..> OrderStatus
@@ -87,7 +87,7 @@ classDiagram
 | `ProductModel` | `update(name, description, price)` | 상품 정보 수정 — 브랜드는 변경 불가 |
 | `ProductModel` | `incrementLikeCount()` | 좋아요 등록 시 호출, SQL 원자적 UPDATE로 위임 |
 | `ProductModel` | `decrementLikeCount()` | 좋아요 취소 시 호출, SQL 원자적 UPDATE로 위임 |
-| `ProductModel` | `quantity` | `PRODUCT_INVENTORY` JOIN으로 채워지는 필드 — DB 컬럼 아님. 상품 조회 시 재고 포함 반환 (품절 여부 노출) |
+| `ProductModel` | `inventory` | 읽기 전용 `@OneToOne(fetch=LAZY, NO_CONSTRAINT)` — 상품 조회 시 자동 JOIN. 쓰기는 `ProductInventoryRepository` 직접 사용 |
 | `ProductInventoryModel` | `deduct(amount)` | 재고 확인 + 차감 원자 수행 — `FOR UPDATE` 락 획득 후 호출 (ADR-006) |
 | `OrderModel` | `calculateTotalAmount()` | `items.sum { subtotal() }` 총 주문 금액 계산 |
 | `OrderModel` | `isOwnedBy(userId)` | `this.userId == userId` 소유권 검증 — 불일치 시 404 |
@@ -100,7 +100,7 @@ classDiagram
 | 관계 | 방식 | 근거 |
 |---|---|---|
 | `ProductModel → BrandModel` | `@ManyToOne` | 상품 조회 시 브랜드명 JOIN 필요 |
-| `ProductInventoryModel → ProductModel` | ID 참조 | 재고 테이블 분리, JPA 관계 불필요 (ADR-006) |
+| `ProductModel → ProductInventoryModel` | 읽기 전용 `@OneToOne` | 상품 조회 시 재고 자동 JOIN. `NO_CONSTRAINT`(ADR-005), `insertable=false, updatable=false` |
 | `OrderModel → OrderItemModel` | `@OneToMany` | 동일 Aggregate, 생명주기 공유 |
 | `OrderItemModel → OrderModel` | `@ManyToOne` | 동일 Aggregate |
 | `OrderItemModel → Product` | ID + 스냅샷 컬럼 | 주문 시점 정보 보존 (ADR-001) |

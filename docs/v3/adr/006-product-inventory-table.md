@@ -31,7 +31,21 @@ product_inventory
 ## 관계
 
 - `product` : `product_inventory` = 1 : 1
-- `product_id`는 ID만 저장하며 JPA `@OneToOne` 관계는 사용하지 않는다 (ADR-005와 동일한 이유)
+- `ProductModel`에 읽기 전용 `@OneToOne` 관계를 허용한다. 상품 조회 시 재고를 자동 JOIN하여 품절 여부를 노출하기 위함.
+
+```java
+@OneToOne(fetch = FetchType.LAZY)
+@JoinColumn(
+    name = "id",
+    referencedColumnName = "product_id",
+    insertable = false,
+    updatable = false,
+    foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)  // ADR-005
+)
+private ProductInventoryModel inventory;
+```
+
+- 쓰기(재고 차감)는 반드시 `ProductInventoryRepository`를 통해 `FOR UPDATE` 락과 함께 처리한다. `ProductModel.inventory`를 통한 쓰기는 금지한다.
 
 ## 추가 결정: UNIQUE 제약 및 deduct() 설계
 
