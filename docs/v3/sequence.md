@@ -56,7 +56,9 @@ sequenceDiagram
     ProductV1Controller->>ProductFacade: getProducts(brandId, sort, page, size)
     ProductFacade->>ProductService: getProducts(brandId, sort, page, size)
     ProductService->>ProductRepository: findAll(brandId, sort, pageable)
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: Page~ProductModel~
+    Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: Page~ProductModel~
     ProductFacade-->>ProductV1Controller: Page~ProductInfo~
 ```
@@ -75,7 +77,9 @@ sequenceDiagram
     ProductV1Controller->>ProductFacade: getProduct(productId)
     ProductFacade->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: ProductModel (없으면 404)
+    Note over ProductService: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
     ProductService-->>ProductFacade: ProductModel
     ProductFacade-->>ProductV1Controller: ProductInfo
 ```
@@ -241,8 +245,11 @@ sequenceDiagram
 
     LikeFacade->>ProductService: findAllByIds(productIds)
     ProductService->>ProductRepository: findAllById(productIds)
+    Note over ProductRepository: BRAND JOIN + PRODUCT_INVENTORY JOIN → brandName, quantity 포함
     ProductRepository-->>ProductService: List~ProductModel~
     ProductService-->>LikeFacade: List~ProductModel~
+
+    Note over LikeFacade: ProductModel.likeCount 필드 포함 (별도 COUNT 쿼리 없음)
 
     LikeFacade-->>LikeV1Controller: List~ProductInfo~
 ```
@@ -254,6 +261,7 @@ sequenceDiagram
 ### POST /api/v1/orders — 주문 생성 `🔐 User`
 
 > 흐름: 상품 조회(재고 포함) → 재고 확인(fast fail) → 주문 생성 → 재고 차감
+> 상품 조회 시 PRODUCT_INVENTORY JOIN으로 quantity를 함께 가져오므로 별도 재고 조회 불필요.
 > fast-fail은 명백한 재고 부족을 조기 차단하는 역할이며, 실제 원자성은 재고 차감 단계의 FOR UPDATE 락이 보장한다.
 > 재고 차감 실패 시 @Transactional로 주문 생성까지 전체 롤백된다.
 
@@ -274,6 +282,7 @@ sequenceDiagram
 
     OrderFacade->>ProductService: getProducts(productIds)
     ProductService->>ProductRepository: findAllByIds(productIds)
+    Note over ProductRepository: WHERE id IN (...) + PRODUCT_INVENTORY JOIN → quantity 포함
     ProductRepository-->>ProductService: List~ProductModel~ (없는 상품 있으면 404)
     ProductService-->>OrderFacade: List~ProductModel~
 
