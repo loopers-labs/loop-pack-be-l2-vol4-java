@@ -38,12 +38,12 @@ class ExampleServiceIntegrationTest {
         @Test
         void returnsExampleInfo_whenValidIdIsProvided() {
             // arrange
-            Example exampleModel = exampleJpaRepository.save(
-                Example.builder().name("예시 제목").description("예시 설명").build()
+            ExampleModel exampleModel = exampleJpaRepository.save(
+                new ExampleModel("예시 제목", "예시 설명")
             );
 
             // act
-            Example result = exampleService.getExample(exampleModel.getId());
+            ExampleModel result = exampleService.getExample(exampleModel.getId());
 
             // assert
             assertAll(

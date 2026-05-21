@@ -15,30 +15,25 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public Product createProduct(String name, String description, Long price, Integer stock) {
-        Product product = Product.builder()
-            .name(name)
-            .description(description)
-            .price(price)
-            .stock(stock)
-            .build();
+    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
+        ProductModel product = new ProductModel(name, description, price, stock);
         return productRepository.save(product);
     }
 
     @Transactional(readOnly = true)
-    public Product getProduct(Long id) {
+    public ProductModel getProduct(Long id) {
         return productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<Product> getAllProducts() {
+    public List<ProductModel> getAllProducts() {
         return productRepository.findAll();
     }
 
     @Transactional
-    public Product updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        Product product = getProduct(id);
+    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+        ProductModel product = getProduct(id);
         product.update(name, description, price, stock);
         return productRepository.save(product);
     }
