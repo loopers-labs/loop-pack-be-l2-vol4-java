@@ -140,7 +140,56 @@ infrastructure/
 
 ---
 
-## 7. API 엔드포인트
+## 7. 인증·인가 처리 구조
+
+인증은 `support/auth/` 패키지의 `HandlerInterceptor`로 처리한다 (ADR-011).
+
+### User 인증 — `UserAuthInterceptor`
+
+적용 경로: `/api/v1/**` (단, 회원가입 `POST /api/v1/users` 제외)
+
+```
+요청 수신
+  → X-Loopers-LoginId 헤더 추출 → 없으면 401
+  → X-Loopers-LoginPw 헤더 추출 → 없으면 401
+  → UserService.getByLoginId(loginId) → 없으면 401
+  → BCrypt.checkpw(loginPw, user.password) → 불일치 시 401
+  → request attribute에 userId 저장
+```
+
+Controller는 request attribute에서 `userId`를 꺼내 사용한다.
+
+### Admin 인증 — `AdminAuthInterceptor`
+
+적용 경로: `/api-admin/v1/**` 전체
+
+```
+요청 수신
+  → X-Loopers-Ldap 헤더 추출 → 없으면 403
+  → "loopers.admin" 값과 비교 → 불일치 시 403
+```
+
+### 등록 — `WebMvcConfig`
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(userAuthInterceptor)
+                .addPathPatterns("/api/v1/**")
+                .excludePathPatterns("/api/v1/users"); // 회원가입
+
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api-admin/v1/**");
+    }
+}
+```
+
+---
+
+## 8. API 엔드포인트
 
 ### Brand
 
@@ -219,7 +268,7 @@ infrastructure/
 
 ---
 
-## 8. 응답 DTO 스펙
+## 9. 응답 DTO 스펙
 
 > **HTTP 상태 코드 기준**
 > - 단건/목록 조회 (GET): `200 OK`
@@ -461,7 +510,7 @@ infrastructure/
 
 ---
 
-## 9. 핵심 비즈니스 로직
+## 10. 핵심 비즈니스 로직
 
 ### Brand 삭제
 
@@ -530,13 +579,13 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ---
 
-## 10. 시퀀스 다이어그램
+## 11. 시퀀스 다이어그램
 
 → [`docs/v3/sequence.md`](./sequence.md) 참고 (전체 API 시퀀스 다이어그램)
 
 ---
 
-## 11. 에러 처리
+## 12. 에러 처리
 
 | 상황 | ErrorType | HTTP |
 |---|---|---|
@@ -552,7 +601,7 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ---
 
-## 12. ADR 목록
+## 13. ADR 목록
 
 | 번호 | 제목 | 파일 |
 |---|---|---|
