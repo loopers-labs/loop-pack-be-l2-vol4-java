@@ -518,3 +518,4 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 | ADR-007 | 주문 생성 흐름 설계 | `adr/007-order-creation-flow.md` |
 | ADR-008 | likes 테이블 UNIQUE 제약 | `adr/008-likes-unique-constraint.md` |
 | ADR-009 | 좋아요 목록 소유권 검증 | `adr/009-likes-ownership-check.md` |
+| ADR-010 | 내 주문 목록 조회 — 날짜 필터 + 페이지네이션 | `adr/010-order-list-query-spec.md` |
