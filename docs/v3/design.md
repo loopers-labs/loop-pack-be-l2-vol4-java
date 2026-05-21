@@ -77,15 +77,15 @@ application/
 
 domain/
 ├── brand/   BrandModel, BrandRepository, BrandService
-├── product/ ProductModel, ProductStockModel,
-│            ProductRepository, ProductStockRepository, ProductService
+├── product/ ProductModel, ProductInventoryModel,
+│            ProductRepository, ProductInventoryRepository, ProductService
 ├── like/    LikeModel, LikeRepository, LikeService
 └── order/   OrderModel, OrderItemModel, OrderRepository, OrderService
 
 infrastructure/
 ├── brand/   BrandJpaRepository, BrandRepositoryImpl
 ├── product/ ProductJpaRepository, ProductRepositoryImpl,
-│            ProductStockJpaRepository, ProductStockRepositoryImpl
+│            ProductInventoryJpaRepository, ProductInventoryRepositoryImpl
 ├── like/    LikeJpaRepository, LikeRepositoryImpl
 └── order/   OrderJpaRepository, OrderRepositoryImpl
 ```
@@ -183,7 +183,7 @@ infrastructure/
   "name": "에어맥스",
   "description": "편안한 러닝화",
   "price": 150000,
-  "stock": 10,
+  "quantity": 10,
   "likeCount": 42
 }
 ```
@@ -262,13 +262,13 @@ DELETE → userId + productId 조합 없으면 404 Not Found
 1. 상품 목록 전체 조회 (product 테이블, 스냅샷 데이터 수집)
 2. 재고 확인 (fast fail, 락 없음) — 하나라도 부족하면 400 Bad Request
 3. 주문 생성 — OrderModel + OrderItemModel INSERT (스냅샷 포함)
-4. 재고 차감 — SELECT ... FOR UPDATE → productStock.deduct(quantity)
+4. 재고 차감 — SELECT ... FOR UPDATE → productInventory.deduct(quantity)
    → 실패 시 @Transactional 전체 롤백 (주문 생성 포함)
 ```
 
 > - 2번 재고 확인은 명백한 재고 부족을 주문 INSERT 이전에 조기 차단하는 역할 (fast fail)
 > - 실제 동시성 보장은 4번의 FOR UPDATE 락이 담당
-> - product_stock 테이블에만 락이 걸리므로 상품 조회 성능에 영향 없음 (ADR-006 참고)
+> - product_inventory 테이블에만 락이 걸리므로 상품 조회 성능에 영향 없음 (ADR-006 참고)
 
 ### 어드민 인증
 
@@ -305,7 +305,7 @@ DELETE → userId + productId 조합 없으면 404 Not Found
 | ADR-003 | 좋아요 수 COUNT 쿼리 | `adr/003-like-count-query.md` |
 | ADR-004 | 상품 응답에 브랜드명 포함 | `adr/004-product-brand-response.md` |
 | ADR-005 | @ManyToOne FK 제약조건 제거 | `adr/005-jpa-no-fk-constraint.md` |
-| ADR-006 | 재고 별도 테이블 분리 | `adr/006-product-stock-table.md` |
+| ADR-006 | 재고 별도 테이블 분리 | `adr/006-product-inventory-table.md` |
 | ADR-007 | 주문 생성 흐름 설계 | `adr/007-order-creation-flow.md` |
 | ADR-008 | likes 테이블 UNIQUE 제약 | `adr/008-likes-unique-constraint.md` |
 | ADR-009 | 좋아요 목록 소유권 검증 | `adr/009-likes-ownership-check.md` |

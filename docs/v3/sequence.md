@@ -175,7 +175,7 @@ sequenceDiagram
     participant ProductService
     participant BrandRepository
     participant ProductRepository
-    participant ProductStockRepository
+    participant ProductInventoryRepository
 
     ProductAdminV1Controller->>ProductFacade: createProduct(brandId, name, description, price, quantity)
     ProductFacade->>ProductService: create(brandId, name, description, price, quantity)
@@ -183,8 +183,8 @@ sequenceDiagram
     BrandRepository-->>ProductService: BrandModel (없으면 404)
     ProductService->>ProductRepository: save(new ProductModel)
     ProductRepository-->>ProductService: ProductModel
-    ProductService->>ProductStockRepository: save(new ProductStockModel(productId, quantity))
-    ProductStockRepository-->>ProductService: ProductStockModel
+    ProductService->>ProductInventoryRepository: save(new ProductInventoryModel(productId, quantity))
+    ProductInventoryRepository-->>ProductService: ProductInventoryModel
     ProductService-->>ProductFacade: ProductModel
     ProductFacade-->>ProductAdminV1Controller: ProductInfo
 ```
@@ -342,7 +342,7 @@ sequenceDiagram
     participant ProductService
     participant OrderService
     participant ProductRepository
-    participant ProductStockRepository
+    participant ProductInventoryRepository
     participant OrderRepository
 
     OrderV1Controller->>OrderFacade: createOrder(userId, items)
@@ -357,10 +357,10 @@ sequenceDiagram
     end
 
     loop 상품별
-        OrderFacade->>ProductService: getStock(productId)
-        ProductService->>ProductStockRepository: findByProductId(productId)
-        ProductStockRepository-->>ProductService: ProductStockModel
-        ProductService-->>OrderFacade: ProductStockModel
+        OrderFacade->>ProductService: getInventory(productId)
+        ProductService->>ProductInventoryRepository: findByProductId(productId)
+        ProductInventoryRepository-->>ProductService: ProductInventoryModel
+        ProductService-->>OrderFacade: ProductInventoryModel
     end
 
     Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — 하나라도 부족하면 400 Bad Request
@@ -373,9 +373,9 @@ sequenceDiagram
     OrderService-->>OrderFacade: OrderModel
 
     loop 상품별
-        OrderFacade->>ProductService: deductStock(productId, quantity)
-        ProductService->>ProductStockRepository: findByProductId (FOR UPDATE)
-        ProductService->>ProductService: productStock.deduct(quantity)
+        OrderFacade->>ProductService: deductInventory(productId, quantity)
+        ProductService->>ProductInventoryRepository: findByProductId (FOR UPDATE)
+        ProductService->>ProductService: productInventory.deduct(quantity)
     end
 
     Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 재고 부족 시 전체 Rollback ──
