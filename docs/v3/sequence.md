@@ -172,21 +172,36 @@ sequenceDiagram
     LikeV1Controller->>LikeFacade: addLike(userId, productId)
     LikeFacade->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
-    ProductRepository-->>ProductService: ProductModel (없으면 404)
 
-    LikeFacade->>LikeService: addLike(userId, productId)
-    LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
-    Note over LikeRepository: deleted_at 포함 전체 조회
-    LikeRepository-->>LikeService: Optional~LikeModel~
-    Note over LikeService: active(deleted_at=null) 존재 → 409 Conflict
-    Note over LikeService: soft-deleted 존재 → restore() [deleted_at=null]
-    Note over LikeService: 없음 → save(new LikeModel)
+    alt 상품 없음
+        ProductRepository-->>LikeV1Controller: 404 Not Found
+    else 상품 존재
+        ProductRepository-->>ProductService: ProductModel
+        ProductService-->>LikeFacade: ProductModel
 
-    LikeFacade->>ProductService: incrementLikeCount(productId)
-    Note over ProductRepository: UPDATE product SET like_count = like_count + 1 WHERE id = ?
-    ProductService->>ProductRepository: incrementLikeCount(productId)
+        LikeFacade->>LikeService: addLike(userId, productId)
+        LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
+        Note over LikeRepository: deleted_at 포함 전체 조회
+        LikeRepository-->>LikeService: Optional~LikeModel~
 
-    LikeFacade-->>LikeV1Controller: void
+        alt active(deleted_at=null) 존재
+            LikeService-->>LikeV1Controller: 409 Conflict
+        else soft-deleted 존재
+            LikeService->>LikeService: like.restore() [deleted_at=null]
+            LikeService-->>LikeFacade: void
+        else 없음
+            LikeService->>LikeRepository: save(new LikeModel)
+            LikeRepository-->>LikeService: LikeModel
+            LikeService-->>LikeFacade: void
+        end
+
+        LikeFacade->>ProductService: incrementLikeCount(productId)
+        ProductService->>ProductRepository: UPDATE like_count = like_count + 1
+        ProductRepository-->>ProductService: void
+        ProductService-->>LikeFacade: void
+
+        LikeFacade-->>LikeV1Controller: void
+    end
 ```
 
 ---
