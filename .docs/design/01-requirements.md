@@ -20,12 +20,11 @@
 | 액터 | 식별 방법 | 역할 |
 |---|---|---|
 | 일반 유저 | `X-Loopers-LoginId` / `X-Loopers-LoginPw` 헤더 | 상품 탐색, 좋아요, 주문 |
-| 어드민 | `X-Loopers-Ldap: loopers.admin` 헤더 | 브랜드·상품 CRUD, 주문 조회 |
+| 어드민 | `X-Loopers-Ldap: loopers.admin` 헤더 | 브랜드·상품 조회 (등록·수정·삭제는 추후) |
 | 외부 결제 시스템 (PG) | — | **이번 라운드 미구현**. 시퀀스 다이어그램에 확장 지점으로만 표시 |
 
 - 인증·인가는 구현하지 않는다. 헤더 기반 식별만 사용 (고객 `/api/v1`, 어드민 `/api-admin/v1`).
 - 유저는 타 유저의 좋아요·주문에 직접 접근할 수 없다.
-- 어드민은 전체 유저의 주문을 조회할 수 있다.
 
 ---
 
@@ -36,7 +35,7 @@
 | 도메인 | 상태 | 역할 |
 |---|---|---|
 | User | Round 1 완료 (재사용) | 식별자 `userId` 보유 |
-| Brand | 신규 | 상품의 소속 기준. 고객은 단건 조회, 어드민은 CRUD (삭제 시 소속 상품 cascade) |
+| Brand | 신규 | 상품의 소속 기준. 고객·어드민 조회 (등록·수정·삭제는 추후, 삭제 시 cascade 제약은 D14) |
 | Product | 기존 확장 | `brandId` 참조 + `likeCount` 비정규화 컬럼. 재고는 보유하지 않음 (Stock 분리) |
 | Stock | 신규 | **재고 자원의 단일 책임자**. Product와 1:1. 차감·복원 도메인 메서드 |
 | Like | 신규 | `(userId, productId)` 유일성 보장. 멱등 등록/취소 |
@@ -58,6 +57,7 @@
 ## 4. 기능 요구사항 (도메인별 — 고객 / 어드민 쌍)
 
 > 같은 도메인이라도 **고객(`/api/v1`, LoginId/Pw)** 과 **어드민(`/api-admin/v1`, Ldap)** 의 오퍼레이션·노출 정보가 다르다. 도메인 모델은 공유하고 응답 DTO만 분리한다 (D15).
+- 지금은 상품 목록 / 상품 상세 / 브랜드 조회, 상품 좋아요 등록/취소, 주문 생성 및 결제 흐름 (재고 차감, 외부 시스템 연동) 까지만 고려한다. 추후 등록과 수정, 삭제를 추가한다. 대신 제약은 미리 추가한다.
 
 ### 4.1 Brand
 
@@ -66,9 +66,6 @@
 | 고객 | 브랜드 단건 조회 | `GET /api/v1/brands/{brandId}` | — | 공개 정보 |
 | 어드민 | 브랜드 목록 조회 | `GET /api-admin/v1/brands?page=&size=` | Ldap | 등록된 브랜드 목록 (페이징) |
 | 어드민 | 브랜드 상세 조회 | `GET /api-admin/v1/brands/{brandId}` | Ldap | 관리 정보 포함 |
-| 어드민 | 브랜드 등록 | `POST /api-admin/v1/brands` | Ldap | — |
-| 어드민 | 브랜드 수정 | `PUT /api-admin/v1/brands/{brandId}` | Ldap | — |
-| 어드민 | 브랜드 삭제 | `DELETE /api-admin/v1/brands/{brandId}` | Ldap | **소속 상품·재고 cascade soft delete** (D14) |
 
 **고객 / 어드민 응답 차등**
 - 고객: `id`, `name`, `description`
@@ -89,9 +86,7 @@
 | 고객 | 상품 단건 조회 | `GET /api/v1/products/{productId}` | — | — |
 | 어드민 | 상품 목록 조회 | `GET /api-admin/v1/products?page=&size=&brandId=` | Ldap | 등록된 상품 목록 |
 | 어드민 | 상품 상세 조회 | `GET /api-admin/v1/products/{productId}` | Ldap | 재고·관리 정보 포함 |
-| 어드민 | 상품 등록 | `POST /api-admin/v1/products` | Ldap | **브랜드 존재 검증 + 초기 재고 동시 생성** (D16) |
-| 어드민 | 상품 수정 | `PUT /api-admin/v1/products/{productId}` | Ldap | **브랜드 변경 불가** |
-| 어드민 | 상품 삭제 | `DELETE /api-admin/v1/products/{productId}` | Ldap | 상품 + 재고 soft delete |
+
 
 **상품 목록 쿼리 파라미터 (고객)**
 
@@ -122,7 +117,6 @@
 |---|---|---|
 | 좋아요 등록 | `POST /api/v1/products/{productId}/likes` | **멱등** |
 | 좋아요 취소 | `DELETE /api/v1/products/{productId}/likes` | **멱등** |
-| 내 좋아요 목록 | `GET /api/v1/users/{userId}/likes` | 본인만 |
 
 **유저 시나리오**
 - 이미 좋아요한 상품에 다시 등록해도 에러 없이 통과한다 (멱등).
@@ -142,14 +136,6 @@
 | 구분 | 기능 | METHOD · URI | 식별 | 설명 |
 |---|---|---|---|---|
 | 고객 | 주문 생성 | `POST /api/v1/orders` | LoginId/Pw | 재고 차감 + 스냅샷 저장 |
-| 고객 | 주문 목록 조회 | `GET /api/v1/orders?startAt=&endAt=` | LoginId/Pw | 본인 주문, 날짜 범위 |
-| 고객 | 주문 단건 조회 | `GET /api/v1/orders/{orderId}` | LoginId/Pw | 본인 주문만 |
-| 어드민 | 주문 목록 조회 | `GET /api-admin/v1/orders?page=&size=` | Ldap | **전체 유저** 주문 (페이징) |
-| 어드민 | 주문 단건 조회 | `GET /api-admin/v1/orders/{orderId}` | Ldap | 임의 주문 |
-
-**고객 / 어드민 차등**
-- 고객: 본인 주문만, 날짜 범위(`startAt`/`endAt`) 필터.
-- 어드민: 전체 유저 주문, 유저 식별자 포함, 페이징.
 
 **주문 생성 요청 예시**
 ```json
@@ -168,8 +154,6 @@
 - 존재하지 않는 상품 ID 포함 시 *전체 주문 실패* → `404 NOT_FOUND`.
 - 주문 정보에는 *주문 당시* 상품 정보(`name`, `unitPrice`)가 OrderItem 스냅샷으로 저장된다.
 - 주문 후 상품의 가격·이름이 바뀌어도 주문 내역은 *당시 값* 그대로 유지.
-- 유저는 날짜 범위로 자신의 주문 목록을 조회할 수 있다.
-- 타 유저의 주문은 접근 불가 (어드민은 전체 조회 가능).
 
 **제약**
 - 재고 차감과 주문 저장은 **단일 트랜잭션**.
@@ -214,7 +198,7 @@
 | D2 | OrderItem 스냅샷 = `productId, productName, unitPrice, quantity` 4개 최소 | 영수증 수준의 완전 복사는 과잉. 브랜드명·이미지는 조회 시 fallback |
 | D3 | 좋아요 수는 `product.like_count` **비정규화 컬럼**으로 관리. 등록/취소 반영 시 증감, `likes_desc` 정렬·목록 노출은 컬럼 기반 | COUNT 집계는 상품 대량 시 정렬·조회 비용이 큼. 비정규화로 목록 조회·정렬을 단순 컬럼으로 처리. `product_like` 테이블은 관계·멱등의 진실 원천으로 유지하며 증감 근거가 된다 |
 | D4 | `OrderStatus` enum 도입. 값: `CREATED` → `SUCCEEDED` / `FAILED` | 시퀀스에 그려진 결제 흐름의 성공·실패 분기와 일치. `CANCELED`(결제 후 취소) 등은 추후 라운드에 추가 |
-| D5 | 어드민 API **포함**. 대고객/어드민을 prefix·헤더로 분리 (`/api/v1`+LoginId/Pw vs `/api-admin/v1`+Ldap) | 요구사항 명세에 어드민 브랜드·상품 CRUD와 주문 조회가 명시됨. 도메인 모델은 공유하고 오퍼레이션·노출 정보만 분리 |
+| D5 | 어드민 API **포함 — 단 이번 라운드는 스코프(상품·브랜드 조회)에 해당하는 어드민 *조회*만**. 등록·수정·삭제와 어드민 주문 조회는 추후. 대고객/어드민을 prefix·헤더로 분리 (`/api/v1`+LoginId/Pw vs `/api-admin/v1`+Ldap) | 명세에 어드민 기능이 명시됨. 도메인 모델은 공유하고 오퍼레이션·노출 정보만 분리. CUD 제약(D14·D16)은 미리 정의 |
 | D6 | 좋아요 멱등 = `UNIQUE(user_id, product_id)` + 서비스 분기 | DB 예외 의존 안 함. 흐름 가독성 우선 |
 | D7 | **다도메인 협력 흐름은 Facade `@Transactional` 합성 (B안)**. 주문은 `OrderFacade`가 `ProductService` + `StockService` + `OrderService` 호출, 좋아요는 `LikeFacade`가 `ProductService` + `LikeService` 호출 | 도메인별 책임 분리 강화 + Service-Service 의존 회피. 외부 I/O 없는 본 라운드 한정 — 결제 합류 시 외부 호출은 트랜잭션 밖으로 분리 |
 | D8 | `order_item.product_id` = 단순 BIGINT (논리적 FK도 약하게, JPA 연관 매핑 없음) | 스냅샷 의미 강조 + 상품 hard delete와 무관하게 주문 이력 보존. 다른 컬럼들과 달리 JPA `@ManyToOne` 매핑도 두지 않음 |
