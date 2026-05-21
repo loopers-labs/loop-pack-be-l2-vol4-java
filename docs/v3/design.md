@@ -23,22 +23,23 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 ### Customer
 
 ```
-회원가입 (POST /api/v1/users)
-  └── 이후 모든 요청에 X-Loopers-LoginId / X-Loopers-LoginPw 헤더 포함
-        ├── 내 정보 조회 (GET /api/v1/users/me)
-        ├── 비밀번호 수정 (PUT /api/v1/users/me/password)
-        ├── 상품 탐색
-        │     ├── 브랜드 단건 조회 (GET /api/v1/brands/{brandId})
-        │     ├── 상품 목록 조회 (GET /api/v1/products?sort=latest)
-        │     └── 상품 단건 조회 (GET /api/v1/products/{productId})
-        ├── 좋아요
-        │     ├── 좋아요 등록 (POST /api/v1/products/{productId}/likes)
-        │     ├── 좋아요 취소 (DELETE /api/v1/products/{productId}/likes)
-        │     └── 내 좋아요 목록 (GET /api/v1/users/{userId}/likes)
-        └── 주문
-              ├── 주문 생성 (POST /api/v1/orders)
-              ├── 내 주문 목록 (GET /api/v1/orders?startAt=&endAt=)
-              └── 주문 단건 조회 (GET /api/v1/orders/{orderId})
+[인증 불필요]
+  ├── 회원가입 (POST /api/v1/users)
+  ├── 브랜드 단건 조회 (GET /api/v1/brands/{brandId})
+  ├── 상품 목록 조회 (GET /api/v1/products?sort=latest)
+  └── 상품 단건 조회 (GET /api/v1/products/{productId})
+
+[인증 필요 — X-Loopers-LoginId / X-Loopers-LoginPw 헤더 포함]
+  ├── 내 정보 조회 (GET /api/v1/users/me)
+  ├── 비밀번호 수정 (PUT /api/v1/users/me/password)
+  ├── 좋아요
+  │     ├── 좋아요 등록 (POST /api/v1/products/{productId}/likes)
+  │     ├── 좋아요 취소 (DELETE /api/v1/products/{productId}/likes)
+  │     └── 내 좋아요 목록 (GET /api/v1/users/{userId}/likes)
+  └── 주문
+        ├── 주문 생성 (POST /api/v1/orders)
+        ├── 내 주문 목록 (GET /api/v1/orders?startAt=&endAt=)
+        └── 주문 단건 조회 (GET /api/v1/orders/{orderId})
 ```
 
 ### Admin
