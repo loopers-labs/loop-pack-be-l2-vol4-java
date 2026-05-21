@@ -31,6 +31,7 @@ erDiagram
     products ||--o{ likes    : "1상품이 N개의 좋아요"
     products ||--o{ order_items : "스냅샷 참조"
     orders ||--|{ order_items : "1주문이 1~N개의 항목"
+    orders ||--|| payments    : "1주문이 0~1개의 결제 (MVP는 1:1)"
 
     users {
         bigint      id              PK
@@ -39,8 +40,6 @@ erDiagram
         varchar50   name                "1~50자"
         date        birth               "생년월일 (BirthVO)"
         varchar255  email               "이메일 형식 검증 (EmailVO)"
-        enum        status              "ACTIVE / WITHDRAWN"
-        datetime    withdrawn_at        "탈퇴 일시 (NULL 가능)"
         datetime    created_at
         datetime    updated_at
         datetime    deleted_at
@@ -83,7 +82,7 @@ erDiagram
 
     orders {
         bigint      id              PK
-        bigint      user_id         FK  "users.id — 탈퇴 후에도 보존"
+        bigint      user_id         FK  "users.id"
         enum        status              "PENDING / CONFIRMED / CANCELLED"
         int         total_amount        "주문 시점 총액"
         datetime    ordered_at
@@ -103,6 +102,21 @@ erDiagram
         datetime    updated_at
         datetime    deleted_at
     }
+
+    payments {
+        bigint      id                 PK
+        bigint      order_id           FK  "orders.id, UNIQUE (MVP 1:1)"
+        enum        method                  "CARD / VIRTUAL_ACCOUNT / BANK_TRANSFER"
+        int         amount                  "PaidAmount, Order.total_amount와 일치"
+        varchar100  pg_transaction_id       "PG 응답 수신 후 세팅, PENDING은 NULL"
+        enum        status                  "PENDING / SUCCEEDED / FAILED"
+        varchar255  failure_reason          "실패 시 PG 응답 메시지"
+        datetime    requested_at
+        datetime    completed_at            "PG 응답 수신 시각"
+        datetime    created_at
+        datetime    updated_at
+        datetime    deleted_at              "삭제 불가 — 항상 NULL"
+    }
 ```
 
 ---
@@ -111,23 +125,17 @@ erDiagram
 
 ### users
 
-| 컬럼           | 타입         | 제약                       | 설명                                                                   |
-|----------------|--------------|----------------------------|------------------------------------------------------------------------|
-| `id`           | BIGINT       | PK, AUTO_INCREMENT         |                                                                        |
-| `login_id`     | VARCHAR(50)  | UNIQUE, NOT NULL           | 인증 식별자                                                            |
-| `password`     | VARCHAR(255) | NOT NULL                   | BCrypt 해시값                                                          |
-| `name`         | VARCHAR(50)  | NOT NULL                   | 표시 이름                                                              |
-| `birth`        | DATE         | NOT NULL                   | 생년월일 — `BirthVO`로 검증. 비밀번호에 생년월일 포함 금지 규칙에 사용 |
-| `email`        | VARCHAR(255) | NOT NULL                   | 이메일 — `EmailVO` 정규식 검증                                         |
-| `status`       | ENUM         | NOT NULL, DEFAULT 'ACTIVE' | ACTIVE \| WITHDRAWN                                                    |
-| `withdrawn_at` | DATETIME     | NULL                       | 탈퇴 처리 일시                                                         |
-| `created_at`   | DATETIME     | NOT NULL                   | BaseEntity                                                             |
-| `updated_at`   | DATETIME     | NOT NULL                   | BaseEntity                                                             |
-| `deleted_at`   | DATETIME     | NULL                       | BaseEntity (탈퇴 시 `delete()` 호출)                                   |
-
-> `withdrawn_at`과 `deleted_at`이 중복처럼 보이지만 역할이 다르다.  
-> `deleted_at` — BaseEntity 공통 소프트 삭제 필드, 조회 필터 기준.  
-> `withdrawn_at` — 탈퇴 이력 추적용. CS·감사 목적으로 별도 보존.
+| 컬럼         | 타입         | 제약               | 설명                                                                   |
+|--------------|--------------|--------------------|------------------------------------------------------------------------|
+| `id`         | BIGINT       | PK, AUTO_INCREMENT |                                                                        |
+| `login_id`   | VARCHAR(50)  | UNIQUE, NOT NULL   | 인증 식별자                                                            |
+| `password`   | VARCHAR(255) | NOT NULL           | BCrypt 해시값                                                          |
+| `name`       | VARCHAR(50)  | NOT NULL           | 표시 이름                                                              |
+| `birth`      | DATE         | NOT NULL           | 생년월일 — `BirthVO`로 검증. 비밀번호에 생년월일 포함 금지 규칙에 사용 |
+| `email`      | VARCHAR(255) | NOT NULL           | 이메일 — `EmailVO` 정규식 검증                                         |
+| `created_at` | DATETIME     | NOT NULL           | BaseEntity                                                             |
+| `updated_at` | DATETIME     | NOT NULL           | BaseEntity                                                             |
+| `deleted_at` | DATETIME     | NULL               | BaseEntity                                                             |
 
 **인덱스**
 
@@ -219,7 +227,7 @@ erDiagram
 | 컬럼           | 타입     | 제약                        | 설명                                                 |
 |----------------|----------|-----------------------------|------------------------------------------------------|
 | `id`           | BIGINT   | PK, AUTO_INCREMENT          |                                                      |
-| `user_id`      | BIGINT   | NOT NULL, FK → users.id     | 탈퇴 후에도 이력 보존                                |
+| `user_id`      | BIGINT   | NOT NULL, FK → users.id     | 주문 이력 보존                                       |
 | `status`       | ENUM     | NOT NULL, DEFAULT 'PENDING' | PENDING \| CONFIRMED \| CANCELLED                    |
 | `total_amount` | INT      | NOT NULL                    | 주문 시점 총액                                       |
 | `ordered_at`   | DATETIME | NOT NULL                    | 주문 확정 일시                                       |
@@ -257,15 +265,53 @@ erDiagram
 
 ---
 
+### payments
+
+| 컬럼                 | 타입         | 제약                                | 설명                                                          |
+|----------------------|--------------|-------------------------------------|---------------------------------------------------------------|
+| `id`                 | BIGINT       | PK, AUTO_INCREMENT                  |                                                               |
+| `order_id`           | BIGINT       | NOT NULL, UNIQUE, FK → orders.id    | MVP 1:1 — 한 Order에 Payment 1건 (UNIQUE 제약으로 강제)       |
+| `method`             | ENUM         | NOT NULL                            | `CARD` \| `VIRTUAL_ACCOUNT` \| `BANK_TRANSFER`                |
+| `amount`             | INT          | NOT NULL                            | `PaidAmount` — `orders.total_amount`와 일치해야 함 (R1)       |
+| `pg_transaction_id`  | VARCHAR(100) | NULL                                | PG 응답 수신 시 세팅. `PENDING` 단계에서는 NULL               |
+| `status`             | ENUM         | NOT NULL, DEFAULT 'PENDING'         | `PENDING` \| `SUCCEEDED` \| `FAILED` (단방향 전이)            |
+| `failure_reason`     | VARCHAR(255) | NULL                                | PG 실패 응답 메시지 (보상 트랜잭션 트리거 시 기록)            |
+| `requested_at`       | DATETIME     | NOT NULL                            | PG 호출 시각                                                  |
+| `completed_at`       | DATETIME     | NULL                                | PG 응답 수신 시각. `PENDING` 단계에서는 NULL                  |
+| `created_at`         | DATETIME     | NOT NULL                            | BaseEntity                                                    |
+| `updated_at`         | DATETIME     | NOT NULL                            | BaseEntity                                                    |
+| `deleted_at`         | DATETIME     | NULL                                | 삭제 불가 — 항상 NULL (회계·감사 영구 보존)                   |
+
+**인덱스**
+
+| 인덱스                     | 컬럼                  | 용도                                              |
+|----------------------------|-----------------------|---------------------------------------------------|
+| `uk_payments_order_id`     | `order_id`            | 1:1 보장. 주문별 결제 단건 조회                   |
+| `idx_payments_status_date` | `status`, `requested_at` | 운영팀 결제 상태별 모니터링 (실패 건수·PG 지연 등) |
+| `idx_payments_pg_txn_id`   | `pg_transaction_id`   | PG 거래번호로 역조회 (CS·환불 대응)               |
+
+**상태 전이 규칙 (애플리케이션 보장):**
+
+| 현재 상태 → 다음 상태 | 허용 여부 | 트리거                                |
+|-----------------------|-----------|---------------------------------------|
+| `PENDING` → `SUCCEEDED` | ✅       | PG 성공 응답 수신                     |
+| `PENDING` → `FAILED`    | ✅       | PG 실패 응답 수신                     |
+| `SUCCEEDED` → 모든 상태 | ❌       | 단방향 전이. 재결제·환불은 새 행 생성 |
+| `FAILED` → 모든 상태    | ❌       | 단방향 전이. 재시도는 새 행 생성      |
+
+---
+
 ## 설계 결정 및 주의사항
 
-| 항목                                 | 결정                                                                               | 근거                                                                                                          |
-|--------------------------------------|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| `BaseEntity` 공통 필드               | 전 테이블에 `id`, `created_at`, `updated_at`, `deleted_at`                         | JPA `@MappedSuperclass` 상속. 소프트 삭제·이력 추적 표준화                                                    |
-| `users.birth` / `users.email`        | `BirthVO`, `EmailVO`로 검증 후 각 컬럼에 저장                                      | `birth` — 비밀번호에 생년월일 포함 금지 규칙 검증에 활용. `email` — 표준 정규식 검증                          |
-| `users.withdrawn_at` vs `deleted_at` | 둘 다 보유                                                                         | `deleted_at` = 조회 필터 기준 (BaseEntity 표준). `withdrawn_at` = 탈퇴 이력 감사용 별도 보존                  |
-| `like_count` 비정규화                | `products.like_count` 컬럼으로 직접 관리                                           | `likes_desc` 정렬 시 매번 COUNT 집계 쿼리 회피                                                                |
-| `order_items.product_id` FK 없음     | 참조 무결성 강제 안 함                                                             | 상품 소프트 삭제 후에도 스냅샷 영구 보존 필요                                                                 |
-| `orders` / `order_items` 삭제 불가   | `deleted_at` 항상 NULL                                                             | 회계·법적 증거 영구 보존. BaseEntity 필드는 있으나 `delete()` 호출 금지                                       |
-| `likes` 삭제 방식 구분               | 유저 토글: 행 하드 삭제 / cascade: `deleted_at` 소프트 삭제                        | 토글은 빈번한 연산 — 하드 삭제가 단순. cascade는 복구 가능성 고려                                             |
-| `likes` 멱등성 보장 계층             | DB: 복합 PK 제약 (race condition 방지) / App: 선제 `exists` 검사 후 완전 멱등 처리 | 좋아요는 상태 토글 — REST PUT 시맨틱. 모바일 재시도/네트워크 재전송 강건. 자원 최종 상태가 동일하면 동일 응답 |
+| 항목                               | 결정                                                                               | 근거                                                                                                          |
+|------------------------------------|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `BaseEntity` 공통 필드             | 전 테이블에 `id`, `created_at`, `updated_at`, `deleted_at`                         | JPA `@MappedSuperclass` 상속. 소프트 삭제·이력 추적 표준화                                                    |
+| `users.birth` / `users.email`      | `BirthVO`, `EmailVO`로 검증 후 각 컬럼에 저장                                      | `birth` — 비밀번호에 생년월일 포함 금지 규칙 검증에 활용. `email` — 표준 정규식 검증                          |
+| `like_count` 비정규화              | `products.like_count` 컬럼으로 직접 관리                                           | `likes_desc` 정렬 시 매번 COUNT 집계 쿼리 회피                                                                |
+| `order_items.product_id` FK 없음   | 참조 무결성 강제 안 함                                                             | 상품 소프트 삭제 후에도 스냅샷 영구 보존 필요                                                                 |
+| `orders` / `order_items` 삭제 불가 | `deleted_at` 항상 NULL                                                             | 회계·법적 증거 영구 보존. BaseEntity 필드는 있으나 `delete()` 호출 금지                                       |
+| `payments` 1:1 강제                | `order_id` UNIQUE 제약                                                             | MVP 단일 결제만 허용. 다중 결제수단 도입 시 UNIQUE 해제 + `payment_group_id` 도입                              |
+| `payments` 삭제 불가               | `deleted_at` 항상 NULL                                                             | PG 거래 감사·정산 영구 보존. 재결제·환불도 새 행 생성으로 처리                                                |
+| `payments` PG 종속 격리            | `pg_transaction_id` VARCHAR(100) 단일 컬럼                                         | PG별 응답 스키마 차이는 어댑터(`TossPgAdapter` 등)가 흡수. DB에는 거래번호만 영속                              |
+| `likes` 삭제 방식 구분             | 유저 토글: 행 하드 삭제 / cascade: `deleted_at` 소프트 삭제                        | 토글은 빈번한 연산 — 하드 삭제가 단순. cascade는 복구 가능성 고려                                             |
+| `likes` 멱등성 보장 계층           | DB: 복합 PK 제약 (race condition 방지) / App: 선제 `exists` 검사 후 완전 멱등 처리 | 좋아요는 상태 토글 — REST PUT 시맨틱. 모바일 재시도/네트워크 재전송 강건. 자원 최종 상태가 동일하면 동일 응답 |

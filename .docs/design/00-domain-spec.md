@@ -29,6 +29,8 @@
 | 한국어        | 영어 (코드명)  | 정의                                                                          |
 |---------------|----------------|-------------------------------------------------------------------------------|
 | 유저          | `User`         | 서비스에 가입 완료한 IT 직군 기술자                                           |
+| 생년월일      | `Birth`        | 유저의 생년월일. 비밀번호 검증 정책(생년월일 포함 금지)에도 사용              |
+| 이메일        | `Email`        | 유저 연락처. 향후 알림·마케팅 채널의 도달 주소                                |
 | 관리자        | `Admin`        | 서비스 운영팀 구성원. Brand·Product 등록·수정·삭제, 전체 Order 조회 권한 보유 |
 | 브랜드        | `Brand`        | IT 기술서를 등록하는 판매 주체 (O'Reilly, 한빛미디어 등)                      |
 | 상품          | `Product`      | 브랜드가 판매하는 IT 기술 도서 한 권                                          |
@@ -41,6 +43,12 @@
 | 주문          | `Order`        | 구매 의사를 확정한 문서 (브랜드 무관 단일 건)                                 |
 | 주문 상품     | `OrderItem`    | Order 안에 담긴 개별 상품 단위                                                |
 | 스냅샷        | `Snapshot`     | 주문 시점의 상품명·가격을 변경 불가 형태로 저장한 값                          |
+| 결제          | `Payment`      | 한 건의 Order에 대한 PG 거래 시도·결과 (Order 내부 엔티티, 1:1)               |
+| 결제 수단     | `PaymentMethod`| 결제에 사용된 수단 (CARD · VIRTUAL_ACCOUNT · POINT 등)                        |
+| 결제 상태     | `PaymentStatus`| PG 거래의 진행 상태 (PENDING · SUCCEEDED · FAILED)                            |
+| PG 거래번호   | `PgTransactionId` | 외부 PG가 발급한 거래 식별자. PG 응답 수신 후 영속화                       |
+| 결제 금액     | `PaidAmount`   | PG로 청구한 금액 (Order.totalAmount와 일치해야 함)                            |
+| PG 게이트웨이 | `PaymentGateway`  | 외부 PG 시스템과의 통신을 추상화하는 포트 (헥사고날 어댑터 인터페이스)     |
 | 쿠폰          | `Coupon`       | 할인 조건을 담은 발급 단위 `[확장]`                                           |
 | 발급된 쿠폰   | `IssuedCoupon` | 특정 유저에게 귀속된 쿠폰 `[확장]`                                            |
 | 쿠폰 코드     | `CouponCode`   | 수동 등록을 위한 문자열 식별자 `[확장]`                                       |
@@ -57,8 +65,8 @@ graph LR
     BP[브랜드·상품\nBrand·Product]
     L[좋아요\nLike]
     O((주문\nOrder))
+    P((결제\nPayment))
     C[쿠폰\nCoupon]
-    P[결제\nPayment]
     PT[포인트\nPoint]
     UA[행동기록\nUserActivity]
 
@@ -67,17 +75,18 @@ graph LR
     BP -->|ProductId · Stock| O
     BP --> L
     L -->|LikeAdded| UA
-    O -->|OrderPlaced| UA
-    O -->|확장| P
+    O -->|pay 요청| P
+    P -->|성공: confirmOrder| O
+    P -->|실패: cancelOrder + restoreStock| O
+    O -->|OrderConfirmed| UA
     P -->|확장| PT
 
     style C fill:#f5f5f5,stroke:#bbb,color:#999
-    style P fill:#f5f5f5,stroke:#bbb,color:#999
     style PT fill:#f5f5f5,stroke:#bbb,color:#999
     style UA fill:#f5f5f5,stroke:#bbb,color:#999
 ```
 
-> 회색: 현재 구현 범위 외 (확장 포인트)
+> 회색: 현재 구현 범위 외 (확장 포인트). **Payment는 MVP 범위에 포함된다** — Order 애그리거트 내부 엔티티로 통합 (안 B). 명명은 향후 별도 BC 분리(안 A) 전환을 고려해 `PaymentFacade`/`PaymentService`/`PaymentGateway`를 유지.
 
 ---
 
@@ -114,6 +123,40 @@ graph LR
 
 ---
 
+### 결제 (Payment)
+
+**담당:** Order의 PG 거래 시도·결과를 영속화한다. 결제 성공 시 Order를 `CONFIRMED`로, 실패 시 `CANCELLED` + 재고 복구 보상 트랜잭션을 트리거한다.
+
+**핵심 개념:**
+- Payment는 Order 1건당 최대 1건 (1:1) — MVP는 단일 결제수단, 부분/분할 결제 없음
+- Payment는 **Order 애그리거트 내부 엔티티**다 (안 B). DB 테이블은 별도로 분리하지만 도메인 라이프사이클은 Order가 소유
+- PG 호출은 항상 `@Transactional` **외부**에서 수행한다 (외부 I/O가 DB connection을 점유하지 않도록)
+- PG 응답 수신 후 별도의 짧은 트랜잭션으로 Payment 상태와 Order 상태를 함께 갱신
+- Payment 상태는 `PENDING` → (`SUCCEEDED` | `FAILED`)로 단방향 전이만 허용
+
+**비즈니스 규칙:**
+
+| #   | 규칙                                                                                              | Actor  |
+|-----|---------------------------------------------------------------------------------------------------|--------|
+| R1  | 결제 요청 금액(`paidAmount`)은 Order의 `totalAmount`와 일치해야 한다                              | System |
+| R2  | 결제 가능 상태는 Order가 `PENDING`일 때뿐이다                                                     | System |
+| R3  | 결제는 본인 Order에 대해서만 가능하다 (`OrderModel.isOwnedBy(userId)` 통과 필요)                   | User   |
+| R4  | PG 결제 성공 시 Order는 `CONFIRMED`로 전이하고 `OrderConfirmed` 이벤트를 발행한다                 | System |
+| R5  | PG 결제 실패 시 Order는 `CANCELLED`로 전이하고 차감된 재고를 복구한다 (보상 트랜잭션)             | System |
+| R6  | Payment 상태(`PENDING` → `SUCCEEDED`/`FAILED`)는 단방향 전이만 허용한다 (역전·재시도 시 새 행)    | System |
+| R7  | Payment는 영구 보존한다 (회계·감사 목적). 소프트 삭제·하드 삭제 모두 금지                         | System |
+
+**미결 사항 (공동 결정 필요):**
+- PG 응답 타임아웃·네트워크 단절 시 처리 (현재는 성공/실패 이분법) — 운영 데이터 수집 후 결정
+- 결제 멱등 키(`Idempotency-Key`) 도입 시점 — 클라이언트 재시도 시 중복 결제 방지
+
+**확장 포인트 (현 범위 외):**
+- 다중 결제수단(카드+포인트+쿠폰 분할) → Payment를 별도 BC로 분리(안 A) 전환
+- 부분 환불·재결제 → Payment 라이프사이클 풍부화
+- Saga 패턴 도입 — 분산 트랜잭션·보상 트랜잭션 표준화
+
+---
+
 ### 유저 (User)
 
 **담당:** 서비스 가입·인증. 주문과 좋아요의 주체.
@@ -121,16 +164,29 @@ graph LR
 **핵심 개념:**
 - 유저는 로그인 ID와 비밀번호로 식별된다
 - 인증은 매 요청 헤더로 처리한다 (별도 토큰·세션 없음)
+- 유저는 가입 시 `LoginId`·비밀번호·`UserName`·`Birth`·`Email`을 모두 입력한다
 - 유저 가입 완료가 쿠폰 자동 발급의 트리거가 된다 (확장)
+
+**가입 입력 필드:**
+
+| 필드          | 타입            | 검증 규칙                                                |
+|---------------|-----------------|----------------------------------------------------------|
+| `loginId`     | `LoginId`       | 1~50자, 서비스 내 유일                                   |
+| `password`    | `HashedPassword`| 8자 이상, **생년월일 포함 금지**, 해시 저장(원문 미보관) |
+| `name`        | `UserName`      | 1~50자                                                   |
+| `birth`       | `Birth`         | `yyyy-MM-dd` 형식. 과거 일자만 허용                      |
+| `email`       | `Email`         | RFC 5322 호환 정규식 검증                                |
 
 **비즈니스 규칙:**
 
-| #   | 규칙                                                | Actor  |
-|-----|-----------------------------------------------------|--------|
-| R1  | `LoginId`는 서비스 전체에서 중복 불가               | System |
-| R2  | 비밀번호는 8자 이상이어야 한다                      | System |
-| R3  | 유저는 타 유저의 정보에 직접 접근할 수 없다         | User   |
-| R4  | 비밀번호 변경 시 현재 비밀번호 일치 확인이 필요하다 | User   |
+| #   | 규칙                                                                | Actor  |
+|-----|---------------------------------------------------------------------|--------|
+| R1  | `LoginId`는 서비스 전체에서 중복 불가                               | System |
+| R2  | 비밀번호는 8자 이상이어야 한다                                      | System |
+| R3  | 비밀번호는 유저의 생년월일(`yyyyMMdd` / `yyMMdd`)을 포함할 수 없다  | System |
+| R4  | 유저는 타 유저의 정보에 직접 접근할 수 없다                         | User   |
+| R5  | 비밀번호 변경 시 현재 비밀번호 일치 확인이 필요하다                 | User   |
+| R6  | 이메일은 RFC 5322 정규식을 통과해야 한다                            | System |
 
 **인증 정책 (API 전체 공통):**
 
@@ -238,33 +294,38 @@ graph LR
 
 > MVP 구현 범위에서 의미 있는 트리거 이벤트만 명시한다.
 
-| 이벤트           | 발행 컨텍스트 | 발행 시점   | 주요 구독자                                  |
-|------------------|---------------|-------------|----------------------------------------------|
-| `UserRegistered` | User          | 가입 완료   | Coupon `[확장]` — 웰컴 쿠폰 자동 발급 트리거 |
-| `LikeAdded`      | Like          | 좋아요 등록 | Product (`likeCount +1`)                     |
-| `LikeRemoved`    | Like          | 좋아요 취소 | Product (`likeCount -1`)                     |
-| `OrderConfirmed` | Order         | 주문 확정   | UserActivity `[확장]`                        |
+| 이벤트              | 발행 컨텍스트 | 발행 시점                              | 주요 구독자                                  |
+|---------------------|---------------|----------------------------------------|----------------------------------------------|
+| `UserRegistered`    | User          | 가입 완료                              | Coupon `[확장]` — 웰컴 쿠폰 자동 발급 트리거 |
+| `LikeAdded`         | Like          | 좋아요 등록                            | Product (`likeCount +1`)                     |
+| `LikeRemoved`       | Like          | 좋아요 취소                            | Product (`likeCount -1`)                     |
+| `PaymentRequested`  | Order/Payment | 결제 요청 — PG 호출 전 Payment PENDING | (내부) PaymentService                        |
+| `PaymentSucceeded`  | Order/Payment | PG 성공 응답 수신                      | Order (→ `CONFIRMED` 전이)                   |
+| `PaymentFailed`     | Order/Payment | PG 실패 응답 수신                      | Order (→ `CANCELLED` + 재고 복구 트리거)     |
+| `OrderConfirmed`    | Order         | 결제 성공 후 Order CONFIRMED 전이      | UserActivity `[확장]`, Point `[확장]`        |
+
+> MVP는 `PaymentRequested`/`Succeeded`/`Failed` 이벤트를 **메서드 호출**로 직접 처리한다 (Order 애그리거트 내부). Payment를 별도 BC로 분리(안 A 전환)할 때 이 이벤트들이 그대로 도메인 이벤트로 격상된다.
 
 ---
 
-## [확장 포인트] 쿠폰 / 결제 / 포인트 / 행동 기록
+## [확장 포인트] 쿠폰 / 포인트 / 행동 기록
 
-> 현재 구현 범위 외. 경계와 트리거만 정의한다.
+> 현재 구현 범위 외. 경계와 트리거만 정의한다. (Payment는 MVP 범위로 이동)
 
 ```mermaid
 graph TD
     MR[UserRegistered] -->|웰컴 쿠폰 자동 발급| IC[IssuedCoupon]
     CC[CouponCode 입력] --> IC
-    OP[OrderPlaced] -->|확장| PAY[Payment]
-    PAY -->|확장| PT[Point 적립·사용]
+    PS[PaymentSucceeded] -->|확장| PT[Point 적립·사용]
+    OC[OrderConfirmed] -->|확장| PT
     LA[LikeAdded] --> UA[UserActivity 기록]
-    OP --> UA
+    OC --> UA
     UA -->|미래| RANK[랭킹·추천 엔진]
 
-    style PAY fill:#f5f5f5,stroke:#bbb,color:#999
     style PT fill:#f5f5f5,stroke:#bbb,color:#999
     style IC fill:#f5f5f5,stroke:#bbb,color:#999
     style RANK fill:#f5f5f5,stroke:#bbb,color:#999
+    style UA fill:#f5f5f5,stroke:#bbb,color:#999
 ```
 
 ---
@@ -342,10 +403,89 @@ stateDiagram-v2
 
 ### 주문 — 설계 리스크
 
-| 리스크              | 설명                              | 선택지                                                                     |
-|---------------------|-----------------------------------|----------------------------------------------------------------------------|
-| 재고 동시성         | 동시 주문 시 재고 음수 가능       | A. 낙관적 락(version) · B. 비관적 락(SELECT FOR UPDATE) · C. Redis 분산 락 |
-| 주문 취소 정책 미정 | CANCELLED 상태가 있으나 조건 없음 | 결제 컨텍스트 추가 시 함께 결정                                            |
+| 리스크              | 설명                                   | 선택지                                                                     |
+|---------------------|----------------------------------------|----------------------------------------------------------------------------|
+| 재고 동시성         | 동시 주문 시 재고 음수 가능            | A. 낙관적 락(version) · B. 비관적 락(SELECT FOR UPDATE) · C. Redis 분산 락 |
+| 주문 취소 트리거    | CANCELLED 전이는 결제 실패에 의해 발생 | ✅ 결제 컨텍스트 통합 — 아래 Payment 섹션 참조                              |
+
+---
+
+### 결제 — 도메인 구조
+
+```mermaid
+classDiagram
+    class Payment {
+        +PaymentId id
+        +OrderId orderId
+        +PaymentMethod method
+        +PaidAmount amount
+        +PgTransactionId pgTransactionId
+        +PaymentStatus status
+        +datetime requestedAt
+        +datetime completedAt
+    }
+
+    class PaymentMethod {
+        <<enumeration>>
+        CARD
+        VIRTUAL_ACCOUNT
+        BANK_TRANSFER
+    }
+
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING
+        SUCCEEDED
+        FAILED
+    }
+
+    class PgTransactionId {
+        <<value object>>
+        String value
+    }
+
+    class PaidAmount {
+        <<value object>>
+        int value
+    }
+
+    class PaymentGateway {
+        <<port>>
+        +request(method, amount) PaymentResult
+    }
+
+    Payment --> PaymentMethod : 수단
+    Payment --> PaymentStatus : 상태
+    Payment --> PgTransactionId : PG 거래번호
+    Payment --> PaidAmount : 결제 금액
+```
+
+- `Payment`는 Order 1:1로 묶이는 내부 엔티티. `orderId`로 Order를 참조 (객체 직접 참조 아님)
+- `PgTransactionId`: PG 응답 수신 시점에 세팅. PENDING 단계에서는 NULL
+- `PaymentGateway`: 헥사고날 포트. infrastructure 어댑터(`TossPgAdapter` 등)가 구현. 도메인은 PG 종류를 모름
+
+### 결제 — 상태 생명주기
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> PENDING : pay 요청 — Payment 생성
+    PENDING --> SUCCEEDED : PG 성공 응답
+    PENDING --> FAILED : PG 실패 응답
+    SUCCEEDED --> [*] : PaymentSucceeded → Order CONFIRMED
+    FAILED --> [*] : PaymentFailed → Order CANCELLED + 재고 복구
+```
+
+> **단방향 전이**: SUCCEEDED ↔ FAILED 사이 전이 불가. 재결제는 새 Payment 행을 생성한다 (확장 시).
+
+### 결제 — 설계 리스크
+
+| 리스크                | 설명                                                        | 선택지                                                              |
+|-----------------------|-------------------------------------------------------------|---------------------------------------------------------------------|
+| PG 호출 타임아웃      | PG 응답 지연 시 사용자가 재시도 → 중복 결제 가능            | A. Idempotency-Key 헤더 · B. PG 측 거래 조회 API 폴링                |
+| 보상 트랜잭션 원자성  | 재고 복구·Order CANCELLED·Payment FAILED가 별 트랜잭션      | A. 단일 Service로 통합 · B. Saga 패턴 도입 (분산 환경)              |
+| Order 애그리거트 비대 | Payment 흡수로 Order 책임이 커짐                            | 운영 안정화 후 안 A(Payment BC 분리)로 전환 — 명명 호환성 이미 확보 |
 
 ---
 
@@ -358,6 +498,8 @@ classDiagram
         +LoginId loginId
         +HashedPassword password
         +UserName name
+        +Birth birth
+        +Email email
         +datetime createdAt
     }
 
@@ -376,14 +518,28 @@ classDiagram
         String value
     }
 
+    class Birth {
+        <<value object>>
+        LocalDate value
+    }
+
+    class Email {
+        <<value object>>
+        String value
+    }
+
     User --> LoginId : 식별자
     User --> HashedPassword : 인증
     User --> UserName : 표시명
+    User --> Birth : 생년월일
+    User --> Email : 연락처
 ```
 
 - `LoginId`: 1~50자, 서비스 내 유일
-- `HashedPassword`: 8자 이상 입력 → 해시 저장 (원문 미보관)
+- `HashedPassword`: 8자 이상 입력 → 해시 저장 (원문 미보관). **`Birth.value`의 `yyyyMMdd`/`yyMMdd` 표현 포함 금지**
 - `UserName`: 1~50자
+- `Birth`: `LocalDate`, 과거 일자만 허용. R3 비밀번호 검증 정책의 입력값
+- `Email`: RFC 5322 정규식 검증. 향후 알림 채널의 도달 주소
 
 ### 유저 — 상태 생명주기
 
@@ -579,7 +735,7 @@ stateDiagram-v2
 |--------------------|-------------------------------------------------------------------------------------|-----------------------------------------------|
 | 어드민 인증 강도   | `loopers.admin` 고정 헤더값 — 네트워크 스니핑에 취약                                | 운영 전 JWT·mTLS 교체 필수                    |
 | 역할 단일화        | 어드민 권한 하나뿐, 세분화 불가                                                     | 운영팀 규모 커지기 전에 Role 테이블 설계 검토 |
-| Brand 삭제 cascade | 소프트 삭제 채택 — `DELETED` + `deletedAt` 기록. 연결 Order 없으면 주기적 하드 삭제 | 탈퇴·삭제 배치 시 Order 참조 여부 먼저 확인   |
+| Brand 삭제 cascade | 소프트 삭제 채택 — `DELETED` + `deletedAt` 기록. 연결 Order 없으면 주기적 하드 삭제 | 삭제 배치 시 Order 참조 여부 먼저 확인        |
 
 ---
 
@@ -675,7 +831,18 @@ Stock 모델:
 
 ---
 
-### [보류 2] Payment 컨텍스트 — 별도 BC vs Order 내부
+### [결정 2] Payment 컨텍스트 — Order 내부 엔티티 채택 (MVP)
+
+> **결정일:** 2026-05-22 · **결정자:** Backend Squad · **회수 조건:** 다중 결제수단·환불 시나리오 도입 시 안 A로 전환
+
+**결정 사항:** MVP는 **안 B(Order 내부 엔티티)** 로 구현한다. 단, **명명은 안 A 호환**으로 유지한다 (`PaymentFacade`, `PaymentService`, `PaymentRepository`, `PaymentGateway`).
+
+**근거:**
+1. MVP는 단일 결제수단(카드 1종) + 부분 환불 없음 + PG 1개 → 안 A의 응집도·격리 이점이 과설계
+2. Order ↔ Payment가 1:1이고 라이프사이클이 강결합 (결제 성공/실패가 곧 Order 상태 전이) → 단일 트랜잭션 안에 묶는 안 B가 자연스러움
+3. 명명을 안 A 호환으로 두면 향후 별도 BC 분리 시 **클래스명·메서드 시그니처 변경 비용 = 0**, 패키지 이동·이벤트 발행만 추가하면 됨
+
+**대안과 트레이드오프 (이하 두 안 비교는 참고 자료):**
 
 결제는 외부 시스템(PG) 연동을 포함하므로 **바운디드 컨텍스트 경계**를 어디에 둘지가 핵심 결정 포인트.
 
@@ -751,11 +918,26 @@ OrderFacade.pay() 내부에서:
 
 ---
 
-#### 권고
+#### 회수 시그널 (안 A 전환 트리거)
 
-| 시점                       | 선택                                                   |
-|----------------------------|--------------------------------------------------------|
-| MVP (현재)                 | **안 B** — Order 내부 엔티티. 단순 구현, 단일 트랜잭션 |
-| 다중 결제수단/환불 확장 시 | **안 A** 전환 — Payment BC 분리, 도메인 이벤트 기반    |
+다음 중 **하나라도 발생**하면 안 A로 전환한다:
 
-**현재 시퀀스 다이어그램 Section 7**(`02-sequence-diagrams.md`)은 안 B에 가깝게 작성되어 있으나, `PaymentFacade`·`PaymentService` 명명은 안 A 방향. 명명만 유지하고 **물리적으로는 안 B(Order 내부)** 로 구현 — 안 A 전환 시 명명 변경 부담 최소화.
+| # | 시그널                                                          | 측정 방법                                |
+|---|-----------------------------------------------------------------|------------------------------------------|
+| 1 | 결제수단 종류가 2개를 초과 (분할 결제 도입)                     | 비즈니스 의사결정                        |
+| 2 | 부분 환불 정책 도입                                             | 비즈니스 의사결정                        |
+| 3 | 월 결제 건수 ≥ 100만 건 또는 PG 응답 평균 ≥ 3s                  | APM 메트릭                               |
+| 4 | PG 다중화 (Toss/이니시스/PayPal 동시 운영)                      | 인프라 의사결정                          |
+| 5 | Payment 로직 변경이 Order 코드에 침투하는 PR이 분기당 3건 초과  | 코드 리뷰 정성 평가                      |
+
+전환 시 작업: ① Payment 클래스를 별도 패키지·바운디드 컨텍스트로 이동 ② 메서드 호출을 도메인 이벤트(`PaymentSucceeded`/`Failed`)로 교체 ③ ACL 어댑터 신설. **클래스명·DB 스키마 변경은 없음** (이미 안 A 호환 설계).
+
+#### 산출물 매핑
+
+| 영역             | 위치                                                                                     |
+|------------------|------------------------------------------------------------------------------------------|
+| 도메인 구조      | 본 문서 §결제 — 도메인 구조 / 상태 생명주기                                              |
+| 클래스 다이어그램 | `03-class-diagram.md` §6 Payment 컨텍스트                                                |
+| ERD              | `04-erd.md` `payments` 테이블                                                            |
+| 시퀀스 (개발자)  | `02-sequence-diagrams.md` §5 결제 요청                                                   |
+| 시퀀스 (기획자)  | `02-sequence-diagrams-overview.md` §6 결제                                               |

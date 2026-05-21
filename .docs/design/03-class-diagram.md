@@ -84,19 +84,12 @@ classDiagram
         -loginId: LoginId
         -password: HashedPassword
         -name: UserName
-        -status: UserStatus
+        -birth: Birth
+        -email: Email
         -createdAt: LocalDateTime
-        -withdrawnAt: LocalDateTime
         +of(loginId, name, password, birth, email)$ UserModel
         +validPasswordChange(old, target, matcher) void
         +changePassword(encrypted) void
-        +withdraw() void
-    }
-
-    class UserStatus {
-        <<enumeration>>
-        ACTIVE
-        WITHDRAWN
     }
 
     class LoginId {
@@ -111,6 +104,7 @@ classDiagram
         -value: String
         +HashedPassword(value)
         규칙 원문미보관 해시값만저장
+        검증 8자이상 Birth포함금지
     }
 
     class UserName {
@@ -120,11 +114,28 @@ classDiagram
         규칙 1~50자
     }
 
+    class Birth {
+        <<ValueObject>>
+        -value: LocalDate
+        +Birth(value)
+        규칙 과거일자만허용
+        파생 yyyyMMdd yyMMdd 표현
+        비밀번호검증 입력값 사용
+    }
+
+    class Email {
+        <<ValueObject>>
+        -value: String
+        +Email(value)
+        규칙 RFC5322 정규식검증
+        용도 알림채널 도달주소
+    }
+
     class UserService {
         <<Service>>
         -userRepository: UserRepository
         +checkLoginIdDuplication(loginId) void
-        +createUserModel(loginId, name, password) UserModel
+        +createUserModel(loginId, name, password, birth, email) UserModel
         +getUserModel(id) UserModel
         +changePassword(userModel, encrypted) void
     }
@@ -142,7 +153,7 @@ classDiagram
         <<Facade>>
         -userService: UserService
         -passwordEncoder: BCryptPasswordEncoder
-        +createUser(loginId, password, name) UserInfo
+        +createUser(loginId, password, name, birth, email) UserInfo
         +getUserInfo(id) UserInfo
         +changePassword(id, currentPw, newPw) void
     }
@@ -152,18 +163,23 @@ classDiagram
         +userId: Long
         +loginId: String
         +name: String
+        +birth: LocalDate
+        +email: String
         +from(UserModel)$ UserInfo
     }
 
     UserModel *-- LoginId
     UserModel *-- HashedPassword
     UserModel *-- UserName
-    UserModel --> UserStatus
+    UserModel *-- Birth
+    UserModel *-- Email
 
     UserService ..> UserRepository
     UserFacade ..> UserService
     UserFacade ..> UserInfo : 생성
 ```
+
+> **비밀번호 ↔ 생년월일 검증:** `UserModel.of()` 또는 `HashedPassword(value, birth)` 검증 시점에 `birth.value`를 `yyyyMMdd`/`yyMMdd` 문자열로 변환해 `password` 원문에 포함 여부 확인. 도메인 규칙(R3) — 인프라(BCryptPasswordEncoder)는 검증 결과만 받아 해시한다.
 
 ---
 
@@ -308,6 +324,7 @@ classDiagram
         +deleteProduct(id) void
         +softDeleteAllByBrandId(brandId) void
         +validateAndReduceStock(productModel, qty) void
+        +restoreStock(orderItems) void
         +incrementLikeCount(productModel) void
         +decrementLikeCount(productId) void
     }
@@ -457,7 +474,6 @@ classDiagram
         +deleteLike(likeModel) void
         +findLikesByUserId(userId) List~LikeModel~
         +softDeleteByProductIds(productIds) void
-        +softDeleteByUserId(userId) void
     }
 
     class LikeRepository {
@@ -562,6 +578,8 @@ classDiagram
         +getOrderModel(orderId) OrderModel
         +findOrders(userId, startAt, endAt) List~OrderModel~
         +findAllOrders(pageable) Page~OrderModel~
+        +confirmOrder(orderModel) OrderModel
+        +cancelOrder(orderModel) OrderModel
     }
 
     class OrderRepository {
@@ -650,12 +668,147 @@ classDiagram
     AdminOrderFacade ..> OrderService
 ```
 
+> **`OrderService.confirmOrder/cancelOrder`**: 결제 시퀀스의 보상·완료 단계가 호출. `cancelOrder`는 상태만 `CANCELLED`로 전이 — 재고 복구는 `ProductService.restoreStock`이 별도 트랜잭션으로 수행 (Facade가 두 호출을 순서 조율).
+>
+> **`ProductService.restoreStock(orderItems)`**: 결제 실패 보상. 각 `OrderItem`의 `productId`·`quantity`만큼 `stock`을 `UPDATE products SET stock = stock + ?`로 가산. 항목별 별도 트랜잭션 (현 MVP) — 부분 실패 시 운영 로그 + 수동 처리.
+
 ---
 
-## 6. Application Layer — Facade 의존 관계 전체
+## 6. Payment 컨텍스트 — Order 내부 엔티티 (결정 2)
+
+담당: PG 거래 시도·결과 영속화. **Order 애그리거트 내부 엔티티(안 B)** 이나 명명은 안 A 호환 유지 (`PaymentFacade`/`Service`/`Repository`/`Gateway`).
+
+**책임 분리:**
+- `PaymentFacade`: 선제 검증 → PG 호출(트랜잭션 외부) → 결과에 따라 `OrderService.confirmOrder` 또는 `cancelOrder` + `ProductService.restoreStock` 조율
+- `PaymentService`: Payment 엔티티 영속화·상태 전이. PG와 직접 통신하지 않음
+- `PaymentGateway`: 헥사고날 포트. infrastructure 어댑터(`TossPgAdapter` 등)가 구현
+
+```mermaid
+classDiagram
+    direction TB
+
+    class PaymentModel {
+        <<Entity>>
+        -id: Long
+        -orderId: Long
+        orderId는 OrderModel의 ID참조
+        -method: PaymentMethod
+        -amount: PaidAmount
+        -pgTransactionId: PgTransactionId
+        -status: PaymentStatus
+        -failureReason: String
+        -requestedAt: LocalDateTime
+        -completedAt: LocalDateTime
+        +of(orderId, method, amount)$ PaymentModel
+        +markSucceeded(pgTransactionId) void
+        +markFailed(reason) void
+        규칙 PENDING→SUCCEEDED FAILED 단방향
+    }
+
+    class PaymentMethod {
+        <<enumeration>>
+        CARD
+        VIRTUAL_ACCOUNT
+        BANK_TRANSFER
+    }
+
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING
+        SUCCEEDED
+        FAILED
+    }
+
+    class PgTransactionId {
+        <<ValueObject>>
+        -value: String
+        PG 응답 수신시 세팅
+    }
+
+    class PaidAmount {
+        <<ValueObject>>
+        -value: int
+        규칙 0초과 Order.totalAmount와 일치
+    }
+
+    class PaymentGateway {
+        <<port>>
+        <<interface>>
+        +request(method, amount) PaymentResult
+        구현 infrastructure 어댑터
+    }
+
+    class PaymentResult {
+        <<DTO>>
+        +success: boolean
+        +pgTransactionId: String
+        +failureReason: String
+    }
+
+    class PaymentService {
+        <<Service>>
+        -paymentRepository: PaymentRepository
+        +createPendingPayment(orderId, method, amount) PaymentModel
+        +markSucceeded(paymentModel, pgTransactionId) PaymentModel
+        +markFailed(paymentModel, reason) PaymentModel
+        +findByOrderId(orderId) Optional~PaymentModel~
+    }
+
+    class PaymentRepository {
+        <<Repository>>
+        <<interface>>
+        +save(PaymentModel) PaymentModel
+        +findById(id) Optional~PaymentModel~
+        +findByOrderId(orderId) Optional~PaymentModel~
+    }
+
+    class PaymentFacade {
+        <<Facade>>
+        -orderService: OrderService
+        -paymentService: PaymentService
+        -productService: ProductService
+        -paymentGateway: PaymentGateway
+        조율순서 검증→PendingPayment→PG호출→Order상태전이
+        +pay(userId, orderId, method, amount) PaymentResultInfo
+    }
+
+    class PaymentResultInfo {
+        <<DTO>>
+        +orderId: Long
+        +paymentId: Long
+        +status: String
+        +paidAmount: int
+        +pgTransactionId: String
+        +from(PaymentModel)$ PaymentResultInfo
+    }
+
+    PaymentModel *-- PaidAmount
+    PaymentModel *-- PgTransactionId
+    PaymentModel --> PaymentMethod
+    PaymentModel --> PaymentStatus
+
+    PaymentService ..> PaymentRepository
+    PaymentFacade ..> PaymentService
+    PaymentFacade ..> OrderService : confirmOrder / cancelOrder
+    PaymentFacade ..> ProductService : restoreStock (결제 실패 보상)
+    PaymentFacade ..> PaymentGateway : 외부 PG 호출 (트랜잭션 외부)
+    PaymentFacade ..> PaymentResultInfo : 생성
+```
+
+> **트랜잭션 경계:** `PaymentFacade.pay()`에는 `@Transactional`이 없다. 내부 호출 흐름은:
+> 1. `OrderService.getOrderModel(orderId)` — readOnly 트랜잭션
+> 2. 선제 검증 (소유권·상태·금액) — Facade 레벨, 트랜잭션 없음
+> 3. `PaymentService.createPendingPayment` — 짧은 쓰기 트랜잭션
+> 4. `PaymentGateway.request` — **트랜잭션 외부** (외부 I/O)
+> 5-a. (성공) `PaymentService.markSucceeded` + `OrderService.confirmOrder` — 별 트랜잭션
+> 5-b. (실패) `PaymentService.markFailed` + `OrderService.cancelOrder` + `ProductService.restoreStock` — 별 트랜잭션 (보상)
+
+---
+
+## 7. Application Layer — Facade 의존 관계 전체
 
 Facade가 어떤 도메인 Service를 조율하는지 한눈에 파악한다.  
-`LikeFacade`, `OrderFacade`, `AdminBrandFacade`, `AdminProductFacade`는 **복수의 Service를 조율**한다.
+`LikeFacade`, `OrderFacade`, `PaymentFacade`, `AdminBrandFacade`, `AdminProductFacade`는 **복수의 Service를 조율**한다.
 
 ```mermaid
 classDiagram
@@ -667,6 +820,7 @@ classDiagram
     class AdminProductFacade { <<Facade>> }
     class LikeFacade { <<Facade>> }
     class OrderFacade { <<Facade>> }
+    class PaymentFacade { <<Facade>> }
     class AdminOrderFacade { <<Facade>> }
 
     class UserService { <<Service>> }
@@ -674,6 +828,8 @@ classDiagram
     class ProductService { <<Service>> }
     class LikeService { <<Service>> }
     class OrderService { <<Service>> }
+    class PaymentService { <<Service>> }
+    class PaymentGateway { <<port>> }
 
     UserFacade ..> UserService
 
@@ -692,12 +848,17 @@ classDiagram
     OrderFacade ..> ProductService : 재고 확인·차감 조율
     OrderFacade ..> OrderService
 
+    PaymentFacade ..> OrderService : 상태 전이 조율
+    PaymentFacade ..> PaymentService : 결제 영속화
+    PaymentFacade ..> ProductService : 결제 실패 시 재고 복구
+    PaymentFacade ..> PaymentGateway : 외부 PG 호출
+
     AdminOrderFacade ..> OrderService
 ```
 
 ---
 
-## 7. Infrastructure Layer — Repository 구현 관계
+## 8. Infrastructure Layer — Repository 구현 관계
 
 도메인의 `Repository` 인터페이스를 infrastructure 레이어의 `RepositoryImpl`이 구현한다.  
 `RepositoryImpl`은 Spring Data JPA 레포지토리에 위임한다. 도메인 Service는 JPA를 직접 알지 못한다.
@@ -711,6 +872,8 @@ classDiagram
     class ProductRepository { <<interface>> }
     class LikeRepository { <<interface>> }
     class OrderRepository { <<interface>> }
+    class PaymentRepository { <<interface>> }
+    class PaymentGateway { <<port>> }
 
     class UserRepositoryImpl {
         <<infrastructure>>
@@ -733,6 +896,15 @@ classDiagram
         -orderJpaRepository: OrderJpaRepository
         -orderItemJpaRepository: OrderItemJpaRepository
     }
+    class PaymentRepositoryImpl {
+        <<infrastructure>>
+        -paymentJpaRepository: PaymentJpaRepository
+    }
+    class TossPgAdapter {
+        <<infrastructure>>
+        외부 PG API 호출
+        application.yml 인증키 주입
+    }
 
     class UserJpaRepository { <<JpaRepository>> }
     class BrandJpaRepository { <<JpaRepository>> }
@@ -740,12 +912,15 @@ classDiagram
     class LikeJpaRepository { <<JpaRepository>> }
     class OrderJpaRepository { <<JpaRepository>> }
     class OrderItemJpaRepository { <<JpaRepository>> }
+    class PaymentJpaRepository { <<JpaRepository>> }
 
     UserRepositoryImpl ..|> UserRepository : 구현
     BrandRepositoryImpl ..|> BrandRepository : 구현
     ProductRepositoryImpl ..|> ProductRepository : 구현
     LikeRepositoryImpl ..|> LikeRepository : 구현
     OrderRepositoryImpl ..|> OrderRepository : 구현
+    PaymentRepositoryImpl ..|> PaymentRepository : 구현
+    TossPgAdapter ..|> PaymentGateway : 구현
 
     UserRepositoryImpl ..> UserJpaRepository : 위임
     BrandRepositoryImpl ..> BrandJpaRepository : 위임
@@ -753,36 +928,41 @@ classDiagram
     LikeRepositoryImpl ..> LikeJpaRepository : 위임
     OrderRepositoryImpl ..> OrderJpaRepository : 위임
     OrderRepositoryImpl ..> OrderItemJpaRepository : 위임
+    PaymentRepositoryImpl ..> PaymentJpaRepository : 위임
 ```
+
+> **`TossPgAdapter`는 예시 명명**이다. 실제 PG가 결정되면 어댑터 이름을 교체. `PaymentGateway` 포트는 PG 종류와 무관하게 유지된다 (헥사고날 원칙).
 
 ---
 
 ## 설계 요점
 
-| 항목                   | 결정 내용                                                                                                                                                                                                             |
-|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 크로스 애그리거트 참조 | ID(Long)로만 참조. `Product.brandId`, `OrderItem.productId`, `LikeModel.userId·productId` 모두 값 참조. 직접 객체 참조 금지                                                                                           |
-| Brand·Product 분리     | 두 개의 독립 Aggregate. `Product.reduceStock()`·`incrementLikeCount()`는 Brand 불필요. cascade 삭제는 `AdminBrandFacade`가 Facade 레이어에서 조율                                                                     |
-| `Price` 공유           | Brand·Product 컨텍스트와 Order 컨텍스트가 공유하는 값 객체                                                                                                                                                            |
-| `likeCount` 변경 책임  | Like 컨텍스트 소유. `LikeFacade`가 `LikeService` + `ProductService` 두 Service를 조율                                                                                                                                 |
-| `stock` 차감 책임      | `ProductModel`이 보유하나 차감 호출은 `OrderFacade`가 `ProductService`를 통해 수행                                                                                                                                    |
-| 스냅샷                 | `OrderItemModel`이 `productNameSnapshot` · `unitPriceSnapshot`을 직접 보유. 이후 `ProductModel` 변경 무관                                                                                                             |
-| 소프트 삭제 정책       | Brand·Product: `DELETED` + `deletedAt` 소프트 삭제 후 주기적 하드 삭제. User: `WITHDRAWN` + `withdrawnAt` + 즉시 PII 익명화. Like: 유저 토글은 하드 삭제·cascade는 소프트 삭제. Order·OrderItem: 삭제 불가(영구 보존) |
+| 항목                   | 결정 내용                                                                                                                                                        |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 크로스 애그리거트 참조 | ID(Long)로만 참조. `Product.brandId`, `OrderItem.productId`, `LikeModel.userId·productId`, `PaymentModel.orderId` 모두 값 참조. 직접 객체 참조 금지              |
+| Brand·Product 분리     | 두 개의 독립 Aggregate. `Product.reduceStock()`·`incrementLikeCount()`는 Brand 불필요. cascade 삭제는 `AdminBrandFacade`가 Facade 레이어에서 조율                |
+| `Price` 공유           | Brand·Product 컨텍스트와 Order 컨텍스트가 공유하는 값 객체                                                                                                       |
+| `likeCount` 변경 책임  | Like 컨텍스트 소유. `LikeFacade`가 `LikeService` + `ProductService` 두 Service를 조율                                                                            |
+| `stock` 차감 책임      | `ProductModel`이 보유하나 차감 호출은 `OrderFacade`가 `ProductService`를 통해 수행. 결제 실패 시 복구는 `PaymentFacade` → `ProductService.restoreStock`           |
+| 스냅샷                 | `OrderItemModel`이 `productNameSnapshot` · `unitPriceSnapshot`을 직접 보유. 이후 `ProductModel` 변경 무관                                                        |
+| Payment 위치           | Order 내부 엔티티(안 B)지만 별도 패키지·테이블 분리. 명명은 안 A 호환 (`PaymentFacade`/`Service`/`Repository`/`Gateway`). 전환 시 클래스명 변경 0건 (결정 2)      |
+| 외부 시스템 격리       | `PaymentGateway` 헥사고날 포트. infrastructure 어댑터(`TossPgAdapter` 등)가 구현. 도메인은 PG 종류를 모름                                                         |
+| 소프트 삭제 정책       | Brand·Product: `DELETED` + `deletedAt` 소프트 삭제 후 주기적 하드 삭제. Like: 유저 토글은 하드 삭제·cascade는 소프트 삭제. Order·OrderItem·Payment: 삭제 불가(영구 보존) |
 
 ---
 
-## 8. 소프트 삭제 및 데이터 생명주기 정책
+## 9. 소프트 삭제 및 데이터 생명주기 정책
 
 이커머스 특성상 삭제 데이터는 주문 이력·정산·감사 목적으로 일정 기간 유지가 필요하다.
 엔티티 성격에 따라 삭제 방식과 보존 주기를 구분한다.
 
-| 엔티티                          | 삭제 방식                                           | 추가 필드                          | 주기적 처리                                   | 근거                       |
-|---------------------------------|-----------------------------------------------------|------------------------------------|-----------------------------------------------|----------------------------|
-| `BrandModel`                    | 소프트 삭제                                         | `status=DELETED` + `deletedAt`     | 연결된 Order 없을 때 하드 삭제                | 과거 주문 브랜드 출처 추적 |
-| `ProductModel`                  | 소프트 삭제                                         | `status=DELETED` + `deletedAt`     | 연결된 Order 없을 때 하드 삭제                | 주문 스냅샷 참조 무결성    |
-| `UserModel`                     | 소프트 삭제 (탈퇴)                                  | `status=WITHDRAWN` + `withdrawnAt` | 즉시 PII 익명화, `userId`는 Order 참조용 보존 | 개인정보보호법 준수        |
-| `LikeModel`                     | 유저 토글: **하드 삭제** / cascade: **소프트 삭제** | cascade 시 `deletedAt` 세팅        | 유저 탈퇴·상품 삭제 시 일괄 처리              | 집계 정합성 유지           |
-| `OrderModel` / `OrderItemModel` | **삭제 불가**                                       | —                                  | 영구 보존                                     | 회계·법적 증거 자료        |
+| 엔티티                          | 삭제 방식                                           | 추가 필드                      | 주기적 처리                    | 근거                       |
+|---------------------------------|-----------------------------------------------------|--------------------------------|--------------------------------|----------------------------|
+| `BrandModel`                    | 소프트 삭제                                         | `status=DELETED` + `deletedAt` | 연결된 Order 없을 때 하드 삭제 | 과거 주문 브랜드 출처 추적 |
+| `ProductModel`                  | 소프트 삭제                                         | `status=DELETED` + `deletedAt` | 연결된 Order 없을 때 하드 삭제 | 주문 스냅샷 참조 무결성    |
+| `LikeModel`                     | 유저 토글: **하드 삭제** / cascade: **소프트 삭제** | cascade 시 `deletedAt` 세팅    | 상품 삭제 시 일괄 처리         | 집계 정합성 유지           |
+| `OrderModel` / `OrderItemModel` | **삭제 불가**                                       | —                              | 영구 보존                      | 회계·법적 증거 자료        |
+| `PaymentModel`                  | **삭제 불가**                                       | —                              | 영구 보존                      | PG 거래 감사·정산          |
 
 ### cascade 삭제 흐름 (소프트)
 
@@ -792,15 +972,3 @@ AdminBrandFacade.deleteBrand(brandId)
   → LikeService.softDeleteByProductIds(productIds)   ← LikeModel deletedAt 세팅
   → BrandService.softDeleteBrand(brandModel)          ← Brand DELETED + deletedAt
 ```
-
-### 유저 탈퇴 흐름 (확장 포인트 — MVP 미구현)
-
-> MVP 범위(회원가입·내정보조회·비밀번호변경)에는 탈퇴 API가 없다. 향후 구현 시 아래 흐름을 따른다.
-
-```
-UserFacade.withdraw(userId)          ← 확장 포인트 (현재 UserFacade에 미선언)
-  → LikeService.softDeleteByUserId(userId)            ← LikeModel deletedAt 세팅
-  → UserService.withdraw(userModel)                   ← WITHDRAWN + withdrawnAt + PII 익명화
-```
-
-> Order는 탈퇴 후에도 삭제하지 않는다. `userId`를 보존하되 개인 식별 정보는 User 테이블에서 익명화한다.
