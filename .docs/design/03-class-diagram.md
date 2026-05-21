@@ -37,7 +37,6 @@ classDiagram
         +Brand brand
         +Stock stock
         +softDelete() void
-        +restore() void
     }
 
     class Stock {
