@@ -82,6 +82,8 @@ subprojects {
         useJUnitPlatform()
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
+        // Testcontainers 1.20.x defaults to Docker API 1.32, but Docker 29 requires 1.40+.
+        systemProperty("api.version", System.getProperty("api.version") ?: "1.40")
         jvmArgs("-Xshare:off")
     }
 

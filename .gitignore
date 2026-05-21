@@ -36,5 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 
+### Local agent state ###
+.omc/
+
 ### Kotlin ###
 .kotlin
