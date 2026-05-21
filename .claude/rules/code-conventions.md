@@ -40,6 +40,7 @@
 - Bean 등록이 필요한 경우 명확한 설정 클래스 또는 auto-configuration 성격의 모듈에 둔다.
 - 트랜잭션 경계는 Facade/Application Service 또는 명확한 UseCase 단위에 둔다.
 - 조회 전용 트랜잭션은 `@Transactional(readOnly = true)` 를 사용한다.
+- 외부 시스템 호출이 포함되면 DB 트랜잭션과 외부 호출 경계를 명확히 분리한다.
 - 운영용 profile 설정(`dev`/`qa`/`prd`) 변경은 사용자 확인 후 진행한다.
 
 ## Lombok 규칙
@@ -107,7 +108,7 @@
 - 단위 테스트는 JUnit 5 + Mockito 또는 springmockk 를 사용한다.
 - 테스트 데이터 생성은 Instancio 사용을 우선 고려한다.
 - 통합 테스트는 Testcontainers 기반 fixture 를 재사용한다.
+- API 테스트는 Controller 계약, 입력 검증, 응답 형태를 검증한다.
 - `modules:jpa`, `modules:redis`, `modules:kafka` 의 testFixtures 를 우선 활용한다.
 - 테스트는 루트 Gradle 설정의 `spring.profiles.active=test`, `user.timezone=Asia/Seoul` 조건에서 동작해야 한다.
 - 시간, 랜덤 값, 외부 I/O 에 의존하는 테스트는 재현 가능하게 작성한다.
-
