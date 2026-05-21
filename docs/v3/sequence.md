@@ -178,8 +178,7 @@ sequenceDiagram
     LikeFacade->>LikeService: addLike(userId, productId)
     LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
     Note over LikeRepository: deleted_at 포함 전체 조회
-    LikeRepository-->>LikeService: Optional~LikeModel~
-    Note over LikeService: active(deleted_at=null) 존재 → 409 Conflict
+    LikeRepository-->>LikeService: Optional~LikeModel~ (active 존재 시 409 Conflict)
 
     alt soft-deleted 존재
         LikeService->>LikeService: like.restore() [deleted_at=null]
