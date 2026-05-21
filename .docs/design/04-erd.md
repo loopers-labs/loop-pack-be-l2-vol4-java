@@ -10,6 +10,8 @@ erDiagram
         VARCHAR password
         VARCHAR email UK
         VARCHAR gender
+        VARCHAR role
+        BIGINT brand_id
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -64,6 +66,7 @@ erDiagram
         DATETIME updated_at
     }
 
+    users }o--o| brands : "brand_id (nullable)"
     users ||--o{ likes : ""
     users ||--o{ orders : ""
     brands ||--o{ products : ""
@@ -74,6 +77,10 @@ erDiagram
 ---
 
 ## 설계 결정 사항
+
+### users — role + brand_id
+
+어드민 역할을 `role` 컬럼으로 구분한다 (`CUSTOMER` / `BRAND_ADMIN` / `SUPER_ADMIN`). `brand_id`는 `BRAND_ADMIN`일 때만 값이 존재하며 자신이 담당하는 브랜드를 가리킨다. DB 레벨 FK를 걸지 않는 기존 정책을 따르며, 존재 여부는 애플리케이션에서 검증한다.
 
 ### BaseEntity / SoftDeletableEntity 분리
 `BaseEntity`는 `id`, `created_at`, `updated_at`만 담당한다. 소프트 딜리트가 필요한 엔티티만 `SoftDeletableEntity`(extends BaseEntity)를 상속해 `deleted_at`, `delete()`, `restore()`를 갖는다.
@@ -101,12 +108,13 @@ erDiagram
 
 ## 제약 조건
 
-| 테이블 | 종류 | 대상 컬럼 |
-|--------|------|-----------|
-| users | UK | login_id |
-| users | UK | email |
-| brands | UK | name |
-| likes | UK | (user_id, product_id) |
+| 테이블 | 종류 | 대상 컬럼 | 비고 |
+|--------|------|-----------|------|
+| users | UK | login_id | — |
+| users | UK | email | — |
+| users | CHECK | role, brand_id | role = 'BRAND_ADMIN'일 때만 brand_id 존재 |
+| brands | UK | name | — |
+| likes | UK | (user_id, product_id) | — |
 
 ---
 
@@ -114,8 +122,9 @@ erDiagram
 
 | 테이블 | 인덱스명 | 컬럼 | 목적 |
 |--------|----------|------|------|
+| users | idx_users_brand_id | brand_id | BRAND_ADMIN의 브랜드 귀속 조회 |
 | products | idx_products_brand_deleted | (brand_id, deleted_at) | 브랜드 필터 |
-| products | idx_products_deleted_likes | (deleted_at, like_count) | likes_desc 정렬 |
+| products | idx_products_deleted_likes | (deleted_at, like_count, created_at) | likes_desc 정렬 (동순위 시 최신순 2차 정렬) |
 | products | idx_products_deleted_price | (deleted_at, price) | price_asc 정렬 |
 | products | idx_products_deleted_created | (deleted_at, created_at) | latest 정렬 |
 | likes | uk_likes_user_product | (user_id, product_id) | 중복 체크 (UK가 인덱스 겸용) |

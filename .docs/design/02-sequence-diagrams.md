@@ -309,18 +309,23 @@ sequenceDiagram
     participant DB
 
     Admin->>+Controller: POST /api-admin/v1/brands
-    Controller->>+Facade: createBrand(name, ...)
 
-    alt 브랜드명 없음
-        Facade-->>Controller: CoreException(BAD_REQUEST)
-        Controller-->>Admin: 400
-    else 유효한 입력
-        Facade->>+Service: createBrand(name, ...)
-        Service->>DB: INSERT brand
-        deactivate Service
-        Controller-->>Admin: 201
+    alt SUPER_ADMIN이 아님
+        Controller-->>Admin: 403
+    else SUPER_ADMIN
+        Controller->>+Facade: createBrand(name, ...)
+
+        alt 브랜드명 없음
+            Facade-->>Controller: CoreException(BAD_REQUEST)
+            Controller-->>Admin: 400
+        else 유효한 입력
+            Facade->>+Service: createBrand(name, ...)
+            Service->>DB: INSERT brand
+            deactivate Service
+            Controller-->>Admin: 201
+        end
+        deactivate Facade
     end
-    deactivate Facade
     deactivate Controller
 ```
 
@@ -335,13 +340,19 @@ sequenceDiagram
     participant DB
 
     Admin->>+Controller: GET /api-admin/v1/brands?page=0&size=20
-    Controller->>+Facade: getBrands(page, size)
-    Facade->>+Service: findBrands(page, size)
-    Service->>+DB: SELECT brands (pagination)
-    DB-->>-Service: brand list
-    deactivate Service
-    deactivate Facade
-    Controller-->>-Admin: 200
+
+    alt SUPER_ADMIN이 아님
+        Controller-->>Admin: 403
+    else SUPER_ADMIN
+        Controller->>+Facade: getBrands(page, size)
+        Facade->>+Service: findBrands(page, size)
+        Service->>+DB: SELECT brands (pagination)
+        DB-->>-Service: brand list
+        deactivate Service
+        deactivate Facade
+        Controller-->>Admin: 200
+    end
+    deactivate Controller
 ```
 
 ### 7-3. 브랜드 상세 조회
@@ -365,7 +376,12 @@ sequenceDiagram
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Admin: 404
     else 브랜드 존재
-        Controller-->>Admin: 200
+        alt BRAND_ADMIN이면서 자신의 브랜드가 아님
+            Facade-->>Controller: CoreException(FORBIDDEN)
+            Controller-->>Admin: 403
+        else 권한 있음
+            Controller-->>Admin: 200
+        end
     end
     deactivate Facade
     deactivate Controller
@@ -392,10 +408,15 @@ sequenceDiagram
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Admin: 404
     else 브랜드 존재
-        Facade->>+Service: updateBrand(brand, name, ...)
-        Service->>DB: UPDATE brand
-        deactivate Service
-        Controller-->>Admin: 200
+        alt BRAND_ADMIN이면서 자신의 브랜드가 아님
+            Facade-->>Controller: CoreException(FORBIDDEN)
+            Controller-->>Admin: 403
+        else 권한 있음
+            Facade->>+Service: updateBrand(brand, name, ...)
+            Service->>DB: UPDATE brand
+            deactivate Service
+            Controller-->>Admin: 200
+        end
     end
     deactivate Facade
     deactivate Controller
@@ -414,25 +435,30 @@ sequenceDiagram
     participant DB
 
     Admin->>+Controller: DELETE /api-admin/v1/brands/{brandId}
-    Controller->>+Facade: deleteBrand(brandId)
 
-    Facade->>+Service: getBrand(brandId)
-    Service->>+DB: SELECT brand WHERE id = brandId
-    DB-->>-Service: brand | null
-    deactivate Service
+    alt SUPER_ADMIN이 아님
+        Controller-->>Admin: 403
+    else SUPER_ADMIN
+        Controller->>+Facade: deleteBrand(brandId)
 
-    alt 브랜드 없음 또는 삭제됨
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
-    else 브랜드 존재
-        Facade->>+Service: deleteBrand(brand)
-        Note over Service,DB: @Transactional
-        Service->>DB: soft delete products WHERE brandId
-        Service->>DB: soft delete brand
+        Facade->>+Service: getBrand(brandId)
+        Service->>+DB: SELECT brand WHERE id = brandId
+        DB-->>-Service: brand | null
         deactivate Service
-        Controller-->>Admin: 200
+
+        alt 브랜드 없음 또는 삭제됨
+            Facade-->>Controller: CoreException(NOT_FOUND)
+            Controller-->>Admin: 404
+        else 브랜드 존재
+            Facade->>+Service: deleteBrand(brand)
+            Note over Service,DB: @Transactional
+            Service->>DB: soft delete products WHERE brandId
+            Service->>DB: soft delete brand
+            deactivate Service
+            Controller-->>Admin: 200
+        end
+        deactivate Facade
     end
-    deactivate Facade
     deactivate Controller
 ```
 
@@ -466,10 +492,15 @@ sequenceDiagram
             Facade-->>Controller: CoreException(NOT_FOUND)
             Controller-->>Admin: 404
         else 브랜드 존재
-            Facade->>+Service: createProduct(brand, name, price, stock, description)
-            Service->>DB: INSERT product
-            deactivate Service
-            Controller-->>Admin: 201
+            alt BRAND_ADMIN이면서 자신의 브랜드가 아님
+                Facade-->>Controller: CoreException(FORBIDDEN)
+                Controller-->>Admin: 403
+            else 권한 있음
+                Facade->>+Service: createProduct(brand, name, price, stock, description)
+                Service->>DB: INSERT product
+                deactivate Service
+                Controller-->>Admin: 201
+            end
         end
     end
     deactivate Facade
@@ -488,6 +519,7 @@ sequenceDiagram
 
     Admin->>+Controller: GET /api-admin/v1/products?page=0&size=20&brandId={brandId}
     Controller->>+Facade: getProducts(page, size, brandId)
+    Note over Facade: BRAND_ADMIN이면 자신의 brandId로 강제 필터링
     Facade->>+Service: findProducts(page, size, brandId)
     Service->>+DB: SELECT products (filter + pagination)
     DB-->>-Service: product list
@@ -517,7 +549,12 @@ sequenceDiagram
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Admin: 404
     else 상품 존재
-        Controller-->>Admin: 200
+        alt BRAND_ADMIN이면서 자신의 브랜드 상품이 아님
+            Facade-->>Controller: CoreException(FORBIDDEN)
+            Controller-->>Admin: 403
+        else 권한 있음
+            Controller-->>Admin: 200
+        end
     end
     deactivate Facade
     deactivate Controller
@@ -544,14 +581,19 @@ sequenceDiagram
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Admin: 404
     else 상품 존재
-        alt 브랜드 변경 시도
-            Facade-->>Controller: CoreException(BAD_REQUEST)
-            Controller-->>Admin: 400
-        else 브랜드 변경 없음
-            Facade->>+Service: updateProduct(product, name, price, stock, description)
-            Service->>DB: UPDATE product
-            deactivate Service
-            Controller-->>Admin: 200
+        alt BRAND_ADMIN이면서 자신의 브랜드 상품이 아님
+            Facade-->>Controller: CoreException(FORBIDDEN)
+            Controller-->>Admin: 403
+        else 권한 있음
+            alt 브랜드 변경 시도
+                Facade-->>Controller: CoreException(BAD_REQUEST)
+                Controller-->>Admin: 400
+            else 브랜드 변경 없음
+                Facade->>+Service: updateProduct(product, name, price, stock, description)
+                Service->>DB: UPDATE product
+                deactivate Service
+                Controller-->>Admin: 200
+            end
         end
     end
     deactivate Facade
@@ -579,10 +621,15 @@ sequenceDiagram
         Facade-->>Controller: CoreException(NOT_FOUND)
         Controller-->>Admin: 404
     else 상품 존재
-        Facade->>+Service: deleteProduct(product)
-        Service->>DB: soft delete product
-        deactivate Service
-        Controller-->>Admin: 200
+        alt BRAND_ADMIN이면서 자신의 브랜드 상품이 아님
+            Facade-->>Controller: CoreException(FORBIDDEN)
+            Controller-->>Admin: 403
+        else 권한 있음
+            Facade->>+Service: deleteProduct(product)
+            Service->>DB: soft delete product
+            deactivate Service
+            Controller-->>Admin: 200
+        end
     end
     deactivate Facade
     deactivate Controller
@@ -603,13 +650,19 @@ sequenceDiagram
     participant DB
 
     Admin->>+Controller: GET /api-admin/v1/orders?page=0&size=20
-    Controller->>+Facade: getAllOrders(page, size)
-    Facade->>+Service: findAllOrders(page, size)
-    Service->>+DB: SELECT orders (pagination)
-    DB-->>-Service: order list
-    deactivate Service
-    deactivate Facade
-    Controller-->>-Admin: 200
+
+    alt SUPER_ADMIN이 아님
+        Controller-->>Admin: 403
+    else SUPER_ADMIN
+        Controller->>+Facade: getAllOrders(page, size)
+        Facade->>+Service: findAllOrders(page, size)
+        Service->>+DB: SELECT orders (pagination)
+        DB-->>-Service: order list
+        deactivate Service
+        deactivate Facade
+        Controller-->>Admin: 200
+    end
+    deactivate Controller
 ```
 
 ### 9-2. 주문 상세 조회
@@ -623,18 +676,23 @@ sequenceDiagram
     participant DB
 
     Admin->>+Controller: GET /api-admin/v1/orders/{orderId}
-    Controller->>+Facade: getOrder(orderId)
-    Facade->>+Service: getOrder(orderId)
-    Service->>+DB: SELECT order WHERE id = orderId
-    DB-->>-Service: order | null
-    deactivate Service
 
-    alt 주문 없음
-        Facade-->>Controller: CoreException(NOT_FOUND)
-        Controller-->>Admin: 404
-    else 주문 존재
-        Controller-->>Admin: 200
+    alt SUPER_ADMIN이 아님
+        Controller-->>Admin: 403
+    else SUPER_ADMIN
+        Controller->>+Facade: getOrder(orderId)
+        Facade->>+Service: getOrder(orderId)
+        Service->>+DB: SELECT order WHERE id = orderId
+        DB-->>-Service: order | null
+        deactivate Service
+
+        alt 주문 없음
+            Facade-->>Controller: CoreException(NOT_FOUND)
+            Controller-->>Admin: 404
+        else 주문 존재
+            Controller-->>Admin: 200
+        end
+        deactivate Facade
     end
-    deactivate Facade
     deactivate Controller
 ```

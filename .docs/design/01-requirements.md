@@ -151,17 +151,32 @@
 
 ### 🔧 어드민
 
+### 역할 정의
+
+| 역할 | 설명 | 브랜드 귀속 |
+|------|------|------------|
+| `CUSTOMER` | 일반 고객 | — |
+| `BRAND_ADMIN` | 특정 브랜드 담당 어드민 | 1개 브랜드에 귀속 |
+| `SUPER_ADMIN` | 전체 관리 어드민 | — |
+
+---
+
 #### 시나리오 7. 어드민이 브랜드를 등록·관리한다
 
-어드민만 브랜드를 생성·수정·삭제할 수 있다. 일반 유저는 이 기능에 접근할 수 없다.
+브랜드를 생성·수정·삭제할 수 있다. 일반 유저는 이 기능에 접근할 수 없다.
 
-| METHOD | URI | 인증 | 설명 |
-|--------|-----|:----:|------|
-| POST | `/api-admin/v1/brands` | O | 브랜드 등록 |
-| GET | `/api-admin/v1/brands?page=0&size=20` | O | 브랜드 목록 조회 |
-| GET | `/api-admin/v1/brands/{brandId}` | O | 브랜드 상세 조회 |
-| PUT | `/api-admin/v1/brands/{brandId}` | O | 브랜드 수정 |
-| DELETE | `/api-admin/v1/brands/{brandId}` | O | 브랜드 삭제 |
+| METHOD | URI | 인증 | 역할 | 설명 |
+|--------|-----|:----:|------|------|
+| POST | `/api-admin/v1/brands` | O | SUPER_ADMIN | 브랜드 등록 |
+| GET | `/api-admin/v1/brands?page=0&size=20` | O | SUPER_ADMIN | 브랜드 목록 조회 |
+| GET | `/api-admin/v1/brands/{brandId}` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 브랜드 상세 조회 |
+| PUT | `/api-admin/v1/brands/{brandId}` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 브랜드 수정 |
+| DELETE | `/api-admin/v1/brands/{brandId}` | O | SUPER_ADMIN | 브랜드 삭제 |
+
+**BRAND_ADMIN 제한**
+- 자신의 브랜드 상세 조회·수정만 허용된다
+- 브랜드 등록·삭제·목록 조회는 SUPER_ADMIN만 가능하다
+- 다른 브랜드 접근 시도 → 403
 
 **등록**
 - 브랜드명은 필수 입력값이다
@@ -175,20 +190,27 @@
 
 **예외**
 - 존재하지 않는 브랜드 접근 → 404
+- 다른 브랜드 접근 시도 (BRAND_ADMIN) → 403
 
 ---
 
 #### 시나리오 8. 어드민이 상품을 등록·관리한다
 
-어드민만 상품을 생성·수정·삭제할 수 있다.
+상품을 생성·수정·삭제할 수 있다.
 
-| METHOD | URI | 인증 | 설명 |
-|--------|-----|:----:|------|
-| POST | `/api-admin/v1/products` | O | 상품 등록 |
-| GET | `/api-admin/v1/products?page=0&size=20&brandId={brandId}` | O | 상품 목록 조회 |
-| GET | `/api-admin/v1/products/{productId}` | O | 상품 상세 조회 |
-| PUT | `/api-admin/v1/products/{productId}` | O | 상품 수정 |
-| DELETE | `/api-admin/v1/products/{productId}` | O | 상품 삭제 |
+| METHOD | URI | 인증 | 역할 | 설명 |
+|--------|-----|:----:|------|------|
+| POST | `/api-admin/v1/products` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 상품 등록 |
+| GET | `/api-admin/v1/products?page=0&size=20&brandId={brandId}` | O | SUPER_ADMIN, BRAND_ADMIN(자동 필터) | 상품 목록 조회 |
+| GET | `/api-admin/v1/products/{productId}` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 상품 상세 조회 |
+| PUT | `/api-admin/v1/products/{productId}` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 상품 수정 |
+| DELETE | `/api-admin/v1/products/{productId}` | O | SUPER_ADMIN, BRAND_ADMIN(자신의 브랜드) | 상품 삭제 |
+
+**BRAND_ADMIN 제한**
+- 자신의 브랜드 상품만 등록·조회·수정·삭제할 수 있다
+- 상품 목록 조회 시 자신의 brandId로 자동 필터링된다 (쿼리 파라미터 무시)
+- 다른 브랜드 상품 접근 시도 → 403
+- 상품 등록 시 다른 브랜드 지정 시도 → 403
 
 **등록**
 - 상품은 반드시 기존에 등록된 브랜드에 속해야 한다
@@ -207,17 +229,18 @@
 - 등록되지 않은 브랜드로 상품 등록 시도 → 404
 - 상품 수정 시 브랜드 변경 시도 → 400
 - 존재하지 않는 상품 접근 → 404
+- 다른 브랜드 상품 접근 시도 (BRAND_ADMIN) → 403
 
 ---
 
 #### 시나리오 9. 어드민이 전체 주문을 조회한다
 
-어드민은 모든 유저의 주문을 조회할 수 있다.
+SUPER_ADMIN은 모든 유저의 주문을 조회할 수 있다.
 
-| METHOD | URI | 인증 | 설명 |
-|--------|-----|:----:|------|
-| GET | `/api-admin/v1/orders?page=0&size=20` | O | 전체 주문 목록 조회 |
-| GET | `/api-admin/v1/orders/{orderId}` | O | 주문 상세 조회 |
+| METHOD | URI | 인증 | 역할 | 설명 |
+|--------|-----|:----:|------|------|
+| GET | `/api-admin/v1/orders?page=0&size=20` | O | SUPER_ADMIN | 전체 주문 목록 조회 |
+| GET | `/api-admin/v1/orders/{orderId}` | O | SUPER_ADMIN | 주문 상세 조회 |
 
 **목록 조회**
 - 전체 주문을 페이지 단위로 조회한다
@@ -258,10 +281,14 @@
 - **주문 목록 조회**: 날짜 범위 필터
 - **주문 상세 조회**
 
-**어드민**
+**어드민 (SUPER_ADMIN)**
 - **브랜드 관리**: 등록 / 목록 조회 / 상세 조회 / 수정 / 삭제 (삭제 시 소속 상품 함께 삭제)
-- **상품 관리**: 등록 / 목록 조회 (브랜드 필터) / 상세 조회 / 수정 / 삭제
+- **상품 관리**: 전체 브랜드 상품 등록 / 목록 조회 / 상세 조회 / 수정 / 삭제
 - **주문 조회**: 전체 주문 목록 조회 / 주문 상세 조회
+
+**어드민 (BRAND_ADMIN)**
+- **브랜드 관리**: 자신의 브랜드 상세 조회 / 수정
+- **상품 관리**: 자신의 브랜드 상품 등록 / 목록 조회 / 상세 조회 / 수정 / 삭제
 
 ---
 
@@ -272,5 +299,5 @@
 - **응답 속도**: 상품 목록 조회, 좋아요 등록 등 고객 인터랙션은 체감상 즉각 반영되어야 한다
 - **데이터 불변성**: 주문 완료 후 상품 정보가 변경되어도 주문 기록의 상품명·가격은 변하지 않아야 한다
 - **데이터 일관성**: 주문 시 재고 확인과 차감은 원자적으로 처리되어야 한다
-- **접근 제어**: 고객은 본인의 데이터(주문)만 접근할 수 있다. 어드민 기능은 어드민 인증을 통해서만 접근 가능하다
+- **접근 제어**: 고객은 본인의 데이터(주문)만 접근할 수 있다. SUPER_ADMIN은 전체 브랜드·상품·주문을 관리할 수 있고, BRAND_ADMIN은 자신의 브랜드 상품 관리에만 접근할 수 있다
 - **동시성**: 동일 상품에 동시 주문이 발생해도 재고가 초과 차감되지 않아야 한다. 재고가 부족해진 시점 이후의 주문은 실패 처리된다. 비관적 락(Pessimistic Lock)으로 구현한다.

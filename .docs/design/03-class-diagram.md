@@ -21,11 +21,20 @@ classDiagram
         +isDeleted() boolean
     }
 
+    class Role {
+        <<enumeration>>
+        CUSTOMER
+        BRAND_ADMIN
+        SUPER_ADMIN
+    }
+
     class UserModel {
         +String loginId
         +String password
         +String email
         +Gender gender
+        +Role role
+        +Long brandId
     }
 
     class BrandModel {
@@ -79,6 +88,8 @@ classDiagram
     BaseEntity <|-- OrderModel
     BaseEntity <|-- OrderItemModel
 
+    UserModel --> Role
+    UserModel "N" --> "0..1" BrandModel : "brandId (nullable)"
     BrandModel "1" --> "N" ProductModel
     UserModel "1" --> "N" LikeModel
     ProductModel "1" --> "N" LikeModel
@@ -105,6 +116,10 @@ classDiagram
 
 ### ProductModel — likeCount 역정규화
 `likes_desc` 정렬을 집계 쿼리로 처리하면 페이지마다 `GROUP BY` + `COUNT` 조합이 발생해 성능 보장이 어렵다. `ProductModel`에 `likeCount` 필드를 역정규화하고, 좋아요 등록·취소 시 `like_count = like_count ± 1` 형태의 DB 원자 UPDATE로 처리한다. 이렇게 하면 동시성 문제 없이 `ORDER BY like_count DESC` 단순 인덱스 정렬이 가능하다. 메서드명은 구현 방식이 아닌 도메인 이벤트를 기준으로 `likeAdded()` / `likeRemoved()`로 명명한다.
+
+### UserModel — role + brandId
+
+`role`은 `CUSTOMER`, `BRAND_ADMIN`, `SUPER_ADMIN` 세 가지 값을 갖는다. `brandId`는 `BRAND_ADMIN`일 때만 값이 존재하며, 나머지 역할에서는 null이다. 어드민 기능의 접근 범위는 이 두 필드로 결정된다.
 
 ### OrderModel — 주문 총액은 집계 쿼리
 주문 항목 수는 수십 개 수준이므로 `SUM(price * quantity)` 집계 부담이 크지 않다. 총액은 추후 결제 도메인 추가 시 계산 방식이 달라질 수 있어 지금 역정규화하지 않는다.
