@@ -456,12 +456,12 @@ sequenceDiagram
     participant OrderService
     participant OrderRepository
 
-    OrderV1Controller->>OrderFacade: getOrders(userId, startAt, endAt)
-    OrderFacade->>OrderService: getOrders(userId, startAt, endAt)
-    OrderService->>OrderRepository: findByUserIdAndCreatedAtBetween(userId, startAt, endAt)
-    OrderRepository-->>OrderService: List~OrderModel~
-    OrderService-->>OrderFacade: List~OrderModel~
-    OrderFacade-->>OrderV1Controller: List~OrderInfo~
+    OrderV1Controller->>OrderFacade: getOrders(userId, startAt, endAt, pageable)
+    OrderFacade->>OrderService: getOrders(userId, startAt, endAt, pageable)
+    OrderService->>OrderRepository: findByUserIdAndCreatedAtBetween(userId, startAt, endAt, pageable)
+    OrderRepository-->>OrderService: Page~OrderModel~
+    OrderService-->>OrderFacade: Page~OrderModel~
+    OrderFacade-->>OrderV1Controller: Page~OrderInfo~
 ```
 
 ---

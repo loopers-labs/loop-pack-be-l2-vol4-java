@@ -160,7 +160,7 @@ infrastructure/
 | Method | URI | 설명 |
 |---|---|---|
 | POST | `/api/v1/orders` | 주문 생성 |
-| GET | `/api/v1/orders?startAt=&endAt=` | 내 주문 목록 |
+| GET | `/api/v1/orders?startAt=&endAt=&page=0&size=20` | 내 주문 목록 (page 기본값 0, size 기본값 20) |
 | GET | `/api/v1/orders/{orderId}` | 주문 단건 조회 |
 
 **Admin**
@@ -350,15 +350,20 @@ infrastructure/
   "createdAt": "2026-05-20T10:00:00"
 }
 
-// GET /api/v1/orders?startAt=2026-05-01&endAt=2026-05-31  →  200
-[
-  {
-    "orderId": 10,
-    "status": "COMPLETED",
-    "totalAmount": 380000,
-    "createdAt": "2026-05-20T10:00:00"
-  }
-]
+// GET /api/v1/orders?startAt=2026-05-01&endAt=2026-05-31&page=0&size=20  →  200
+{
+  "content": [
+    {
+      "orderId": 10,
+      "status": "COMPLETED",
+      "totalAmount": 380000,
+      "createdAt": "2026-05-20T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 3
+}
 
 // GET /api/v1/orders/{orderId}  →  200
 {
