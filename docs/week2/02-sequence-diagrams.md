@@ -12,21 +12,21 @@ sequenceDiagram
     participant BrandService
     participant BrandRepository
 
-    User->>BrandController: GET /api/v1/brands/{brandId}
-    BrandController->>BrandFacade: getBrand(brandId)
-    BrandFacade->>BrandService: getBrand(brandId)
-    BrandService->>BrandRepository: findById(brandId)
+    User->>+BrandController: GET /api/v1/brands/{brandId}
+    BrandController->>+BrandFacade: getBrand(brandId)
+    BrandFacade->>+BrandService: getBrand(brandId)
+    BrandService->>+BrandRepository: findById(brandId)
 
     alt 존재하지 않거나 삭제된 브랜드
-        BrandRepository-->>BrandService: null
-        BrandService-->>BrandFacade: 404 Not Found
-        BrandFacade-->>BrandController: 404 Not Found
-        BrandController-->>User: 404 Not Found
+        BrandRepository-->>-BrandService: null
+        BrandService-->>-BrandFacade: 404 Not Found
+        BrandFacade-->>-BrandController: 404 Not Found
+        BrandController-->>-User: 404 Not Found
     else 브랜드 존재
-        BrandRepository-->>BrandService: brand
-        BrandService-->>BrandFacade: brand
-        BrandFacade-->>BrandController: brandResponse
-        BrandController-->>User: 200 OK
+        BrandRepository-->>-BrandService: brand
+        BrandService-->>-BrandFacade: brand
+        BrandFacade-->>-BrandController: brandResponse
+        BrandController-->>-User: 200 OK
     end
 ```
 
@@ -42,14 +42,14 @@ sequenceDiagram
     participant ProductService
     participant ProductRepository
 
-    User->>ProductController: GET /api/v1/products?brandId=&sort=&page=&size=
-    ProductController->>ProductFacade: getProducts(brandId, sort, page, size)
-    ProductFacade->>ProductService: getProducts(brandId, sort, page, size)
-    ProductService->>ProductRepository: findAll(brandId, sort, pageable)
-    ProductRepository-->>ProductService: products
-    ProductService-->>ProductFacade: products
-    ProductFacade-->>ProductController: productListResponse
-    ProductController-->>User: 200 OK
+    User->>+ProductController: GET /api/v1/products?brandId=&sort=&page=&size=
+    ProductController->>+ProductFacade: getProducts(brandId, sort, page, size)
+    ProductFacade->>+ProductService: getProducts(brandId, sort, page, size)
+    ProductService->>+ProductRepository: findAll(brandId, sort, pageable)
+    ProductRepository-->>-ProductService: products
+    ProductService-->>-ProductFacade: products
+    ProductFacade-->>-ProductController: productListResponse
+    ProductController-->>-User: 200 OK
 ```
 
 **읽는 포인트**
@@ -68,21 +68,21 @@ sequenceDiagram
     participant ProductService
     participant ProductRepository
 
-    User->>ProductController: GET /api/v1/products/{productId}
-    ProductController->>ProductFacade: getProduct(productId)
-    ProductFacade->>ProductService: getProduct(productId)
-    ProductService->>ProductRepository: findById(productId)
+    User->>+ProductController: GET /api/v1/products/{productId}
+    ProductController->>+ProductFacade: getProduct(productId)
+    ProductFacade->>+ProductService: getProduct(productId)
+    ProductService->>+ProductRepository: findById(productId)
 
     alt 존재하지 않거나 삭제된 상품
-        ProductRepository-->>ProductService: null
-        ProductService-->>ProductFacade: 404 Not Found
-        ProductFacade-->>ProductController: 404 Not Found
-        ProductController-->>User: 404 Not Found
+        ProductRepository-->>-ProductService: null
+        ProductService-->>-ProductFacade: 404 Not Found
+        ProductFacade-->>-ProductController: 404 Not Found
+        ProductController-->>-User: 404 Not Found
     else 상품 존재
-        ProductRepository-->>ProductService: product
-        ProductService-->>ProductFacade: product
-        ProductFacade-->>ProductController: productResponse
-        ProductController-->>User: 200 OK
+        ProductRepository-->>-ProductService: product
+        ProductService-->>-ProductFacade: product
+        ProductFacade-->>-ProductController: productResponse
+        ProductController-->>-User: 200 OK
     end
 ```
 
@@ -100,22 +100,26 @@ sequenceDiagram
     participant LikeService
     participant LikeRepository
 
-    User->>LikeController: POST /api/v1/products/{productId}/likes
-    LikeController->>LikeFacade: addLike(userId, productId)
-    LikeFacade->>LikeService: addLike(userId, productId)
-    LikeService->>LikeRepository: exists(userId, productId)
+    User->>+LikeController: POST /api/v1/products/{productId}/likes
+    LikeController->>+LikeFacade: addLike(userId, productId)
+    LikeFacade->>+LikeService: addLike(userId, productId)
+    LikeService->>+LikeRepository: exists(userId, productId)
 
     alt 이미 좋아요한 경우
-        LikeRepository-->>LikeService: true
-        LikeService-->>LikeFacade: 200 OK (무시)
+        LikeRepository-->>-LikeService: true
+        LikeService-->>-LikeFacade: 200 OK (무시)
+        LikeFacade-->>-LikeController: 200 OK
+        LikeController-->>-User: 200 OK
     else 좋아요 없음
-        LikeService->>LikeRepository: save(like)
-        LikeService->>LikeRepository: incrementLikeCount(productId)
-        LikeService-->>LikeFacade: 200 OK
+        LikeRepository-->>-LikeService: false
+        LikeService->>+LikeRepository: save(like)
+        LikeRepository-->>-LikeService: saved
+        LikeService->>+LikeRepository: incrementLikeCount(productId)
+        LikeRepository-->>-LikeService: updated
+        LikeService-->>-LikeFacade: 200 OK
+        LikeFacade-->>-LikeController: 200 OK
+        LikeController-->>-User: 200 OK
     end
-
-    LikeFacade-->>LikeController: 200 OK
-    LikeController-->>User: 200 OK
 ```
 
 **읽는 포인트**
@@ -134,22 +138,26 @@ sequenceDiagram
     participant LikeService
     participant LikeRepository
 
-    User->>LikeController: DELETE /api/v1/products/{productId}/likes
-    LikeController->>LikeFacade: removeLike(userId, productId)
-    LikeFacade->>LikeService: removeLike(userId, productId)
-    LikeService->>LikeRepository: exists(userId, productId)
+    User->>+LikeController: DELETE /api/v1/products/{productId}/likes
+    LikeController->>+LikeFacade: removeLike(userId, productId)
+    LikeFacade->>+LikeService: removeLike(userId, productId)
+    LikeService->>+LikeRepository: exists(userId, productId)
 
     alt 좋아요 없음
-        LikeRepository-->>LikeService: false
-        LikeService-->>LikeFacade: 200 OK (무시)
+        LikeRepository-->>-LikeService: false
+        LikeService-->>-LikeFacade: 200 OK (무시)
+        LikeFacade-->>-LikeController: 200 OK
+        LikeController-->>-User: 200 OK
     else 좋아요 존재
-        LikeService->>LikeRepository: delete(userId, productId)
-        LikeService->>LikeRepository: decrementLikeCount(productId)
-        LikeService-->>LikeFacade: 200 OK
+        LikeRepository-->>-LikeService: true
+        LikeService->>+LikeRepository: delete(userId, productId)
+        LikeRepository-->>-LikeService: deleted
+        LikeService->>+LikeRepository: decrementLikeCount(productId)
+        LikeRepository-->>-LikeService: updated
+        LikeService-->>-LikeFacade: 200 OK
+        LikeFacade-->>-LikeController: 200 OK
+        LikeController-->>-User: 200 OK
     end
-
-    LikeFacade-->>LikeController: 200 OK
-    LikeController-->>User: 200 OK
 ```
 
 ---
@@ -164,19 +172,19 @@ sequenceDiagram
     participant LikeService
     participant LikeRepository
 
-    User->>LikeController: GET /api/v1/users/{userId}/likes
-    LikeController->>LikeFacade: getLikes(requestUserId, userId)
+    User->>+LikeController: GET /api/v1/users/{userId}/likes
+    LikeController->>+LikeFacade: getLikes(requestUserId, userId)
 
     alt 요청자 != 조회 대상 유저
-        LikeFacade-->>LikeController: 403 Forbidden
-        LikeController-->>User: 403 Forbidden
+        LikeFacade-->>-LikeController: 403 Forbidden
+        LikeController-->>-User: 403 Forbidden
     else 본인 요청
-        LikeFacade->>LikeService: getLikes(userId)
-        LikeService->>LikeRepository: findAllByUserId(userId)
-        LikeRepository-->>LikeService: likes
-        LikeService-->>LikeFacade: likedProducts
-        LikeFacade-->>LikeController: likeListResponse
-        LikeController-->>User: 200 OK
+        LikeFacade->>+LikeService: getLikes(userId)
+        LikeService->>+LikeRepository: findAllByUserId(userId)
+        LikeRepository-->>-LikeService: likes
+        LikeService-->>-LikeFacade: likedProducts
+        LikeFacade-->>-LikeController: likeListResponse
+        LikeController-->>-User: 200 OK
     end
 ```
 
@@ -196,28 +204,30 @@ sequenceDiagram
     participant OrderRepository
     participant OrderItemSnapshotRepository
 
-    User->>OrderController: POST /api/v1/orders
-    OrderController->>OrderFacade: createOrder(userId, items)
+    User->>+OrderController: POST /api/v1/orders
+    OrderController->>+OrderFacade: createOrder(userId, items)
 
     loop 각 주문 항목
-        OrderFacade->>StockService: deductIfAvailable(productId, quantity)
-
+        OrderFacade->>+StockService: deductIfAvailable(productId, quantity)
         alt 재고 충분
-            StockService-->>OrderFacade: ORDERED
+            StockService-->>-OrderFacade: ORDERED
         else 재고 부족 또는 상품 없음
-            StockService-->>OrderFacade: SKIPPED
+            StockService-->>-OrderFacade: SKIPPED
         end
     end
 
     alt ORDERED 항목 없음
-        OrderFacade-->>OrderController: 400 Bad Request
+        OrderFacade-->>-OrderController: 400 Bad Request
+        OrderController-->>-User: 400 Bad Request
     else ORDERED 항목 있음
-        OrderFacade->>OrderService: createOrder(userId, orderedItems, skippedItems)
-        OrderService->>OrderRepository: save(order, orderItems)
-        OrderService->>OrderItemSnapshotRepository: save(productName, price, brandName)
-        OrderService-->>OrderFacade: orderResult
-        OrderFacade-->>OrderController: { orderedItems, skippedItems }
-        OrderController-->>User: 200 OK
+        OrderFacade->>+OrderService: createOrder(userId, orderedItems, skippedItems)
+        OrderService->>+OrderRepository: save(order, orderItems)
+        OrderRepository-->>-OrderService: savedOrder
+        OrderService->>+OrderItemSnapshotRepository: save(productName, price, brandName)
+        OrderItemSnapshotRepository-->>-OrderService: saved
+        OrderService-->>-OrderFacade: orderResult
+        OrderFacade-->>-OrderController: { orderedItems, skippedItems }
+        OrderController-->>-User: 200 OK
     end
 ```
 
@@ -238,19 +248,19 @@ sequenceDiagram
     participant OrderService
     participant OrderRepository
 
-    User->>OrderController: GET /api/v1/orders?startAt=&endAt=
-    OrderController->>OrderFacade: getOrders(userId, startAt, endAt)
+    User->>+OrderController: GET /api/v1/orders?startAt=&endAt=
+    OrderController->>+OrderFacade: getOrders(userId, startAt, endAt)
 
     alt startAt > endAt
-        OrderFacade-->>OrderController: 400 Bad Request
-        OrderController-->>User: 400 Bad Request
+        OrderFacade-->>-OrderController: 400 Bad Request
+        OrderController-->>-User: 400 Bad Request
     else 유효한 날짜 범위
-        OrderFacade->>OrderService: getOrders(userId, startAt, endAt)
-        OrderService->>OrderRepository: findAllByUserIdAndDateRange(userId, startAt, endAt)
-        OrderRepository-->>OrderService: orders
-        OrderService-->>OrderFacade: orders
-        OrderFacade-->>OrderController: orderListResponse
-        OrderController-->>User: 200 OK
+        OrderFacade->>+OrderService: getOrders(userId, startAt, endAt)
+        OrderService->>+OrderRepository: findAllByUserIdAndDateRange(userId, startAt, endAt)
+        OrderRepository-->>-OrderService: orders
+        OrderService-->>-OrderFacade: orders
+        OrderFacade-->>-OrderController: orderListResponse
+        OrderController-->>-User: 200 OK
     end
 ```
 
@@ -266,26 +276,26 @@ sequenceDiagram
     participant OrderService
     participant OrderRepository
 
-    User->>OrderController: GET /api/v1/orders/{orderId}
-    OrderController->>OrderFacade: getOrder(userId, orderId)
-    OrderFacade->>OrderService: getOrder(userId, orderId)
-    OrderService->>OrderRepository: findById(orderId)
+    User->>+OrderController: GET /api/v1/orders/{orderId}
+    OrderController->>+OrderFacade: getOrder(userId, orderId)
+    OrderFacade->>+OrderService: getOrder(userId, orderId)
+    OrderService->>+OrderRepository: findById(orderId)
 
     alt 주문 없음
-        OrderRepository-->>OrderService: null
-        OrderService-->>OrderFacade: 404 Not Found
-        OrderFacade-->>OrderController: 404 Not Found
-        OrderController-->>User: 404 Not Found
+        OrderRepository-->>-OrderService: null
+        OrderService-->>-OrderFacade: 404 Not Found
+        OrderFacade-->>-OrderController: 404 Not Found
+        OrderController-->>-User: 404 Not Found
     else 타 유저 주문
-        OrderRepository-->>OrderService: order
-        OrderService-->>OrderFacade: 403 Forbidden
-        OrderFacade-->>OrderController: 403 Forbidden
-        OrderController-->>User: 403 Forbidden
+        OrderRepository-->>-OrderService: order
+        OrderService-->>-OrderFacade: 403 Forbidden
+        OrderFacade-->>-OrderController: 403 Forbidden
+        OrderController-->>-User: 403 Forbidden
     else 본인 주문
-        OrderRepository-->>OrderService: order
-        OrderService-->>OrderFacade: orderDetail
-        OrderFacade-->>OrderController: orderDetailResponse
-        OrderController-->>User: 200 OK
+        OrderRepository-->>-OrderService: order
+        OrderService-->>-OrderFacade: orderDetail
+        OrderFacade-->>-OrderController: orderDetailResponse
+        OrderController-->>-User: 200 OK
     end
 ```
 
@@ -304,38 +314,42 @@ sequenceDiagram
     participant ProductRepository
 
     alt 브랜드 등록
-        Admin->>BrandController: POST /api-admin/v1/brands
-        BrandController->>BrandFacade: createBrand(request)
-        BrandFacade->>BrandService: createBrand(request)
-        BrandService->>BrandRepository: save(brand)
-        BrandRepository-->>BrandService: savedBrand
-        BrandService-->>BrandFacade: brandResponse
-        BrandFacade-->>BrandController: brandResponse
-        BrandController-->>Admin: 200 OK
+        Admin->>+BrandController: POST /api-admin/v1/brands
+        BrandController->>+BrandFacade: createBrand(request)
+        BrandFacade->>+BrandService: createBrand(request)
+        BrandService->>+BrandRepository: save(brand)
+        BrandRepository-->>-BrandService: savedBrand
+        BrandService-->>-BrandFacade: brandResponse
+        BrandFacade-->>-BrandController: brandResponse
+        BrandController-->>-Admin: 200 OK
 
     else 브랜드 수정
-        Admin->>BrandController: PUT /api-admin/v1/brands/{brandId}
-        BrandController->>BrandFacade: updateBrand(brandId, request)
-        BrandFacade->>BrandService: updateBrand(brandId, request)
-        BrandService->>BrandRepository: findById(brandId)
-        BrandRepository-->>BrandService: brand
-        BrandService->>BrandRepository: update(brand)
-        BrandService-->>BrandFacade: brandResponse
-        BrandFacade-->>BrandController: brandResponse
-        BrandController-->>Admin: 200 OK
+        Admin->>+BrandController: PUT /api-admin/v1/brands/{brandId}
+        BrandController->>+BrandFacade: updateBrand(brandId, request)
+        BrandFacade->>+BrandService: updateBrand(brandId, request)
+        BrandService->>+BrandRepository: findById(brandId)
+        BrandRepository-->>-BrandService: brand
+        BrandService->>+BrandRepository: update(brand)
+        BrandRepository-->>-BrandService: updatedBrand
+        BrandService-->>-BrandFacade: brandResponse
+        BrandFacade-->>-BrandController: brandResponse
+        BrandController-->>-Admin: 200 OK
 
     else 브랜드 삭제
-        Admin->>BrandController: DELETE /api-admin/v1/brands/{brandId}
-        BrandController->>BrandFacade: deleteBrand(brandId)
-        BrandFacade->>BrandService: deleteBrand(brandId)
-        BrandService->>BrandRepository: findById(brandId)
-        BrandRepository-->>BrandService: brand
-        BrandService->>BrandRepository: softDelete(brandId)
-        BrandService->>ProductService: softDeleteByBrandId(brandId)
-        ProductService->>ProductRepository: softDeleteAllByBrandId(brandId)
-        BrandService-->>BrandFacade: 200 OK
-        BrandFacade-->>BrandController: 200 OK
-        BrandController-->>Admin: 200 OK
+        Admin->>+BrandController: DELETE /api-admin/v1/brands/{brandId}
+        BrandController->>+BrandFacade: deleteBrand(brandId)
+        BrandFacade->>+BrandService: deleteBrand(brandId)
+        BrandService->>+BrandRepository: findById(brandId)
+        BrandRepository-->>-BrandService: brand
+        BrandService->>+BrandRepository: softDelete(brandId)
+        BrandRepository-->>-BrandService: done
+        BrandService->>+ProductService: softDeleteByBrandId(brandId)
+        ProductService->>+ProductRepository: softDeleteAllByBrandId(brandId)
+        ProductRepository-->>-ProductService: done
+        ProductService-->>-BrandService: done
+        BrandService-->>-BrandFacade: 200 OK
+        BrandFacade-->>-BrandController: 200 OK
+        BrandController-->>-Admin: 200 OK
     end
 ```
 
@@ -357,44 +371,47 @@ sequenceDiagram
     participant ProductRepository
 
     alt 상품 등록
-        Admin->>ProductController: POST /api-admin/v1/products
-        ProductController->>ProductFacade: createProduct(request)
-        ProductFacade->>BrandService: getBrand(brandId)
+        Admin->>+ProductController: POST /api-admin/v1/products
+        ProductController->>+ProductFacade: createProduct(request)
+        ProductFacade->>+BrandService: getBrand(brandId)
 
         alt 브랜드 없음 or 삭제됨
-            BrandService-->>ProductFacade: 400 Bad Request
-            ProductFacade-->>ProductController: 400 Bad Request
-            ProductController-->>Admin: 400 Bad Request
+            BrandService-->>-ProductFacade: 400 Bad Request
+            ProductFacade-->>-ProductController: 400 Bad Request
+            ProductController-->>-Admin: 400 Bad Request
         else 브랜드 존재
-            ProductFacade->>ProductService: createProduct(request)
-            ProductService->>ProductRepository: save(product)
-            ProductRepository-->>ProductService: savedProduct
-            ProductService-->>ProductFacade: productResponse
-            ProductFacade-->>ProductController: productResponse
-            ProductController-->>Admin: 200 OK
+            BrandService-->>-ProductFacade: brand
+            ProductFacade->>+ProductService: createProduct(request)
+            ProductService->>+ProductRepository: save(product)
+            ProductRepository-->>-ProductService: savedProduct
+            ProductService-->>-ProductFacade: productResponse
+            ProductFacade-->>-ProductController: productResponse
+            ProductController-->>-Admin: 200 OK
         end
 
     else 상품 수정
-        Admin->>ProductController: PUT /api-admin/v1/products/{productId}
-        ProductController->>ProductFacade: updateProduct(productId, request)
-        ProductFacade->>ProductService: updateProduct(productId, request)
-        ProductService->>ProductRepository: findById(productId)
-        ProductRepository-->>ProductService: product
-        ProductService->>ProductRepository: update(product)
-        ProductService-->>ProductFacade: productResponse
-        ProductFacade-->>ProductController: productResponse
-        ProductController-->>Admin: 200 OK
+        Admin->>+ProductController: PUT /api-admin/v1/products/{productId}
+        ProductController->>+ProductFacade: updateProduct(productId, request)
+        ProductFacade->>+ProductService: updateProduct(productId, request)
+        ProductService->>+ProductRepository: findById(productId)
+        ProductRepository-->>-ProductService: product
+        ProductService->>+ProductRepository: update(product)
+        ProductRepository-->>-ProductService: updatedProduct
+        ProductService-->>-ProductFacade: productResponse
+        ProductFacade-->>-ProductController: productResponse
+        ProductController-->>-Admin: 200 OK
 
     else 상품 삭제
-        Admin->>ProductController: DELETE /api-admin/v1/products/{productId}
-        ProductController->>ProductFacade: deleteProduct(productId)
-        ProductFacade->>ProductService: deleteProduct(productId)
-        ProductService->>ProductRepository: findById(productId)
-        ProductRepository-->>ProductService: product
-        ProductService->>ProductRepository: softDelete(productId)
-        ProductService-->>ProductFacade: 200 OK
-        ProductFacade-->>ProductController: 200 OK
-        ProductController-->>Admin: 200 OK
+        Admin->>+ProductController: DELETE /api-admin/v1/products/{productId}
+        ProductController->>+ProductFacade: deleteProduct(productId)
+        ProductFacade->>+ProductService: deleteProduct(productId)
+        ProductService->>+ProductRepository: findById(productId)
+        ProductRepository-->>-ProductService: product
+        ProductService->>+ProductRepository: softDelete(productId)
+        ProductRepository-->>-ProductService: done
+        ProductService-->>-ProductFacade: 200 OK
+        ProductFacade-->>-ProductController: 200 OK
+        ProductController-->>-Admin: 200 OK
     end
 ```
 
@@ -415,31 +432,31 @@ sequenceDiagram
     participant OrderRepository
 
     alt 주문 목록 조회
-        Admin->>OrderController: GET /api-admin/v1/orders?page=&size=
-        OrderController->>OrderFacade: getOrders(page, size)
-        OrderFacade->>OrderService: getOrders(page, size)
-        OrderService->>OrderRepository: findAll(pageable)
-        OrderRepository-->>OrderService: orders
-        OrderService-->>OrderFacade: orders
-        OrderFacade-->>OrderController: orderListResponse
-        OrderController-->>Admin: 200 OK
+        Admin->>+OrderController: GET /api-admin/v1/orders?page=&size=
+        OrderController->>+OrderFacade: getOrders(page, size)
+        OrderFacade->>+OrderService: getOrders(page, size)
+        OrderService->>+OrderRepository: findAll(pageable)
+        OrderRepository-->>-OrderService: orders
+        OrderService-->>-OrderFacade: orders
+        OrderFacade-->>-OrderController: orderListResponse
+        OrderController-->>-Admin: 200 OK
 
     else 주문 상세 조회
-        Admin->>OrderController: GET /api-admin/v1/orders/{orderId}
-        OrderController->>OrderFacade: getOrder(orderId)
-        OrderFacade->>OrderService: getOrder(orderId)
-        OrderService->>OrderRepository: findById(orderId)
+        Admin->>+OrderController: GET /api-admin/v1/orders/{orderId}
+        OrderController->>+OrderFacade: getOrder(orderId)
+        OrderFacade->>+OrderService: getOrder(orderId)
+        OrderService->>+OrderRepository: findById(orderId)
 
         alt 주문 없음
-            OrderRepository-->>OrderService: null
-            OrderService-->>OrderFacade: 404 Not Found
-            OrderFacade-->>OrderController: 404 Not Found
-            OrderController-->>Admin: 404 Not Found
+            OrderRepository-->>-OrderService: null
+            OrderService-->>-OrderFacade: 404 Not Found
+            OrderFacade-->>-OrderController: 404 Not Found
+            OrderController-->>-Admin: 404 Not Found
         else 주문 존재
-            OrderRepository-->>OrderService: order
-            OrderService-->>OrderFacade: orderDetail
-            OrderFacade-->>OrderController: orderDetailResponse
-            OrderController-->>Admin: 200 OK
+            OrderRepository-->>-OrderService: order
+            OrderService-->>-OrderFacade: orderDetail
+            OrderFacade-->>-OrderController: orderDetailResponse
+            OrderController-->>-Admin: 200 OK
         end
     end
 ```
