@@ -200,7 +200,7 @@
 | D4 | `OrderStatus` enum 도입. 값: `CREATED` → `SUCCEEDED` / `FAILED` | 시퀀스에 그려진 결제 흐름의 성공·실패 분기와 일치. `CANCELED`(결제 후 취소) 등은 추후 라운드에 추가 |
 | D5 | 어드민 API **포함 — 단 이번 라운드는 스코프(상품·브랜드 조회)에 해당하는 어드민 *조회*만**. 등록·수정·삭제와 어드민 주문 조회는 추후. 대고객/어드민을 prefix·헤더로 분리 (`/api/v1`+LoginId/Pw vs `/api-admin/v1`+Ldap) | 명세에 어드민 기능이 명시됨. 도메인 모델은 공유하고 오퍼레이션·노출 정보만 분리. CUD 제약(D14·D16)은 미리 정의 |
 | D6 | 좋아요 멱등 = `UNIQUE(user_id, product_id)` + 서비스 분기 | DB 예외 의존 안 함. 흐름 가독성 우선 |
-| D7 | **다도메인 협력 흐름은 Facade `@Transactional` 합성 (B안)**. 주문은 `OrderFacade`가 `ProductService` + `StockService` + `OrderService` 호출, 좋아요는 `LikeFacade`가 `ProductService` + `LikeService` 호출 | 도메인별 책임 분리 강화 + Service-Service 의존 회피. 외부 I/O 없는 본 라운드 한정 — 결제 합류 시 외부 호출은 트랜잭션 밖으로 분리 |
+| D7 | **다도메인 협력은 Facade `@Transactional` 합성 (B안)** — 단 좋아요는 예외. 주문은 `OrderFacade`가 `ProductService` + `StockService` + `OrderService`를 *분기 없이* 합성. 좋아요는 `LikeFacade`가 `LikeService`에 **1:1 위임**하고, `LikeService`가 `ProductService`(상품 조회 + `like_count` 증감)와 협력 | 주문은 합성·분기가 Facade에 없어 규약대로. 좋아요는 *멱등 분기(등록·취소가 실제 반영될 때만 카운터 변경)*가 핵심 유스케이스 흐름이라 **Service 안에 두어야** 한다(Facade 분기 금지 규약) → `like_count` 갱신을 `ProductService` write로 호출. `like_count`는 약한 일관성(D3)이므로 Service↔Service 쓰기를 *이 카운터에 한해* 좁게 허용. 외부 I/O 없는 본 라운드 한정 |
 | D8 | `order_item.product_id` = 단순 BIGINT (논리적 FK도 약하게, JPA 연관 매핑 없음) | 스냅샷 의미 강조 + 상품 hard delete와 무관하게 주문 이력 보존. 다른 컬럼들과 달리 JPA `@ManyToOne` 매핑도 두지 않음 |
 | D9 | `like` 테이블명 → `product_like` | SQL 예약어 회피 + 의미 명확성 |
 | D10 | `order` 테이블명 → `orders` | SQL 예약어 회피 |
