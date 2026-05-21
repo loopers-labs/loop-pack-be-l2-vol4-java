@@ -32,12 +32,19 @@ classDiagram
         +Long brandId
         +String name
         +Long price
-        +Integer stockQuantity
         +ProductStatus status
-        +ProductModel(brandId, name, price, stockQuantity)
-        +update(name, price, stockQuantity)
+        +ProductModel(brandId, name, price)
+        +update(name, price)
         +suspend()
         +delete()
+    }
+
+    class ProductStockModel {
+        +Long productId
+        +Integer stockQuantity
+        +ProductStockModel(productId, stockQuantity)
+        +increase(quantity)
+        +decrease(quantity)
     }
 
     class OrderModel {
@@ -100,6 +107,7 @@ classDiagram
 
     BaseEntity <|-- BrandModel
     BaseEntity <|-- ProductModel
+    BaseEntity <|-- ProductStockModel
     BaseEntity <|-- OrderModel
     BaseEntity <|-- OrderItemModel
     BaseEntity <|-- WishlistModel
@@ -111,6 +119,7 @@ classDiagram
     UserModel --> UserRole
 
     BrandModel "1" --o "0..*" ProductModel : brandId
+    ProductModel "1" *-- "1" ProductStockModel : productId
     UserModel "1" --o "0..*" WishlistModel : userId
     ProductModel "1" --o "0..*" WishlistModel : productId
     UserModel "1" --o "0..*" OrderModel : userId
@@ -133,8 +142,13 @@ classDiagram
 | brandId | null 불허, 등록 후 변경 불가 |
 | name | null 불허, 2글자 이상 |
 | price | null 불허, 0 이상 |
-| stockQuantity | null 불허, 0 이상 |
 | status | 생성 시 `ACTIVE` 고정 |
+
+### ProductStockModel
+| 필드 | 규칙 |
+|------|------|
+| productId | null 불허, 상품 생성 시 함께 생성, 변경 불가 |
+| stockQuantity | null 불허, 0 이상 |
 
 ### OrderModel
 | 필드 | 규칙 |

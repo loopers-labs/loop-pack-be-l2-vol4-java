@@ -64,6 +64,7 @@ sequenceDiagram
     participant OrderService
     participant PaymentService
     participant ProductRepository
+    participant ProductStockRepository
     participant OrderRepository
     participant OrderItemRepository
     participant PaymentRepository
@@ -91,19 +92,23 @@ sequenceDiagram
                 ProductRepository-->>ProductService: Product(INACTIVE)
                 ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_ORDERABLE)
                 OrderFacade-->>Controller: 400 BAD_REQUEST
-            else 재고 부족
-                ProductRepository-->>ProductService: Product(ACTIVE)
-                ProductService-->>OrderFacade: CoreException(STOCK_NOT_ENOUGH)
-                OrderFacade-->>Controller: 400 BAD_REQUEST
             else 정상
                 ProductRepository-->>ProductService: Product(ACTIVE)
-                ProductService-->>OrderFacade: Product
+                ProductService->>ProductStockRepository: findByProductId(productId)
+                alt 재고 부족
+                    ProductStockRepository-->>ProductService: ProductStock(부족)
+                    ProductService-->>OrderFacade: CoreException(STOCK_NOT_ENOUGH)
+                    OrderFacade-->>Controller: 400 BAD_REQUEST
+                else 재고 충분
+                    ProductStockRepository-->>ProductService: ProductStock
+                    ProductService-->>OrderFacade: Product
+                end
             end
         end
 
         OrderFacade->>ProductService: decreaseStock(items)
-        ProductService->>ProductRepository: update stocks
-        ProductRepository-->>ProductService: ok
+        ProductService->>ProductStockRepository: update stocks
+        ProductStockRepository-->>ProductService: ok
 
         OrderFacade->>OrderService: createOrder(userId, items)
         OrderService->>OrderRepository: save(new Order) REQUESTED
@@ -181,6 +186,7 @@ sequenceDiagram
     participant ProductFacade
     participant ProductService
     participant ProductRepository
+    participant ProductStockRepository
 
     Admin->>Controller: PATCH /admin/products/{productId} {name?, price?, stockQuantity?}
     Note over Admin,Controller: 키가 있는 필드만 수정. stockQuantity 양수(추가) / 음수(차감)
@@ -207,6 +213,8 @@ sequenceDiagram
             ProductFacade-->>Controller: 400 BAD_REQUEST
         else stockQuantity 키 있고 수정 후 재고 < 0
             ProductRepository-->>ProductService: Product
+            ProductService->>ProductStockRepository: findByProductId(productId)
+            ProductStockRepository-->>ProductService: ProductStock
             ProductService-->>ProductFacade: CoreException(STOCK_UNDERFLOW)
             ProductFacade-->>Controller: 400 BAD_REQUEST
         else 정상
@@ -215,6 +223,10 @@ sequenceDiagram
             ProductFacade->>ProductService: update(productId, request)
             ProductService->>ProductRepository: save(product)
             ProductRepository-->>ProductService: ok
+            opt stockQuantity 키 존재
+                ProductService->>ProductStockRepository: save(productStock)
+                ProductStockRepository-->>ProductService: ok
+            end
             ProductFacade-->>Controller: ProductInfo
             Controller-->>Admin: 200 OK
         end

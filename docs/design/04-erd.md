@@ -36,8 +36,16 @@ erDiagram
         bigint brand_id FK
         varchar name
         bigint price
-        int stock_quantity
         varchar status "ACTIVE | INACTIVE"
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    product_stocks {
+        bigint id PK
+        bigint product_id FK "UK"
+        int stock_quantity
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -77,6 +85,7 @@ erDiagram
     users ||--o{ orders : "user_id"
     users ||--o{ wishlists : "user_id"
     brands ||--o{ products : "brand_id"
+    products ||--|| product_stocks : "product_id"
     orders ||--|{ order_items : "order_id"
     products ||--o{ order_items : "product_id"
     products ||--o{ wishlists : "product_id"
@@ -91,6 +100,7 @@ erDiagram
 | users | UNIQUE (userid) | 로그인 ID 중복 불가 |
 | brands | UNIQUE (name) | 브랜드명 중복 불가 |
 | orders | UNIQUE (order_number) | 주문 번호 중복 불가 |
+| product_stocks | UNIQUE (product_id) | 상품당 재고 레코드 1개 |
 | order_items | UNIQUE (order_id, product_id) | 동일 주문 내 상품 중복 불가 |
 | wishlists | UNIQUE (user_id, product_id) | 동일 사용자 찜 중복 불가 |
 
@@ -101,6 +111,7 @@ erDiagram
 | users → orders | 한 사용자는 여러 주문을 가질 수 있다 |
 | users → wishlists | 한 사용자는 여러 찜을 가질 수 있다 |
 | brands → products | 한 브랜드는 여러 상품을 가질 수 있다 |
+| products → product_stocks | 한 상품은 하나의 재고 레코드를 가진다 (1:1) |
 | orders → order_items | 한 주문은 하나 이상의 주문 항목을 가진다 |
 | products → order_items | 상품은 주문 항목에 이력 보존용으로 참조된다 |
 | products → wishlists | 한 상품은 여러 사용자에게 찜될 수 있다 |
