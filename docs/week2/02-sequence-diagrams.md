@@ -18,16 +18,21 @@ sequenceDiagram
     BrandService->>+BrandRepository: findById(brandId)
 
     alt 존재하지 않거나 삭제된 브랜드
-        BrandRepository-->>-BrandService: null
-        BrandService-->>-BrandFacade: 404 Not Found
-        BrandFacade-->>-BrandController: 404 Not Found
-        BrandController-->>-User: 404 Not Found
+        BrandRepository-->>BrandService: null
+        BrandService-->>BrandFacade: 404 Not Found
+        BrandFacade-->>BrandController: 404 Not Found
+        BrandController-->>User: 404 Not Found
     else 브랜드 존재
-        BrandRepository-->>-BrandService: brand
-        BrandService-->>-BrandFacade: brand
-        BrandFacade-->>-BrandController: brandResponse
-        BrandController-->>-User: 200 OK
+        BrandRepository-->>BrandService: brand
+        BrandService-->>BrandFacade: brand
+        BrandFacade-->>BrandController: brandResponse
+        BrandController-->>User: 200 OK
     end
+
+    deactivate BrandRepository
+    deactivate BrandService
+    deactivate BrandFacade
+    deactivate BrandController
 ```
 
 ---
@@ -74,16 +79,21 @@ sequenceDiagram
     ProductService->>+ProductRepository: findById(productId)
 
     alt 존재하지 않거나 삭제된 상품
-        ProductRepository-->>-ProductService: null
-        ProductService-->>-ProductFacade: 404 Not Found
-        ProductFacade-->>-ProductController: 404 Not Found
-        ProductController-->>-User: 404 Not Found
+        ProductRepository-->>ProductService: null
+        ProductService-->>ProductFacade: 404 Not Found
+        ProductFacade-->>ProductController: 404 Not Found
+        ProductController-->>User: 404 Not Found
     else 상품 존재
-        ProductRepository-->>-ProductService: product
-        ProductService-->>-ProductFacade: product
-        ProductFacade-->>-ProductController: productResponse
-        ProductController-->>-User: 200 OK
+        ProductRepository-->>ProductService: product
+        ProductService-->>ProductFacade: product
+        ProductFacade-->>ProductController: productResponse
+        ProductController-->>User: 200 OK
     end
+
+    deactivate ProductRepository
+    deactivate ProductService
+    deactivate ProductFacade
+    deactivate ProductController
 ```
 
 ---
@@ -106,20 +116,17 @@ sequenceDiagram
     LikeService->>+LikeRepository: exists(userId, productId)
 
     alt 이미 좋아요한 경우
-        LikeRepository-->>-LikeService: true
-        LikeService-->>-LikeFacade: 200 OK (무시)
-        LikeFacade-->>-LikeController: 200 OK
-        LikeController-->>-User: 200 OK
+        LikeRepository-->>LikeService: true
     else 좋아요 없음
-        LikeRepository-->>-LikeService: false
-        LikeService->>+LikeRepository: save(like)
-        LikeRepository-->>-LikeService: saved
-        LikeService->>+LikeRepository: incrementLikeCount(productId)
-        LikeRepository-->>-LikeService: updated
-        LikeService-->>-LikeFacade: 200 OK
-        LikeFacade-->>-LikeController: 200 OK
-        LikeController-->>-User: 200 OK
+        LikeRepository-->>LikeService: false
+        LikeService->>LikeRepository: save(like)
+        LikeService->>LikeRepository: incrementLikeCount(productId)
     end
+
+    deactivate LikeRepository
+    LikeService-->>-LikeFacade: 200 OK
+    LikeFacade-->>-LikeController: 200 OK
+    LikeController-->>-User: 200 OK
 ```
 
 **읽는 포인트**
@@ -144,20 +151,17 @@ sequenceDiagram
     LikeService->>+LikeRepository: exists(userId, productId)
 
     alt 좋아요 없음
-        LikeRepository-->>-LikeService: false
-        LikeService-->>-LikeFacade: 200 OK (무시)
-        LikeFacade-->>-LikeController: 200 OK
-        LikeController-->>-User: 200 OK
+        LikeRepository-->>LikeService: false
     else 좋아요 존재
-        LikeRepository-->>-LikeService: true
-        LikeService->>+LikeRepository: delete(userId, productId)
-        LikeRepository-->>-LikeService: deleted
-        LikeService->>+LikeRepository: decrementLikeCount(productId)
-        LikeRepository-->>-LikeService: updated
-        LikeService-->>-LikeFacade: 200 OK
-        LikeFacade-->>-LikeController: 200 OK
-        LikeController-->>-User: 200 OK
+        LikeRepository-->>LikeService: true
+        LikeService->>LikeRepository: delete(userId, productId)
+        LikeService->>LikeRepository: decrementLikeCount(productId)
     end
+
+    deactivate LikeRepository
+    LikeService-->>-LikeFacade: 200 OK
+    LikeFacade-->>-LikeController: 200 OK
+    LikeController-->>-User: 200 OK
 ```
 
 ---
@@ -176,16 +180,19 @@ sequenceDiagram
     LikeController->>+LikeFacade: getLikes(requestUserId, userId)
 
     alt 요청자 != 조회 대상 유저
-        LikeFacade-->>-LikeController: 403 Forbidden
-        LikeController-->>-User: 403 Forbidden
+        LikeFacade-->>LikeController: 403 Forbidden
+        LikeController-->>User: 403 Forbidden
     else 본인 요청
         LikeFacade->>+LikeService: getLikes(userId)
         LikeService->>+LikeRepository: findAllByUserId(userId)
         LikeRepository-->>-LikeService: likes
         LikeService-->>-LikeFacade: likedProducts
-        LikeFacade-->>-LikeController: likeListResponse
-        LikeController-->>-User: 200 OK
+        LikeFacade-->>LikeController: likeListResponse
+        LikeController-->>User: 200 OK
     end
+
+    deactivate LikeFacade
+    deactivate LikeController
 ```
 
 ---
@@ -210,15 +217,16 @@ sequenceDiagram
     loop 각 주문 항목
         OrderFacade->>+StockService: deductIfAvailable(productId, quantity)
         alt 재고 충분
-            StockService-->>-OrderFacade: ORDERED
+            StockService-->>OrderFacade: ORDERED
         else 재고 부족 또는 상품 없음
-            StockService-->>-OrderFacade: SKIPPED
+            StockService-->>OrderFacade: SKIPPED
         end
+        deactivate StockService
     end
 
     alt ORDERED 항목 없음
-        OrderFacade-->>-OrderController: 400 Bad Request
-        OrderController-->>-User: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
+        OrderController-->>User: 400 Bad Request
     else ORDERED 항목 있음
         OrderFacade->>+OrderService: createOrder(userId, orderedItems, skippedItems)
         OrderService->>+OrderRepository: save(order, orderItems)
@@ -226,9 +234,12 @@ sequenceDiagram
         OrderService->>+OrderItemSnapshotRepository: save(productName, price, brandName)
         OrderItemSnapshotRepository-->>-OrderService: saved
         OrderService-->>-OrderFacade: orderResult
-        OrderFacade-->>-OrderController: { orderedItems, skippedItems }
-        OrderController-->>-User: 200 OK
+        OrderFacade-->>OrderController: { orderedItems, skippedItems }
+        OrderController-->>User: 200 OK
     end
+
+    deactivate OrderFacade
+    deactivate OrderController
 ```
 
 **읽는 포인트**
@@ -252,16 +263,19 @@ sequenceDiagram
     OrderController->>+OrderFacade: getOrders(userId, startAt, endAt)
 
     alt startAt > endAt
-        OrderFacade-->>-OrderController: 400 Bad Request
-        OrderController-->>-User: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
+        OrderController-->>User: 400 Bad Request
     else 유효한 날짜 범위
         OrderFacade->>+OrderService: getOrders(userId, startAt, endAt)
         OrderService->>+OrderRepository: findAllByUserIdAndDateRange(userId, startAt, endAt)
         OrderRepository-->>-OrderService: orders
         OrderService-->>-OrderFacade: orders
-        OrderFacade-->>-OrderController: orderListResponse
-        OrderController-->>-User: 200 OK
+        OrderFacade-->>OrderController: orderListResponse
+        OrderController-->>User: 200 OK
     end
+
+    deactivate OrderFacade
+    deactivate OrderController
 ```
 
 ---
@@ -282,21 +296,26 @@ sequenceDiagram
     OrderService->>+OrderRepository: findById(orderId)
 
     alt 주문 없음
-        OrderRepository-->>-OrderService: null
-        OrderService-->>-OrderFacade: 404 Not Found
-        OrderFacade-->>-OrderController: 404 Not Found
-        OrderController-->>-User: 404 Not Found
+        OrderRepository-->>OrderService: null
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
+        OrderController-->>User: 404 Not Found
     else 타 유저 주문
-        OrderRepository-->>-OrderService: order
-        OrderService-->>-OrderFacade: 403 Forbidden
-        OrderFacade-->>-OrderController: 403 Forbidden
-        OrderController-->>-User: 403 Forbidden
+        OrderRepository-->>OrderService: order
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
+        OrderController-->>User: 403 Forbidden
     else 본인 주문
-        OrderRepository-->>-OrderService: order
-        OrderService-->>-OrderFacade: orderDetail
-        OrderFacade-->>-OrderController: orderDetailResponse
-        OrderController-->>-User: 200 OK
+        OrderRepository-->>OrderService: order
+        OrderService-->>OrderFacade: orderDetail
+        OrderFacade-->>OrderController: orderDetailResponse
+        OrderController-->>User: 200 OK
     end
+
+    deactivate OrderRepository
+    deactivate OrderService
+    deactivate OrderFacade
+    deactivate OrderController
 ```
 
 ---
@@ -339,18 +358,23 @@ sequenceDiagram
     BrandService->>+BrandRepository: findById(brandId)
 
     alt 브랜드 없음
-        BrandRepository-->>-BrandService: null
-        BrandService-->>-BrandFacade: 404 Not Found
-        BrandFacade-->>-BrandController: 404 Not Found
-        BrandController-->>-Admin: 404 Not Found
+        BrandRepository-->>BrandService: null
+        BrandService-->>BrandFacade: 404 Not Found
+        BrandFacade-->>BrandController: 404 Not Found
+        BrandController-->>Admin: 404 Not Found
     else 브랜드 존재
-        BrandRepository-->>-BrandService: brand
-        BrandService->>+BrandRepository: update(brand)
-        BrandRepository-->>-BrandService: updatedBrand
-        BrandService-->>-BrandFacade: brandResponse
-        BrandFacade-->>-BrandController: brandResponse
-        BrandController-->>-Admin: 200 OK
+        BrandRepository-->>BrandService: brand
+        BrandService->>BrandRepository: update(brand)
+        BrandRepository-->>BrandService: updatedBrand
+        BrandService-->>BrandFacade: brandResponse
+        BrandFacade-->>BrandController: brandResponse
+        BrandController-->>Admin: 200 OK
     end
+
+    deactivate BrandRepository
+    deactivate BrandService
+    deactivate BrandFacade
+    deactivate BrandController
 ```
 
 ---
@@ -373,22 +397,26 @@ sequenceDiagram
     BrandService->>+BrandRepository: findById(brandId)
 
     alt 브랜드 없음
-        BrandRepository-->>-BrandService: null
-        BrandService-->>-BrandFacade: 404 Not Found
-        BrandFacade-->>-BrandController: 404 Not Found
-        BrandController-->>-Admin: 404 Not Found
+        BrandRepository-->>BrandService: null
+        BrandService-->>BrandFacade: 404 Not Found
+        BrandFacade-->>BrandController: 404 Not Found
+        BrandController-->>Admin: 404 Not Found
     else 브랜드 존재
-        BrandRepository-->>-BrandService: brand
-        BrandService->>+BrandRepository: softDelete(brandId)
-        BrandRepository-->>-BrandService: done
+        BrandRepository-->>BrandService: brand
+        BrandService->>BrandRepository: softDelete(brandId)
         BrandService->>+ProductService: softDeleteByBrandId(brandId)
         ProductService->>+ProductRepository: softDeleteAllByBrandId(brandId)
         ProductRepository-->>-ProductService: done
         ProductService-->>-BrandService: done
-        BrandService-->>-BrandFacade: 200 OK
-        BrandFacade-->>-BrandController: 200 OK
-        BrandController-->>-Admin: 200 OK
+        BrandService-->>BrandFacade: 200 OK
+        BrandFacade-->>BrandController: 200 OK
+        BrandController-->>Admin: 200 OK
     end
+
+    deactivate BrandRepository
+    deactivate BrandService
+    deactivate BrandFacade
+    deactivate BrandController
 ```
 
 **읽는 포인트**
@@ -413,18 +441,22 @@ sequenceDiagram
     ProductFacade->>+BrandService: getBrand(brandId)
 
     alt 브랜드 없음 or 삭제됨
-        BrandService-->>-ProductFacade: 400 Bad Request
-        ProductFacade-->>-ProductController: 400 Bad Request
-        ProductController-->>-Admin: 400 Bad Request
+        BrandService-->>ProductFacade: 400 Bad Request
+        ProductFacade-->>ProductController: 400 Bad Request
+        ProductController-->>Admin: 400 Bad Request
     else 브랜드 존재
-        BrandService-->>-ProductFacade: brand
+        BrandService-->>ProductFacade: brand
         ProductFacade->>+ProductService: createProduct(request)
         ProductService->>+ProductRepository: save(product)
         ProductRepository-->>-ProductService: savedProduct
         ProductService-->>-ProductFacade: productResponse
-        ProductFacade-->>-ProductController: productResponse
-        ProductController-->>-Admin: 200 OK
+        ProductFacade-->>ProductController: productResponse
+        ProductController-->>Admin: 200 OK
     end
+
+    deactivate BrandService
+    deactivate ProductFacade
+    deactivate ProductController
 ```
 
 ---
@@ -445,18 +477,23 @@ sequenceDiagram
     ProductService->>+ProductRepository: findById(productId)
 
     alt 상품 없음
-        ProductRepository-->>-ProductService: null
-        ProductService-->>-ProductFacade: 404 Not Found
-        ProductFacade-->>-ProductController: 404 Not Found
-        ProductController-->>-Admin: 404 Not Found
+        ProductRepository-->>ProductService: null
+        ProductService-->>ProductFacade: 404 Not Found
+        ProductFacade-->>ProductController: 404 Not Found
+        ProductController-->>Admin: 404 Not Found
     else 상품 존재
-        ProductRepository-->>-ProductService: product
-        ProductService->>+ProductRepository: update(product)
-        ProductRepository-->>-ProductService: updatedProduct
-        ProductService-->>-ProductFacade: productResponse
-        ProductFacade-->>-ProductController: productResponse
-        ProductController-->>-Admin: 200 OK
+        ProductRepository-->>ProductService: product
+        ProductService->>ProductRepository: update(product)
+        ProductRepository-->>ProductService: updatedProduct
+        ProductService-->>ProductFacade: productResponse
+        ProductFacade-->>ProductController: productResponse
+        ProductController-->>Admin: 200 OK
     end
+
+    deactivate ProductRepository
+    deactivate ProductService
+    deactivate ProductFacade
+    deactivate ProductController
 ```
 
 **읽는 포인트**
@@ -480,18 +517,23 @@ sequenceDiagram
     ProductService->>+ProductRepository: findById(productId)
 
     alt 상품 없음
-        ProductRepository-->>-ProductService: null
-        ProductService-->>-ProductFacade: 404 Not Found
-        ProductFacade-->>-ProductController: 404 Not Found
-        ProductController-->>-Admin: 404 Not Found
+        ProductRepository-->>ProductService: null
+        ProductService-->>ProductFacade: 404 Not Found
+        ProductFacade-->>ProductController: 404 Not Found
+        ProductController-->>Admin: 404 Not Found
     else 상품 존재
-        ProductRepository-->>-ProductService: product
-        ProductService->>+ProductRepository: softDelete(productId)
-        ProductRepository-->>-ProductService: done
-        ProductService-->>-ProductFacade: 200 OK
-        ProductFacade-->>-ProductController: 200 OK
-        ProductController-->>-Admin: 200 OK
+        ProductRepository-->>ProductService: product
+        ProductService->>ProductRepository: softDelete(productId)
+        ProductRepository-->>ProductService: done
+        ProductService-->>ProductFacade: 200 OK
+        ProductFacade-->>ProductController: 200 OK
+        ProductController-->>Admin: 200 OK
     end
+
+    deactivate ProductRepository
+    deactivate ProductService
+    deactivate ProductFacade
+    deactivate ProductController
 ```
 
 ---
@@ -534,14 +576,19 @@ sequenceDiagram
     OrderService->>+OrderRepository: findById(orderId)
 
     alt 주문 없음
-        OrderRepository-->>-OrderService: null
-        OrderService-->>-OrderFacade: 404 Not Found
-        OrderFacade-->>-OrderController: 404 Not Found
-        OrderController-->>-Admin: 404 Not Found
+        OrderRepository-->>OrderService: null
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
+        OrderController-->>Admin: 404 Not Found
     else 주문 존재
-        OrderRepository-->>-OrderService: order
-        OrderService-->>-OrderFacade: orderDetail
-        OrderFacade-->>-OrderController: orderDetailResponse
-        OrderController-->>-Admin: 200 OK
+        OrderRepository-->>OrderService: order
+        OrderService-->>OrderFacade: orderDetail
+        OrderFacade-->>OrderController: orderDetailResponse
+        OrderController-->>Admin: 200 OK
     end
+
+    deactivate OrderRepository
+    deactivate OrderService
+    deactivate OrderFacade
+    deactivate OrderController
 ```
