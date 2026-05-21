@@ -35,23 +35,14 @@ classDiagram
         +LocalDateTime deletedAt
         +boolean likesPurged
         +Brand brand
-        +List~ProductOption~ options
+        +Stock stock
         +softDelete() void
         +restore() void
     }
 
-    class ProductOption {
-        +Long id
-        +Long productId
-        +String optionName
-        +Long additionalPrice
-        +Stock stock
-        +actualPrice() Long
-    }
-
     class Stock {
         +Long id
-        +Long productOptionId
+        +Long productId
         +int totalQuantity
         +int reservedQuantity
         +availableQuantity() int
@@ -83,9 +74,8 @@ classDiagram
         +Long id
         +Long orderId
         +Long productId
-        +Long productOptionId
         +String productName
-        +String optionName
+        +String brandName
         +int quantity
         +Long price
         +subtotal() Long
@@ -114,8 +104,7 @@ classDiagram
     }
 
     Product --> Brand
-    Product --> ProductOption
-    ProductOption --> Stock
+    Product --> Stock
     Order --> OrderItem
     Order --> OrderStatus
     Order --> Payment
@@ -135,25 +124,23 @@ classDiagram
 - 브랜드 정보 변경이 상품에 영향을 주지 않도록 분리
 - `deletedAt`으로 소프트 딜리트. 삭제 시 소속 상품도 함께 소프트 딜리트 (cascade)
 
-### Product / ProductOption / Stock
-- Product는 ProductOption을 1:N으로 가짐
-- 옵션 없는 상품은 `optionName = "기본"`, `additionalPrice = 0` 인 옵션 1개 자동 생성
-- `actualPrice() = product.price + additionalPrice`
-- Stock은 ProductOption과 1:1 관계 (옵션당 재고 1개)
+### Product / Stock
+- 옵션 개념 없음. Product는 Stock과 **1:1 관계**(상품당 재고 1건)
 - 재고 상태 변경(`reserve`, `confirm`, `release`, `restore`)은 Stock이 단독으로 책임
 - `availableQuantity() = totalQuantity - reservedQuantity`
-- Product는 `deletedAt`으로 소프트 딜리트(복구 가능). 옵션·재고는 상품을 통해 조회되므로 별도 삭제 플래그 불필요 — 상품 삭제 시 자동 숨김, 복구 시 자동 복구
+- Stock은 `productId`를 참조 (상품 단위 재고)
+- Product는 `deletedAt`으로 소프트 딜리트(복구 가능). 재고는 상품을 통해 조회되므로 별도 삭제 플래그 불필요 — 상품 삭제 시 자동 숨김, 복구 시 자동 복구
 - `likesPurged`: 삭제된 상품의 좋아요(고용량, 복구 제외)를 비동기 배치가 청크 삭제했는지 마킹
 
 ### Like
 - `userId + productId` 복합키로 중복 방지
-- 토글 동작은 LikeFacade가 조회 후 분기
+- 등록(`POST`)/취소(`DELETE`)가 분리된 멱등 동작을 LikeFacade가 처리
 
 ### Order / OrderItem
 - Order가 상태 전이 메서드(`confirm`, `fail`, `cancel`)를 직접 보유
 - Order는 1개 이상의 OrderItem을 가짐 (복수 상품 주문)
 - 포인트 제거로 금액은 `pgAmount` 하나만 보유. `totalAmount()`는 주문 라인 합계 = pgAmount
-- OrderItem은 주문 시점의 상품명, 옵션명, 단가, 수량을 스냅샷으로 저장
+- OrderItem은 주문 시점의 상품명, 브랜드명, 단가, 수량을 스냅샷으로 저장 (옵션 없음)
 - 상품이 소프트 딜리트되어도 OrderItem 스냅샷은 보존되어 과거 주문 조회에 영향 없음
 
 ### Payment

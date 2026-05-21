@@ -7,7 +7,7 @@
 
 | 표기 | 의미 | 이 ERD에서 사용 위치 |
 |---|---|---|
-| `\|\|--\|\|` | 1 : 1 (양쪽 반드시 1개) | product_options → stocks |
+| `\|\|--\|\|` | 1 : 1 (양쪽 반드시 1개) | products → stocks |
 | `\|\|--o\|` | 1 : 0 or 1 (오른쪽 없을 수도 있음) | orders → payments |
 | `\|\|--o{` | 1 : 0 or N (오른쪽 없거나 여러 개) | users → orders, products → likes 등 |
 | `\|\|--\|{` | 1 : 1 or N (오른쪽 반드시 1개 이상) | _(현재 미사용)_ |
@@ -55,17 +55,9 @@ erDiagram
         boolean likes_purged "좋아요 정리 완료 여부 | 삭제된 상품의 좋아요 비동기 청크 삭제용 마킹"
     }
 
-    product_options["상품 옵션 (product_options)"] {
-        bigint id PK "옵션 고유 ID | PK"
-        bigint product_id FK "상품 ID | FK → products.id"
-        varchar option_name "옵션명 (예: 기본 / 흰색-S / 검정-M)"
-        bigint additional_price "옵션 추가금액 (기본 0원)"
-        datetime created_at "등록일시"
-    }
-
     stocks["재고 (stocks)"] {
         bigint id PK "재고 고유 ID | PK"
-        bigint product_option_id FK "상품 옵션 ID | FK + UNIQUE"
+        bigint product_id FK "상품 ID | FK + UNIQUE (상품당 재고 1건)"
         int total_quantity "실제 보유 수량 (결제 확정 시 차감)"
         int reserved_quantity "예약 중 수량 (주문 생성 시 증가)"
         datetime updated_at "최종 수정일시"
@@ -95,11 +87,10 @@ erDiagram
         bigint id PK "주문 상품 고유 ID | PK"
         bigint order_id FK "주문 ID | FK → orders.id"
         bigint product_id FK "상품 ID | FK → products.id"
-        bigint product_option_id FK "상품 옵션 ID | FK → product_options.id"
         varchar product_name "상품명 | 주문 시점 스냅샷"
-        varchar option_name "옵션명 | 주문 시점 스냅샷"
+        varchar brand_name "브랜드명 | 주문 시점 스냅샷"
         int quantity "주문 수량"
-        bigint price "단가 (price + additional_price) | 주문 시점 스냅샷"
+        bigint price "단가 (products.price) | 주문 시점 스냅샷"
     }
 
     payments["결제 (payments)"] {
@@ -114,11 +105,9 @@ erDiagram
     users ||--o{ orders : "회원은 주문을 여러 개 할 수 있다"
     users ||--o{ likes : "회원은 좋아요를 여러 개 누를 수 있다"
     brands ||--o{ products : "브랜드는 상품을 여러 개 가진다"
-    products ||--o{ product_options : "상품은 옵션을 1개 이상 가진다"
-    product_options ||--|| stocks : "옵션당 재고는 반드시 1개"
+    products ||--|| stocks : "상품당 재고는 반드시 1개"
     products ||--o{ likes : "상품은 좋아요를 여러 개 받을 수 있다"
     products ||--o{ order_items : "상품은 여러 주문에 담길 수 있다"
-    product_options ||--o{ order_items : "옵션 단위로 주문에 담긴다"
     orders ||--o{ order_items : "주문은 상품을 1개 이상 포함한다"
     orders ||--o| payments : "주문당 결제는 최대 1건"
 ```
@@ -152,26 +141,24 @@ erDiagram
 
 ### 삭제·복구 정책 (요약)
 - **소프트 딜리트 (복구 가능)**: brands, products — 저용량, 복구 가치 있음
-- **상품에 종속되어 자동 처리**: product_options, stocks — 플래그 없음. 상품 삭제 시 자동으로 도달 불가(숨김), 상품 복구 시 자동으로 도달 가능(복구). 저용량이라 정리 불필요
+- **상품에 종속되어 자동 처리**: stocks — 플래그 없음. 상품 삭제 시 자동으로 도달 불가(숨김), 상품 복구 시 자동으로 도달 가능(복구). 저용량이라 정리 불필요
 - **비동기 물리 삭제 (복구 제외)**: likes — 고용량(수천만~수억), 삭제된 상품의 좋아요는 의미 없음 → 배치 청크 삭제
 - 브랜드 삭제 트랜잭션은 brands/products의 `deleted_at`만 기록(즉시 노출 차단). 좋아요 대량 삭제는 비동기 배치가 수행
 
-### product_options
-- `option_name`: 옵션명 (ex. "기본", "흰색/S", "검정/M")
-- `additional_price`: 옵션 추가금액 (기본 0원). 실제 가격 = `products.price + additional_price`
-- 옵션 없는 상품은 `option_name = "기본"`, `additional_price = 0` 인 옵션 1개 자동 생성
-- 상품 등록/수정 시 옵션·재고를 함께 등록 (관리자 API)
-
 ### stocks
-- `product_option_id`: UK — 옵션당 재고 1개
-- `total_quantity`: 실제 보유 재고 (결제 확정 시 차감)
-- `reserved_quantity`: 예약 중인 수량 (주문 생성 시 증가)
+- 옵션 개념 없음 — 재고는 **상품 단위**(상품당 재고 1건)
+- `product_id`: UK — 상품당 재고 1개 보장
+- `total_quantity`: 실제 보유 재고 (결제 확정 시 차감, 관리자가 수정 가능)
+- `reserved_quantity`: 예약 중인 수량 (주문 생성 시 증가, 시스템 관리값 — 관리자 직접 수정 불가)
 - 가용 재고 = `total_quantity - reserved_quantity`
+- **불변식**: `total_quantity >= reserved_quantity` (가용 ≥ 0). 항상 성립해야 함
+  - 예약: `UPDATE ... SET reserved += qty WHERE (total - reserved) >= qty` (조건부, 오버셀 방지)
+  - 관리자 재고 수정: `UPDATE ... SET total = :newTotal WHERE :newTotal >= reserved` (reserved 미만이면 거부)
 - `updated_at`: 재고 변경 추적용
 
 ### likes
 - `(user_id, product_id)` 복합 유니크 제약 필요 → 중복 좋아요 DB 레벨 방어
-- 멱등 토글: 존재하면 DELETE, 없으면 INSERT
+- 등록(`POST`)/취소(`DELETE`) 분리, 각각 멱등: 이미 있으면 INSERT 생략, 없으면 DELETE no-op
 
 ### orders
 - `status`: PENDING / CONFIRMED / FAILED / CANCELLED
@@ -184,8 +171,8 @@ erDiagram
 ### order_items
 - 주문 생성 시점에 INSERT되는 라인 아이템 테이블 (한 주문에 1개 이상)
 - `product_name`: 당시 상품명 스냅샷
-- `option_name`: 당시 옵션명 스냅샷 (ex. "기본", "흰색/S")
-- `price`: 당시 단가 스냅샷 (`products.price + additional_price` 계산값)
+- `brand_name`: 당시 브랜드명 스냅샷
+- `price`: 당시 단가 스냅샷 (`products.price`)
 - 상품이 소프트 딜리트되어도 스냅샷이 보존되어 과거 주문 조회에 영향 없음
 
 ### payments
@@ -199,7 +186,7 @@ erDiagram
 |---|---|---|
 | users.login_id | UNIQUE | 중복 가입 방지 |
 | brands.name | UNIQUE | 브랜드명 중복 방지 (삭제 후 재등록도 차단) |
-| stocks.product_option_id | UNIQUE | 옵션당 재고 1개 보장 |
+| stocks.product_id | UNIQUE | 상품당 재고 1개 보장 |
 | likes.(user_id, product_id) | 복합 UNIQUE | 중복 좋아요 방지 |
 | payments.order_id | UNIQUE | 주문당 결제 1건 |
 | payments.pg_transaction_id | UNIQUE | PG 트랜잭션 중복 방지 |
