@@ -152,7 +152,6 @@ sequenceDiagram
         O-->>C: 409 CONFLICT
     end
     Note over O: 주문 저장 (스냅샷, status=CREATED)
-    Note over O,PG: ↓ 이하 결제 흐름은 다음 라운드 (시퀀스만) — 본 라운드는 status=CREATED에서 종료
 
     O->>+Pay: 결제 요청 (orderId, amount)
     Pay->>+PG: 결제 호출
