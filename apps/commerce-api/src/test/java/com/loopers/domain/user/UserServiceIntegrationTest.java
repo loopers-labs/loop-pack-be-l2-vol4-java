@@ -78,6 +78,25 @@ class UserServiceIntegrationTest {
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
+
+        @DisplayName("회원 가입 시 비밀번호는 평문이 아닌 해시로 저장된다.")
+        @Test
+        void storesHashedPassword_whenSignUp() {
+            // arrange
+            UserModel user = new UserModel(
+                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
+            );
+
+            // act
+            userService.signUp(user);
+
+            // assert
+            UserModel reloaded = userService.getMyInfo("tester01").orElseThrow();
+            assertAll(
+                () -> assertThat(reloaded.getPassword()).isNotEqualTo("Password1!"),
+                () -> assertThat(reloaded.matchesPassword("Password1!")).isTrue()
+            );
+        }
     }
 
     @DisplayName("내 정보를 조회할 때, ")
@@ -132,7 +151,10 @@ class UserServiceIntegrationTest {
 
             // assert
             UserModel reloaded = userService.getMyInfo("tester01").orElseThrow();
-            assertThat(reloaded.getPassword()).isEqualTo("NewPass2@");
+            assertAll(
+                () -> assertThat(reloaded.matchesPassword("NewPass2@")).isTrue(),
+                () -> assertThat(reloaded.matchesPassword("Password1!")).isFalse()
+            );
         }
 
         @DisplayName("현재 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")

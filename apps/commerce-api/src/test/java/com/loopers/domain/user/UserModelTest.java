@@ -36,11 +36,25 @@ class UserModelTest {
             // assert
             assertAll(
                 () -> assertThat(user.getLoginId()).isEqualTo(VALID_LOGIN_ID),
-                () -> assertThat(user.getPassword()).isEqualTo(VALID_PASSWORD),
                 () -> assertThat(user.getName()).isEqualTo(VALID_NAME),
                 () -> assertThat(user.getBirthDate()).isEqualTo(VALID_BIRTH_DATE),
                 () -> assertThat(user.getEmail()).isEqualTo(VALID_EMAIL),
                 () -> assertThat(user.getGender()).isEqualTo(VALID_GENDER)
+            );
+        }
+
+        @DisplayName("비밀번호는 평문이 아닌 해시 형태로 저장되고, 원문으로 검증하면 일치한다.")
+        @Test
+        void storesPasswordAsHash() {
+            // act
+            UserModel user = new UserModel(
+                VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(user.getPassword()).isNotEqualTo(VALID_PASSWORD),
+                () -> assertThat(user.matchesPassword(VALID_PASSWORD)).isTrue()
             );
         }
 
@@ -223,7 +237,10 @@ class UserModelTest {
             user.changePassword(VALID_PASSWORD, newPassword);
 
             // assert
-            assertThat(user.getPassword()).isEqualTo(newPassword);
+            assertAll(
+                () -> assertThat(user.matchesPassword(newPassword)).isTrue(),
+                () -> assertThat(user.matchesPassword(VALID_PASSWORD)).isFalse()
+            );
         }
     }
 }
