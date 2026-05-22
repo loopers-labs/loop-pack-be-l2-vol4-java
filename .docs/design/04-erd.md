@@ -16,9 +16,17 @@ erDiagram
     BRAND ||--o{ PRODUCT : owns
     ORDERS ||--|{ ORDER_ITEM : contains
 
-    %% USERS: 외부 컨텍스트(Round 1) — 관계 표현용 식별자만 표기
+    %% USERS: 외부 컨텍스트(Round 1 구현 완료) — 본 라운드 설계 범위 밖이나 관계 파악을 위해 실제 스키마를 표기
     USERS {
         BIGINT id PK
+        VARCHAR login_id UK "영문/숫자 8~16자"
+        VARCHAR password "암호화 저장(encoded)"
+        VARCHAR name "한글/영문 1~20자"
+        DATE birth_date
+        VARCHAR email "최대 254자"
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
     }
 
     BRAND {
@@ -52,8 +60,8 @@ erDiagram
 
     PRODUCT_LIKE {
         BIGINT id PK
-        BIGINT user_id
-        BIGINT product_id
+        BIGINT user_id UK "(user_id, product_id) 복합 UNIQUE — 멱등(D6)"
+        BIGINT product_id UK
         DATETIME created_at
     }
 
@@ -78,3 +86,5 @@ erDiagram
     }
 ```
 - Stock은 동시성 제어가 필수이고 변경 패턴이 Product(read-heavy)와 크게 달라 **독립 애그리거트**로 분리(D13) — `product_id`로 1:1 참조하며 물리 FK는 두지 않는다(D12, 크로스 애그리거트는 ID 참조). 주문·재고 변경은 Facade 합성(D7)으로 *같은 트랜잭션*에서 Product·Stock을 함께 다룬다. like_count는 약한 일관성으로 충분해 Product 컬럼으로 유지.
+- **STOCK에 `deleted_at`이 없는 것은 의도된 설계다**(D14). 독립은 트랜잭션·동시성 축에 한정되고 라이프사이클은 Product에 종속하므로, 상품이 삭제되면 재고는 접근 경로가 사라져 자연 비활성된다. 삭제 진실은 Product 한 곳에 두고(SSOT), 재고 행은 보존돼 복원 시 수량이 그대로 유지된다. soft delete를 쓰는 다른 테이블(BRAND·PRODUCT·ORDERS)과 달리 STOCK·PRODUCT_LIKE·ORDER_ITEM은 `deleted_at`을 두지 않는다.
+- **`PRODUCT_LIKE`는 `(user_id, product_id)` 복합 UNIQUE 제약**으로 멱등을 보장한다(D6) — 같은 유저가 같은 상품에 좋아요는 최대 1개. 이 제약이 좋아요 등록/취소 멱등과 동시 등록 레이스(한쪽만 성공)의 최종 방어선이다. Mermaid ERD 문법에는 복합 UNIQUE 전용 표기가 없어, 구성 컬럼 두 개에 `UK` 마커를 달고 `user_id` 컬럼 코멘트로 복합임을 한 번만 명시했다.
