@@ -177,6 +177,44 @@ sequenceDiagram
 
 ---
 
+## UC-009: 결제 승인 처리
+
+```mermaid
+sequenceDiagram
+    actor PG
+    participant Controller
+    participant PaymentFacade
+    participant PaymentService
+    participant OrderService
+    participant PaymentRepository
+    participant OrderRepository
+
+    PG->>Controller: POST /payments/webhook/approval {paymentId, ...}
+
+    alt 웹훅 유효성 검증 실패
+        Controller-->>PG: 무시 (처리 안 함)
+    else 유효
+        Controller->>PaymentFacade: handlePaymentApproval(paymentId)
+
+        PaymentFacade->>PaymentService: getPayment(paymentId)
+        PaymentService->>PaymentRepository: findById(paymentId)
+        PaymentRepository-->>PaymentService: Payment
+
+        PaymentFacade->>PaymentService: approve(payment)
+        PaymentService->>PaymentRepository: save(payment) APPROVED
+        PaymentRepository-->>PaymentService: ok
+
+        PaymentFacade->>OrderService: complete(orderId)
+        OrderService->>OrderRepository: save(order) COMPLETED
+        OrderRepository-->>OrderService: ok
+
+        PaymentFacade-->>Controller: ok
+        Controller-->>PG: 200 OK
+    end
+```
+
+---
+
 ## UC-010: 결제 실패 처리
 
 ```mermaid
@@ -298,8 +336,12 @@ sequenceDiagram
             OrderRepository-->>OrderService: Order(COMPLETED or CANCELLED)
             OrderService-->>PaymentFacade: CoreException(ORDER_NOT_RETRYABLE)
             PaymentFacade-->>Controller: 400 BAD_REQUEST
+        else 주문 생성 후 15분 경과
+            OrderRepository-->>OrderService: Order(REQUESTED, createdAt 15분 초과)
+            OrderService-->>PaymentFacade: CoreException(ORDER_PAYMENT_TIMEOUT)
+            PaymentFacade-->>Controller: 400 BAD_REQUEST
         else 정상
-            OrderRepository-->>OrderService: Order(REQUESTED)
+            OrderRepository-->>OrderService: Order(REQUESTED, createdAt 15분 이내)
             OrderService-->>PaymentFacade: Order
 
             PaymentFacade->>PaymentService: createPayment(orderId, amount)

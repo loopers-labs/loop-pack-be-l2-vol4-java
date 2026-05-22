@@ -305,6 +305,7 @@
 - (2) 주문이 존재하지 않으면 → `404 NOT_FOUND`
 - (2) 본인 주문이 아니면 → `403 FORBIDDEN`
 - (3) 주문이 `REQUESTED` 상태가 아니면 → `400 BAD_REQUEST`
+- (3) 주문 생성 후 15분이 경과했으면 → `400 BAD_REQUEST` (결제 시도 불가)
 - (1) 비로그인 상태 → `401 UNAUTHORIZED`
 
 ---
