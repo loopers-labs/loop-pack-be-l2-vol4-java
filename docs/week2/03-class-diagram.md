@@ -16,6 +16,7 @@
 - `Stock.isAvailable()`은 조회 전용 (상품 상세의 재고 여부 표시 등). 차감 전 guard 체크 용도로 쓰지 않는다 — 원자적 차감은 `StockRepository.deductStock()`이 전담한다
 - 주문은 올-오어-낫싱 정책 — `OrderItemStatus.SKIPPED`는 존재하지 않는다
 - 필드는 `-(private)`, 메서드는 `+(public)` — 캡슐화 의도를 가시성으로 표현한다
+- `User`는 회원(Member) 전용 도메인 객체다. 어드민은 `X-Loopers-Ldap` 헤더로 식별되는 별도 액터로, `users` 테이블에 존재하지 않으므로 `User`에 `role` 필드를 두지 않는다
 
 ---
 
