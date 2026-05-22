@@ -5,6 +5,8 @@
 
 ---
 
+# 1부: 무엇을 만드나
+
 ## 1. 개요
 
 Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 추가 구현한다.
@@ -18,7 +20,84 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 
 ---
 
-## 2. 유저 플로우
+## 2. 도메인 모델
+
+### 핵심 설계 결정 요약
+
+| 관계 | 방식 | 근거 |
+|---|---|---|
+| Product → Brand | `@ManyToOne` (NO_CONSTRAINT) | 상품 조회 시 브랜드명 JOIN 필요 |
+| Product.likeCount | DB 비정규화 컬럼 | SQL 원자적 증감으로 COUNT 쿼리 제거 (ADR-003) |
+| Product.quantity | PRODUCT_INVENTORY JOIN 필드 | 상품 조회 시 재고 포함 반환 — 별도 재고 조회 불필요, 품절 여부 노출 |
+| Like → User / Product | `userId`, `productId` Long | 존재 여부 확인만 필요, JPA 관계 불필요 |
+| OrderItem → Order | `@ManyToOne` | 동일 Aggregate, 생명주기 공유 |
+| OrderItem → Product | `productId` + 스냅샷 컬럼 | 주문 시점 정보 보존 (요구사항 명시) |
+| Order → User | `userId` Long | 유저 변경과 주문 이력 분리 |
+
+> 상세 결정 근거는 `docs/v3/adr/` 참고
+
+---
+
+## 3. ERD
+
+→ [`docs/v3/erd.md`](./erd.md) 참고
+
+---
+
+## 4. 클래스 다이어그램
+
+→ [`docs/v3/class.md`](./class.md) 참고
+
+---
+
+## 5. 레이어 구조 (도메인별)
+
+기존 패턴(`interfaces → application → domain → infrastructure`)을 동일하게 따른다.
+
+```
+interfaces/api/
+├── brand/
+│   ├── BrandV1Controller         # Customer
+│   ├── BrandAdminV1Controller    # Admin
+│   └── BrandV1Dto
+├── product/
+│   ├── ProductV1Controller       # Customer
+│   ├── ProductAdminV1Controller  # Admin
+│   └── ProductV1Dto
+├── like/
+│   ├── LikeV1Controller
+│   └── LikeV1Dto
+└── order/
+    ├── OrderV1Controller         # Customer
+    ├── OrderAdminV1Controller    # Admin
+    └── OrderV1Dto
+
+application/
+├── brand/   BrandFacade, BrandInfo
+├── product/ ProductFacade, ProductInfo
+├── like/    LikeFacade, LikeInfo
+└── order/   OrderFacade, OrderInfo
+
+domain/
+├── brand/   BrandModel, BrandRepository, BrandService
+├── product/ ProductModel, ProductInventoryModel,
+│            ProductRepository, ProductInventoryRepository, ProductService
+├── like/    LikeModel, LikeRepository, LikeService
+└── order/   OrderModel, OrderItemModel, OrderRepository, OrderService
+
+infrastructure/
+├── brand/   BrandJpaRepository, BrandRepositoryImpl
+├── product/ ProductJpaRepository, ProductRepositoryImpl,
+│            ProductInventoryJpaRepository, ProductInventoryRepositoryImpl
+├── like/    LikeJpaRepository, LikeRepositoryImpl
+└── order/   OrderJpaRepository, OrderRepositoryImpl
+```
+
+---
+
+# 2부: 무엇을 제공하나
+
+## 6. 유저 플로우
 
 ### Customer
 
@@ -65,331 +144,7 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 
 ---
 
-## 3. 도메인 모델
-
-### 핵심 설계 결정 요약
-
-| 관계 | 방식 | 근거 |
-|---|---|---|
-| Product → Brand | `@ManyToOne` (NO_CONSTRAINT) | 상품 조회 시 브랜드명 JOIN 필요 |
-| Product.likeCount | DB 비정규화 컬럼 | SQL 원자적 증감으로 COUNT 쿼리 제거 (ADR-003) |
-| Product.quantity | PRODUCT_INVENTORY JOIN 필드 | 상품 조회 시 재고 포함 반환 — 별도 재고 조회 불필요, 품절 여부 노출 |
-| Like → User / Product | `userId`, `productId` Long | 존재 여부 확인만 필요, JPA 관계 불필요 |
-| OrderItem → Order | `@ManyToOne` | 동일 Aggregate, 생명주기 공유 |
-| OrderItem → Product | `productId` + 스냅샷 컬럼 | 주문 시점 정보 보존 (요구사항 명시) |
-| Order → User | `userId` Long | 유저 변경과 주문 이력 분리 |
-
-> 상세 결정 근거는 `docs/v3/adr/` 참고
-
----
-
-## 4. ERD
-
-→ [`docs/v3/erd.md`](./erd.md) 참고
-
----
-
-## 5. 클래스 다이어그램
-
-→ [`docs/v3/class.md`](./class.md) 참고
-
----
-
-## 6. 레이어 구조 (도메인별)
-
-기존 패턴(`interfaces → application → domain → infrastructure`)을 동일하게 따른다.
-
-```
-interfaces/api/
-├── brand/
-│   ├── BrandV1Controller         # Customer
-│   ├── BrandAdminV1Controller    # Admin
-│   └── BrandV1Dto
-├── product/
-│   ├── ProductV1Controller       # Customer
-│   ├── ProductAdminV1Controller  # Admin
-│   └── ProductV1Dto
-├── like/
-│   ├── LikeV1Controller
-│   └── LikeV1Dto
-└── order/
-    ├── OrderV1Controller         # Customer
-    ├── OrderAdminV1Controller    # Admin
-    └── OrderV1Dto
-
-application/
-├── brand/   BrandFacade, BrandInfo
-├── product/ ProductFacade, ProductInfo
-├── like/    LikeFacade, LikeInfo
-└── order/   OrderFacade, OrderInfo
-
-domain/
-├── brand/   BrandModel, BrandRepository, BrandService
-├── product/ ProductModel, ProductInventoryModel,
-│            ProductRepository, ProductInventoryRepository, ProductService
-├── like/    LikeModel, LikeRepository, LikeService
-└── order/   OrderModel, OrderItemModel, OrderRepository, OrderService
-
-infrastructure/
-├── brand/   BrandJpaRepository, BrandRepositoryImpl
-├── product/ ProductJpaRepository, ProductRepositoryImpl,
-│            ProductInventoryJpaRepository, ProductInventoryRepositoryImpl
-├── like/    LikeJpaRepository, LikeRepositoryImpl
-└── order/   OrderJpaRepository, OrderRepositoryImpl
-```
-
----
-
-## 7. 인증·인가 처리 구조
-
-인증은 `support/auth/` 패키지의 `HandlerInterceptor`로 처리한다 (ADR-011).
-
-### User 인증 — `UserAuthInterceptor`
-
-적용 경로: `/api/v1/**` (단, 회원가입 `POST /api/v1/users` 제외)
-
-```
-요청 수신
-  → X-Loopers-LoginId 헤더 추출 → 없으면 401
-  → X-Loopers-LoginPw 헤더 추출 → 없으면 401
-  → UserService.getByLoginId(loginId) → 없으면 401
-  → BCrypt.checkpw(loginPw, user.password) → 불일치 시 401
-  → request attribute에 userId 저장
-```
-
-Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `LoginUserArgumentResolver`가 request attribute에서 `userId`를 꺼내 메서드 파라미터로 바인딩한다.
-
-```java
-// 커스텀 어노테이션
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface LoginUser {}
-
-// Controller 사용 예시
-public ApiResponse<OrderInfo> createOrder(
-    @LoginUser Long userId,
-    @RequestBody OrderV1Dto.CreateRequest request
-) { ... }
-```
-
-`LoginUserArgumentResolver`와 인터셉터는 모두 `support/auth/` 패키지에 위치하며, `WebMvcConfig`에서 함께 등록한다.
-
-### Admin 인증 — `AdminAuthInterceptor`
-
-적용 경로: `/api-admin/v1/**` 전체
-
-```
-요청 수신
-  → X-Loopers-Ldap 헤더 추출 → 없으면 403
-  → "loopers.admin" 값과 비교 → 불일치 시 403
-```
-
-### 등록 — `WebMvcConfig`
-
-```java
-@Configuration
-public class WebMvcConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(userAuthInterceptor)
-                .addPathPatterns("/api/v1/**")
-                .excludePathPatterns("/api/v1/users"); // 회원가입
-
-        registry.addInterceptor(adminAuthInterceptor)
-                .addPathPatterns("/api-admin/v1/**");
-    }
-}
-```
-
----
-
-## 8. 트랜잭션 경계 원칙
-
-| 레이어 | 규칙 |
-|---|---|
-| Controller | `@Transactional` 미적용 |
-| Facade | 기본적으로 미적용. 단, 여러 Service 쓰기 작업이 원자성을 요구하는 경우에 한해 적용 |
-| Service (조회) | `@Transactional(readOnly = true)` |
-| Service (쓰기) | `@Transactional` |
-
-트랜잭션 경계는 원칙적으로 **Service** 레이어에서 시작한다. Facade는 Service에 위임하며 트랜잭션에 관여하지 않는다.
-
-### 예외 — OrderFacade.createOrder()
-
-주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 `@Transactional`로 경계를 감싼다.
-
-```java
-// OrderFacade
-@Transactional
-public OrderInfo createOrder(...) {
-    ProductModel product = productService.getProduct(...); // ← 트랜잭션 참여 (readOnly 전파)
-    // 재고 fast fail 검증
-    OrderModel order = orderService.createOrder(product, ...); // ← 주문 생성
-    inventoryService.deductInventory(product.getId(), quantity); // ← 재고 차감 (FOR UPDATE)
-    return OrderInfo.from(order);
-}
-```
-
-> Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 금지한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
-
----
-
-## 9. 유효성 검증 레이어 원칙
-
-검증 책임은 두 레이어로 분리한다.
-
-| 레이어 | 담당 | 예시 |
-|---|---|---|
-| Controller (`@Valid`) | 입력 형식 검증 | `@NotBlank`, `@Min(0)`, `@Size(max=100)`, null 체크 |
-| Domain Model 생성자·메서드 | 비즈니스 규칙 검증 | 중복 불가, 상태 전이, 재고 부족 → `CoreException` throw |
-
-```java
-// Controller — 형식 검증
-public record CreateRequest(
-    @NotBlank @Size(max = 100) String name,
-    @Min(0) int quantity
-) {}
-
-// Domain Model — 비즈니스 규칙
-public BrandModel(String name, String description) {
-    if (name == null || name.isBlank()) throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 필수입니다.");
-    this.name = name;
-    this.description = description;
-}
-```
-
-> `@Valid`를 통과한 요청도 도메인 규칙에 위반되면 `CoreException`이 발생하며, `ApiControllerAdvice`가 처리한다.
-
----
-
-## 10. 연쇄 삭제 정책
-
-모든 삭제는 Soft Delete(`deleted_at = now()`)이며, 연쇄 삭제는 **Facade** 레이어에서 오케스트레이션한다. JPA Cascade는 사용하지 않는다 — Like는 `productId`(Long) ID 참조 방식이라 JPA 관계가 없고, Like와 Product는 서로 다른 Aggregate이므로 ID 참조를 유지한다.
-
-### Brand 삭제
-
-```
-BrandFacade.deleteBrand(brandId)
-  ├── BrandService.delete(brandId)
-  ├── ProductService.findIdsByBrand(brandId) → List<productId>
-  ├── ProductService.deleteAll(productIds)
-  ├── ProductInventoryService.deleteAllByProducts(productIds)
-  └── LikeService.deleteAllByProducts(productIds)
-```
-
-### Product 삭제
-
-```
-ProductFacade.deleteProduct(productId)
-  ├── ProductService.delete(productId)
-  ├── ProductInventoryService.deleteByProduct(productId)
-  └── LikeService.deleteAllByProduct(productId)
-```
-
-### Like 삭제 (좋아요 취소)
-
-```
-LikeFacade.removeLike(userId, productId)
-  └── LikeService.delete(userId, productId)   ← 단독 삭제, 연쇄 없음
-```
-
-> **like_count 처리**: 좋아요 취소(`removeLike`) 시에는 `like_count`를 차감한다. Brand/Product 삭제로 인한 Like 연쇄 삭제 시에는 `like_count` 차감을 수행하지 않는다 — 상품 자체가 삭제되므로 `like_count` 정합성 유지가 불필요하다.
-
----
-
-## 11. Soft Delete 범위 및 조회 정책
-
-### 적용 범위
-
-모든 엔티티는 `BaseEntity`의 `deletedAt` 컬럼으로 Soft Delete를 관리한다.
-
-| 엔티티 | Soft Delete | 비고 |
-|---|---|---|
-| User | O | |
-| Brand | O | |
-| Product | O | |
-| ProductInventory | O | Product 삭제 시 연쇄 삭제 |
-| Like | O | Product/Brand 삭제 시 연쇄 삭제. 좋아요 재등록 시 Restore 패턴 적용 |
-| Order | O | |
-| OrderItem | O | Order 삭제 시 연쇄 삭제 (미구현, 향후 고려) |
-
-### 조회 필터 적용 원칙
-
-`deleted_at IS NULL` 조건은 Repository 구현체에서 **명시적으로** 포함한다. `@Where` 어노테이션이나 Hibernate Filter는 사용하지 않는다.
-
-```java
-// ProductRepositoryImpl
-public Optional<ProductModel> findById(Long id) {
-    return jpaRepository.findByIdAndDeletedAtIsNull(id);
-}
-
-public Page<ProductModel> findAll(Pageable pageable) {
-    return jpaRepository.findAllByDeletedAtIsNull(pageable);
-}
-```
-
-`@Where`나 Hibernate Filter는 자동 적용되어 편리하지만, 의도치 않게 삭제된 데이터가 조회되거나 누락되는 버그를 발견하기 어렵다. 명시적 조건으로 제어 범위를 명확히 한다.
-
-### Like 예외 — Restore 패턴
-
-좋아요 재등록 시에는 soft delete된 레코드를 포함한 전체 조회가 필요하다.
-
-```java
-// LikeRepositoryImpl
-// 일반 조회 — active only
-public Optional<LikeModel> findActive(Long userId, Long productId) {
-    return jpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(userId, productId);
-}
-
-// Restore용 — deleted_at 포함 전체 조회
-public Optional<LikeModel> findAny(Long userId, Long productId) {
-    return jpaRepository.findByUserIdAndProductId(userId, productId);
-}
-```
-
----
-
-## 12. 페이지네이션 공통 정책
-
-### 기본값
-
-| 파라미터 | 기본값 | 설명 |
-|---|---|---|
-| `page` | `0` | 0-based 페이지 번호. 미전달 시 첫 번째 페이지 |
-| `size` | `20` | 페이지당 항목 수. 미전달 시 20개 |
-
-### 응답 구조
-
-페이지네이션이 적용된 모든 목록 조회 API는 아래 구조로 통일한다.
-
-```json
-{
-  "content": [ ... ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 100
-}
-```
-
-### 적용 API 목록
-
-| API | 비고 |
-|---|---|
-| `GET /api-admin/v1/brands` | |
-| `GET /api/v1/products` | `sort` 파라미터 추가 (섹션 12 참고) |
-| `GET /api-admin/v1/products` | |
-| `GET /api/v1/users/{userId}/likes` | |
-| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 (ADR-010) |
-| `GET /api-admin/v1/orders` | |
-
-### 예외
-
-단건 조회, 생성(POST), 수정(PUT), 삭제(DELETE) API는 페이지네이션을 적용하지 않는다.
-
----
-
-## 13. API 엔드포인트
+## 7. API 엔드포인트
 
 ### Brand
 
@@ -469,52 +224,7 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 14. 공통 응답 구조
-
-모든 API 응답은 `ApiResponse<T>`로 감싸서 반환한다.
-
-### 성공 응답
-
-```json
-// 단건/목록 조회 (GET 200, POST 201)
-{
-  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
-  "data": { ... }
-}
-
-// 수정/삭제/좋아요 등록·취소 (204 No Content — body 없음)
-```
-
-### 페이지네이션 응답
-
-페이지네이션이 적용된 API는 `data` 안에 아래 구조가 중첩된다.
-
-```json
-{
-  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
-  "data": {
-    "content": [ ... ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 100
-  }
-}
-```
-
-### 에러 응답
-
-```json
-{
-  "meta": { "result": "FAIL", "errorCode": "NOT_FOUND", "message": "주문을 찾을 수 없습니다." },
-  "data": null
-}
-```
-
-> `errorCode`는 `ErrorType` enum의 code 값 (예: `NOT_FOUND`, `BAD_REQUEST`, `FORBIDDEN`, `CONFLICT`)
-
----
-
-## 15. 제공 정보 정책
+## 8. 제공 정보 정책
 
 > **HTTP 상태 코드 기준**
 > - 단건/목록 조회 (GET): `200 OK`
@@ -593,7 +303,54 @@ public Optional<LikeModel> findAny(Long userId, Long productId) {
 
 ---
 
-## 16. 핵심 비즈니스 로직
+## 9. 공통 응답 구조
+
+모든 API 응답은 `ApiResponse<T>`로 감싸서 반환한다.
+
+### 성공 응답
+
+```json
+// 단건/목록 조회 (GET 200, POST 201)
+{
+  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+  "data": { ... }
+}
+
+// 수정/삭제/좋아요 등록·취소 (204 No Content — body 없음)
+```
+
+### 페이지네이션 응답
+
+페이지네이션이 적용된 API는 `data` 안에 아래 구조가 중첩된다.
+
+```json
+{
+  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+  "data": {
+    "content": [ ... ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 100
+  }
+}
+```
+
+### 에러 응답
+
+```json
+{
+  "meta": { "result": "FAIL", "errorCode": "NOT_FOUND", "message": "주문을 찾을 수 없습니다." },
+  "data": null
+}
+```
+
+> `errorCode`는 `ErrorType` enum의 code 값 (예: `NOT_FOUND`, `BAD_REQUEST`, `FORBIDDEN`, `CONFLICT`)
+
+---
+
+# 3부: 어떻게 구현하나
+
+## 10. 핵심 비즈니스 로직
 
 ### Brand 삭제
 
@@ -636,16 +393,22 @@ ProductFacade.deleteProduct(productId)
 
 ### 좋아요 등록 / 취소
 
+```mermaid
+stateDiagram-v2
+    [*] --> Active : POST (신규 INSERT)
+    Deleted --> Active : POST (restore)
+    Active --> Active : POST → 409 Conflict
+    Active --> Deleted : DELETE
+    Deleted --> [*] : 상품/브랜드 삭제 시 연쇄 삭제
 ```
-POST  → findByUserIdAndProductId (deleted_at 포함 전체 조회)
-        → active 존재: 409 Conflict
-        → soft-deleted 존재: restore() [deleted_at = null]
-        → 없음: save(new LikeModel)
 
-DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
-        → 없으면 404 Not Found
-        → 존재: like.delete() [deleted_at = now()]
-```
+- POST: `findByUserIdAndProductId` (deleted_at 포함 전체 조회)
+  - active 존재 → 409 Conflict
+  - soft-deleted 존재 → `restore()` [deleted_at = null]
+  - 없음 → `save(new LikeModel)`
+- DELETE: `findByUserIdAndProductId` (deleted_at IS NULL, active만)
+  - 없으면 404 Not Found
+  - 존재 → `like.delete()` [deleted_at = now()]
 
 좋아요 수:
 - `product` 테이블의 `like_count` 컬럼으로 관리 (DB 비정규화, ADR-003)
@@ -655,23 +418,22 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 
 ### 주문 생성
 
-요청 유효성 검증 (Facade 진입 전):
-- `items` 빈 배열 → `400 Bad Request`
-- 개별 item `quantity` ≤ 0 → `400 Bad Request`
-- `items` 내 중복 `productId` → `400 Bad Request`
-
+```mermaid
+flowchart TD
+    A[주문 요청] --> B{items 유효성 검증\n빈 배열 / quantity≤0 / 중복 productId}
+    B -- 실패 --> C[400 Bad Request]
+    B -- 통과 --> D{상품 조회\nPRODUCT JOIN PRODUCT_INVENTORY}
+    D -- 없는 상품 포함 --> E[404 Not Found]
+    D -- 성공 --> F{재고 확인\nfast fail, 락 없음}
+    F -- quantity 부족 --> G[400 Bad Request]
+    F -- 통과 --> H[@Transactional 시작\n주문 생성 INSERT\nOrderModel + OrderItemModel 스냅샷]
+    H --> I{재고 차감\nSELECT FOR UPDATE\nproductInventory.deduct}
+    I -- 재고 부족 --> J[Rollback → 400]
+    I -- 성공 --> K[Commit → 201 Created]
 ```
-1. 상품 조회 — PRODUCT JOIN PRODUCT_INVENTORY → ProductModel (quantity 포함, 스냅샷 데이터 수집)
-   → 존재하지 않는 productId 포함 시 404 Not Found
-2. 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
-3. 주문 생성 — OrderModel + OrderItemModel INSERT (스냅샷 포함)
-4. 재고 차감 — SELECT ... FOR UPDATE → productInventory.deduct(quantity)
-   → 실패 시 @Transactional 전체 롤백 (주문 생성 포함)
-```
 
-> - 상품 조회 시 PRODUCT_INVENTORY JOIN으로 quantity를 함께 가져오므로 별도 재고 조회 불필요
-> - 2번 재고 확인은 명백한 재고 부족을 주문 INSERT 이전에 조기 차단하는 역할 (fast fail)
-> - 실제 동시성 보장은 4번의 FOR UPDATE 락이 담당
+> - 2번 fast fail은 명백한 재고 부족을 주문 INSERT 이전에 조기 차단하는 역할
+> - 실제 동시성 보장은 FOR UPDATE 락이 담당
 > - product_inventory 테이블에만 락이 걸리므로 상품 조회 성능에 영향 없음 (ADR-006 참고)
 
 ### 어드민 인증
@@ -679,6 +441,244 @@ DELETE → findByUserIdAndProductId (deleted_at IS NULL, active만)
 `X-Loopers-Ldap` 헤더 값 == `"loopers.admin"` 검증. 불일치 시 `403 Forbidden`.
 
 ---
+
+## 11. 인증·인가 처리 구조
+
+인증은 `support/auth/` 패키지의 `HandlerInterceptor`로 처리한다 (ADR-011).
+
+### User 인증 — `UserAuthInterceptor`
+
+적용 경로: `/api/v1/**` (단, 회원가입 `POST /api/v1/users` 제외)
+
+```
+요청 수신
+  → X-Loopers-LoginId 헤더 추출 → 없으면 401
+  → X-Loopers-LoginPw 헤더 추출 → 없으면 401
+  → UserService.getByLoginId(loginId) → 없으면 401
+  → BCrypt.checkpw(loginPw, user.password) → 불일치 시 401
+  → request attribute에 userId 저장
+```
+
+Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `LoginUserArgumentResolver`가 request attribute에서 `userId`를 꺼내 메서드 파라미터로 바인딩한다.
+
+```java
+// 커스텀 어노테이션
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LoginUser {}
+
+// Controller 사용 예시
+public ApiResponse<OrderInfo> createOrder(
+    @LoginUser Long userId,
+    @RequestBody OrderV1Dto.CreateRequest request
+) { ... }
+```
+
+`LoginUserArgumentResolver`와 인터셉터는 모두 `support/auth/` 패키지에 위치하며, `WebMvcConfig`에서 함께 등록한다.
+
+### Admin 인증 — `AdminAuthInterceptor`
+
+적용 경로: `/api-admin/v1/**` 전체
+
+```
+요청 수신
+  → X-Loopers-Ldap 헤더 추출 → 없으면 403
+  → "loopers.admin" 값과 비교 → 불일치 시 403
+```
+
+### 등록 — `WebMvcConfig`
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(userAuthInterceptor)
+                .addPathPatterns("/api/v1/**")
+                .excludePathPatterns("/api/v1/users"); // 회원가입
+
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api-admin/v1/**");
+    }
+}
+```
+
+---
+
+## 12. 유효성 검증 레이어 원칙
+
+검증 책임은 두 레이어로 분리한다.
+
+| 레이어 | 담당 | 예시 |
+|---|---|---|
+| Controller (`@Valid`) | 입력 형식 검증 | `@NotBlank`, `@Min(0)`, `@Size(max=100)`, null 체크 |
+| Domain Model 생성자·메서드 | 비즈니스 규칙 검증 | 중복 불가, 상태 전이, 재고 부족 → `CoreException` throw |
+
+```java
+// Controller — 형식 검증
+public record CreateRequest(
+    @NotBlank @Size(max = 100) String name,
+    @Min(0) int quantity
+) {}
+
+// Domain Model — 비즈니스 규칙
+public BrandModel(String name, String description) {
+    if (name == null || name.isBlank()) throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 필수입니다.");
+    this.name = name;
+    this.description = description;
+}
+```
+
+> `@Valid`를 통과한 요청도 도메인 규칙에 위반되면 `CoreException`이 발생하며, `ApiControllerAdvice`가 처리한다.
+
+---
+
+## 13. 트랜잭션 경계 원칙
+
+| 레이어 | 규칙 |
+|---|---|
+| Controller | `@Transactional` 미적용 |
+| Facade | 기본적으로 미적용. 단, 여러 Service 쓰기 작업이 원자성을 요구하는 경우에 한해 적용 |
+| Service (조회) | `@Transactional(readOnly = true)` |
+| Service (쓰기) | `@Transactional` |
+
+트랜잭션 경계는 원칙적으로 **Service** 레이어에서 시작한다. Facade는 Service에 위임하며 트랜잭션에 관여하지 않는다.
+
+### 예외 — OrderFacade.createOrder()
+
+주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 `@Transactional`로 경계를 감싼다.
+
+```java
+// OrderFacade
+@Transactional
+public OrderInfo createOrder(...) {
+    ProductModel product = productService.getProduct(...); // ← 트랜잭션 참여 (readOnly 전파)
+    // 재고 fast fail 검증
+    OrderModel order = orderService.createOrder(product, ...); // ← 주문 생성
+    inventoryService.deductInventory(product.getId(), quantity); // ← 재고 차감 (FOR UPDATE)
+    return OrderInfo.from(order);
+}
+```
+
+> Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 금지한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
+
+---
+
+## 14. 연쇄 삭제 정책
+
+모든 삭제는 Soft Delete(`deleted_at = now()`)이며, 연쇄 삭제는 **Facade** 레이어에서 오케스트레이션한다. JPA Cascade는 사용하지 않는다 — Like는 `productId`(Long) ID 참조 방식이라 JPA 관계가 없고, Like와 Product는 서로 다른 Aggregate이므로 ID 참조를 유지한다.
+
+### Brand 삭제
+
+```
+BrandFacade.deleteBrand(brandId)
+  ├── BrandService.delete(brandId)
+  ├── ProductService.findIdsByBrand(brandId) → List<productId>
+  ├── ProductService.deleteAll(productIds)
+  ├── ProductInventoryService.deleteAllByProducts(productIds)
+  └── LikeService.deleteAllByProducts(productIds)
+```
+
+### Product 삭제
+
+```
+ProductFacade.deleteProduct(productId)
+  ├── ProductService.delete(productId)
+  ├── ProductInventoryService.deleteByProduct(productId)
+  └── LikeService.deleteAllByProduct(productId)
+```
+
+### Like 삭제 (좋아요 취소)
+
+```
+LikeFacade.removeLike(userId, productId)
+  └── LikeService.delete(userId, productId)   ← 단독 삭제, 연쇄 없음
+```
+
+> **like_count 처리**: 좋아요 취소(`removeLike`) 시에는 `like_count`를 차감한다. Brand/Product 삭제로 인한 Like 연쇄 삭제 시에는 `like_count` 차감을 수행하지 않는다 — 상품 자체가 삭제되므로 `like_count` 정합성 유지가 불필요하다.
+
+---
+
+## 15. Soft Delete 범위 및 조회 정책
+
+### 적용 범위
+
+모든 엔티티는 `BaseEntity`의 `deletedAt` 컬럼으로 Soft Delete를 관리한다.
+
+| 엔티티 | Soft Delete | 비고 |
+|---|---|---|
+| User | O | |
+| Brand | O | |
+| Product | O | |
+| ProductInventory | O | Product 삭제 시 연쇄 삭제 |
+| Like | O | Product/Brand 삭제 시 연쇄 삭제. 좋아요 재등록 시 Restore 패턴 적용 |
+| Order | O | |
+| OrderItem | O | Order 삭제 시 연쇄 삭제 (미구현, 향후 고려) |
+
+### 조회 필터 적용 원칙
+
+`deleted_at IS NULL` 조건은 Repository 구현체에서 **명시적으로** 포함한다. `@Where` 어노테이션이나 Hibernate Filter는 사용하지 않는다.
+
+```java
+// ProductRepositoryImpl
+public Optional<ProductModel> findById(Long id) {
+    return jpaRepository.findByIdAndDeletedAtIsNull(id);
+}
+
+public Page<ProductModel> findAll(Pageable pageable) {
+    return jpaRepository.findAllByDeletedAtIsNull(pageable);
+}
+```
+
+`@Where`나 Hibernate Filter는 자동 적용되어 편리하지만, 의도치 않게 삭제된 데이터가 조회되거나 누락되는 버그를 발견하기 어렵다. 명시적 조건으로 제어 범위를 명확히 한다.
+
+### Like 예외 — Restore 패턴
+
+좋아요 재등록 시에는 soft delete된 레코드를 포함한 전체 조회가 필요하다.
+
+```java
+// LikeRepositoryImpl
+// 일반 조회 — active only
+public Optional<LikeModel> findActive(Long userId, Long productId) {
+    return jpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(userId, productId);
+}
+
+// Restore용 — deleted_at 포함 전체 조회
+public Optional<LikeModel> findAny(Long userId, Long productId) {
+    return jpaRepository.findByUserIdAndProductId(userId, productId);
+}
+```
+
+---
+
+## 16. 페이지네이션 공통 정책
+
+### 기본값
+
+| 파라미터 | 기본값 | 설명 |
+|---|---|---|
+| `page` | `0` | 0-based 페이지 번호. 미전달 시 첫 번째 페이지 |
+| `size` | `20` | 페이지당 항목 수. 미전달 시 20개 |
+
+### 적용 API 목록
+
+| API | 비고 |
+|---|---|
+| `GET /api-admin/v1/brands` | |
+| `GET /api/v1/products` | `sort` 파라미터 추가 (섹션 7 참고) |
+| `GET /api-admin/v1/products` | |
+| `GET /api/v1/users/{userId}/likes` | |
+| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 (ADR-010) |
+| `GET /api-admin/v1/orders` | |
+
+### 예외
+
+단건 조회, 생성(POST), 수정(PUT), 삭제(DELETE) API는 페이지네이션을 적용하지 않는다.
+
+---
+
+# 4부: 참고
 
 ## 17. 시퀀스 다이어그램
 
