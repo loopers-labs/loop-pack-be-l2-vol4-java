@@ -420,14 +420,14 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-    A[주문 요청] --> B{items 유효성 검증\n빈 배열 / quantity≤0 / 중복 productId}
+    A[주문 요청] --> B{"items 유효성 검증<br/>빈 배열 / quantity≤0 / 중복 productId"}
     B -- 실패 --> C[400 Bad Request]
-    B -- 통과 --> D{상품 조회\nPRODUCT JOIN PRODUCT_INVENTORY}
+    B -- 통과 --> D{"상품 조회<br/>PRODUCT JOIN PRODUCT_INVENTORY"}
     D -- 없는 상품 포함 --> E[404 Not Found]
-    D -- 성공 --> F{재고 확인\nfast fail, 락 없음}
+    D -- 성공 --> F{"재고 확인<br/>fast fail, 락 없음"}
     F -- quantity 부족 --> G[400 Bad Request]
-    F -- 통과 --> H[@Transactional 시작\n주문 생성 INSERT\nOrderModel + OrderItemModel 스냅샷]
-    H --> I{재고 차감\nSELECT FOR UPDATE\nproductInventory.deduct}
+    F -- 통과 --> H["Transactional 시작<br/>주문 생성 INSERT<br/>OrderModel + OrderItemModel 스냅샷"]
+    H --> I{"재고 차감<br/>SELECT FOR UPDATE<br/>productInventory.deduct"}
     I -- 재고 부족 --> J[Rollback → 400]
     I -- 성공 --> K[Commit → 201 Created]
 ```
