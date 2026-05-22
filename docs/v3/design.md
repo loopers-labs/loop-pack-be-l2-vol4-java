@@ -466,22 +466,7 @@ flowchart TD
   → request attribute에 userId 저장
 ```
 
-Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `LoginUserArgumentResolver`가 request attribute에서 `userId`를 꺼내 메서드 파라미터로 바인딩한다.
-
-```java
-// 커스텀 어노테이션
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface LoginUser {}
-
-// Controller 사용 예시
-public ApiResponse<OrderInfo> createOrder(
-    @LoginUser Long userId,
-    @RequestBody OrderV1Dto.CreateRequest request
-) { ... }
-```
-
-`LoginUserArgumentResolver`와 인터셉터는 모두 `support/auth/` 패키지에 위치하며, `WebMvcConfig`에서 함께 등록한다.
+Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `LoginUserArgumentResolver`가 request attribute에서 `userId`를 꺼내 메서드 파라미터로 바인딩한다. `LoginUserArgumentResolver`와 인터셉터는 모두 `support/auth/` 패키지에 위치하며, `WebMvcConfig`에서 함께 등록한다.
 
 ### Admin 인증 — `AdminAuthInterceptor`
 
@@ -491,29 +476,6 @@ public ApiResponse<OrderInfo> createOrder(
 요청 수신
   → X-Loopers-Ldap 헤더 추출 → 없으면 403
   → "loopers.admin" 값과 비교 → 불일치 시 403
-```
-
-### 등록 — `WebMvcConfig`
-
-```java
-@Configuration
-public class WebMvcConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(userAuthInterceptor)
-                .addPathPatterns("/api/v1/**")
-                .excludePathPatterns(
-                    "/api/v1/users",             // 회원가입
-                    "/api/v1/brands/*",          // 브랜드 단건 조회
-                    "/api/v1/products",          // 상품 목록 조회
-                    "/api/v1/products/*"         // 상품 단건 조회
-                );
-
-        registry.addInterceptor(adminAuthInterceptor)
-                .addPathPatterns("/api-admin/v1/**");
-    }
-}
 ```
 
 ---
@@ -526,21 +488,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
 |---|---|---|
 | Controller (`@Valid`) | 입력 형식 검증 | `@NotBlank`, `@Min(0)`, `@Size(max=100)`, null 체크 |
 | Domain Model 생성자·메서드 | 비즈니스 규칙 검증 | 중복 불가, 상태 전이, 재고 부족 → `CoreException` throw |
-
-```java
-// Controller — 형식 검증
-public record CreateRequest(
-    @NotBlank @Size(max = 100) String name,
-    @Min(0) int quantity
-) {}
-
-// Domain Model — 비즈니스 규칙
-public BrandModel(String name, String description) {
-    if (name == null || name.isBlank()) throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 필수입니다.");
-    this.name = name;
-    this.description = description;
-}
-```
 
 > `@Valid`를 통과한 요청도 도메인 규칙에 위반되면 `CoreException`이 발생하며, `ApiControllerAdvice`가 처리한다.
 
@@ -559,19 +506,7 @@ public BrandModel(String name, String description) {
 
 ### 예외 — OrderFacade.createOrder()
 
-주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 `@Transactional`로 경계를 감싼다.
-
-```java
-// OrderFacade
-@Transactional
-public OrderInfo createOrder(...) {
-    ProductModel product = productService.getProduct(...); // ← 트랜잭션 참여 (readOnly 전파)
-    // 재고 fast fail 검증
-    OrderModel order = orderService.createOrder(product, ...); // ← 주문 생성
-    inventoryService.deductInventory(product.getId(), quantity); // ← 재고 차감 (FOR UPDATE)
-    return OrderInfo.from(order);
-}
-```
+주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 트랜잭션 경계를 감싼다.
 
 > Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 금지한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
 
@@ -630,37 +565,16 @@ LikeFacade.removeLike(userId, productId)
 
 ### 조회 필터 적용 원칙
 
-`deleted_at IS NULL` 조건은 Repository 구현체에서 **명시적으로** 포함한다. `@Where` 어노테이션이나 Hibernate Filter는 사용하지 않는다.
-
-```java
-// ProductRepositoryImpl
-public Optional<ProductModel> findById(Long id) {
-    return jpaRepository.findByIdAndDeletedAtIsNull(id);
-}
-
-public Page<ProductModel> findAll(Pageable pageable) {
-    return jpaRepository.findAllByDeletedAtIsNull(pageable);
-}
-```
-
-`@Where`나 Hibernate Filter는 자동 적용되어 편리하지만, 의도치 않게 삭제된 데이터가 조회되거나 누락되는 버그를 발견하기 어렵다. 명시적 조건으로 제어 범위를 명확히 한다.
+`deleted_at IS NULL` 조건은 Repository 구현체에서 **명시적으로** 포함한다. `@Where` 어노테이션이나 Hibernate Filter는 사용하지 않는다. 자동 적용되어 편리하지만, 의도치 않게 삭제된 데이터가 조회되거나 누락되는 버그를 발견하기 어렵기 때문이다.
 
 ### Like 예외 — Restore 패턴
 
-좋아요 재등록 시에는 soft delete된 레코드를 포함한 전체 조회가 필요하다.
+좋아요 재등록 시에는 soft delete된 레코드를 포함한 전체 조회가 필요하다. 이를 위해 Repository에 아래 두 가지 조회 메서드를 분리한다.
 
-```java
-// LikeRepositoryImpl
-// 일반 조회 — active only
-public Optional<LikeModel> findActive(Long userId, Long productId) {
-    return jpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(userId, productId);
-}
-
-// Restore용 — deleted_at 포함 전체 조회
-public Optional<LikeModel> findAny(Long userId, Long productId) {
-    return jpaRepository.findByUserIdAndProductId(userId, productId);
-}
-```
+| 메서드 | 조건 | 용도 |
+|---|---|---|
+| `findActive(userId, productId)` | `deleted_at IS NULL` | 일반 조회 |
+| `findAny(userId, productId)` | 조건 없음 | Restore 전 존재 여부 확인 |
 
 ---
 
