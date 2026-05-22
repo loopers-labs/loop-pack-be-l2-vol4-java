@@ -19,8 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class UserServiceIntegrationTest {
@@ -70,12 +69,11 @@ class UserServiceIntegrationTest {
             UserModel saved = userService.signUp(user);
 
             // assert
-            assertAll(
-                () -> assertThat(saved.getId()).isNotNull(),
-                () -> assertThat(saved.getLoginId()).isEqualTo("user01"),
-                () -> assertThat(saved.getName()).isEqualTo("홍길동"),
-                () -> assertThat(saved.getEmail()).isEqualTo("user@example.com")
-            );
+            assertThat(saved)
+                .satisfies(u -> assertThat(u.getId()).isNotNull())
+                .satisfies(u -> assertThat(u.getLoginId()).isEqualTo("user01"))
+                .satisfies(u -> assertThat(u.getName()).isEqualTo("홍길동"))
+                .satisfies(u -> assertThat(u.getEmail()).isEqualTo("user@example.com"));
         }
 
         @DisplayName("동일 loginId로 동시에 가입 요청 시, 한 건만 성공하고 나머지는 CONFLICT 예외가 발생한다.")
@@ -132,13 +130,11 @@ class UserServiceIntegrationTest {
                 LocalDate.of(1995, 5, 5), "other@example.com"
             );
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                userService.signUp(duplicateUser)
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+            // act & assert
+            assertThatThrownBy(() -> userService.signUp(duplicateUser))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
         }
     }
 
@@ -159,10 +155,9 @@ class UserServiceIntegrationTest {
             UserModel result = userService.getUserById(saved.getId());
 
             // assert
-            assertAll(
-                () -> assertThat(result.getId()).isEqualTo(saved.getId()),
-                () -> assertThat(result.getLoginId()).isEqualTo("user01")
-            );
+            assertThat(result)
+                .satisfies(u -> assertThat(u.getId()).isEqualTo(saved.getId()))
+                .satisfies(u -> assertThat(u.getLoginId()).isEqualTo("user01"));
         }
 
         @DisplayName("존재하지 않는 userId가 주어지면, NOT_FOUND 예외가 발생한다.")
@@ -171,13 +166,11 @@ class UserServiceIntegrationTest {
             // arrange
             Long nonExistentUserId = 999L;
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                userService.getUserById(nonExistentUserId)
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            // act & assert
+            assertThatThrownBy(() -> userService.getUserById(nonExistentUserId))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 
@@ -198,12 +191,11 @@ class UserServiceIntegrationTest {
             UserModel result = userService.getUser("user01", "Password1!");
 
             // assert
-            assertAll(
-                () -> assertThat(result.getLoginId()).isEqualTo(saved.getLoginId()),
-                () -> assertThat(result.getName()).isEqualTo(saved.getName()),
-                () -> assertThat(result.getBirthDate()).isEqualTo(saved.getBirthDate()),
-                () -> assertThat(result.getEmail()).isEqualTo(saved.getEmail())
-            );
+            assertThat(result)
+                .satisfies(u -> assertThat(u.getLoginId()).isEqualTo(saved.getLoginId()))
+                .satisfies(u -> assertThat(u.getName()).isEqualTo(saved.getName()))
+                .satisfies(u -> assertThat(u.getBirthDate()).isEqualTo(saved.getBirthDate()))
+                .satisfies(u -> assertThat(u.getEmail()).isEqualTo(saved.getEmail()));
         }
 
         @DisplayName("존재하지 않는 loginId가 주어지면, NOT_FOUND 예외가 발생한다.")
@@ -212,13 +204,11 @@ class UserServiceIntegrationTest {
             // arrange
             String notExistLoginId = "unknown";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                userService.getUser(notExistLoginId, "Password1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            // act & assert
+            assertThatThrownBy(() -> userService.getUser(notExistLoginId, "Password1!"))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
 
         @DisplayName("비밀번호가 일치하지 않으면, UNAUTHORIZED 예외가 발생한다.")
@@ -230,13 +220,13 @@ class UserServiceIntegrationTest {
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 userService.getUser("user01", "WrongPassword!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
 
@@ -285,13 +275,13 @@ class UserServiceIntegrationTest {
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 userService.updatePassword("user01", "WrongPassword!", "NewPassword1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
@@ -303,13 +293,13 @@ class UserServiceIntegrationTest {
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 userService.updatePassword("user01", "Password1!", "Password1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }

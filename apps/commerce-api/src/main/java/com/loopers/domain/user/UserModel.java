@@ -47,7 +47,10 @@ public class UserModel extends BaseEntity {
         this.password = encoder.encode(this.password);
     }
 
-    public void updatePassword(String encodedNewPassword) {
+    void updatePassword(String encodedNewPassword) {
+        if (encodedNewPassword == null || encodedNewPassword.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "인코딩된 비밀번호는 비어있을 수 없습니다.");
+        }
         this.password = encodedNewPassword;
     }
 

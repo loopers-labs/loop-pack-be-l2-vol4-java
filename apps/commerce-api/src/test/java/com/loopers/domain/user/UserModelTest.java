@@ -250,6 +250,45 @@ class UserModelTest {
             // assert
             assertThat(user.getPassword()).isEqualTo(encodedNew);
         }
+
+        @DisplayName("인코딩된 비밀번호가 null이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEncodedPasswordIsNull() {
+            // arrange
+            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
+
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword(null))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("인코딩된 비밀번호가 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEncodedPasswordIsEmpty() {
+            // arrange
+            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
+
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword(""))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("인코딩된 비밀번호가 공백이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenEncodedPasswordIsBlank() {
+            // arrange
+            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
+
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword("   "))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
     }
 
     @DisplayName("이름을 마스킹할 때,")

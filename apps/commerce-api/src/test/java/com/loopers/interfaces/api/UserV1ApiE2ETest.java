@@ -18,8 +18,6 @@ import org.springframework.http.*;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserV1ApiE2ETest {
@@ -66,10 +64,9 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user01")
-            );
+            assertThat(response)
+                .satisfies(r -> assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED))
+                .satisfies(r -> assertThat(r.getBody().data().loginId()).isEqualTo("user01"));
         }
 
         @DisplayName("중복된 loginId로 가입하면, 409 응답을 반환한다.")
@@ -203,12 +200,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertAll(
-                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user01"),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
-                () -> assertThat(response.getBody().data().email()).isEqualTo("user@example.com")
-            );
+            assertThat(response)
+                .satisfies(r -> assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK))
+                .satisfies(r -> assertThat(r.getBody().data().loginId()).isEqualTo("user01"))
+                .satisfies(r -> assertThat(r.getBody().data().name()).isEqualTo("홍길*"))
+                .satisfies(r -> assertThat(r.getBody().data().email()).isEqualTo("user@example.com"));
         }
 
         @DisplayName("헤더가 없으면, 401 응답을 반환한다.")
@@ -336,7 +332,7 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertTrue(response.getStatusCode().is2xxSuccessful());
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
         @DisplayName("기존 비밀번호가 틀리면, 400 응답을 반환한다.")
