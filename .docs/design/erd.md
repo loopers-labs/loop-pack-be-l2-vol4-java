@@ -42,7 +42,9 @@ erDiagram
     orders {
         bigint id PK
         bigint user_id FK
-        varchar status "PENDING_PAYMENT | PAID | CANCELLED"
+        bigint coupon_id FK "nullable"
+        bigint discount_amount
+        varchar status "PAID | CANCELLED"
         timestamp ordered_at
     }
 
@@ -68,9 +70,9 @@ erDiagram
         bigint id PK
         bigint order_id FK, UK
         bigint user_id FK
-        bigint coupon_id FK "nullable"
         bigint amount
-        bigint discount_amount
+        varchar pg_provider
+        varchar pg_transaction_id
         varchar status "COMPLETED | CANCELLED"
         timestamp paid_at
         timestamp cancelled_at "nullable"
@@ -81,6 +83,7 @@ erDiagram
         bigint user_id FK
         bigint discount_amount
         varchar status "AVAILABLE | USED"
+        timestamp expired_at
         timestamp used_at "nullable"
     }
 
@@ -95,7 +98,7 @@ erDiagram
     users     ||--o{ payments   : ""
     orders    ||--o| payments   : ""
     users     ||--o{ coupons    : ""
-    coupons   o|--o| payments   : ""
+    coupons   o|--o{ orders     : ""
 ```
 
 ---
@@ -122,7 +125,7 @@ erDiagram
 
 | 테이블 | 컬럼 | 값 |
 |--------|------|----|
-| orders | status | `PENDING_PAYMENT`, `PAID`, `CANCELLED` |
+| orders | status | `PAID`, `CANCELLED` |
 | payments | status | `COMPLETED`, `CANCELLED` |
 | coupons | status | `AVAILABLE`, `USED` |
 
@@ -152,9 +155,14 @@ erDiagram
 
 ---
 
-### payments.coupon_id (nullable FK)
+### orders.coupon_id (nullable FK) / discount_amount
 
-결제 시 쿠폰 사용은 선택. 쿠폰 없이 결제하면 `coupon_id = NULL`, `discount_amount = 0`.
+쿠폰은 주문 시점에 확정되므로 `orders`에 보관. 쿠폰 없이 주문하면 `coupon_id = NULL`, `discount_amount = 0`.
+결제(`payments`)는 VAN/PG사와의 거래 정보(실제 청구 금액, 거래 ID 등)만 담는다.
+
+### payments.pg_provider / pg_transaction_id
+
+PG사(결제대행사) 연동 정보. 실제 구현 시 VAN사 요구 스펙에 따라 컬럼이 추가될 수 있음.
 
 ---
 

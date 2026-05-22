@@ -561,164 +561,9 @@ sequenceDiagram
 
 ---
 
-## 4. 주문 (Orders)
+## 4. 장바구니 (Cart)
 
-### 4-1. 주문 요청
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant OrderController
-    participant OrderFacade
-    participant ProductService
-    participant ProductRepository
-    participant CartService
-    participant CartRepository
-    participant OrderService
-    participant OrderRepository
-
-    User->>OrderController: POST /api/v1/orders (items)
-    OrderController->>OrderFacade: createOrder(userId, items)
-
-    alt 주문 목록이 비어 있음
-        OrderFacade-->>OrderController: 400 Bad Request
-        OrderController-->>User: 400 Bad Request
-    else 정상
-        loop 각 상품
-            OrderFacade->>ProductService: getProduct(productId)
-            ProductService->>ProductRepository: findById(productId)
-            alt 존재하지 않는 상품
-                ProductRepository-->>ProductService: empty
-                ProductService-->>OrderFacade: 404 Not Found
-                OrderFacade-->>OrderController: 404 Not Found
-                OrderController-->>User: 404 Not Found
-            else 재고 부족
-                ProductService-->>OrderFacade: 400 Bad Request (부족한 상품 정보)
-                OrderFacade-->>OrderController: 400 Bad Request
-                OrderController-->>User: 400 Bad Request
-            end
-        end
-        OrderFacade->>ProductService: decreaseStock(items)
-        ProductService->>ProductRepository: decreaseStock(productId, quantity)
-        OrderFacade->>CartService: deleteItems(userId, productIds)
-        CartService->>CartRepository: deleteItems(userId, productIds)
-        OrderFacade->>OrderService: createOrder(userId, items, snapshot)
-        OrderService->>OrderRepository: save(order)
-        OrderController-->>User: 201 Created (orderId)
-    end
-```
-
----
-
-### 4-2. 주문 목록 조회
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant OrderController
-    participant OrderFacade
-    participant OrderService
-    participant OrderRepository
-
-    User->>OrderController: GET /api/v1/orders?startAt=&endAt=
-    OrderController->>OrderFacade: getOrders(userId, startAt, endAt)
-    OrderFacade->>OrderService: getOrders(userId, startAt, endAt)
-    OrderService->>OrderService: 날짜 유효성 검증
-
-    alt 날짜 형식 오류 또는 startAt > endAt
-        OrderService-->>OrderFacade: 400 Bad Request
-        OrderFacade-->>OrderController: 400 Bad Request
-        OrderController-->>User: 400 Bad Request
-    else 정상
-        OrderService->>OrderRepository: findAllByUserIdAndPeriod(userId, startAt, endAt)
-        OrderRepository-->>OrderService: 주문 목록
-        OrderService-->>OrderFacade: 주문 목록
-        OrderFacade-->>OrderController: 주문 목록
-        OrderController-->>User: 200 OK
-    end
-```
-
----
-
-### 4-3. 주문 상세 조회
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant OrderController
-    participant OrderFacade
-    participant OrderService
-    participant OrderRepository
-
-    User->>OrderController: GET /api/v1/orders/{orderId}
-    OrderController->>OrderFacade: getOrder(userId, orderId)
-    OrderFacade->>OrderService: getOrder(userId, orderId)
-    OrderService->>OrderRepository: findById(orderId)
-
-    alt 존재하지 않는 주문
-        OrderService-->>OrderFacade: 404 Not Found
-        OrderFacade-->>OrderController: 404 Not Found
-        OrderController-->>User: 404 Not Found
-    else 타 유저 주문 접근
-        OrderService-->>OrderFacade: 403 Forbidden
-        OrderFacade-->>OrderController: 403 Forbidden
-        OrderController-->>User: 403 Forbidden
-    else 정상
-        OrderRepository-->>OrderService: 주문 상세 (상품 스냅샷 포함)
-        OrderService-->>OrderFacade: 주문 상세
-        OrderFacade-->>OrderController: 주문 상세
-        OrderController-->>User: 200 OK
-    end
-```
-
----
-
-### 4-4. 주문 결제 내역 조회
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant OrderController
-    participant OrderFacade
-    participant OrderService
-    participant OrderRepository
-    participant PaymentService
-    participant PaymentRepository
-
-    User->>OrderController: GET /api/v1/orders/{orderId}/payments
-    OrderController->>OrderFacade: getOrderPayments(userId, orderId)
-    OrderFacade->>OrderService: getOrder(userId, orderId)
-    OrderService->>OrderRepository: findById(orderId)
-
-    alt 존재하지 않는 주문
-        OrderService-->>OrderFacade: 404 Not Found
-        OrderFacade-->>OrderController: 404 Not Found
-        OrderController-->>User: 404 Not Found
-    else 타 유저 주문 접근
-        OrderService-->>OrderFacade: 403 Forbidden
-        OrderFacade-->>OrderController: 403 Forbidden
-        OrderController-->>User: 403 Forbidden
-    else 정상
-        OrderFacade->>PaymentService: getPayments(orderId)
-        PaymentService->>PaymentRepository: findByOrderId(orderId)
-        alt 미결제 주문
-            PaymentRepository-->>PaymentService: 빈 결제 내역
-        else 결제 내역 있음
-            PaymentRepository-->>PaymentService: 결제 내역
-            PaymentService->>PaymentRepository: findCancelByOrderId(orderId)
-            PaymentRepository-->>PaymentService: 취소 내역 (있는 경우)
-        end
-        PaymentService-->>OrderFacade: 결제 내역 + 취소 내역
-        OrderFacade-->>OrderController: 결제 내역 + 취소 내역
-        OrderController-->>User: 200 OK
-    end
-```
-
----
-
-## 5. 장바구니 (Cart)
-
-### 5-1. 장바구니 상품 추가
+### 4-1. 장바구니 상품 추가
 
 ```mermaid
 sequenceDiagram
@@ -758,7 +603,7 @@ sequenceDiagram
 
 ---
 
-### 5-2. 장바구니 목록 조회
+### 4-2. 장바구니 목록 조회
 
 ```mermaid
 sequenceDiagram
@@ -780,7 +625,7 @@ sequenceDiagram
 
 ---
 
-### 5-3. 장바구니 수량 변경
+### 4-3. 장바구니 수량 변경
 
 ```mermaid
 sequenceDiagram
@@ -812,7 +657,7 @@ sequenceDiagram
 
 ---
 
-### 5-4. 장바구니 상품 제거
+### 4-4. 장바구니 상품 제거
 
 ```mermaid
 sequenceDiagram
@@ -844,79 +689,291 @@ sequenceDiagram
 
 ---
 
-## 6. 결제 (Payment)
+## 5. 쿠폰 (Coupons)
 
-### 6-1. 결제 요청
+### 5-1. 쿠폰 목록 조회
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant PaymentController
-    participant PaymentFacade
-    participant OrderService
-    participant OrderRepository
+    participant CouponController
+    participant CouponFacade
     participant CouponService
     participant CouponRepository
-    participant PaymentService
-    participant PaymentRepository
 
-    User->>PaymentController: POST /api/v1/payments (orderId, 카드 정보, couponId?)
-    PaymentController->>PaymentFacade: pay(userId, command)
-    PaymentFacade->>OrderService: getOrder(orderId)
-    OrderService->>OrderRepository: findById(orderId)
+    User->>CouponController: GET /api/v1/coupons
+    CouponController->>CouponFacade: getCoupons(userId)
+    CouponFacade->>CouponService: getAvailableCoupons(userId)
+    CouponService->>CouponRepository: findAvailableByUserId(userId, now)
+    Note right of CouponRepository: status=AVAILABLE AND expired_at > now
+    CouponRepository-->>CouponService: 쿠폰 목록
+    CouponService-->>CouponFacade: 쿠폰 목록
+    CouponFacade-->>CouponController: 쿠폰 목록
+    CouponController-->>User: 200 OK
+```
 
-    alt 존재하지 않는 주문
-        OrderRepository-->>OrderService: empty
-        OrderService-->>PaymentFacade: 404 Not Found
-        PaymentFacade-->>PaymentController: 404 Not Found
-        PaymentController-->>User: 404 Not Found
-    else 이미 결제된 주문
-        OrderService-->>PaymentFacade: 400 Bad Request
-        PaymentFacade-->>PaymentController: 400 Bad Request
-        PaymentController-->>User: 400 Bad Request
+---
+
+## 5-ADMIN. 쿠폰 ADMIN
+
+### 5-ADMIN-1. 쿠폰 발급
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant CouponController
+    participant CouponFacade
+    participant UserService
+    participant UserRepository
+    participant CouponService
+    participant CouponRepository
+
+    Admin->>CouponController: POST /api-admin/v1/coupons (userId, discountAmount)
+    alt 어드민 권한 없음
+        CouponController-->>Admin: 401 Unauthorized
     else 정상
-        alt 쿠폰 있음
-            PaymentFacade->>CouponService: validateAndGetDiscount(couponId)
-            CouponService->>CouponRepository: findById(couponId)
-            alt 유효하지 않은 쿠폰
-                CouponService-->>PaymentFacade: 400 Bad Request
-                PaymentFacade-->>PaymentController: 400 Bad Request
-                PaymentController-->>User: 400 Bad Request
-            else 정상
-                CouponRepository-->>CouponService: 쿠폰
-                CouponService-->>PaymentFacade: 할인 금액
-            end
-        end
-        PaymentFacade->>PaymentService: processPayment(command, discountAmount)
-        alt 결제 실패
-            PaymentService-->>PaymentFacade: 400 Bad Request
-            PaymentFacade-->>PaymentController: 400 Bad Request
-            PaymentController-->>User: 400 Bad Request
-        else 결제 성공
-            PaymentService->>PaymentRepository: save(payment)
-            PaymentService-->>PaymentFacade: payment
-            PaymentFacade->>OrderService: updateStatus(orderId, PAID)
-            OrderService->>OrderRepository: updateStatus(orderId, PAID)
-            PaymentFacade->>CouponService: markAsUsed(couponId)
-            CouponService->>CouponRepository: markAsUsed(couponId)
-            PaymentController-->>User: 200 OK
+        CouponController->>CouponFacade: issueCoupon(userId, discountAmount)
+        CouponFacade->>UserService: getOrThrow(userId)
+        UserService->>UserRepository: findById(userId)
+        alt 존재하지 않는 유저
+            UserRepository-->>UserService: empty
+            UserService-->>CouponFacade: 404 Not Found
+            CouponFacade-->>CouponController: 404 Not Found
+            CouponController-->>Admin: 404 Not Found
+        else 정상
+            CouponFacade->>CouponService: issueCoupon(userId, discountAmount)
+            CouponService->>CouponRepository: save(coupon)
+            CouponFacade-->>CouponController: Created
+            CouponController-->>Admin: 201 Created
         end
     end
 ```
 
 ---
 
-### 6-2. 결제 취소
+### 5-ADMIN-2. 쿠폰 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant CouponController
+    participant CouponFacade
+    participant CouponService
+    participant CouponRepository
+
+    Admin->>CouponController: GET /api-admin/v1/coupons?userId=&page=&size=
+    alt 어드민 권한 없음
+        CouponController-->>Admin: 401 Unauthorized
+    else 정상
+        CouponController->>CouponFacade: getCoupons(userId, pageable)
+        CouponFacade->>CouponService: getCoupons(userId, pageable)
+        alt userId 있음
+            CouponService->>CouponRepository: findAllByUserId(userId, pageable)
+        else userId 없음
+            CouponService->>CouponRepository: findAll(pageable)
+        end
+        CouponRepository-->>CouponService: 쿠폰 목록
+        CouponService-->>CouponFacade: 쿠폰 목록
+        CouponFacade-->>CouponController: 쿠폰 목록
+        CouponController-->>Admin: 200 OK
+    end
+```
+
+---
+
+## 6. 주문 (Orders)
+
+### 6-1. 주문 요청
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant PaymentController
-    participant PaymentFacade
-    participant PaymentService
-    participant PaymentRepository
+    participant OrderController
+    participant OrderFacade
+    participant ProductService
+    participant ProductRepository
+    participant CouponService
+    participant CouponRepository
+    participant CartService
+    participant CartRepository
     participant OrderService
     participant OrderRepository
+    participant PaymentService
+    participant PaymentRepository
+
+    User->>OrderController: POST /api/v1/orders (items, cardInfo, couponId?)
+    OrderController->>OrderFacade: createOrder(userId, items, cardInfo, couponId?)
+    Note over OrderFacade: @Transactional 시작
+
+    alt 주문 목록이 비어 있음
+        OrderFacade-->>OrderController: 400 Bad Request
+        OrderController-->>User: 400 Bad Request
+    else 정상
+        loop 각 상품
+            OrderFacade->>ProductService: getProduct(productId)
+            ProductService->>ProductRepository: findById(productId)
+            alt 존재하지 않는 상품
+                ProductRepository-->>ProductService: empty
+                ProductService-->>OrderFacade: 404 Not Found
+                OrderFacade-->>OrderController: 404 Not Found
+                OrderController-->>User: 404 Not Found
+            else 재고 부족
+                ProductService-->>OrderFacade: 400 Bad Request (부족한 상품 정보)
+                OrderFacade-->>OrderController: 400 Bad Request
+                OrderController-->>User: 400 Bad Request
+            end
+        end
+
+        alt 쿠폰 있음
+            OrderFacade->>CouponService: validateAndGetDiscount(couponId)
+            CouponService->>CouponRepository: findById(couponId)
+            alt 유효하지 않거나 만료된 쿠폰
+                CouponService-->>OrderFacade: 400 Bad Request
+                OrderFacade-->>OrderController: 400 Bad Request
+                OrderController-->>User: 400 Bad Request
+            else 정상
+                CouponRepository-->>CouponService: 쿠폰
+                CouponService-->>OrderFacade: 할인 금액
+            end
+        end
+
+        OrderFacade->>ProductService: decreaseStock(items)
+        ProductService->>ProductRepository: decreaseStock(productId, quantity)
+        OrderFacade->>CartService: deleteItems(userId, productIds)
+        CartService->>CartRepository: deleteItems(userId, productIds)
+        OrderFacade->>OrderService: createOrder(userId, items, snapshot)
+        OrderService->>OrderRepository: save(order)
+        OrderFacade->>PaymentService: processPayment(orderId, cardInfo, discountAmount)
+        alt 결제 실패
+            PaymentService-->>OrderFacade: 400 Bad Request
+            OrderFacade-->>OrderController: 400 Bad Request
+            OrderController-->>User: 400 Bad Request
+        else 결제 성공
+            PaymentService->>PaymentRepository: save(payment)
+            alt 쿠폰 사용한 경우
+                OrderFacade->>CouponService: markAsUsed(couponId)
+                CouponService->>CouponRepository: markAsUsed(couponId)
+            end
+            OrderFacade->>OrderService: updateStatus(orderId, PAID)
+            OrderService->>OrderRepository: updateStatus(orderId, PAID)
+            OrderController-->>User: 201 Created (orderId)
+        end
+    end
+```
+
+---
+
+### 6-2. 주문 목록 조회
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
+    participant OrderRepository
+
+    User->>OrderController: GET /api/v1/orders?startAt=&endAt=
+    OrderController->>OrderFacade: getOrders(userId, startAt, endAt)
+    OrderFacade->>OrderService: getOrders(userId, startAt, endAt)
+    OrderService->>OrderService: 날짜 유효성 검증
+
+    alt 날짜 형식 오류 또는 startAt > endAt
+        OrderService-->>OrderFacade: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
+        OrderController-->>User: 400 Bad Request
+    else 정상
+        OrderService->>OrderRepository: findAllByUserIdAndPeriod(userId, startAt, endAt)
+        OrderRepository-->>OrderService: 주문 목록
+        OrderService-->>OrderFacade: 주문 목록
+        OrderFacade-->>OrderController: 주문 목록
+        OrderController-->>User: 200 OK
+    end
+```
+
+---
+
+### 6-3. 주문 상세 조회
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
+    participant OrderRepository
+
+    User->>OrderController: GET /api/v1/orders/{orderId}
+    OrderController->>OrderFacade: getOrder(userId, orderId)
+    OrderFacade->>OrderService: getOrder(userId, orderId)
+    OrderService->>OrderRepository: findById(orderId)
+
+    alt 존재하지 않는 주문
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
+        OrderController-->>User: 404 Not Found
+    else 타 유저 주문 접근
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
+        OrderController-->>User: 403 Forbidden
+    else 정상
+        OrderRepository-->>OrderService: 주문 상세 (상품 스냅샷 포함)
+        OrderService-->>OrderFacade: 주문 상세
+        OrderFacade-->>OrderController: 주문 상세
+        OrderController-->>User: 200 OK
+    end
+```
+
+---
+
+### 6-4. 주문 결제 내역 조회
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
+    participant OrderRepository
+    participant PaymentService
+    participant PaymentRepository
+
+    User->>OrderController: GET /api/v1/orders/{orderId}/payments
+    OrderController->>OrderFacade: getOrderPayments(userId, orderId)
+    OrderFacade->>OrderService: getOrder(userId, orderId)
+    OrderService->>OrderRepository: findById(orderId)
+
+    alt 존재하지 않는 주문
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
+        OrderController-->>User: 404 Not Found
+    else 타 유저 주문 접근
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
+        OrderController-->>User: 403 Forbidden
+    else 정상
+        OrderFacade->>PaymentService: getPayment(orderId)
+        PaymentService->>PaymentRepository: findByOrderId(orderId)
+        PaymentRepository-->>PaymentService: 결제 내역
+        PaymentService-->>OrderFacade: 결제 내역 (취소 정보 포함)
+        OrderFacade-->>OrderController: 결제 내역
+        OrderController-->>User: 200 OK
+    end
+```
+
+---
+
+### 6-5. 주문 취소
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
+    participant OrderRepository
+    participant PaymentService
+    participant PaymentRepository
     participant ProductService
     participant ProductRepository
     participant CouponService
@@ -924,44 +981,51 @@ sequenceDiagram
     participant CartService
     participant CartRepository
 
-    User->>PaymentController: POST /api/v1/payments/{paymentId}/cancel
-    PaymentController->>PaymentFacade: cancel(userId, paymentId)
-    PaymentFacade->>PaymentService: getPayment(paymentId)
-    PaymentService->>PaymentRepository: findById(paymentId)
+    User->>OrderController: POST /api/v1/orders/{orderId}/cancel
+    OrderController->>OrderFacade: cancelOrder(userId, orderId)
+    Note over OrderFacade: @Transactional 시작
+    OrderFacade->>OrderService: getOrder(userId, orderId)
+    OrderService->>OrderRepository: findById(orderId)
 
-    alt 존재하지 않는 결제
-        PaymentRepository-->>PaymentService: empty
-        PaymentService-->>PaymentFacade: 404 Not Found
-        PaymentFacade-->>PaymentController: 404 Not Found
-        PaymentController-->>User: 404 Not Found
-    else 타 유저 결제 접근
-        PaymentService-->>PaymentFacade: 403 Forbidden
-        PaymentFacade-->>PaymentController: 403 Forbidden
-        PaymentController-->>User: 403 Forbidden
-    else 이미 취소된 결제 또는 취소 불가 상태
-        PaymentService-->>PaymentFacade: 400 Bad Request
-        PaymentFacade-->>PaymentController: 400 Bad Request
-        PaymentController-->>User: 400 Bad Request
+    alt 존재하지 않는 주문
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
+        OrderController-->>User: 404 Not Found
+    else 타 유저 주문 접근
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
+        OrderController-->>User: 403 Forbidden
+    else 이미 취소된 주문
+        OrderService-->>OrderFacade: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
+        OrderController-->>User: 400 Bad Request
     else 정상
-        PaymentFacade->>PaymentService: cancel(paymentId)
-        PaymentService->>PaymentRepository: saveCancel(paymentCancel)
-        PaymentFacade->>OrderService: updateStatus(orderId, CANCELLED)
-        OrderService->>OrderRepository: updateStatus(orderId, CANCELLED)
-        PaymentFacade->>ProductService: restoreStock(items)
+        OrderFacade->>PaymentService: getPaymentByOrderId(orderId)
+        PaymentService->>PaymentRepository: findByOrderId(orderId)
+        PaymentRepository-->>PaymentService: payment
+        PaymentService-->>OrderFacade: payment
+        OrderFacade->>PaymentService: cancel(paymentId)
+        PaymentService->>PaymentRepository: saveCancel(payment)
+        OrderFacade->>ProductService: restoreStock(items)
         ProductService->>ProductRepository: restoreStock(items)
-        PaymentFacade->>CouponService: restore(couponId)
-        CouponService->>CouponRepository: restore(couponId)
-        PaymentFacade->>CartService: restoreItems(items)
+        alt 쿠폰 사용한 경우
+            OrderFacade->>CouponService: restore(couponId)
+            CouponService->>CouponRepository: restore(couponId)
+        end
+        OrderFacade->>CartService: restoreItems(items)
         CartService->>CartRepository: restoreItems(items)
-        PaymentController-->>User: 200 OK
+        OrderFacade->>OrderService: updateStatus(orderId, CANCELLED)
+        OrderService->>OrderRepository: updateStatus(orderId, CANCELLED)
+        OrderFacade-->>OrderController: OK
+        OrderController-->>User: 200 OK
     end
 ```
 
 ---
 
-## 4-ADMIN. 주문 ADMIN
+## 6-ADMIN. 주문 ADMIN
 
-### 4-ADMIN-1. 전체 주문 목록 조회
+### 6-ADMIN-1. 전체 주문 목록 조회
 
 ```mermaid
 sequenceDiagram
@@ -987,7 +1051,7 @@ sequenceDiagram
 
 ---
 
-### 4-ADMIN-2. 전체 수익 조회
+### 6-ADMIN-2. 전체 수익 조회
 
 ```mermaid
 sequenceDiagram
@@ -1023,7 +1087,7 @@ sequenceDiagram
 
 ---
 
-### 4-ADMIN-3. 유저 목록 조회
+### 6-ADMIN-3. 유저 목록 조회
 
 ```mermaid
 sequenceDiagram
@@ -1049,7 +1113,7 @@ sequenceDiagram
 
 ---
 
-### 4-ADMIN-4. 유저 상세 조회
+### 6-ADMIN-4. 유저 상세 조회
 
 ```mermaid
 sequenceDiagram
@@ -1081,7 +1145,7 @@ sequenceDiagram
 
 ---
 
-### 4-ADMIN-5. 특정 유저의 주문 내역 조회
+### 6-ADMIN-5. 특정 유저의 주문 내역 조회
 
 ```mermaid
 sequenceDiagram

@@ -84,6 +84,8 @@ classDiagram
         class Order {
             +Long orderId
             +Long userId
+            +Long couponId "nullable"
+            +Long discountAmount
             +OrderStatus status
             +LocalDateTime orderedAt
             +List~OrderItem~ items
@@ -101,7 +103,6 @@ classDiagram
 
         class OrderStatus {
             <<Enumeration>>
-            PENDING_PAYMENT
             PAID
             CANCELLED
         }
@@ -125,7 +126,8 @@ classDiagram
             +Long orderId
             +Long userId
             +Long amount
-            +Long discountAmount
+            +String pgProvider
+            +String pgTransactionId
             +PaymentStatus status
             +LocalDateTime paidAt
             +PaymentCancelInfo cancelInfo
@@ -152,10 +154,12 @@ classDiagram
             +Long userId
             +Long discountAmount
             +CouponStatus status
+            +LocalDateTime expiredAt
             +LocalDateTime usedAt
             +validate() void
             +use() void
             +restore() void
+            +isExpired() boolean
         }
 
         class CouponStatus {
@@ -237,7 +241,8 @@ classDiagram
 - `belongsTo`: Order와 동일한 이유.
 
 ### Coupon
-- `validate`: AVAILABLE 상태 여부 + 만료 여부. Coupon이 자신의 유효성을 직접 선언.
+- `isExpired`: `expiredAt < now` 여부를 Coupon이 직접 판단. 호출부에서 날짜 비교 로직이 흩어지는 것을 방지.
+- `validate`: `isExpired()`와 status=AVAILABLE 두 조건을 동시에 검증. 결제 시 쿠폰 적용 전 반드시 호출.
 - `use` / `restore`: CouponStatus 전이를 Coupon 외부에서 하면 상태 기계가 Facade/Service로 누출됨.
 
 ### CartItem
@@ -258,7 +263,7 @@ classDiagram
 | OrderItem | 0 | 적절 | 스냅샷 보관 컨테이너 |
 | CartItem | 2 | 적절 | 수량 관리 + 소유권 |
 | Payment | 3 | 적절 | 취소 가능 여부 + 취소 처리 + 소유권. PaymentCancelInfo를 내부에서 관리하므로 응집도 높음 |
-| Coupon | 3 | 적절 | 상태 기계(AVAILABLE ↔ USED)로 역할 명확 |
+| Coupon | 4 | 적절 | 상태 기계(AVAILABLE ↔ USED) + 만료 판단으로 역할 명확 |
 
 **결론: 책임 집중 없음.** 각 도메인 객체가 자신의 상태와 불변식만 관리하며, 크로스 도메인 조율은 Facade 계층이 담당한다.
 
