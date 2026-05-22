@@ -147,9 +147,9 @@ classDiagram
 
 | Facade | 협력 도메인 | 핵심 책임 |
 | --- | --- | --- |
-| ProductFacade | ProductService, LikeService | 목록(필터·정렬·페이징), 상세에 좋아요 수 + (로그인 시) 내 좋아요 여부 결합 |
+| ProductFacade | ProductService, LikeService | (고객) 목록(필터·정렬·페이징), 상세에 좋아요 수 + (로그인 시) 내 좋아요 여부 결합. (어드민) 상품 등록·수정(브랜드 변경 불가)·삭제. 조회 결합과 어드민 쓰기를 한 Facade가 겸한다(대안: `AdminProductFacade` 분리 — §6.2) |
 | LikeFacade | ProductService, LikeService | 상품 존재 확인 → Like 멱등 토글 → `Product.likeCount` 동기 갱신 (한 트랜잭션). 내 좋아요 목록 조회 |
-| OrderFacade | ProductService, PointService, OrderService | 재고 차감 → 포인트 차감 → 주문 확정·스냅샷 저장 (한 트랜잭션, 실패 시 롤백). 외부 결제는 후속 |
+| OrderFacade | ProductService, PointService, OrderService | (고객) 재고 차감 → 포인트 차감 → 주문 확정·스냅샷 저장 (한 트랜잭션, 실패 시 롤백). 외부 결제는 후속. (어드민) 전체 주문 목록·상세 조회 — 고객은 본인 주문만, 어드민은 전 주문 |
 | BrandFacade | BrandService, ProductService | 브랜드 조회/관리; 삭제 시 소속 상품 동반 소프트 삭제 |
 
 **Repository (도메인 인터페이스)**
@@ -161,7 +161,41 @@ classDiagram
 
 ---
 
-## 6. 잠재 리스크 (선택지)
+## 6. 어드민 경계 (식별·컨트롤러·노출 구분)
+
+> 요구사항 §4.4가 "고객 노출 vs 어드민 전용" 결정을 클래스 단계로 미뤘다. 여기서 확정한다. 어드민은 "존재·권한·핵심 제약만" 다루므로 얕게 잡는다.
+
+### 6.1 식별 — 가드
+- 어드민은 `X-Loopers-Ldap: loopers.admin` 고정 헤더값으로 식별한다. 어드민 도메인 엔티티는 없다(§01 가정 → ERD에 `admin` 테이블 없음).
+- 헤더 검증은 컨트롤러마다 흩지 않고, 어드민 prefix(`/api-admin/v1/**`)에 걸리는 단일 진입 가드가 처리한다.
+  - 선택 A(권장): `HandlerInterceptor`로 prefix 전체를 가드 — 개별 컨트롤러가 권한을 신경 쓰지 않는다.
+  - 선택 B: week1의 `@LoginUser` ArgumentResolver처럼 `@AdminOnly` 애너테이션 — 메서드 단위로 명시적이나 부착 누락 위험.
+  - 어느 쪽이든 헤더값 불일치 시 거부한다. week1 `LoginUserArgumentResolver`(X-Loopers-LoginId/Pw)와 같은 결의 진입 가드다.
+
+### 6.2 컨트롤러 — prefix 분리
+- 같은 도메인을 고객/어드민 컨트롤러가 나눠 가진다. `domain`·`application` 계층은 공유하고 `interfaces`(컨트롤러)에서만 갈린다.
+  - 고객(`/api/v1`): 상품·브랜드 **조회**, 좋아요, 내 주문.
+  - 어드민(`/api-admin/v1`): 브랜드·상품 **쓰기(등록·수정·삭제)** + 전체 주문 조회.
+- 쓰기는 어드민 컨트롤러에만 둔다. (현 스캐폴드 `ProductV1Controller`의 POST/PUT/DELETE가 `/api/v1`에 있는데, 구현 시 어드민 컨트롤러로 옮긴다)
+
+### 6.3 노출 필드 구분
+엔티티는 하나지만 응답 DTO에서 노출 범위를 나눈다.
+
+| 필드 | 고객 `/api/v1` | 어드민 `/api-admin/v1` |
+| --- | --- | --- |
+| Brand.name / description | O | O |
+| Product.name / description / price / brandId | O | O |
+| Product.likeCount | O | O |
+| 상세 — 내 좋아요 여부 | 로그인 시 O | — |
+| Product.stock | 품절 여부만 | 정확 수량 |
+| created_at / updated_at / deleted_at | X | O |
+
+- 결정: 정확한 재고 수치는 운영 정보라 어드민 전용으로 두고, 고객에게는 "구매 가능 / 품절"만 노출한다. 대안 — 잔여 수량을 그대로 노출(품절 임박 마케팅)할 수 있으나 이번 범위에선 감춘다.
+- 감사 컬럼(생성·수정·삭제 시각)은 어드민 응답에만 싣는다.
+
+---
+
+## 7. 잠재 리스크 (선택지)
 
 - likeCount 동기 갱신의 정합·동시성: 좋아요 토글과 카운트 갱신이 분리되면 드리프트·경쟁이 생긴다.
   - 선택 A: 같은 트랜잭션 안에서 갱신(단순, 동시성 방어는 ERD/구현의 락·원자 갱신)

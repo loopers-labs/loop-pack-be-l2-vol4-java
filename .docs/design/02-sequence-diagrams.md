@@ -164,7 +164,7 @@ sequenceDiagram
     participant B as 브랜드
     participant P as 상품
 
-    Note over 어드민,AC: X-Loopers-Ldap 로 어드민 식별 (아니면 거부)
+    Note over 어드민,AC: 진입 가드가 X-Loopers-Ldap 검증 후 통과 (불일치 시 거부) — 가드 책임 주체는 §03 6.1
 
     어드민->>AC: 브랜드 삭제 (brandId)
     AC->>AF: 브랜드 삭제

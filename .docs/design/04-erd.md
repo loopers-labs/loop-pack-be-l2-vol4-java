@@ -94,6 +94,8 @@ erDiagram
 ```
 
 > `user`는 week1(volume-1) 산출물이라 참고용으로만 표기한다. 이번 설계에서 새로 만드는 테이블은 `brand`·`product_like`·`orders`·`order_item`·`point`이고, `product`는 기존 테이블에 `brand_id`·`like_count`를 더한다.
+>
+> 어드민은 헤더 고정값으로만 식별하므로 영속 엔티티가 없다(§01 6장 가정). 그래서 ERD에 `admin` 테이블을 두지 않는다 — `user`처럼 참조용으로 표기할 대상도 없다.
 
 ---
 
