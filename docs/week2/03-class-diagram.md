@@ -249,13 +249,19 @@ classDiagram
     }
 
     class StockService {
+        +createStock(Long productId, int initialQuantity)
         +deductStock(Long productId, int quantity)
+    }
+
+    class LikeFacade {
+        +addLike(Long userId, Long productId)
+        +removeLike(Long userId, Long productId)
     }
 
     class LikeService {
         +getLikes(Long requestUserId, Long userId) List~Like~
-        +addLike(Long userId, Long productId)
-        +removeLike(Long userId, Long productId)
+        +addLike(Long userId, Long productId) bool
+        +removeLike(Long userId, Long productId) bool
     }
 
     class OrderService {
@@ -264,8 +270,11 @@ classDiagram
         +createOrder(Long userId, items, snapshots) Order
     }
 
+    %% Facade 의존성 (application 레이어)
+    LikeFacade ..> LikeService
+    LikeFacade ..> ProductService : likeCount 위임
+
     %% 서비스 간 의존성
-    LikeService ..> ProductService : likeCount 위임
     BrandService ..> ProductService : cascade 소프트 딜리트
 
     %% Repository 의존성
@@ -293,9 +302,10 @@ classDiagram
 Service는 `BrandRepository` 인터페이스에만 의존합니다.
 `JpaBrandRepository` 구현체는 infrastructure 레이어에 위치하며, Service는 구현체를 모릅니다.
 
-### 4. LikeService → ProductService 의존
+### 4. LikeFacade → ProductService 의존
 `likeCount` 변경의 책임은 Product 도메인에 있습니다.
-LikeService가 직접 Product 테이블을 건드리지 않고, ProductService를 통해 위임합니다.
+LikeService는 좋아요 저장/삭제만 담당하고, LikeFacade가 affected rows 결과를 보고 ProductService에 likeCount 갱신을 위임합니다.
+LikeService가 ProductService를 직접 호출하지 않으므로 도메인 서비스 간 결합이 없습니다.
 
 ### 5. OrderItem 상태 전환
 `CANCELLED` 상태 전환은 `OrderItem.cancel()` 도메인 메서드가 담당합니다.

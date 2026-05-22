@@ -171,6 +171,7 @@
 
 [Exception Flow]
 - 존재하지 않는 상품 ID → 404 Not Found
+- 소프트 딜리트된 상품 → 404 Not Found
 - 인증 헤더 없음 → 401 Unauthorized
 ```
 
