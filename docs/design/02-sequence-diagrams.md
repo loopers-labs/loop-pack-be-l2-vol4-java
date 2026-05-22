@@ -185,6 +185,38 @@ sequenceDiagram
     participant Controller
     participant PaymentFacade
     participant PaymentService
+    participant PaymentRepository
+
+    PG->>Controller: POST /payments/webhook/failure {paymentId, ...}
+
+    alt 웹훅 유효성 검증 실패
+        Controller-->>PG: 무시 (처리 안 함)
+    else 유효
+        Controller->>PaymentFacade: handlePaymentFailure(paymentId)
+
+        PaymentFacade->>PaymentService: getPayment(paymentId)
+        PaymentService->>PaymentRepository: findById(paymentId)
+        PaymentRepository-->>PaymentService: Payment
+
+        PaymentFacade->>PaymentService: fail(payment)
+        PaymentService->>PaymentRepository: save(payment) FAILED
+        PaymentRepository-->>PaymentService: ok
+
+        Note over PaymentFacade: 주문은 REQUESTED 유지 (재시도 가능)
+        PaymentFacade-->>Controller: ok
+        Controller-->>PG: 200 OK
+    end
+```
+
+---
+
+## UC-011: 미완료 결제 만료 처리 (배치)
+
+```mermaid
+sequenceDiagram
+    participant Batch
+    participant PaymentFacade
+    participant PaymentService
     participant OrderService
     participant ProductService
     participant PaymentRepository
@@ -192,39 +224,92 @@ sequenceDiagram
     participant OrderItemRepository
     participant ProductStockRepository
 
-    PG->>Controller: POST /payments/webhook/failure {orderId, ...}
+    Batch->>PaymentFacade: expireStalePayments()
 
-    alt 웹훅 유효성 검증 실패
-        Controller-->>PG: 무시 (처리 안 함)
-    else 유효
-        Controller->>PaymentFacade: handlePaymentFailure(orderId)
+    Note over PaymentFacade,OrderRepository: 주문 생성 후 15분 경과, APPROVED 결제 없는 REQUESTED 주문 조회
+    PaymentFacade->>OrderService: getExpiredOrders(threshold=15min)
+    OrderService->>OrderRepository: findRequestedOrdersOlderThan(threshold)
+    OrderRepository-->>OrderService: Orders
 
-        PaymentFacade->>PaymentService: getPaymentByOrderId(orderId)
-        PaymentService->>PaymentRepository: findByOrderId(orderId)
-        PaymentRepository-->>PaymentService: Payment
+    alt 대상 주문 없음
+        PaymentFacade-->>Batch: 처리 없이 종료
+    else 대상 주문 존재
+        loop 각 주문
+            PaymentFacade->>PaymentService: expirePendingPayment(orderId)
+            PaymentService->>PaymentRepository: findPendingByOrderId(orderId)
+            PaymentRepository-->>PaymentService: Payment
+            PaymentService->>PaymentRepository: save(payment) EXPIRED
+            PaymentRepository-->>PaymentService: ok
 
-        PaymentFacade->>PaymentService: fail(payment)
-        PaymentService->>PaymentRepository: save(payment) FAILED
-        PaymentRepository-->>PaymentService: ok
+            PaymentFacade->>OrderService: cancel(orderId)
+            OrderService->>OrderRepository: save(order) CANCELLED
+            OrderRepository-->>OrderService: ok
 
-        PaymentFacade->>OrderService: cancel(orderId)
-        OrderService->>OrderRepository: save(order) CANCELLED
-        OrderRepository-->>OrderService: ok
+            Note over PaymentFacade,ProductStockRepository: 보상 트랜잭션 - 차감된 재고 전량 원복
+            PaymentFacade->>OrderService: getOrderItems(orderId)
+            OrderService->>OrderItemRepository: findByOrderId(orderId)
+            OrderItemRepository-->>OrderService: OrderItems
+            OrderService-->>PaymentFacade: OrderItems
 
-        Note over PaymentFacade,ProductStockRepository: 보상 트랜잭션 - 차감된 재고 전량 원복
-        PaymentFacade->>OrderService: getOrderItems(orderId)
-        OrderService->>OrderItemRepository: findByOrderId(orderId)
-        OrderItemRepository-->>OrderService: OrderItems
-        OrderService-->>PaymentFacade: OrderItems
-
-        loop 주문 항목 각각
-            PaymentFacade->>ProductService: increaseStock(productId, quantity)
-            ProductService->>ProductStockRepository: save(productStock)
-            ProductStockRepository-->>ProductService: ok
+            loop 주문 항목 각각
+                PaymentFacade->>ProductService: increaseStock(productStockId, quantity)
+                ProductService->>ProductStockRepository: save(productStock)
+                ProductStockRepository-->>ProductService: ok
+            end
         end
 
-        PaymentFacade-->>Controller: ok
-        Controller-->>PG: 200 OK
+        PaymentFacade-->>Batch: ok
+    end
+```
+
+---
+
+## UC-012: 결제 재시도
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller
+    participant PaymentFacade
+    participant OrderService
+    participant PaymentService
+    participant OrderRepository
+    participant PaymentRepository
+
+    User->>Controller: POST /orders/{orderId}/payments
+
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 로그인
+        Controller->>PaymentFacade: retryPayment(userId, orderId)
+
+        PaymentFacade->>OrderService: getOrder(orderId)
+        OrderService->>OrderRepository: findById(orderId)
+
+        alt 주문 없음
+            OrderRepository-->>OrderService: null
+            OrderService-->>PaymentFacade: CoreException(ORDER_NOT_FOUND)
+            PaymentFacade-->>Controller: 404 NOT_FOUND
+        else 본인 주문 아님
+            OrderRepository-->>OrderService: Order
+            OrderService-->>PaymentFacade: CoreException(ORDER_FORBIDDEN)
+            PaymentFacade-->>Controller: 403 FORBIDDEN
+        else 주문이 REQUESTED 아님
+            OrderRepository-->>OrderService: Order(COMPLETED or CANCELLED)
+            OrderService-->>PaymentFacade: CoreException(ORDER_NOT_RETRYABLE)
+            PaymentFacade-->>Controller: 400 BAD_REQUEST
+        else 정상
+            OrderRepository-->>OrderService: Order(REQUESTED)
+            OrderService-->>PaymentFacade: Order
+
+            PaymentFacade->>PaymentService: createPayment(orderId, amount)
+            PaymentService->>PaymentRepository: save(new Payment) PENDING
+            PaymentRepository-->>PaymentService: Payment
+            PaymentService-->>PaymentFacade: Payment
+
+            PaymentFacade-->>Controller: PaymentInfo
+            Controller-->>User: 200 OK
+        end
     end
 ```
 

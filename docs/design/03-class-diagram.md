@@ -64,6 +64,7 @@ classDiagram
         +PaymentModel(orderId, amount)
         +approve()
         +fail()
+        +expire()
     }
 
     class OrderItemModel {
@@ -117,6 +118,7 @@ classDiagram
         PENDING
         APPROVED
         FAILED
+        EXPIRED
     }
 
     class UserRole {
@@ -147,7 +149,7 @@ classDiagram
     UserModel "1" --o "0..*" OrderModel : userId
     OrderModel "1" *-- "1..*" OrderItemModel : orderId
     ProductStockModel "1" --o "0..*" OrderItemModel : productStockId
-    OrderModel "1" *-- "1" PaymentModel : orderId
+    OrderModel "1" *-- "1..*" PaymentModel : orderId
 ```
 
 ---
@@ -185,9 +187,9 @@ classDiagram
 ### PaymentModel
 | 필드 | 규칙 |
 |------|------|
-| orderId | null 불허, 변경 불가. 주문당 1개 (유니크 제약) |
+| orderId | null 불허, 변경 불가. 주문당 여러 번 존재 가능 (재시도 허용) |
 | amount | null 불허, 0 이상. 주문 생성 시 orders.totalAmount와 동일 |
-| status | 생성 시 `PENDING` 고정. PG 승인 후 `APPROVED`로 전이 |
+| status | 생성 시 `PENDING` 고정. PG 승인 → `APPROVED`, PG 실패 → `FAILED`, 배치 만료 → `EXPIRED` |
 
 ### OrderItemModel
 | 필드 | 규칙 |
@@ -231,4 +233,5 @@ REQUESTED → CANCELLED  : cancel()
 ```
 PENDING → APPROVED : approve()
 PENDING → FAILED   : fail()
+PENDING → EXPIRED  : expire()
 ```
