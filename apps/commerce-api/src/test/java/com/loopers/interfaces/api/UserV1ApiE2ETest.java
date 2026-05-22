@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +33,9 @@ class UserV1ApiE2ETest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -122,7 +126,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUserInfo_whenValidHeadersAreProvided() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -161,11 +165,68 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
+        @DisplayName("loginId 헤더가 공백이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenLoginIdHeaderIsBlank() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "   ");
+            headers.set(LOGIN_PW_HEADER, "Password1!");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("password 헤더가 공백이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenPasswordHeaderIsBlank() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "user01");
+            headers.set(LOGIN_PW_HEADER, "   ");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("loginId 헤더가 빈 문자열이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenLoginIdHeaderIsEmpty() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "");
+            headers.set(LOGIN_PW_HEADER, "Password1!");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
         @DisplayName("비밀번호가 틀리면, 401 응답을 반환한다.")
         @Test
         void returns401_whenPasswordIsWrong() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -194,7 +255,7 @@ class UserV1ApiE2ETest {
         @Test
         void returns200_whenPasswordUpdateSucceeds() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -222,7 +283,7 @@ class UserV1ApiE2ETest {
         @Test
         void returns400_whenOldPasswordIsWrong() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));

@@ -16,7 +16,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         String loginId = request.getHeader(LOGIN_ID_HEADER);
         String password = request.getHeader(LOGIN_PW_HEADER);
 
-        if (loginId == null || password == null) {
+        if (loginId == null || loginId.isBlank() || password == null || password.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 필요합니다.");
         }
 
