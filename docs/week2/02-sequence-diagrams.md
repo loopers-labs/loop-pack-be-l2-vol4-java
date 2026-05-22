@@ -151,7 +151,7 @@ sequenceDiagram
 ### 구현 결정
 
 **검증할 결정**  
-멱등성 보장을 애플리케이션 분기(exists 조회)로 할지 DB 제약(unique)으로 할지. like_count를 비정규화 컬럼에 둘지 매번 집계할지.
+상품 존재 검증 위치, 멱등성 보장 메커니즘, like_count 갱신 책임, TX 경계.
 
 ```mermaid
 sequenceDiagram
@@ -166,64 +166,70 @@ sequenceDiagram
     Note over M,PR: 등록
     M->>+C: 좋아요 등록 요청
     C->>+F: addLike(userId, productId)
-    Note over F: TX 시작
-    F->>+LS: 좋아요 저장 시도
-    LS->>+LR: save (DB unique 제약)
-    alt 이미 좋아요 (unique 충돌)
-        LR-->>LS: 충돌
-        LS-->>F: 이미 존재
-        Note over F: TX 커밋 — 수 변동 없음
-        F-->>C: 200 OK
-        C-->>M: 200 OK
-    else 신규
-        LR-->>LS: 저장 완료
-        LS-->>F: 완료
-        F->>+PS: like_count 증가
-        PS->>+PR: increment
-        PR-->>-PS: 완료
-        PS-->>-F: 완료
-        Note over F: TX 커밋
+    F->>+PS: 상품 존재 확인
+    PS-->>-F: 결과
+    alt 상품 없음 / 삭제
+        F-->>C: 404 Not Found
+        C-->>M: 404 Not Found
+    else 상품 존재
+        Note over F: TX 시작
+        F->>+LS: 좋아요 저장
+        LS->>+LR: INSERT IGNORE INTO likes
+        LR-->>-LS: affected rows
+        LS-->>-F: 결과
+        alt 0 rows (이미 좋아요)
+            Note over F: TX 커밋 — 수 변동 없음
+        else 1 row (신규)
+            F->>+PS: like_count 증가
+            PS->>+PR: increment
+            PR-->>-PS: 완료
+            PS-->>-F: 완료
+            Note over F: TX 커밋
+        end
         F-->>C: 200 OK
         C-->>M: 200 OK
     end
-    deactivate LR
-    deactivate LS
     deactivate F
     deactivate C
 
     Note over M,PR: 취소
     M->>+C: 좋아요 취소 요청
     C->>+F: removeLike(userId, productId)
-    Note over F: TX 시작
-    F->>+LS: 좋아요 삭제
-    LS->>+LR: deleteIfExists
-    alt 삭제 행 없음
-        LR-->>LS: 0 rows
-        LS-->>F: 없음
-        Note over F: TX 커밋 — 수 변동 없음
-        F-->>C: 200 OK
-        C-->>M: 200 OK
-    else 삭제 성공
-        LR-->>LS: 1 row
-        LS-->>F: 완료
-        F->>+PS: like_count 감소
-        PS->>+PR: decrement
-        PR-->>-PS: 완료
-        PS-->>-F: 완료
-        Note over F: TX 커밋
+    F->>+PS: 상품 존재 확인
+    PS-->>-F: 결과
+    alt 상품 없음
+        F-->>C: 404 Not Found
+        C-->>M: 404 Not Found
+    else 상품 존재
+        Note over F: TX 시작
+        F->>+LS: 좋아요 삭제
+        LS->>+LR: DELETE WHERE user_id AND product_id
+        LR-->>-LS: affected rows
+        LS-->>-F: 결과
+        alt 0 rows (좋아요 없음)
+            Note over F: TX 커밋 — 수 변동 없음
+        else 1 row (삭제됨)
+            F->>+PS: like_count 감소
+            PS->>+PR: decrement
+            PR-->>-PS: 완료
+            PS-->>-F: 완료
+            Note over F: TX 커밋
+        end
         F-->>C: 200 OK
         C-->>M: 200 OK
     end
-    deactivate LR
-    deactivate LS
     deactivate F
     deactivate C
 ```
 
 **결정과 대안**
-- **DB unique 제약으로 멱등성 보장** — exists 조회 후 save는 동시 요청 시 둘 다 exists=false를 읽고 둘 다 저장을 시도하는 race condition이 발생한다. DB 제약은 최후 방어선으로 항상 유효하다.
-- **like_count 비정규화 컬럼 채택** — `sort=likes_desc` 정렬 시 집계 쿼리 없이 인덱스만으로 처리 가능. 동일 TX 내 갱신이라 정합성은 보장된다.
-- 대안: likes 테이블 COUNT 집계 — 정합 고민이 사라지지만 인기순 정렬마다 전체 집계가 발생한다. likes_desc 정렬이 요구사항에 명시되어 있어 채택하지 않았다.
+- **상품 존재 검증은 Facade가 사전 조회** — 명시적이고 흐름이 다이어그램에 드러난다.  
+  대안: likes 테이블에 product_id FK를 걸고 FK 위반 예외를 404로 매핑 — DB가 보장하지만 검증 흐름이 코드에 숨겨져 가독성이 떨어진다.
+- **멱등성은 MySQL `INSERT IGNORE`로 보장** — unique 충돌 시 예외 없이 0 row를 반환하므로 affected rows로 신규/중복을 분기한다. 예외 catch보다 코드가 단순하고 race condition도 없다.  
+  대안 1: `save` 후 DataIntegrityViolationException catch — Spring/JPA에선 일반적이나 정상 흐름에 예외를 사용하는 패턴이 됨.  
+  대안 2: exists 사전 조회 — 동시 요청에서 둘 다 false를 읽고 둘 다 저장 시도하는 race condition.
+- **like_count 비정규화 컬럼 채택** — `sort=likes_desc` 정렬을 집계 쿼리 없이 인덱스만으로 처리. 동일 TX 내 갱신이라 정합성 보장.  
+  대안: likes COUNT 집계 — 정합 고민은 사라지나 인기순 정렬마다 전체 집계. 요구사항에 likes_desc 정렬 명시되어 채택하지 않음.
 
 ---
 
@@ -266,13 +272,14 @@ sequenceDiagram
 ### 구현 결정
 
 **검증할 결정**  
-단일 TX 안에서 재고 차감 실패 시 이미 차감된 항목을 어떻게 원복할지. 재고를 원자적으로 차감하는 방식. 스냅샷을 언제 저장할지.
+상품 유효성 검증과 스냅샷 소스 확보 위치, 원자적 재고 차감 방식, 차감 실패 신호 방식, TX 경계.
 
 ```mermaid
 sequenceDiagram
     actor M as 회원
     participant C as OrderController
     participant F as OrderFacade
+    participant PS as ProductService
     participant SS as StockService
     participant OS as OrderService
     participant SR as StockRepository
@@ -281,45 +288,48 @@ sequenceDiagram
 
     M->>+C: 주문 요청 (상품·수량 목록)
     C->>+F: createOrder(userId, items)
-    Note over F: TX 시작
-    loop 각 항목
-        F->>+SS: 재고 차감 시도
-        SS->>+SR: UPDATE stocks SET quantity = quantity - ? WHERE quantity >= ?
-        alt 차감 실패 (재고 부족 / 없음 / 삭제)
-            SR-->>SS: 0 rows affected
-            SS-->>F: 차감 실패
-        else 차감 성공
-            SR-->>SS: 1 row affected
-            SS-->>F: 차감 완료 + 상품 스냅샷 정보
-        end
-        deactivate SR
-        deactivate SS
-    end
-    alt 차감 실패 항목 있음
-        Note over F: TX 롤백 — 이미 차감된 항목 자동 원복
-        F-->>C: 400 Bad Request (품절 상품 식별 정보 포함)
+    F->>+PS: getByIds(productIds) [batch]
+    PS-->>-F: 상품 목록 (스냅샷 소스)
+    alt 존재하지 않거나 삭제된 상품 포함
+        F-->>C: 400 Bad Request
         C-->>M: 400 Bad Request
-    else 전체 차감 성공
-        F->>+OS: 주문 생성 (항목 · 총액)
-        OS->>+OR: 주문 저장
-        OR-->>-OS: 완료
-        OS->>+SN: 스냅샷 저장 (상품명·가격·브랜드명)
-        SN-->>-OS: 완료
-        OS-->>-F: 완료
-        Note over F: TX 커밋
-        F-->>C: 200 OK
-        C-->>M: 200 OK
+    else 모든 상품 유효
+        Note over F: TX 시작
+        loop 각 항목
+            F->>+SS: 재고 차감 시도
+            SS->>+SR: UPDATE stocks SET quantity = quantity - ? WHERE quantity >= ?
+            SR-->>-SS: affected rows
+            SS-->>-F: 결과 (0 rows이면 throw StockInsufficientException)
+        end
+        alt 차감 중 예외 발생
+            Note over F: TX 롤백 — 이미 차감된 항목 자동 원복
+            F-->>C: 400 Bad Request (품절 상품 식별)
+            C-->>M: 400 Bad Request
+        else 모두 차감 성공
+            F->>+OS: 주문 생성 (items + snapshots + 총액)
+            OS->>+OR: 주문 저장
+            OR-->>-OS: 완료
+            OS->>+SN: 스냅샷 저장 (Facade가 전달한 상품 정보)
+            SN-->>-OS: 완료
+            OS-->>-F: 완료
+            Note over F: TX 커밋
+            F-->>C: 200 OK
+            C-->>M: 200 OK
+        end
     end
     deactivate F
     deactivate C
 ```
 
 **결정과 대안**
-- **TX 롤백으로 재고 원복** — 차감 실패 시 예외를 던져 TX를 롤백하면 이미 차감된 항목도 자동으로 원복된다. 수동으로 "이미 차감된 항목을 다시 더해주는" 보상 로직이 필요 없다.
-- **원자적 재고 차감 채택** — UPDATE 문에 `WHERE quantity >= ?` 조건을 포함해 영향 행이 0이면 실패로 처리한다. SELECT 후 UPDATE는 동시 요청 시 두 요청이 모두 재고 있음을 읽고 둘 다 차감해 음수가 될 수 있다.
-- 대안 1: 비관적 락(SELECT FOR UPDATE) — 직관적이나 다항목 주문에서 락 순서 차이로 데드락 가능. 재고 테이블을 분리한 이유(블로킹 분리)와도 상충한다.
-- 대안 2: 낙관적 락(version 컬럼) + 재시도 — 경합이 적을 때 유리하나 핫상품에서 재시도 폭증. 현 범위에서 과설계.
-- **스냅샷은 OrderService 내부, 동일 TX** — 차감 성공 시 SS가 상품 정보를 함께 반환하므로 별도 조회 없이 일관된 데이터로 저장 가능. 주문 저장과 스냅샷 저장이 같은 TX이므로 둘 중 하나 실패 시 모두 롤백된다.
+- **상품 유효성 검증 + 스냅샷 소스는 Facade가 batch 조회** — `ProductService.getByIds(productIds)` 한 번 호출로 존재 검증과 스냅샷 소스를 동시에 확보한다. StockService 책임을 재고에만 한정하면서 추가 조회 횟수도 발생하지 않는다.  
+  대안 1: StockService 차감 응답에 상품 정보 포함 — 조회를 가장 적게 하지만 StockService 책임이 비대해진다.  
+  대안 2: OrderService가 스냅샷 시점에 별도 조회 — 책임은 깔끔하지만 같은 TX 안에서 N+N 쿼리가 발생한다.
+- **재고 차감 실패는 Exception으로 신호** — `StockInsufficientException`을 던져 TX 자동 롤백을 트리거한다. 이미 차감된 항목도 함께 원복되므로 수동 보상 로직이 필요 없다.  
+  대안: `StockResult.failed()` 결과 객체 반환 → Facade가 명시적 롤백 트리거. 흐름이 명시적이지만 코드가 장황하고 의도 전달이 약해진다.
+- **원자적 재고 차감 채택** — UPDATE 문에 `WHERE quantity >= ?` 조건을 포함해 영향 행이 0이면 실패로 처리. SELECT 후 UPDATE는 동시 요청 시 두 요청이 모두 재고 있음을 읽고 둘 다 차감해 음수가 될 수 있다.  
+  대안 1: 비관적 락(SELECT FOR UPDATE) — 직관적이나 다항목 주문에서 락 순서 차이로 데드락 가능. 재고 테이블 분리 이유(블로킹 분리)와도 상충.  
+  대안 2: 낙관적 락(version) + 재시도 — 경합이 적을 때 유리하나 핫상품에서 재시도 폭증. 현 범위에서 과설계.
 
 ---
 
