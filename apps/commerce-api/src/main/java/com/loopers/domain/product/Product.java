@@ -5,19 +5,24 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "product")
-public class ProductModel extends BaseEntity {
+public class Product extends BaseEntity {
 
     private String name;
     private String description;
     private Long price;
     private Integer stock;
 
-    protected ProductModel() {}
-
-    public ProductModel(String name, String description, Long price, Integer stock) {
+    @Builder
+    public Product(String name, String description, Long price, Integer stock) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -35,22 +40,6 @@ public class ProductModel extends BaseEntity {
         this.description = description;
         this.price = price;
         this.stock = stock;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public Long getPrice() {
-        return price;
-    }
-
-    public Integer getStock() {
-        return stock;
     }
 
     public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
