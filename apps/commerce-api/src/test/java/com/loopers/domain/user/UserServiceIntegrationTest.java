@@ -37,6 +37,20 @@ class UserServiceIntegrationTest {
     @Nested
     class SignUp {
 
+        @DisplayName("회원가입 후 저장된 비밀번호는 평문과 다르다.")
+        @Test
+        void password_isNotStoredAsPlainText_afterSignUp() {
+            // arrange
+            String rawPassword = "Password1!";
+            UserModel user = new UserModel("user01", rawPassword, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
+
+            // act
+            UserModel saved = userService.signUp(user);
+
+            // assert
+            assertThat(saved.getPassword()).isNotEqualTo(rawPassword);
+        }
+
         @DisplayName("유효한 정보가 주어지면, 유저가 저장된다.")
         @Test
         void savesUser_whenValidUserInfoIsProvided() {
@@ -62,7 +76,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsException_whenLoginIdAlreadyExists() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -90,7 +104,7 @@ class UserServiceIntegrationTest {
         @Test
         void returnsUserInfo_whenValidCredentialsAreProvided() {
             // arrange
-            UserModel saved = userRepository.save(new UserModel(
+            UserModel saved = userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -126,7 +140,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsException_whenPasswordNotMatches() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -145,11 +159,26 @@ class UserServiceIntegrationTest {
     @Nested
     class UpdatePassword {
 
+        @DisplayName("비밀번호 변경 후 저장된 비밀번호는 새 평문과 다르다.")
+        @Test
+        void password_isNotStoredAsPlainText_afterUpdate() {
+            // arrange
+            String newRawPassword = "NewPassword1!";
+            userService.signUp(new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com"));
+
+            // act
+            userService.updatePassword("user01", "Password1!", newRawPassword);
+
+            // assert
+            UserModel updated = userRepository.findByLoginId("user01").get();
+            assertThat(updated.getPassword()).isNotEqualTo(newRawPassword);
+        }
+
         @DisplayName("기존 비밀번호가 일치하면, 비밀번호가 변경된다.")
         @Test
         void updatesPassword_whenOldPasswordMatches() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -159,14 +188,14 @@ class UserServiceIntegrationTest {
 
             // assert
             UserModel updated = userService.getUser("user01", "NewPassword1!");
-            assertThat(updated.matchesPassword("NewPassword1!")).isTrue();
+            assertThat(updated).isNotNull();
         }
 
         @DisplayName("기존 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsException_whenOldPasswordNotMatches() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -184,7 +213,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsException_whenNewPasswordIsSameAsCurrent() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));

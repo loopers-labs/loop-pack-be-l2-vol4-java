@@ -8,13 +8,16 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Entity
 @Table(name = "users")
 public class UserModel extends BaseEntity {
 
     private static final String MASK = "*";
-    private static final DateTimeFormatter BIRTH_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter BIRTH_DATE_FORMATTER_8 = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter BIRTH_DATE_FORMATTER_6 = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final DateTimeFormatter BIRTH_DATE_FORMATTER_4 = DateTimeFormatter.ofPattern("MMdd");
 
     private String loginId;
     private String password;
@@ -38,19 +41,16 @@ public class UserModel extends BaseEntity {
         this.email = email;
     }
 
-    public void updatePassword(String oldPassword, String newPassword) {
-        if (!matchesPassword(oldPassword)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
-        }
-        if (matchesPassword(newPassword)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다르게 설정해야 합니다.");
-        }
-        validatePassword(newPassword, this.birthDate);
-        this.password = newPassword;
+    public void encodePassword(PasswordEncoder encoder) {
+        this.password = encoder.encode(this.password);
     }
 
-    public boolean matchesPassword(String password) {
-        return this.password.equals(password);
+    public void updatePassword(String encodedNewPassword) {
+        this.password = encodedNewPassword;
+    }
+
+    public String getPassword() {
+        return password;
     }
 
     public String getLoginId() {
@@ -88,7 +88,7 @@ public class UserModel extends BaseEntity {
         }
     }
 
-    private static void validatePassword(String password, LocalDate birthDate) {
+    public static void validatePassword(String password, LocalDate birthDate) {
         if (password == null || password.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
         }
@@ -98,7 +98,9 @@ public class UserModel extends BaseEntity {
         if (!password.matches("^[\\x21-\\x7E]+$")) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 영문 대소문자, 숫자, 특수문자만 사용 가능합니다.");
         }
-        if (password.contains(birthDate.format(BIRTH_DATE_FORMATTER))) {
+        if (password.contains(birthDate.format(BIRTH_DATE_FORMATTER_8))
+                || password.contains(birthDate.format(BIRTH_DATE_FORMATTER_6))
+                || password.contains(birthDate.format(BIRTH_DATE_FORMATTER_4))) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
         }
     }
