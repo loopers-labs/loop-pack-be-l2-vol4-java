@@ -1,6 +1,0 @@
-<included>
-    <property name="SLACK_USERNAME" value=""/>
-    <property name="SLACK_CHANNEL" value=""/>
-    <property name="SLACK_WEBHOOK_URI"
-              value=""/>
-</included>
