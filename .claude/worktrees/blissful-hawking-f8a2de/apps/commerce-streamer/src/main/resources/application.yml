@@ -21,20 +21,13 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
-jwt:
-  secret: loopers_super_secret_key_must_be_at_least_32_characters
-  expiration-days: 7
-
-cors:
-  allowed-origin: http://localhost:5173
-
-springdoc:
-  use-fqn: true
-  swagger-ui:
-    path: /swagger-ui.html
+demo-kafka:
+  test:
+    topic-name: demo.internal.topic-v1
 
 ---
 spring:
