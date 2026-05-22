@@ -39,6 +39,10 @@ out/
 ### Kotlin ###
 .kotlin
 
+### Generated sources (QueryDSL) ###
+**/src/main/generated/
+
 ### Claude Code / tooling ###
 .claude/
 .omc/
+docs/superpowers/
