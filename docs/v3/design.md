@@ -448,7 +448,14 @@ flowchart TD
 
 ### User 인증 — `UserAuthInterceptor`
 
-적용 경로: `/api/v1/**` (단, 회원가입 `POST /api/v1/users` 제외)
+적용 경로: `/api/v1/**` 중 아래 **제외 경로를 뺀 나머지 전체**
+
+| 제외 경로 | 이유 |
+|---|---|
+| `POST /api/v1/users` | 회원가입 — 인증 전 단계 |
+| `GET /api/v1/brands/{brandId}` | 브랜드 조회 — 비로그인 허용 |
+| `GET /api/v1/products` | 상품 목록 조회 — 비로그인 허용 |
+| `GET /api/v1/products/{productId}` | 상품 단건 조회 — 비로그인 허용 |
 
 ```
 요청 수신
@@ -496,7 +503,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(userAuthInterceptor)
                 .addPathPatterns("/api/v1/**")
-                .excludePathPatterns("/api/v1/users"); // 회원가입
+                .excludePathPatterns(
+                    "/api/v1/users",             // 회원가입
+                    "/api/v1/brands/*",          // 브랜드 단건 조회
+                    "/api/v1/products",          // 상품 목록 조회
+                    "/api/v1/products/*"         // 상품 단건 조회
+                );
 
         registry.addInterceptor(adminAuthInterceptor)
                 .addPathPatterns("/api-admin/v1/**");
