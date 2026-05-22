@@ -1,9 +1,13 @@
 package com.loopers.domain.user;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -26,5 +30,18 @@ public class UserService {
             command.email()
         );
         return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Long> authenticate(String loginId, String rawPassword) {
+        return userRepository.findByLoginId(loginId)
+            .filter(user -> passwordEncoder.matches(rawPassword, user.getPassword()))
+            .map(User::getId);
+    }
+
+    @Transactional(readOnly = true)
+    public User getInfo(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
     }
 }

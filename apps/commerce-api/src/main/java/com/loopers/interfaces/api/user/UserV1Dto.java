@@ -56,4 +56,25 @@ public class UserV1Dto {
             );
         }
     }
+
+    public record UserInfoResponse(
+        String loginId,
+        String name,
+        LocalDate birthDate,
+        String email
+    ) {
+        public static UserInfoResponse from(User user) {
+            return new UserInfoResponse(
+                user.getLoginId(),
+                maskLastCharacter(user.getName()),
+                user.getBirthDate(),
+                user.getEmail()
+            );
+        }
+
+        /** 이름의 마지막 글자를 * 로 마스킹한다. (예: "김루퍼" -> "김루*", "김" -> "*") */
+        private static String maskLastCharacter(String name) {
+            return name.substring(0, name.length() - 1) + "*";
+        }
+    }
 }

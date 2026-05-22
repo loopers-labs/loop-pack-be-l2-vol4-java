@@ -45,3 +45,16 @@ Content-Type: application/json
   "birthDate": "1995-03-21",
   "email": "looper@example.com"
 }
+
+### 내 정보 조회 - 정상 (위 "회원가입 - 정상"을 먼저 보낸 뒤 실행, 이름은 마스킹되어 반환)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 정보 조회 - 비밀번호 틀림 (401)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: WrongPass1!
+
+### 내 정보 조회 - 인증 헤더 없음 (401)
+GET {{commerce-api}}/api/v1/users/me

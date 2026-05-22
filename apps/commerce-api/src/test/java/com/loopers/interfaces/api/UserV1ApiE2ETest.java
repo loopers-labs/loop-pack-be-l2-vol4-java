@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -99,6 +100,60 @@ class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = signUp(invalidRequest);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me")
+    @Nested
+    class GetMyInfo {
+
+        private HttpHeaders authHeaders(String loginId, String loginPw) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+            headers.set("X-Loopers-LoginPw", loginPw);
+            return headers;
+        }
+
+        private ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> requestMyInfo(HttpHeaders headers) {
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+            return testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(headers), responseType);
+        }
+
+        @DisplayName("올바른 인증 헤더로 요청하면, 200과 내 정보를 반환한다. (이름은 마스킹)")
+        @Test
+        void returnsMyInfo_whenHeadersAreValid() {
+            signUp(validRequest());
+
+            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+                requestMyInfo(authHeaders("loopers01", "Passw0rd!"));
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().loginId()).isEqualTo("loopers01"),
+                () -> assertThat(response.getBody().data().name()).isEqualTo("김루*"),
+                () -> assertThat(response.getBody().data().birthDate()).isEqualTo(LocalDate.of(1995, 3, 21)),
+                () -> assertThat(response.getBody().data().email()).isEqualTo("looper@example.com")
+            );
+        }
+
+        @DisplayName("비밀번호가 틀리면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void throwsUnauthorized_whenPasswordIsWrong() {
+            signUp(validRequest());
+
+            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+                requestMyInfo(authHeaders("loopers01", "WrongPass1!"));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void throwsUnauthorized_whenHeadersAreMissing() {
+            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+                requestMyInfo(new HttpHeaders());
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 }

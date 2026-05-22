@@ -5,6 +5,8 @@ import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,5 +26,12 @@ public class UserV1Controller implements UserV1ApiSpec {
     ) {
         User user = userService.signUp(request.toCommand());
         return ApiResponse.success(UserV1Dto.UserResponse.from(user));
+    }
+
+    @GetMapping("/me")
+    @Override
+    public ApiResponse<UserV1Dto.UserInfoResponse> getMyInfo(@AuthenticationPrincipal Long userId) {
+        User user = userService.getInfo(userId);
+        return ApiResponse.success(UserV1Dto.UserInfoResponse.from(user));
     }
 }

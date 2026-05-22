@@ -9,6 +9,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,5 +75,63 @@ class UserServiceTest {
             .isInstanceOf(CoreException.class);
 
         verify(userRepository, never()).save(any());
+    }
+
+    private User existingUser() {
+        return User.create(
+            "loopers01", passwordEncoder.encode(RAW_PASSWORD), "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
+        );
+    }
+
+    @Test
+    @DisplayName("올바른 자격으로 인증하면 userId를 반환한다")
+    void authenticate_withValidCredentials_returnsUserId() {
+        User user = existingUser();
+        when(userRepository.findByLoginId("loopers01")).thenReturn(Optional.of(user));
+
+        Optional<Long> result = userService.authenticate("loopers01", RAW_PASSWORD);
+
+        assertThat(result).contains(user.getId());
+    }
+
+    @Test
+    @DisplayName("비밀번호가 일치하지 않으면 빈 값을 반환한다")
+    void authenticate_withWrongPassword_returnsEmpty() {
+        when(userRepository.findByLoginId("loopers01")).thenReturn(Optional.of(existingUser()));
+
+        Optional<Long> result = userService.authenticate("loopers01", "WrongPass1!");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 로그인 ID이면 빈 값을 반환한다")
+    void authenticate_withUnknownLoginId_returnsEmpty() {
+        when(userRepository.findByLoginId("unknown01")).thenReturn(Optional.empty());
+
+        Optional<Long> result = userService.authenticate("unknown01", RAW_PASSWORD);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("userId로 내 정보를 조회하면 해당 사용자를 반환한다")
+    void getInfo_returnsUser() {
+        User user = existingUser();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        User result = userService.getInfo(1L);
+
+        assertThat(result).isSameAs(user);
+    }
+
+    @Test
+    @DisplayName("사용자가 존재하지 않으면 NOT_FOUND 예외가 발생한다")
+    void getInfo_whenUserNotFound_throwsNotFound() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getInfo(999L))
+            .isInstanceOf(CoreException.class)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
     }
 }
