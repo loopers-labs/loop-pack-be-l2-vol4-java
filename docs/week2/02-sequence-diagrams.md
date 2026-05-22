@@ -39,13 +39,14 @@ sequenceDiagram
     participant B as 브랜드
     participant P as 상품
 
-    A->>B: 브랜드 삭제 요청
+    A->>+B: 브랜드 삭제 요청
     alt 존재하지 않거나 이미 삭제된 브랜드
-        B-->>A: 없음 (404)
+        B-->>-A: 없음 (404)
     else 활성 브랜드
-        B->>P: 소속 상품 전체 삭제
+        B->>+P: 소속 상품 전체 삭제
+        P-->>-B: 완료
         B->>B: 자신을 삭제
-        B-->>A: 삭제 완료
+        B-->>-A: 삭제 완료
     end
 ```
 
@@ -68,20 +69,30 @@ sequenceDiagram
     participant BR as BrandRepository
     participant PR as ProductRepository
 
-    A->>C: 브랜드 삭제 요청
-    C->>F: deleteBrand(brandId)
+    A->>+C: 브랜드 삭제 요청
+    C->>+F: deleteBrand(brandId)
     Note over F: TX 시작
-    F->>BS: 브랜드 조회
-    BS->>BR: findById
+    F->>+BS: 브랜드 조회
+    BS->>+BR: findById
     alt 없음 / 이미 삭제
-        F-->>C: 404 Not Found
+        BR-->>-BS: null
+        BS-->>-F: 없음
+        F-->>-C: 404 Not Found
+        C-->>-A: 404 Not Found
     else 활성 브랜드
-        F->>PS: 소속 상품 일괄 soft delete
-        PS->>PR: softDeleteAllByBrandId
-        F->>BS: 브랜드 soft delete
-        BS->>BR: softDelete
+        BR-->>-BS: brand
+        BS-->>-F: brand
+        F->>+PS: 소속 상품 일괄 soft delete
+        PS->>+PR: softDeleteAllByBrandId
+        PR-->>-PS: 완료
+        PS-->>-F: 완료
+        F->>+BS: 브랜드 soft delete
+        BS->>+BR: softDelete
+        BR-->>-BS: 완료
+        BS-->>-F: 완료
         Note over F: TX 커밋
-        F-->>C: 200 OK
+        F-->>-C: 200 OK
+        C-->>-A: 200 OK
     end
 ```
 
@@ -104,22 +115,24 @@ sequenceDiagram
     participant L as 좋아요
     participant P as 상품
 
-    M->>L: 좋아요 등록 요청
+    M->>+L: 좋아요 등록 요청
     alt 이미 좋아요한 상품
-        L-->>M: 변동 없이 성공
+        L-->>-M: 변동 없이 성공
     else
         L->>L: 좋아요 기록
-        L->>P: 좋아요 수 +1
-        L-->>M: 등록 완료
+        L->>+P: 좋아요 수 +1
+        P-->>-L: 완료
+        L-->>-M: 등록 완료
     end
 
-    M->>L: 좋아요 취소 요청
+    M->>+L: 좋아요 취소 요청
     alt 좋아요한 적 없음
-        L-->>M: 변동 없이 성공
+        L-->>-M: 변동 없이 성공
     else
         L->>L: 좋아요 해제
-        L->>P: 좋아요 수 -1
-        L-->>M: 취소 완료
+        L->>+P: 좋아요 수 -1
+        P-->>-L: 완료
+        L-->>-M: 취소 완료
     end
 ```
 
@@ -144,35 +157,51 @@ sequenceDiagram
     participant PR as ProductRepository
 
     Note over M,PR: 등록
-    M->>C: 좋아요 등록 요청
-    C->>F: addLike(userId, productId)
+    M->>+C: 좋아요 등록 요청
+    C->>+F: addLike(userId, productId)
     Note over F: TX 시작
-    F->>LS: 좋아요 저장 시도
-    LS->>LR: save (DB unique 제약)
+    F->>+LS: 좋아요 저장 시도
+    LS->>+LR: save (DB unique 제약)
     alt 이미 좋아요 (unique 충돌)
+        LR-->>-LS: 충돌
+        LS-->>-F: 이미 존재
         Note over F: TX 커밋 — 수 변동 없음
-        F-->>C: 200 OK
+        F-->>-C: 200 OK
+        C-->>-M: 200 OK
     else 신규
-        F->>PS: like_count 증가
-        PS->>PR: increment
+        LR-->>-LS: 저장 완료
+        LS-->>-F: 완료
+        F->>+PS: like_count 증가
+        PS->>+PR: increment
+        PR-->>-PS: 완료
+        PS-->>-F: 완료
         Note over F: TX 커밋
-        F-->>C: 200 OK
+        F-->>-C: 200 OK
+        C-->>-M: 200 OK
     end
 
     Note over M,PR: 취소
-    M->>C: 좋아요 취소 요청
-    C->>F: removeLike(userId, productId)
+    M->>+C: 좋아요 취소 요청
+    C->>+F: removeLike(userId, productId)
     Note over F: TX 시작
-    F->>LS: 좋아요 삭제
-    LS->>LR: deleteIfExists
+    F->>+LS: 좋아요 삭제
+    LS->>+LR: deleteIfExists
     alt 삭제 행 없음
+        LR-->>-LS: 0 rows
+        LS-->>-F: 없음
         Note over F: TX 커밋 — 수 변동 없음
-        F-->>C: 200 OK
+        F-->>-C: 200 OK
+        C-->>-M: 200 OK
     else 삭제 성공
-        F->>PS: like_count 감소
-        PS->>PR: decrement
+        LR-->>-LS: 1 row
+        LS-->>-F: 완료
+        F->>+PS: like_count 감소
+        PS->>+PR: decrement
+        PR-->>-PS: 완료
+        PS-->>-F: 완료
         Note over F: TX 커밋
-        F-->>C: 200 OK
+        F-->>-C: 200 OK
+        C-->>-M: 200 OK
     end
 ```
 
@@ -197,19 +226,20 @@ sequenceDiagram
     participant S as 재고
     participant OI as 주문 항목
 
-    M->>O: 상품·수량 목록으로 주문 요청
+    M->>+O: 상품·수량 목록으로 주문 요청
     loop 각 상품
-        O->>S: 재고 차감 요청(수량)
+        O->>+S: 재고 차감 요청(수량)
         alt 재고 부족 / 상품 없음 / 삭제된 상품
-            S-->>O: 차감 거부
+            S-->>-O: 차감 거부
             Note over O: 주문 전체 실패<br/>(이미 차감된 재고는 원복)
         else 재고 충분
-            S-->>O: 차감 완료 + 차감 시점 상품 정보
-            O->>OI: 주문 시점 정보 보존 (상품명·가격·브랜드명)
+            S-->>-O: 차감 완료 + 차감 시점 상품 정보
+            O->>+OI: 주문 시점 정보 보존 (상품명·가격·브랜드명)
+            OI-->>-O: 완료
         end
     end
     O->>O: 총액 계산
-    O-->>M: 주문 확정
+    O-->>-M: 주문 확정
 ```
 
 **읽는 포인트**
@@ -233,24 +263,35 @@ sequenceDiagram
     participant OR as OrderRepository
     participant SN as SnapshotRepository
 
-    M->>C: 주문 요청 (상품·수량 목록)
-    C->>F: createOrder(userId, items)
+    M->>+C: 주문 요청 (상품·수량 목록)
+    C->>+F: createOrder(userId, items)
     Note over F: TX 시작
     loop 각 항목
-        F->>SS: 재고 차감 시도
-        SS->>SR: UPDATE stocks SET quantity = quantity - ? WHERE quantity >= ?
+        F->>+SS: 재고 차감 시도
+        SS->>+SR: UPDATE stocks SET quantity = quantity - ? WHERE quantity >= ?
         alt 차감 실패 (재고 부족 / 없음 / 삭제)
-            Note over F: TX 롤백 — 이미 차감된 항목 자동 원복
-            F-->>C: 400 Bad Request (품절 상품 식별 정보 포함)
+            SR-->>-SS: 0 rows affected
+            SS-->>-F: 차감 실패
         else 차감 성공
-            SS-->>F: 차감 완료 + 상품 스냅샷 정보
+            SR-->>-SS: 1 row affected
+            SS-->>-F: 차감 완료 + 상품 스냅샷 정보
         end
     end
-    F->>OS: 주문 생성 (항목 · 총액)
-    OS->>OR: 주문 저장
-    OS->>SN: 스냅샷 저장 (상품명·가격·브랜드명)
-    Note over F: TX 커밋
-    F-->>C: 200 OK
+    alt 차감 실패 항목 있음
+        Note over F: TX 롤백 — 이미 차감된 항목 자동 원복
+        F-->>-C: 400 Bad Request (품절 상품 식별 정보 포함)
+        C-->>-M: 400 Bad Request
+    else 전체 차감 성공
+        F->>+OS: 주문 생성 (항목 · 총액)
+        OS->>+OR: 주문 저장
+        OR-->>-OS: 완료
+        OS->>+SN: 스냅샷 저장 (상품명·가격·브랜드명)
+        SN-->>-OS: 완료
+        OS-->>-F: 완료
+        Note over F: TX 커밋
+        F-->>-C: 200 OK
+        C-->>-M: 200 OK
+    end
 ```
 
 **결정과 대안**
