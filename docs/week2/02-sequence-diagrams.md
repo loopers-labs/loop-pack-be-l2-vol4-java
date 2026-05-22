@@ -228,8 +228,9 @@ sequenceDiagram
 - **멱등성은 MySQL `INSERT IGNORE`로 보장** — unique 충돌 시 예외 없이 0 row를 반환하므로 affected rows로 신규/중복을 분기한다. 예외 catch보다 코드가 단순하고 race condition도 없다.  
   대안 1: `save` 후 DataIntegrityViolationException catch — Spring/JPA에선 일반적이나 정상 흐름에 예외를 사용하는 패턴이 됨.  
   대안 2: exists 사전 조회 — 동시 요청에서 둘 다 false를 읽고 둘 다 저장 시도하는 race condition.
-- **like_count 비정규화 컬럼 채택** — `sort=likes_desc` 정렬을 집계 쿼리 없이 인덱스만으로 처리. 동일 TX 내 갱신이라 정합성 보장.  
-  대안: likes COUNT 집계 — 정합 고민은 사라지나 인기순 정렬마다 전체 집계. 요구사항에 likes_desc 정렬 명시되어 채택하지 않음.
+- **like_count 비정규화 컬럼 채택** — 상품 테이블에 카운터를 두고 등록/취소 시 같은 TX에서 갱신한다.  
+  근거는 워크로드 특성: 이커머스에서 *상품 상세 조회·인기순 정렬*은 매우 빈번한 read인 반면 *좋아요 등록·취소*는 그보다 훨씬 적은 write다. 읽기가 압도적으로 많은 환경에서 매 조회마다 `COUNT(*)` 집계는 낭비이므로, 갱신 시 한 번 계산해두는 비정규화가 유리하다.  
+  대안: likes 테이블 `COUNT(*)` 집계 — 정합 고민이 사라지고 카운터 갱신 경합이 없어 *write-heavy* 환경(라이브 스트리밍 좋아요 등 등록/취소가 조회보다 많은 서비스)에 적합하지만, 우리 워크로드와 반대다.
 
 ---
 
