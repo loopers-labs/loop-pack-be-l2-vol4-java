@@ -15,6 +15,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.web.bind.MethodArgumentNotValidException;
+
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -105,6 +107,15 @@ public class ApiControllerAdvice {
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handleNotFound(NoResourceFoundException e) {
         return failureResponse(ErrorType.NOT_FOUND, null);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleValidationError(MethodArgumentNotValidException e) {
+        String errorMessage = e.getBindingResult().getFieldErrors().stream()
+            .map(error -> String.format("필드 '%s': %s", error.getField(), error.getDefaultMessage()))
+            .collect(Collectors.joining(", "));
+
+        return failureResponse(ErrorType.BAD_REQUEST, errorMessage);
     }
 
     @ExceptionHandler

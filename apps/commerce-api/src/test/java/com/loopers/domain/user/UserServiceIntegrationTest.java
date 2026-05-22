@@ -142,6 +142,45 @@ class UserServiceIntegrationTest {
         }
     }
 
+    @DisplayName("ID로 유저를 조회할 때,")
+    @Nested
+    class GetUserById {
+
+        @DisplayName("유효한 userId가 주어지면, 유저 정보를 반환한다.")
+        @Test
+        void returnsUserInfo_whenValidUserIdIsProvided() {
+            // arrange
+            UserModel saved = userService.signUp(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            // act
+            UserModel result = userService.getUserById(saved.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getId()).isEqualTo(saved.getId()),
+                () -> assertThat(result.getLoginId()).isEqualTo("user01")
+            );
+        }
+
+        @DisplayName("존재하지 않는 userId가 주어지면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsException_whenUserIdNotFound() {
+            // arrange
+            Long nonExistentUserId = 999L;
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                userService.getUserById(nonExistentUserId)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("내 정보를 조회할 때,")
     @Nested
     class GetUser {

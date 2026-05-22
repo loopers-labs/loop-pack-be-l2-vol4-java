@@ -4,6 +4,7 @@ import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -17,7 +18,7 @@ public class UserV1Controller {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
+    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@Valid @RequestBody UserV1Dto.SignUpRequest request) {
         UserModel user = new UserModel(
             request.loginId(),
             request.password(),
@@ -31,20 +32,18 @@ public class UserV1Controller {
 
     @GetMapping("/me")
     public ApiResponse<UserV1Dto.UserResponse> getUser(
-        @RequestAttribute("loginId") String loginId,
-        @RequestAttribute("password") String password
+        @RequestAttribute("userId") Long userId
     ) {
-        UserInfo info = userFacade.getUser(loginId, password);
+        UserInfo info = userFacade.getUser(userId);
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 
     @PatchMapping("/me/password")
     public ApiResponse<Void> updatePassword(
-        @RequestAttribute("loginId") String loginId,
-        @RequestAttribute("password") String password,
-        @RequestBody UserV1Dto.UpdatePasswordRequest request
+        @RequestAttribute("userId") Long userId,
+        @Valid @RequestBody UserV1Dto.UpdatePasswordRequest request
     ) {
-        userFacade.updatePassword(loginId, request.oldPassword(), request.newPassword());
+        userFacade.updatePassword(userId, request.oldPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 }

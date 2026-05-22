@@ -36,6 +36,12 @@ public class UserService {
         return user;
     }
 
+    @Transactional(readOnly = true)
+    public UserModel getUserById(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userId = " + userId + "] 유저를 찾을 수 없습니다."));
+    }
+
     @Transactional
     public void updatePassword(String loginId, String oldRawPassword, String newRawPassword) {
         UserModel user = findUserOrThrow(loginId);

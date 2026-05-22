@@ -116,6 +116,66 @@ class UserV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+
+        @DisplayName("loginId가 빈 문자열이면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenLoginIdIsBlank() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("password가 null이면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenPasswordIsNull() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "user01", null, "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일 형식이 잘못되면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenEmailFormatIsInvalid() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "invalid-email"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("GET /api/v1/users/me")
