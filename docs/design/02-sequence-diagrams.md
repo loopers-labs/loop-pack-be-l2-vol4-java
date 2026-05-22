@@ -177,6 +177,59 @@ sequenceDiagram
 
 ---
 
+## UC-010: 결제 실패 처리
+
+```mermaid
+sequenceDiagram
+    actor PG
+    participant Controller
+    participant PaymentFacade
+    participant PaymentService
+    participant OrderService
+    participant ProductService
+    participant PaymentRepository
+    participant OrderRepository
+    participant OrderItemRepository
+    participant ProductStockRepository
+
+    PG->>Controller: POST /payments/webhook/failure {orderId, ...}
+
+    alt 웹훅 유효성 검증 실패
+        Controller-->>PG: 무시 (처리 안 함)
+    else 유효
+        Controller->>PaymentFacade: handlePaymentFailure(orderId)
+
+        PaymentFacade->>PaymentService: getPaymentByOrderId(orderId)
+        PaymentService->>PaymentRepository: findByOrderId(orderId)
+        PaymentRepository-->>PaymentService: Payment
+
+        PaymentFacade->>PaymentService: fail(payment)
+        PaymentService->>PaymentRepository: save(payment) FAILED
+        PaymentRepository-->>PaymentService: ok
+
+        PaymentFacade->>OrderService: cancel(orderId)
+        OrderService->>OrderRepository: save(order) CANCELLED
+        OrderRepository-->>OrderService: ok
+
+        Note over PaymentFacade,ProductStockRepository: 보상 트랜잭션 - 차감된 재고 전량 원복
+        PaymentFacade->>OrderService: getOrderItems(orderId)
+        OrderService->>OrderItemRepository: findByOrderId(orderId)
+        OrderItemRepository-->>OrderService: OrderItems
+        OrderService-->>PaymentFacade: OrderItems
+
+        loop 주문 항목 각각
+            PaymentFacade->>ProductService: increaseStock(productId, quantity)
+            ProductService->>ProductStockRepository: save(productStock)
+            ProductStockRepository-->>ProductService: ok
+        end
+
+        PaymentFacade-->>Controller: ok
+        Controller-->>PG: 200 OK
+    end
+```
+
+---
+
 ## UC-A005: 상품 수정
 
 ```mermaid

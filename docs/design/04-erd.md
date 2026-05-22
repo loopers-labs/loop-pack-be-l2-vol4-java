@@ -35,7 +35,6 @@ erDiagram
         bigint id PK
         bigint brand_id FK
         varchar name
-        bigint price
         varchar status "ACTIVE | INACTIVE"
         datetime created_at
         datetime updated_at
@@ -44,8 +43,9 @@ erDiagram
 
     product_stocks {
         bigint id PK
-        bigint product_id FK "UK"
-        int stock_quantity
+        bigint product_id FK
+        bigint price
+        int stock_quantity "CHECK >= 0"
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -55,7 +55,18 @@ erDiagram
         bigint id PK
         varchar order_number UK "ORD-YYYYMMDD-NNNN"
         bigint user_id FK
-        varchar status "REQUESTED | COMPLETED"
+        bigint total_amount "주문 시점 총액 스냅샷"
+        varchar status "REQUESTED | COMPLETED | CANCELLED"
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    payments {
+        bigint id PK
+        bigint order_id FK "UK"
+        bigint amount
+        varchar status "PENDING | APPROVED | FAILED"
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -64,6 +75,7 @@ erDiagram
     order_items {
         bigint id PK
         bigint order_id FK
+        bigint product_stock_id FK
         bigint product_id FK
         varchar product_name "주문 시점 스냅샷"
         bigint product_price "주문 시점 스냅샷"
@@ -85,8 +97,10 @@ erDiagram
     users ||--o{ orders : "user_id"
     users ||--o{ wishlists : "user_id"
     brands ||--o{ products : "brand_id"
-    products ||--|| product_stocks : "product_id"
+    products ||--|{ product_stocks : "product_id"
     orders ||--|{ order_items : "order_id"
+    orders ||--|| payments : "order_id"
+    product_stocks ||--o{ order_items : "product_stock_id"
     products ||--o{ order_items : "product_id"
     products ||--o{ wishlists : "product_id"
 ```
@@ -100,8 +114,8 @@ erDiagram
 | users | UNIQUE (userid) | 로그인 ID 중복 불가 |
 | brands | UNIQUE (name) | 브랜드명 중복 불가 |
 | orders | UNIQUE (order_number) | 주문 번호 중복 불가 |
-| product_stocks | UNIQUE (product_id) | 상품당 재고 레코드 1개 |
-| order_items | UNIQUE (order_id, product_id) | 동일 주문 내 상품 중복 불가 |
+| product_stocks | CHECK (stock_quantity >= 0) | 재고 수량 음수 불가 (DB 레벨 보장) |
+| payments | UNIQUE (order_id) | 주문당 결제 레코드 1개 |
 | wishlists | UNIQUE (user_id, product_id) | 동일 사용자 찜 중복 불가 |
 
 ## 관계 요약
@@ -111,7 +125,9 @@ erDiagram
 | users → orders | 한 사용자는 여러 주문을 가질 수 있다 |
 | users → wishlists | 한 사용자는 여러 찜을 가질 수 있다 |
 | brands → products | 한 브랜드는 여러 상품을 가질 수 있다 |
-| products → product_stocks | 한 상품은 하나의 재고 레코드를 가진다 (1:1) |
+| products → product_stocks | 한 상품은 하나 이상의 재고 레코드를 가진다 (1:N, 옵션 단위 관리) |
 | orders → order_items | 한 주문은 하나 이상의 주문 항목을 가진다 |
+| orders → payments | 한 주문은 하나의 결제 레코드를 가진다 (1:1) |
+| product_stocks → order_items | 주문 항목은 주문 시점의 특정 옵션(재고)을 참조한다 |
 | products → order_items | 상품은 주문 항목에 이력 보존용으로 참조된다 |
 | products → wishlists | 한 상품은 여러 사용자에게 찜될 수 있다 |
