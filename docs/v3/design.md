@@ -359,8 +359,6 @@ stateDiagram-v2
 > 기존 레코드를 `restore()`로 재활성화하면 UNIQUE 제약을 유지하면서 재좋아요를 처리할 수 있다.
 > DB UNIQUE 제약은 동시 요청 시 최후 방어선 역할도 한다.
 
-> **좋아요 목록 소유권** ([ADR-009](./adr/009-likes-ownership-check.md))
-> `GET /api/v1/users/{userId}/likes`는 path의 `userId`와 인증된 userId가 다르면 DB 조회 없이 즉시 `403 Forbidden`을 반환한다.
 
 좋아요 수:
 - `product` 테이블의 `like_count` 컬럼으로 관리 (DB 비정규화, [ADR-003](./adr/003-like-count-query.md))
