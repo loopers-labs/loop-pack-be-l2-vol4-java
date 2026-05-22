@@ -137,15 +137,22 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant BrandController
+    participant BrandFacade
     participant BrandService
     participant BrandRepository
 
     Admin->>BrandController: GET /api-admin/v1/brands?page=&size=
-    BrandController->>BrandService: getBrands(page, size)
-    BrandService->>BrandRepository: findAll(pageable)
-    BrandRepository-->>BrandService: 브랜드 목록
-    BrandService-->>BrandController: 브랜드 목록
-    BrandController-->>Admin: 200 OK (브랜드 목록)
+    alt 어드민 권한 없음
+        BrandController-->>Admin: 401 Unauthorized
+    else 정상
+        BrandController->>BrandFacade: getBrands(page, size)
+        BrandFacade->>BrandService: getBrands(page, size)
+        BrandService->>BrandRepository: findAll(pageable)
+        BrandRepository-->>BrandService: 브랜드 목록
+        BrandService-->>BrandFacade: 브랜드 목록
+        BrandFacade-->>BrandController: 브랜드 목록
+        BrandController-->>Admin: 200 OK (브랜드 목록)
+    end
 ```
 
 ---
@@ -156,21 +163,28 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant BrandController
+    participant BrandFacade
     participant BrandService
     participant BrandRepository
 
     Admin->>BrandController: GET /api-admin/v1/brands/{brandId}
-    BrandController->>BrandService: getBrand(brandId)
-    BrandService->>BrandRepository: findById(brandId)
-
-    alt 존재하지 않는 브랜드
-        BrandRepository-->>BrandService: empty
-        BrandService-->>BrandController: 404 Not Found
-        BrandController-->>Admin: 404 Not Found
+    alt 어드민 권한 없음
+        BrandController-->>Admin: 401 Unauthorized
     else 정상
-        BrandRepository-->>BrandService: 브랜드
-        BrandService-->>BrandController: 브랜드 상세
-        BrandController-->>Admin: 200 OK (브랜드 상세)
+        BrandController->>BrandFacade: getBrand(brandId)
+        BrandFacade->>BrandService: getBrand(brandId)
+        BrandService->>BrandRepository: findById(brandId)
+        alt 존재하지 않는 브랜드
+            BrandRepository-->>BrandService: empty
+            BrandService-->>BrandFacade: 404 Not Found
+            BrandFacade-->>BrandController: 404 Not Found
+            BrandController-->>Admin: 404 Not Found
+        else 정상
+            BrandRepository-->>BrandService: 브랜드
+            BrandService-->>BrandFacade: 브랜드 상세
+            BrandFacade-->>BrandController: 브랜드 상세
+            BrandController-->>Admin: 200 OK (브랜드 상세)
+        end
     end
 ```
 
@@ -182,20 +196,27 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant BrandController
+    participant BrandFacade
     participant BrandService
     participant BrandRepository
 
     Admin->>BrandController: POST /api-admin/v1/brands (브랜드 정보)
-    BrandController->>BrandService: createBrand(command)
-    BrandService->>BrandRepository: existsByName(name)
-
-    alt 이미 존재하는 브랜드명
-        BrandRepository-->>BrandService: true
-        BrandService-->>BrandController: 400 Bad Request
-        BrandController-->>Admin: 400 Bad Request
+    alt 어드민 권한 없음
+        BrandController-->>Admin: 401 Unauthorized
     else 정상
-        BrandService->>BrandRepository: save(brand)
-        BrandController-->>Admin: 201 Created
+        BrandController->>BrandFacade: createBrand(command)
+        BrandFacade->>BrandService: createBrand(command)
+        BrandService->>BrandRepository: existsByName(name)
+        alt 이미 존재하는 브랜드명
+            BrandRepository-->>BrandService: true
+            BrandService-->>BrandFacade: 400 Bad Request
+            BrandFacade-->>BrandController: 400 Bad Request
+            BrandController-->>Admin: 400 Bad Request
+        else 정상
+            BrandService->>BrandRepository: save(brand)
+            BrandFacade-->>BrandController: Created
+            BrandController-->>Admin: 201 Created
+        end
     end
 ```
 
@@ -207,20 +228,27 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant BrandController
+    participant BrandFacade
     participant BrandService
     participant BrandRepository
 
     Admin->>BrandController: PUT /api-admin/v1/brands/{brandId} (수정 정보)
-    BrandController->>BrandService: updateBrand(brandId, command)
-    BrandService->>BrandRepository: findById(brandId)
-
-    alt 존재하지 않는 브랜드
-        BrandRepository-->>BrandService: empty
-        BrandService-->>BrandController: 404 Not Found
-        BrandController-->>Admin: 404 Not Found
+    alt 어드민 권한 없음
+        BrandController-->>Admin: 401 Unauthorized
     else 정상
-        BrandService->>BrandRepository: update(brand)
-        BrandController-->>Admin: 200 OK
+        BrandController->>BrandFacade: updateBrand(brandId, command)
+        BrandFacade->>BrandService: updateBrand(brandId, command)
+        BrandService->>BrandRepository: findById(brandId)
+        alt 존재하지 않는 브랜드
+            BrandRepository-->>BrandService: empty
+            BrandService-->>BrandFacade: 404 Not Found
+            BrandFacade-->>BrandController: 404 Not Found
+            BrandController-->>Admin: 404 Not Found
+        else 정상
+            BrandService->>BrandRepository: update(brand)
+            BrandFacade-->>BrandController: OK
+            BrandController-->>Admin: 200 OK
+        end
     end
 ```
 
@@ -232,21 +260,31 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant BrandController
+    participant BrandFacade
     participant BrandService
     participant BrandRepository
+    participant ProductService
     participant ProductRepository
 
     Admin->>BrandController: DELETE /api-admin/v1/brands/{brandId}
-    BrandController->>BrandService: deleteBrand(brandId)
-    BrandService->>BrandRepository: findById(brandId)
-
-    alt 존재하지 않는 브랜드
-        BrandService-->>BrandController: 404 Not Found
-        BrandController-->>Admin: 404 Not Found
+    alt 어드민 권한 없음
+        BrandController-->>Admin: 401 Unauthorized
     else 정상
-        BrandService->>ProductRepository: deleteAllByBrandId(brandId)
-        BrandService->>BrandRepository: delete(brandId)
-        BrandController-->>Admin: 204 No Content
+        BrandController->>BrandFacade: deleteBrand(brandId)
+        BrandFacade->>BrandService: getOrThrow(brandId)
+        BrandService->>BrandRepository: findById(brandId)
+        alt 존재하지 않는 브랜드
+            BrandRepository-->>BrandService: empty
+            BrandService-->>BrandFacade: 404 Not Found
+            BrandFacade-->>BrandController: 404 Not Found
+            BrandController-->>Admin: 404 Not Found
+        else 정상
+            BrandFacade->>ProductService: deleteAllByBrandId(brandId)
+            ProductService->>ProductRepository: deleteAllByBrandId(brandId)
+            BrandFacade->>BrandService: delete(brandId)
+            BrandService->>BrandRepository: delete(brandId)
+            BrandController-->>Admin: 204 No Content
+        end
     end
 ```
 
@@ -258,21 +296,26 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant ProductController
+    participant ProductFacade
     participant ProductService
     participant ProductRepository
 
     Admin->>ProductController: GET /api-admin/v1/products?brandId=&page=&size=
-    ProductController->>ProductService: getProducts(brandId, page, size)
-
-    alt brandId 있음
-        ProductService->>ProductRepository: findAllByBrandId(brandId, pageable)
-    else brandId 없음
-        ProductService->>ProductRepository: findAll(pageable)
+    alt 어드민 권한 없음
+        ProductController-->>Admin: 401 Unauthorized
+    else 정상
+        ProductController->>ProductFacade: getProducts(brandId, page, size)
+        ProductFacade->>ProductService: getProducts(brandId, page, size)
+        alt brandId 있음
+            ProductService->>ProductRepository: findAllByBrandId(brandId, pageable)
+        else brandId 없음
+            ProductService->>ProductRepository: findAll(pageable)
+        end
+        ProductRepository-->>ProductService: 상품 목록
+        ProductService-->>ProductFacade: 상품 목록
+        ProductFacade-->>ProductController: 상품 목록
+        ProductController-->>Admin: 200 OK (상품 목록)
     end
-
-    ProductRepository-->>ProductService: 상품 목록
-    ProductService-->>ProductController: 상품 목록
-    ProductController-->>Admin: 200 OK (상품 목록)
 ```
 
 ---
@@ -283,21 +326,28 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant ProductController
+    participant ProductFacade
     participant ProductService
     participant ProductRepository
 
     Admin->>ProductController: GET /api-admin/v1/products/{productId}
-    ProductController->>ProductService: getProduct(productId)
-    ProductService->>ProductRepository: findById(productId)
-
-    alt 존재하지 않는 상품
-        ProductRepository-->>ProductService: empty
-        ProductService-->>ProductController: 404 Not Found
-        ProductController-->>Admin: 404 Not Found
+    alt 어드민 권한 없음
+        ProductController-->>Admin: 401 Unauthorized
     else 정상
-        ProductRepository-->>ProductService: 상품
-        ProductService-->>ProductController: 상품 상세
-        ProductController-->>Admin: 200 OK (상품 상세)
+        ProductController->>ProductFacade: getProduct(productId)
+        ProductFacade->>ProductService: getProduct(productId)
+        ProductService->>ProductRepository: findById(productId)
+        alt 존재하지 않는 상품
+            ProductRepository-->>ProductService: empty
+            ProductService-->>ProductFacade: 404 Not Found
+            ProductFacade-->>ProductController: 404 Not Found
+            ProductController-->>Admin: 404 Not Found
+        else 정상
+            ProductRepository-->>ProductService: 상품
+            ProductService-->>ProductFacade: 상품 상세
+            ProductFacade-->>ProductController: 상품 상세
+            ProductController-->>Admin: 200 OK (상품 상세)
+        end
     end
 ```
 
@@ -309,21 +359,30 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant ProductController
+    participant ProductFacade
+    participant BrandService
+    participant BrandRepository
     participant ProductService
     participant ProductRepository
-    participant BrandReader
 
     Admin->>ProductController: POST /api-admin/v1/products (상품 정보)
-    ProductController->>ProductService: createProduct(command)
-    ProductService->>BrandReader: get(brandId)
-
-    alt 존재하지 않는 브랜드
-        BrandReader-->>ProductService: 400 Bad Request
-        ProductService-->>ProductController: 400 Bad Request
-        ProductController-->>Admin: 400 Bad Request
+    alt 어드민 권한 없음
+        ProductController-->>Admin: 401 Unauthorized
     else 정상
-        ProductService->>ProductRepository: save(product)
-        ProductController-->>Admin: 201 Created
+        ProductController->>ProductFacade: createProduct(command)
+        ProductFacade->>BrandService: getOrThrow(brandId)
+        BrandService->>BrandRepository: findById(brandId)
+        alt 존재하지 않는 브랜드
+            BrandRepository-->>BrandService: empty
+            BrandService-->>ProductFacade: 400 Bad Request
+            ProductFacade-->>ProductController: 400 Bad Request
+            ProductController-->>Admin: 400 Bad Request
+        else 정상
+            ProductFacade->>ProductService: createProduct(command, brand)
+            ProductService->>ProductRepository: save(product)
+            ProductFacade-->>ProductController: Created
+            ProductController-->>Admin: 201 Created
+        end
     end
 ```
 
@@ -335,22 +394,30 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant ProductController
+    participant ProductFacade
     participant ProductService
     participant ProductRepository
 
     Admin->>ProductController: PUT /api-admin/v1/products/{productId} (수정 정보)
-    ProductController->>ProductService: updateProduct(productId, command)
-    ProductService->>ProductRepository: findById(productId)
-
-    alt 존재하지 않는 상품
-        ProductService-->>ProductController: 404 Not Found
-        ProductController-->>Admin: 404 Not Found
-    else 브랜드 변경 시도
-        ProductService-->>ProductController: 400 Bad Request
-        ProductController-->>Admin: 400 Bad Request
+    alt 어드민 권한 없음
+        ProductController-->>Admin: 401 Unauthorized
     else 정상
-        ProductService->>ProductRepository: update(product)
-        ProductController-->>Admin: 200 OK
+        ProductController->>ProductFacade: updateProduct(productId, command)
+        ProductFacade->>ProductService: updateProduct(productId, command)
+        ProductService->>ProductRepository: findById(productId)
+        alt 존재하지 않는 상품
+            ProductService-->>ProductFacade: 404 Not Found
+            ProductFacade-->>ProductController: 404 Not Found
+            ProductController-->>Admin: 404 Not Found
+        else 브랜드 변경 시도
+            ProductService-->>ProductFacade: 400 Bad Request
+            ProductFacade-->>ProductController: 400 Bad Request
+            ProductController-->>Admin: 400 Bad Request
+        else 정상
+            ProductService->>ProductRepository: update(product)
+            ProductFacade-->>ProductController: OK
+            ProductController-->>Admin: 200 OK
+        end
     end
 ```
 
@@ -362,47 +429,27 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant ProductController
+    participant ProductFacade
     participant ProductService
     participant ProductRepository
 
     Admin->>ProductController: DELETE /api-admin/v1/products/{productId}
-    ProductController->>ProductService: deleteProduct(productId)
-    ProductService->>ProductRepository: findById(productId)
-
-    alt 존재하지 않는 상품
-        ProductRepository-->>ProductService: empty
-        ProductService-->>ProductController: 404 Not Found
-        ProductController-->>Admin: 404 Not Found
+    alt 어드민 권한 없음
+        ProductController-->>Admin: 401 Unauthorized
     else 정상
-        ProductService->>ProductRepository: delete(productId)
-        ProductController-->>Admin: 204 No Content
-    end
-```
-
----
-
-### 2-ADMIN-11. 상품별 판매 통계 조회
-
-```mermaid
-sequenceDiagram
-    participant Admin
-    participant AdminStatsController
-    participant AdminStatsService
-    participant OrderRepository
-
-    Admin->>AdminStatsController: GET /api-admin/v1/stats/products?startAt=&endAt=
-    AdminStatsController->>AdminStatsService: getProductStats(startAt, endAt)
-    AdminStatsService->>AdminStatsService: 날짜 유효성 검증
-
-    alt 날짜 형식 오류
-        AdminStatsService-->>AdminStatsController: 400 Bad Request
-        AdminStatsController-->>Admin: 400 Bad Request
-    else 정상
-        AdminStatsService->>OrderRepository: findPaidOrdersByPeriod(startAt, endAt)
-        OrderRepository-->>AdminStatsService: 결제 완료 주문 목록
-        AdminStatsService->>AdminStatsService: 상품별 판매 수량 및 금액 집계
-        AdminStatsService-->>AdminStatsController: 상품별 판매 통계
-        AdminStatsController-->>Admin: 200 OK
+        ProductController->>ProductFacade: deleteProduct(productId)
+        ProductFacade->>ProductService: deleteProduct(productId)
+        ProductService->>ProductRepository: findById(productId)
+        alt 존재하지 않는 상품
+            ProductRepository-->>ProductService: empty
+            ProductService-->>ProductFacade: 404 Not Found
+            ProductFacade-->>ProductController: 404 Not Found
+            ProductController-->>Admin: 404 Not Found
+        else 정상
+            ProductService->>ProductRepository: delete(productId)
+            ProductFacade-->>ProductController: No Content
+            ProductController-->>Admin: 204 No Content
+        end
     end
 ```
 
@@ -416,26 +463,31 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant LikeController
-    participant LikeService
+    participant LikeFacade
     participant ProductReader
+    participant LikeService
     participant LikeRepository
 
     User->>LikeController: POST /api/v1/products/{productId}/likes
-    LikeController->>LikeService: addLike(userId, productId)
-    LikeService->>ProductReader: get(productId)
+    LikeController->>LikeFacade: addLike(userId, productId)
+    LikeFacade->>ProductReader: get(productId)
 
     alt 존재하지 않는 상품
-        ProductReader-->>LikeService: 404 Not Found
-        LikeService-->>LikeController: 404 Not Found
+        ProductReader-->>LikeFacade: 404 Not Found
+        LikeFacade-->>LikeController: 404 Not Found
         LikeController-->>User: 404 Not Found
     else 이미 좋아요한 상품
+        LikeFacade->>LikeService: exists(userId, productId)
         LikeService->>LikeRepository: exists(userId, productId)
         LikeRepository-->>LikeService: true
-        LikeService-->>LikeController: 400 Bad Request
+        LikeService-->>LikeFacade: true
+        LikeFacade-->>LikeController: 400 Bad Request
         LikeController-->>User: 400 Bad Request
     else 정상
+        LikeFacade->>LikeService: addLike(userId, productId)
         LikeService->>LikeRepository: save(like)
-        LikeService->>ProductReader: increaseLikeCount(productId)
+        LikeFacade->>ProductReader: increaseLikeCount(productId)
+        LikeFacade-->>LikeController: Created
         LikeController-->>User: 201 Created
     end
 ```
@@ -448,26 +500,31 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant LikeController
-    participant LikeService
+    participant LikeFacade
     participant ProductReader
+    participant LikeService
     participant LikeRepository
 
     User->>LikeController: DELETE /api/v1/products/{productId}/likes
-    LikeController->>LikeService: removeLike(userId, productId)
-    LikeService->>ProductReader: get(productId)
+    LikeController->>LikeFacade: removeLike(userId, productId)
+    LikeFacade->>ProductReader: get(productId)
 
     alt 존재하지 않는 상품
-        ProductReader-->>LikeService: 404 Not Found
-        LikeService-->>LikeController: 404 Not Found
+        ProductReader-->>LikeFacade: 404 Not Found
+        LikeFacade-->>LikeController: 404 Not Found
         LikeController-->>User: 404 Not Found
     else 좋아요하지 않은 상품
+        LikeFacade->>LikeService: exists(userId, productId)
         LikeService->>LikeRepository: exists(userId, productId)
         LikeRepository-->>LikeService: false
-        LikeService-->>LikeController: 400 Bad Request
+        LikeService-->>LikeFacade: false
+        LikeFacade-->>LikeController: 400 Bad Request
         LikeController-->>User: 400 Bad Request
     else 정상
+        LikeFacade->>LikeService: removeLike(userId, productId)
         LikeService->>LikeRepository: delete(userId, productId)
-        LikeService->>ProductReader: decreaseLikeCount(productId)
+        LikeFacade->>ProductReader: decreaseLikeCount(productId)
+        LikeFacade-->>LikeController: OK
         LikeController-->>User: 200 OK
     end
 ```
@@ -480,20 +537,24 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant LikeController
+    participant LikeFacade
     participant LikeService
     participant LikeRepository
 
     User->>LikeController: GET /api/v1/users/{userId}/likes
-    LikeController->>LikeService: getLikes(requestUserId, userId)
+    LikeController->>LikeFacade: getLikes(requestUserId, userId)
+    LikeFacade->>LikeService: getLikes(requestUserId, userId)
     LikeService->>LikeService: 본인 여부 검증
 
     alt 타 유저 접근
-        LikeService-->>LikeController: 403 Forbidden
+        LikeService-->>LikeFacade: 403 Forbidden
+        LikeFacade-->>LikeController: 403 Forbidden
         LikeController-->>User: 403 Forbidden
     else 정상
         LikeService->>LikeRepository: findAllByUserId(userId)
         LikeRepository-->>LikeService: 좋아요 상품 목록
-        LikeService-->>LikeController: 좋아요 상품 목록
+        LikeService-->>LikeFacade: 좋아요 상품 목록
+        LikeFacade-->>LikeController: 좋아요 상품 목록
         LikeController-->>User: 200 OK
     end
 ```
@@ -508,31 +569,40 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant OrderController
-    participant OrderService
-    participant ProductReader
+    participant OrderFacade
+    participant ProductService
     participant ProductRepository
+    participant CartService
+    participant CartRepository
+    participant OrderService
     participant OrderRepository
 
     User->>OrderController: POST /api/v1/orders (items)
-    OrderController->>OrderService: createOrder(userId, items)
+    OrderController->>OrderFacade: createOrder(userId, items)
 
     alt 주문 목록이 비어 있음
-        OrderService-->>OrderController: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
         OrderController-->>User: 400 Bad Request
     else 정상
         loop 각 상품
-            OrderService->>ProductReader: get(productId)
+            OrderFacade->>ProductService: getProduct(productId)
+            ProductService->>ProductRepository: findById(productId)
             alt 존재하지 않는 상품
-                ProductReader-->>OrderService: 404 Not Found
-                OrderService-->>OrderController: 404 Not Found
+                ProductRepository-->>ProductService: empty
+                ProductService-->>OrderFacade: 404 Not Found
+                OrderFacade-->>OrderController: 404 Not Found
                 OrderController-->>User: 404 Not Found
             else 재고 부족
-                OrderService-->>OrderController: 400 Bad Request (부족한 상품 정보)
+                ProductService-->>OrderFacade: 400 Bad Request (부족한 상품 정보)
+                OrderFacade-->>OrderController: 400 Bad Request
                 OrderController-->>User: 400 Bad Request
             end
         end
-        OrderService->>OrderService: 상품 정보 스냅샷 생성
-        OrderService->>ProductRepository: decreaseStock(productId, quantity)
+        OrderFacade->>ProductService: decreaseStock(items)
+        ProductService->>ProductRepository: decreaseStock(productId, quantity)
+        OrderFacade->>CartService: deleteItems(userId, productIds)
+        CartService->>CartRepository: deleteItems(userId, productIds)
+        OrderFacade->>OrderService: createOrder(userId, items, snapshot)
         OrderService->>OrderRepository: save(order)
         OrderController-->>User: 201 Created (orderId)
     end
@@ -546,20 +616,24 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant OrderController
+    participant OrderFacade
     participant OrderService
     participant OrderRepository
 
     User->>OrderController: GET /api/v1/orders?startAt=&endAt=
-    OrderController->>OrderService: getOrders(userId, startAt, endAt)
+    OrderController->>OrderFacade: getOrders(userId, startAt, endAt)
+    OrderFacade->>OrderService: getOrders(userId, startAt, endAt)
     OrderService->>OrderService: 날짜 유효성 검증
 
     alt 날짜 형식 오류 또는 startAt > endAt
-        OrderService-->>OrderController: 400 Bad Request
+        OrderService-->>OrderFacade: 400 Bad Request
+        OrderFacade-->>OrderController: 400 Bad Request
         OrderController-->>User: 400 Bad Request
     else 정상
         OrderService->>OrderRepository: findAllByUserIdAndPeriod(userId, startAt, endAt)
         OrderRepository-->>OrderService: 주문 목록
-        OrderService-->>OrderController: 주문 목록
+        OrderService-->>OrderFacade: 주문 목록
+        OrderFacade-->>OrderController: 주문 목록
         OrderController-->>User: 200 OK
     end
 ```
@@ -572,22 +646,27 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant OrderController
+    participant OrderFacade
     participant OrderService
     participant OrderRepository
 
     User->>OrderController: GET /api/v1/orders/{orderId}
-    OrderController->>OrderService: getOrder(userId, orderId)
+    OrderController->>OrderFacade: getOrder(userId, orderId)
+    OrderFacade->>OrderService: getOrder(userId, orderId)
     OrderService->>OrderRepository: findById(orderId)
 
     alt 존재하지 않는 주문
-        OrderService-->>OrderController: 404 Not Found
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
         OrderController-->>User: 404 Not Found
     else 타 유저 주문 접근
-        OrderService-->>OrderController: 403 Forbidden
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
         OrderController-->>User: 403 Forbidden
     else 정상
         OrderRepository-->>OrderService: 주문 상세 (상품 스냅샷 포함)
-        OrderService-->>OrderController: 주문 상세
+        OrderService-->>OrderFacade: 주문 상세
+        OrderFacade-->>OrderController: 주문 상세
         OrderController-->>User: 200 OK
     end
 ```
@@ -600,30 +679,37 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant OrderController
+    participant OrderFacade
     participant OrderService
     participant OrderRepository
+    participant PaymentService
     participant PaymentRepository
 
     User->>OrderController: GET /api/v1/orders/{orderId}/payments
-    OrderController->>OrderService: getOrderPayments(userId, orderId)
+    OrderController->>OrderFacade: getOrderPayments(userId, orderId)
+    OrderFacade->>OrderService: getOrder(userId, orderId)
     OrderService->>OrderRepository: findById(orderId)
 
     alt 존재하지 않는 주문
-        OrderService-->>OrderController: 404 Not Found
+        OrderService-->>OrderFacade: 404 Not Found
+        OrderFacade-->>OrderController: 404 Not Found
         OrderController-->>User: 404 Not Found
     else 타 유저 주문 접근
-        OrderService-->>OrderController: 403 Forbidden
+        OrderService-->>OrderFacade: 403 Forbidden
+        OrderFacade-->>OrderController: 403 Forbidden
         OrderController-->>User: 403 Forbidden
     else 정상
-        OrderService->>PaymentRepository: findByOrderId(orderId)
+        OrderFacade->>PaymentService: getPayments(orderId)
+        PaymentService->>PaymentRepository: findByOrderId(orderId)
         alt 미결제 주문
-            PaymentRepository-->>OrderService: 빈 결제 내역
+            PaymentRepository-->>PaymentService: 빈 결제 내역
         else 결제 내역 있음
-            PaymentRepository-->>OrderService: 결제 내역
-            OrderService->>PaymentRepository: findCancelByOrderId(orderId)
-            PaymentRepository-->>OrderService: 취소 내역 (있는 경우)
+            PaymentRepository-->>PaymentService: 결제 내역
+            PaymentService->>PaymentRepository: findCancelByOrderId(orderId)
+            PaymentRepository-->>PaymentService: 취소 내역 (있는 경우)
         end
-        OrderService-->>OrderController: 결제 내역 + 취소 내역
+        PaymentService-->>OrderFacade: 결제 내역 + 취소 내역
+        OrderFacade-->>OrderController: 결제 내역 + 취소 내역
         OrderController-->>User: 200 OK
     end
 ```
@@ -638,29 +724,33 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant CartController
-    participant CartService
+    participant CartFacade
     participant ProductReader
+    participant CartService
     participant CartRepository
 
     User->>CartController: POST /api/v1/cart (productId, quantity)
-    CartController->>CartService: addItem(userId, productId, quantity)
-    CartService->>CartService: 수량 유효성 검증
+    CartController->>CartFacade: addItem(userId, productId, quantity)
 
     alt 수량이 0 이하
-        CartService-->>CartController: 400 Bad Request
+        CartFacade-->>CartController: 400 Bad Request
         CartController-->>User: 400 Bad Request
     else 정상
-        CartService->>ProductReader: get(productId)
+        CartFacade->>ProductReader: get(productId)
         alt 존재하지 않는 상품
-            ProductReader-->>CartService: 404 Not Found
-            CartService-->>CartController: 404 Not Found
+            ProductReader-->>CartFacade: 404 Not Found
+            CartFacade-->>CartController: 404 Not Found
             CartController-->>User: 404 Not Found
         else 이미 담긴 상품
+            CartFacade->>CartService: updateQuantity(userId, productId, quantity)
             CartService->>CartRepository: findByUserIdAndProductId(userId, productId)
             CartService->>CartRepository: updateQuantity(cartItemId, quantity)
+            CartFacade-->>CartController: OK
             CartController-->>User: 200 OK
         else 신규 상품
+            CartFacade->>CartService: addItem(userId, productId, quantity)
             CartService->>CartRepository: save(cartItem)
+            CartFacade-->>CartController: Created
             CartController-->>User: 201 Created
         end
     end
@@ -674,14 +764,17 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant CartController
+    participant CartFacade
     participant CartService
     participant CartRepository
 
     User->>CartController: GET /api/v1/cart
-    CartController->>CartService: getItems(userId)
+    CartController->>CartFacade: getItems(userId)
+    CartFacade->>CartService: getItems(userId)
     CartService->>CartRepository: findAllByUserId(userId)
     CartRepository-->>CartService: 장바구니 목록
-    CartService-->>CartController: 장바구니 목록
+    CartService-->>CartFacade: 장바구니 목록
+    CartFacade-->>CartController: 장바구니 목록
     CartController-->>User: 200 OK
 ```
 
@@ -693,21 +786,26 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant CartController
+    participant CartFacade
     participant CartService
     participant CartRepository
 
     User->>CartController: PUT /api/v1/cart/{cartItemId} (quantity)
-    CartController->>CartService: updateQuantity(userId, cartItemId, quantity)
+    CartController->>CartFacade: updateQuantity(userId, cartItemId, quantity)
+    CartFacade->>CartService: updateQuantity(userId, cartItemId, quantity)
     CartService->>CartRepository: findById(cartItemId)
 
     alt 존재하지 않는 항목
-        CartService-->>CartController: 404 Not Found
+        CartService-->>CartFacade: 404 Not Found
+        CartFacade-->>CartController: 404 Not Found
         CartController-->>User: 404 Not Found
     else 수량이 0 이하
-        CartService-->>CartController: 400 Bad Request
+        CartService-->>CartFacade: 400 Bad Request
+        CartFacade-->>CartController: 400 Bad Request
         CartController-->>User: 400 Bad Request
     else 정상
         CartService->>CartRepository: updateQuantity(cartItemId, quantity)
+        CartFacade-->>CartController: OK
         CartController-->>User: 200 OK
     end
 ```
@@ -720,21 +818,26 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant CartController
+    participant CartFacade
     participant CartService
     participant CartRepository
 
     User->>CartController: DELETE /api/v1/cart/{cartItemId}
-    CartController->>CartService: removeItem(userId, cartItemId)
+    CartController->>CartFacade: removeItem(userId, cartItemId)
+    CartFacade->>CartService: removeItem(userId, cartItemId)
     CartService->>CartRepository: findById(cartItemId)
 
     alt 존재하지 않는 항목
-        CartService-->>CartController: 404 Not Found
+        CartService-->>CartFacade: 404 Not Found
+        CartFacade-->>CartController: 404 Not Found
         CartController-->>User: 404 Not Found
     else 타 유저 항목 접근
-        CartService-->>CartController: 403 Forbidden
+        CartService-->>CartFacade: 403 Forbidden
+        CartFacade-->>CartController: 403 Forbidden
         CartController-->>User: 403 Forbidden
     else 정상
         CartService->>CartRepository: delete(cartItemId)
+        CartFacade-->>CartController: No Content
         CartController-->>User: 204 No Content
     end
 ```
@@ -749,39 +852,53 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant PaymentController
-    participant PaymentService
+    participant PaymentFacade
+    participant OrderService
     participant OrderRepository
+    participant CouponService
     participant CouponRepository
+    participant PaymentService
     participant PaymentRepository
 
     User->>PaymentController: POST /api/v1/payments (orderId, 카드 정보, couponId?)
-    PaymentController->>PaymentService: pay(userId, command)
-    PaymentService->>OrderRepository: findById(orderId)
+    PaymentController->>PaymentFacade: pay(userId, command)
+    PaymentFacade->>OrderService: getOrder(orderId)
+    OrderService->>OrderRepository: findById(orderId)
 
     alt 존재하지 않는 주문
-        PaymentService-->>PaymentController: 404 Not Found
+        OrderRepository-->>OrderService: empty
+        OrderService-->>PaymentFacade: 404 Not Found
+        PaymentFacade-->>PaymentController: 404 Not Found
         PaymentController-->>User: 404 Not Found
     else 이미 결제된 주문
-        PaymentService-->>PaymentController: 400 Bad Request
+        OrderService-->>PaymentFacade: 400 Bad Request
+        PaymentFacade-->>PaymentController: 400 Bad Request
         PaymentController-->>User: 400 Bad Request
     else 정상
         alt 쿠폰 있음
-            PaymentService->>CouponRepository: findById(couponId)
+            PaymentFacade->>CouponService: validateAndGetDiscount(couponId)
+            CouponService->>CouponRepository: findById(couponId)
             alt 유효하지 않은 쿠폰
-                PaymentService-->>PaymentController: 400 Bad Request
+                CouponService-->>PaymentFacade: 400 Bad Request
+                PaymentFacade-->>PaymentController: 400 Bad Request
                 PaymentController-->>User: 400 Bad Request
             else 정상
-                PaymentService->>PaymentService: 할인 금액 계산
+                CouponRepository-->>CouponService: 쿠폰
+                CouponService-->>PaymentFacade: 할인 금액
             end
         end
-        PaymentService->>PaymentService: 결제 처리
+        PaymentFacade->>PaymentService: processPayment(command, discountAmount)
         alt 결제 실패
-            PaymentService-->>PaymentController: 400 Bad Request
+            PaymentService-->>PaymentFacade: 400 Bad Request
+            PaymentFacade-->>PaymentController: 400 Bad Request
             PaymentController-->>User: 400 Bad Request
         else 결제 성공
             PaymentService->>PaymentRepository: save(payment)
-            PaymentService->>OrderRepository: updateStatus(orderId, PAID)
-            PaymentService->>CouponRepository: markAsUsed(couponId)
+            PaymentService-->>PaymentFacade: payment
+            PaymentFacade->>OrderService: updateStatus(orderId, PAID)
+            OrderService->>OrderRepository: updateStatus(orderId, PAID)
+            PaymentFacade->>CouponService: markAsUsed(couponId)
+            CouponService->>CouponRepository: markAsUsed(couponId)
             PaymentController-->>User: 200 OK
         end
     end
@@ -795,30 +912,47 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant PaymentController
+    participant PaymentFacade
     participant PaymentService
     participant PaymentRepository
+    participant OrderService
     participant OrderRepository
+    participant ProductService
     participant ProductRepository
+    participant CouponService
     participant CouponRepository
+    participant CartService
+    participant CartRepository
 
     User->>PaymentController: POST /api/v1/payments/{paymentId}/cancel
-    PaymentController->>PaymentService: cancel(userId, paymentId)
+    PaymentController->>PaymentFacade: cancel(userId, paymentId)
+    PaymentFacade->>PaymentService: getPayment(paymentId)
     PaymentService->>PaymentRepository: findById(paymentId)
 
     alt 존재하지 않는 결제
-        PaymentService-->>PaymentController: 404 Not Found
+        PaymentRepository-->>PaymentService: empty
+        PaymentService-->>PaymentFacade: 404 Not Found
+        PaymentFacade-->>PaymentController: 404 Not Found
         PaymentController-->>User: 404 Not Found
     else 타 유저 결제 접근
-        PaymentService-->>PaymentController: 403 Forbidden
+        PaymentService-->>PaymentFacade: 403 Forbidden
+        PaymentFacade-->>PaymentController: 403 Forbidden
         PaymentController-->>User: 403 Forbidden
     else 이미 취소된 결제 또는 취소 불가 상태
-        PaymentService-->>PaymentController: 400 Bad Request
+        PaymentService-->>PaymentFacade: 400 Bad Request
+        PaymentFacade-->>PaymentController: 400 Bad Request
         PaymentController-->>User: 400 Bad Request
     else 정상
+        PaymentFacade->>PaymentService: cancel(paymentId)
         PaymentService->>PaymentRepository: saveCancel(paymentCancel)
-        PaymentService->>OrderRepository: updateStatus(orderId, CANCELLED)
-        PaymentService->>ProductRepository: restoreStock(items)
-        PaymentService->>CouponRepository: restore(couponId)
+        PaymentFacade->>OrderService: updateStatus(orderId, CANCELLED)
+        OrderService->>OrderRepository: updateStatus(orderId, CANCELLED)
+        PaymentFacade->>ProductService: restoreStock(items)
+        ProductService->>ProductRepository: restoreStock(items)
+        PaymentFacade->>CouponService: restore(couponId)
+        CouponService->>CouponRepository: restore(couponId)
+        PaymentFacade->>CartService: restoreItems(items)
+        CartService->>CartRepository: restoreItems(items)
         PaymentController-->>User: 200 OK
     end
 ```
@@ -832,16 +966,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant AdminOrderController
-    participant AdminOrderService
+    participant OrderController
+    participant OrderFacade
+    participant OrderService
     participant OrderRepository
 
-    Admin->>AdminOrderController: GET /api-admin/v1/orders?page=&size=
-    AdminOrderController->>AdminOrderService: getOrders(pageable)
-    AdminOrderService->>OrderRepository: findAll(pageable)
-    OrderRepository-->>AdminOrderService: 전체 주문 목록
-    AdminOrderService-->>AdminOrderController: 전체 주문 목록
-    AdminOrderController-->>Admin: 200 OK
+    Admin->>OrderController: GET /api-admin/v1/orders?page=&size=
+    alt 어드민 권한 없음
+        OrderController-->>Admin: 401 Unauthorized
+    else 정상
+        OrderController->>OrderFacade: getOrders(pageable)
+        OrderFacade->>OrderService: getOrders(pageable)
+        OrderService->>OrderRepository: findAll(pageable)
+        OrderRepository-->>OrderService: 전체 주문 목록
+        OrderService-->>OrderFacade: 전체 주문 목록
+        OrderFacade-->>OrderController: 전체 주문 목록
+        OrderController-->>Admin: 200 OK
+    end
 ```
 
 ---
@@ -851,23 +992,32 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant AdminStatsController
-    participant AdminStatsService
+    participant StatsController
+    participant StatsFacade
+    participant StatsService
+    participant PaymentService
     participant PaymentRepository
 
-    Admin->>AdminStatsController: GET /api-admin/v1/stats/revenue?startAt=&endAt=
-    AdminStatsController->>AdminStatsService: getRevenue(startAt, endAt)
-    AdminStatsService->>AdminStatsService: 날짜 유효성 검증
-
-    alt 날짜 형식 오류 또는 startAt > endAt
-        AdminStatsService-->>AdminStatsController: 400 Bad Request
-        AdminStatsController-->>Admin: 400 Bad Request
+    Admin->>StatsController: GET /api-admin/v1/stats/revenue?startAt=&endAt=
+    alt 어드민 권한 없음
+        StatsController-->>Admin: 401 Unauthorized
     else 정상
-        AdminStatsService->>PaymentRepository: sumByPeriod(startAt, endAt)
-        PaymentRepository-->>AdminStatsService: 총 결제액, 총 할인액
-        AdminStatsService->>AdminStatsService: 순 수익 계산
-        AdminStatsService-->>AdminStatsController: 수익 통계
-        AdminStatsController-->>Admin: 200 OK
+        StatsController->>StatsFacade: getRevenue(startAt, endAt)
+        StatsFacade->>StatsService: validate(startAt, endAt)
+        alt 날짜 형식 오류 또는 startAt > endAt
+            StatsService-->>StatsFacade: 400 Bad Request
+            StatsFacade-->>StatsController: 400 Bad Request
+            StatsController-->>Admin: 400 Bad Request
+        else 정상
+            StatsFacade->>PaymentService: sumByPeriod(startAt, endAt)
+            PaymentService->>PaymentRepository: sumByPeriod(startAt, endAt)
+            PaymentRepository-->>PaymentService: 총 결제액, 총 할인액
+            PaymentService-->>StatsFacade: 총 결제액, 총 할인액
+            StatsFacade->>StatsService: calculateRevenue(총 결제액, 총 할인액)
+            StatsService-->>StatsFacade: 수익 통계
+            StatsFacade-->>StatsController: 수익 통계
+            StatsController-->>Admin: 200 OK
+        end
     end
 ```
 
@@ -878,16 +1028,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant AdminUserController
-    participant AdminUserService
+    participant UserController
+    participant UserOrderFacade
+    participant UserService
     participant UserRepository
 
-    Admin->>AdminUserController: GET /api-admin/v1/users?page=&size=
-    AdminUserController->>AdminUserService: getUsers(pageable)
-    AdminUserService->>UserRepository: findAll(pageable)
-    UserRepository-->>AdminUserService: 유저 목록
-    AdminUserService-->>AdminUserController: 유저 목록
-    AdminUserController-->>Admin: 200 OK
+    Admin->>UserController: GET /api-admin/v1/users?page=&size=
+    alt 어드민 권한 없음
+        UserController-->>Admin: 401 Unauthorized
+    else 정상
+        UserController->>UserOrderFacade: getUsers(pageable)
+        UserOrderFacade->>UserService: getUsers(pageable)
+        UserService->>UserRepository: findAll(pageable)
+        UserRepository-->>UserService: 유저 목록
+        UserService-->>UserOrderFacade: 유저 목록
+        UserOrderFacade-->>UserController: 유저 목록
+        UserController-->>Admin: 200 OK
+    end
 ```
 
 ---
@@ -897,21 +1054,28 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant AdminUserController
-    participant AdminUserService
+    participant UserController
+    participant UserOrderFacade
+    participant UserService
     participant UserRepository
 
-    Admin->>AdminUserController: GET /api-admin/v1/users/{userId}
-    AdminUserController->>AdminUserService: getUser(userId)
-    AdminUserService->>UserRepository: findById(userId)
-
-    alt 존재하지 않는 유저
-        AdminUserService-->>AdminUserController: 404 Not Found
-        AdminUserController-->>Admin: 404 Not Found
+    Admin->>UserController: GET /api-admin/v1/users/{userId}
+    alt 어드민 권한 없음
+        UserController-->>Admin: 401 Unauthorized
     else 정상
-        UserRepository-->>AdminUserService: 유저 상세
-        AdminUserService-->>AdminUserController: 유저 상세
-        AdminUserController-->>Admin: 200 OK
+        UserController->>UserOrderFacade: getUser(userId)
+        UserOrderFacade->>UserService: getUser(userId)
+        UserService->>UserRepository: findById(userId)
+        alt 존재하지 않는 유저
+            UserService-->>UserOrderFacade: 404 Not Found
+            UserOrderFacade-->>UserController: 404 Not Found
+            UserController-->>Admin: 404 Not Found
+        else 정상
+            UserRepository-->>UserService: 유저 상세
+            UserService-->>UserOrderFacade: 유저 상세
+            UserOrderFacade-->>UserController: 유저 상세
+            UserController-->>Admin: 200 OK
+        end
     end
 ```
 
@@ -922,22 +1086,32 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant AdminUserController
-    participant AdminUserService
+    participant UserController
+    participant UserOrderFacade
+    participant UserService
     participant UserRepository
+    participant OrderService
     participant OrderRepository
 
-    Admin->>AdminUserController: GET /api-admin/v1/users/{userId}/orders?page=&size=
-    AdminUserController->>AdminUserService: getUserOrders(userId, pageable)
-    AdminUserService->>UserRepository: findById(userId)
-
-    alt 존재하지 않는 유저
-        AdminUserService-->>AdminUserController: 404 Not Found
-        AdminUserController-->>Admin: 404 Not Found
+    Admin->>UserController: GET /api-admin/v1/users/{userId}/orders?page=&size=
+    alt 어드민 권한 없음
+        UserController-->>Admin: 401 Unauthorized
     else 정상
-        AdminUserService->>OrderRepository: findAllByUserId(userId, pageable)
-        OrderRepository-->>AdminUserService: 주문 목록
-        AdminUserService-->>AdminUserController: 주문 목록
-        AdminUserController-->>Admin: 200 OK
+        UserController->>UserOrderFacade: getUserOrders(userId, pageable)
+        UserOrderFacade->>UserService: getUser(userId)
+        UserService->>UserRepository: findById(userId)
+        alt 존재하지 않는 유저
+            UserRepository-->>UserService: empty
+            UserService-->>UserOrderFacade: 404 Not Found
+            UserOrderFacade-->>UserController: 404 Not Found
+            UserController-->>Admin: 404 Not Found
+        else 정상
+            UserOrderFacade->>OrderService: getOrdersByUserId(userId, pageable)
+            OrderService->>OrderRepository: findAllByUserId(userId, pageable)
+            OrderRepository-->>OrderService: 주문 목록
+            OrderService-->>UserOrderFacade: 주문 목록
+            UserOrderFacade-->>UserController: 주문 목록
+            UserController-->>Admin: 200 OK
+        end
     end
 ```
