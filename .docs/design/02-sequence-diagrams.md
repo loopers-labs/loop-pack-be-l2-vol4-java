@@ -5,7 +5,7 @@
 
 ## 다이어그램 1. 주문 생성 + 결제
 
-> 재고 차감 → 포인트 차감 → 외부 PG 연동. 실패(재고 부족·포인트 부족·PG 실패) 시 보상 트랜잭션까지 표현.
+> 재고 차감 → 주문 생성 → 외부 PG 결제(실결제액). 포인트는 결제 금액을 깎는 할인 수단. 실패(재고 부족·포인트 범위 오류·PG 실패) 흐름까지 표현.
 
 ```mermaid
 sequenceDiagram
@@ -19,8 +19,8 @@ sequenceDiagram
     participant PaySvc as PaymentService
     participant PG as 외부 PG
 
-    User->>API: POST /api/v1/orders {items}
-    API->>Facade: order(userId, items)
+    User->>API: POST /api/v1/orders {items, usePoint}
+    API->>Facade: order(userId, items, usePoint)
 
     Facade->>ProductSvc: 재고 확인·차감(items)
     alt 재고 부족
@@ -29,41 +29,41 @@ sequenceDiagram
         API-->>User: 400 Bad Request
     end
     ProductSvc-->>Facade: 차감 완료 + 상품 스냅샷(상품명·단가)
-    Note over Facade,OrderSvc: 주문 총액은 조회 시점 스냅샷 단가로 계산 — 이후 상품 가격이 바뀌어도 영향 없음
+    Note over Facade,OrderSvc: 주문 총액 = Σ(스냅샷 단가 × 수량) — 이후 상품 가격이 바뀌어도 영향 없음
 
-    Facade->>OrderSvc: 주문 생성(PENDING, 스냅샷, totalAmount)
-    OrderSvc-->>Facade: order(PENDING)
-
-    Facade->>PointSvc: 포인트 차감(userId, totalAmount)
-    alt 포인트 잔액 부족
-        PointSvc-->>Facade: 잔액 부족 예외
-        Facade->>ProductSvc: 재고 복원 (보상)
-        Facade->>OrderSvc: 주문 FAILED
+    Facade->>PointSvc: 사용 포인트 검증(userId, usePoint, 주문 총액)
+    alt usePoint 범위 오류 (보유 초과 또는 총액 초과)
+        PointSvc-->>Facade: 검증 실패 예외
+        Facade->>ProductSvc: 재고 원복
         Facade-->>API: CoreException(BAD_REQUEST)
         API-->>User: 400 Bad Request
     end
-    PointSvc-->>Facade: 차감 완료
+    PointSvc-->>Facade: 검증 통과
 
-    Facade->>PaySvc: 결제 생성(PENDING)
-    PaySvc->>PG: 결제 요청(orderId, amount)
+    Facade->>OrderSvc: 주문 생성(PENDING, 스냅샷, totalAmount, usePoint)
+    OrderSvc-->>Facade: order(PENDING)
+
+    Note over Facade,PG: 실결제액 = 주문 총액 − usePoint. 실결제액이 0이면 PG 호출 생략 후 바로 PAID
+    Facade->>PaySvc: 결제 생성(PENDING, 실결제액)
+    PaySvc->>PG: 결제 요청(orderId, 실결제액)
     alt PG 결제 성공
         PG-->>PaySvc: 승인(externalTxId)
         PaySvc-->>Facade: Payment SUCCESS
+        Facade->>PointSvc: 포인트 차감 확정(usePoint)
         Facade->>OrderSvc: 주문 PAID
         Facade-->>API: OrderInfo
         API-->>User: 200 OK · ApiResponse(OrderResponse)
     else PG 결제 실패 / 타임아웃
         PG-->>PaySvc: 거절 / 타임아웃
         PaySvc-->>Facade: Payment FAILED
-        Facade->>PointSvc: 포인트 복원 (보상)
-        Facade->>ProductSvc: 재고 복원 (보상)
+        Facade->>ProductSvc: 재고 원복
         Facade->>OrderSvc: 주문 FAILED
         Facade-->>API: CoreException(결제 실패)
         API-->>User: 4xx · 결제 실패
     end
 ```
 
-- 트랜잭션 경계: 재고·포인트·주문 갱신은 로컬 DB 트랜잭션, 외부 PG 호출은 트랜잭션 밖에서 수행하고 결과에 따라 별도 트랜잭션으로 확정/보상한다.
+- 트랜잭션 경계: 재고·주문·포인트 갱신은 로컬 DB 트랜잭션, 외부 PG 호출은 트랜잭션 밖에서 수행한다. PG 결과를 받은 뒤 성공이면 포인트 차감·주문 확정을, 실패면 재고 원복을 처리한다.
 
 ---
 

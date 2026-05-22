@@ -37,6 +37,7 @@ erDiagram
         BIGINT user_id
         VARCHAR status
         BIGINT total_amount
+        BIGINT used_point
     }
     ORDER_ITEMS {
         BIGINT id PK
@@ -102,13 +103,15 @@ erDiagram
 ### orders
 - 인덱스: `idx_orders_user_id_created_at` — 유저별 목록 조회 + 기간 필터
 - `status`는 `OrderStatus` enum(`PENDING`/`PAID`/`FAILED`)을 문자열로 저장한다.
+- 실결제액(외부 PG 결제 금액) = `total_amount` − `used_point`. 별도 컬럼 없이 `payments.amount`로 저장한다.
 
 | 컬럼 | 타입 | 제약 | 비고 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK | |
 | user_id | BIGINT | NOT NULL | |
 | status | VARCHAR | NOT NULL | PENDING / PAID / FAILED |
-| total_amount | BIGINT | NOT NULL | 주문 총액 |
+| total_amount | BIGINT | NOT NULL | 주문 총액 (할인 전) |
+| used_point | BIGINT | NOT NULL DEFAULT 0 | 할인에 사용한 포인트 |
 
 ### order_items
 - 스냅샷 컬럼(`product_name_snapshot`, `price_snapshot`) — 상품이 수정·삭제돼도 주문 내역은 당시 정보를 그대로 보존한다.
@@ -132,7 +135,7 @@ erDiagram
 | id | BIGINT | PK | |
 | order_id | BIGINT | FK(orders.id), UNIQUE, NOT NULL | 주문 1:1 |
 | status | VARCHAR | NOT NULL | PENDING / SUCCESS / FAILED |
-| amount | BIGINT | NOT NULL | 결제 금액 |
+| amount | BIGINT | NOT NULL | 실결제액 (주문 총액 − used_point) |
 | external_tx_id | VARCHAR | UNIQUE, NULL | PG 트랜잭션 ID |
 
 ### points
@@ -149,7 +152,7 @@ erDiagram
 - **좋아요**: `UNIQUE(user_id, product_id)`로 중복 등록을 차단. 멱등성은 애플리케이션(존재 확인)과 DB 제약(최종 방어)으로 이중 보장한다.
 - **재고 차감**: 동시 주문 시 재고 정합성(초과 판매 방지)은 후속 주차의 동시성 제어(조건부 UPDATE 또는 락) 대상이다. 본 설계에서는 단일 흐름의 차감/복원 정책만 정의한다.
 - **주문-결제 1:1**: `payments.order_id` UNIQUE로 한 주문에 결제가 중복 생성되지 않도록 보장한다.
-- **결제 실패 보상**: 재고 복원, 포인트 복원, `orders.status = FAILED`로 일관 상태를 회복한다.
+- **결제 실패 처리**: PG 결제 실패 시 차감한 재고를 원복하고 `orders.status = FAILED`로 둔다. 포인트는 결제 성공 후 차감하므로 실패 시 복원 대상이 아니다.
 - **외부 PG 중복 방지**: `payments.external_tx_id` UNIQUE로 동일 트랜잭션의 중복 반영을 차단한다.
 - **Soft delete 조회**: 모든 목록·상세·집계 조회는 `deleted_at IS NULL` 조건을 포함한다. `deleted_at` 단독 인덱스는 선택도가 낮아 효과가 제한적이므로, 자주 쓰이는 복합 인덱스(`products`의 `(brand_id, created_at)` 등) 선두에 `deleted_at`을 포함하는 방식을 우선 검토한다.
 

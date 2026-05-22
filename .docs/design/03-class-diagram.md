@@ -45,7 +45,9 @@ classDiagram
         +Long userId
         +OrderStatus status
         +Long totalAmount
+        +Long usedPoint
         +List~OrderItemModel~ items
+        +paidAmount() Long
         +paid()
         +failed()
         +isOwnedBy(Long userId) boolean
@@ -72,8 +74,8 @@ classDiagram
         +Long id
         +Long userId
         +Long balance
+        +hasEnough(Long amount) boolean
         +use(Long amount)
-        +restore(Long amount)
     }
     class OrderStatus {
         <<enumeration>>
@@ -111,24 +113,25 @@ classDiagram
 - unique 제약: `(user_id, product_id)` — 애플리케이션 검증의 최종 방어선
 
 ### OrderModel / OrderItemModel / OrderService
-- 책임: `OrderModel`은 상태 전이(`PENDING → PAID/FAILED`)와 총액을 보유하고, 본인 소유 검증(`isOwnedBy`)을 제공. `OrderItemModel`은 주문 시점 상품 스냅샷(상품명·단가)을 보유.
+- 책임: `OrderModel`은 상태 전이(`PENDING → PAID/FAILED`), 주문 총액과 사용 포인트(`usedPoint`)를 보유하고, 본인 소유 검증(`isOwnedBy`)과 실결제액(`paidAmount` = 총액 − 사용 포인트)을 제공. `OrderItemModel`은 주문 시점 상품 스냅샷(상품명·단가)을 보유.
 - 스냅샷 저장 책임: 주문 생성 시 `OrderService`가 상품 정보를 `OrderItemModel`로 복사한다.
 - 상태 전이 규칙: 생성 시 `PENDING`, 결제 성공 시 `paid()`, 결제 실패 시 `failed()`.
 
 ### PaymentModel / PaymentService
-- 책임: `PaymentModel`은 결제 1건의 상태·금액·외부 트랜잭션 ID를 보유. `PaymentService`는 결제 생성과 외부 PG 호출 위임, 결과 반영을 담당.
+- 책임: `PaymentModel`은 결제 1건의 상태·실결제액(주문 총액 − 사용 포인트)·외부 트랜잭션 ID를 보유. `PaymentService`는 결제 생성과 외부 PG 호출 위임, 결과 반영을 담당.
 - **외부 시스템 호출은 `PgClient`(domain port)를 통해서만 수행**하며, 실제 어댑터(`PgClientImpl`)는 infrastructure에 위치한다.
 
 ### PointModel / PointService
-- 책임: `PointModel`이 유저 포인트 잔액을 보유·검증한다 — `use()`는 잔액 부족을 검증한 뒤 차감하고, `restore()`는 보상 시 복원한다.
+- 책임: `PointModel`이 유저 포인트 잔액을 보유한다 — `hasEnough()`로 사용 가능 여부를 확인하고, `use()`는 잔액을 검증한 뒤 할인에 쓴 만큼 차감한다.
+- 포인트는 PG 결제 성공 후에 차감하므로, 결제 실패 시 복원 처리가 필요 없다.
 
 ### OrderFacade (application)
-- 책임: **유스케이스 조율과 트랜잭션 경계.** 재고 차감 → 포인트 차감 → 결제 순서로 도메인 서비스를 호출하고, 어느 단계든 실패하면 **보상 트랜잭션**(재고·포인트 복원, 주문 `FAILED`)을 수행한다.
-- 트랜잭션 고려: 외부 PG 호출은 DB 트랜잭션에 포함하지 않는다. 로컬 차감은 트랜잭션으로 묶고, PG 결과에 따라 별도 트랜잭션으로 확정/보상한다.
+- 책임: **유스케이스 조율과 트랜잭션 경계.** 재고 차감 → 주문 생성 → 외부 PG 결제(실결제액) 순으로 도메인 서비스를 호출한다. PG 결제가 성공하면 사용 포인트를 차감하고 주문을 `PAID`로, 실패하면 차감했던 재고를 원복하고 주문을 `FAILED`로 둔다.
+- 트랜잭션 고려: 외부 PG 호출은 DB 트랜잭션에 포함하지 않는다. 로컬 갱신(재고·주문·포인트)은 트랜잭션으로 묶고, PG 결과를 받은 뒤 성공/실패에 따라 별도 트랜잭션으로 마무리한다.
 
 ## 4. 외부 시스템 / 어댑터
 
-- `PgClient` — `domain.payment`의 port 인터페이스 (`requestPayment(orderId, amount)`, `cancelPayment(externalTxId)`)
+- `PgClient` — `domain.payment`의 port 인터페이스 (`requestPayment(orderId, 실결제액)`, `cancelPayment(externalTxId)`)
 - `PgClientImpl` — `infrastructure.payment`의 adapter. 외부 PG와 실제 HTTP 연동을 담당.
 - port/adapter 분리로 도메인은 외부 PG 구현에 의존하지 않으며, 테스트 시 `PgClient`를 대역으로 대체할 수 있다.
 
