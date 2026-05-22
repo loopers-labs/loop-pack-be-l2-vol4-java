@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class ApiControllerAdvice {
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handle(CoreException e) {
-        log.warn("CoreException : {}", e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage(), e);
+        log.warn("CoreException : {}", e.getLogMessage(), e);
         return failureResponse(e.getErrorType(), e.getCustomMessage());
     }
 

@@ -21,7 +21,7 @@ public class UserService {
         try {
             return userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            throw new CoreException(ErrorType.CONFLICT, "[loginId = " + user.getLoginId() + "] 이미 존재하는 아이디입니다.");
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 아이디입니다.", "[loginId = " + user.getLoginId() + "] 이미 존재하는 아이디입니다.", e);
         }
     }
 

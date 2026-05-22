@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -85,6 +86,7 @@ class UserServiceIntegrationTest {
             CountDownLatch latch = new CountDownLatch(1);
             AtomicInteger successCount = new AtomicInteger(0);
             AtomicInteger conflictCount = new AtomicInteger(0);
+            List<Throwable> unexpectedExceptions = new ArrayList<>();
 
             // act
             List<Future<?>> futures = List.of(
@@ -95,7 +97,9 @@ class UserServiceIntegrationTest {
                         successCount.incrementAndGet();
                     } catch (CoreException e) {
                         if (e.getErrorType() == ErrorType.CONFLICT) conflictCount.incrementAndGet();
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        unexpectedExceptions.add(e);
+                    }
                 }),
                 executor.submit(() -> {
                     try {
@@ -104,7 +108,9 @@ class UserServiceIntegrationTest {
                         successCount.incrementAndGet();
                     } catch (CoreException e) {
                         if (e.getErrorType() == ErrorType.CONFLICT) conflictCount.incrementAndGet();
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        unexpectedExceptions.add(e);
+                    }
                 })
             );
             latch.countDown();
@@ -112,8 +118,36 @@ class UserServiceIntegrationTest {
             executor.shutdown();
 
             // assert
+            assertThat(unexpectedExceptions).isEmpty();
             assertThat(successCount.get()).isEqualTo(1);
             assertThat(conflictCount.get()).isEqualTo(1);
+        }
+
+        @DisplayName("동시 가입 중 예상치 못한 예외가 발생하면, 무시되지 않고 감지되어야 한다.")
+        @Test
+        void failsTest_whenUnexpectedExceptionOccursInConcurrentThread() throws Exception {
+            // arrange
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            CountDownLatch latch = new CountDownLatch(1);
+            List<Throwable> unexpectedExceptions = new ArrayList<>();
+
+            // act
+            Future<?> future = executor.submit(() -> {
+                try {
+                    latch.await();
+                    throw new RuntimeException("의도적 예외");
+                } catch (CoreException e) {
+                    if (e.getErrorType() == ErrorType.CONFLICT) {}
+                } catch (Exception e) {
+                    unexpectedExceptions.add(e); // 수집
+                }
+            });
+            latch.countDown();
+            future.get();
+            executor.shutdown();
+
+            // assert - 예외가 감지되어야 하므로 비어있으면 안 됨
+            assertThat(unexpectedExceptions).isNotEmpty();
         }
 
         @DisplayName("이미 존재하는 loginId로 가입하면, CONFLICT 예외가 발생한다.")
@@ -133,8 +167,13 @@ class UserServiceIntegrationTest {
             // act & assert
             assertThatThrownBy(() -> userService.signUp(duplicateUser))
                 .isInstanceOf(CoreException.class)
-                .extracting("errorType")
-                .isEqualTo(ErrorType.CONFLICT);
+                .satisfies(e -> {
+                    CoreException ce = (CoreException) e;
+                    assertThat(ce.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+                    assertThat(ce.getCause()).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+                    assertThat(ce.getMessage()).doesNotContain("user01");
+                    assertThat(ce.getLogMessage()).contains("user01");
+                });
         }
     }
 
