@@ -508,7 +508,7 @@ Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `L
 
 주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 트랜잭션 경계를 감싼다.
 
-> Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 금지한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
+> Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 최대한 지양한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
 
 ---
 
