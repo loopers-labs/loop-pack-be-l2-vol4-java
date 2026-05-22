@@ -12,6 +12,8 @@
 - 소프트 딜리트(`deletedAt`)는 Brand, Product에만 적용
 - 좋아요 취소는 하드 딜리트 (Like 행 삭제)
 - `likeCount`는 Product 도메인이 소유하며 LikeService의 요청을 받아 직접 관리
+- `Stock.deduct()`는 반환값 없이 동작하며, 재고 부족 시 `StockInsufficientException`을 던져 TX 롤백을 트리거한다
+- 주문은 올-오어-낫싱 정책 — `OrderItemStatus.SKIPPED`는 존재하지 않는다
 
 ---
 
@@ -73,7 +75,7 @@ classDiagram
     class Stock {
         +Long productId
         +int quantity
-        +deduct(int quantity) bool
+        +deduct(int quantity)
         +isAvailable(int quantity) bool
     }
     Stock --|> BaseEntity
@@ -102,7 +104,6 @@ classDiagram
         +int quantity
         +OrderItemStatus status
         +isOrdered() bool
-        +isSkipped() bool
         +cancel()
     }
     OrderItem --|> BaseEntity
@@ -117,7 +118,6 @@ classDiagram
     class OrderItemStatus {
         <<enumeration>>
         ORDERED
-        SKIPPED
         CANCELLED
     }
 
@@ -146,7 +146,7 @@ classDiagram
 | Stock | quantity | >= 0 | 음수 재고 방지 |
 | Product | price | > 0 | 유효한 가격만 허용 |
 | Product | likeCount | >= 0 | 음수 좋아요 방지 |
-| Order | orderItems | ORDERED 항목 >= 1 | 전부 SKIPPED면 주문 불가 |
+| OrderItem | quantity | >= 1 | 수량 0 이하 주문 항목 불가 |
 | OrderItemSnapshot | (productName, brandName, price) | NOT NULL | 스냅샷은 주문 당시 정보 보존 필수 |
 
 ---
@@ -230,7 +230,7 @@ classDiagram
     }
 
     class StockService {
-        +deductIfAvailable(Long productId, int quantity) OrderItemStatus
+        +deductStock(Long productId, int quantity)
     }
 
     class LikeService {
@@ -242,7 +242,7 @@ classDiagram
     class OrderService {
         +getOrders(Long userId, LocalDate startAt, LocalDate endAt) List~Order~
         +getOrder(Long userId, Long orderId) Order
-        +createOrder(Long userId, orderedItems, skippedItems) Order
+        +createOrder(Long userId, items, snapshots) Order
     }
 
     %% 서비스 간 의존성
@@ -277,6 +277,7 @@ Service는 `BrandRepository` 인터페이스에만 의존합니다.
 `likeCount` 변경의 책임은 Product 도메인에 있습니다.
 LikeService가 직접 Product 테이블을 건드리지 않고, ProductService를 통해 위임합니다.
 
-### 5. OrderItem.cancel()
-`CANCELLED` 상태 전환은 OrderItem의 도메인 메서드가 담당합니다.
+### 5. OrderItem 상태 전환
+`CANCELLED` 상태 전환은 `OrderItem.cancel()` 도메인 메서드가 담당합니다.
 외부에서 상태 필드를 직접 변경하지 않으며, 비즈니스 의도가 메서드 이름에 드러납니다.
+`SKIPPED`는 B2C 올-오어-낫싱 정책 채택으로 제거되었습니다 — 재고 부족 시 주문 전체가 실패하므로 부분 주문 상태가 필요 없습니다.
