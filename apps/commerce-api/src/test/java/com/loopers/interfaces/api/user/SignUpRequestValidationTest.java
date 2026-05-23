@@ -105,13 +105,4 @@ class SignUpRequestValidationTest {
         assertThat(hasViolationOn(request, "email")).isTrue();
         assertThat(hasViolationOn(request, "birthDate")).isTrue();
     }
-
-    @Test
-    @DisplayName("비밀번호에 생년월일이 포함되면 위반이 발생한다")
-    void passwordContainingBirthDate_hasViolation() {
-        SignUpRequest request = new SignUpRequest(
-            "loopers01", "19950321aA", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
-        );
-        assertThat(validator.validate(request)).isNotEmpty();
-    }
 }

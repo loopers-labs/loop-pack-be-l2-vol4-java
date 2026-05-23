@@ -1,7 +1,5 @@
 package com.loopers.domain.user;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -16,6 +14,7 @@ public class UserService {
     private final UserValidator userValidator;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserReader userReader;
 
     @Transactional
     public User signUp(UserCommand.SignUp command) {
@@ -40,8 +39,14 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public User getInfo(Long userId) {
-        return userRepository.findById(userId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    public User get(Long userId) {
+        return userReader.get(userId);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
+        User user = userReader.get(userId);
+        userValidator.validateChangePassword(user, currentRawPassword, newRawPassword);
+        user.changePassword(passwordEncoder.encode(newRawPassword));
     }
 }

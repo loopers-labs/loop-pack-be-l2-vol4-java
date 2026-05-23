@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.UserCommand;
 import com.loopers.domain.user.User;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,7 +13,6 @@ import java.time.LocalDate;
 
 public class UserV1Dto {
 
-    @PasswordNotContainBirthDate
     public record SignUpRequest(
         @NotBlank(message = "로그인 ID는 필수입니다.")
         @Pattern(regexp = "^[a-z0-9]{4,20}$", message = "로그인 ID는 영문 소문자와 숫자 4~20자여야 합니다.")
@@ -75,6 +75,24 @@ public class UserV1Dto {
         /** 이름의 마지막 글자를 * 로 마스킹한다. (예: "김루퍼" -> "김루*", "김" -> "*") */
         private static String maskLastCharacter(String name) {
             return name.substring(0, name.length() - 1) + "*";
+        }
+    }
+
+    public record UpdatePasswordRequest(
+        @NotBlank(message = "현재 비밀번호는 필수입니다.")
+        String currentPassword,
+
+        @NotBlank(message = "새 비밀번호는 필수입니다.")
+        @Pattern(regexp = "^[\\x21-\\x7E]{8,16}$", message = "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.")
+        String newPassword
+    ) {
+
+        @AssertTrue(message = "새 비밀번호는 현재 비밀번호와 달라야 합니다.")
+        public boolean isNewPasswordDifferent() {
+            if (currentPassword == null || newPassword == null) {
+                return true;
+            }
+            return !newPassword.equals(currentPassword);
         }
     }
 }

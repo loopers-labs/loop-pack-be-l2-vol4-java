@@ -156,4 +156,71 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
+
+    @DisplayName("PUT /api/v1/users/password")
+    @Nested
+    class ChangePassword {
+
+        private HttpHeaders authHeaders(String loginId, String loginPw) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Loopers-LoginId", loginId);
+            headers.set("X-Loopers-LoginPw", loginPw);
+            return headers;
+        }
+
+        private ResponseEntity<ApiResponse<Void>> requestChange(HttpHeaders headers, UserV1Dto.UpdatePasswordRequest body) {
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            return testRestTemplate.exchange(ENDPOINT + "/password", HttpMethod.PUT, new HttpEntity<>(body, headers), responseType);
+        }
+
+        @DisplayName("올바른 헤더 + 유효한 요청이면, 200 으로 비밀번호가 변경된다.")
+        @Test
+        void changesPassword_whenRequestIsValid() {
+            signUp(validRequest());
+
+            ResponseEntity<ApiResponse<Void>> response = requestChange(
+                authHeaders("loopers01", "Passw0rd!"),
+                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "NewPass1!")
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @DisplayName("새 비밀번호 형식이 잘못되면, 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void throwsBadRequest_whenNewPasswordFormatIsInvalid() {
+            signUp(validRequest());
+
+            ResponseEntity<ApiResponse<Void>> response = requestChange(
+                authHeaders("loopers01", "Passw0rd!"),
+                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "short")
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("현재 비밀번호가 일치하지 않으면, 400 BAD_REQUEST 응답을 받는다.")
+        @Test
+        void throwsBadRequest_whenCurrentPasswordMismatches() {
+            signUp(validRequest());
+
+            ResponseEntity<ApiResponse<Void>> response = requestChange(
+                authHeaders("loopers01", "Passw0rd!"),
+                new UserV1Dto.UpdatePasswordRequest("WrongPass1!", "NewPass1!")
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void throwsUnauthorized_whenHeadersAreMissing() {
+            ResponseEntity<ApiResponse<Void>> response = requestChange(
+                new HttpHeaders(),
+                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "NewPass1!")
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
 }

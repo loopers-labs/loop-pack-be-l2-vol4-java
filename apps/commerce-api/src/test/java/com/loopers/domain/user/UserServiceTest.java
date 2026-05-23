@@ -27,7 +27,8 @@ class UserServiceTest {
     private final UserValidator userValidator = mock(UserValidator.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    private final UserService userService = new UserService(userValidator, userRepository, passwordEncoder);
+    private final UserReader userReader = mock(UserReader.class);
+    private final UserService userService = new UserService(userValidator, userRepository, passwordEncoder, userReader);
 
     private UserCommand.SignUp signUpCommand() {
         return new UserCommand.SignUp(
@@ -115,22 +116,24 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("userId로 내 정보를 조회하면 해당 사용자를 반환한다")
-    void getInfo_returnsUser() {
+    @DisplayName("비밀번호 수정 시 새 비밀번호가 인코딩되어 갱신된다")
+    void changePassword_updatesPasswordToEncoded() {
         User user = existingUser();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userReader.get(1L)).thenReturn(user);
+        String newRawPassword = "NewPass1!";
 
-        User result = userService.getInfo(1L);
+        userService.changePassword(1L, RAW_PASSWORD, newRawPassword);
 
-        assertThat(result).isSameAs(user);
+        assertThat(user.getPassword()).isNotEqualTo(newRawPassword);
+        assertThat(passwordEncoder.matches(newRawPassword, user.getPassword())).isTrue();
     }
 
     @Test
-    @DisplayName("사용자가 존재하지 않으면 NOT_FOUND 예외가 발생한다")
-    void getInfo_whenUserNotFound_throwsNotFound() {
-        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+    @DisplayName("비밀번호 수정 시 사용자가 존재하지 않으면 NOT_FOUND 예외가 발생한다")
+    void changePassword_whenUserNotFound_throwsNotFound() {
+        when(userReader.get(999L)).thenThrow(new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        assertThatThrownBy(() -> userService.getInfo(999L))
+        assertThatThrownBy(() -> userService.changePassword(999L, RAW_PASSWORD, "NewPass1!"))
             .isInstanceOf(CoreException.class)
             .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
     }

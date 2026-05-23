@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,7 +32,17 @@ public class UserV1Controller implements UserV1ApiSpec {
     @GetMapping("/me")
     @Override
     public ApiResponse<UserV1Dto.UserInfoResponse> getMyInfo(@AuthenticationPrincipal Long userId) {
-        User user = userService.getInfo(userId);
+        User user = userService.get(userId);
         return ApiResponse.success(UserV1Dto.UserInfoResponse.from(user));
+    }
+
+    @PutMapping("/password")
+    @Override
+    public ApiResponse<Void> changePassword(
+        @AuthenticationPrincipal Long userId,
+        @Valid @RequestBody UserV1Dto.UpdatePasswordRequest request
+    ) {
+        userService.changePassword(userId, request.currentPassword(), request.newPassword());
+        return ApiResponse.success(null);
     }
 }

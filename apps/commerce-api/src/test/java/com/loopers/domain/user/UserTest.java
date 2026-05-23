@@ -82,4 +82,26 @@ class UserTest {
             .isInstanceOf(CoreException.class)
             .hasMessageContaining("생년월일은 비어있을 수 없습니다.");
     }
+
+    @Test
+    @DisplayName("changePassword 로 비밀번호를 갱신할 수 있다")
+    void changePassword_updatesPassword() {
+        User user = User.create(LOGIN_ID, PASSWORD, NAME, BIRTH_DATE, EMAIL);
+
+        user.changePassword("new-encoded-password");
+
+        assertThat(user.getPassword()).isEqualTo("new-encoded-password");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "   "})
+    @DisplayName("changePassword 에 비어있는 값을 주면 CoreException 이 발생한다")
+    void changePassword_withBlank_throws(String invalidPassword) {
+        User user = User.create(LOGIN_ID, PASSWORD, NAME, BIRTH_DATE, EMAIL);
+
+        assertThatThrownBy(() -> user.changePassword(invalidPassword))
+            .isInstanceOf(CoreException.class)
+            .hasMessageContaining("비밀번호는 비어있을 수 없습니다.");
+    }
 }

@@ -20,4 +20,13 @@ public interface UserV1ApiSpec {
         description = "X-Loopers-LoginId / X-Loopers-LoginPw 헤더로 인증된 사용자의 정보를 조회합니다."
     )
     ApiResponse<UserV1Dto.UserInfoResponse> getMyInfo(@Parameter(hidden = true) Long userId);
+
+    @Operation(
+        summary = "비밀번호 수정",
+        description = "X-Loopers-LoginId / X-Loopers-LoginPw 헤더로 인증한 사용자의 비밀번호를 변경합니다."
+    )
+    ApiResponse<Void> changePassword(
+        @Parameter(hidden = true) Long userId,
+        @Valid UserV1Dto.UpdatePasswordRequest request
+    );
 }

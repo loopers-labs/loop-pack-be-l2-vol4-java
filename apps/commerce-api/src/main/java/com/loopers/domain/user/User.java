@@ -7,7 +7,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
@@ -19,6 +21,7 @@ import java.time.LocalDate;
         }
 )
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseEntity {
 
     @Column(name = "login_id", nullable = false, unique = true)
@@ -36,9 +39,6 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String email;
 
-    protected User() {
-    }
-
     private User(String loginId, String password, String name, LocalDate birthDate, String email) {
         this.loginId = loginId;
         this.password = password;
@@ -48,10 +48,13 @@ public class User extends BaseEntity {
         validate();
     }
 
-    /**
-     * User 의 구조적 불변식(필수 값 누락 금지)을 검증한다.
-     * 형식 검증(정규식 등)은 경계의 Bean Validation 이 담당하므로 여기서 다루지 않는다.
-     */
+    public void changePassword(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
+        }
+        this.password = encodedPassword;
+    }
+
     private void validate() {
         if (loginId == null || loginId.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 비어있을 수 없습니다.");
