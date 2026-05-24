@@ -1,0 +1,414 @@
+# 시퀀스 다이어그램
+
+---
+
+## UC-004: 상품 찜 / 찜 취소
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller
+    participant WishlistFacade
+    participant ProductService
+    participant WishlistService
+    participant ProductRepository
+    participant WishlistRepository
+
+    User->>Controller: POST /wishlists/{productId}
+
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 로그인
+        Controller->>WishlistFacade: toggleWishlist(userId, productId)
+
+        WishlistFacade->>ProductService: getProduct(productId)
+        ProductService->>ProductRepository: findById(productId)
+
+        alt 상품 없음
+            ProductRepository-->>ProductService: null
+            ProductService-->>WishlistFacade: CoreException(PRODUCT_NOT_FOUND)
+            WishlistFacade-->>Controller: 404 NOT_FOUND
+        else 상품 존재
+            ProductRepository-->>ProductService: Product
+            ProductService-->>WishlistFacade: Product
+
+            WishlistFacade->>WishlistService: toggle(userId, productId)
+            WishlistService->>WishlistRepository: findByUserIdAndProductId(userId, productId)
+
+            alt 찜 이력 있음
+                WishlistRepository-->>WishlistService: Wishlist
+                WishlistService->>WishlistRepository: delete(wishlist)
+                WishlistService-->>WishlistFacade: CANCELLED
+            else 찜 이력 없음
+                WishlistRepository-->>WishlistService: null
+                WishlistService->>WishlistRepository: save(new Wishlist)
+                WishlistService-->>WishlistFacade: ADDED
+            end
+
+            WishlistFacade-->>Controller: WishlistInfo
+            Controller-->>User: 200 OK
+        end
+    end
+```
+
+---
+
+## UC-006: 주문 및 결제 요청
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller
+    participant OrderFacade
+    participant ProductService
+    participant OrderService
+    participant PaymentService
+    participant ProductRepository
+    participant ProductStockRepository
+    participant OrderRepository
+    participant OrderItemRepository
+    participant PaymentRepository
+
+    User->>Controller: POST /orders {items: [{productId, quantity}]}
+
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 상품 목록이 비어있음
+        Controller-->>User: 400 BAD_REQUEST
+    else 수량 < 1인 항목 있음
+        Controller-->>User: 400 BAD_REQUEST
+    else 유효
+        Controller->>OrderFacade: placeOrder(userId, items)
+
+        loop 상품 목록 각각
+            OrderFacade->>ProductService: getProduct(productId)
+            ProductService->>ProductRepository: findById(productId)
+
+            alt 상품 없음
+                ProductRepository-->>ProductService: null
+                ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_FOUND)
+                OrderFacade-->>Controller: 404 NOT_FOUND
+            else 상품이 ACTIVE 아님
+                ProductRepository-->>ProductService: Product(INACTIVE)
+                ProductService-->>OrderFacade: CoreException(PRODUCT_NOT_ORDERABLE)
+                OrderFacade-->>Controller: 400 BAD_REQUEST
+            else 정상
+                ProductRepository-->>ProductService: Product(ACTIVE)
+                ProductService->>ProductStockRepository: findByProductId(productId)
+                alt 재고 부족
+                    ProductStockRepository-->>ProductService: ProductStock(부족)
+                    ProductService-->>OrderFacade: CoreException(STOCK_NOT_ENOUGH)
+                    OrderFacade-->>Controller: 400 BAD_REQUEST
+                else 재고 충분
+                    ProductStockRepository-->>ProductService: ProductStock
+                    ProductService-->>OrderFacade: Product
+                end
+            end
+        end
+
+        OrderFacade->>ProductService: decreaseStock(items)
+        ProductService->>ProductStockRepository: update stocks
+        ProductStockRepository-->>ProductService: ok
+
+        OrderFacade->>OrderService: createOrder(userId, items)
+        OrderService->>OrderRepository: save(new Order) REQUESTED
+        OrderRepository-->>OrderService: Order
+        OrderService->>OrderItemRepository: save(OrderItems with snapshot)
+        OrderItemRepository-->>OrderService: OrderItems
+        OrderService-->>OrderFacade: Order
+
+        OrderFacade->>PaymentService: createPayment(orderId, totalAmount)
+        PaymentService->>PaymentRepository: save(new Payment) PENDING
+        PaymentRepository-->>PaymentService: Payment
+        PaymentService-->>OrderFacade: Payment
+
+        OrderFacade-->>Controller: PaymentInfo
+        Controller-->>User: 200 OK
+    end
+```
+
+---
+
+## UC-A003: 브랜드 삭제
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Controller
+    participant BrandFacade
+    participant BrandService
+    participant ProductService
+    participant BrandRepository
+    participant ProductRepository
+
+    Admin->>Controller: DELETE /admin/brands/{brandId}
+
+    alt 비관리자
+        Controller-->>Admin: 403 FORBIDDEN
+    else 관리자
+        Controller->>BrandFacade: deleteBrand(brandId)
+
+        BrandFacade->>BrandService: getBrand(brandId)
+        BrandService->>BrandRepository: findById(brandId)
+
+        alt 브랜드 없음
+            BrandRepository-->>BrandService: null
+            BrandService-->>BrandFacade: CoreException(BRAND_NOT_FOUND)
+            BrandFacade-->>Controller: 404 NOT_FOUND
+        else 브랜드 존재
+            BrandRepository-->>BrandService: Brand
+            BrandService-->>BrandFacade: Brand
+
+            Note over BrandFacade,ProductRepository: 소속 상품 판매중지 (찜 이력은 보존)
+            BrandFacade->>ProductService: suspendAllByBrand(brandId)
+            ProductService->>ProductRepository: updateStatusByBrandId(brandId, INACTIVE)
+            ProductRepository-->>ProductService: ok
+            ProductService-->>BrandFacade: ok
+
+            BrandFacade->>BrandService: delete(brandId)
+            BrandService->>BrandRepository: updateStatus(brandId, INACTIVE)
+            BrandRepository-->>BrandService: ok
+
+            BrandFacade-->>Controller: ok
+            Controller-->>Admin: 200 OK
+        end
+    end
+```
+
+---
+
+## UC-009: 결제 승인 처리
+
+```mermaid
+sequenceDiagram
+    actor PG
+    participant Controller
+    participant PaymentFacade
+    participant PaymentService
+    participant OrderService
+    participant PaymentRepository
+    participant OrderRepository
+
+    PG->>Controller: POST /payments/webhook/approval {paymentId, ...}
+
+    alt 웹훅 유효성 검증 실패
+        Controller-->>PG: 무시 (처리 안 함)
+    else 유효
+        Controller->>PaymentFacade: handlePaymentApproval(paymentId)
+
+        PaymentFacade->>PaymentService: getPayment(paymentId)
+        PaymentService->>PaymentRepository: findById(paymentId)
+        PaymentRepository-->>PaymentService: Payment
+
+        PaymentFacade->>PaymentService: approve(payment)
+        PaymentService->>PaymentRepository: save(payment) APPROVED
+        PaymentRepository-->>PaymentService: ok
+
+        PaymentFacade->>OrderService: complete(orderId)
+        OrderService->>OrderRepository: save(order) COMPLETED
+        OrderRepository-->>OrderService: ok
+
+        PaymentFacade-->>Controller: ok
+        Controller-->>PG: 200 OK
+    end
+```
+
+---
+
+## UC-010: 결제 실패 처리
+
+```mermaid
+sequenceDiagram
+    actor PG
+    participant Controller
+    participant PaymentFacade
+    participant PaymentService
+    participant PaymentRepository
+
+    PG->>Controller: POST /payments/webhook/failure {paymentId, ...}
+
+    alt 웹훅 유효성 검증 실패
+        Controller-->>PG: 무시 (처리 안 함)
+    else 유효
+        Controller->>PaymentFacade: handlePaymentFailure(paymentId)
+
+        PaymentFacade->>PaymentService: getPayment(paymentId)
+        PaymentService->>PaymentRepository: findById(paymentId)
+        PaymentRepository-->>PaymentService: Payment
+
+        PaymentFacade->>PaymentService: fail(payment)
+        PaymentService->>PaymentRepository: save(payment) FAILED
+        PaymentRepository-->>PaymentService: ok
+
+        Note over PaymentFacade: 주문은 REQUESTED 유지 (재시도 가능)
+        PaymentFacade-->>Controller: ok
+        Controller-->>PG: 200 OK
+    end
+```
+
+---
+
+## UC-011: 미완료 결제 만료 처리 (배치)
+
+```mermaid
+sequenceDiagram
+    participant Batch
+    participant PaymentFacade
+    participant PaymentService
+    participant OrderService
+    participant ProductService
+    participant PaymentRepository
+    participant OrderRepository
+    participant OrderItemRepository
+    participant ProductStockRepository
+
+    Batch->>PaymentFacade: expireStalePayments()
+
+    Note over PaymentFacade,OrderRepository: 주문 생성 후 15분 경과, APPROVED 결제 없는 REQUESTED 주문 조회
+    PaymentFacade->>OrderService: getExpiredOrders(threshold=15min)
+    OrderService->>OrderRepository: findRequestedOrdersOlderThan(threshold)
+    OrderRepository-->>OrderService: Orders
+
+    alt 대상 주문 없음
+        PaymentFacade-->>Batch: 처리 없이 종료
+    else 대상 주문 존재
+        loop 각 주문
+            PaymentFacade->>PaymentService: expirePendingPayment(orderId)
+            PaymentService->>PaymentRepository: findPendingByOrderId(orderId)
+            PaymentRepository-->>PaymentService: Payment
+            PaymentService->>PaymentRepository: save(payment) EXPIRED
+            PaymentRepository-->>PaymentService: ok
+
+            PaymentFacade->>OrderService: cancel(orderId)
+            OrderService->>OrderRepository: save(order) CANCELLED
+            OrderRepository-->>OrderService: ok
+
+            Note over PaymentFacade,ProductStockRepository: 보상 트랜잭션 - 차감된 재고 전량 원복
+            PaymentFacade->>OrderService: getOrderItems(orderId)
+            OrderService->>OrderItemRepository: findByOrderId(orderId)
+            OrderItemRepository-->>OrderService: OrderItems
+            OrderService-->>PaymentFacade: OrderItems
+
+            loop 주문 항목 각각
+                PaymentFacade->>ProductService: increaseStock(productStockId, quantity)
+                ProductService->>ProductStockRepository: save(productStock)
+                ProductStockRepository-->>ProductService: ok
+            end
+        end
+
+        PaymentFacade-->>Batch: ok
+    end
+```
+
+---
+
+## UC-012: 결제 재시도
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller
+    participant PaymentFacade
+    participant OrderService
+    participant PaymentService
+    participant OrderRepository
+    participant PaymentRepository
+
+    User->>Controller: POST /orders/{orderId}/payments
+
+    alt 비로그인
+        Controller-->>User: 401 UNAUTHORIZED
+    else 로그인
+        Controller->>PaymentFacade: retryPayment(userId, orderId)
+
+        PaymentFacade->>OrderService: getOrder(orderId)
+        OrderService->>OrderRepository: findById(orderId)
+
+        alt 주문 없음
+            OrderRepository-->>OrderService: null
+            OrderService-->>PaymentFacade: CoreException(ORDER_NOT_FOUND)
+            PaymentFacade-->>Controller: 404 NOT_FOUND
+        else 본인 주문 아님
+            OrderRepository-->>OrderService: Order
+            OrderService-->>PaymentFacade: CoreException(ORDER_FORBIDDEN)
+            PaymentFacade-->>Controller: 403 FORBIDDEN
+        else 주문이 REQUESTED 아님
+            OrderRepository-->>OrderService: Order(COMPLETED or CANCELLED)
+            OrderService-->>PaymentFacade: CoreException(ORDER_NOT_RETRYABLE)
+            PaymentFacade-->>Controller: 400 BAD_REQUEST
+        else 주문 생성 후 15분 경과
+            OrderRepository-->>OrderService: Order(REQUESTED, createdAt 15분 초과)
+            OrderService-->>PaymentFacade: CoreException(ORDER_PAYMENT_TIMEOUT)
+            PaymentFacade-->>Controller: 400 BAD_REQUEST
+        else 정상
+            OrderRepository-->>OrderService: Order(REQUESTED, createdAt 15분 이내)
+            OrderService-->>PaymentFacade: Order
+
+            PaymentFacade->>PaymentService: createPayment(orderId, amount)
+            PaymentService->>PaymentRepository: save(new Payment) PENDING
+            PaymentRepository-->>PaymentService: Payment
+            PaymentService-->>PaymentFacade: Payment
+
+            PaymentFacade-->>Controller: PaymentInfo
+            Controller-->>User: 200 OK
+        end
+    end
+```
+
+---
+
+## UC-A005: 상품 수정
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Controller
+    participant ProductFacade
+    participant ProductService
+    participant ProductRepository
+    participant ProductStockRepository
+
+    Admin->>Controller: PATCH /admin/products/{productId} {name?, price?, stockQuantity?}
+    Note over Admin,Controller: 키가 있는 필드만 수정. stockQuantity 양수(추가) / 음수(차감)
+
+    alt 비관리자
+        Controller-->>Admin: 403 FORBIDDEN
+    else name 키 있고 2글자 미만
+        Controller-->>Admin: 400 BAD_REQUEST
+    else stockQuantity 키 있고 값이 0
+        Controller-->>Admin: 400 BAD_REQUEST
+    else 관리자
+        Controller->>ProductFacade: updateProduct(productId, request)
+
+        ProductFacade->>ProductService: getProduct(productId)
+        ProductService->>ProductRepository: findById(productId)
+
+        alt 상품 없음
+            ProductRepository-->>ProductService: null
+            ProductService-->>ProductFacade: CoreException(PRODUCT_NOT_FOUND)
+            ProductFacade-->>Controller: 404 NOT_FOUND
+        else 브랜드 변경 시도
+            ProductRepository-->>ProductService: Product
+            ProductService-->>ProductFacade: CoreException(BRAND_CHANGE_NOT_ALLOWED)
+            ProductFacade-->>Controller: 400 BAD_REQUEST
+        else stockQuantity 키 있고 수정 후 재고 < 0
+            ProductRepository-->>ProductService: Product
+            ProductService->>ProductStockRepository: findByProductId(productId)
+            ProductStockRepository-->>ProductService: ProductStock
+            ProductService-->>ProductFacade: CoreException(STOCK_UNDERFLOW)
+            ProductFacade-->>Controller: 400 BAD_REQUEST
+        else 정상
+            ProductRepository-->>ProductService: Product
+            ProductService-->>ProductFacade: Product
+            ProductFacade->>ProductService: update(productId, request)
+            ProductService->>ProductRepository: save(product)
+            ProductRepository-->>ProductService: ok
+            opt stockQuantity 키 존재
+                ProductService->>ProductStockRepository: save(productStock)
+                ProductStockRepository-->>ProductService: ok
+            end
+            ProductFacade-->>Controller: ProductInfo
+            Controller-->>Admin: 200 OK
+        end
+    end
+```
