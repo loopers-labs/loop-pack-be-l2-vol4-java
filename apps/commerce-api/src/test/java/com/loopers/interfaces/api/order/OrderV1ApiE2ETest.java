@@ -6,6 +6,7 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.ProductStockService;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -165,6 +166,100 @@ class OrderV1ApiE2ETest {
         }
     }
 
+    @DisplayName("GET /api/v1/orders")
+    @Nested
+    class GetOrders {
+
+        @DisplayName("인증 사용자의 주문이 있으면, 기간 조건에 맞는 내 주문 목록을 최신순 Page로 반환한다.")
+        @Test
+        void returnsMyOrdersByLatest_whenAuthenticatedUserAndDateRangeAreProvided() {
+            // arrange
+            signUpUser();
+            Brand brand = createBrand();
+            Product iphone = createProduct(brand, "아이폰 16 Pro", "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰", 1_550_000L, 10);
+            Product iphoneMax = createProduct(brand, "아이폰 16 Pro Max", "더 큰 화면과 향상된 배터리를 제공하는 스마트폰", 1_900_000L, 5);
+            OrderV1Dto.OrderResponse firstOrder = createOrder(new OrderV1Dto.CreateOrderRequest(List.of(
+                new OrderV1Dto.CreateOrderRequest.Item(iphone.getId(), 1)
+            )), authHeaders()).getBody().data();
+            OrderV1Dto.OrderResponse secondOrder = createOrder(new OrderV1Dto.CreateOrderRequest(List.of(
+                new OrderV1Dto.CreateOrderRequest.Item(iphoneMax.getId(), 1)
+            )), authHeaders()).getBody().data();
+            LocalDate today = LocalDate.now();
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<OrderV1Dto.OrderResponse>>> response = getOrders(
+                "?startAt=" + today + "&endAt=" + today,
+                authHeaders()
+            );
+
+            // assert
+            PageResponse<OrderV1Dto.OrderResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.totalElements()).isEqualTo(2),
+                () -> assertThat(data.content())
+                    .extracting(OrderV1Dto.OrderResponse::id)
+                    .containsExactly(secondOrder.id(), firstOrder.id()),
+                () -> assertThat(data.content().get(0).items())
+                    .extracting(OrderV1Dto.OrderResponse.Item::productName)
+                    .containsExactly("아이폰 16 Pro Max"),
+                () -> assertThat(data.content().get(1).items())
+                    .extracting(OrderV1Dto.OrderResponse.Item::productName)
+                    .containsExactly("아이폰 16 Pro")
+            );
+        }
+    }
+
+    @DisplayName("GET /api/v1/orders/{orderId}")
+    @Nested
+    class GetOrder {
+
+        @DisplayName("본인 주문 ID가 주어지면, 주문 스냅샷 상세를 반환한다.")
+        @Test
+        void returnsMyOrderDetail_whenOrderBelongsToAuthenticatedUser() {
+            // arrange
+            signUpUser();
+            Brand brand = createBrand();
+            Product iphone = createProduct(brand, "아이폰 16 Pro", "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰", 1_550_000L, 10);
+            OrderV1Dto.OrderResponse createdOrder = createOrder(new OrderV1Dto.CreateOrderRequest(List.of(
+                new OrderV1Dto.CreateOrderRequest.Item(iphone.getId(), 2)
+            )), authHeaders()).getBody().data();
+
+            // act
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = getOrder(createdOrder.id(), authHeaders());
+
+            // assert
+            OrderV1Dto.OrderResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(createdOrder.id()),
+                () -> assertThat(data.orderTotalPrice()).isEqualTo(3_100_000L),
+                () -> assertThat(data.items())
+                    .extracting(OrderV1Dto.OrderResponse.Item::brandName)
+                    .containsExactly("애플"),
+                () -> assertThat(data.items())
+                    .extracting(OrderV1Dto.OrderResponse.Item::productName)
+                    .containsExactly("아이폰 16 Pro"),
+                () -> assertThat(data.items())
+                    .extracting(OrderV1Dto.OrderResponse.Item::unitPrice)
+                    .containsExactly(1_550_000L)
+            );
+        }
+
+        @DisplayName("존재하지 않는 주문 ID가 주어지면 404 NOT_FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenOrderDoesNotExist() {
+            // arrange
+            signUpUser();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = getOrderForError(999_999L, authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
     private Brand createBrand() {
         return brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
     }
@@ -208,6 +303,39 @@ class OrderV1ApiE2ETest {
             ENDPOINT_ORDERS,
             HttpMethod.POST,
             new HttpEntity<>(request, headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<OrderV1Dto.OrderResponse>>> getOrders(
+        String query,
+        HttpHeaders headers
+    ) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<OrderV1Dto.OrderResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_ORDERS + query,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> getOrder(Long orderId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_ORDERS + "/" + orderId,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> getOrderForError(Long orderId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_ORDERS + "/" + orderId,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
             responseType
         );
     }

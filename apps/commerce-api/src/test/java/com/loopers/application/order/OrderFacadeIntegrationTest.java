@@ -279,4 +279,34 @@ class OrderFacadeIntegrationTest {
             assertThat(orderJpaRepository.count()).isZero();
         }
     }
+
+    @DisplayName("내 주문 상세를 조회할 때 ")
+    @Nested
+    class GetMyOrderDetail {
+
+        @DisplayName("다른 사용자의 주문 ID가 주어지면, FORBIDDEN 예외를 던진다.")
+        @Test
+        void throwsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange
+            Long ownerUserId = 1L;
+            Long otherUserId = 2L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
+            OrderInfo order = orderFacade.createOrder(new CreateOrderCommand(ownerUserId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            )));
+
+            // act & assert
+            assertThatThrownBy(() -> orderFacade.getMyOrderDetail(order.id(), otherUserId))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.FORBIDDEN);
+        }
+    }
 }

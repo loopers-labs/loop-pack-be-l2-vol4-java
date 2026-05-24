@@ -11,6 +11,8 @@ import com.loopers.domain.stock.ProductStock;
 import com.loopers.domain.stock.ProductStockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,29 @@ public class OrderFacade {
             .toList();
 
         Order order = orderService.createOrder(command.userId(), orderItems);
+        return OrderInfo.from(order);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<OrderInfo> getMyOrders(GetMyOrdersCommand command) {
+        if (command == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 조회 요청은 비어있을 수 없습니다.");
+        }
+        return orderService.getOrders(
+                command.userId(),
+                new PageQuery(command.page(), command.size()),
+                command.startAt(),
+                command.endAt()
+            )
+            .map(OrderInfo::from);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderInfo getMyOrderDetail(Long orderId, Long userId) {
+        Order order = orderService.getOrder(orderId);
+        if (!order.isOwnedBy(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "다른 사용자의 주문은 조회할 수 없습니다.");
+        }
         return OrderInfo.from(order);
     }
 

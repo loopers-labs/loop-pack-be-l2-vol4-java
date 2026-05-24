@@ -8,6 +8,7 @@ import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
@@ -25,7 +26,10 @@ import java.util.stream.Collectors;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    indexes = @Index(name = "idx_orders_user_created_at_id", columnList = "user_id, created_at, id")
+)
 public class Order extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)
