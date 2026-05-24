@@ -30,4 +30,10 @@ public class ProductService {
     public PageResult<Product> getProducts(PageQuery query, Long brandId) {
         return productRepository.findActiveAll(query, brandId);
     }
+
+    @Transactional
+    public void deleteProduct(Long productId) {
+        Product product = getProduct(productId);
+        product.delete();
+    }
 }

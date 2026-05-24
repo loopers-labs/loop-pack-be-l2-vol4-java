@@ -7,6 +7,7 @@ import com.loopers.interfaces.api.PageResponse;
 import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,5 +46,11 @@ public class ProductAdminV1Controller {
         PageResult<ProductAdminV1Dto.ProductResponse> products = productAdminFacade.getProducts(page, size, brandId)
             .map(ProductAdminV1Dto.ProductResponse::from);
         return ApiResponse.success(PageResponse.from(products));
+    }
+
+    @DeleteMapping("/{productId}")
+    public ApiResponse<Object> deleteProduct(@PathVariable Long productId) {
+        productAdminFacade.deleteProduct(productId);
+        return ApiResponse.success();
     }
 }

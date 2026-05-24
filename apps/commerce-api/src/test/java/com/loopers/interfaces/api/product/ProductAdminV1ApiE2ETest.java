@@ -176,6 +176,36 @@ class ProductAdminV1ApiE2ETest {
         }
     }
 
+    @DisplayName("DELETE /api-admin/v1/products/{productId}")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("어드민 헤더와 존재하는 상품 ID가 주어지면 200 OK를 반환하고, 이후 상세 조회에서 제외한다.")
+        @Test
+        void deletesProduct_whenAdminHeaderAndProductIdExist() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            ProductAdminV1Dto.CreateProductRequest request = new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            );
+            Long productId = createProduct(request, adminHeaders()).getBody().data().id();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> deleteResponse = deleteProduct(productId, adminHeaders());
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> getResponse = getProduct(productId, adminHeaders());
+
+            // assert
+            assertAll(
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
+            );
+        }
+    }
+
     private ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> createProduct(
         ProductAdminV1Dto.CreateProductRequest request,
         HttpHeaders headers
@@ -207,6 +237,17 @@ class ProductAdminV1ApiE2ETest {
             HttpMethod.GET,
             new HttpEntity<>(headers),
             responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> deleteProduct(Long productId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCT_DETAIL,
+            HttpMethod.DELETE,
+            new HttpEntity<>(headers),
+            responseType,
+            productId
         );
     }
 
