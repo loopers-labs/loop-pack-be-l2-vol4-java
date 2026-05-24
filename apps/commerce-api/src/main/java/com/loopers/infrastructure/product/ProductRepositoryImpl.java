@@ -6,11 +6,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
+
     private final ProductJpaRepository productJpaRepository;
 
     @Override
@@ -19,17 +19,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Optional<Product> find(Long id) {
-        return productJpaRepository.findById(id);
-    }
-
-    @Override
-    public List<Product> findAll() {
-        return productJpaRepository.findAll();
-    }
-
-    @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public Optional<Product> findActiveById(Long productId) {
+        return productJpaRepository.findByIdAndDeletedAtIsNull(productId);
     }
 }

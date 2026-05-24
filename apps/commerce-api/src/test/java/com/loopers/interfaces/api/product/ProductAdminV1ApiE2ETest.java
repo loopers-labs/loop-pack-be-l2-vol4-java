@@ -1,0 +1,156 @@
+package com.loopers.interfaces.api.product;
+
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.brand.BrandService;
+import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.utils.DatabaseCleanUp;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class ProductAdminV1ApiE2ETest {
+
+    private static final String ENDPOINT_PRODUCTS = "/api-admin/v1/products";
+    private static final String ENDPOINT_PRODUCT_DETAIL = "/api-admin/v1/products/{productId}";
+    private static final String HEADER_ADMIN_LDAP = "X-Loopers-Ldap";
+    private static final String ADMIN_LDAP = "loopers.admin";
+
+    private final TestRestTemplate testRestTemplate;
+    private final BrandService brandService;
+    private final DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    ProductAdminV1ApiE2ETest(
+        TestRestTemplate testRestTemplate,
+        BrandService brandService,
+        DatabaseCleanUp databaseCleanUp
+    ) {
+        this.testRestTemplate = testRestTemplate;
+        this.brandService = brandService;
+        this.databaseCleanUp = databaseCleanUp;
+    }
+
+    @AfterEach
+    void tearDown() {
+        databaseCleanUp.truncateAllTables();
+    }
+
+    @DisplayName("POST /api-admin/v1/products")
+    @Nested
+    class CreateProduct {
+
+        @DisplayName("어드민 헤더와 미삭제 브랜드의 상품 정보, 초기 재고가 주어지면 201 CREATED와 생성된 상품 정보를 반환한다.")
+        @Test
+        void returnsCreatedProduct_whenAdminHeaderAndValidRequestAreProvided() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            ProductAdminV1Dto.CreateProductRequest request = new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            );
+
+            // act
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = createProduct(request, adminHeaders());
+
+            // assert
+            ProductAdminV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(data.id()).isNotNull(),
+                () -> assertThat(data.brandId()).isEqualTo(brand.getId()),
+                () -> assertThat(data.name()).isEqualTo("아이폰 16 Pro"),
+                () -> assertThat(data.description()).isEqualTo("강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰"),
+                () -> assertThat(data.price()).isEqualTo(1_550_000L),
+                () -> assertThat(data.stockQuantity()).isEqualTo(10),
+                () -> assertThat(data.createdAt()).isNotNull(),
+                () -> assertThat(data.updatedAt()).isNotNull(),
+                () -> assertThat(data.deletedAt()).isNull()
+            );
+        }
+    }
+
+    @DisplayName("GET /api-admin/v1/products/{productId}")
+    @Nested
+    class GetProduct {
+
+        @DisplayName("어드민 헤더와 존재하는 상품 ID가 주어지면 200 OK와 상품 정보를 반환한다.")
+        @Test
+        void returnsProduct_whenAdminHeaderAndProductIdExist() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            ProductAdminV1Dto.CreateProductRequest request = new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            );
+            Long productId = createProduct(request, adminHeaders()).getBody().data().id();
+
+            // act
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = getProduct(productId, adminHeaders());
+
+            // assert
+            ProductAdminV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(productId),
+                () -> assertThat(data.brandId()).isEqualTo(brand.getId()),
+                () -> assertThat(data.name()).isEqualTo("아이폰 16 Pro"),
+                () -> assertThat(data.description()).isEqualTo("강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰"),
+                () -> assertThat(data.price()).isEqualTo(1_550_000L),
+                () -> assertThat(data.stockQuantity()).isEqualTo(10),
+                () -> assertThat(data.createdAt()).isNotNull(),
+                () -> assertThat(data.updatedAt()).isNotNull(),
+                () -> assertThat(data.deletedAt()).isNull()
+            );
+        }
+    }
+
+    private ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> createProduct(
+        ProductAdminV1Dto.CreateProductRequest request,
+        HttpHeaders headers
+    ) {
+        ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCTS,
+            HttpMethod.POST,
+            new HttpEntity<>(request, headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> getProduct(Long productId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCT_DETAIL,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType,
+            productId
+        );
+    }
+
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HEADER_ADMIN_LDAP, ADMIN_LDAP);
+        return headers;
+    }
+}
