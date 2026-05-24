@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.like;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.ProductStockService;
@@ -48,6 +49,7 @@ class LikeV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
+    private final LikeService likeService;
     private final ProductService productService;
     private final ProductStockService productStockService;
     private final DatabaseCleanUp databaseCleanUp;
@@ -56,12 +58,14 @@ class LikeV1ApiE2ETest {
     LikeV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandService brandService,
+        LikeService likeService,
         ProductService productService,
         ProductStockService productStockService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
+        this.likeService = likeService;
         this.productService = productService;
         this.productStockService = productStockService;
         this.databaseCleanUp = databaseCleanUp;
@@ -112,6 +116,34 @@ class LikeV1ApiE2ETest {
                 () -> assertThat(detailResponse.getBody().data().likeCount()).isEqualTo(1)
             );
         }
+
+        @DisplayName("존재하지 않는 상품 ID가 주어지면 404 NOT_FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenProductDoesNotExist() {
+            // arrange
+            signUpUser();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = likeProduct(999_999L, authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("삭제된 상품 ID가 주어지면 404 NOT_FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenProductIsDeleted() {
+            // arrange
+            signUpUser();
+            Product product = createProduct();
+            productService.deleteProduct(product.getId());
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = likeProduct(product.getId(), authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
     }
 
     @DisplayName("DELETE /api/v1/products/{productId}/likes")
@@ -152,6 +184,38 @@ class LikeV1ApiE2ETest {
             assertAll(
                 () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(detailResponse.getBody().data().likeCount()).isZero()
+            );
+        }
+
+        @DisplayName("존재하지 않는 상품 ID에 취소 요청을 보내도 200 OK를 반환한다.")
+        @Test
+        void returnsOk_whenProductDoesNotExist() {
+            // arrange
+            signUpUser();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = unlikeProduct(999_999L, authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @DisplayName("삭제된 상품 ID에 취소 요청을 보내도 200 OK를 반환하고, 기존 좋아요를 제거한다.")
+        @Test
+        void deletesLike_whenProductIsDeleted() {
+            // arrange
+            signUpUser();
+            Product product = createProduct();
+            likeProduct(product.getId(), authHeaders());
+            productService.deleteProduct(product.getId());
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = unlikeProduct(product.getId(), authHeaders());
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(likeService.countProductLikes(product.getId())).isZero()
             );
         }
     }
