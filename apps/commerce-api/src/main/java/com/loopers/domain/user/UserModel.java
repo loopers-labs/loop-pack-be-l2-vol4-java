@@ -5,10 +5,12 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
 import lombok.Getter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
 @Table(name = "users")
+@SQLRestriction("deleted_at IS NULL")
 public class UserModel extends BaseEntity {
 
     @Embedded

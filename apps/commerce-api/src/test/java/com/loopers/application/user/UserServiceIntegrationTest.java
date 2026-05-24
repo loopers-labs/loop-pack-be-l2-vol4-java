@@ -15,13 +15,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-class UserModifierIntegrationTest {
+class UserServiceIntegrationTest {
 
     @Autowired
-    private UserModifier userModifier;
+    private UserService userService;
 
     @Autowired
     private UserRepository userRepository;
@@ -35,6 +36,54 @@ class UserModifierIntegrationTest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    @DisplayName("회원 가입을 할 때,")
+    @Nested
+    class SignUp {
+
+        @DisplayName("정상 회원가입 시 UserModel 의 모든 필드가 영속화된다")
+        @Test
+        void persistsAllFields_whenSignUpIsSuccessful() {
+            // given
+            String loginId = "user01";
+            String loginPw = "Password1!";
+            String name = "홍길동";
+            String birthDate = "1990-01-01";
+            String email = "user@example.com";
+            Gender gender = Gender.MALE;
+
+            // when
+            userService.create(loginId, loginPw, name, birthDate, email, gender);
+
+            // then
+            UserModel persisted = userRepository.findByLoginId(loginId).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getId()).isNotNull(),
+                    () -> assertThat(persisted.getLoginId().value()).isEqualTo(loginId),
+                    () -> assertThat(persisted.getName()).isEqualTo(name),
+                    () -> assertThat(persisted.getBirthDate().value()).isEqualTo(birthDate),
+                    () -> assertThat(persisted.getEmail().value()).isEqualTo(email),
+                    () -> assertThat(persisted.getGender()).isEqualTo(gender),
+                    () -> assertThat(persisted.matchesPassword(loginPw, passwordEncryptor)).isTrue()
+            );
+        }
+
+        @DisplayName("이미 가입된 ID 로 회원가입 시도 시 CONFLICT 예외가 발생한다")
+        @Test
+        void throwsConflictException_whenDuplicateLoginIdIsProvided() {
+            // given
+            String loginId = "user01";
+            userRepository.save(new UserModel(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.create(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
     }
 
     @DisplayName("비밀번호를 변경할 때,")
@@ -51,7 +100,7 @@ class UserModifierIntegrationTest {
             userRepository.save(new UserModel(loginId, oldPassword, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
 
             // when
-            userModifier.changePassword(loginId, oldPassword, oldPassword, newPassword);
+            userService.changePassword(loginId, oldPassword, oldPassword, newPassword);
 
             // then
             UserModel updated = userRepository.findByLoginId(loginId).orElseThrow();
@@ -63,7 +112,7 @@ class UserModifierIntegrationTest {
         void throwsNotFoundException_whenUserDoesNotExist() {
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    userModifier.changePassword("nonexistent", "Password1!", "Password1!", "NewPass99!")
+                    userService.changePassword("nonexistent", "Password1!", "Password1!", "NewPass99!")
             );
 
             // then
@@ -79,7 +128,7 @@ class UserModifierIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    userModifier.changePassword(loginId, "WrongPass1!", "Password1!", "NewPass99!")
+                    userService.changePassword(loginId, "WrongPass1!", "Password1!", "NewPass99!")
             );
 
             // then
@@ -95,7 +144,7 @@ class UserModifierIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    userModifier.changePassword(loginId, "Password1!", "WrongPass1!", "NewPass99!")
+                    userService.changePassword(loginId, "Password1!", "WrongPass1!", "NewPass99!")
             );
 
             // then

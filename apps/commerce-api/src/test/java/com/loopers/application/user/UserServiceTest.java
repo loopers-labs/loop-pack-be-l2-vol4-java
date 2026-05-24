@@ -2,7 +2,6 @@ package com.loopers.application.user;
 
 import com.loopers.domain.user.FakePasswordEncryptor;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
@@ -20,23 +19,67 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class UserModifierTest {
+class UserServiceTest {
 
-    private UserModifier userModifier;
-
-    private UserFinder userFinder;
-
-    private PasswordEncryptor passwordEncryptor;
+    private UserService userService;
 
     private UserRepository userRepository;
+    private UserFinder userFinder;
+    private FakePasswordEncryptor passwordEncryptor;
 
     @BeforeEach
     void setUp() {
+        userRepository = mock(UserRepository.class);
         userFinder = mock(UserFinder.class);
         passwordEncryptor = new FakePasswordEncryptor("encrypted:");
-        userRepository = mock(UserRepository.class);
+        userService = new UserService(userRepository, passwordEncryptor, userFinder);
+    }
 
-        userModifier = new UserModifier(userFinder, passwordEncryptor, userRepository);
+    @DisplayName("회원 가입을 할 때, ")
+    @Nested
+    class SignUp {
+
+        @DisplayName("가입된 적 없는 ID 이면 정상적으로 수행된다.")
+        @Test
+        void signUp() {
+            // given
+            String loginId = "user01";
+            String loginPw = "Password1!";
+            String name = "홍길동";
+            String birthDate = "1990-01-01";
+            String email = "user@example.com";
+            Gender gender = Gender.MALE;
+
+            when(userRepository.existsByLoginId(loginId)).thenReturn(false);
+
+            // when
+            userService.create(loginId, loginPw, name, birthDate, email, gender);
+
+            // then
+            verify(userRepository).save(any(UserModel.class));
+        }
+
+        @DisplayName("이미 가입된 ID 로 회원 가입 시도 시 CONFLICT 예외가 발생한다")
+        @Test
+        void throwsConflictException_whenDuplicateLoginIdIsProvided() {
+            // given
+            String loginId = "user01";
+            String loginPw = "Password1!";
+            String name = "홍길동";
+            String birthDate = "1990-01-01";
+            String email = "user@example.com";
+            Gender gender = Gender.MALE;
+
+            when(userRepository.existsByLoginId(loginId)).thenReturn(true);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () ->
+                    userService.create(loginId, loginPw, name, birthDate, email, gender)
+            );
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
     }
 
     @DisplayName("비밀번호를 변경할 때,")
@@ -56,7 +99,7 @@ class UserModifierTest {
             when(userFinder.getLoginUser(loginId, loginPw)).thenReturn(user);
 
             // when
-            userModifier.changePassword(loginId, loginPw, oldPassword, newPassword);
+            userService.changePassword(loginId, loginPw, oldPassword, newPassword);
 
             // then
             verify(userRepository).save(user);
@@ -73,7 +116,7 @@ class UserModifierTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    userModifier.changePassword(loginId, loginPw, oldPassword, newPassword)
+                    userService.changePassword(loginId, loginPw, oldPassword, newPassword)
             );
 
             // then
