@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class BrandService {
@@ -24,6 +27,11 @@ public class BrandService {
     public Brand getBrand(Long brandId) {
         return brandRepository.findActiveById(brandId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Brand> getBrands(Collection<Long> brandIds) {
+        return brandRepository.findActiveAllByIds(brandIds);
     }
 
     @Transactional(readOnly = true)

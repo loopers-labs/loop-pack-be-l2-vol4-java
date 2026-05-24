@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -27,6 +29,14 @@ public class BrandRepositoryImpl implements BrandRepository {
     @Override
     public Optional<Brand> findActiveById(Long brandId) {
         return brandJpaRepository.findByIdAndDeletedAtIsNull(brandId);
+    }
+
+    @Override
+    public List<Brand> findActiveAllByIds(Collection<Long> brandIds) {
+        if (brandIds.isEmpty()) {
+            return List.of();
+        }
+        return brandJpaRepository.findByIdInAndDeletedAtIsNull(brandIds);
     }
 
     @Override

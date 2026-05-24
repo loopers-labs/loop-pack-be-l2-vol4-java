@@ -2,6 +2,7 @@ package com.loopers.domain.brand;
 
 import com.loopers.support.pagination.PageQuery;
 import com.loopers.support.pagination.PageResult;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,6 +52,11 @@ class BrandServiceTest {
         @Override
         public Optional<Brand> findActiveById(Long brandId) {
             return Optional.ofNullable(savedBrand);
+        }
+
+        @Override
+        public List<Brand> findActiveAllByIds(Collection<Long> brandIds) {
+            return savedBrand == null ? List.of() : List.of(savedBrand);
         }
 
         @Override

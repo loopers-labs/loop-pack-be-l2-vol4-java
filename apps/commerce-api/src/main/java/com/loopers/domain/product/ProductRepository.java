@@ -12,4 +12,6 @@ public interface ProductRepository {
     Optional<Product> findActiveById(Long productId);
 
     PageResult<Product> findActiveAll(PageQuery query, Long brandId);
+
+    PageResult<Product> findVisibleAll(PageQuery query, Long brandId, ProductSort sort);
 }

@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.Map;
+
 @RequiredArgsConstructor
 @Component
 public class LikeService {
@@ -19,6 +22,11 @@ public class LikeService {
     @Transactional(readOnly = true)
     public long countProductLikes(Long productId) {
         return likeRepository.countByProductId(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Long> countProductLikes(Collection<Long> productIds) {
+        return likeRepository.countByProductIds(productIds);
     }
 
     @Transactional

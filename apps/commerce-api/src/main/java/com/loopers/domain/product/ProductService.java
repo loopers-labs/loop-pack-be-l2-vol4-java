@@ -31,6 +31,11 @@ public class ProductService {
         return productRepository.findActiveAll(query, brandId);
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<Product> getVisibleProducts(PageQuery query, Long brandId, ProductSort sort) {
+        return productRepository.findVisibleAll(query, brandId, sort);
+    }
+
     @Transactional
     public void deleteProduct(Long productId) {
         Product product = getProduct(productId);

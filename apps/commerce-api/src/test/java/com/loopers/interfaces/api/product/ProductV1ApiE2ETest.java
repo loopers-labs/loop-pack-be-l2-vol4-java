@@ -2,10 +2,12 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.ProductStockService;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,12 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductV1ApiE2ETest {
 
+    private static final String ENDPOINT_PRODUCTS = "/api/v1/products";
     private static final String ENDPOINT_PRODUCT_DETAIL = "/api/v1/products/{productId}";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
     private final ProductService productService;
     private final ProductStockService productStockService;
+    private final LikeService likeService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -39,12 +43,14 @@ class ProductV1ApiE2ETest {
         BrandService brandService,
         ProductService productService,
         ProductStockService productStockService,
+        LikeService likeService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
         this.productService = productService;
         this.productStockService = productStockService;
+        this.likeService = likeService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -86,6 +92,215 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(data.price()).isEqualTo(1_550_000L),
                 () -> assertThat(data.likeCount()).isZero()
             );
+        }
+
+        @DisplayName("삭제된 상품 ID가 주어지면 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenProductIsDeleted() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            productService.deleteProduct(product.getId());
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("삭제된 브랜드의 상품 ID가 주어지면 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenBrandIsDeleted() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            brandService.deleteBrand(brand.getId());
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("GET /api/v1/products")
+    @Nested
+    class GetProducts {
+
+        @DisplayName("미삭제 상품들이 주어지면 200 OK와 브랜드 정보, 좋아요 수를 포함한 최신순 상품 목록을 반환한다.")
+        @Test
+        void returnsProductsByLatest_whenProductsExist() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            Product pro = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            Product proMax = createProduct(brand, "아이폰 16 Pro Max", 1_900_000L, 5);
+            likeProduct(pro, 101L);
+            likeProduct(proMax, 101L, 102L);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts();
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16 Pro Max", "아이폰 16 Pro", "아이폰 16"),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::likeCount)
+                    .containsExactly(2L, 1L, 0L),
+                () -> assertThat(data.content())
+                    .extracting(product -> product.brand().name())
+                    .containsOnly("애플"),
+                () -> assertThat(data.totalElements()).isEqualTo(3),
+                () -> assertThat(data.totalPages()).isEqualTo(1),
+                () -> assertThat(data.number()).isZero(),
+                () -> assertThat(data.size()).isEqualTo(20),
+                () -> assertThat(data.first()).isTrue(),
+                () -> assertThat(data.last()).isTrue()
+            );
+        }
+
+        @DisplayName("sort=price_asc가 주어지면 200 OK와 가격 오름차순 상품 목록을 반환한다.")
+        @Test
+        void returnsProductsByPriceAsc_whenSortIsPriceAsc() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            createProduct(brand, "아이폰 16 Pro Max", 1_900_000L, 5);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts("?sort=price_asc");
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16", "아이폰 16 Pro", "아이폰 16 Pro Max")
+            );
+        }
+
+        @DisplayName("sort=likes_desc가 주어지면 200 OK와 좋아요 수 내림차순 상품 목록을 반환한다.")
+        @Test
+        void returnsProductsByLikesDesc_whenSortIsLikesDesc() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            Product pro = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            Product proMax = createProduct(brand, "아이폰 16 Pro Max", 1_900_000L, 5);
+            likeProduct(iphone, 101L, 102L);
+            likeProduct(proMax, 101L);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts("?sort=likes_desc");
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16", "아이폰 16 Pro Max", "아이폰 16 Pro"),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::likeCount)
+                    .containsExactly(2L, 1L, 0L)
+            );
+        }
+
+        @DisplayName("삭제된 상품이 있으면 200 OK와 삭제 상품을 제외한 목록을 반환한다.")
+        @Test
+        void excludesDeletedProduct_whenProductIsDeleted() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            Product deletedProduct = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            productService.deleteProduct(deletedProduct.getId());
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts();
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16"),
+                () -> assertThat(data.totalElements()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("삭제된 브랜드 ID로 필터링하면 200 OK와 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenBrandFilterIsDeleted() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            brandService.deleteBrand(brand.getId());
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts("?brandId=" + brand.getId());
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content()).isEmpty(),
+                () -> assertThat(data.totalElements()).isZero()
+            );
+        }
+
+        @DisplayName("존재하지 않는 브랜드 ID로 필터링하면 200 OK와 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenBrandFilterDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts("?brandId=999999");
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content()).isEmpty(),
+                () -> assertThat(data.totalElements()).isZero()
+            );
+        }
+    }
+
+    private Product createProduct(Brand brand, String name, long price, int stockQuantity) {
+        Product product = productService.createProduct(
+            brand.getId(),
+            name,
+            "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+            price
+        );
+        productStockService.createProductStock(product.getId(), stockQuantity);
+        return product;
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> getProducts() {
+        return getProducts("");
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> getProducts(String query) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCTS + query,
+            HttpMethod.GET,
+            null,
+            responseType
+        );
+    }
+
+    private void likeProduct(Product product, Long... userIds) {
+        for (Long userId : userIds) {
+            likeService.like(userId, product.getId());
         }
     }
 

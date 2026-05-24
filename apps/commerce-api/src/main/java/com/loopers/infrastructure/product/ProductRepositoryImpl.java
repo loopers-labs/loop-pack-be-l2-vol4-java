@@ -2,6 +2,7 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSort;
 import com.loopers.support.pagination.PageQuery;
 import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
@@ -47,5 +48,46 @@ public class ProductRepositoryImpl implements ProductRepository {
             page.isFirst(),
             page.isLast()
         );
+    }
+
+    @Override
+    public PageResult<Product> findVisibleAll(PageQuery query, Long brandId, ProductSort sort) {
+        Page<Product> page = findVisiblePage(query, brandId, sort);
+        return new PageResult<>(
+            page.getContent(),
+            page.getTotalElements(),
+            page.getTotalPages(),
+            page.getNumber(),
+            page.getSize(),
+            page.isFirst(),
+            page.isLast()
+        );
+    }
+
+    private Page<Product> findVisiblePage(PageQuery query, Long brandId, ProductSort sort) {
+        if (sort == ProductSort.LIKES_DESC) {
+            return productJpaRepository.findVisibleAllOrderByLikes(
+                brandId,
+                PageRequest.of(query.page(), query.size())
+            );
+        }
+        return productJpaRepository.findVisibleAll(
+            brandId,
+            PageRequest.of(query.page(), query.size(), toSort(sort))
+        );
+    }
+
+    private Sort toSort(ProductSort sort) {
+        return switch (sort) {
+            case PRICE_ASC -> Sort.by(
+                Sort.Order.asc("price"),
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            );
+            case LATEST, LIKES_DESC -> Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            );
+        };
     }
 }
