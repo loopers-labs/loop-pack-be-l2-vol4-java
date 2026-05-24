@@ -9,7 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BrandModelTest {
@@ -39,9 +38,7 @@ class BrandModelTest {
             CoreException result = assertThrows(CoreException.class, () -> new BrandModel(name));
 
             // then
-            assertAll(
-                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST)
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }
