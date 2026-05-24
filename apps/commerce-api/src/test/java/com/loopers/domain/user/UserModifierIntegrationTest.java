@@ -14,10 +14,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-class UpdateUserServiceIntegrationTest {
+class UserModifierIntegrationTest {
 
     @Autowired
-    private UpdateUserService updateUserService;
+    private UserModifier userModifier;
 
     @Autowired
     private UserRepository userRepository;
@@ -47,7 +47,7 @@ class UpdateUserServiceIntegrationTest {
             userRepository.save(new UserModel(loginId, oldPassword, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
 
             // when
-            updateUserService.changePassword(loginId, oldPassword, oldPassword, newPassword);
+            userModifier.changePassword(loginId, oldPassword, oldPassword, newPassword);
 
             // then
             UserModel updated = userRepository.findByLoginId(loginId).orElseThrow();
@@ -59,7 +59,7 @@ class UpdateUserServiceIntegrationTest {
         void throwsNotFoundException_whenUserDoesNotExist() {
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    updateUserService.changePassword("nonexistent", "Password1!", "Password1!", "NewPass99!")
+                    userModifier.changePassword("nonexistent", "Password1!", "Password1!", "NewPass99!")
             );
 
             // then
@@ -75,7 +75,7 @@ class UpdateUserServiceIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    updateUserService.changePassword(loginId, "WrongPass1!", "Password1!", "NewPass99!")
+                    userModifier.changePassword(loginId, "WrongPass1!", "Password1!", "NewPass99!")
             );
 
             // then
@@ -91,7 +91,7 @@ class UpdateUserServiceIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    updateUserService.changePassword(loginId, "Password1!", "WrongPass1!", "NewPass99!")
+                    userModifier.changePassword(loginId, "Password1!", "WrongPass1!", "NewPass99!")
             );
 
             // then

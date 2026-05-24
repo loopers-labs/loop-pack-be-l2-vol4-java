@@ -12,9 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class CreateUserServiceTest {
+class UserCreatorTest {
 
-    private CreateUserService createUserService;
+    private UserCreator userCreator;
 
     private UserRepository userRepository;
 
@@ -22,7 +22,7 @@ class CreateUserServiceTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
 
-        createUserService = new CreateUserService(userRepository, new FakePasswordEncryptor("encrypted:"));
+        userCreator = new UserCreator(userRepository, new FakePasswordEncryptor("encrypted:"));
     }
 
     @DisplayName("회원 가입을 할 때, ")
@@ -42,7 +42,7 @@ class CreateUserServiceTest {
             when(userRepository.existsByLoginId(loginId)).thenReturn(false);
 
             // when
-            createUserService.signUp(loginId, loginPw, name, birthDate, email, gender);
+            userCreator.create(loginId, loginPw, name, birthDate, email, gender);
 
             // then
             verify(userRepository).save(any(UserModel.class));
@@ -63,7 +63,7 @@ class CreateUserServiceTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    createUserService.signUp(loginId, loginPw, name, birthDate, email, gender)
+                    userCreator.create(loginId, loginPw, name, birthDate, email, gender)
             );
 
             // then

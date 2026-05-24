@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-class CreateUserServiceIntegrationTest {
+class UserCreatorIntegrationTest {
 
     @Autowired
-    private CreateUserService createUserService;
+    private UserCreator userCreator;
 
     @Autowired
     private UserRepository userRepository;
@@ -50,7 +50,7 @@ class CreateUserServiceIntegrationTest {
             Gender gender = Gender.MALE;
 
             // when
-            createUserService.signUp(loginId, loginPw, name, birthDate, email, gender);
+            userCreator.create(loginId, loginPw, name, birthDate, email, gender);
 
             // then
             UserModel persisted = userRepository.findByLoginId(loginId).orElseThrow();
@@ -74,7 +74,7 @@ class CreateUserServiceIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    createUserService.signUp(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE)
+                    userCreator.create(loginId, "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE)
             );
 
             // then
