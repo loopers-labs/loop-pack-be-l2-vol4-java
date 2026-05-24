@@ -3,13 +3,16 @@ package com.loopers.application.order;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 public record OrderInfo(
     Long id,
     Long userId,
     long orderTotalPrice,
-    List<Item> items
+    List<Item> items,
+    ZonedDateTime createdAt,
+    ZonedDateTime updatedAt
 ) {
 
     public static OrderInfo from(Order order) {
@@ -19,7 +22,9 @@ public record OrderInfo(
             order.getOrderTotalPrice(),
             order.getItems().stream()
                 .map(Item::from)
-                .toList()
+                .toList(),
+            order.getCreatedAt(),
+            order.getUpdatedAt()
         );
     }
 

@@ -19,6 +19,12 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
     Optional<Order> findWithItemsById(Long orderId);
 
     @Query(
+        value = "select o.id from Order o",
+        countQuery = "select count(o) from Order o"
+    )
+    Page<Long> findIds(Pageable pageable);
+
+    @Query(
         value = """
             select o.id
             from Order o

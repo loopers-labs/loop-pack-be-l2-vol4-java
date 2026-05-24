@@ -44,6 +44,11 @@ public class OrderService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<Order> getOrders(PageQuery query) {
+        return orderRepository.findAll(query);
+    }
+
     private ZonedDateTime startOfDay(LocalDate date) {
         if (date == null) {
             return null;

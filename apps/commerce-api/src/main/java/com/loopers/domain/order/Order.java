@@ -28,7 +28,10 @@ import java.util.stream.Collectors;
 @Entity
 @Table(
     name = "orders",
-    indexes = @Index(name = "idx_orders_user_created_at_id", columnList = "user_id, created_at, id")
+    indexes = {
+        @Index(name = "idx_orders_user_created_at_id", columnList = "user_id, created_at, id"),
+        @Index(name = "idx_orders_created_at_id", columnList = "created_at, id")
+    }
 )
 public class Order extends BaseEntity {
 

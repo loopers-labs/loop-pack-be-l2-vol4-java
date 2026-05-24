@@ -13,4 +13,6 @@ public interface OrderRepository {
     Optional<Order> findById(Long orderId);
 
     PageResult<Order> findAllByUserId(Long userId, PageQuery query, ZonedDateTime startAt, ZonedDateTime endBefore);
+
+    PageResult<Order> findAll(PageQuery query);
 }

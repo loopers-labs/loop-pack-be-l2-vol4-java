@@ -35,18 +35,24 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public PageResult<Order> findAll(PageQuery query) {
+        Page<Long> orderIds = orderJpaRepository.findIds(latestPageRequest(query));
+        return toPageResult(orderIds);
+    }
+
+    @Override
     public PageResult<Order> findAllByUserId(Long userId, PageQuery query, ZonedDateTime startAt, ZonedDateTime endBefore) {
         Page<Long> orderIds = orderJpaRepository.findIdsByUserIdAndPeriod(
             userId,
             startAt,
             endBefore,
-            PageRequest.of(query.page(), query.size(), Sort.by(
-                Sort.Order.desc("createdAt"),
-                Sort.Order.desc("id")
-            ))
+            latestPageRequest(query)
         );
-        List<Order> orders = findAllByIdsKeepingPageOrder(orderIds.getContent());
+        return toPageResult(orderIds);
+    }
 
+    private PageResult<Order> toPageResult(Page<Long> orderIds) {
+        List<Order> orders = findAllByIdsKeepingPageOrder(orderIds.getContent());
         return new PageResult<>(
             orders,
             orderIds.getTotalElements(),
@@ -56,6 +62,13 @@ public class OrderRepositoryImpl implements OrderRepository {
             orderIds.isFirst(),
             orderIds.isLast()
         );
+    }
+
+    private PageRequest latestPageRequest(PageQuery query) {
+        return PageRequest.of(query.page(), query.size(), Sort.by(
+            Sort.Order.desc("createdAt"),
+            Sort.Order.desc("id")
+        ));
     }
 
     private List<Order> findAllByIdsKeepingPageOrder(Collection<Long> orderIds) {
