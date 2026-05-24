@@ -142,6 +142,26 @@ class BrandAdminV1ApiE2ETest {
                 () -> assertThat(data.last()).isTrue()
             );
         }
+
+        @DisplayName("브랜드 목록을 조회하면, 안정적인 기본 순서로 반환한다.")
+        @Test
+        void returnsBrandPageInDefaultOrder_whenBrandsExist() {
+            // arrange
+            Brand oldBrand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Brand latestBrand = brandService.createBrand("애플 스토어", "사용자 경험과 서비스를 함께 제공하는 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> response = getBrands(adminHeaders());
+
+            // assert
+            PageResponse<BrandV1Dto.BrandResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content()).hasSize(2),
+                () -> assertThat(data.content().get(0).id()).isEqualTo(latestBrand.getId()),
+                () -> assertThat(data.content().get(1).id()).isEqualTo(oldBrand.getId())
+            );
+        }
     }
 
     @DisplayName("PUT /api-admin/v1/brands/{brandId}")
