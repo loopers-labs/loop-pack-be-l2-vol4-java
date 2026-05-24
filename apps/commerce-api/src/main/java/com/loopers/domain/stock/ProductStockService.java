@@ -6,6 +6,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 @RequiredArgsConstructor
 @Component
 public class ProductStockService {
@@ -22,5 +28,16 @@ public class ProductStockService {
     public ProductStock getProductStock(Long productId) {
         return productStockRepository.findByProductId(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품 재고입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, ProductStock> getProductStocks(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<ProductStock> productStocks = productStockRepository.findAllByProductIds(productIds);
+        return productStocks.stream()
+            .collect(Collectors.toMap(ProductStock::getProductId, Function.identity()));
     }
 }

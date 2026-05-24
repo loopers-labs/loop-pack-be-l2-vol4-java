@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -124,6 +125,57 @@ class ProductAdminV1ApiE2ETest {
         }
     }
 
+    @DisplayName("GET /api-admin/v1/products")
+    @Nested
+    class GetProducts {
+
+        @DisplayName("어드민 헤더와 page, size가 주어지면 200 OK와 최신순 상품 목록을 반환한다.")
+        @Test
+        void returnsProductsByLatest_whenAdminHeaderAndPageQueryAreProvided() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            createProduct(new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_250_000L,
+                7
+            ), adminHeaders());
+            createProduct(new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            ), adminHeaders());
+            createProduct(new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro Max",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_900_000L,
+                5
+            ), adminHeaders());
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductAdminV1Dto.ProductResponse>>> response = getProducts(adminHeaders());
+
+            // assert
+            PageResponse<ProductAdminV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductAdminV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16 Pro Max", "아이폰 16 Pro", "아이폰 16"),
+                () -> assertThat(data.totalElements()).isEqualTo(3),
+                () -> assertThat(data.totalPages()).isEqualTo(1),
+                () -> assertThat(data.number()).isZero(),
+                () -> assertThat(data.size()).isEqualTo(20),
+                () -> assertThat(data.first()).isTrue(),
+                () -> assertThat(data.last()).isTrue()
+            );
+        }
+    }
+
     private ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> createProduct(
         ProductAdminV1Dto.CreateProductRequest request,
         HttpHeaders headers
@@ -145,6 +197,16 @@ class ProductAdminV1ApiE2ETest {
             new HttpEntity<>(headers),
             responseType,
             productId
+        );
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<ProductAdminV1Dto.ProductResponse>>> getProducts(HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<ProductAdminV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCTS,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
         );
     }
 

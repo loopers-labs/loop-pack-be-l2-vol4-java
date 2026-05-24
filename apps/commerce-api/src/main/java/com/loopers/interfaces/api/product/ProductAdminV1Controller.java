@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductAdminFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,5 +34,16 @@ public class ProductAdminV1Controller {
     public ApiResponse<ProductAdminV1Dto.ProductResponse> getProduct(@PathVariable Long productId) {
         ProductInfo info = productAdminFacade.getProduct(productId);
         return ApiResponse.success(ProductAdminV1Dto.ProductResponse.from(info));
+    }
+
+    @GetMapping
+    public ApiResponse<PageResponse<ProductAdminV1Dto.ProductResponse>> getProducts(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(required = false) Long brandId
+    ) {
+        PageResult<ProductAdminV1Dto.ProductResponse> products = productAdminFacade.getProducts(page, size, brandId)
+            .map(ProductAdminV1Dto.ProductResponse::from);
+        return ApiResponse.success(PageResponse.from(products));
     }
 }
