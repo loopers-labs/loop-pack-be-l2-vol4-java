@@ -1,10 +1,34 @@
 package com.loopers.interfaces.api.brand;
 
+import com.loopers.application.brand.BrandInfo;
 import com.loopers.application.brand.CreateBrandCommand;
 import com.loopers.application.brand.UpdateBrandCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.time.ZonedDateTime;
+
 public class BrandAdminV1Dto {
+
+    @Schema(name = "AdminBrandResponse", description = "어드민 브랜드 정보 응답")
+    public record BrandResponse(
+        Long id,
+        String name,
+        String description,
+        ZonedDateTime createdAt,
+        ZonedDateTime updatedAt,
+        ZonedDateTime deletedAt
+    ) {
+        public static BrandResponse from(BrandInfo info) {
+            return new BrandResponse(
+                info.id(),
+                info.name(),
+                info.description(),
+                info.createdAt(),
+                info.updatedAt(),
+                info.deletedAt()
+            );
+        }
+    }
 
     @Schema(name = "CreateBrandRequest", description = "어드민 브랜드 생성 요청")
     public record CreateBrandRequest(

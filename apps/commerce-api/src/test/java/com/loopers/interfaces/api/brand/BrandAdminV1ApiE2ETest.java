@@ -64,12 +64,15 @@ class BrandAdminV1ApiE2ETest {
             );
 
             // act
-            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = createBrand(request, adminHeaders());
+            ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> response = createBrand(request, adminHeaders());
 
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
                 () -> assertThat(response.getBody().data().id()).isNotNull(),
+                () -> assertThat(response.getBody().data().createdAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().updatedAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().deletedAt()).isNull(),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("애플"),
                 () -> assertThat(response.getBody().data().description()).isEqualTo("기술과 디자인으로 일상을 새롭게 만드는 브랜드")
             );
@@ -85,7 +88,7 @@ class BrandAdminV1ApiE2ETest {
             );
 
             // act
-            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = createBrand(request, new HttpHeaders());
+            ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> response = createBrand(request, new HttpHeaders());
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -103,12 +106,15 @@ class BrandAdminV1ApiE2ETest {
             Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
 
             // act
-            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = getBrand(saved.getId(), adminHeaders());
+            ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> response = getBrand(saved.getId(), adminHeaders());
 
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
+                () -> assertThat(response.getBody().data().createdAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().updatedAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().deletedAt()).isNull(),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("애플"),
                 () -> assertThat(response.getBody().data().description()).isEqualTo("기술과 디자인으로 일상을 새롭게 만드는 브랜드")
             );
@@ -126,14 +132,17 @@ class BrandAdminV1ApiE2ETest {
             Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
 
             // act
-            ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> response = getBrands(adminHeaders());
+            ResponseEntity<ApiResponse<PageResponse<BrandAdminV1Dto.BrandResponse>>> response = getBrands(adminHeaders());
 
             // assert
-            PageResponse<BrandV1Dto.BrandResponse> data = response.getBody().data();
+            PageResponse<BrandAdminV1Dto.BrandResponse> data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.content()).hasSize(1),
                 () -> assertThat(data.content().getFirst().id()).isEqualTo(saved.getId()),
+                () -> assertThat(data.content().getFirst().createdAt()).isNotNull(),
+                () -> assertThat(data.content().getFirst().updatedAt()).isNotNull(),
+                () -> assertThat(data.content().getFirst().deletedAt()).isNull(),
                 () -> assertThat(data.totalElements()).isEqualTo(1),
                 () -> assertThat(data.totalPages()).isEqualTo(1),
                 () -> assertThat(data.number()).isZero(),
@@ -151,10 +160,10 @@ class BrandAdminV1ApiE2ETest {
             Brand latestBrand = brandService.createBrand("애플 스토어", "사용자 경험과 서비스를 함께 제공하는 브랜드");
 
             // act
-            ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> response = getBrands(adminHeaders());
+            ResponseEntity<ApiResponse<PageResponse<BrandAdminV1Dto.BrandResponse>>> response = getBrands(adminHeaders());
 
             // assert
-            PageResponse<BrandV1Dto.BrandResponse> data = response.getBody().data();
+            PageResponse<BrandAdminV1Dto.BrandResponse> data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.content()).hasSize(2),
@@ -179,23 +188,26 @@ class BrandAdminV1ApiE2ETest {
             );
 
             // act
-            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = updateBrand(saved.getId(), request, adminHeaders());
+            ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> response = updateBrand(saved.getId(), request, adminHeaders());
 
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
+                () -> assertThat(response.getBody().data().createdAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().updatedAt()).isNotNull(),
+                () -> assertThat(response.getBody().data().deletedAt()).isNull(),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("애플 스토어"),
                 () -> assertThat(response.getBody().data().description()).isEqualTo("사용자 경험과 서비스를 함께 제공하는 브랜드")
             );
         }
     }
 
-    private ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> createBrand(
+    private ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> createBrand(
         BrandAdminV1Dto.CreateBrandRequest request,
         HttpHeaders headers
     ) {
-        ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
+        ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             ENDPOINT_BRANDS,
             HttpMethod.POST,
@@ -204,8 +216,8 @@ class BrandAdminV1ApiE2ETest {
         );
     }
 
-    private ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> getBrand(Long brandId, HttpHeaders headers) {
-        ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
+    private ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> getBrand(Long brandId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             ENDPOINT_BRAND_DETAIL,
             HttpMethod.GET,
@@ -215,8 +227,8 @@ class BrandAdminV1ApiE2ETest {
         );
     }
 
-    private ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> getBrands(HttpHeaders headers) {
-        ParameterizedTypeReference<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> responseType = new ParameterizedTypeReference<>() {};
+    private ResponseEntity<ApiResponse<PageResponse<BrandAdminV1Dto.BrandResponse>>> getBrands(HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<BrandAdminV1Dto.BrandResponse>>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             ENDPOINT_BRANDS,
             HttpMethod.GET,
@@ -225,12 +237,12 @@ class BrandAdminV1ApiE2ETest {
         );
     }
 
-    private ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> updateBrand(
+    private ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> updateBrand(
         Long brandId,
         BrandAdminV1Dto.UpdateBrandRequest request,
         HttpHeaders headers
     ) {
-        ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
+        ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.BrandResponse>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             ENDPOINT_BRAND_DETAIL,
             HttpMethod.PUT,

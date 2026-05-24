@@ -26,33 +26,33 @@ public class BrandAdminV1Controller {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<BrandV1Dto.BrandResponse> createBrand(@RequestBody BrandAdminV1Dto.CreateBrandRequest request) {
+    public ApiResponse<BrandAdminV1Dto.BrandResponse> createBrand(@RequestBody BrandAdminV1Dto.CreateBrandRequest request) {
         BrandInfo info = brandAdminFacade.createBrand(request.toCommand());
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(info));
+        return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
 
     @GetMapping("/{brandId}")
-    public ApiResponse<BrandV1Dto.BrandResponse> getBrand(@PathVariable Long brandId) {
+    public ApiResponse<BrandAdminV1Dto.BrandResponse> getBrand(@PathVariable Long brandId) {
         BrandInfo info = brandAdminFacade.getBrand(brandId);
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(info));
+        return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<BrandV1Dto.BrandResponse>> getBrands(
+    public ApiResponse<PageResponse<BrandAdminV1Dto.BrandResponse>> getBrands(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        PageResult<BrandV1Dto.BrandResponse> brands = brandAdminFacade.getBrands(page, size)
-            .map(BrandV1Dto.BrandResponse::from);
+        PageResult<BrandAdminV1Dto.BrandResponse> brands = brandAdminFacade.getBrands(page, size)
+            .map(BrandAdminV1Dto.BrandResponse::from);
         return ApiResponse.success(PageResponse.from(brands));
     }
 
     @PutMapping("/{brandId}")
-    public ApiResponse<BrandV1Dto.BrandResponse> updateBrand(
+    public ApiResponse<BrandAdminV1Dto.BrandResponse> updateBrand(
         @PathVariable Long brandId,
         @RequestBody BrandAdminV1Dto.UpdateBrandRequest request
     ) {
         BrandInfo info = brandAdminFacade.updateBrand(request.toCommand(brandId));
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(info));
+        return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
 }

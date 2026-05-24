@@ -57,11 +57,13 @@ class BrandV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = getBrand(saved.getId());
+            ResponseEntity<String> rawResponse = getBrandRaw(saved.getId());
 
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
+                () -> assertThat(rawResponse.getBody()).doesNotContain("deletedAt"),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("애플"),
                 () -> assertThat(response.getBody().data().description()).isEqualTo("기술과 디자인으로 일상을 새롭게 만드는 브랜드")
             );
@@ -85,6 +87,16 @@ class BrandV1ApiE2ETest {
             HttpMethod.GET,
             HttpEntity.EMPTY,
             responseType,
+            brandId
+        );
+    }
+
+    private ResponseEntity<String> getBrandRaw(Long brandId) {
+        return testRestTemplate.exchange(
+            ENDPOINT_BRAND_DETAIL,
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            String.class,
             brandId
         );
     }
