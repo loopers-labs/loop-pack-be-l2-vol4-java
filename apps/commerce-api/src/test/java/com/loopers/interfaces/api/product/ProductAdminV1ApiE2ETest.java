@@ -85,6 +85,26 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(data.deletedAt()).isNull()
             );
         }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            ProductAdminV1Dto.CreateProductRequest request = new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            );
+
+            // act
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = createProduct(request, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
     }
 
     @DisplayName("GET /api-admin/v1/products/{productId}")
