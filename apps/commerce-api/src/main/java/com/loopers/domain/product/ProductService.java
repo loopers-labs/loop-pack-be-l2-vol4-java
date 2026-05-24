@@ -62,6 +62,12 @@ public class ProductService {
     }
 
     @Transactional
+    public void deleteProductsByBrandId(Long brandId) {
+        productRepository.findActiveAllByBrandId(brandId)
+            .forEach(Product::delete);
+    }
+
+    @Transactional
     public Product updateProduct(Long productId, String name, String description, long price) {
         Product product = getProduct(productId);
         product.update(name, description, price);

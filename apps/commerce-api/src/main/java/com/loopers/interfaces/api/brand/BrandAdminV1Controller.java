@@ -7,6 +7,7 @@ import com.loopers.interfaces.api.PageResponse;
 import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,5 +55,11 @@ public class BrandAdminV1Controller {
     ) {
         BrandInfo info = brandAdminFacade.updateBrand(request.toCommand(brandId));
         return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
+    }
+
+    @DeleteMapping("/{brandId}")
+    public ApiResponse<Object> deleteBrand(@PathVariable Long brandId) {
+        brandAdminFacade.deleteBrand(brandId);
+        return ApiResponse.success();
     }
 }

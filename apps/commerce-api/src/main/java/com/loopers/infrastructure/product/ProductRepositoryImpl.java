@@ -38,6 +38,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<Product> findActiveAllByBrandId(Long brandId) {
+        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
+    }
+
+    @Override
     public PageResult<Product> findActiveAll(PageQuery query, Long brandId) {
         Pageable pageable = PageRequest.of(query.page(), query.size(), Sort.by(
             Sort.Order.desc("createdAt"),

@@ -2,16 +2,19 @@ package com.loopers.application.brand;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.ProductService;
 import com.loopers.support.pagination.PageQuery;
 import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
 public class BrandAdminFacade {
 
     private final BrandService brandService;
+    private final ProductService productService;
 
     public BrandInfo createBrand(CreateBrandCommand command) {
         Brand brand = brandService.createBrand(command.name(), command.description());
@@ -31,5 +34,11 @@ public class BrandAdminFacade {
     public BrandInfo updateBrand(UpdateBrandCommand command) {
         Brand brand = brandService.updateBrand(command.brandId(), command.name(), command.description());
         return BrandInfo.from(brand);
+    }
+
+    @Transactional
+    public void deleteBrand(Long brandId) {
+        brandService.deleteBrand(brandId);
+        productService.deleteProductsByBrandId(brandId);
     }
 }

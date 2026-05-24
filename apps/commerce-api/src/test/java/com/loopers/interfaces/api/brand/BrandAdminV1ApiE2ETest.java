@@ -203,6 +203,42 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
+    @DisplayName("DELETE /api-admin/v1/brands/{brandId}")
+    @Nested
+    class DeleteBrand {
+
+        @DisplayName("어드민 헤더와 존재하는 브랜드 ID가 주어지면, 200 OK를 반환하고 이후 상세 조회에서 제외한다.")
+        @Test
+        void deletesBrand_whenAdminHeaderAndBrandIdExist() {
+            // arrange
+            Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> deleteResponse = deleteBrand(saved.getId(), adminHeaders());
+            ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> getResponse = getBrand(saved.getId(), adminHeaders());
+
+            // assert
+            assertAll(
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
+            );
+        }
+
+        @DisplayName("이미 삭제된 브랜드 ID가 주어지면, 404 NOT_FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenBrandIsAlreadyDeleted() {
+            // arrange
+            Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            brandService.deleteBrand(saved.getId());
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = deleteBrand(saved.getId(), adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
     private ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> createBrand(
         BrandAdminV1Dto.CreateBrandRequest request,
         HttpHeaders headers
@@ -247,6 +283,17 @@ class BrandAdminV1ApiE2ETest {
             ENDPOINT_BRAND_DETAIL,
             HttpMethod.PUT,
             new HttpEntity<>(request, headers),
+            responseType,
+            brandId
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> deleteBrand(Long brandId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_BRAND_DETAIL,
+            HttpMethod.DELETE,
+            new HttpEntity<>(headers),
             responseType,
             brandId
         );
