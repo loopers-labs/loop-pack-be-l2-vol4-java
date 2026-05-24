@@ -6,10 +6,12 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
 @Table(name = "brand")
+@SQLRestriction("deleted_at IS NULL")
 public class BrandModel extends BaseEntity {
 
     private String name;
@@ -20,6 +22,7 @@ public class BrandModel extends BaseEntity {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
         }
+
         this.name = name;
     }
 }
