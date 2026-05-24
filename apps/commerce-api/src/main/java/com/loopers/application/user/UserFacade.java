@@ -1,6 +1,7 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.*;
+import com.loopers.domain.user.Gender;
+import com.loopers.domain.user.UserModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
