@@ -1,10 +1,10 @@
 package com.loopers.domain.brand;
 
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +27,8 @@ public class BrandService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Brand> getBrands(Pageable pageable) {
-        return brandRepository.findActiveAll(pageable);
+    public PageResult<Brand> getBrands(PageQuery query) {
+        return brandRepository.findActiveAll(query);
     }
 
     @Transactional

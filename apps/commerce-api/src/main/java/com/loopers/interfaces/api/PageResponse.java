@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import org.springframework.data.domain.Page;
+import com.loopers.support.pagination.PageResult;
 
 import java.util.List;
 
@@ -14,15 +14,15 @@ public record PageResponse<T>(
     boolean last
 ) {
 
-    public static <T> PageResponse<T> from(Page<T> page) {
+    public static <T> PageResponse<T> from(PageResult<T> page) {
         return new PageResponse<>(
-            page.getContent(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.getNumber(),
-            page.getSize(),
-            page.isFirst(),
-            page.isLast()
+            page.content(),
+            page.totalElements(),
+            page.totalPages(),
+            page.number(),
+            page.size(),
+            page.first(),
+            page.last()
         );
     }
 }

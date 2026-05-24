@@ -2,9 +2,9 @@ package com.loopers.application.brand;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
@@ -23,8 +23,8 @@ public class BrandAdminFacade {
         return BrandInfo.from(brand);
     }
 
-    public Page<BrandInfo> getBrands(Pageable pageable) {
-        return brandService.getBrands(pageable)
+    public PageResult<BrandInfo> getBrands(int page, int size) {
+        return brandService.getBrands(new PageQuery(page, size))
             .map(BrandInfo::from);
     }
 

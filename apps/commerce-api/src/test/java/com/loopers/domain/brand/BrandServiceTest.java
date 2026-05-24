@@ -1,14 +1,13 @@
 package com.loopers.domain.brand;
 
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -55,9 +54,17 @@ class BrandServiceTest {
         }
 
         @Override
-        public Page<Brand> findActiveAll(Pageable pageable) {
+        public PageResult<Brand> findActiveAll(PageQuery query) {
             List<Brand> brands = savedBrand == null ? List.of() : List.of(savedBrand);
-            return new PageImpl<>(brands, pageable, brands.size());
+            return new PageResult<>(
+                brands,
+                brands.size(),
+                brands.isEmpty() ? 0 : 1,
+                query.page(),
+                query.size(),
+                query.page() == 0,
+                true
+            );
         }
     }
 }

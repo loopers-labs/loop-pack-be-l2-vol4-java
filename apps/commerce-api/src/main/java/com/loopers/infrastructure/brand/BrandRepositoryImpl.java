@@ -2,9 +2,13 @@ package com.loopers.infrastructure.brand;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -26,7 +30,20 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
-    public Page<Brand> findActiveAll(Pageable pageable) {
-        return brandJpaRepository.findByDeletedAtIsNull(pageable);
+    public PageResult<Brand> findActiveAll(PageQuery query) {
+        Pageable pageable = PageRequest.of(query.page(), query.size(), Sort.by(
+            Sort.Order.desc("createdAt"),
+            Sort.Order.desc("id")
+        ));
+        Page<Brand> page = brandJpaRepository.findByDeletedAtIsNull(pageable);
+        return new PageResult<>(
+            page.getContent(),
+            page.getTotalElements(),
+            page.getTotalPages(),
+            page.getNumber(),
+            page.getSize(),
+            page.isFirst(),
+            page.isLast()
+        );
     }
 }
