@@ -247,4 +247,77 @@ class StockModelTest {
             assertThat(result).isFalse();
         }
     }
+
+    @DisplayName("재고를 목표 수량으로 맞출 때, ")
+    @Nested
+    class ChangeTo {
+
+        @DisplayName("target 이 현재 quantity 보다 크면, quantity 가 target 으로 증가한다.")
+        @Test
+        void increasesQuantityToTarget_whenTargetIsGreater() {
+            // given
+            StockModel stock = new StockModel(1L, 10);
+
+            // when
+            stock.changeTo(25);
+
+            // then
+            assertThat(stock.getQuantity()).isEqualTo(25);
+        }
+
+        @DisplayName("target 이 현재 quantity 보다 작으면, quantity 가 target 으로 감소한다.")
+        @Test
+        void decreasesQuantityToTarget_whenTargetIsLess() {
+            // given
+            StockModel stock = new StockModel(1L, 50);
+
+            // when
+            stock.changeTo(12);
+
+            // then
+            assertThat(stock.getQuantity()).isEqualTo(12);
+        }
+
+        @DisplayName("target 이 현재 quantity 와 같으면, quantity 가 변하지 않는다.")
+        @Test
+        void doesNotChangeQuantity_whenTargetEqualsCurrent() {
+            // given
+            StockModel stock = new StockModel(1L, 10);
+
+            // when
+            stock.changeTo(10);
+
+            // then
+            assertThat(stock.getQuantity()).isEqualTo(10);
+        }
+
+        @DisplayName("target 이 0 이면, quantity 가 0 으로 감소한다.")
+        @Test
+        void decreasesQuantityToZero_whenTargetIsZero() {
+            // given
+            StockModel stock = new StockModel(1L, 7);
+
+            // when
+            stock.changeTo(0);
+
+            // then
+            assertThat(stock.getQuantity()).isEqualTo(0);
+        }
+
+        @DisplayName("target 이 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenTargetIsNegative() {
+            // given
+            StockModel stock = new StockModel(1L, 10);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> stock.changeTo(-1));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("재고는 0 이상이어야 합니다.")
+            );
+        }
+    }
 }

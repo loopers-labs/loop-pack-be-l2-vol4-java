@@ -47,6 +47,18 @@ public class StockModel extends BaseEntity {
         this.quantity += amount;
     }
 
+    public void changeTo(int target) {
+        if (target < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
+        int diff = target - this.quantity;
+        if (diff > 0) {
+            increase(diff);
+        } else if (diff < 0) {
+            decrease(-diff);
+        }
+    }
+
     public boolean isAvailable() {
         return this.quantity > 0;
     }
