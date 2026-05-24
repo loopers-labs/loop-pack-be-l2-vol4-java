@@ -18,4 +18,6 @@ public interface ProductRepository {
     PageResult<Product> findActiveAll(PageQuery query, Long brandId);
 
     PageResult<Product> findVisibleAll(PageQuery query, Long brandId, ProductSort sort);
+
+    PageResult<Product> findVisibleLikedAllByUserId(Long userId, PageQuery query);
 }

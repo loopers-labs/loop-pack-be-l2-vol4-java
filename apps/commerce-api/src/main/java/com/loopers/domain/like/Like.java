@@ -5,6 +5,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -16,6 +17,10 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
     name = "likes",
+    indexes = {
+        @Index(name = "idx_likes_user_created_at_id", columnList = "user_id, created_at, id"),
+        @Index(name = "idx_likes_product_id", columnList = "product_id")
+    },
     uniqueConstraints = @UniqueConstraint(
         name = "uk_likes_user_product",
         columnNames = {"user_id", "product_id"}

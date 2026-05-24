@@ -81,4 +81,35 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
             """
     )
     Page<Product> findVisibleAllOrderByLikes(@Param("brandId") Long brandId, Pageable pageable);
+
+    @Query(
+        value = """
+            select p
+            from Like l
+            join Product p on p.id = l.productId
+            where l.userId = :userId
+              and p.deletedAt is null
+              and exists (
+                  select b.id
+                  from Brand b
+                  where b.id = p.brandId
+                    and b.deletedAt is null
+              )
+            order by l.createdAt desc, l.id desc
+            """,
+        countQuery = """
+            select count(p)
+            from Like l
+            join Product p on p.id = l.productId
+            where l.userId = :userId
+              and p.deletedAt is null
+              and exists (
+                  select b.id
+                  from Brand b
+                  where b.id = p.brandId
+                    and b.deletedAt is null
+              )
+            """
+    )
+    Page<Product> findVisibleLikedAllByUserId(@Param("userId") Long userId, Pageable pageable);
 }

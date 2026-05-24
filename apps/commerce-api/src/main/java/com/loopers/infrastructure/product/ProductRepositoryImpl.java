@@ -60,15 +60,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public PageResult<Product> findVisibleAll(PageQuery query, Long brandId, ProductSort sort) {
         Page<Product> page = findVisiblePage(query, brandId, sort);
-        return new PageResult<>(
-            page.getContent(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.getNumber(),
-            page.getSize(),
-            page.isFirst(),
-            page.isLast()
+        return toPageResult(page);
+    }
+
+    @Override
+    public PageResult<Product> findVisibleLikedAllByUserId(Long userId, PageQuery query) {
+        Page<Product> page = productJpaRepository.findVisibleLikedAllByUserId(
+            userId,
+            PageRequest.of(query.page(), query.size())
         );
+        return toPageResult(page);
     }
 
     private Page<Product> findVisiblePage(PageQuery query, Long brandId, ProductSort sort) {
@@ -96,5 +97,17 @@ public class ProductRepositoryImpl implements ProductRepository {
                 Sort.Order.desc("id")
             );
         };
+    }
+
+    private PageResult<Product> toPageResult(Page<Product> page) {
+        return new PageResult<>(
+            page.getContent(),
+            page.getTotalElements(),
+            page.getTotalPages(),
+            page.getNumber(),
+            page.getSize(),
+            page.isFirst(),
+            page.isLast()
+        );
     }
 }

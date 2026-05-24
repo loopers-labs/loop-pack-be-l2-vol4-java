@@ -47,6 +47,14 @@ public class ProductService {
         return productRepository.findVisibleAll(query, brandId, sort);
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<Product> getLikedProducts(Long userId, PageQuery query) {
+        if (userId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 비어있을 수 없습니다.");
+        }
+        return productRepository.findVisibleLikedAllByUserId(userId, query);
+    }
+
     @Transactional
     public void deleteProduct(Long productId) {
         Product product = getProduct(productId);
