@@ -67,4 +67,16 @@ public class ProductAdminFacade {
     public void deleteProduct(Long productId) {
         productService.deleteProduct(productId);
     }
+
+    @Transactional
+    public ProductInfo updateProduct(UpdateProductCommand command) {
+        Product product = productService.updateProduct(
+            command.productId(),
+            command.name(),
+            command.description(),
+            command.price()
+        );
+        ProductStock productStock = productStockService.changeProductStock(product.getId(), command.stockQuantity());
+        return ProductInfo.from(product, productStock);
+    }
 }

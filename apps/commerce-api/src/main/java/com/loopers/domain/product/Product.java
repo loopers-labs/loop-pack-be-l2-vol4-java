@@ -31,6 +31,18 @@ public class Product extends BaseEntity {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
         }
+        validateInfo(name, description, price);
+        return new Product(brandId, name, description, price);
+    }
+
+    public void update(String name, String description, long price) {
+        validateInfo(name, description, price);
+        this.name = name;
+        this.description = description;
+        this.price = price;
+    }
+
+    private static void validateInfo(String name, String description, long price) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -40,7 +52,6 @@ public class Product extends BaseEntity {
         if (price < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
-        return new Product(brandId, name, description, price);
     }
 
     public boolean isDeleted() {

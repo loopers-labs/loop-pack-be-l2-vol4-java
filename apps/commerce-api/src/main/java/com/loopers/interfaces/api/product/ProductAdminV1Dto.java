@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.CreateProductCommand;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.UpdateProductCommand;
 
 import java.time.ZonedDateTime;
 
@@ -16,6 +17,17 @@ public class ProductAdminV1Dto {
     ) {
         public CreateProductCommand toCommand() {
             return new CreateProductCommand(brandId, name, description, price, stockQuantity);
+        }
+    }
+
+    public record UpdateProductRequest(
+        String name,
+        String description,
+        long price,
+        int stockQuantity
+    ) {
+        public UpdateProductCommand toCommand(Long productId) {
+            return new UpdateProductCommand(productId, name, description, price, stockQuantity);
         }
     }
 

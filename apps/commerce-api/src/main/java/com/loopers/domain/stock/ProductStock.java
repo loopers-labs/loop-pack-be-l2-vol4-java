@@ -48,4 +48,8 @@ public class ProductStock extends BaseEntity {
     public void deduct(int quantity) {
         this.quantity = this.quantity.deduct(quantity);
     }
+
+    public void changeQuantity(int quantity) {
+        this.quantity = StockQuantity.of(quantity);
+    }
 }

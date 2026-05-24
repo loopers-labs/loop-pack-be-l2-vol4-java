@@ -40,4 +40,11 @@ public class ProductStockService {
         return productStocks.stream()
             .collect(Collectors.toMap(ProductStock::getProductId, Function.identity()));
     }
+
+    @Transactional
+    public ProductStock changeProductStock(Long productId, int quantity) {
+        ProductStock productStock = getProductStock(productId);
+        productStock.changeQuantity(quantity);
+        return productStock;
+    }
 }

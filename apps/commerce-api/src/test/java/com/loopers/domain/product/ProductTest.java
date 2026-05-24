@@ -96,4 +96,50 @@ class ProductTest {
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
     }
+
+    @DisplayName("상품 기본 정보를 수정하면, 상품명과 설명과 가격이 변경된다.")
+    @Test
+    void updatesProductInfo_whenNameDescriptionAndPriceAreProvided() {
+        // arrange
+        Product product = Product.create(
+            1L,
+            "아이폰 16 Pro",
+            "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+            1_550_000L
+        );
+        String name = "아이폰 16 Pro Max";
+        String description = "더 큰 화면과 향상된 배터리를 제공하는 스마트폰";
+        long price = 1_900_000L;
+
+        // act
+        product.update(name, description, price);
+
+        // assert
+        assertAll(
+            () -> assertThat(product.getName()).isEqualTo(name),
+            () -> assertThat(product.getDescription()).isEqualTo(description),
+            () -> assertThat(product.getPrice()).isEqualTo(price)
+        );
+    }
+
+    @DisplayName("상품 수정 시 상품명이 비어 있으면, BAD_REQUEST 예외를 던진다.")
+    @Test
+    void throwsBadRequest_whenUpdateNameIsBlank() {
+        // arrange
+        Product product = Product.create(
+            1L,
+            "아이폰 16 Pro",
+            "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+            1_550_000L
+        );
+        String name = " ";
+        String description = "더 큰 화면과 향상된 배터리를 제공하는 스마트폰";
+        long price = 1_900_000L;
+
+        // act & assert
+        assertThatThrownBy(() -> product.update(name, description, price))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
+    }
 }

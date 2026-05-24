@@ -103,4 +103,35 @@ class ProductStockTest {
             () -> assertThat(productStock.getQuantity()).isEqualTo(10)
         );
     }
+
+    @DisplayName("재고 수량을 변경하면, 현재 재고가 요청 수량으로 바뀐다.")
+    @Test
+    void changesQuantity_whenQuantityIsProvided() {
+        // arrange
+        ProductStock productStock = ProductStock.create(1L, 10);
+        int quantity = 5;
+
+        // act
+        productStock.changeQuantity(quantity);
+
+        // assert
+        assertThat(productStock.getQuantity()).isEqualTo(quantity);
+    }
+
+    @DisplayName("재고 수량 변경 값이 음수이면, BAD_REQUEST 예외를 던지고 재고를 유지한다.")
+    @Test
+    void throwsBadRequest_whenChangeQuantityIsNegative() {
+        // arrange
+        ProductStock productStock = ProductStock.create(1L, 10);
+        int quantity = -1;
+
+        // act & assert
+        assertAll(
+            () -> assertThatThrownBy(() -> productStock.changeQuantity(quantity))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST),
+            () -> assertThat(productStock.getQuantity()).isEqualTo(10)
+        );
+    }
 }
