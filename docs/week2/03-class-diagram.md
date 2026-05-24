@@ -54,13 +54,13 @@ classDiagram
         -String description
         -BigDecimal price
         -long likeCount
-        -Stock stock
         +update(String name, String description, BigDecimal price) void
         +increaseLikeCount() void
         +decreaseLikeCount() void
     }
     class Stock {
         -Long id
+        -Product product
         -long quantity
         +decrease(long quantity) void
         +increase(long quantity) void
@@ -103,7 +103,7 @@ classDiagram
     User *-- Email
     User *-- Gender
 
-    Product *-- Stock
+    Stock --> Product
 
     Order "1" *-- "*" OrderItem
     OrderItem ..> Product
