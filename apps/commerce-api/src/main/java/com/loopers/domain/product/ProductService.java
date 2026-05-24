@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class ProductService {
@@ -24,6 +27,14 @@ public class ProductService {
     public Product getProduct(Long productId) {
         return productRepository.findActiveById(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> getProducts(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findActiveAllByIds(productIds);
     }
 
     @Transactional(readOnly = true)

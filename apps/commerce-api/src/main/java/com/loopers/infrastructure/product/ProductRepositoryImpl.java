@@ -12,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -28,6 +30,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public Optional<Product> findActiveById(Long productId) {
         return productJpaRepository.findByIdAndDeletedAtIsNull(productId);
+    }
+
+    @Override
+    public List<Product> findActiveAllByIds(Collection<Long> productIds) {
+        return productJpaRepository.findByIdInAndDeletedAtIsNull(productIds);
     }
 
     @Override
