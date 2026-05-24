@@ -107,6 +107,48 @@ class LikeV1ApiE2ETest {
         }
     }
 
+    @DisplayName("DELETE /api/v1/products/{productId}/likes")
+    @Nested
+    class UnlikeProduct {
+
+        @DisplayName("좋아요한 상품에 취소 요청을 보내면 200 OK를 반환하고, 상품 좋아요 수가 0으로 감소한다.")
+        @Test
+        void unlikesProduct_whenProductIsLiked() {
+            // arrange
+            signUpUser();
+            Product product = createProduct();
+            likeProduct(product.getId(), authHeaders());
+
+            // act
+            ResponseEntity<ApiResponse<Object>> unlikeResponse = unlikeProduct(product.getId(), authHeaders());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(detailResponse.getBody().data().likeCount()).isZero()
+            );
+        }
+
+        @DisplayName("좋아요하지 않은 상품에 취소 요청을 보내도 200 OK를 반환하고, 상품 좋아요 수를 유지한다.")
+        @Test
+        void keepsLikeCount_whenProductIsNotLiked() {
+            // arrange
+            signUpUser();
+            Product product = createProduct();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> unlikeResponse = unlikeProduct(product.getId(), authHeaders());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(detailResponse.getBody().data().likeCount()).isZero()
+            );
+        }
+    }
+
     private Product createProduct() {
         Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
         Product product = productService.createProduct(
@@ -135,6 +177,17 @@ class LikeV1ApiE2ETest {
         return testRestTemplate.exchange(
             ENDPOINT_PRODUCT_LIKES,
             HttpMethod.POST,
+            new HttpEntity<>(headers),
+            responseType,
+            productId
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> unlikeProduct(Long productId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PRODUCT_LIKES,
+            HttpMethod.DELETE,
             new HttpEntity<>(headers),
             responseType,
             productId

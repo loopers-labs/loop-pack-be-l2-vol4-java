@@ -20,4 +20,10 @@ public class LikeService {
     public long countProductLikes(Long productId) {
         return likeRepository.countByProductId(productId);
     }
+
+    @Transactional
+    public void unlike(Long userId, Long productId) {
+        likeRepository.findByUserIdAndProductId(userId, productId)
+            .ifPresent(likeRepository::delete);
+    }
 }

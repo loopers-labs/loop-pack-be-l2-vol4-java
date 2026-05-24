@@ -18,4 +18,9 @@ public class LikeFacade {
         productService.getProduct(productId);
         likeService.like(userId, productId);
     }
+
+    @Transactional
+    public void unlike(Long userId, Long productId) {
+        likeService.unlike(userId, productId);
+    }
 }

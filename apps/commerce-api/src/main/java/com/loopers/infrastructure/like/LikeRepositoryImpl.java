@@ -27,4 +27,9 @@ public class LikeRepositoryImpl implements LikeRepository {
     public long countByProductId(Long productId) {
         return likeJpaRepository.countByProductId(productId);
     }
+
+    @Override
+    public void delete(Like like) {
+        likeJpaRepository.delete(like);
+    }
 }
