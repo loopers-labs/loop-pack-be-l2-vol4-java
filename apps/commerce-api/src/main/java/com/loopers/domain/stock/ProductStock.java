@@ -38,6 +38,9 @@ public class ProductStock extends BaseEntity {
     }
 
     public void deduct(int quantity) {
+        if (quantity <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
+        }
         if (!hasStock(quantity)) {
             throw new CoreException(ErrorType.CONFLICT, "재고가 부족합니다.");
         }

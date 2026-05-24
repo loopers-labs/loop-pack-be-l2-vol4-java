@@ -86,4 +86,21 @@ class ProductStockTest {
             () -> assertThat(productStock.getQuantity()).isEqualTo(10)
         );
     }
+
+    @DisplayName("차감 수량이 0 이하이면, BAD_REQUEST 예외를 던지고 재고를 유지한다.")
+    @Test
+    void throwsBadRequest_whenDeductQuantityIsNotPositive() {
+        // arrange
+        ProductStock productStock = ProductStock.create(1L, 10);
+        int quantity = 0;
+
+        // act & assert
+        assertAll(
+            () -> assertThatThrownBy(() -> productStock.deduct(quantity))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST),
+            () -> assertThat(productStock.getQuantity()).isEqualTo(10)
+        );
+    }
 }
