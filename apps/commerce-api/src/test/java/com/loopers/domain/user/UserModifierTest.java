@@ -15,11 +15,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class UpdateUserServiceTest {
+class UserModifierTest {
 
-    private UpdateUserService updateUserService;
+    private UserModifier userModifier;
 
-    private FindUserService findUserService;
+    private UserFinder userFinder;
 
     private PasswordEncryptor passwordEncryptor;
 
@@ -27,11 +27,11 @@ class UpdateUserServiceTest {
 
     @BeforeEach
     void setUp() {
-        findUserService = mock(FindUserService.class);
+        userFinder = mock(UserFinder.class);
         passwordEncryptor = new FakePasswordEncryptor("encrypted:");
         userRepository = mock(UserRepository.class);
 
-        updateUserService = new UpdateUserService(findUserService, passwordEncryptor, userRepository);
+        userModifier = new UserModifier(userFinder, passwordEncryptor, userRepository);
     }
 
     @DisplayName("비밀번호를 변경할 때,")
@@ -48,10 +48,10 @@ class UpdateUserServiceTest {
             String newPassword = "NewPass99!";
             UserModel user = new UserModel(loginId, loginPw, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor);
 
-            when(findUserService.getLoginUser(loginId, loginPw)).thenReturn(user);
+            when(userFinder.getLoginUser(loginId, loginPw)).thenReturn(user);
 
             // when
-            updateUserService.changePassword(loginId, loginPw, oldPassword, newPassword);
+            userModifier.changePassword(loginId, loginPw, oldPassword, newPassword);
 
             // then
             verify(userRepository).save(user);
@@ -68,12 +68,12 @@ class UpdateUserServiceTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    updateUserService.changePassword(loginId, loginPw, oldPassword, newPassword)
+                    userModifier.changePassword(loginId, loginPw, oldPassword, newPassword)
             );
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            verify(findUserService, never()).getLoginUser(loginId, loginPw);
+            verify(userFinder, never()).getLoginUser(loginId, loginPw);
             verify(userRepository, never()).save(any());
         }
     }

@@ -8,12 +8,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
-public class CreateUserService {
+public class UserCreator {
     private final UserRepository userRepository;
     private final PasswordEncryptor passwordEncryptor;
 
     @Transactional
-    public UserModel signUp(String loginId, String loginPw, String name, String birthDate, String email, Gender gender) {
+    public UserModel create(String loginId, String loginPw, String name, String birthDate, String email, Gender gender) {
         if (userRepository.existsByLoginId(loginId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
         }

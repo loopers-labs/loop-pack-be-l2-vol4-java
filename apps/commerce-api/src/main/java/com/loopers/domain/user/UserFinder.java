@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
-public class FindUserService {
+public class UserFinder {
     private final UserRepository userRepository;
     private final PasswordEncryptor passwordEncryptor;
 

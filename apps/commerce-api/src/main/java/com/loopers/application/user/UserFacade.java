@@ -7,22 +7,22 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Component
 public class UserFacade {
-    private final CreateUserService createUserService;
-    private final UpdateUserService updateUserService;
-    private final FindUserService findUserService;
+    private final UserCreator userCreator;
+    private final UserModifier userModifier;
+    private final UserFinder userFinder;
 
     public UserInfo signUp(String loginId, String password, String name, String birthDate, String email, Gender gender) {
-        UserModel user = createUserService.signUp(loginId, password, name, birthDate, email, gender);
+        UserModel user = userCreator.create(loginId, password, name, birthDate, email, gender);
         return UserInfo.from(user);
     }
 
     public UserInfo getMyInfo(String loginId, String loginPw) {
-        UserModel user = findUserService.getLoginUser(loginId, loginPw);
+        UserModel user = userFinder.getLoginUser(loginId, loginPw);
         return UserInfo.from(user);
     }
 
     public void changePassword(String loginId, String loginPw, String oldPassword, String newPassword) {
-        updateUserService.changePassword(loginId, loginPw, oldPassword, newPassword);
+        userModifier.changePassword(loginId, loginPw, oldPassword, newPassword);
     }
 
 }

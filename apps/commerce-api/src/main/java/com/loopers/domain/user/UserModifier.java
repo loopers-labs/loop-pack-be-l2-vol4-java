@@ -8,8 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
-public class UpdateUserService {
-    private final FindUserService findUserService;
+public class UserModifier {
+    private final UserFinder userFinder;
     private final PasswordEncryptor passwordEncryptor;
     private final UserRepository userRepository;
 
@@ -19,7 +19,7 @@ public class UpdateUserService {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
 
-        UserModel user = findUserService.getLoginUser(loginId, loginPw);
+        UserModel user = userFinder.getLoginUser(loginId, loginPw);
 
         user.changePassword(newPassword, passwordEncryptor);
 

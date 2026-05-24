@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class FindUserServiceTest {
+class UserFinderTest {
 
-    private FindUserService findUserService;
+    private UserFinder userFinder;
 
     private UserRepository userRepository;
 
@@ -27,7 +27,7 @@ class FindUserServiceTest {
         userRepository = mock(UserRepository.class);
         passwordEncryptor = new FakePasswordEncryptor("encrypted:");
 
-        findUserService = new FindUserService(userRepository, passwordEncryptor);
+        userFinder = new UserFinder(userRepository, passwordEncryptor);
     }
 
     @DisplayName("로그인 유저를 조회할 때,")
@@ -45,7 +45,7 @@ class FindUserServiceTest {
             when(userRepository.findByLoginId(loginId)).thenReturn(Optional.of(user));
 
             // when
-            UserModel result = findUserService.getLoginUser(loginId, loginPw);
+            UserModel result = userFinder.getLoginUser(loginId, loginPw);
 
             // then
             assertThat(result).isSameAs(user);
@@ -61,7 +61,7 @@ class FindUserServiceTest {
             when(userRepository.findByLoginId(loginId)).thenReturn(Optional.empty());
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> findUserService.getLoginUser(loginId, loginPw));
+            CoreException result = assertThrows(CoreException.class, () -> userFinder.getLoginUser(loginId, loginPw));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -77,7 +77,7 @@ class FindUserServiceTest {
             when(userRepository.findByLoginId(loginId)).thenReturn(Optional.of(user));
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> findUserService.getLoginUser(loginId, "WrongPass1!"));
+            CoreException result = assertThrows(CoreException.class, () -> userFinder.getLoginUser(loginId, "WrongPass1!"));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

@@ -14,10 +14,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-class FindUserServiceIntegrationTest {
+class UserFinderIntegrationTest {
 
     @Autowired
-    private FindUserService findUserService;
+    private UserFinder userFinder;
 
     @Autowired
     private UserRepository userRepository;
@@ -46,7 +46,7 @@ class FindUserServiceIntegrationTest {
             UserModel saved = userRepository.save(new UserModel(loginId, loginPw, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
 
             // when
-            UserModel result = findUserService.getLoginUser(loginId, loginPw);
+            UserModel result = userFinder.getLoginUser(loginId, loginPw);
 
             // then
             assertThat(result.getId()).isEqualTo(saved.getId());
@@ -57,7 +57,7 @@ class FindUserServiceIntegrationTest {
         void throwsNotFoundException_whenUserDoesNotExist() {
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    findUserService.getLoginUser("nonexistent", "Password1!")
+                    userFinder.getLoginUser("nonexistent", "Password1!")
             );
 
             // then
@@ -73,7 +73,7 @@ class FindUserServiceIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class, () ->
-                    findUserService.getLoginUser(loginId, "WrongPass1!")
+                    userFinder.getLoginUser(loginId, "WrongPass1!")
             );
 
             // then
