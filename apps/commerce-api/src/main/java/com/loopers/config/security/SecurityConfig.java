@@ -24,6 +24,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http,
+        AdminAuthenticationFilter adminAuthenticationFilter,
         LoopersAuthenticationFilter loopersAuthenticationFilter,
         LoopersAuthenticationEntryPoint authenticationEntryPoint
     ) throws Exception {
@@ -35,9 +36,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/error").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/brands/**").permitAll()
+                .requestMatchers("/api-admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()
             )
+            .addFilterBefore(adminAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(loopersAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint));
         return http.build();
