@@ -42,6 +42,14 @@ public class ProductStockService {
     }
 
     @Transactional
+    public List<ProductStock> getProductStocksForUpdate(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        return productStockRepository.findAllByProductIdsForUpdate(productIds);
+    }
+
+    @Transactional
     public ProductStock changeProductStock(Long productId, int quantity) {
         ProductStock productStock = getProductStock(productId);
         productStock.changeQuantity(quantity);

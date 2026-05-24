@@ -11,4 +11,6 @@ public interface ProductStockRepository {
     Optional<ProductStock> findByProductId(Long productId);
 
     List<ProductStock> findAllByProductIds(Collection<Long> productIds);
+
+    List<ProductStock> findAllByProductIdsForUpdate(Collection<Long> productIds);
 }

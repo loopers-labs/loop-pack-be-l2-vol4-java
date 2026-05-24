@@ -29,4 +29,9 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
     public List<ProductStock> findAllByProductIds(Collection<Long> productIds) {
         return productStockJpaRepository.findAllByProductIdIn(productIds);
     }
+
+    @Override
+    public List<ProductStock> findAllByProductIdsForUpdate(Collection<Long> productIds) {
+        return productStockJpaRepository.findAllByProductIdInOrderByProductIdAsc(productIds);
+    }
 }

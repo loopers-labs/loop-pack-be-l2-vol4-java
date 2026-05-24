@@ -9,6 +9,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,9 +17,16 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "product_stock")
+@Table(
+    name = "product_stock",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_product_stock_product",
+        columnNames = "product_id"
+    )
+)
 public class ProductStock extends BaseEntity {
 
+    @Column(name = "product_id", nullable = false)
     private Long productId;
 
     @Embedded
