@@ -46,7 +46,7 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public ProductDetailInfo getProduct(Long productId) {
-        Product product = productService.getProduct(productId);
+        Product product = productService.getVisibleProduct(productId);
         Brand brand = brandService.getBrand(product.getBrandId());
         long likeCount = likeService.countProductLikes(product.getId());
         return ProductDetailInfo.from(product, brand, likeCount);

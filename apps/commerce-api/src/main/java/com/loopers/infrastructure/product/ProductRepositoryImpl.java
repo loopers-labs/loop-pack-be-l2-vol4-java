@@ -33,6 +33,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public Optional<Product> findVisibleById(Long productId) {
+        return productJpaRepository.findVisibleById(productId);
+    }
+
+    @Override
     public List<Product> findActiveAllByIds(Collection<Long> productIds) {
         return productJpaRepository.findByIdInAndDeletedAtIsNull(productIds);
     }

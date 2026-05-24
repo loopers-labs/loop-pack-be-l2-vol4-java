@@ -13,6 +13,8 @@ public interface ProductRepository {
 
     Optional<Product> findActiveById(Long productId);
 
+    Optional<Product> findVisibleById(Long productId);
+
     List<Product> findActiveAllByIds(Collection<Long> productIds);
 
     List<Product> findActiveAllByBrandId(Long brandId);
