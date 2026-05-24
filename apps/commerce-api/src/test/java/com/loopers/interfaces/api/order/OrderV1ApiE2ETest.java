@@ -38,6 +38,11 @@ class OrderV1ApiE2ETest {
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
     private static final String LOGIN_ID = "loopers01";
     private static final String PASSWORD = "Loopers!2026";
+    private static final String OTHER_LOGIN_ID = "jungwon01";
+    private static final String OTHER_PASSWORD = "Jungwon!2026";
+    private static final String OTHER_NAME = "정원이";
+    private static final LocalDate OTHER_BIRTH_DATE = LocalDate.of(2004, 5, 25);
+    private static final String OTHER_EMAIL = "jungwon@example.com";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
@@ -258,6 +263,28 @@ class OrderV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
+
+        @DisplayName("다른 사용자의 주문 ID가 주어지면 403 FORBIDDEN을 반환한다.")
+        @Test
+        void returnsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange
+            signUpUser();
+            signUpUser(OTHER_LOGIN_ID, OTHER_PASSWORD, OTHER_NAME, OTHER_BIRTH_DATE, OTHER_EMAIL);
+            Brand brand = createBrand();
+            Product iphone = createProduct(brand, "아이폰 16 Pro", "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰", 1_550_000L, 10);
+            OrderV1Dto.OrderResponse createdOrder = createOrder(new OrderV1Dto.CreateOrderRequest(List.of(
+                new OrderV1Dto.CreateOrderRequest.Item(iphone.getId(), 1)
+            )), authHeaders()).getBody().data();
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = getOrderForError(
+                createdOrder.id(),
+                authHeaders(OTHER_LOGIN_ID, OTHER_PASSWORD)
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
     }
 
     private Brand createBrand() {
@@ -271,12 +298,22 @@ class OrderV1ApiE2ETest {
     }
 
     private void signUpUser() {
-        UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+        signUpUser(
             LOGIN_ID,
             PASSWORD,
             "김성호",
             LocalDate.of(1993, 11, 3),
             "loopers@example.com"
+        );
+    }
+
+    private void signUpUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+        UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            loginId,
+            password,
+            name,
+            birthDate,
+            email
         );
         testRestTemplate.postForEntity(ENDPOINT_USERS, request, ApiResponse.class);
     }
@@ -341,9 +378,13 @@ class OrderV1ApiE2ETest {
     }
 
     private HttpHeaders authHeaders() {
+        return authHeaders(LOGIN_ID, PASSWORD);
+    }
+
+    private HttpHeaders authHeaders(String loginId, String password) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set(HEADER_LOGIN_ID, LOGIN_ID);
-        headers.set(HEADER_LOGIN_PW, PASSWORD);
+        headers.set(HEADER_LOGIN_ID, loginId);
+        headers.set(HEADER_LOGIN_PW, password);
         return headers;
     }
 }
