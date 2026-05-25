@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class UserService {
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public UserModel signUp(UserModel userModel) {
@@ -30,7 +31,7 @@ public class UserService {
         UserModel user = userRepository.findById(userId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
 
-        if (!user.matchesPassword(currentPassword)) {
+        if (!user.matchesPassword(currentPassword, passwordEncoder)) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
 
@@ -38,7 +39,7 @@ public class UserService {
             throw new CoreException(ErrorType.BAD_REQUEST, "이전과 동일한 비밀번호는 사용할 수 없습니다.");
         }
 
-        user.changePassword(newPassword);
+        user.changePassword(newPassword, passwordEncoder);
         userRepository.save(user);
     }
 
@@ -46,7 +47,7 @@ public class UserService {
     public UserModel authenticate(String loginId, String rawPassword) {
         UserModel user = userRepository.findByLoginId(new LoginId(loginId))
                 .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지않습니다."));
-        if (!user.matchesPassword(rawPassword)) {
+        if (!user.matchesPassword(rawPassword, passwordEncoder)) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
         return user;

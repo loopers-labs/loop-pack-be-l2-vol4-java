@@ -1,5 +1,6 @@
 package com.loopers.domain.user;
 
+import com.loopers.infrastructure.user.BCryptPasswordEncoderAdapter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,7 @@ public class UserModelTest {
             String email = "test@example.com";
 
             // Act (실행) - 실제로 테스트하려는 동작 수행
-            UserModel userModel = new UserModel(loginId, password, name, birthday, email);
+            UserModel userModel = new UserModel(loginId, password, name, birthday, email, new BCryptPasswordEncoderAdapter());
 
             // Assert (검증) - 결과가 기대한 대로인지 확인
             assertAll(
@@ -189,6 +190,53 @@ public class UserModelTest {
                         LocalDate.of(1900, 1, 1)        // 오래된 과거
                 );
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("비밀번호 암호화")
+    class PasswordEncryption {
+
+        private final PasswordEncoder encoder = new BCryptPasswordEncoderAdapter();
+
+        @DisplayName("비밀번호는 BCrypt 해시로 저장된다 (평문 미저장)")
+        @Test
+        void given_rawPassword_when_createUserModel_then_storedAsBCryptHash() {
+            UserModel user = aUser().withPassword("testPw1234").build();
+
+            assertAll(
+                    () -> assertThat(user.getPassword()).isNotEqualTo("testPw1234"),
+                    () -> assertThat(user.getPassword()).startsWith("$2")   // BCrypt 식별자
+            );
+        }
+
+        @DisplayName("올바른 비밀번호로 matchesPassword 하면 true를 반환한다")
+        @Test
+        void given_correctRawPassword_when_matchesPassword_then_returnsTrue() {
+            UserModel user = aUser().withPassword("testPw1234").build();
+
+            assertThat(user.matchesPassword("testPw1234", encoder)).isTrue();
+        }
+
+        @DisplayName("틀린 비밀번호로 matchesPassword 하면 false를 반환한다")
+        @Test
+        void given_wrongRawPassword_when_matchesPassword_then_returnsFalse() {
+            UserModel user = aUser().withPassword("testPw1234").build();
+
+            assertThat(user.matchesPassword("wrongPw9999", encoder)).isFalse();
+        }
+
+        @DisplayName("같은 평문이라도 salt로 해시는 매번 다르지만, 둘 다 검증에 성공한다")
+        @Test
+        void given_samePassword_when_encodedTwice_then_differentHashesButBothMatch() {
+            UserModel user1 = aUser().withLoginId("idone").withPassword("samePw1234").build();
+            UserModel user2 = aUser().withLoginId("idtwo").withPassword("samePw1234").build();
+
+            assertAll(
+                    () -> assertThat(user1.getPassword()).isNotEqualTo(user2.getPassword()),
+                    () -> assertThat(user1.matchesPassword("samePw1234", encoder)).isTrue(),
+                    () -> assertThat(user2.matchesPassword("samePw1234", encoder)).isTrue()
+            );
         }
     }
 

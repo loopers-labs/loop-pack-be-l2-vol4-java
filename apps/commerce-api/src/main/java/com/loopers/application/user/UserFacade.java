@@ -1,5 +1,6 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.PasswordEncoder;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class UserFacade {
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
 
     public UserInfo signUp(
             String loginId,
@@ -20,7 +22,7 @@ public class UserFacade {
             String email
     ) {
         UserModel saved = userService.signUp(
-                new UserModel(loginId, password, name, birthday, email)
+                new UserModel(loginId, password, name, birthday, email, passwordEncoder)
         );
         return toUserInfo(saved);
     }

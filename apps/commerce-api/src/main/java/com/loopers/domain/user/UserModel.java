@@ -7,11 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
-import java.util.Base64;
 import java.util.regex.Pattern;
 
 @Entity
@@ -31,11 +27,11 @@ public class UserModel extends BaseEntity {
 
     protected UserModel() {}
 
-    public UserModel(String loginId, String password, String name, LocalDate birthday, String email) {
+    public UserModel(String loginId, String password, String name, LocalDate birthday, String email, PasswordEncoder passwordEncoder) {
         // 검증 순서: birthday 먼저 (password 검증이 birthday를 사용하기 때문)
         this.birthday = validateBirthday(birthday);
         this.loginId = new LoginId(loginId).getValue();
-        this.password = encrypt(new Password(password, this.birthday).getValue());
+        this.password = passwordEncoder.encode(new Password(password, this.birthday).getValue());
         this.name = validateName(name);
         this.email = new Email(email).getValue();
     }
@@ -68,30 +64,20 @@ public class UserModel extends BaseEntity {
         return birthday;
     }
 
-    private static String encrypt(String rawPassword) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest(rawPassword.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hashed);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
-        }
-    }
-
     // --- 비밀번호 관련 도메인 메서드 ---
 
     /**
      * 입력된 raw 비밀번호가 저장된 hash와 일치하는지 확인
      */
-    public boolean matchesPassword(String rawPassword) {
-        return this.password.equals(encrypt(rawPassword));
+    public boolean matchesPassword(String rawPassword, PasswordEncoder passwordEncoder) {
+        return passwordEncoder.matches(rawPassword, this.password);
     }
 
     /**
      * 비밀번호 변경. raw 비밀번호 검증 후 해싱하여 저장
      */
-    public void changePassword(String newRawPassword) {
-        this.password = encrypt(new Password(newRawPassword, this.birthday).getValue());
+    public void changePassword(String newRawPassword, PasswordEncoder passwordEncoder) {
+        this.password = passwordEncoder.encode(new Password(newRawPassword, this.birthday).getValue());
     }
 
     // --- Getter ---
