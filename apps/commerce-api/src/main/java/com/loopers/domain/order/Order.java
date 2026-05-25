@@ -72,7 +72,7 @@ public class Order extends BaseEntity {
         return Collections.unmodifiableList(items);
     }
 
-    public boolean isOwnedBy(Long userId) {
+    public boolean isOrderedBy(Long userId) {
         return this.userId.equals(userId);
     }
 

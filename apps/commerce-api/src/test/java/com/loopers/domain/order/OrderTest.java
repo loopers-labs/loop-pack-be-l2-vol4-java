@@ -29,8 +29,8 @@ class OrderTest {
             () -> assertThat(order.getUserId()).isEqualTo(userId),
             () -> assertThat(order.getItems()).containsExactly(iphone, iphoneMax),
             () -> assertThat(order.getOrderTotalPrice()).isEqualTo(5_000_000L),
-            () -> assertThat(order.isOwnedBy(userId)).isTrue(),
-            () -> assertThat(order.isOwnedBy(2L)).isFalse()
+            () -> assertThat(order.isOrderedBy(userId)).isTrue(),
+            () -> assertThat(order.isOrderedBy(2L)).isFalse()
         );
     }
 

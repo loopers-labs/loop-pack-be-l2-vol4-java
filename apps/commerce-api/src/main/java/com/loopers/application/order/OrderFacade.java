@@ -64,7 +64,7 @@ public class OrderFacade {
     @Transactional(readOnly = true)
     public OrderInfo getMyOrderDetail(Long orderId, Long userId) {
         Order order = orderService.getOrder(orderId);
-        if (!order.isOwnedBy(userId)) {
+        if (!order.isOrderedBy(userId)) {
             throw new CoreException(ErrorType.FORBIDDEN, "다른 사용자의 주문은 조회할 수 없습니다.");
         }
         return OrderInfo.from(order);
