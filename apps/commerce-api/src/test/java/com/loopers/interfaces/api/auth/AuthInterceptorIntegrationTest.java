@@ -1,7 +1,5 @@
 package com.loopers.interfaces.api.auth;
 
-import com.loopers.application.user.UserAccountFacade;
-import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.WebMvcConfig;
@@ -17,7 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,9 +26,6 @@ class AuthInterceptorIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private UserAccountFacade userFacade;
 
     @MockitoBean
     private UserService userService;
@@ -52,10 +46,7 @@ class AuthInterceptorIntegrationTest {
         void returns200_whenValidCredentialsProvided() throws Exception {
             // arrange
             UserModel user = new UserModel("user123", "encoded!", "홍길동", LocalDate.of(1990, 1, 15), "test@example.com");
-            UserInfo info = new UserInfo(1L, "user123", "홍길*", LocalDate.of(1990, 1, 15), "test@example.com");
-
             given(userService.authenticate(eq("user123"), eq("Password1!"))).willReturn(user);
-            given(userFacade.getMe(any(UserModel.class))).willReturn(info);
 
             // act & assert
             mockMvc.perform(get("/api/v1/users/me")

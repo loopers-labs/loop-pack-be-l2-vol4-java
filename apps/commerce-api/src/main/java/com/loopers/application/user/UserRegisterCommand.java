@@ -11,7 +11,7 @@ public record UserRegisterCommand(
     LocalDate birthDate,
     String email
 ) {
-    public UserModel toDomain(String encodedPassword) {
-        return new UserModel(loginId, encodedPassword, name, birthDate, email);
+    public UserModel toDomain() {
+        return new UserModel(loginId, password, name, birthDate, email);
     }
 }

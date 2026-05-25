@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.application.user.UserAccountFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.CurrentUser;
 import lombok.RequiredArgsConstructor;
@@ -19,14 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserV1Controller {
 
-    private final UserAccountFacade userFacade;
+    private final UserService userService;
 
     @PostMapping
     public ApiResponse<UserV1Dto.UserRegisterResponse> register(
         @Valid @RequestBody UserV1Dto.UserRegisterRequest request
     ) {
-        UserInfo info = userFacade.register(request.toCommand());
-        return ApiResponse.success(UserV1Dto.UserRegisterResponse.from(info));
+        UserModel saved = userService.register(request.toCommand().toDomain());
+        return ApiResponse.success(UserV1Dto.UserRegisterResponse.from(UserInfo.from(saved)));
     }
 
     @PatchMapping("/me/password")
@@ -34,13 +34,12 @@ public class UserV1Controller {
         @CurrentUser UserModel user,
         @Valid @RequestBody UserV1Dto.UserChangePasswordRequest request
     ) {
-        userFacade.changePassword(user, request.toCommand());
+        userService.changePassword(user, request.currentPassword(), request.newPassword());
         return ApiResponse.success();
     }
 
     @GetMapping("/me")
     public ApiResponse<UserV1Dto.UserMeResponse> getMe(@CurrentUser UserModel user) {
-        UserInfo info = userFacade.getMe(user);
-        return ApiResponse.success(UserV1Dto.UserMeResponse.from(info));
+        return ApiResponse.success(UserV1Dto.UserMeResponse.from(user));
     }
 }
