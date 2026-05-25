@@ -65,9 +65,9 @@ sequenceDiagram
 - 재고는 `ProductStockService`에서 따로 조회한다(`getStock`). `Product`는 이름·설명·가격만 들고, 재고가 0이면 품절로 표시한다.
 - 상품 상세는 인증이 필요 없다. 좋아요 수만 노출하고 "내 좋아요 여부"는 응답에 포함하지 않는다.
 
-## F-03. 브랜드 조회
+## F-03. 브랜드 목록·검색 조회
 
-**목적.** 단순 단건 조회의 계층 흐름을 확인한다.
+**목적.** 검색어 유무 분기·정렬·페이지네이션이 어느 계층에서 일어나는지, 일치 결과가 없을 때 빈 목록으로 끝나는지 확인한다.
 
 ```mermaid
 sequenceDiagram
@@ -75,17 +75,30 @@ sequenceDiagram
     participant C as BrandV1Controller
     participant F as BrandFacade
     participant BS as BrandService
+    participant BR as BrandRepository
 
-    사용자->>C: GET /api/v1/brands/{brandId}
-    C->>F: getBrand(brandId)
-    F->>BS: getBrand(brandId)
-    BS-->>F: BrandModel
-    F-->>C: BrandInfo
-    C-->>사용자: ApiResponse(BrandResponse)
+    사용자->>C: GET /api/v1/brands?query&page&size
+    C->>F: getBrands(criteria)
+    F->>BS: getBrands(criteria)
+    activate BS
+    note over BS: offset = page × size, 정렬 = name 오름차순(가나다순)
+    alt 검색어 없음
+        BS->>BR: findAll(offset, size)
+    else 검색어 있음
+        BS->>BR: findByNameContaining(query, offset, size)
+    end
+    BR-->>BS: List<BrandModel> · 총 개수 (빈 목록 가능)
+    BS-->>F: Page<BrandModel>
+    deactivate BS
+    F-->>C: Page<BrandInfo>
+    C-->>사용자: ApiResponse(BrandResponse 목록)
 ```
 
 **흐름 해석.**
-- 미존재 브랜드는 `BrandService`에서 `CoreException(NOT_FOUND)`로 처리한다. Facade는 변환만 한다.
+- 검색어 유무로 분기한다. 없으면 전체 브랜드를, 있으면 브랜드명이 검색어를 부분 포함하는(`name LIKE %query%`) 브랜드를 조회한다. 두 갈래 모두 같은 정렬·페이지네이션 규약을 따른다.
+- 정렬은 브랜드명 오름차순(가나다순) 고정이다. 페이지네이션은 F-01과 동일한 offset 방식으로, 컨트롤러는 `page`·`size`를 받고 `BrandService`가 `offset = page × size`로 환산해 조회한다.
+- 일치하는 브랜드가 없으면 `CoreException`이 아니라 빈 목록(`Page` 0건)으로 정상 응답한다. 단건 조회의 `NOT_FOUND`와 달리, 목록·검색에는 "없음"이 에러가 아니다.
+- 조회이므로 트랜잭션을 묶지 않는다. Facade는 무 트랜잭션, `BrandService`는 `readOnly` 트랜잭션을 자체적으로 잡는다.
 
 ## F-04. 상품 좋아요 등록 (멱등)
 
