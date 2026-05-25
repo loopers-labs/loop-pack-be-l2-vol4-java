@@ -35,8 +35,6 @@ public class OrderFacade {
 
     @Transactional
     public OrderInfo createOrder(CreateOrderCommand command) {
-        validateCommand(command);
-
         Map<Long, Product> products = getProducts(command.productIds());
         Map<Long, Brand> brands = getBrands(products.values());
 
@@ -73,15 +71,6 @@ public class OrderFacade {
             throw new CoreException(ErrorType.FORBIDDEN, "다른 사용자의 주문은 조회할 수 없습니다.");
         }
         return OrderInfo.from(order);
-    }
-
-    private void validateCommand(CreateOrderCommand command) {
-        if (command == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청은 비어있을 수 없습니다.");
-        }
-        if (command.userId() == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 비어있을 수 없습니다.");
-        }
     }
 
     private Map<Long, Product> getProducts(List<Long> productIds) {
