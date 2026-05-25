@@ -284,6 +284,39 @@ class OrderFacadeIntegrationTest {
     @Nested
     class GetMyOrderDetail {
 
+        @DisplayName("주문 이후 상품이 삭제되어도, 주문 당시 상품 스냅샷을 반환한다.")
+        @Test
+        void returnsOrderSnapshot_whenProductIsDeletedAfterOrderCreated() {
+            // arrange
+            Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
+            OrderInfo order = orderFacade.createOrder(new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 2)
+            )));
+            productService.deleteProduct(iphone.getId());
+
+            // act
+            OrderInfo found = orderFacade.getMyOrderDetail(order.id(), userId);
+
+            // assert
+            assertAll(
+                () -> assertThat(found.id()).isEqualTo(order.id()),
+                () -> assertThat(found.items()).hasSize(1),
+                () -> assertThat(found.items().getFirst().brandName()).isEqualTo("애플"),
+                () -> assertThat(found.items().getFirst().productName()).isEqualTo("아이폰 16 Pro"),
+                () -> assertThat(found.items().getFirst().unitPrice()).isEqualTo(1_550_000L),
+                () -> assertThat(found.items().getFirst().quantity()).isEqualTo(2),
+                () -> assertThat(found.items().getFirst().totalPrice()).isEqualTo(3_100_000L)
+            );
+        }
+
         @DisplayName("다른 사용자의 주문 ID가 주어지면, FORBIDDEN 예외를 던진다.")
         @Test
         void throwsForbidden_whenOrderBelongsToAnotherUser() {
