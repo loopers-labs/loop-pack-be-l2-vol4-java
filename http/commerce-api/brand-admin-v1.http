@@ -1,0 +1,37 @@
+### 브랜드 등록 - 정상 (201 Created)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "감성 브랜드",
+  "description": "감성을 담은 브랜드"
+}
+
+### 브랜드 등록 - 설명 생략 (201 Created)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "이름만 있는 브랜드"
+}
+
+### 브랜드 등록 - 관리자 인증 헤더 누락 (403 Forbidden)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+
+{
+  "name": "감성 브랜드",
+  "description": "감성을 담은 브랜드"
+}
+
+### 브랜드 등록 - 이름 빈 값 (400 Bad Request)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "   ",
+  "description": "감성을 담은 브랜드"
+}
