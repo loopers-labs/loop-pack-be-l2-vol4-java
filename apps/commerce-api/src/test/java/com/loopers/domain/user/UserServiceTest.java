@@ -53,7 +53,7 @@ class UserServiceTest {
         void returnsRegisteredUser_whenLoginIdIsUnique() {
             // arrange
             String rawPassword = user.getPassword(); // 서비스 실행 전 원본 비밀번호 캡처 (서비스가 user 객체를 mutate하므로)
-            willDoNothing().given(passwordPolicy).validate(rawPassword, user.getBirthDate());
+            willDoNothing().given(passwordPolicy).validate(new PasswordValidationContext(rawPassword, user.getBirthDate()));
             given(userRepository.existsByLoginId(user.getLoginId())).willReturn(false);
             given(passwordEncoder.encode(rawPassword)).willReturn("encodedHash!");
             given(userRepository.save(user)).willReturn(user);
@@ -63,7 +63,7 @@ class UserServiceTest {
 
             // assert
             assertThat(result).isEqualTo(user);
-            then(passwordPolicy).should().validate(rawPassword, user.getBirthDate());
+            then(passwordPolicy).should().validate(new PasswordValidationContext(rawPassword, user.getBirthDate()));
             then(passwordEncoder).should().encode(rawPassword);
         }
 
@@ -71,7 +71,7 @@ class UserServiceTest {
         @Test
         void throwsConflict_whenLoginIdIsDuplicated() {
             // arrange
-            willDoNothing().given(passwordPolicy).validate(user.getPassword(), user.getBirthDate());
+            willDoNothing().given(passwordPolicy).validate(new PasswordValidationContext(user.getPassword(), user.getBirthDate()));
             given(userRepository.existsByLoginId(user.getLoginId())).willReturn(true);
 
             // act
@@ -97,7 +97,7 @@ class UserServiceTest {
         void updatesPasswordAndSaves_whenCurrentPasswordIsCorrectAndNewPasswordIsValid() {
             // arrange
             given(passwordEncoder.matches(CURRENT_RAW, user.getPassword())).willReturn(true);
-            willDoNothing().given(passwordPolicy).validate(NEW_RAW, user.getBirthDate());
+            willDoNothing().given(passwordPolicy).validate(new PasswordValidationContext(NEW_RAW, user.getBirthDate()));
             given(passwordEncoder.matches(NEW_RAW, user.getPassword())).willReturn(false);
             given(passwordEncoder.encode(NEW_RAW)).willReturn("encodedNew!");
             given(userRepository.save(user)).willReturn(user);
@@ -131,7 +131,7 @@ class UserServiceTest {
         void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // arrange
             given(passwordEncoder.matches(CURRENT_RAW, user.getPassword())).willReturn(true);
-            willDoNothing().given(passwordPolicy).validate(CURRENT_RAW, user.getBirthDate());
+            willDoNothing().given(passwordPolicy).validate(new PasswordValidationContext(CURRENT_RAW, user.getBirthDate()));
             given(passwordEncoder.matches(CURRENT_RAW, user.getPassword())).willReturn(true); // same check
 
             // act

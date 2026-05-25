@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -20,7 +21,7 @@ class PasswordPolicyTest {
 
     @BeforeEach
     void setUp() {
-        passwordPolicy = new PasswordPolicy();
+        passwordPolicy = new PasswordPolicy(List.of(new PasswordFormatRule(), new BirthDatePasswordRule()));
     }
 
     @DisplayName("비밀번호 형식을 검증할 때,")
@@ -34,7 +35,7 @@ class PasswordPolicyTest {
             String password = "ValidPw1!";
 
             // act & assert
-            assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
+            assertDoesNotThrow(() -> passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE)));
         }
 
         @DisplayName("8자 비밀번호(최소 길이) 검증 시 예외가 발생하지 않는다.")
@@ -44,7 +45,7 @@ class PasswordPolicyTest {
             String password = "Valid1!@";
 
             // act & assert
-            assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
+            assertDoesNotThrow(() -> passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE)));
         }
 
         @DisplayName("16자 비밀번호(최대 길이) 검증 시 예외가 발생하지 않는다.")
@@ -54,7 +55,7 @@ class PasswordPolicyTest {
             String password = "ValidPassword1!@";
 
             // act & assert
-            assertDoesNotThrow(() -> passwordPolicy.validate(password, BIRTH_DATE));
+            assertDoesNotThrow(() -> passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE)));
         }
 
         @DisplayName("7자 비밀번호(최소 길이 미만) 검증 시 BAD_REQUEST 예외가 발생한다.")
@@ -65,7 +66,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -80,7 +81,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -95,7 +96,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -107,7 +108,7 @@ class PasswordPolicyTest {
         void throwsBadRequest_whenPasswordIsNull() {
             // arrange & act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(null, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(null, BIRTH_DATE))
             );
 
             // assert
@@ -127,7 +128,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -142,7 +143,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -157,7 +158,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert
@@ -172,7 +173,7 @@ class PasswordPolicyTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                passwordPolicy.validate(password, BIRTH_DATE)
+                passwordPolicy.validate(new PasswordValidationContext(password, BIRTH_DATE))
             );
 
             // assert

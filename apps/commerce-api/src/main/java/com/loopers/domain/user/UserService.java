@@ -17,7 +17,7 @@ public class UserService {
 
     @Transactional
     public UserModel register(UserModel user) {
-        passwordPolicy.validate(user.getPassword(), user.getBirthDate());
+        passwordPolicy.validate(PasswordValidationContext.from(user.getPassword(), user));
         if (userRepository.existsByLoginId(user.getLoginId())) {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 로그인 ID입니다.");
         }
@@ -30,7 +30,7 @@ public class UserService {
         if (!passwordEncoder.matches(currentRawPassword, user.getPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
-        passwordPolicy.validate(newRawPassword, user.getBirthDate());
+        passwordPolicy.validate(PasswordValidationContext.from(newRawPassword, user));
         if (passwordEncoder.matches(newRawPassword, user.getPassword())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.");
         }
