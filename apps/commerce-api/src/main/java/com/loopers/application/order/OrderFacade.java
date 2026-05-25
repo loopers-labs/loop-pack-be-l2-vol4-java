@@ -4,6 +4,7 @@ import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderSearchPeriod;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
@@ -55,8 +56,7 @@ public class OrderFacade {
         return orderService.getOrders(
                 command.userId(),
                 new PageQuery(command.page(), command.size()),
-                command.startAt(),
-                command.endAt()
+                OrderSearchPeriod.of(command.startAt(), command.endAt())
             )
             .map(OrderInfo::from);
     }

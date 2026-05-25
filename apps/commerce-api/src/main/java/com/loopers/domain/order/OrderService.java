@@ -8,10 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-
 @RequiredArgsConstructor
 @Component
 public class OrderService {
@@ -30,31 +26,17 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<Order> getOrders(Long userId, PageQuery query, LocalDate startAt, LocalDate endAt) {
+    public PageResult<Order> getOrders(Long userId, PageQuery query, OrderSearchPeriod period) {
         return orderRepository.findAllByUserId(
             userId,
             query,
-            startOfDay(startAt),
-            nextDayStart(endAt)
+            period.startDateTime(),
+            period.endExclusiveDateTime()
         );
     }
 
     @Transactional(readOnly = true)
     public PageResult<Order> getOrders(PageQuery query) {
         return orderRepository.findAll(query);
-    }
-
-    private ZonedDateTime startOfDay(LocalDate date) {
-        if (date == null) {
-            return null;
-        }
-        return date.atStartOfDay(ZoneId.systemDefault());
-    }
-
-    private ZonedDateTime nextDayStart(LocalDate date) {
-        if (date == null) {
-            return null;
-        }
-        return date.plusDays(1).atStartOfDay(ZoneId.systemDefault());
     }
 }
