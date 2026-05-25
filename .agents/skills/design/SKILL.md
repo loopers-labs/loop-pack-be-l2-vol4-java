@@ -63,11 +63,16 @@ productStock.deduct(quantity);
 
 `Controller` 는 요청 파싱과 응답 래핑만 한다.
 
+- HTTP request shape 검증은 `@Valid`/Bean Validation 으로 `interfaces/api` 경계에서 처리한다.
+- 인증 사용자 식별은 인증 필터/시큐리티 경계의 책임이다.
+
 `Facade` 는 API 유스케이스의 진입점이다.
 
 - 여러 도메인 `Service` 를 조합한다.
 - `Command` 입력과 도메인 결과를 유스케이스 흐름에 맞게 변환한다.
 - 단일 Service 호출만 감싸는 경우 얇게 유지하고 비즈니스 규칙을 넣지 않는다.
+- adapter 가 만든 유효한 `Command` 를 전제로 흐름을 조합한다. 위 레이어에서 보장한 `command == null`, DTO 필드 null, 인증 사용자 null 같은 request shape 검증을 Facade 에서 반복하지 않는다.
+- HTTP 외 adapter 가 같은 유스케이스를 호출한다면 그 adapter 경계에서 검증하거나 Command 생성 경로를 안전하게 만든다. 미래 호출자를 가정해 Facade 에 중복 방어를 미리 넣지 않는다.
 
 `Service` 는 도메인 단위의 트랜잭션/비즈니스 흐름을 담당한다.
 

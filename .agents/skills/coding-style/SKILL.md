@@ -109,6 +109,12 @@ public void validate(Order order) {
 
 내부 로직에 null 이 흐르지 않게 한다. 입력 경계에서 검증하거나 기본값으로 바꾼다.
 
+- HTTP request 의 null/blank/size/positive 같은 shape 검증은 DTO/Controller 의 `@Valid` 로 처리한다.
+- 인증 principal null 검증은 인증 필터/시큐리티 경계가 책임진다.
+- `Facade` 에서 `validateCommand(command)` 를 만들어 위 레이어에서 이미 보장한 `command == null`, DTO 필드 null, 인증 사용자 null 을 다시 검사하지 않는다.
+- 도메인 invariant 는 DTO 검증으로 대체하지 않는다. `Order.create(...)`, `OrderItem.create(...)`, `ProductStock.deduct(...)` 처럼 Entity/VO/Domain Service 가 계속 책임진다.
+- HTTP 외 adapter 가 같은 유스케이스를 호출하면 그 adapter 경계에서 검증하거나 Command 생성 경로를 안전하게 만든다.
+
 ```java
 public List<Item> getItems() {
     return items == null ? List.of() : items;

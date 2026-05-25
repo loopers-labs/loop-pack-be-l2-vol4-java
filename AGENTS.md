@@ -116,6 +116,10 @@ supports/    add-on (java-library)
 
 `Request`/`Response` 명명은 HTTP 입출력을 표현하는 `interfaces/api` 에만 사용한다. `application` 입력은 `SignUpCommand`, `CreateOrderCommand` 처럼 `Request` 를 빼고 유스케이스 의미로 이름 짓는다.
 
+입력 검증은 가장 가까운 진입 경계에서 처리한다. HTTP request shape 검증은 `interfaces/api` 의 DTO/Controller 에서 `@Valid` 와 Bean Validation 으로 처리하고, 인증 사용자 식별은 인증 필터/시큐리티 경계가 책임진다. `application` 의 `Facade` 는 adapter 가 만든 유효한 `Command` 를 받아 도메인 서비스와 도메인 객체를 조합하는 흐름에 집중하며, 이미 위 레이어에서 보장한 `command == null`, `productId == null`, `quantity <= 0`, 인증 사용자 null 같은 검증을 중복 작성하지 않는다. 단, Entity/VO/Domain Service 의 핵심 invariant 는 항상 도메인 레이어에 남긴다.
+
+HTTP 외에 Batch/Kafka/internal job 이 같은 유스케이스를 직접 호출한다면, 그 adapter 경계에서 별도로 검증하거나 Command 생성 경로를 안전하게 만든다. "언젠가 다른 호출자가 생길 수 있다"는 이유만으로 Facade 에 광범위한 방어 검증을 추가하지 않는다.
+
 응답은 모두 `ApiResponse<T>` (`Metadata{result, errorCode, message}` + `data`). `CoreException(ErrorType, msg)` 는 `ApiControllerAdvice` 가 `ApiResponse.fail(...)` 로 매핑하므로 컨트롤러에서 catch 하지 말고 advice 를 확장한다.
 
 엔티티는 `modules/jpa` 의 `BaseEntity` 를 상속한다: IDENTITY id, `createdAt`/`updatedAt`/`deletedAt` (soft delete), `@PrePersist`/`@PreUpdate` 에서 호출되는 `protected guard()` 훅. `delete()`/`restore()` 는 멱등.
