@@ -38,9 +38,6 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public PageResult<Order> getOrders(Long userId, PageQuery query, LocalDate startAt, LocalDate endAt) {
-        if (userId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 비어있을 수 없습니다.");
-        }
         return orderRepository.findAllByUserId(
             userId,
             query,

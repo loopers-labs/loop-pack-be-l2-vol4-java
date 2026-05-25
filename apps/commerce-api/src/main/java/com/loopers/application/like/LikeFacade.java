@@ -40,9 +40,6 @@ public class LikeFacade {
 
     @Transactional(readOnly = true)
     public PageResult<ProductListInfo> getMyLikes(GetMyLikesCommand command) {
-        if (command == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "좋아요 목록 조회 요청은 비어있을 수 없습니다.");
-        }
         if (!command.isOwnUser()) {
             throw new CoreException(ErrorType.FORBIDDEN, "다른 사용자의 좋아요 목록은 조회할 수 없습니다.");
         }
