@@ -33,20 +33,21 @@ class OrderServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("주문을 생성할 때 ")
+    @DisplayName("주문을 저장할 때")
     @Nested
-    class CreateOrder {
+    class SaveOrder {
 
-        @DisplayName("사용자 ID와 주문 항목들이 주어지면, 주문과 주문 항목을 함께 저장한다.")
+        @DisplayName("주문이 주어지면, 주문과 주문 항목을 함께 저장한다.")
         @Test
-        void savesOrderAndItems_whenUserIdAndItemsAreProvided() {
+        void savesOrderAndItems_whenOrderIsProvided() {
             // arrange
             Long userId = 1L;
             OrderItem iphone = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 2);
             OrderItem iphoneMax = OrderItem.create(1L, "애플", 2L, "아이폰 16 Pro Max", 1_900_000L, 1);
+            Order order = Order.create(userId, List.of(iphone, iphoneMax));
 
             // act
-            Order saved = orderService.createOrder(userId, List.of(iphone, iphoneMax));
+            Order saved = orderService.saveOrder(order);
             Order found = orderService.getOrder(saved.getId());
 
             // assert

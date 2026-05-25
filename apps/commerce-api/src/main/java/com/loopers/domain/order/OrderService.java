@@ -11,19 +11,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class OrderService {
 
     private final OrderRepository orderRepository;
-
-    @Transactional
-    public Order createOrder(Long userId, List<OrderItem> items) {
-        Order order = Order.create(userId, items);
-        return saveOrder(order);
-    }
 
     @Transactional
     public Order saveOrder(Order order) {
