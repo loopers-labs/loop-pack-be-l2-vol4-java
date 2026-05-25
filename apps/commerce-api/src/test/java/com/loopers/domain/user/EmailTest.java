@@ -34,7 +34,7 @@ class EmailTest {
         @ParameterizedTest
         @ValueSource(strings = {"notanemail", "missing.domain@", "@nodomain.com", "two@@signs.com"})
         void throwsBadRequest_whenValueIsInvalidEmailFormat(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Email.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -59,7 +59,7 @@ class EmailTest {
         @NullAndEmptySource
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenValueIsNullOrBlank(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Email.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")

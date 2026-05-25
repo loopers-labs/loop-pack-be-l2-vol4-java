@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
+import static org.mockito.BDDMockito.then;
 
 import java.time.LocalDate;
 
@@ -57,7 +57,7 @@ class UserModelTest {
                 () -> assertThat(userModel.getBirthDate()).isEqualTo(BirthDate.from(rawBirthDate)),
                 () -> assertThat(userModel.getEmail()).isEqualTo(Email.from(rawEmail)),
                 () -> assertThat(userModel.getEncryptedPassword().value()).isEqualTo(encryptedPasswordValue),
-                () -> verify(passwordEncrypter).encrypt(rawPassword)
+                () -> then(passwordEncrypter).should().encrypt(rawPassword)
             );
         }
 
