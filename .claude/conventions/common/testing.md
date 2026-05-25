@@ -52,7 +52,7 @@
 @ParameterizedTest
 @ValueSource(strings = {"a", "abc"})
 void throwsBadRequest_whenValueIsShorterThanMinLength(String value) {
-    // arrange, act & assert
+    // arrange & act & assert
     assertThatThrownBy(() -> LoginId.from(value))
         .isInstanceOf(CoreException.class)
         .extracting("errorType")
