@@ -19,10 +19,19 @@ import java.util.regex.Pattern;
 })
 public class UserModel extends BaseEntity {
 
+    @Column(nullable = false, length = 16)
     private String userid;
+
+    @Column(nullable = false)
     private String password;
+
+    @Column(nullable = false, length = 50)
     private String name;
+
+    @Column(nullable = false, length = 10)
     private String birthDay;
+
+    @Column(nullable = false)
     private String email;
 
     @Enumerated(EnumType.STRING)
@@ -45,6 +54,7 @@ public class UserModel extends BaseEntity {
 
     public static void validateUserId(String userid) {
         Guard.notBlank(userid, "아이디는 빈값이 들어올 수 없습니다.");
+        Guard.maxLength(userid, 16, "아이디는 16자를 초과할 수 없습니다.");
         Guard.matches(userid, USERID_PATTERN, "아이디는 영문과 숫자만 허용됩니다.");
     }
 
@@ -62,6 +72,7 @@ public class UserModel extends BaseEntity {
         validateEmail(email);
         Guard.notBlank(name, "이름은 비어있을 수 없습니다.");
         Guard.minLength(name, 2, "이름은 2글자 이상으로 작성해 주세요.");
+        Guard.maxLength(name, 50, "이름은 50자를 초과할 수 없습니다.");
         Guard.notNull(role, "역할은 필수입니다.");
 
         this.userid = userid;

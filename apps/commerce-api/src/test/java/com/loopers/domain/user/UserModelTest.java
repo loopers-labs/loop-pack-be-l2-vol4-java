@@ -36,17 +36,18 @@ class UserModelTest {
     @DisplayName("회원 모델을 생성 할 때,")
     @Nested
     class Create {
-        @DisplayName("아이디가 영문 대소문자 특수문자를 포함하지 않으면,")
+        @DisplayName("아이디가 영문/숫자 외 문자를 포함하거나 16자를 초과하면,")
         @Nested
         class UserIdFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
             @ValueSource(strings = {
                     BLANK,
                     SPACE,
-                    "유저1",     // 한글 포함
-                    "user_1",   // 언더스코어 포함
-                    "user-1",   // 하이픈 포함
-                    "user!1",   // 특수문자 포함
+                    "유저1",               // 한글 포함
+                    "user_1",             // 언더스코어 포함
+                    "user-1",             // 하이픈 포함
+                    "user!1",             // 특수문자 포함
+                    "abcdefghijklmnopq",  // 17자 초과
             })
             @DisplayName("BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenUseridIsBlank(String invalidUserId) {
@@ -60,11 +61,11 @@ class UserModelTest {
             }
         }
 
-        @DisplayName("이름이 공백이거나 2자 미만이면,")
+        @DisplayName("이름이 공백이거나 2자 미만이거나 50자를 초과하면,")
         @Nested
         class NameFormatValidation {
             @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {BLANK, SPACE, "양"})
+            @ValueSource(strings = {BLANK, SPACE, "양", "가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다"})
             @DisplayName("BAD_REQUEST 예외가 발생한다.")
             void throwsBadRequest_whenNameIsInvalid(String invalidName) {
                 // act
