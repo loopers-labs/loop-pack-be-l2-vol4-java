@@ -20,7 +20,7 @@ public class UserService {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 아이디입니다.");
         }
         UserModel.validatePassword(password, birthDay);
-        UserModel user = new UserModel(userid, passwordEncoder.encode(password), name, birthDay, email);
+        UserModel user = new UserModel(userid, passwordEncoder.encode(password), name, birthDay, email, UserRole.USER);
         return userRepository.save(user);
     }
 
