@@ -8,6 +8,6 @@ public record GetMyLikesCommand(
 ) {
 
     public boolean isOwnUser() {
-        return userId != null && userId.equals(authenticatedUserId);
+        return userId.equals(authenticatedUserId);
     }
 }
