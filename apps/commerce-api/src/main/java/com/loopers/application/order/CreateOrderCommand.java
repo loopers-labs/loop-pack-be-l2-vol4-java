@@ -8,7 +8,7 @@ public record CreateOrderCommand(
 ) {
 
     public CreateOrderCommand {
-        items = items == null ? List.of() : List.copyOf(items);
+        items = List.copyOf(items);
     }
 
     public List<Long> productIds() {

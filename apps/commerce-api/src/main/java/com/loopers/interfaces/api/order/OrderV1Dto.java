@@ -17,11 +17,9 @@ public class OrderV1Dto {
     ) {
 
         public CreateOrderCommand toCommand(Long userId) {
-            List<CreateOrderCommand.Item> commandItems = items == null
-                ? List.of()
-                : items.stream()
-                    .map(item -> new CreateOrderCommand.Item(item.productId(), item.quantity()))
-                    .toList();
+            List<CreateOrderCommand.Item> commandItems = items.stream()
+                .map(item -> new CreateOrderCommand.Item(item.productId(), item.quantity()))
+                .toList();
             return new CreateOrderCommand(userId, commandItems);
         }
 
