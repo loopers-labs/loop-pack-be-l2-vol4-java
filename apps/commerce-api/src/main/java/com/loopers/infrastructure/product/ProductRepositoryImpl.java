@@ -98,7 +98,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     private Sort toSort(ProductSort sort) {
         return switch (sort) {
             case PRICE_ASC -> Sort.by(
-                Sort.Order.asc("price"),
+                Sort.Order.asc("price.value"),
                 Sort.Order.desc("createdAt"),
                 Sort.Order.desc("id")
             );

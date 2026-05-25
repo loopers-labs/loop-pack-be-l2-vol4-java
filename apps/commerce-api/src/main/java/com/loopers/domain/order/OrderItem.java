@@ -1,9 +1,12 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.order.vo.OrderPrice;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -32,21 +35,23 @@ public class OrderItem extends BaseEntity {
     @Column(name = "product_name", nullable = false)
     private String productName;
 
-    @Column(name = "unit_price", nullable = false)
-    private long unitPrice;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "unit_price", nullable = false))
+    private OrderPrice unitPrice;
 
     @Column(nullable = false)
     private int quantity;
 
-    @Column(name = "total_price", nullable = false)
-    private long totalPrice;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "total_price", nullable = false))
+    private OrderPrice totalPrice;
 
     private OrderItem(
         Long brandId,
         String brandName,
         Long productId,
         String productName,
-        long unitPrice,
+        OrderPrice unitPrice,
         int quantity
     ) {
         this.brandId = brandId;
@@ -55,7 +60,7 @@ public class OrderItem extends BaseEntity {
         this.productName = productName;
         this.unitPrice = unitPrice;
         this.quantity = quantity;
-        this.totalPrice = unitPrice * quantity;
+        this.totalPrice = unitPrice.multiply(quantity);
     }
 
     public static OrderItem create(
@@ -67,9 +72,9 @@ public class OrderItem extends BaseEntity {
         int quantity
     ) {
         validateSnapshot(brandId, brandName, productId, productName);
-        validatePrice(unitPrice);
+        OrderPrice orderPrice = OrderPrice.of(unitPrice);
         validateQuantity(quantity);
-        return new OrderItem(brandId, brandName, productId, productName, unitPrice, quantity);
+        return new OrderItem(brandId, brandName, productId, productName, orderPrice, quantity);
     }
 
     private static void validateSnapshot(Long brandId, String brandName, Long productId, String productName) {
@@ -87,15 +92,21 @@ public class OrderItem extends BaseEntity {
         }
     }
 
-    private static void validatePrice(long unitPrice) {
-        if (unitPrice < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 단가는 0 이상이어야 합니다.");
-        }
-    }
-
     private static void validateQuantity(int quantity) {
         if (quantity <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");
         }
+    }
+
+    public long getUnitPrice() {
+        return unitPrice.value();
+    }
+
+    public long getTotalPrice() {
+        return totalPrice.value();
+    }
+
+    OrderPrice totalPrice() {
+        return totalPrice;
     }
 }

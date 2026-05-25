@@ -1,11 +1,14 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.order.vo.OrderPrice;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
@@ -38,8 +41,9 @@ public class Order extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "order_total_price", nullable = false)
-    private long orderTotalPrice;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "order_total_price", nullable = false))
+    private OrderPrice orderTotalPrice;
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(
@@ -72,6 +76,10 @@ public class Order extends BaseEntity {
         return this.userId.equals(userId);
     }
 
+    public long getOrderTotalPrice() {
+        return orderTotalPrice.value();
+    }
+
     private static void validateItems(List<OrderItem> items) {
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
@@ -84,9 +92,10 @@ public class Order extends BaseEntity {
         }
     }
 
-    private static long calculateTotalPrice(List<OrderItem> items) {
+    private static OrderPrice calculateTotalPrice(List<OrderItem> items) {
         return items.stream()
-            .mapToLong(OrderItem::getTotalPrice)
-            .sum();
+            .map(OrderItem::totalPrice)
+            .reduce(OrderPrice::add)
+            .orElseGet(() -> OrderPrice.of(0));
     }
 }
