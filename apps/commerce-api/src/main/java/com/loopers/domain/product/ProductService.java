@@ -3,9 +3,12 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -14,33 +17,38 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-    @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
-        return productRepository.save(product);
-    }
-
     @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
-        return productRepository.find(id)
+    public ProductModel getById(Long id) {
+        return productRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public List<ProductModel> getAllByIds(Collection<Long> ids) {
+        return productRepository.findAllByIds(ids);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductModel> search(Long brandId, SortOption sort, Pageable pageable) {
+        return productRepository.search(brandId, sort, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByBrandId(Long brandId) {
+        return productRepository.countByBrandId(brandId);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
-        return productRepository.save(product);
+    public void incrementLikeCount(Long productId) {
+        ProductModel product = productRepository.findById(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        product.increaseLike();
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+    public void decrementLikeCount(Long productId) {
+        ProductModel product = productRepository.findById(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        product.decreaseLike();
     }
 }
