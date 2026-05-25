@@ -1,5 +1,7 @@
-package com.loopers.domain.product;
+package com.loopers.domain.product.service;
 
+import com.loopers.domain.product.model.ProductModel;
+import com.loopers.domain.product.repository.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;

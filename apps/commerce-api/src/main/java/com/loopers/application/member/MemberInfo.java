@@ -1,6 +1,6 @@
 package com.loopers.application.member;
 
-import com.loopers.domain.member.Member;
+import com.loopers.domain.member.model.Member;
 
 public record MemberInfo(String loginId, String name, String birthDate, String email) {
 

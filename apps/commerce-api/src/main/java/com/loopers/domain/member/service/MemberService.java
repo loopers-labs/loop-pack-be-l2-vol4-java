@@ -1,5 +1,8 @@
-package com.loopers.domain.member;
+package com.loopers.domain.member.service;
 
+import com.loopers.domain.member.model.Member;
+import com.loopers.domain.member.model.Password;
+import com.loopers.domain.member.repository.MemberRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;

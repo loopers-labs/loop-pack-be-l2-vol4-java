@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.member;
 
-import com.loopers.domain.member.Member;
-import com.loopers.domain.member.MemberRepository;
+import com.loopers.domain.member.model.Member;
+import com.loopers.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -1,6 +1,6 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.model.ProductModel;
 
 public record ProductInfo(
     Long id,

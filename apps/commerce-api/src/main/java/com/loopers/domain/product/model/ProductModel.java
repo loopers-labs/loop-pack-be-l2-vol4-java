@@ -1,4 +1,4 @@
-package com.loopers.domain.product;
+package com.loopers.domain.product.model;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;

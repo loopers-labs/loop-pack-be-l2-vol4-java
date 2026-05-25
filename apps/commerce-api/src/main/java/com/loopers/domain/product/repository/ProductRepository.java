@@ -1,5 +1,6 @@
-package com.loopers.domain.product;
+package com.loopers.domain.product.repository;
 
+import com.loopers.domain.product.model.ProductModel;
 import java.util.Optional;
 import java.util.List;
 

@@ -1,5 +1,6 @@
-package com.loopers.domain.brand;
+package com.loopers.domain.brand.repository;
 
+import com.loopers.domain.brand.model.Brand;
 import java.util.Optional;
 
 public interface BrandRepository {
