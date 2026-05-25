@@ -17,6 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -141,6 +146,53 @@ class OrderFacadeIntegrationTest {
                 () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(10),
                 () -> assertThat(productStockService.getProductStock(iphoneMax.getId()).getQuantity()).isEqualTo(5)
             );
+        }
+
+        @DisplayName("재고가 1개인 상품을 동시에 주문하면, 하나의 주문만 성공하고 초과 판매가 발생하지 않는다.")
+        @Test
+        void createsOnlyOneOrder_whenTwoUsersOrderLastStockConcurrently() throws Exception {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 1);
+            CreateOrderCommand firstCommand = new CreateOrderCommand(1L, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ));
+            CreateOrderCommand secondCommand = new CreateOrderCommand(2L, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ));
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+
+            try {
+                Future<OrderAttempt> first = executor.submit(() -> createOrderAfter(start, firstCommand));
+                Future<OrderAttempt> second = executor.submit(() -> createOrderAfter(start, secondCommand));
+
+                // act
+                start.countDown();
+                List<OrderAttempt> attempts = List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)
+                );
+
+                // assert
+                assertAll(
+                    () -> assertThat(attempts).filteredOn(OrderAttempt::succeeded).hasSize(1),
+                    () -> assertThat(attempts)
+                        .filteredOn(attempt -> !attempt.succeeded())
+                        .extracting(OrderAttempt::errorType)
+                        .containsExactly(ErrorType.CONFLICT),
+                    () -> assertThat(orderJpaRepository.count()).isEqualTo(1),
+                    () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isZero()
+                );
+            } finally {
+                executor.shutdownNow();
+            }
         }
 
         @DisplayName("삭제된 상품이 포함되면, 주문 생성을 실패하고 재고를 차감하지 않는다.")
@@ -340,6 +392,30 @@ class OrderFacadeIntegrationTest {
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.FORBIDDEN);
+        }
+    }
+
+    private OrderAttempt createOrderAfter(CountDownLatch start, CreateOrderCommand command) {
+        try {
+            start.await();
+            orderFacade.createOrder(command);
+            return OrderAttempt.successAttempt();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("주문 시작 대기 중 인터럽트가 발생했습니다.", e);
+        } catch (CoreException e) {
+            return OrderAttempt.failureAttempt(e.getErrorType());
+        }
+    }
+
+    private record OrderAttempt(boolean succeeded, ErrorType errorType) {
+
+        private static OrderAttempt successAttempt() {
+            return new OrderAttempt(true, null);
+        }
+
+        private static OrderAttempt failureAttempt(ErrorType errorType) {
+            return new OrderAttempt(false, errorType);
         }
     }
 }
