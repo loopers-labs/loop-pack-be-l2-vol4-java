@@ -25,6 +25,7 @@ erDiagram
     bigint brand_id FK
     varchar name
     decimal price
+    int like_count
     timestamp created_at
     timestamp updated_at
     timestamp deleted_at
