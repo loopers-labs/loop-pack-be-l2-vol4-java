@@ -18,12 +18,13 @@ class UserServiceUnitTest {
     private InMemoryUserRepository userRepository;
     private UserService sut;
 
-    private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
-    private final String NEW_PASSWORD     = "Dlaxodid2!";
-    private final String DEFAULT_NAME     = "홍길동";
-    private final String DEFAULT_BIRTHDAY = "1990-01-01";
-    private final String DEFAULT_EMAIL    = "test@test.com";
+    private final String DEFAULT_USERID    = "user1";
+    private final String DEFAULT_PASSWORD  = "Dlaxodid1!";
+    private final String NEW_PASSWORD      = "Dlaxodid2!";
+    private final String DEFAULT_NAME      = "홍길동";
+    private final String DEFAULT_BIRTHDAY  = "1990-01-01";
+    private final String DEFAULT_EMAIL     = "test@test.com";
+    private final UserRole DEFAULT_ROLE    = UserRole.USER;
 
     @BeforeEach
     void setUp() {
@@ -32,7 +33,7 @@ class UserServiceUnitTest {
     }
 
     private void saveDefaultUser() {
-        userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+        userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
     }
 
     @DisplayName("회원가입을 할 때,")

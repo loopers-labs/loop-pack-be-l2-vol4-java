@@ -32,12 +32,13 @@ class UserServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
-    private final String NEW_PASSWORD     = "Dlaxodid2!";
-    private final String DEFAULT_NAME     = "홍길동";
-    private final String DEFAULT_BIRTHDAY = "1990-01-01";
-    private final String DEFAULT_EMAIL    = "test@test.com";
+    private final String DEFAULT_USERID    = "user1";
+    private final String DEFAULT_PASSWORD  = "Dlaxodid1!";
+    private final String NEW_PASSWORD      = "Dlaxodid2!";
+    private final String DEFAULT_NAME      = "홍길동";
+    private final String DEFAULT_BIRTHDAY  = "1990-01-01";
+    private final String DEFAULT_EMAIL     = "test@test.com";
+    private final UserRole DEFAULT_ROLE    = UserRole.USER;
 
     @AfterEach
     void tearDown() {
@@ -63,7 +64,7 @@ class UserServiceIntegrationTest {
         void onlyOneSucceeds_whenConcurrentRegistrationWithSameUserid() throws InterruptedException {
             // act
             ConcurrentResult result = runConcurrent(5, () ->
-                    userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL))
+                    userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE))
             );
 
             // assert
@@ -75,7 +76,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsConflict_whenUseridAlreadyExists() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -127,7 +128,7 @@ class UserServiceIntegrationTest {
         @Test
         void returnsUser_whenUserIdExists() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             UserModel result = userService.getUser(DEFAULT_USERID);
@@ -145,7 +146,7 @@ class UserServiceIntegrationTest {
         @Test
         void changesPassword_whenPasswordIsValid() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             userService.changePassword(DEFAULT_USERID, NEW_PASSWORD);
@@ -159,7 +160,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenPasswordFormatIsInvalid() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -174,7 +175,7 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->

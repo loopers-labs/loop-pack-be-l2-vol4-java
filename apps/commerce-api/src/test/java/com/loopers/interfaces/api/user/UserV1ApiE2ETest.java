@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.domain.user.UserRole;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -38,11 +39,12 @@ class UserV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
-    private final String DEFAULT_NAME     = "홍길동";
-    private final String DEFAULT_BIRTHDAY = "1990-01-01";
-    private final String DEFAULT_EMAIL    = "test@test.com";
+    private final String DEFAULT_USERID    = "user1";
+    private final String DEFAULT_PASSWORD  = "Dlaxodid1!";
+    private final String DEFAULT_NAME      = "홍길동";
+    private final String DEFAULT_BIRTHDAY  = "1990-01-01";
+    private final String DEFAULT_EMAIL     = "test@test.com";
+    private final UserRole DEFAULT_ROLE    = UserRole.USER;
 
     private final String MASKING_NAME = "홍길*";
     private final String NEW_PASSWORD = "Dlaxodid2!";
@@ -66,7 +68,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUnauthorized_whenAuthHeadersAreMissing() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -81,7 +83,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUser_whenAuthHeadersAreValid() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
 
             // act
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -146,7 +148,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsConflict_whenUseridAlreadyExists() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
             UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
                 DEFAULT_USERID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL
             );
@@ -171,7 +173,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUser_whenNewPasswordIsValid() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(NEW_PASSWORD);
             HttpHeaders headers = authHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -191,7 +193,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenNewPasswordIsNull() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(null);
             HttpHeaders headers = authHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -209,7 +211,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // arrange
-            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL));
+            userRepository.save(new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE));
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest(DEFAULT_PASSWORD);
             HttpHeaders headers = authHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

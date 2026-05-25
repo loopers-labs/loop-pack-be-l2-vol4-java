@@ -17,19 +17,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UserModelTest {
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    private final String DEFAULT_USERID   = "user1";
-    private final String DEFAULT_PASSWORD = "Dlaxodid1!";
-    private final String DEFAULT_NAME     = "홍길동";
-    private final String DEFAULT_BIRTHDAY = "1990-01-01";
-    private final String DEFAULT_EMAIL    = "test@test.com";
+    private final String DEFAULT_USERID    = "user1";
+    private final String DEFAULT_PASSWORD  = "Dlaxodid1!";
+    private final String DEFAULT_NAME      = "홍길동";
+    private final String DEFAULT_BIRTHDAY  = "1990-01-01";
+    private final String DEFAULT_EMAIL     = "test@test.com";
+    private final UserRole DEFAULT_ROLE    = UserRole.USER;
 
-    private final String NEW_PASSWORD     = "Dlaxodid2!";
+    private final String NEW_PASSWORD      = "Dlaxodid2!";
 
     private static final String BLANK      = "";
     private static final String SPACE      = " ";
 
     private UserModel createDefaultUser() {
-        return new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL);
+        return new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE);
     }
 
     @DisplayName("회원 모델을 생성 할 때,")
@@ -51,7 +52,7 @@ class UserModelTest {
             void throwsBadRequest_whenUseridIsBlank(String invalidUserId) {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(invalidUserId, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL)
+                        new UserModel(invalidUserId, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE)
                 );
 
                 // assert
@@ -68,7 +69,7 @@ class UserModelTest {
             void throwsBadRequest_whenNameIsInvalid(String invalidName) {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), invalidName, DEFAULT_BIRTHDAY, DEFAULT_EMAIL)
+                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), invalidName, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE)
                 );
 
                 // assert
@@ -128,7 +129,7 @@ class UserModelTest {
             void throwsBadRequest_whenBirthDayFormatIsInvalid(String invalidBirthDay) {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, invalidBirthDay, DEFAULT_EMAIL)
+                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, invalidBirthDay, DEFAULT_EMAIL, DEFAULT_ROLE)
                 );
 
                 // assert
@@ -150,7 +151,23 @@ class UserModelTest {
             void throwsBadRequest_whenEmailFormatIsInvalid(String invalidEmail) {
                 // act
                 CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, invalidEmail)
+                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, invalidEmail, DEFAULT_ROLE)
+                );
+
+                // assert
+                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            }
+        }
+
+        @DisplayName("역할이 null이면,")
+        @Nested
+        class RoleValidation {
+            @Test
+            @DisplayName("BAD_REQUEST 예외가 발생한다.")
+            void throwsBadRequest_whenRoleIsNull() {
+                // act
+                CoreException result = assertThrows(CoreException.class, () ->
+                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, null)
                 );
 
                 // assert
@@ -168,7 +185,8 @@ class UserModelTest {
                     () -> assertThat(user.getName()).isEqualTo(DEFAULT_NAME),
                     () -> assertThat(user.getEmail()).isEqualTo(DEFAULT_EMAIL),
                     () -> assertThat(user.getBirthDay()).isEqualTo(DEFAULT_BIRTHDAY),
-                    () ->  assertThat(passwordEncoder.matches(DEFAULT_PASSWORD, user.getPassword())).isTrue()
+                    () -> assertThat(passwordEncoder.matches(DEFAULT_PASSWORD, user.getPassword())).isTrue(),
+                    () -> assertThat(user.getRole()).isEqualTo(DEFAULT_ROLE)
             );
         }
     }
