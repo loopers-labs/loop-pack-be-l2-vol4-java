@@ -15,8 +15,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel createProduct(Long brandId, String name, String description, String imageUrl, Long price, Integer stock) {
+        ProductModel product = new ProductModel(brandId, name, description, imageUrl, price, stock);
         return productRepository.save(product);
     }
 
@@ -26,15 +26,23 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
+    /** 대고객 조회: 활성 상품만 반환. 없거나 비활성이면 NOT_FOUND (01 §7.4, UC-04). */
+    @Transactional(readOnly = true)
+    public ProductModel getActiveProduct(Long id) {
+        return productRepository.find(id)
+            .filter(ProductModel::isActive)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    }
+
     @Transactional(readOnly = true)
     public List<ProductModel> getAllProducts() {
         return productRepository.findAll();
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(Long id, String name, String description, String imageUrl, Long price, Integer stock) {
         ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
+        product.update(name, description, imageUrl, price, stock);
         return productRepository.save(product);
     }
 

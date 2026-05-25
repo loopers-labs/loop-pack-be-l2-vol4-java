@@ -20,8 +20,10 @@ public class ProductV1Controller {
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
+            request.brandId(),
             request.name(),
             request.description(),
+            request.imageUrl(),
             request.price(),
             request.stock()
         );
@@ -35,6 +37,15 @@ public class ProductV1Controller {
     ) {
         ProductInfo info = productFacade.getProduct(productId);
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{productId}/detail")
+    public ApiResponse<ProductV1Dto.ProductDetailResponse> getProductDetail(
+        @PathVariable(value = "productId") Long productId
+    ) {
+        ProductV1Dto.ProductDetailResponse response =
+            ProductV1Dto.ProductDetailResponse.from(productFacade.getProductDetail(productId));
         return ApiResponse.success(response);
     }
 
@@ -56,6 +67,7 @@ public class ProductV1Controller {
             productId,
             request.name(),
             request.description(),
+            request.imageUrl(),
             request.price(),
             request.stock()
         );
