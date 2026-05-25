@@ -43,6 +43,12 @@ public final class Guard {
         }
     }
 
+    public static void maxLength(String value, int max, String message) {
+        if (value != null && value.length() > max) {
+            throw new CoreException(ErrorType.BAD_REQUEST, message);
+        }
+    }
+
     public static void matches(String value, java.util.regex.Pattern pattern, String message) {
         if (value == null || !pattern.matcher(value).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, message);
