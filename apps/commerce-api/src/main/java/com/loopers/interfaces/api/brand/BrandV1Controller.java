@@ -1,7 +1,6 @@
 package com.loopers.interfaces.api.brand;
 
 import com.loopers.application.brand.BrandFacade;
-import com.loopers.application.brand.BrandInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +20,6 @@ public class BrandV1Controller implements BrandV1ApiSpec {
     public ApiResponse<BrandV1Dto.BrandResponse> getBrand(
         @PathVariable(value = "brandId") Long brandId
     ) {
-        BrandInfo info = brandFacade.getBrand(brandId);
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(info));
+        return ApiResponse.success(BrandV1Dto.BrandResponse.from(brandFacade.getBrand(brandId)));
     }
 }
