@@ -111,6 +111,48 @@ class OrderFacadeIntegrationTest {
             );
         }
 
+        @DisplayName("여러 상품 ID가 역순으로 주어져도, 재고를 차감하고 주문 스냅샷을 저장한다.")
+        @Test
+        void createsOrderAndDeductsStock_whenProductIdsAreProvidedInReverseOrder() {
+            // arrange
+            Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            Product iphoneMax = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro Max",
+                "더 큰 화면과 향상된 배터리를 제공하는 스마트폰",
+                1_900_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
+            productStockService.createProductStock(iphoneMax.getId(), 5);
+            CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphoneMax.getId(), 1),
+                new CreateOrderCommand.Item(iphone.getId(), 2)
+            ));
+
+            // act
+            OrderInfo result = orderFacade.createOrder(command);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.items())
+                    .extracting(OrderInfo.Item::productName)
+                    .containsExactly("아이폰 16 Pro Max", "아이폰 16 Pro"),
+                () -> assertThat(result.items())
+                    .extracting(OrderInfo.Item::totalPrice)
+                    .containsExactly(1_900_000L, 3_100_000L),
+                () -> assertThat(orderJpaRepository.count()).isEqualTo(1),
+                () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(8),
+                () -> assertThat(productStockService.getProductStock(iphoneMax.getId()).getQuantity()).isEqualTo(4)
+            );
+        }
+
         @DisplayName("하나의 상품이라도 재고가 부족하면, 주문 생성을 실패하고 차감된 재고도 롤백한다.")
         @Test
         void throwsConflictAndRollsBackStock_whenAnyProductStockIsInsufficient() {
