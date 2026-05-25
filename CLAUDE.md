@@ -128,9 +128,3 @@ if (gender == null) {
     throw new CoreException(ErrorType.BAD_REQUEST, "성별은 비어있을 수 없습니다.");
 }
 ```
-
----
-
-## 현재 구현 과제 (.codeguide/loopers-1-week.md)
-
-회원 가입, 내 정보 조회, 포인트 조회 기능을 구현해야 한다. 각 기능마다 단위/통합/E2E 테스트를 필수로 구현하고 통과시켜야 한다. `apps/commerce-api` 내에 `example` 패키지의 구조를 참고해 동일한 레이어 패턴으로 작성한다.
