@@ -51,4 +51,20 @@ public class ProductService {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);
     }
+
+    /** 좋아요 수 동기 +1 (01 §7.3, 04 §4.2 — 좋아요 등록과 동일 트랜잭션). */
+    @Transactional
+    public void increaseLikesCount(Long id) {
+        ProductModel product = getProduct(id);
+        product.incrementLikesCount();
+        productRepository.save(product);
+    }
+
+    /** 좋아요 수 동기 -1 (음수 방지는 ProductModel 책임). */
+    @Transactional
+    public void decreaseLikesCount(Long id) {
+        ProductModel product = getProduct(id);
+        product.decrementLikesCount();
+        productRepository.save(product);
+    }
 }
