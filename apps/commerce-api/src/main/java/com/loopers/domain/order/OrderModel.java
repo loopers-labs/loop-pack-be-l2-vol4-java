@@ -1,56 +1,28 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-@Entity
-@Table(name = "orders")
-public class OrderModel extends BaseEntity {
+/**
+ * Order Aggregate 루트 — 순수 도메인 객체. 상태 머신/집계 같은 비즈니스 규칙만 보유하고
+ * 영속 기술(JPA)에는 의존하지 않는다. JPA 매핑은 infrastructure.order.OrderEntity가 담당하고,
+ * 도메인 ↔ 엔티티 변환은 OrderEntityMapper가 처리한다.
+ */
+public class OrderModel {
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    private final Long id;   // 영속 전에는 null, 저장 후 매퍼가 채운 값으로 복원된다.
+    private final Long userId;
     private OrderStatus status;
-
-    @Embedded
-    @AttributeOverride(name = "amount", column = @Column(name = "total_amount", nullable = false))
     private Money totalAmount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, length = 20)
-    private PaymentMethod paymentMethod;
-
-    @Column(name = "failure_reason", length = 500)
+    private final PaymentMethod paymentMethod;
     private String failureReason;
-
-    @Column(name = "paid_at")
     private ZonedDateTime paidAt;
-
-    // 아그리거트 루트의 composition — 주문 로드 시 항목은 항상 함께 필요하므로 EAGER (단건 조회 위주)
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    @JoinColumn(name = "order_id", nullable = false)
-    private List<OrderItem> items = new ArrayList<>();
-
-    protected OrderModel() {}
+    private final List<OrderItem> items = new ArrayList<>();
 
     public OrderModel(Long userId, PaymentMethod paymentMethod) {
         if (userId == null) {
@@ -59,10 +31,30 @@ public class OrderModel extends BaseEntity {
         if (paymentMethod == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "결제 수단은 null일 수 없습니다.");
         }
+        this.id = null;
         this.userId = userId;
         this.paymentMethod = paymentMethod;
         this.status = OrderStatus.PENDING;
         this.totalAmount = Money.zero();
+    }
+
+    private OrderModel(Long id, Long userId, OrderStatus status, Money totalAmount, PaymentMethod paymentMethod,
+                       String failureReason, ZonedDateTime paidAt, List<OrderItem> items) {
+        this.id = id;
+        this.userId = userId;
+        this.status = status;
+        this.totalAmount = totalAmount;
+        this.paymentMethod = paymentMethod;
+        this.failureReason = failureReason;
+        this.paidAt = paidAt;
+        this.items.addAll(items);
+    }
+
+    /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). */
+    public static OrderModel reconstitute(Long id, Long userId, OrderStatus status, Money totalAmount,
+                                          PaymentMethod paymentMethod, String failureReason,
+                                          ZonedDateTime paidAt, List<OrderItem> items) {
+        return new OrderModel(id, userId, status, totalAmount, paymentMethod, failureReason, paidAt, items);
     }
 
     public void addItem(OrderItem item) {
@@ -97,6 +89,10 @@ public class OrderModel extends BaseEntity {
         if (this.status != OrderStatus.PENDING) {
             throw new CoreException(ErrorType.CONFLICT, "PENDING 상태에서만 결제 결과를 반영할 수 있습니다. (현재: " + this.status + ")");
         }
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public Long getUserId() {

@@ -1,46 +1,22 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
 /**
- * Order Aggregate 내부 자식 엔티티. 주문 시점 상품 정보 스냅샷을 보존한다 (03 §2.5, 04 §2.6).
+ * Order Aggregate 내부 자식. 주문 시점 상품 정보 스냅샷을 보존한다 (03 §2.5, 04 §2.6).
  * 외부에서 단독 조작 금지 — 항상 OrderModel을 통해 접근.
+ * 영속 기술에 의존하지 않는 순수 도메인 객체이며, JPA 매핑은 infrastructure.order.OrderItemEntity가 담당한다.
  */
-@Entity
-@Table(name = "order_item")
-public class OrderItem extends BaseEntity {
+public class OrderItem {
 
-    @Column(name = "product_id", nullable = false)
-    private Long productId;
-
-    @Column(name = "product_name", nullable = false, length = 200)
-    private String productName;
-
-    @Column(name = "brand_name", nullable = false, length = 100)
-    private String brandName;
-
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
-
-    @Embedded
-    @AttributeOverride(name = "amount", column = @Column(name = "unit_price", nullable = false))
-    private Money unitPrice;
-
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
-
-    @Embedded
-    @AttributeOverride(name = "amount", column = @Column(name = "line_total", nullable = false))
-    private Money lineTotal;
-
-    protected OrderItem() {}
+    private final Long productId;
+    private final String productName;
+    private final String brandName;
+    private final String imageUrl;
+    private final Money unitPrice;
+    private final Integer quantity;
+    private final Money lineTotal;
 
     public OrderItem(Long productId, String productName, String brandName, String imageUrl, Money unitPrice, int quantity) {
         if (productId == null) {
