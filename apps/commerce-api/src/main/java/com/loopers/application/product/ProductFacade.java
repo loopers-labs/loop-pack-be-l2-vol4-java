@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +36,8 @@ public class ProductFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
+    public List<ProductInfo> getAllProducts(ProductSortType sort, int page, int size) {
+        List<ProductModel> products = productService.getAllProducts(sort, page, size);
         List<Long> productIds = products.stream().map(ProductModel::getId).toList();
         Map<Long, StockModel> stockByProductId = stockService.getAllByProductIdIn(productIds).stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));

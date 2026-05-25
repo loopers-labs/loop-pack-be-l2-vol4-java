@@ -148,6 +148,37 @@ class ProductModelTest {
                 () -> assertThat(result.getCustomMessage()).isEqualTo("가격은 0 이상이어야 합니다.")
             );
         }
+
+        @DisplayName("생성 직후 likeCount 는 0 이다.")
+        @Test
+        void likeCountIsZero_whenJustCreated() {
+            // given
+            String name = "에어맥스 270";
+            String description = "가벼운 쿠셔닝의 데일리 러닝화";
+            Long price = 159_000L;
+
+            // when
+            ProductModel product = new ProductModel(name, description, price);
+
+            // then
+            assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("brandId 를 함께 받아 생성하면, brandId 가 그대로 보관된다.")
+        @Test
+        void keepsBrandId_whenCreatedWithBrandId() {
+            // given
+            String name = "슈퍼스타";
+            String description = "쉘토 스니커즈의 상징";
+            Long price = 129_000L;
+            Long brandId = 42L;
+
+            // when
+            ProductModel product = new ProductModel(name, description, price, brandId);
+
+            // then
+            assertThat(product.getBrandId()).isEqualTo(brandId);
+        }
     }
 
     @DisplayName("ProductModel 을 수정할 때, ")
@@ -273,6 +304,54 @@ class ProductModelTest {
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                 () -> assertThat(result.getCustomMessage()).isEqualTo("가격은 0 이상이어야 합니다.")
+            );
+        }
+    }
+
+    @DisplayName("ProductModel 의 좋아요 수를 변경할 때, ")
+    @Nested
+    class LikeCount {
+
+        @DisplayName("incrementLikeCount() 를 호출하면 likeCount 가 1 증가한다.")
+        @Test
+        void increasesLikeCountByOne_whenIncrementLikeCountIsCalled() {
+            // given
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+
+            // when
+            product.incrementLikeCount();
+
+            // then
+            assertThat(product.getLikeCount()).isEqualTo(1L);
+        }
+
+        @DisplayName("likeCount 가 1 일 때 decrementLikeCount() 를 호출하면 0 이 된다.")
+        @Test
+        void decreasesLikeCountByOne_whenDecrementLikeCountIsCalled() {
+            // given
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            product.incrementLikeCount();
+
+            // when
+            product.decrementLikeCount();
+
+            // then
+            assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("likeCount 가 0 일 때 decrementLikeCount() 를 호출하면 INVALID_LIKE_COUNT 예외가 발생한다.")
+        @Test
+        void throwsInvalidLikeCountException_whenDecrementingFromZero() {
+            // given
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, product::decrementLikeCount);
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.INVALID_LIKE_COUNT),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("좋아요 수는 0 미만이 될 수 없습니다.")
             );
         }
     }

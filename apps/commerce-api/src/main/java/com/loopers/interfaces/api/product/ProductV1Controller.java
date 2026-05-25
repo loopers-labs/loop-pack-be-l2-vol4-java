@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -39,8 +40,12 @@ public class ProductV1Controller {
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
+    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts(
+        @RequestParam(defaultValue = "LATEST") ProductSortType sort,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        List<ProductInfo> infos = productFacade.getAllProducts(sort, page, size);
         List<ProductV1Dto.ProductResponse> responses = infos.stream()
             .map(ProductV1Dto.ProductResponse::from)
             .toList();

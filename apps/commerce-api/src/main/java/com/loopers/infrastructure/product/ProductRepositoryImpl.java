@@ -2,7 +2,10 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -24,12 +27,20 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductModel> findAll() {
-        return productJpaRepository.findAll();
+    public List<ProductModel> findAll(ProductSortType sort, int page, int size) {
+        return productJpaRepository.findAll(PageRequest.of(page, size, toSort(sort))).getContent();
     }
 
     @Override
     public void delete(Long id) {
         productJpaRepository.deleteById(id);
+    }
+
+    private Sort toSort(ProductSortType sort) {
+        return switch (sort) {
+            case LATEST     -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+            case PRICE_ASC  -> Sort.by(Sort.Order.asc("price"),      Sort.Order.asc("id"));
+            case LIKES_DESC -> Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("id"));
+        };
     }
 }

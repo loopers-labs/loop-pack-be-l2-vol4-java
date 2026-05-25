@@ -1,5 +1,7 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -9,6 +11,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -109,6 +113,86 @@ class ProductFacadeIntegrationTest {
             // then
             assertThat(stockJpaRepository.findByProductId(productId))
                 .hasValueSatisfying(s -> assertThat(s.getQuantity()).isEqualTo(12));
+        }
+    }
+
+    @DisplayName("상품 목록을 조회할 때, ")
+    @Nested
+    class GetAllProducts {
+
+        @DisplayName("LATEST 정렬은, 최근에 등록한 상품부터 반환한다.")
+        @Test
+        void returnsLatestFirst_whenSortIsLatest() {
+            // given
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40);
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(airmax.id(), star.id(), chuck.id());
+        }
+
+        @DisplayName("PRICE_ASC 정렬은, 가격이 낮은 상품부터 반환한다.")
+        @Test
+        void returnsLowestPriceFirst_whenSortIsPriceAsc() {
+            // given
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50);
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.PRICE_ASC, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(chuck.id(), star.id(), airmax.id());
+        }
+
+        @DisplayName("LIKES_DESC 정렬은, 좋아요 수가 많은 상품부터 반환한다.")
+        @Test
+        void returnsMostLikedFirst_whenSortIsLikesDesc() {
+            // given
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50);
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40);
+            increaseLikes(airmax.id(), 5);
+            increaseLikes(chuck.id(), 2);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LIKES_DESC, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(airmax.id(), chuck.id(), star.id());
+        }
+
+        @DisplayName("page 와 size 로 슬라이싱하면, 해당 페이지의 상품만 반환한다.")
+        @Test
+        void returnsSlicedPage_whenPageAndSizeGiven() {
+            // given
+            ProductInfo first  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30);
+            ProductInfo second = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40);
+            ProductInfo third  = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50);
+            ProductInfo fourth = productFacade.createProduct("스탠스미스", "올타임 화이트 스니커즈", 119_000L, 25);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 1, 2);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(second.id(), first.id());
+        }
+
+        private void increaseLikes(Long productId, int times) {
+            ProductModel product = productJpaRepository.findById(productId).orElseThrow();
+            for (int i = 0; i < times; i++) {
+                product.incrementLikeCount();
+            }
+            productJpaRepository.save(product);
         }
     }
 

@@ -13,10 +13,16 @@ public class ProductModel extends BaseEntity {
     private String name;
     private String description;
     private Long price;
+    private long likeCount;
+    private Long brandId;
 
     protected ProductModel() {}
 
     public ProductModel(String name, String description, Long price) {
+        this(name, description, price, null);
+    }
+
+    public ProductModel(String name, String description, Long price, Long brandId) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -30,6 +36,7 @@ public class ProductModel extends BaseEntity {
         this.name = name;
         this.description = description;
         this.price = price;
+        this.brandId = brandId;
     }
 
     public String getName() {
@@ -42,6 +49,25 @@ public class ProductModel extends BaseEntity {
 
     public Long getPrice() {
         return price;
+    }
+
+    public long getLikeCount() {
+        return likeCount;
+    }
+
+    public Long getBrandId() {
+        return brandId;
+    }
+
+    public void incrementLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decrementLikeCount() {
+        if (this.likeCount <= 0) {
+            throw new CoreException(ErrorType.INVALID_LIKE_COUNT, "좋아요 수는 0 미만이 될 수 없습니다.");
+        }
+        this.likeCount--;
     }
 
     public void update(String newName, String newDescription, Long newPrice) {
