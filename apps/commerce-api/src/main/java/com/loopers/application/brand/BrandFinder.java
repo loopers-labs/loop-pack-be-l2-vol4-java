@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
-import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -21,7 +22,8 @@ public class BrandFinder {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
     }
 
-    public List<BrandModel> getAllByIds(Collection<Long> ids) {
-        return brandRepository.findAllByIdIn(ids);
+    public Map<Long, BrandModel> getMapByIds(Collection<Long> ids) {
+        return brandRepository.findAllByIdIn(ids).stream()
+                .collect(Collectors.toMap(BrandModel::getId, b -> b));
     }
 }

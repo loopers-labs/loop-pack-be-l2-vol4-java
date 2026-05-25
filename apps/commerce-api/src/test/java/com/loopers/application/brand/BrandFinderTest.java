@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -67,50 +68,58 @@ class BrandFinderTest {
         }
     }
 
-    @DisplayName("여러 ID로 브랜드를 조회할 때, ")
+    @DisplayName("여러 ID로 브랜드 맵을 조회할 때, ")
     @Nested
-    class GetAllByIds {
+    class GetMapByIds {
 
-        @DisplayName("모든 ID에 해당하는 브랜드가 존재하면 전부 반환한다.")
+        @DisplayName("존재하는 브랜드의 ID → BrandModel 맵을 반환한다.")
         @Test
-        void returnsAllBrands_whenAllIdsExist() {
+        void returnsBrandMap_whenBrandExists() {
             // given
+            // BaseEntity.id는 항상 0L로 고정되므로 단일 브랜드로 검증
+            Long brandId = 0L;
+            Set<Long> ids = Set.of(brandId);
             BrandModel nike = new BrandModel("Nike");
-            BrandModel adidas = new BrandModel("Adidas");
-            Set<Long> ids = Set.of(1L, 2L);
-            when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of(nike, adidas));
-
-            // when
-            List<BrandModel> result = brandFinder.getAllByIds(ids);
-
-            // then
-            assertThat(result).containsExactlyInAnyOrder(nike, adidas);
-        }
-
-        @DisplayName("일부 ID에 해당하는 브랜드가 없으면 존재하는 것만 반환한다.")
-        @Test
-        void returnsPartialBrands_whenSomeIdsDoNotExist() {
-            // given
-            BrandModel nike = new BrandModel("Nike");
-            Set<Long> ids = Set.of(1L, 999L);
             when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of(nike));
 
             // when
-            List<BrandModel> result = brandFinder.getAllByIds(ids);
+            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
 
             // then
-            assertThat(result).containsExactly(nike);
+            assertAll(
+                    () -> assertThat(result).hasSize(1),
+                    () -> assertThat(result).containsEntry(brandId, nike)
+            );
         }
 
-        @DisplayName("빈 ID 목록이면 빈 리스트를 반환한다.")
+        @DisplayName("일부 ID에 해당하는 브랜드가 없으면 존재하는 것만 맵에 담아 반환한다.")
         @Test
-        void returnsEmptyList_whenIdsIsEmpty() {
+        void returnsPartialBrandMap_whenSomeIdsDoNotExist() {
+            // given
+            Long brandId = 0L;
+            Set<Long> ids = Set.of(brandId, 999L);
+            BrandModel nike = new BrandModel("Nike");
+            when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of(nike));
+
+            // when
+            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
+
+            // then
+            assertAll(
+                    () -> assertThat(result).hasSize(1),
+                    () -> assertThat(result).containsKey(brandId)
+            );
+        }
+
+        @DisplayName("빈 ID 목록이면 빈 맵을 반환한다.")
+        @Test
+        void returnsEmptyMap_whenIdsIsEmpty() {
             // given
             Set<Long> ids = Set.of();
             when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of());
 
             // when
-            List<BrandModel> result = brandFinder.getAllByIds(ids);
+            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
 
             // then
             assertThat(result).isEmpty();

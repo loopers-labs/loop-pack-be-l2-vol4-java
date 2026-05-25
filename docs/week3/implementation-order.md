@@ -17,8 +17,10 @@
 
 ### 3단계 — Product + Brand 도메인 서비스
 상품 상세 조회 시 Product + Brand 정보 조합.
-- `ProductService`가 BrandService를 호출해 `ProductInfo(brand 포함)` 반환
-- 단위 테스트: FakeProductRepository + FakeBrandRepository 활용
+- `ProductDetailAssembler` (`domain/product`): `ProductModel` + `brandName(String)` → `ProductDetail` 조합. `BrandModel` 의존 없이 이름 값만 수신해 도메인 간 결합 제거
+- `BrandFinder` 에 `getNameById(Long)`, `getNamesByIds(Collection<Long>)` 추가 — `ProductFacade` 가 `BrandModel` 전체 대신 이름만 요청
+- `ProductFacade` 가 `ProductFinder`/`BrandFinder` 로 각 도메인 조회 후 `ProductDetailAssembler` 로 조합하는 흐름 완성
+- 단위 테스트: `ProductDetailAssemblerTest` (순수 도메인 로직), `ProductFacadeTest` (협력 객체 mock, `Set.of(brandId)` 등 실 값으로 검증), `BrandFinderTest` 에 `getNameById`/`getNamesByIds` 케이스 추가
 
 ### 4단계 — Like 도메인
 User + Product 간 관계.
@@ -49,7 +51,7 @@ User + Product 간 관계.
 
 - [x] 1단계 — Brand 도메인
 - [x] 2단계 — Product 도메인 확장
-- [ ] 3단계 — Product + Brand 도메인 서비스
+- [x] 3단계 — Product + Brand 도메인 서비스
 - [ ] 4단계 — Like 도메인
 - [ ] 5단계 — Order 도메인
 - [ ] 6단계 — Application Layer Facade

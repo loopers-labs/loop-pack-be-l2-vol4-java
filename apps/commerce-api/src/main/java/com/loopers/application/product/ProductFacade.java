@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.application.brand.BrandFinder;
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductDetailAssembler;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.SortType;
 import lombok.RequiredArgsConstructor;
@@ -22,18 +23,14 @@ public class ProductFacade {
 
     public ProductInfo createProduct(Long brandId, String name, BigDecimal price, Long stock) {
         BrandModel brand = brandFinder.getById(brandId);
-
-        ProductModel product = productService.create(brand.getId(), name, price, stock);
-
-        return ProductInfo.from(brand, product);
+        ProductModel product = productService.create(brandId, name, price, stock);
+        return ProductInfo.from(ProductDetailAssembler.assemble(product, brand));
     }
 
     public ProductInfo getProduct(Long id) {
         ProductModel product = productFinder.getById(id);
-
         BrandModel brand = brandFinder.getById(product.getBrandId());
-
-        return ProductInfo.from(brand, product);
+        return ProductInfo.from(ProductDetailAssembler.assemble(product, brand));
     }
 
     public List<ProductInfo> getAllProducts(SortType sortType) {
@@ -43,20 +40,17 @@ public class ProductFacade {
                 .map(ProductModel::getBrandId)
                 .collect(Collectors.toSet());
 
-        Map<Long, BrandModel> brandMap = brandFinder.getAllByIds(brandIds).stream()
-                .collect(Collectors.toMap(BrandModel::getId, b -> b));
+        Map<Long, BrandModel> brandMap = brandFinder.getMapByIds(brandIds);
 
-        return products.stream()
-                .map(product -> ProductInfo.from(brandMap.get(product.getBrandId()), product))
+        return ProductDetailAssembler.assembleAll(products, brandMap).stream()
+                .map(ProductInfo::from)
                 .toList();
     }
 
     public ProductInfo updateProduct(Long id, String name, BigDecimal price, Long stock) {
         ProductModel product = productService.update(id, name, price, stock);
-
         BrandModel brand = brandFinder.getById(product.getBrandId());
-
-        return ProductInfo.from(brand, product);
+        return ProductInfo.from(ProductDetailAssembler.assemble(product, brand));
     }
 
     public void deleteProduct(Long id) {
