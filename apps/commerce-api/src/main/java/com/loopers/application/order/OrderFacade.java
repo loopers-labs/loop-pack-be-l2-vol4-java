@@ -52,9 +52,6 @@ public class OrderFacade {
 
     @Transactional(readOnly = true)
     public PageResult<OrderInfo> getMyOrders(GetMyOrdersCommand command) {
-        if (command == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 조회 요청은 비어있을 수 없습니다.");
-        }
         return orderService.getOrders(
                 command.userId(),
                 new PageQuery(command.page(), command.size()),
