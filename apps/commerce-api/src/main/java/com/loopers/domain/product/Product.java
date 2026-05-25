@@ -1,6 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.product.vo.ProductDescription;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.product.vo.ProductPrice;
 import com.loopers.support.error.CoreException;
@@ -26,13 +27,15 @@ public class Product extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "name", nullable = false))
     private ProductName name;
 
-    private String description;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "description", nullable = false))
+    private ProductDescription description;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
     private ProductPrice price;
 
-    private Product(Long brandId, ProductName name, String description, ProductPrice price) {
+    private Product(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
@@ -43,25 +46,26 @@ public class Product extends BaseEntity {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
         }
-        validateInfo(description);
-        return new Product(brandId, ProductName.of(name), description, ProductPrice.of(price));
+        return new Product(
+            brandId,
+            ProductName.of(name),
+            ProductDescription.of(description),
+            ProductPrice.of(price)
+        );
     }
 
     public void update(String name, String description, long price) {
-        validateInfo(description);
         this.name = ProductName.of(name);
-        this.description = description;
+        this.description = ProductDescription.of(description);
         this.price = ProductPrice.of(price);
-    }
-
-    private static void validateInfo(String description) {
-        if (description == null || description.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
-        }
     }
 
     public String getName() {
         return name.value();
+    }
+
+    public String getDescription() {
+        return description.value();
     }
 
     public long getPrice() {
