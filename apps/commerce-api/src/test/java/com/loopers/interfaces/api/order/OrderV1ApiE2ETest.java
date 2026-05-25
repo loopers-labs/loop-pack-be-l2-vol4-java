@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,6 +169,22 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(10)
             );
+        }
+
+        @DisplayName("주문 항목 목록에 빈 항목이 있으면 400 BAD_REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenOrderItemIsNull() {
+            // arrange
+            signUpUser();
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
+                Collections.singletonList(null)
+            );
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = createOrderForError(request, authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 

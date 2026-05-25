@@ -361,8 +361,16 @@ class OrderFacadeIntegrationTest {
         void throwsBadRequest_whenQuantityIsNotPositive() {
             // arrange
             Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
             CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
-                new CreateOrderCommand.Item(999L, 0)
+                new CreateOrderCommand.Item(iphone.getId(), 0)
             ));
 
             // act & assert

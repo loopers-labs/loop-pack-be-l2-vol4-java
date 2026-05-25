@@ -39,14 +39,17 @@ public class OrderFacade {
 
         Map<Long, Product> products = getProducts(command.productIds());
         Map<Long, Brand> brands = getBrands(products.values());
-        Map<Long, ProductStock> productStocks = getProductStocksForUpdate(command.productIds());
 
         List<OrderItem> orderItems = command.items().stream()
-            .map(item -> createOrderItem(item, products, brands, productStocks))
+            .map(item -> createOrderItem(item, products, brands))
             .toList();
 
-        Order order = orderService.createOrder(command.userId(), orderItems);
-        return OrderInfo.from(order);
+        Order order = Order.create(command.userId(), orderItems);
+        Map<Long, ProductStock> productStocks = getProductStocksForUpdate(command.productIds());
+        deductStocks(command.items(), productStocks);
+
+        Order savedOrder = orderService.saveOrder(order);
+        return OrderInfo.from(savedOrder);
     }
 
     @Transactional(readOnly = true)
@@ -78,29 +81,6 @@ public class OrderFacade {
         }
         if (command.userId() == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 비어있을 수 없습니다.");
-        }
-        if (command.items().isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
-        }
-
-        HashSet<Long> productIds = new HashSet<>();
-        for (CreateOrderCommand.Item item : command.items()) {
-            validateItem(item);
-            if (!productIds.add(item.productId())) {
-                throw new CoreException(ErrorType.BAD_REQUEST, "같은 상품은 중복 주문할 수 없습니다.");
-            }
-        }
-    }
-
-    private void validateItem(CreateOrderCommand.Item item) {
-        if (item == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
-        }
-        if (item.productId() == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 비어있을 수 없습니다.");
-        }
-        if (item.quantity() <= 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");
         }
     }
 
@@ -138,14 +118,10 @@ public class OrderFacade {
     private OrderItem createOrderItem(
         CreateOrderCommand.Item item,
         Map<Long, Product> products,
-        Map<Long, Brand> brands,
-        Map<Long, ProductStock> productStocks
+        Map<Long, Brand> brands
     ) {
         Product product = products.get(item.productId());
         Brand brand = brands.get(product.getBrandId());
-        ProductStock productStock = productStocks.get(item.productId());
-
-        productStock.deduct(item.quantity());
 
         return OrderItem.create(
             brand.getId(),
@@ -155,5 +131,12 @@ public class OrderFacade {
             product.getPrice(),
             item.quantity()
         );
+    }
+
+    private void deductStocks(List<CreateOrderCommand.Item> items, Map<Long, ProductStock> productStocks) {
+        items.forEach(item -> {
+            ProductStock productStock = productStocks.get(item.productId());
+            productStock.deduct(item.quantity());
+        });
     }
 }

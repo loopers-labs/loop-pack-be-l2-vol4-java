@@ -2,13 +2,18 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.CreateOrderCommand;
 import com.loopers.application.order.OrderInfo;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.util.List;
 
 public class OrderV1Dto {
 
     public record CreateOrderRequest(
-        List<Item> items
+        @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.")
+        List<@NotNull(message = "주문 항목은 비어있을 수 없습니다.") @Valid Item> items
     ) {
 
         public CreateOrderCommand toCommand(Long userId) {
@@ -21,8 +26,12 @@ public class OrderV1Dto {
         }
 
         public record Item(
+            @NotNull(message = "상품 ID는 비어있을 수 없습니다.")
             Long productId,
-            int quantity
+
+            @NotNull(message = "주문 수량은 비어있을 수 없습니다.")
+            @Positive(message = "주문 수량은 1 이상이어야 합니다.")
+            Integer quantity
         ) {
         }
     }

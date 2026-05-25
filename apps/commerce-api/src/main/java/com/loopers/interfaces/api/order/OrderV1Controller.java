@@ -6,6 +6,7 @@ import com.loopers.application.order.OrderInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.support.pagination.PageResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -32,7 +33,7 @@ public class OrderV1Controller {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
         @AuthenticationPrincipal Long userId,
-        @RequestBody OrderV1Dto.CreateOrderRequest request
+        @Valid @RequestBody OrderV1Dto.CreateOrderRequest request
     ) {
         OrderInfo info = orderFacade.createOrder(request.toCommand(userId));
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
