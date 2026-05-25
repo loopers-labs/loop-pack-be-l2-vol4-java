@@ -9,7 +9,7 @@
 ## 핵심 규칙
 - `@Entity` + `extends BaseEntity`로 선언한다. `BaseEntity`가 `id`(IDENTITY 전략), `createdAt`, `updatedAt`, `deletedAt`을 자동 관리한다.
 - `@Table`에 `uniqueConstraints`를 명시해 DB 제약을 문서화한다.
-- VO는 `@Embedded` 필드로 보유한다. 모델이 원시값을 직접 필드로 갖지 않는다.
+- 검증·형식 규칙·도메인 행위가 있는 값은 VO(`@Embeddable` record)로 캡슐화해 `@Embedded` 필드로 보유한다. 검증·행위가 전혀 없는 단순 값(예: 자유 서술 설명)은 VO로 감싸지 않고 원시 타입 + `@Column`으로 모델에 직접 둔다 — 행위 없는 래퍼는 과설계다. (예: `BrandModel.name`은 `BrandName` VO, `BrandModel.description`은 `String`)
 - `@NoArgsConstructor(access = PROTECTED)` + `@AllArgsConstructor(access = PROTECTED)`. 외부에서 직접 생성자를 호출할 수 없게 막는다.
 - 생성은 `private @Builder` 생성자로만. 빌더 내부에서 VO `from()` / `encrypt()`를 호출해 조립하므로, 빌더를 통과한 인스턴스는 항상 유효하다.
 - 도메인 행위는 메서드로 표현하고, 불변식 위반 시 `CoreException`을 던진다.
@@ -70,5 +70,7 @@ public class UserModel extends BaseEntity {
 ## do / don't
 - ✅ 불변식을 모델 메서드 안에 둔다.
 - ✅ 빌더를 `private`으로 선언해 생성 경로를 단일화한다.
+- ✅ 검증·행위 있는 값만 VO로 감싼다. 없는 단순 값은 원시 타입 + `@Column`으로 직접 둔다.
 - ❌ 세터로 상태를 외부에서 직접 바꾸지 않는다.
 - ❌ 표현 계층에 모델을 노출하지 않는다 — Facade가 `Info`로 변환한 뒤 반환한다.
+- ❌ 검증·행위 없는 값을 VO로 감싸지 않는다(과설계).
