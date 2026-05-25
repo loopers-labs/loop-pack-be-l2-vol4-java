@@ -90,5 +90,52 @@ class ProductServiceIntegrationTest {
             assertThat(result).extracting(Product::getId)
                 .containsExactly(p3.getId(), p2.getId(), p1.getId());
         }
+
+        @DisplayName("price_asc 정렬이면, 가격 오름차순으로 반환한다.")
+        @Test
+        void returnsProductsInPriceAscOrder() {
+            // arrange
+            Product cheap = productJpaRepository.save(new Product("저가", null, new Money(BigDecimal.valueOf(1000)), new Stock(1), 1L));
+            Product mid = productJpaRepository.save(new Product("중가", null, new Money(BigDecimal.valueOf(2000)), new Stock(1), 1L));
+            Product expensive = productJpaRepository.save(new Product("고가", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 1L));
+
+            // act
+            List<Product> result = productService.getProducts(null, "price_asc", 0, 10);
+
+            // assert
+            assertThat(result).extracting(Product::getId)
+                .containsExactly(cheap.getId(), mid.getId(), expensive.getId());
+        }
+
+        @DisplayName("brandId를 주면, 해당 브랜드 상품만 반환한다.")
+        @Test
+        void returnsOnlyProductsOfGivenBrand() {
+            // arrange
+            Product nikeA = productJpaRepository.save(new Product("나이키A", null, new Money(BigDecimal.valueOf(1000)), new Stock(1), 1L));
+            Product nikeB = productJpaRepository.save(new Product("나이키B", null, new Money(BigDecimal.valueOf(2000)), new Stock(1), 1L));
+            Product adidas = productJpaRepository.save(new Product("아디다스", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 2L));
+
+            // act
+            List<Product> result = productService.getProducts(1L, "latest", 0, 10);
+
+            // assert
+            assertThat(result).extracting(Product::getId).containsExactly(nikeB.getId(), nikeA.getId());
+            assertThat(result).extracting(Product::getBrandId).containsOnly(1L);
+        }
+
+        @DisplayName("page와 size를 주면, 해당 페이지 조각만 반환한다.")
+        @Test
+        void returnsRequestedPageSlice() {
+            // arrange — 가격 1000~5000 인 5개
+            for (int i = 1; i <= 5; i++) {
+                productJpaRepository.save(new Product("상품" + i, null, new Money(BigDecimal.valueOf(i * 1000L)), new Stock(1), 1L));
+            }
+
+            // act — price_asc(1000..5000) 중 page=1, size=2 → 3·4번째
+            List<Product> result = productService.getProducts(null, "price_asc", 1, 2);
+
+            // assert
+            assertThat(result).extracting(Product::getName).containsExactly("상품3", "상품4");
+        }
     }
 }

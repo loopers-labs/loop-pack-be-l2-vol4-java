@@ -113,4 +113,31 @@ class ProductV1ApiE2ETest {
             );
         }
     }
+
+    @DisplayName("GET /api/v1/products")
+    @Nested
+    class GetList {
+        @DisplayName("page/size로 목록을 조회하면, 페이지 조각과 총개수를 반환한다.")
+        @Test
+        void returnsPagedProducts() {
+            // arrange
+            productJpaRepository.save(new Product("상품1", null, new Money(BigDecimal.valueOf(1000)), new Stock(1), 1L));
+            productJpaRepository.save(new Product("상품2", null, new Money(BigDecimal.valueOf(2000)), new Stock(1), 1L));
+            productJpaRepository.save(new Product("상품3", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 1L));
+
+            // act — page=0, size=2
+            String requestUrl = "/api/v1/products?sort=latest&page=0&size=2";
+            ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductPageResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductPageResponse>> response =
+                testRestTemplate.exchange(requestUrl, HttpMethod.GET, new HttpEntity<>(null), responseType);
+
+            // assert (총 3개, size 2 → items 2개, totalPages 2)
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().items()).hasSize(2),
+                () -> assertThat(response.getBody().data().totalElements()).isEqualTo(3),
+                () -> assertThat(response.getBody().data().totalPages()).isEqualTo(2)
+            );
+        }
+    }
 }
