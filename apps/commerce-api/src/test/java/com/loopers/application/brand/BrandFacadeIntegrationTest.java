@@ -1,8 +1,8 @@
 package com.loopers.application.brand;
 
-import com.loopers.domain.brand.Brand;
-import com.loopers.domain.product.Product;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -44,15 +44,15 @@ class BrandFacadeIntegrationTest {
         @DisplayName("브랜드를 삭제하면 소속 상품도 삭제된다.")
         @Test
         void deletesBrandAndCascadesToProducts() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = productJpaRepository.save(
-                new Product(brand.getId(), "상품", BigDecimal.valueOf(10000))
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "상품", BigDecimal.valueOf(10000))
             );
 
             brandFacade.deleteBrand(brand.getId());
 
-            Brand deletedBrand = brandJpaRepository.findById(brand.getId()).orElseThrow();
-            Product deletedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            BrandEntity deletedBrand = brandJpaRepository.findById(brand.getId()).orElseThrow();
+            ProductEntity deletedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(deletedBrand.getDeletedAt()).isNotNull(),
                 () -> assertThat(deletedProduct.getDeletedAt()).isNotNull()

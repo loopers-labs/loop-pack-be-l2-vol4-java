@@ -1,5 +1,6 @@
 package com.loopers.domain.user;
 
+import com.loopers.infrastructure.user.UserEntity;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -87,7 +88,7 @@ public class UserServiceIntegrationTest {
         @Test
         void throwConflictException_whenLoginIdAlreadyExists() {
             // arrange
-            userJpaRepository.save(new User(loginId, loginPassword, name, birthday, email));
+            userJpaRepository.save(new UserEntity(loginId, loginPassword, name, birthday, email));
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->

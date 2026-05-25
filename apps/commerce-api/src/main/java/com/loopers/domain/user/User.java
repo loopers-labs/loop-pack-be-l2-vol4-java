@@ -1,22 +1,16 @@
 package com.loopers.domain.user;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.BaseDomain;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 
-@Entity
-@Table(name = "users")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User extends BaseEntity {
+public class User extends BaseDomain {
 
     private String loginId;
     private String loginPassword;
@@ -29,12 +23,24 @@ public class User extends BaseEntity {
         validateName(name);
         validateEmail(email);
         validateBirthday(birthday);
-
         this.loginId = loginId;
         this.loginPassword = loginPassword;
         this.name = name;
         this.birthday = birthday;
         this.email = email;
+    }
+
+    public User(Long id, String loginId, String loginPassword, String name, LocalDate birthday, String email,
+                ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+        this.id = id;
+        this.loginId = loginId;
+        this.loginPassword = loginPassword;
+        this.name = name;
+        this.birthday = birthday;
+        this.email = email;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
     }
 
     public void changePassword(String newPassword) {

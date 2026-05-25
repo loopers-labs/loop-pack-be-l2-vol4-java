@@ -1,10 +1,10 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.Brand;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductStock;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.product.ProductStockEntity;
 import com.loopers.infrastructure.product.ProductStockJpaRepository;
 import com.loopers.interfaces.api.product.ProductAdminV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -63,9 +63,9 @@ class ProductAdminV1ApiE2ETest {
         return headers;
     }
 
-    private Product saveProduct(Long brandId, String name, BigDecimal price, long stock) {
-        Product product = productJpaRepository.save(new Product(brandId, name, price));
-        productStockJpaRepository.save(new ProductStock(product.getId(), stock));
+    private ProductEntity saveProduct(Long brandId, String name, BigDecimal price, long stock) {
+        ProductEntity product = productJpaRepository.save(new ProductEntity(brandId, name, price));
+        productStockJpaRepository.save(new ProductStockEntity(product.getId(), stock));
         return product;
     }
 
@@ -76,7 +76,7 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("어드민 헤더가 있으면, 상품 목록을 반환한다.")
         @Test
         void returnsProductList_whenAdminHeaderIsPresent() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             saveProduct(brand.getId(), "상품1", BigDecimal.valueOf(10000), 5L);
             saveProduct(brand.getId(), "상품2", BigDecimal.valueOf(20000), 3L);
             saveProduct(brand.getId(), "상품3", BigDecimal.valueOf(30000), 1L);
@@ -116,8 +116,8 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("존재하는 상품을 조회하면, 재고 포함 상세 정보를 반환한다.")
         @Test
         void returnsProductWithStock_whenProductExists() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 15L);
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 15L);
 
             ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + product.getId(),
@@ -153,7 +153,7 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("유효한 요청이면, 상품이 생성된다.")
         @Test
         void createsProduct_whenValidRequest() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             String body = """
                 {"brandId": %d, "name": "새 상품", "price": 29000, "stock": 10}
                 """.formatted(brand.getId());
@@ -174,7 +174,7 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("가격이 음수이면, 400 응답을 반환한다.")
         @Test
         void returnsBadRequest_whenPriceIsNegative() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             String body = """
                 {"brandId": %d, "name": "상품", "price": -1, "stock": 10}
                 """.formatted(brand.getId());
@@ -230,8 +230,8 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("존재하는 상품을 수정하면, 수정된 정보가 반환된다.")
         @Test
         void updatesProduct_whenProductExists() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
             String body = """
                 {"brandId": %d, "name": "수정 청바지", "price": 45000, "stock": 20}
                 """.formatted(brand.getId());
@@ -273,8 +273,8 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("존재하는 상품을 삭제하면, 200 응답을 반환한다.")
         @Test
         void deletesProduct_whenProductExists() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + product.getId(),
@@ -288,8 +288,8 @@ class ProductAdminV1ApiE2ETest {
         @DisplayName("이미 삭제된 상품을 삭제하면, 404 응답을 반환한다.")
         @Test
         void returnsNotFound_whenProductAlreadyDeleted() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
             product.delete();
             productJpaRepository.save(product);
 

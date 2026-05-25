@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.product;
 
-import com.loopers.domain.product.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,13 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-public interface ProductJpaRepository extends JpaRepository<Product, Long> {
+public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long> {
 
-    Optional<Product> findByIdAndDeletedAtIsNull(Long id);
+    Optional<ProductEntity> findByIdAndDeletedAtIsNull(Long id);
 
-    Page<Product> findAllByDeletedAtIsNull(Pageable pageable);
+    Page<ProductEntity> findAllByDeletedAtIsNull(Pageable pageable);
 
-    Page<Product> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
+    Page<ProductEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 
     @Transactional
     @Modifying

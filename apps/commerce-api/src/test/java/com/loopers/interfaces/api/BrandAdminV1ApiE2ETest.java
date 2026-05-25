@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.Brand;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.interfaces.api.brand.BrandAdminV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -58,8 +58,8 @@ class BrandAdminV1ApiE2ETest {
         @DisplayName("어드민 헤더가 있으면, 브랜드 목록을 반환한다.")
         @Test
         void returnsBrandList_whenAdminHeaderIsPresent() {
-            brandJpaRepository.save(new Brand("브랜드A", "설명A"));
-            brandJpaRepository.save(new Brand("브랜드B", "설명B"));
+            brandJpaRepository.save(new BrandEntity("브랜드A", "설명A"));
+            brandJpaRepository.save(new BrandEntity("브랜드B", "설명B"));
 
             ResponseEntity<ApiResponse<Map>> response = testRestTemplate.exchange(
                 BASE_URL + "?page=0&size=20",
@@ -90,7 +90,7 @@ class BrandAdminV1ApiE2ETest {
         @DisplayName("어드민 헤더가 있으면, 브랜드 정보를 반환한다.")
         @Test
         void returnsBrand_whenAdminHeaderIsPresent() {
-            Brand brand = brandJpaRepository.save(new Brand("무신사", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("무신사", "설명"));
 
             ResponseEntity<ApiResponse<BrandAdminV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + brand.getId(),
@@ -194,7 +194,7 @@ class BrandAdminV1ApiE2ETest {
         @DisplayName("존재하는 브랜드를 수정하면, 수정된 정보가 반환된다.")
         @Test
         void updatesBrand_whenBrandExists() {
-            Brand brand = brandJpaRepository.save(new Brand("원래", "원래 설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("원래", "원래 설명"));
             String body = """
                 {"name": "수정 브랜드", "description": "수정 설명"}
                 """;
@@ -235,7 +235,7 @@ class BrandAdminV1ApiE2ETest {
         @DisplayName("존재하는 브랜드를 삭제하면, 200 응답을 반환한다.")
         @Test
         void deletesBrand_whenBrandExists() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + brand.getId(),

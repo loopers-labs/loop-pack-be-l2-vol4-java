@@ -1,9 +1,10 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.brand.Brand;
-import com.loopers.domain.product.ProductSort;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.product.ProductStockEntity;
 import com.loopers.infrastructure.product.ProductStockJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -53,9 +54,9 @@ class ProductServiceIntegrationTest {
         @DisplayName("존재하는 상품 ID를 주면, 상품 정보를 반환한다.")
         @Test
         void returnsProduct_whenValidIdIsProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product saved = productJpaRepository.save(
-                new Product(brand.getId(), "티셔츠", BigDecimal.valueOf(15000))
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity saved = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "티셔츠", BigDecimal.valueOf(15000))
             );
 
             Product result = productService.getProduct(saved.getId());
@@ -77,9 +78,9 @@ class ProductServiceIntegrationTest {
         @DisplayName("삭제된 상품 ID를 주면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductIsSoftDeleted() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product saved = productJpaRepository.save(
-                new Product(brand.getId(), "티셔츠", BigDecimal.valueOf(15000))
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity saved = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "티셔츠", BigDecimal.valueOf(15000))
             );
             saved.delete();
             productJpaRepository.save(saved);
@@ -97,19 +98,18 @@ class ProductServiceIntegrationTest {
         @DisplayName("유효한 정보를 주면, 상품과 재고가 함께 생성된다.")
         @Test
         void createsProductWithStock_whenValidInfoIsProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
 
             Product product = productService.createProduct(
                 brand.getId(), "청바지", BigDecimal.valueOf(50000), 10L);
 
-            ProductStock stock = productStockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            ProductStockEntity stock = productStockJpaRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(product.getBrandId()).isEqualTo(brand.getId()),
                 () -> assertThat(product.getName()).isEqualTo("청바지"),
                 () -> assertThat(stock.getQuantity()).isEqualTo(10L)
             );
         }
-
     }
 
     @DisplayName("상품을 수정할 때,")
@@ -119,14 +119,14 @@ class ProductServiceIntegrationTest {
         @DisplayName("유효한 정보로 수정하면, 상품과 재고가 함께 수정된다.")
         @Test
         void updatesProductAndStock_whenValidInfoIsProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             Product product = productService.createProduct(
                 brand.getId(), "청바지", BigDecimal.valueOf(50000), 10L);
 
             productService.updateProduct(product.getId(), brand.getId(), "수정 청바지", BigDecimal.valueOf(45000), 20L);
 
-            ProductStock stock = productStockJpaRepository.findByProductId(product.getId()).orElseThrow();
-            Product updated = productJpaRepository.findById(product.getId()).orElseThrow();
+            ProductStockEntity stock = productStockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            ProductEntity updated = productJpaRepository.findById(product.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(updated.getName()).isEqualTo("수정 청바지"),
                 () -> assertThat(stock.getQuantity()).isEqualTo(20L)
@@ -149,15 +149,14 @@ class ProductServiceIntegrationTest {
         @DisplayName("정렬 조건 없이 조회하면, 최신순으로 반환된다.")
         @Test
         void returnsProducts_orderedByLatest() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            productJpaRepository.save(new Product(brand.getId(), "상품1", BigDecimal.valueOf(10000)));
-            productJpaRepository.save(new Product(brand.getId(), "상품2", BigDecimal.valueOf(20000)));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            productJpaRepository.save(new ProductEntity(brand.getId(), "상품1", BigDecimal.valueOf(10000)));
+            productJpaRepository.save(new ProductEntity(brand.getId(), "상품2", BigDecimal.valueOf(20000)));
 
             Page<Product> result = productService.getProducts(null, ProductSort.LATEST, PageRequest.of(0, 10));
 
             assertThat(result.getTotalElements()).isEqualTo(2);
         }
-
     }
 
     @DisplayName("상품을 삭제할 때,")
@@ -167,20 +166,20 @@ class ProductServiceIntegrationTest {
         @DisplayName("존재하는 상품을 삭제하면, 삭제된다.")
         @Test
         void softDeletesProduct_whenProductExists() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             Product product = productService.createProduct(
                 brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
 
             productService.deleteProduct(product.getId());
 
-            Product deleted = productJpaRepository.findById(product.getId()).orElseThrow();
+            ProductEntity deleted = productJpaRepository.findById(product.getId()).orElseThrow();
             assertThat(deleted.getDeletedAt()).isNotNull();
         }
 
         @DisplayName("이미 삭제된 상품을 삭제하면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductAlreadyDeleted() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             Product product = productService.createProduct(
                 brand.getId(), "청바지", BigDecimal.valueOf(50000), 5L);
             productService.deleteProduct(product.getId());

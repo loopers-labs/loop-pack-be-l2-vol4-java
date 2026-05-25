@@ -2,36 +2,28 @@ package com.loopers.domain.product;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
-@Entity
-@Table(name = "product_stock")
 @Getter
 public class ProductStock {
 
-    @Id
-    @Column(name = "product_id")
     private Long productId;
-
-    @Column(nullable = false)
     private long quantity;
-
-    @Column(name = "updated_at")
     private ZonedDateTime updatedAt;
-
-    protected ProductStock() {}
 
     public ProductStock(Long productId, long quantity) {
         validate(productId, quantity);
         this.productId = productId;
         this.quantity = quantity;
         this.updatedAt = ZonedDateTime.now();
+    }
+
+    public ProductStock(Long productId, long quantity, ZonedDateTime updatedAt) {
+        this.productId = productId;
+        this.quantity = quantity;
+        this.updatedAt = updatedAt;
     }
 
     public void deduct(long amount) {

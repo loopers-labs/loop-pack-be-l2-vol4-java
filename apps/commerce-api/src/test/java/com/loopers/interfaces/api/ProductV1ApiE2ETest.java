@@ -1,10 +1,10 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.Brand;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductStock;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.product.ProductStockEntity;
 import com.loopers.infrastructure.product.ProductStockJpaRepository;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -51,9 +51,9 @@ class ProductV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private Product saveProduct(Long brandId, String name, BigDecimal price) {
-        Product product = productJpaRepository.save(new Product(brandId, name, price));
-        productStockJpaRepository.save(new ProductStock(product.getId(), 10L));
+    private ProductEntity saveProduct(Long brandId, String name, BigDecimal price) {
+        ProductEntity product = productJpaRepository.save(new ProductEntity(brandId, name, price));
+        productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
         return product;
     }
 
@@ -64,8 +64,8 @@ class ProductV1ApiE2ETest {
         @DisplayName("존재하는 상품 ID를 주면, 상품 정보를 반환한다.")
         @Test
         void returnsProduct_whenValidIdIsProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
-            Product product = saveProduct(brand.getId(), "티셔츠", BigDecimal.valueOf(29000));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "티셔츠", BigDecimal.valueOf(29000));
 
             ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + product.getId(),
@@ -101,7 +101,7 @@ class ProductV1ApiE2ETest {
         @DisplayName("page, size를 주면, 상품 목록을 반환한다.")
         @Test
         void returnsProductList_whenPageAndSizeAreProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             saveProduct(brand.getId(), "상품1", BigDecimal.valueOf(10000));
             saveProduct(brand.getId(), "상품2", BigDecimal.valueOf(20000));
 
@@ -153,7 +153,7 @@ class ProductV1ApiE2ETest {
         @DisplayName("price_asc 정렬로 조회하면, 낮은 가격 순으로 반환된다.")
         @Test
         void returnsProducts_orderedByPriceAsc() {
-            Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
             saveProduct(brand.getId(), "비싼 상품", BigDecimal.valueOf(50000));
             saveProduct(brand.getId(), "싼 상품", BigDecimal.valueOf(10000));
 

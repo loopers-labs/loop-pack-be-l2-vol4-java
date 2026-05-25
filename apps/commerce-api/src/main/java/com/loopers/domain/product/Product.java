@@ -1,33 +1,20 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.BaseDomain;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 
-@Entity
-@Table(name = "product")
 @Getter
-public class Product extends BaseEntity {
+public class Product extends BaseDomain {
 
-    @Column(name = "brand_id", nullable = false)
     private Long brandId;
-
-    @Column(nullable = false)
     private String name;
-
-    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
-
-    @Column(nullable = false)
     private long likeCount = 0;
-
-    protected Product() {}
 
     public Product(Long brandId, String name, BigDecimal price) {
         validate(brandId, name, price);
@@ -36,11 +23,31 @@ public class Product extends BaseEntity {
         this.price = price;
     }
 
+    public Product(Long id, Long brandId, String name, BigDecimal price, long likeCount,
+                   ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+        this.id = id;
+        this.brandId = brandId;
+        this.name = name;
+        this.price = price;
+        this.likeCount = likeCount;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
+    }
+
     public void update(Long newBrandId, String newName, BigDecimal newPrice) {
         validate(newBrandId, newName, newPrice);
         this.brandId = newBrandId;
         this.name = newName;
         this.price = newPrice;
+    }
+
+    public void incrementLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decrementLikeCount() {
+        if (this.likeCount > 0) this.likeCount--;
     }
 
     private void validate(Long brandId, String name, BigDecimal price) {

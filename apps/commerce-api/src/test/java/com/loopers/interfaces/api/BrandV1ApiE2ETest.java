@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.Brand;
+import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -46,7 +46,7 @@ class BrandV1ApiE2ETest {
         @DisplayName("존재하는 브랜드 ID를 주면, 브랜드 정보를 반환한다.")
         @Test
         void returnsBrandInfo_whenValidIdIsProvided() {
-            Brand brand = brandJpaRepository.save(new Brand("무신사", "무신사 브랜드"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("무신사", "무신사 브랜드"));
 
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + brand.getId(),
@@ -77,7 +77,7 @@ class BrandV1ApiE2ETest {
         @DisplayName("삭제된 브랜드 ID를 주면, 404 응답을 반환한다.")
         @Test
         void returnsNotFound_whenBrandIsSoftDeleted() {
-            Brand brand = brandJpaRepository.save(new Brand("삭제 브랜드", "설명"));
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("삭제 브랜드", "설명"));
             brand.delete();
             brandJpaRepository.save(brand);
 

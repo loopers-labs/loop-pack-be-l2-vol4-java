@@ -14,12 +14,13 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
     private final ProductStockJpaRepository productStockJpaRepository;
 
     @Override
-    public ProductStock save(ProductStock stock) {
-        return productStockJpaRepository.save(stock);
+    public ProductStock save(ProductStock domain) {
+        return productStockJpaRepository.save(ProductStockEntity.from(domain)).toDomain();
     }
 
     @Override
     public Optional<ProductStock> findByProductId(Long productId) {
-        return productStockJpaRepository.findByProductId(productId);
+        return productStockJpaRepository.findByProductId(productId)
+            .map(ProductStockEntity::toDomain);
     }
 }

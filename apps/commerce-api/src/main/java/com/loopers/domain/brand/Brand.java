@@ -1,26 +1,32 @@
 package com.loopers.domain.brand;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.BaseDomain;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import lombok.Getter;
 
+import java.time.ZonedDateTime;
+
 @Getter
-@Entity
-@Table(name = "brand")
-public class Brand extends BaseEntity {
+public class Brand extends BaseDomain {
 
     private String name;
     private String description;
-
-    protected Brand() {}
 
     public Brand(String name, String description) {
         validate(name, description);
         this.name = name;
         this.description = description;
+    }
+
+    public Brand(Long id, String name, String description,
+                 ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
     }
 
     public void update(String newName, String newDescription) {
