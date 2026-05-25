@@ -1,13 +1,13 @@
-package com.loopers.domain.user;
+package com.loopers.application.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -20,11 +20,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.loopers.domain.user.Name;
+import com.loopers.domain.user.PasswordEncrypter;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 @ExtendWith(MockitoExtension.class)
-class UserServiceTest {
+class UserFacadeTest {
 
     @Mock
     private UserRepository userRepository;
@@ -33,7 +37,7 @@ class UserServiceTest {
     private PasswordEncrypter passwordEncrypter;
 
     @InjectMocks
-    private UserService userService;
+    private UserFacade userFacade;
 
     @DisplayName("회원가입을 처리할 때,")
     @Nested
@@ -45,24 +49,23 @@ class UserServiceTest {
         private final LocalDate rawBirthDate = LocalDate.of(1995, 3, 21);
         private final String rawEmail = "kyle@example.com";
 
-        @DisplayName("신규 로그인 ID와 이메일이면 회원가입에 성공한다.")
+        @DisplayName("신규 로그인 ID와 이메일이면 회원가입에 성공하고 가입 정보를 반환한다.")
         @Test
-        void returnsSavedUser_whenLoginIdAndEmailAreAvailable() {
+        void returnsSignUpInfo_whenLoginIdAndEmailAreAvailable() {
             // arrange
             given(userRepository.existsByLoginId(rawLoginId)).willReturn(false);
             given(userRepository.existsByEmail(rawEmail)).willReturn(false);
             given(userRepository.save(any(UserModel.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
-            UserModel signedUpUser = userService.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail);
+            UserSignUpInfo signUpInfo = userFacade.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail);
 
             // assert
             assertAll(
-                () -> assertThat(signedUpUser.getLoginId()).isEqualTo(LoginId.from(rawLoginId)),
-                () -> assertThat(signedUpUser.getEmail()).isEqualTo(Email.from(rawEmail)),
-                () -> verify(userRepository).existsByLoginId(rawLoginId),
-                () -> verify(userRepository).existsByEmail(rawEmail),
-                () -> verify(userRepository).save(any(UserModel.class))
+                () -> assertThat(signUpInfo.loginId()).isEqualTo(rawLoginId),
+                () -> then(userRepository).should().existsByLoginId(rawLoginId),
+                () -> then(userRepository).should().existsByEmail(rawEmail),
+                () -> then(userRepository).should().save(any(UserModel.class))
             );
         }
 
@@ -74,11 +77,11 @@ class UserServiceTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> userService.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail))
+                () -> assertThatThrownBy(() -> userFacade.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
-                () -> verify(userRepository, never()).save(any(UserModel.class))
+                () -> then(userRepository).should(never()).save(any(UserModel.class))
             );
         }
 
@@ -91,11 +94,11 @@ class UserServiceTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> userService.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail))
+                () -> assertThatThrownBy(() -> userFacade.signUp(rawLoginId, rawPassword, rawName, rawBirthDate, rawEmail))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
-                () -> verify(userRepository, never()).save(any(UserModel.class))
+                () -> then(userRepository).should(never()).save(any(UserModel.class))
             );
         }
     }
@@ -104,19 +107,35 @@ class UserServiceTest {
     @Nested
     class ReadMyInfo {
 
-        @DisplayName("저장된 회원이면 해당 UserModel을 반환한다.")
+        @DisplayName("저장된 회원이면 마스킹된 내 정보를 반환한다.")
         @Test
-        void returnsUser_whenUserIdIsRegistered() {
+        void returnsMyInfo_whenUserIdIsRegistered() {
             // arrange
             Long userId = 1L;
-            UserModel storedUser = mock(UserModel.class);
+            String rawLoginId = "kyleKim";
+            String rawName = "김카일";
+            LocalDate rawBirthDate = LocalDate.of(1995, 3, 21);
+            String rawEmail = "kyle@example.com";
+            UserModel storedUser = UserModel.builder()
+                .rawLoginId(rawLoginId)
+                .rawPassword("Kyle!2030")
+                .rawName(rawName)
+                .rawBirthDate(rawBirthDate)
+                .rawEmail(rawEmail)
+                .passwordEncrypter(passwordEncrypter)
+                .build();
             given(userRepository.findById(userId)).willReturn(Optional.of(storedUser));
 
             // act
-            UserModel readUser = userService.readMyInfo(userId);
+            UserMyInfo myInfo = userFacade.readMyInfo(userId);
 
             // assert
-            assertThat(readUser).isSameAs(storedUser);
+            assertAll(
+                () -> assertThat(myInfo.loginId()).isEqualTo(rawLoginId),
+                () -> assertThat(myInfo.name()).isEqualTo(Name.from(rawName).maskedValue()),
+                () -> assertThat(myInfo.birthDate()).isEqualTo(rawBirthDate),
+                () -> assertThat(myInfo.email()).isEqualTo(rawEmail)
+            );
         }
 
         @DisplayName("저장되지 않은 회원이면 NOT_FOUND 예외가 발생한다.")
@@ -127,7 +146,7 @@ class UserServiceTest {
             given(userRepository.findById(userId)).willReturn(Optional.empty());
 
             // act & assert
-            assertThatThrownBy(() -> userService.readMyInfo(userId))
+            assertThatThrownBy(() -> userFacade.readMyInfo(userId))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
@@ -149,10 +168,10 @@ class UserServiceTest {
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
             // act
-            userService.changePassword(userId, currentRawPassword, newRawPassword);
+            userFacade.changePassword(userId, currentRawPassword, newRawPassword);
 
             // assert
-            verify(user).changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
+            then(user).should().changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
         }
 
         @DisplayName("저장되지 않은 회원이면 NOT_FOUND 예외가 발생한다.")
@@ -165,7 +184,7 @@ class UserServiceTest {
             given(userRepository.findById(userId)).willReturn(Optional.empty());
 
             // act & assert
-            assertThatThrownBy(() -> userService.changePassword(userId, currentRawPassword, newRawPassword))
+            assertThatThrownBy(() -> userFacade.changePassword(userId, currentRawPassword, newRawPassword))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
