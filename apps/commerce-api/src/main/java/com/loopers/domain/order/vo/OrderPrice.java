@@ -17,8 +17,8 @@ public record OrderPrice(long value) {
         return new OrderPrice(value);
     }
 
-    public OrderPrice multiply(int quantity) {
-        return OrderPrice.of(value * quantity);
+    public OrderPrice multiply(OrderQuantity quantity) {
+        return OrderPrice.of(value * quantity.value());
     }
 
     public OrderPrice add(OrderPrice other) {

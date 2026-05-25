@@ -2,6 +2,7 @@ package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.order.vo.OrderPrice;
+import com.loopers.domain.order.vo.OrderQuantity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
@@ -39,8 +40,9 @@ public class OrderItem extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "unit_price", nullable = false))
     private OrderPrice unitPrice;
 
-    @Column(nullable = false)
-    private int quantity;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "quantity", nullable = false))
+    private OrderQuantity quantity;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "total_price", nullable = false))
@@ -52,7 +54,7 @@ public class OrderItem extends BaseEntity {
         Long productId,
         String productName,
         OrderPrice unitPrice,
-        int quantity
+        OrderQuantity quantity
     ) {
         this.brandId = brandId;
         this.brandName = brandName;
@@ -73,8 +75,8 @@ public class OrderItem extends BaseEntity {
     ) {
         validateSnapshot(brandId, brandName, productId, productName);
         OrderPrice orderPrice = OrderPrice.of(unitPrice);
-        validateQuantity(quantity);
-        return new OrderItem(brandId, brandName, productId, productName, orderPrice, quantity);
+        OrderQuantity orderQuantity = OrderQuantity.of(quantity);
+        return new OrderItem(brandId, brandName, productId, productName, orderPrice, orderQuantity);
     }
 
     private static void validateSnapshot(Long brandId, String brandName, Long productId, String productName) {
@@ -92,14 +94,12 @@ public class OrderItem extends BaseEntity {
         }
     }
 
-    private static void validateQuantity(int quantity) {
-        if (quantity <= 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");
-        }
-    }
-
     public long getUnitPrice() {
         return unitPrice.value();
+    }
+
+    public int getQuantity() {
+        return quantity.value();
     }
 
     public long getTotalPrice() {

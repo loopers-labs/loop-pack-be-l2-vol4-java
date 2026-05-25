@@ -42,7 +42,7 @@ class OrderPriceTest {
     void returnsMultipliedPrice_whenQuantityIsProvided() {
         // arrange
         OrderPrice price = OrderPrice.of(1_550_000L);
-        int quantity = 2;
+        OrderQuantity quantity = OrderQuantity.of(2);
 
         // act
         OrderPrice multiplied = price.multiply(quantity);
