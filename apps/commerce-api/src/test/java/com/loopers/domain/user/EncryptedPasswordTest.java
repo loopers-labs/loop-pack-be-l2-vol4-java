@@ -38,7 +38,7 @@ class EncryptedPasswordTest {
         @ParameterizedTest
         @ValueSource(strings = {"a1!", "abc123!"})
         void throwsBadRequest_whenRawPasswordIsShorterThanMinLength(String rawPassword) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> EncryptedPassword.encrypt(rawPassword, passwordEncrypter))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -49,7 +49,7 @@ class EncryptedPasswordTest {
         @ParameterizedTest
         @ValueSource(strings = {"abcdefg12345678!a", "abcdefghij12345678!"})
         void throwsBadRequest_whenRawPasswordIsLongerThanMaxLength(String rawPassword) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> EncryptedPassword.encrypt(rawPassword, passwordEncrypter))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -60,7 +60,7 @@ class EncryptedPasswordTest {
         @ParameterizedTest
         @ValueSource(strings = {"abc 1234", "Kyle 2030!", "abcd123한", "한글비밀번호123!"})
         void throwsBadRequest_whenRawPasswordContainsForbiddenCharacters(String rawPassword) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> EncryptedPassword.encrypt(rawPassword, passwordEncrypter))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -72,7 +72,7 @@ class EncryptedPasswordTest {
         @NullAndEmptySource
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenRawPasswordIsNullOrBlank(String rawPassword) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> EncryptedPassword.encrypt(rawPassword, passwordEncrypter))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")

@@ -35,7 +35,7 @@ class NameTest {
         @ParameterizedTest
         @ValueSource(strings = {"김"})
         void throwsBadRequest_whenValueIsShorterThanMinLength(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -46,7 +46,7 @@ class NameTest {
         @ParameterizedTest
         @ValueSource(strings = {"김카일김카일김카일김카일김카일김카일김카일"})
         void throwsBadRequest_whenValueIsLongerThanMaxLength(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -57,7 +57,7 @@ class NameTest {
         @ParameterizedTest
         @ValueSource(strings = {"kyle", "김카1", "김카!", "김 카"})
         void throwsBadRequest_whenValueContainsNonKoreanCharacters(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -69,7 +69,7 @@ class NameTest {
         @NullAndEmptySource
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenValueIsNullOrBlank(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
