@@ -7,7 +7,8 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId
     ) {}
 
     public record UpdateProductRequest(

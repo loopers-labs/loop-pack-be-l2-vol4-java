@@ -15,8 +15,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price) {
-        ProductModel product = new ProductModel(name, description, price);
+    public ProductModel createProduct(String name, String description, Long price, Long brandId) {
+        ProductModel product = new ProductModel(name, description, price, brandId);
         return productRepository.save(product);
     }
 

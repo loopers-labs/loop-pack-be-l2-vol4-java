@@ -15,7 +15,11 @@ public enum ErrorType {
     CONFLICT(HttpStatus.CONFLICT, HttpStatus.CONFLICT.getReasonPhrase(), "이미 존재하는 리소스입니다."),
 
     /** 상품 도메인 */
-    INVALID_LIKE_COUNT(HttpStatus.BAD_REQUEST, "INVALID_LIKE_COUNT", "좋아요 수는 0 미만이 될 수 없습니다.");
+    INVALID_LIKE_COUNT(HttpStatus.BAD_REQUEST, "INVALID_LIKE_COUNT", "좋아요 수는 0 미만이 될 수 없습니다."),
+
+    /** 브랜드 도메인 */
+    BRAND_NOT_FOUND(HttpStatus.NOT_FOUND, "BRAND_NOT_FOUND", "브랜드를 찾을 수 없습니다."),
+    DUPLICATE_BRAND_NAME(HttpStatus.CONFLICT, "DUPLICATE_BRAND_NAME", "이미 존재하는 브랜드명입니다.");
 
     private final HttpStatus status;
     private final String code;
