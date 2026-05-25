@@ -237,6 +237,39 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(data.deletedAt()).isNull()
             );
         }
+
+        @DisplayName("재고 수량이 주어지지 않으면, 상품 기본 정보만 수정하고 기존 재고를 유지한다.")
+        @Test
+        void keepsStockQuantity_whenStockQuantityIsNotProvided() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Long productId = createProduct(new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            ), adminHeaders()).getBody().data().id();
+            ProductAdminV1Dto.UpdateProductRequest request = new ProductAdminV1Dto.UpdateProductRequest(
+                "아이폰 16 Pro Max",
+                "더 큰 화면과 향상된 배터리를 제공하는 스마트폰",
+                1_900_000L,
+                null
+            );
+
+            // act
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = updateProduct(productId, request, adminHeaders());
+
+            // assert
+            ProductAdminV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.name()).isEqualTo("아이폰 16 Pro Max"),
+                () -> assertThat(data.description()).isEqualTo("더 큰 화면과 향상된 배터리를 제공하는 스마트폰"),
+                () -> assertThat(data.price()).isEqualTo(1_900_000L),
+                () -> assertThat(data.stockQuantity()).isEqualTo(10)
+            );
+        }
     }
 
     @DisplayName("DELETE /api-admin/v1/products/{productId}")

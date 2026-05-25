@@ -5,6 +5,10 @@ public record UpdateProductCommand(
     String name,
     String description,
     long price,
-    int stockQuantity
+    Integer stockQuantity
 ) {
+
+    public boolean hasStockQuantity() {
+        return stockQuantity != null;
+    }
 }

@@ -24,7 +24,7 @@ public class ProductAdminV1Dto {
         String name,
         String description,
         long price,
-        int stockQuantity
+        Integer stockQuantity
     ) {
         public UpdateProductCommand toCommand(Long productId) {
             return new UpdateProductCommand(productId, name, description, price, stockQuantity);
