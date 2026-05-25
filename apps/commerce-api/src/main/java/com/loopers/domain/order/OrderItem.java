@@ -1,10 +1,9 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.order.vo.OrderItemSnapshot;
 import com.loopers.domain.order.vo.OrderPrice;
 import com.loopers.domain.order.vo.OrderQuantity;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -24,17 +23,8 @@ import lombok.NoArgsConstructor;
 )
 public class OrderItem extends BaseEntity {
 
-    @Column(name = "brand_id", nullable = false)
-    private Long brandId;
-
-    @Column(name = "brand_name", nullable = false)
-    private String brandName;
-
-    @Column(name = "product_id", nullable = false)
-    private Long productId;
-
-    @Column(name = "product_name", nullable = false)
-    private String productName;
+    @Embedded
+    private OrderItemSnapshot snapshot;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "unit_price", nullable = false))
@@ -49,17 +39,11 @@ public class OrderItem extends BaseEntity {
     private OrderPrice totalPrice;
 
     private OrderItem(
-        Long brandId,
-        String brandName,
-        Long productId,
-        String productName,
+        OrderItemSnapshot snapshot,
         OrderPrice unitPrice,
         OrderQuantity quantity
     ) {
-        this.brandId = brandId;
-        this.brandName = brandName;
-        this.productId = productId;
-        this.productName = productName;
+        this.snapshot = snapshot;
         this.unitPrice = unitPrice;
         this.quantity = quantity;
         this.totalPrice = unitPrice.multiply(quantity);
@@ -73,25 +57,26 @@ public class OrderItem extends BaseEntity {
         long unitPrice,
         int quantity
     ) {
-        validateSnapshot(brandId, brandName, productId, productName);
+        OrderItemSnapshot snapshot = OrderItemSnapshot.of(brandId, brandName, productId, productName);
         OrderPrice orderPrice = OrderPrice.of(unitPrice);
         OrderQuantity orderQuantity = OrderQuantity.of(quantity);
-        return new OrderItem(brandId, brandName, productId, productName, orderPrice, orderQuantity);
+        return new OrderItem(snapshot, orderPrice, orderQuantity);
     }
 
-    private static void validateSnapshot(Long brandId, String brandName, Long productId, String productName) {
-        if (brandId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
-        }
-        if (brandName == null || brandName.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
-        }
-        if (productId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 비어있을 수 없습니다.");
-        }
-        if (productName == null || productName.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
-        }
+    public Long getBrandId() {
+        return snapshot.brandId();
+    }
+
+    public String getBrandName() {
+        return snapshot.brandName();
+    }
+
+    public Long getProductId() {
+        return snapshot.productId();
+    }
+
+    public String getProductName() {
+        return snapshot.productName();
     }
 
     public long getUnitPrice() {
