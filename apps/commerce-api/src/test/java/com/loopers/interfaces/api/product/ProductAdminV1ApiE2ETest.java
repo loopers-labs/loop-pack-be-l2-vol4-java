@@ -105,6 +105,25 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
+
+        @DisplayName("브랜드 ID가 없으면, 400 BAD_REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenBrandIdIsMissing() {
+            // arrange
+            ProductAdminV1Dto.CreateProductRequest request = new ProductAdminV1Dto.CreateProductRequest(
+                null,
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            );
+
+            // act
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.ProductResponse>> response = createProduct(request, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("GET /api-admin/v1/products/{productId}")

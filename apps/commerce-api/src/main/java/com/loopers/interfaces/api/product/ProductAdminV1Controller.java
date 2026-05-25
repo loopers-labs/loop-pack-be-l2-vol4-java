@@ -5,6 +5,7 @@ import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.support.pagination.PageResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,7 +28,7 @@ public class ProductAdminV1Controller {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<ProductAdminV1Dto.ProductResponse> createProduct(@RequestBody ProductAdminV1Dto.CreateProductRequest request) {
+    public ApiResponse<ProductAdminV1Dto.ProductResponse> createProduct(@Valid @RequestBody ProductAdminV1Dto.CreateProductRequest request) {
         ProductInfo info = productAdminFacade.createProduct(request.toCommand());
         return ApiResponse.success(ProductAdminV1Dto.ProductResponse.from(info));
     }
@@ -58,7 +59,7 @@ public class ProductAdminV1Controller {
     @PutMapping("/{productId}")
     public ApiResponse<ProductAdminV1Dto.ProductResponse> updateProduct(
         @PathVariable Long productId,
-        @RequestBody ProductAdminV1Dto.UpdateProductRequest request
+        @Valid @RequestBody ProductAdminV1Dto.UpdateProductRequest request
     ) {
         ProductInfo info = productAdminFacade.updateProduct(request.toCommand(productId));
         return ApiResponse.success(ProductAdminV1Dto.ProductResponse.from(info));

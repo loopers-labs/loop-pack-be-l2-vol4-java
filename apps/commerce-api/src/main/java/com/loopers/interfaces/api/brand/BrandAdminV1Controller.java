@@ -5,6 +5,7 @@ import com.loopers.application.brand.BrandInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.support.pagination.PageResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,7 +28,7 @@ public class BrandAdminV1Controller {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<BrandAdminV1Dto.BrandResponse> createBrand(@RequestBody BrandAdminV1Dto.CreateBrandRequest request) {
+    public ApiResponse<BrandAdminV1Dto.BrandResponse> createBrand(@Valid @RequestBody BrandAdminV1Dto.CreateBrandRequest request) {
         BrandInfo info = brandAdminFacade.createBrand(request.toCommand());
         return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
@@ -51,7 +52,7 @@ public class BrandAdminV1Controller {
     @PutMapping("/{brandId}")
     public ApiResponse<BrandAdminV1Dto.BrandResponse> updateBrand(
         @PathVariable Long brandId,
-        @RequestBody BrandAdminV1Dto.UpdateBrandRequest request
+        @Valid @RequestBody BrandAdminV1Dto.UpdateBrandRequest request
     ) {
         BrandInfo info = brandAdminFacade.updateBrand(request.toCommand(brandId));
         return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
