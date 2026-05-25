@@ -1,71 +1,22 @@
 # CLAUDE.md
 
-## Commands
+## 도메인 & 객체 설계 전략
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
 
-### 인프라 실행 (테스트/로컬 실행 전 필수)
-```shell
-docker-compose -f ./docker/infra-compose.yml up
-```
+## 아키텍처, 패키지 구성 전략
+- 본 프로젝트는 레이어드 아키텍처를 따르며, DIP (의존성 역전 원칙) 을 준수합니다.
+- API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
+- 패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
+  - 예시
+    > /interfaces/api (presentation 레이어 - API)
+      /application/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
+      /domain/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
+      /infrastructure/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
 
-### 빌드 및 테스트
-```shell
-./gradlew build
-./gradlew test
 
-# 특정 모듈
-./gradlew :apps:commerce-api:test
-./gradlew :apps:commerce-batch:test
-
-# 단일 클래스 / 메서드
-./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest"
-./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest.Create.createsExampleModel_whenNameAndDescriptionAreProvided"
-```
-
-### 애플리케이션 실행
-```shell
-./gradlew :apps:commerce-api:bootRun
-```
-
----
-
-## 아키텍처
-
-### 멀티 모듈 구조
-- `apps/` — 실행 가능한 SpringBootApplication. `commerce-api`(REST API), `commerce-batch`(배치), `commerce-streamer`(Kafka 컨슈머)
-- `modules/` — 도메인에 독립적인 재사용 설정. `jpa`, `redis`, `kafka`
-- `supports/` — 부가 기능 애드온. `jackson`, `monitoring`, `logging`
-
-### `commerce-api` 레이어 구조
-
-```
-interfaces/api  →  Controller, Dto, ApiSpec (Swagger)
-application     →  Facade, Info (레이어 간 데이터 전달 record)
-domain          →  Service, Model (Entity), Repository (인터페이스)
-infrastructure  →  JpaRepository, RepositoryImpl
-```
-
-- **Controller**는 Facade만 호출한다. Service를 직접 호출하지 않는다.
-- **Facade**는 여러 Service를 조합하는 역할이다. 단일 Service 호출도 Facade를 거친다.
-- **Service**는 도메인 로직을 담당하며 `@Transactional`을 선언한다.
-- **Repository**는 도메인 레이어에 인터페이스로 정의되고, `infrastructure`에서 구현한다 (의존성 역전).
-- **Model**은 JPA Entity이자 도메인 객체다. 생성자에서 유효성 검증을 수행하며 유효하지 않으면 `CoreException`을 던진다.
-- **Controller**는 `implements XxxV1ApiSpec` 형태로 Swagger 어노테이션을 인터페이스에 분리한다. Controller 본문에는 `@Operation` 등을 작성하지 않는다.
-
-### API 응답 형식
-모든 응답은 `ApiResponse<T>` record를 사용한다:
-```json
-{ "meta": { "result": "SUCCESS", "errorCode": null, "message": null }, "data": { ... } }
-```
-에러 시 `ApiControllerAdvice`가 `CoreException`을 잡아 `ApiResponse.fail()`로 변환한다.
-
-### 예외 처리
-- 비즈니스 예외는 `CoreException(ErrorType, customMessage)` 사용
-- `ErrorType` enum: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR` (각각 HTTP 상태코드 매핑됨)
-
-### BaseEntity
-모든 Entity는 `modules/jpa`의 `BaseEntity`를 상속한다. `id`(AUTO_INCREMENT), `createdAt`, `updatedAt`, `deletedAt`을 자동 관리한다. 소프트 딜리트는 `delete()` / `restore()` 메서드로 처리하며 둘 다 멱등하게 동작한다.
-
----
 
 ## 테스트 관행
 
