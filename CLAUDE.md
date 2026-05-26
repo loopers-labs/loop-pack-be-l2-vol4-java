@@ -110,7 +110,7 @@ supports/monitoring     # Actuator, Prometheus 설정
 ```java
 // Repository 인터페이스 (domain layer)
 public interface ProductRepository {
-    Optional<ProductModel> find(Long id);
+    Optional<ProductModel> findById(Long id);
     ProductModel save(ProductModel product);
 }
 
