@@ -47,6 +47,7 @@ loopers-java-spring-template/
 - **4-layer × 도메인 패키징**: 최상위는 레이어 패키지, 그 하위에 도메인(`product/`, `user/` …) 을 둔다. 도메인이 늘면 같은 패턴을 반복한다.
 - **DTO 다층 분리**: API 의 요청·응답 DTO 와 응용 레이어의 DTO 는 분리해 작성한다.
 - **Application 경량 유지**: Facade 는 도메인 객체 조합과 변환에 집중한다. 비즈니스 규칙(불변식, 정책 분기, 상태 계산)은 도메인(`*Model` / `*Service`)에 둔다. Facade 가 두꺼워지면 도메인이 빈약(anemic)해지는 신호.
+- **애그리거트 간 협력은 Facade 가 조율**: 서로 다른 애그리거트를 엮는 유스케이스 시퀀스(사전조건 검증 → 주체 변경 → 결과적 협력 변경)는 Facade 가 조립하고 트랜잭션 외곽도 Facade 에 둔다. 도메인 Service 는 다른 도메인의 Service·Repository·Model 을 알지 않으며 자기 애그리거트 책임에만 집중한다.
 - **DIP 적용 범위는 Repository 만이 아니다**: 도메인이 의존하는 외부 효과는 모두 도메인 인터페이스로 정의하고 `infrastructure/` 에서 어댑터를 구현한다. 예: `PasswordEncoder` ↔ `BCryptPasswordEncoderAdapter`. 시계·외부 API·메시지 발행도 같은 패턴.
 
 ## commerce-api 아키텍처
