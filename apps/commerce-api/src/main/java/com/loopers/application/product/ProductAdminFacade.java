@@ -76,12 +76,12 @@ public class ProductAdminFacade {
             command.description(),
             command.price()
         );
-        ProductStock productStock = updateProductStock(product.getId(), command);
+        ProductStock productStock = applyStockChange(product.getId(), command);
         return ProductInfo.from(product, productStock);
     }
 
-    private ProductStock updateProductStock(Long productId, UpdateProductCommand command) {
-        if (!command.hasStockQuantity()) {
+    private ProductStock applyStockChange(Long productId, UpdateProductCommand command) {
+        if (!command.changesStock()) {
             return productStockService.getProductStock(productId);
         }
         return productStockService.changeProductStock(productId, command.stockQuantity());
