@@ -1,45 +1,35 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
-@Entity
-@Table(name = "product")
-public class ProductModel extends BaseEntity {
+import java.time.ZonedDateTime;
+
+/**
+ * Product Aggregate 루트 — 순수 도메인 객체. 재고/좋아요 수/활성 상태 같은 비즈니스 규칙만 보유하고
+ * 영속 기술(JPA)에는 의존하지 않는다. JPA 매핑은 infrastructure.product.ProductEntity가 담당하고,
+ * 도메인 ↔ 엔티티 변환은 ProductEntityMapper가 처리한다.
+ *
+ * Stock은 행동 VO로 도메인 내부에서만 사용하고, 영속 시 엔티티에서 Integer 컬럼으로 풀린다.
+ */
+public class ProductModel {
 
     private static final int NAME_MAX_LENGTH = 200;
     private static final int DESCRIPTION_MAX_LENGTH = 2000;
     private static final int IMAGE_URL_MAX_LENGTH = 500;
 
-    @Column(name = "brand_id", nullable = false)
-    private Long brandId;
-
-    @Column(name = "name", nullable = false, length = NAME_MAX_LENGTH)
+    private final Long id;   // 영속 전에는 null, 저장 후 매퍼가 채운 값으로 복원된다.
+    private final Long brandId;
     private String name;
-
-    @Column(name = "description", length = DESCRIPTION_MAX_LENGTH)
     private String description;
-
-    @Column(name = "image_url", length = IMAGE_URL_MAX_LENGTH)
     private String imageUrl;
-
-    @Column(name = "price", nullable = false)
     private Long price;
-
-    @Embedded
     private Stock stock;
-
-    @Column(name = "likes_count", nullable = false)
     private Long likesCount;
-
-    protected ProductModel() {}
+    private ZonedDateTime deletedAt;   // null이면 활성 (soft delete, 01 §7.5)
 
     public ProductModel(Long brandId, String name, String description, String imageUrl, Long price, Integer stock) {
+        this.id = null;
         this.brandId = validateBrandId(brandId);
         this.name = validateName(name);
         this.description = validateDescription(description);
@@ -47,6 +37,26 @@ public class ProductModel extends BaseEntity {
         this.price = validatePrice(price);
         this.stock = new Stock(stock);
         this.likesCount = 0L;
+        this.deletedAt = null;
+    }
+
+    private ProductModel(Long id, Long brandId, String name, String description, String imageUrl,
+                         Long price, Integer stock, Long likesCount, ZonedDateTime deletedAt) {
+        this.id = id;
+        this.brandId = brandId;
+        this.name = name;
+        this.description = description;
+        this.imageUrl = imageUrl;
+        this.price = price;
+        this.stock = new Stock(stock);
+        this.likesCount = likesCount;
+        this.deletedAt = deletedAt;
+    }
+
+    /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). */
+    public static ProductModel reconstitute(Long id, Long brandId, String name, String description, String imageUrl,
+                                            Long price, Integer stock, Long likesCount, ZonedDateTime deletedAt) {
+        return new ProductModel(id, brandId, name, description, imageUrl, price, stock, likesCount, deletedAt);
     }
 
     // --- 검증 ---
@@ -113,9 +123,21 @@ public class ProductModel extends BaseEntity {
         this.likesCount = Math.max(0L, this.likesCount - 1);
     }
 
-    /** 활성 여부 — deletedAt이 null이면 활성 (soft delete는 BaseEntity.delete()/restore()). */
+    /** 활성 여부 — deletedAt이 null이면 활성 (01 §7.5). */
     public boolean isActive() {
-        return getDeletedAt() == null;
+        return deletedAt == null;
+    }
+
+    /** soft delete. 멱등 — 이미 삭제됐으면 시각을 유지한다 (Brand→Product cascade — 01 §7.5). */
+    public void delete() {
+        if (this.deletedAt == null) {
+            this.deletedAt = ZonedDateTime.now();
+        }
+    }
+
+    /** soft delete 복원. 멱등. */
+    public void restore() {
+        this.deletedAt = null;
     }
 
     public void update(String newName, String newDescription, String newImageUrl, Long newPrice, Integer newStock) {
@@ -127,6 +149,10 @@ public class ProductModel extends BaseEntity {
     }
 
     // --- Getter ---
+
+    public Long getId() {
+        return id;
+    }
 
     public Long getBrandId() {
         return brandId;
@@ -154,5 +180,9 @@ public class ProductModel extends BaseEntity {
 
     public Long getLikesCount() {
         return likesCount;
+    }
+
+    public ZonedDateTime getDeletedAt() {
+        return deletedAt;
     }
 }

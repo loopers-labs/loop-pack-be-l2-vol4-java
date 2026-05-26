@@ -2,22 +2,16 @@ package com.loopers.domain.product;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
 
 import java.util.Objects;
 
 /**
- * 재고 값 객체. "0 이상" 불변식과 차감/복원/가용성 행동을 캡슐화한다.
- * 불변 — 차감/복원은 새 Stock을 반환한다. product 테이블의 stock 컬럼에 embed.
+ * 재고 값 객체 — 순수 도메인. "0 이상" 불변식과 차감/복원/가용성 행동을 캡슐화한다.
+ * 불변 — 차감/복원은 새 Stock을 반환한다. 영속 시 엔티티에서 product.stock 컬럼(Integer)으로 풀린다.
  */
-@Embeddable
 public class Stock {
 
-    @Column(name = "stock", nullable = false)
-    private Integer quantity;
-
-    protected Stock() {}
+    private final Integer quantity;
 
     public Stock(Integer quantity) {
         if (quantity == null || quantity < 0) {
