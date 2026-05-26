@@ -19,6 +19,7 @@
 ### 클래스 접미사 규약 (레이어별)
 | 레이어 | 접미사 | 예 |
 |---|---|---|
+| 도메인 VO | (접미사·접두사 없음, 도메인 개념명) | `Name`, `Price`, `Stock`, `LoginId`, `Email` (`UserName`·`BrandName` 금지) |
 | 도메인 엔티티 | `*Model` | `UserModel` |
 | 도메인 서비스 | `*Service` | `UserService` |
 | 도메인 Repository 인터페이스 | `*Repository` | `UserRepository` |
