@@ -19,6 +19,11 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public Optional<UserModel> findById(Long userId) {
+        return userJpaRepository.findById(userId);
+    }
+
+    @Override
     public boolean existsByLoginId(String loginId) {
         return userJpaRepository.existsByLoginId(loginId);
     }
