@@ -31,7 +31,12 @@ public class LikeFacade {
             return;
         }
 
-        likeRepository.save(LikeModel.of(user.getId(), product.getId()));
+        LikeModel like = LikeModel.builder()
+            .userId(user.getId())
+            .productId(product.getId())
+            .build();
+
+        likeRepository.save(like);
     }
 
     public void deleteLike(Long userId, Long productId) {

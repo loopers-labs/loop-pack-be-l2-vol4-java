@@ -34,7 +34,10 @@ class LikeRepositoryIntegrationTest {
     }
 
     private LikeModel createLike(Long userId, Long productId) {
-        return LikeModel.of(userId, productId);
+        return LikeModel.builder()
+            .userId(userId)
+            .productId(productId)
+            .build();
     }
 
     @DisplayName("좋아요를 저장할 때,")
