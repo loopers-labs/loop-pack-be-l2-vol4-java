@@ -45,17 +45,15 @@ classDiagram
     }
 
     class ProductModel {
-        +BrandModel brand
+        +Long brandId
         +String name
         +Long price
         +int stock
         +String description
         +Long likeCount
-        +ProductModel(brand, name, price, stock, description)
+        +ProductModel(name, description, price, stock, brandId)
         +update(name, price, stock, description) void
         +decrementStock(quantity) void
-        +likeAdded() void
-        +likeRemoved() void
     }
 
     class LikeModel {
@@ -90,7 +88,7 @@ classDiagram
 
     UserModel --> Role
     UserModel "N" --> "0..1" BrandModel : "brandId (nullable)"
-    BrandModel "1" --> "N" ProductModel
+    BrandModel "0..1" --> "N" ProductModel : "brandId (nullable)"
     UserModel "1" --> "N" LikeModel
     ProductModel "1" --> "N" LikeModel
     UserModel "1" --> "N" OrderModel
@@ -106,7 +104,8 @@ classDiagram
 `productName`과 `price`는 주문 시점의 값을 복사해서 저장한다. `productId`는 참조용으로만 남기고, 이후 상품 정보가 변경되어도 주문 기록은 영향을 받지 않는다.
 
 ### ProductModel — 브랜드 변경 불가
-`update()`는 `name`, `price`, `stock`, `description`만 수정하며 `brand`는 파라미터에 포함하지 않는다. 브랜드 변경 시도는 Facade에서 사전 차단한다.
+`update()`는 `name`, `price`, `stock`, `description`만 수정하며 `brandId`는 파라미터에 포함하지 않는다. 브랜드 변경 시도는 Facade에서 사전 차단한다.
+`brandId`는 nullable이다. 브랜드 없이 상품을 등록할 수 있으며, 브랜드가 없는 경우 `brandId`는 null이다.
 
 ### ProductModel — decrementStock()
 재고가 요청 수량보다 적으면 `CoreException(BAD_REQUEST)`을 던진다. 이 검증은 비관적 락 획득 이후 호출되어 동시성 문제를 방지한다.

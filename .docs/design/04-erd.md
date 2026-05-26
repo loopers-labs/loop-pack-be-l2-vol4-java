@@ -69,7 +69,7 @@ erDiagram
     users }o--o| brands : "brand_id (nullable)"
     users ||--o{ likes : ""
     users ||--o{ orders : ""
-    brands ||--o{ products : ""
+    brands |o--o{ products : "brand_id (nullable)"
     products ||--o{ likes : ""
     orders ||--|{ order_items : ""
 ```

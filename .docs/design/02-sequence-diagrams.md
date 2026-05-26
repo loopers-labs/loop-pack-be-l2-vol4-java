@@ -484,24 +484,31 @@ sequenceDiagram
         Facade-->>Controller: CoreException(BAD_REQUEST)
         Controller-->>Admin: 400
     else 유효한 입력
-        Facade->>+Service: getBrand(brandId)
-        Service->>+DB: SELECT brand WHERE id = brandId
-        DB-->>-Service: brand | null
-        deactivate Service
+        alt brandId가 제공된 경우
+            Facade->>+Service: getBrand(brandId)
+            Service->>+DB: SELECT brand WHERE id = brandId
+            DB-->>-Service: brand | null
+            deactivate Service
 
-        alt 브랜드 없음 또는 삭제됨
-            Facade-->>Controller: CoreException(NOT_FOUND)
-            Controller-->>Admin: 404
-        else 브랜드 존재
-            alt BRAND_ADMIN이면서 자신의 브랜드가 아님
-                Facade-->>Controller: CoreException(FORBIDDEN)
-                Controller-->>Admin: 403
-            else 권한 있음
-                Facade->>+Service: createProduct(brand, name, price, stock, description)
-                Service->>DB: INSERT product
-                deactivate Service
-                Controller-->>Admin: 201
+            alt 브랜드 없음 또는 삭제됨
+                Facade-->>Controller: CoreException(NOT_FOUND)
+                Controller-->>Admin: 404
+            else 브랜드 존재
+                alt BRAND_ADMIN이면서 자신의 브랜드가 아님
+                    Facade-->>Controller: CoreException(FORBIDDEN)
+                    Controller-->>Admin: 403
+                else 권한 있음
+                    Facade->>+Service: createProduct(brandId, name, price, stock, description)
+                    Service->>DB: INSERT product
+                    deactivate Service
+                    Controller-->>Admin: 201
+                end
             end
+        else brandId 미제공 (브랜드 없는 상품)
+            Facade->>+Service: createProduct(null, name, price, stock, description)
+            Service->>DB: INSERT product
+            deactivate Service
+            Controller-->>Admin: 201
         end
     end
     deactivate Facade

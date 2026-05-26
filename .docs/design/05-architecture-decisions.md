@@ -224,50 +224,63 @@ class ProductModel {
 장점: JOIN FETCH 한 번으로 상품 + 브랜드 함께 조회. 코드가 단순하다.
 단점: product/domain이 brand/domain을 import → 양방향 인지 발생
 
-**결정: 결합 허용 → 원칙 확정**
+**결정: 결합 제거 → Long brandId (nullable)**
 
-요구사항 관점에서 결합 허용을 결정했고, 이를 통해 도메인 간 의존 원칙이 확정됐다.
+브랜드는 선택 사항이므로 `@ManyToOne BrandModel` 대신 `Long brandId`(nullable)를 사용한다.
 
-- 상품 목록(20개) 카드에 브랜드명이 항상 함께 표시된다.
-- 브랜드 필터와 정렬이 함께 동작한다.
-- Product와 Brand는 이 서비스에서 항상 함께 다뤄지는 도메인이다.
-- 도메인 독립성을 위해 Facade에 조합 로직을 추가하는 것보다, 요구사항에 맞게 결합을 허용하고 코드를 단순하게 유지하는 것이 낫다.
+- 브랜드 없이도 상품을 등록할 수 있다 (노브랜드 상품).
+- `@ManyToOne`으로 nullable 관계를 표현하면 product/domain이 brand/domain을 import하게 된다.
+  브랜드가 항상 존재한다는 보장이 없으므로, JOIN FETCH 단순화 이점도 사라진다.
+- `Long brandId`를 저장하고, 상품 목록 조회 시 Facade에서 brandId 목록으로 브랜드 정보를 일괄 조회해 조합한다.
+- 도메인 완전 독립을 통해 product/domain이 brand/domain을 전혀 모르는 단방향 의존만 남는다.
+
+```java
+class ProductModel {
+    private Long brandId;  // nullable — 브랜드 없는 상품 허용
+}
+
+// ProductFacade에서 IN 쿼리로 브랜드 일괄 조회 후 조합
+List<Long> brandIds = products.stream()
+    .map(ProductModel::getBrandId)
+    .filter(Objects::nonNull)
+    .distinct()
+    .toList();
+Map<Long, BrandModel> brandMap = brandRepository.findAllByIds(brandIds)
+    .stream().collect(toMap(BrandModel::getId, identity()));
+```
 
 **확정된 원칙**
 - Domain 레이어: 자기 도메인 로직만 담당. 다른 도메인의 Service/Repository 직접 참조 금지.
-- Application 레이어: 도메인 간 협력이 일어나는 유일한 곳.
-- 예외: JPA `@ManyToOne` 구조적 참조는 Domain 레이어에서도 허용.
-- `Application → Domain ← Infrastructure` 레이어 원칙은 위반하지 않는다.
-  `product/domain → brand/domain`은 같은 Domain 레이어 안의 수평 의존이며,
-  레이어 원칙은 레이어 간 수직 의존 방향만 다룬다.
+- Application 레이어: 도메인 간 협력이 일어나는 유일한 곳. 브랜드·상품 정보 조합도 Facade에서 처리.
+- `Application → Domain ← Infrastructure` 레이어 원칙 준수.
 
 **전체 의존 방향 지도**
 
 ```
-[Domain 레이어 — 수평 의존]
-product/domain ──(@ManyToOne)──► brand/domain
+[Domain 레이어 — 수평 의존 없음]
+product/domain  (brand/domain을 import하지 않음)
 
 [Application 레이어 — 도메인 간 조합]
-like/application  ──► product/domain  (likeCount 업데이트, 좋아요 목록 상품 조회)
-order/application ──► product/domain  (재고 차감, 스냅샷)
-brand/application ──► product/domain  (브랜드 삭제 연쇄)
-brand/application ──► user/domain     (브랜드 삭제 연쇄)
+product/application ──► brand/domain  (상품 조회 시 브랜드 정보 조합)
+like/application    ──► product/domain  (likeCount 업데이트, 좋아요 목록 상품 조회)
+order/application   ──► product/domain  (재고 차감, 스냅샷)
+brand/application   ──► product/domain  (브랜드 삭제 연쇄)
+brand/application   ──► user/domain     (브랜드 삭제 연쇄)
 ```
 
 **유사 관계 검토 — User(BRAND_ADMIN) → Brand**
 
 Product → Brand와 동일한 패턴이 User → Brand에도 존재한다.
 BRAND_ADMIN은 브랜드에 귀속되고, 브랜드 삭제 시 함께 소프트 딜리트된다.
-그러나 UserModel은 `Long brandId`만 저장하고 `@ManyToOne BrandModel`을 갖지 않는다.
+두 경우 모두 `Long brandId`를 저장하는 방식으로 통일된다.
 
 | | Product → Brand | User → Brand |
 |--|--|--|
-| 관계 | 상품은 브랜드에 소속 | BRAND_ADMIN은 브랜드에 귀속 |
+| 관계 | 상품은 브랜드에 선택적으로 소속 | BRAND_ADMIN은 브랜드에 귀속 |
 | 브랜드 삭제 시 | 상품 소프트 딜리트 | BRAND_ADMIN 소프트 딜리트 |
-| 구현 | `@ManyToOne BrandModel` | `Long brandId` |
+| 구현 | `Long brandId` (nullable) | `Long brandId` (nullable) |
 
-구현이 다른 이유: Product는 조회 시 브랜드명 표시가 필요해 BrandModel 객체가 필요하고,
-User는 자신의 브랜드인지 ID 비교만 하면 되므로 `Long brandId`로 충분하다.
+두 경우 모두 `Long brandId`만 저장한다. 브랜드 이름 표시가 필요한 경우 Facade에서 조합한다.
 
 ---
 
@@ -481,7 +494,7 @@ public ProductModel getOrThrow(Optional<ProductModel> product) {
 public void updateProduct(String loginId, Long productId, ...) {
     UserModel user = userService.getOrThrow(userRepository.findByLoginId(loginId));
     ProductModel product = productService.getOrThrow(productRepository.find(productId));
-    if (!product.getBrand().getId().equals(user.getBrandId())) {
+    if (!Objects.equals(product.getBrandId(), user.getBrandId())) {
         throw new CoreException(ErrorType.FORBIDDEN, "담당 브랜드의 상품만 수정할 수 있습니다.");
     }
 }

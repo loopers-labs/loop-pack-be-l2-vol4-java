@@ -157,16 +157,11 @@ class ProductModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("brandId가 null이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("brandId가 null이면, 정상 생성된다.")
         @Test
-        void throwsBadRequest_whenBrandIdIsNull() {
-            // act
-            CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null)
-            );
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        void createsProductModel_whenBrandIdIsNull() {
+            // act & assert
+            assertDoesNotThrow(() -> new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
         }
     }
 
