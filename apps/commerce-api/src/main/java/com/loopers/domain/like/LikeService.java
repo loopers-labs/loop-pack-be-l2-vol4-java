@@ -54,4 +54,16 @@ public class LikeService {
                 .map(LikeModel::isActive)
                 .orElse(false);
     }
+
+    /**
+     * 특정 상품의 활성 좋아요를 전부 soft delete (Product 비활성 시 cascade 전파 — 01 §7.5).
+     * 멱등 — 활성 좋아요가 없으면 no-op. 상품 자체가 비활성이 되므로 likesCount는 건드리지 않는다.
+     */
+    @Transactional
+    public void deactivateByProduct(Long productId) {
+        for (LikeModel like : likeRepository.findActiveByProductId(productId)) {
+            like.delete();
+            likeRepository.save(like);
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductService;
@@ -26,6 +27,7 @@ public class ProductFacadeIntegrationTest {
     @Autowired BrandService brandService;
     @Autowired ProductService productService;
     @Autowired ProductRepository productRepository;
+    @Autowired LikeService likeService;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -95,6 +97,57 @@ public class ProductFacadeIntegrationTest {
 
             assertThat(thrown).isInstanceOf(CoreException.class);
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("상품을 삭제할 때 (soft delete + Like cascade — 01 §7.5)")
+    class DeleteProduct {
+
+        @DisplayName("상품을 삭제하면, 비활성화되어 상세 조회 시 NotFound가 발생한다.")
+        @Test
+        void given_product_when_delete_then_inactive() {
+            BrandModel brand = brandService.register("나이키", "스포츠");
+            ProductInfo product = productFacade.createProduct(brand.getId(), "에어맥스", "러닝화", null, 139000L, 10);
+
+            productFacade.deleteProduct(product.id());
+
+            Throwable thrown = catchThrowable(() -> productFacade.getProductDetail(product.id()));
+            assertThat(thrown).isInstanceOf(CoreException.class);
+            assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("상품을 삭제하면, 그 상품의 좋아요도 cascade로 전부 비활성화된다.")
+        @Test
+        void given_likedProduct_when_delete_then_likesDeactivated() {
+            BrandModel brand = brandService.register("나이키", "스포츠");
+            ProductInfo product = productFacade.createProduct(brand.getId(), "에어맥스", "러닝화", null, 139000L, 10);
+            likeService.like(1L, product.id());
+            likeService.like(2L, product.id());
+
+            productFacade.deleteProduct(product.id());
+
+            assertAll(
+                    () -> assertThat(likeService.isLiked(1L, product.id())).isFalse(),
+                    () -> assertThat(likeService.isLiked(2L, product.id())).isFalse()
+            );
+        }
+
+        @DisplayName("상품을 삭제해도, 다른 상품의 좋아요는 영향받지 않는다.")
+        @Test
+        void given_twoLikedProducts_when_deleteOne_then_otherLikesIntact() {
+            BrandModel brand = brandService.register("나이키", "스포츠");
+            ProductInfo target = productFacade.createProduct(brand.getId(), "에어맥스", "러닝화", null, 139000L, 10);
+            ProductInfo other = productFacade.createProduct(brand.getId(), "조던", "농구화", null, 199000L, 5);
+            likeService.like(1L, target.id());
+            likeService.like(1L, other.id());
+
+            productFacade.deleteProduct(target.id());
+
+            assertAll(
+                    () -> assertThat(likeService.isLiked(1L, target.id())).isFalse(),
+                    () -> assertThat(likeService.isLiked(1L, other.id())).isTrue()
+            );
         }
     }
 }

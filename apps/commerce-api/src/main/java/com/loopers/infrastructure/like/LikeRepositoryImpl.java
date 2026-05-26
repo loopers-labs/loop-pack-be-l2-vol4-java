@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -43,5 +44,12 @@ public class LikeRepositoryImpl implements LikeRepository {
     @Override
     public Optional<LikeModel> findByUserIdAndProductId(Long userId, Long productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId).map(LikeEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<LikeModel> findActiveByProductId(Long productId) {
+        return likeJpaRepository.findByProductIdAndDeletedAtIsNull(productId).stream()
+                .map(LikeEntityMapper::toDomain)
+                .toList();
     }
 }

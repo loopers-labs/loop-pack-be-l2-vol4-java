@@ -26,4 +26,16 @@ public class BrandService {
                 .filter(BrandModel::isActive)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
     }
+
+    /**
+     * 브랜드 soft delete (01 §7.5). 존재하지 않으면 NOT_FOUND. 멱등 — 이미 비활성이어도 안전.
+     * 하위 상품/좋아요 cascade 전파는 BrandFacade가 조정한다.
+     */
+    @Transactional
+    public void deleteBrand(Long id) {
+        BrandModel brand = brandRepository.find(id)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
+        brand.delete();
+        brandRepository.save(brand);
+    }
 }

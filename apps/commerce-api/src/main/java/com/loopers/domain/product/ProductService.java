@@ -39,6 +39,12 @@ public class ProductService {
         return productRepository.findAll();
     }
 
+    /** 특정 브랜드의 활성 상품 전체 (Brand→Product cascade 전파용 — 01 §7.5). */
+    @Transactional(readOnly = true)
+    public List<ProductModel> getActiveProductsByBrand(Long brandId) {
+        return productRepository.findActiveByBrandId(brandId);
+    }
+
     @Transactional
     public ProductModel updateProduct(Long id, String name, String description, String imageUrl, Long price, Integer stock) {
         ProductModel product = getProduct(id);
@@ -46,10 +52,12 @@ public class ProductService {
         return productRepository.save(product);
     }
 
+    /** soft delete (01 §7.5). 행은 남기고 deletedAt만 설정 → 조회·신규 좋아요에서 NOT_FOUND로 가려진다. */
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductModel product = getProduct(id);
+        product.delete();
+        productRepository.save(product);
     }
 
     /** 재고 차감 — 활성 상품만. 부족 시 ProductModel/Stock이 CONFLICT (주문 트랜잭션 내 호출). */

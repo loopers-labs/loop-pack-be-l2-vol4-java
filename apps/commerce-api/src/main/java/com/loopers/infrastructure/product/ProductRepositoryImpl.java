@@ -53,7 +53,9 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public List<ProductModel> findActiveByBrandId(Long brandId) {
+        return productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId).stream()
+                .map(ProductEntityMapper::toDomain)
+                .toList();
     }
 }
