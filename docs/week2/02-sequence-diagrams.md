@@ -348,15 +348,28 @@ sequenceDiagram
     participant Controller as OrderController
     participant Service as OrderService
     participant ProductRepository as ProductRepository
+    participant ProductStock as ProductStock
+    participant Order as Order
     participant OrderRepository as OrderRepository
 
     Client->>Auth: 주문 요청 (인증 헤더 전달)
     Auth->>Controller: 요청 전달 (인증된 userId)
     Controller->>Service: 주문 생성
-    Service->>ProductRepository: 주문 상품 조회
-    ProductRepository-->>Service: 상품과 재고
-    Service->>ProductRepository: 재고 차감
-    Service->>OrderRepository: 주문 스냅샷 저장
+
+    Note over Service,ProductRepository: 재고 락은 productId 오름차순으로 획득 (deadlock 방지)
+    Service->>ProductRepository: 주문 상품과 재고 조회 (SELECT ... FOR UPDATE)
+    ProductRepository-->>Service: Product / ProductStock 목록
+
+    loop 주문 상품마다
+        Service->>ProductStock: decrease(quantity)
+        ProductStock-->>Service: 차감 완료 (재고 부족 시 예외)
+    end
+
+    Service->>Order: create(userId, 상품 스냅샷 정보)
+    Note over Order: OrderItem 스냅샷 구성 (productId, productName, brandId, brandName, price, quantity)<br/>totalAmount 계산, status=PENDING
+    Order-->>Service: 주문 Aggregate
+
+    Service->>OrderRepository: 주문 저장
     OrderRepository-->>Service: 주문
     Service-->>Controller: 주문 생성 결과
     Controller-->>Client: 응답
@@ -378,6 +391,8 @@ sequenceDiagram
     participant Controller as OrderController
     participant OrderService as OrderService
     participant ProductRepository as ProductRepository
+    participant ProductStock as ProductStock
+    participant Order as Order
     participant OrderRepository as OrderRepository
     participant PaymentService as PaymentService
     participant PG as 외부 결제 시스템
@@ -387,9 +402,15 @@ sequenceDiagram
     Controller->>OrderService: 주문 생성 및 결제
 
     Note over OrderService,OrderRepository: 트랜잭션 1 — 재고 차감 + 주문 PENDING 저장
-    OrderService->>ProductRepository: 주문 상품 조회 및 재고 락 (productId 오름차순)
-    ProductRepository-->>OrderService: 상품과 재고
-    OrderService->>ProductRepository: 재고 차감
+    OrderService->>ProductRepository: 주문 상품과 재고 조회 (productId 오름차순, SELECT ... FOR UPDATE)
+    ProductRepository-->>OrderService: Product / ProductStock 목록
+    loop 주문 상품마다
+        OrderService->>ProductStock: decrease(quantity)
+        ProductStock-->>OrderService: 차감 완료 (재고 부족 시 예외)
+    end
+    OrderService->>Order: create(userId, 상품 스냅샷 정보)
+    Note over Order: OrderItem 스냅샷 구성<br/>totalAmount 계산, status=PENDING
+    Order-->>OrderService: 주문 Aggregate
     OrderService->>OrderRepository: 주문 저장 (PENDING)
     OrderRepository-->>OrderService: 주문
 
@@ -400,15 +421,20 @@ sequenceDiagram
         PG-->>PaymentService: 결제 승인
         PaymentService-->>OrderService: 결제 성공
         Note over OrderService,OrderRepository: 트랜잭션 2 — 주문 상태 PAID 전이
-        OrderService->>OrderRepository: 주문 상태 PAID 업데이트
+        OrderService->>Order: markPaid()
+        OrderService->>OrderRepository: 주문 저장
         OrderService-->>Controller: 주문 결제 완료
         Controller-->>Client: 응답 (PAID)
     else 결제 실패 (잔액 부족 / 외부 결제 시스템 네트워크 오류)
         PG-->>PaymentService: 결제 거절 또는 호출 실패
         PaymentService-->>OrderService: 결제 실패
         Note over OrderService,OrderRepository: 트랜잭션 3 — 보상 처리 (재고 복구 + 주문 상태 FAILED 전이)
-        OrderService->>ProductRepository: 재고 복구
-        OrderService->>OrderRepository: 주문 상태 FAILED 업데이트
+        loop 주문 상품마다
+            OrderService->>ProductStock: increase(quantity)
+            ProductStock-->>OrderService: 복구 완료
+        end
+        OrderService->>Order: markFailed()
+        OrderService->>OrderRepository: 주문 저장
         OrderService-->>Controller: 주문 결제 실패
         Controller-->>Client: 응답 (FAILED)
     end

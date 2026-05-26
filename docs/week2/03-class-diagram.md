@@ -170,6 +170,7 @@ classDiagram
         productId
         quantity
         decrease()
+        increase()
     }
 
     class ProductRepository {
@@ -206,6 +207,7 @@ classDiagram
 ### 설계 리스크
 
 - 상품 재고 차감은 주문과 함께 일어나므로 동시 주문 상황에서 재고 일관성을 보장해야 한다. 1차로는 `ProductStock`에 대한 Pessimistic Lock(`SELECT ... FOR UPDATE`)을 적용한다. 트래픽이 늘어나면 분산락이나 비동기 처리 방식을 다시 검토한다.
+- 결제 실패 등 보상이 필요한 경우 `ProductStock.increase()`로 차감분을 되돌린다. 이 복구는 DB 자동 롤백이 아니라 별도 트랜잭션의 명시적 보상이다.
 - 브랜드 삭제 시 상품이 함께 삭제되므로, 상품 삭제가 주문 이력을 훼손하지 않도록 주문은 상품 정보를 스냅샷으로 저장해야 한다.
 - 좋아요 수 정렬은 현재 범위에서 `Like` 테이블을 매번 집계해 처리한다. 정렬 성능이 문제가 되면 집계 컬럼이나 캐시 도입을 별도로 설계한다.
 
@@ -301,6 +303,9 @@ classDiagram
         status
         totalAmount
         orderedAt
+        create()
+        markPaid()
+        markFailed()
     }
 
     class OrderItem {
@@ -353,4 +358,5 @@ classDiagram
 - 주문 생성과 재고 차감을 하나의 트랜잭션으로 처리하므로, 주문 상품 수가 많아지면 트랜잭션이 커질 수 있다.
 - 재고 차감은 동시 주문 상황에서 충돌 가능성이 있으므로 ProductStock에 대한 동시성 제어가 필요하다.
 - 한 주문에 여러 상품이 포함될 때, 락 획득 순서가 엇갈리면 deadlock이 발생할 수 있다. 이를 막기 위해 재고 락은 `productId` 오름차순으로 획득한다.
+- 상태 전이(`PENDING → PAID/FAILED`)는 `Order` 내부 메서드(`markPaid()`, `markFailed()`)에서 처리하고, 허용되지 않은 전이는 예외로 막는다. 결제 결과는 `Order` 외부에서 받지만 상태 변경 권한은 `Order` aggregate에 둔다.
 - 결제 도메인이 추가되면 실패/취소 시 재고 복구 정책과 주문 상태 전이를 함께 다시 설계해야 한다.
