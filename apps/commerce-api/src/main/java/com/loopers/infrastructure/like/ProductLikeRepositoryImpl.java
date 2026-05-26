@@ -5,6 +5,7 @@ import com.loopers.domain.like.ProductLikeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -21,6 +22,11 @@ public class ProductLikeRepositoryImpl implements ProductLikeRepository {
     @Override
     public Optional<ProductLikeModel> find(String userLoginId, Long productId) {
         return productLikeJpaRepository.findByUserLoginIdAndProductId(userLoginId, productId);
+    }
+
+    @Override
+    public List<ProductLikeModel> findAllByUserLoginId(String userLoginId) {
+        return productLikeJpaRepository.findAllByUserLoginId(userLoginId);
     }
 
     @Override

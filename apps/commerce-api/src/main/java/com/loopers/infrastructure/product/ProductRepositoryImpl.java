@@ -22,22 +22,27 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Optional<ProductModel> find(Long id) {
-        return productJpaRepository.findById(id);
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id);
     }
 
     @Override
     public List<ProductModel> findAll() {
-        return productJpaRepository.findAll();
+        return findAll(ProductSort.LATEST);
     }
 
     @Override
     public List<ProductModel> findAll(ProductSort sort) {
-        return productJpaRepository.findAll(toJpaSort(sort));
+        return productJpaRepository.findAllByDeletedAtIsNull(toJpaSort(sort));
     }
 
     @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public List<ProductModel> findAllByBrandId(Long brandId) {
+        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
+    }
+
+    @Override
+    public List<ProductModel> findAllByBrandId(Long brandId, ProductSort sort) {
+        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, toJpaSort(sort));
     }
 
     private Sort toJpaSort(ProductSort sort) {

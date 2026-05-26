@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class ProductV1ApiE2ETest {
 
     private static final String ENDPOINT_PRODUCTS = "/api/v1/products";
+    private static final String ENDPOINT_ADMIN_PRODUCTS = "/api-admin/v1/products";
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
 
     private final TestRestTemplate testRestTemplate;
@@ -88,7 +89,7 @@ class ProductV1ApiE2ETest {
         }
     }
 
-    @DisplayName("POST /api/v1/products")
+    @DisplayName("POST /api-admin/v1/products")
     @Nested
     class CreateProduct {
         @DisplayName("필수 요청 값이 비어있으면, 400 BAD_REQUEST 응답을 받는다.")
@@ -106,9 +107,9 @@ class ProductV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<Void>> response =
                 testRestTemplate.exchange(
-                    ENDPOINT_PRODUCTS,
+                    ENDPOINT_ADMIN_PRODUCTS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request),
+                    new HttpEntity<>(request, adminHeaders()),
                     voidResponseType()
                 );
 
@@ -321,6 +322,12 @@ class ProductV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Loopers-LoginId", loginId);
         headers.set("X-Loopers-LoginPw", password);
+        return headers;
+    }
+
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
         return headers;
     }
 

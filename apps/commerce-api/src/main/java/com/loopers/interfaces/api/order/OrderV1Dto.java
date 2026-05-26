@@ -14,10 +14,10 @@ public class OrderV1Dto {
 
     public record CreateOrderRequest(
         @NotEmpty
-        List<@Valid OrderProductRequest> products
+        List<@Valid OrderProductRequest> items
     ) {
         public List<OrderProductCommand> toCommands() {
-            return products.stream()
+            return items.stream()
                 .map(product -> new OrderProductCommand(product.productId(), product.quantity()))
                 .toList();
         }

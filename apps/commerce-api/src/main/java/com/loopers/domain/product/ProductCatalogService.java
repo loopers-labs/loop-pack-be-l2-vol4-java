@@ -1,36 +1,29 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 
 import java.util.List;
+import java.util.Map;
 
-@RequiredArgsConstructor
-@Component
 public class ProductCatalogService {
 
-    private final ProductService productService;
-    private final BrandService brandService;
-
-    @Transactional(readOnly = true)
-    public ProductDetail getProductDetail(Long productId) {
-        ProductModel product = productService.getProduct(productId);
-        BrandModel brand = brandService.getBrand(product.getBrandId());
+    public ProductDetail getProductDetail(ProductModel product, BrandModel brand) {
         return new ProductDetail(product, brand);
     }
 
-    @Transactional(readOnly = true)
-    public List<ProductDetail> getProductDetails() {
-        return getProductDetails(ProductSort.LATEST);
+    public List<ProductDetail> getProductDetails(List<ProductModel> products, Map<Long, BrandModel> brandsById) {
+        return products.stream()
+            .map(product -> getProductDetail(product, findBrand(product, brandsById)))
+            .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<ProductDetail> getProductDetails(ProductSort sort) {
-        return productService.getAllProducts(sort).stream()
-            .map(product -> new ProductDetail(product, brandService.getBrand(product.getBrandId())))
-            .toList();
+    private BrandModel findBrand(ProductModel product, Map<Long, BrandModel> brandsById) {
+        BrandModel brand = brandsById.get(product.getBrandId());
+        if (brand == null) {
+            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다.");
+        }
+        return brand;
     }
 }

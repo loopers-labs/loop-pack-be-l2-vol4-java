@@ -7,10 +7,17 @@ import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -25,6 +32,30 @@ public class OrderV1Controller {
         @Valid @RequestBody OrderV1Dto.CreateOrderRequest request
     ) {
         OrderInfo info = orderFacade.createOrder(user.loginId(), request.toCommands());
+        OrderV1Dto.OrderResponse response = OrderV1Dto.OrderResponse.from(info);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping
+    public ApiResponse<List<OrderV1Dto.OrderResponse>> getOrders(
+        @LoginUser AuthenticatedUser user,
+        @RequestParam(value = "startAt", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
+        @RequestParam(value = "endAt", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt,
+        @RequestParam(value = "page", required = false) Integer page,
+        @RequestParam(value = "size", required = false) Integer size
+    ) {
+        List<OrderV1Dto.OrderResponse> responses = orderFacade.getOrders(user.loginId(), startAt, endAt, page, size).stream()
+            .map(OrderV1Dto.OrderResponse::from)
+            .toList();
+        return ApiResponse.success(responses);
+    }
+
+    @GetMapping("/{orderId}")
+    public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
+        @LoginUser AuthenticatedUser user,
+        @PathVariable(value = "orderId") Long orderId
+    ) {
+        OrderInfo info = orderFacade.getOrder(user.loginId(), orderId);
         OrderV1Dto.OrderResponse response = OrderV1Dto.OrderResponse.from(info);
         return ApiResponse.success(response);
     }

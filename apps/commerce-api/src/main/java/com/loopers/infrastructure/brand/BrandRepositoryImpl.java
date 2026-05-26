@@ -21,11 +21,11 @@ public class BrandRepositoryImpl implements BrandRepository {
 
     @Override
     public Optional<BrandModel> find(Long id) {
-        return brandJpaRepository.findById(id);
+        return brandJpaRepository.findByIdAndDeletedAtIsNull(id);
     }
 
     @Override
     public List<BrandModel> findAll() {
-        return brandJpaRepository.findAll();
+        return brandJpaRepository.findAllByDeletedAtIsNull();
     }
 }

@@ -68,6 +68,10 @@ public class ProductModel extends BaseEntity {
         return likeCount;
     }
 
+    public boolean isVisible() {
+        return getDeletedAt() == null;
+    }
+
     public void deductStock(Integer quantity) {
         if (quantity == null || quantity < 1) {
             throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");

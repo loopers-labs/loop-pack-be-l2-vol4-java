@@ -1,58 +1,43 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
-
-    @Mock
-    private OrderRepository orderRepository;
-
-    @Mock
-    private ProductService productService;
 
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, productService);
+        orderService = new OrderService();
     }
 
     @DisplayName("주문을 생성할 때, ")
     @Nested
     class CreateOrder {
-        @DisplayName("모든 상품의 재고가 충분하면, 재고를 차감하고 주문을 저장한다.")
+        @DisplayName("모든 상품의 재고가 충분하면, 재고를 차감하고 주문을 생성한다.")
         @Test
-        void savesOrderAndDeductsStock_whenAllProductsAreAvailable() {
+        void createsOrderAndDeductsStock_whenAllProductsAreAvailable() {
             // arrange
             ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            when(productService.getProduct(1L)).thenReturn(product);
-            when(orderRepository.save(any(OrderModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // act
             OrderResult result = orderService.createOrder(
                 "user1234",
-                List.of(new OrderProductCommand(1L, 2))
+                List.of(new OrderProductCommand(1L, 2)),
+                Map.of(1L, product)
             );
 
             // assert
@@ -61,21 +46,16 @@ class OrderServiceTest {
                 () -> assertThat(order.getOrderLines()).hasSize(1),
                 () -> assertThat(order.getTotalAmount()).isEqualTo(60_000L),
                 () -> assertThat(product.getStock()).isEqualTo(8),
-                () -> assertThat(result.failures()).isEmpty(),
-                () -> verify(productService).saveProduct(product),
-                () -> verify(orderRepository).save(order)
+                () -> assertThat(result.failures()).isEmpty()
             );
         }
 
         @DisplayName("일부 상품의 재고가 부족하면, 가능한 상품만 주문하고 실패 상품을 결과에 남긴다.")
         @Test
-        void savesAvailableOrderLinesAndReturnsFailures_whenSomeProductsAreOutOfStock() {
+        void createsAvailableOrderLinesAndReturnsFailures_whenSomeProductsAreOutOfStock() {
             // arrange
             ProductModel availableProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
             ProductModel outOfStockProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 1);
-            when(productService.getProduct(1L)).thenReturn(availableProduct);
-            when(productService.getProduct(2L)).thenReturn(outOfStockProduct);
-            when(orderRepository.save(any(OrderModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // act
             OrderResult result = orderService.createOrder(
@@ -83,7 +63,8 @@ class OrderServiceTest {
                 List.of(
                     new OrderProductCommand(1L, 2),
                     new OrderProductCommand(2L, 3)
-                )
+                ),
+                Map.of(1L, availableProduct, 2L, outOfStockProduct)
             );
 
             // assert
@@ -97,23 +78,37 @@ class OrderServiceTest {
             );
         }
 
-        @DisplayName("주문 가능한 상품이 하나도 없으면, CONFLICT 예외가 발생하고 주문을 저장하지 않는다.")
+        @DisplayName("상품을 찾을 수 없으면, 실패 상품을 결과에 남긴다.")
+        @Test
+        void returnsFailure_whenProductDoesNotExist() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                orderService.createOrder(
+                    "user1234",
+                    List.of(new OrderProductCommand(1L, 2)),
+                    Map.of()
+                );
+            });
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("주문 가능한 상품이 하나도 없으면, CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflictException_whenNoProductCanBeOrdered() {
             // arrange
             ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 1);
-            when(productService.getProduct(1L)).thenReturn(product);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderService.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)));
+                orderService.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)), Map.of(1L, product));
             });
 
             // assert
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
-                () -> assertThat(product.getStock()).isEqualTo(1),
-                () -> verify(orderRepository, never()).save(any())
+                () -> assertThat(product.getStock()).isEqualTo(1)
             );
         }
 
@@ -122,14 +117,11 @@ class OrderServiceTest {
         void throwsBadRequestException_whenCommandIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderService.createOrder("user1234", List.of());
+                orderService.createOrder("user1234", List.of(), Map.of());
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                () -> verify(orderRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }

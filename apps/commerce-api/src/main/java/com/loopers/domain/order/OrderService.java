@@ -1,41 +1,34 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-@RequiredArgsConstructor
-@Component
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final ProductService productService;
-
-    @Transactional
-    public OrderResult createOrder(String userLoginId, List<OrderProductCommand> commands) {
+    public OrderResult createOrder(
+        String userLoginId,
+        List<OrderProductCommand> commands,
+        Map<Long, ProductModel> productsById
+    ) {
         validateCommands(commands);
 
         List<OrderLineModel> orderLines = new ArrayList<>();
-        List<ProductModel> orderedProducts = new ArrayList<>();
         List<OrderFailure> failures = new ArrayList<>();
 
         for (OrderProductCommand command : commands) {
-            tryOrderProduct(command, orderLines, orderedProducts, failures);
+            tryOrderProduct(command, productsById, orderLines, failures);
         }
 
         if (orderLines.isEmpty()) {
             throw new CoreException(ErrorType.CONFLICT, "주문 가능한 상품이 없습니다.");
         }
 
-        orderedProducts.forEach(productService::saveProduct);
-        OrderModel order = orderRepository.save(new OrderModel(userLoginId, orderLines));
+        OrderModel order = new OrderModel(userLoginId, orderLines);
         return new OrderResult(order, List.copyOf(failures));
     }
 
@@ -47,12 +40,15 @@ public class OrderService {
 
     private void tryOrderProduct(
         OrderProductCommand command,
+        Map<Long, ProductModel> productsById,
         List<OrderLineModel> orderLines,
-        List<ProductModel> orderedProducts,
         List<OrderFailure> failures
     ) {
         try {
-            ProductModel product = productService.getProduct(command.productId());
+            ProductModel product = productsById.get(command.productId());
+            if (product == null) {
+                throw new CoreException(ErrorType.NOT_FOUND, "[id = " + command.productId() + "] 상품을 찾을 수 없습니다.");
+            }
             product.deductStock(command.quantity());
             orderLines.add(new OrderLineModel(
                 command.productId(),
@@ -60,7 +56,6 @@ public class OrderService {
                 product.getPrice(),
                 command.quantity()
             ));
-            orderedProducts.add(product);
         } catch (CoreException e) {
             failures.add(new OrderFailure(command.productId(), command.quantity(), e.getErrorType(), e.getMessage()));
         }

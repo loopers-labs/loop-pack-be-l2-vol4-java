@@ -32,6 +32,19 @@ public record OrderInfo(
         );
     }
 
+    public static OrderInfo from(OrderModel order) {
+        return new OrderInfo(
+            order.getId(),
+            order.getUserLoginId(),
+            order.getStatus(),
+            order.getTotalAmount(),
+            order.getOrderLines().stream()
+                .map(OrderLineInfo::from)
+                .toList(),
+            List.of()
+        );
+    }
+
     public record OrderLineInfo(
         Long productId,
         String productName,

@@ -1,53 +1,131 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductCatalogService;
 import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private final ProductService productService;
-    private final BrandService brandService;
-    private final ProductCatalogService productCatalogService;
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
 
+    private final ProductRepository productRepository;
+    private final BrandRepository brandRepository;
+    private final ProductCatalogService productCatalogService = new ProductCatalogService();
+
+    @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
-        BrandModel brand = brandService.getBrand(brandId);
-        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
-        return ProductInfo.from(new ProductDetail(product, brand));
+        BrandModel brand = getBrand(brandId);
+        ProductModel product = productRepository.save(new ProductModel(brandId, name, description, price, stock));
+        return ProductInfo.from(productCatalogService.getProductDetail(product, brand));
     }
 
+    @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
-        ProductDetail productDetail = productCatalogService.getProductDetail(id);
+        ProductModel product = getProductModel(id);
+        BrandModel brand = getBrand(product.getBrandId());
+        ProductDetail productDetail = productCatalogService.getProductDetail(product, brand);
         return ProductInfo.from(productDetail);
     }
 
+    @Transactional(readOnly = true)
     public List<ProductInfo> getAllProducts() {
         return getAllProducts(null);
     }
 
+    @Transactional(readOnly = true)
     public List<ProductInfo> getAllProducts(String sort) {
-        List<ProductDetail> productDetails = productCatalogService.getProductDetails(ProductSort.from(sort));
+        return getAllProducts(null, sort, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductInfo> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
+        if (brandId != null) {
+            getBrand(brandId);
+        }
+
+        ProductSort productSort = ProductSort.from(sort);
+        List<ProductModel> products = brandId == null
+            ? productRepository.findAll(productSort)
+            : productRepository.findAllByBrandId(brandId, productSort);
+
+        List<ProductModel> pagedProducts = paginate(products, page, size);
+        Map<Long, BrandModel> brandsById = findBrandsByProduct(pagedProducts);
+        List<ProductDetail> productDetails = productCatalogService.getProductDetails(pagedProducts, brandsById);
         return productDetails.stream()
             .map(ProductInfo::from)
             .toList();
     }
 
+    @Transactional
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        BrandModel brand = brandService.getBrand(product.getBrandId());
-        return ProductInfo.from(new ProductDetail(product, brand));
+        ProductModel product = getProductModel(id);
+        product.update(name, description, price, stock);
+        ProductModel savedProduct = productRepository.save(product);
+        BrandModel brand = getBrand(savedProduct.getBrandId());
+        return ProductInfo.from(productCatalogService.getProductDetail(savedProduct, brand));
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+        ProductModel product = getProductModel(id);
+        product.delete();
+        productRepository.save(product);
+    }
+
+    private ProductModel getProductModel(Long id) {
+        return productRepository.find(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    }
+
+    private BrandModel getBrand(Long id) {
+        return brandRepository.find(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
+    }
+
+    private Map<Long, BrandModel> findBrandsByProduct(List<ProductModel> products) {
+        return products.stream()
+            .map(ProductModel::getBrandId)
+            .distinct()
+            .map(this::getBrand)
+            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
+    }
+
+    private List<ProductModel> paginate(List<ProductModel> products, Integer page, Integer size) {
+        int requestedPage = page == null ? DEFAULT_PAGE : page;
+        int requestedSize = size == null ? DEFAULT_SIZE : size;
+        validatePage(requestedPage, requestedSize);
+
+        int fromIndex = requestedPage * requestedSize;
+        if (fromIndex >= products.size()) {
+            return List.of();
+        }
+
+        int toIndex = Math.min(fromIndex + requestedSize, products.size());
+        return products.subList(fromIndex, toIndex);
+    }
+
+    private void validatePage(int page, int size) {
+        if (page < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 번호는 0 이상이어야 합니다.");
+        }
+        if (size < 1) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 크기는 1 이상이어야 합니다.");
+        }
     }
 }
