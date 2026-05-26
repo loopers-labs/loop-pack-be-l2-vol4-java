@@ -16,6 +16,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordHasher passwordEncoder;
 
+    @Transactional
     public UserModel createUser(
             String loginId,
             String password,
@@ -43,6 +44,7 @@ public class UserService {
                 );
     }
 
+    @Transactional
     public UserModel changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel userModel = userRepository.findByLoginId(loginId)
                 .orElseThrow(
