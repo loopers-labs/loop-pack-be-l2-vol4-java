@@ -88,7 +88,7 @@ sequenceDiagram
     participant LikeSvc as LikeService
     participant Repo as Repositories (DB)
 
-    User->>Controller: POST /{productId}/likes
+    User->>Controller: POST /api/v1/products/{productId}/likes
     activate Controller
 
     Controller->>Facade: 좋아요 등록 요청
@@ -147,7 +147,7 @@ sequenceDiagram
     participant ProductSvc as ProductService
     participant Repo as Repositories (DB)
 
-    User->>Controller: DELETE /{productId}/likes
+    User->>Controller: DELETE /api/v1/products/{productId}/likes
     activate Controller
 
     Controller->>Facade: 좋아요 취소 요청
