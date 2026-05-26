@@ -8,7 +8,7 @@ public record UpdateProductCommand(
     Integer stockQuantity
 ) {
 
-    public boolean changesStock() {
+    public boolean hasStockChange() {
         return stockQuantity != null;
     }
 }

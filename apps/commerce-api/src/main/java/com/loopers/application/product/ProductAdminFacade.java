@@ -81,7 +81,7 @@ public class ProductAdminFacade {
     }
 
     private ProductStock updateStock(Long productId, UpdateProductCommand command) {
-        if (!command.changesStock()) {
+        if (!command.hasStockChange()) {
             return productStockService.getProductStock(productId);
         }
         return productStockService.changeProductStock(productId, command.stockQuantity());
