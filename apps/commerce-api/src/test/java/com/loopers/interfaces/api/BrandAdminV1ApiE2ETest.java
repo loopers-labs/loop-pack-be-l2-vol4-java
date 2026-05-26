@@ -32,13 +32,11 @@ class BrandAdminV1ApiE2ETest {
     private static final String ENDPOINT_REGISTER = "/api-admin/v1/brands";
     private static final String LDAP_HEADER = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
-
+    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
     @Autowired
     private TestRestTemplate testRestTemplate;
-
     @Autowired
     private BrandJpaRepository brandJpaRepository;
-
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
@@ -69,6 +67,17 @@ class BrandAdminV1ApiE2ETest {
             .build();
 
         return brandJpaRepository.save(brand);
+    }
+
+    private HttpEntity<Void> adminGet() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(LDAP_HEADER, ADMIN_LDAP);
+
+        return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<Void> guestGet() {
+        return new HttpEntity<>(new HttpHeaders());
     }
 
     @DisplayName("브랜드 등록 - POST /api-admin/v1/brands")
@@ -228,6 +237,317 @@ class BrandAdminV1ApiE2ETest {
                 () -> assertThat(response.getBody().data()).containsOnlyKeys("brandId"),
                 () -> assertThat(response.getBody().data().get("brandId")).isNotNull(),
                 () -> assertThat(brandJpaRepository.findAll()).hasSize(2)
+            );
+        }
+    }
+
+    @DisplayName("브랜드 수정 - PUT /api-admin/v1/brands/{brandId}")
+    @Nested
+    class UpdateBrand {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 brandId가 반환되고 이름이 갱신된다.")
+        @Test
+        void returnsOk_andUpdatesName_whenRequestIsValid() {
+            // arrange
+            BrandModel savedBrand = saveBrand("기존 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("새 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            BrandModel reloadedBrand = brandJpaRepository.findById(savedBrand.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data().get("brandId")).isNotNull(),
+                () -> assertThat(reloadedBrand.getName().value()).isEqualTo("새 브랜드")
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel savedBrand = saveBrand("기존 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("새 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.PUT,
+                jsonRequestWithoutAdmin(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("대상 브랜드가 존재하지 않으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenTargetIsAbsent() {
+            // arrange
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("새 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999",
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("이름이 50자를 초과하면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenNameExceedsMaxLength() {
+            // arrange
+            BrandModel savedBrand = saveBrand("기존 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("가".repeat(51), "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("새 이름이 다른 활성 브랜드와 중복되면, 409 Conflict로 거절된다.")
+        @Test
+        void returnsConflict_whenNewNameDuplicatesOtherActive() {
+            // arrange
+            saveBrand("이미 있는 브랜드");
+            BrandModel target = saveBrand("수정 대상 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("이미 있는 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + target.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode())
+            );
+        }
+
+        @DisplayName("기존과 동일한 이름으로 수정해도, 200 OK로 정상 처리된다.")
+        @Test
+        void returnsOk_whenUpdatedWithSameName() {
+            // arrange
+            BrandModel savedBrand = saveBrand("감성 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("감성 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+    }
+
+    @DisplayName("브랜드 목록 - GET /api-admin/v1/brands")
+    @Nested
+    class ReadBrands {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 삭제되지 않은 브랜드 목록과 페이지 메타가 반환된다.")
+        @Test
+        void returnsOk_withActiveBrandsAndMeta() {
+            // arrange
+            saveBrand("브랜드1");
+            saveBrand("브랜드2");
+            BrandModel deletedBrand = saveBrand("브랜드3");
+            deletedBrand.delete();
+            brandJpaRepository.saveAndFlush(deletedBrand);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data())
+                    .containsKeys("content", "page", "size", "totalElements", "totalPages"),
+                () -> assertThat((java.util.List<?>)response.getBody().data().get("content")).hasSize(2),
+                () -> assertThat(((Number)response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L)
+            );
+        }
+
+        @DisplayName("활성 브랜드가 없으면, 200 OK와 함께 빈 목록이 반환된다.")
+        @Test
+        void returnsOk_withEmptyContent_whenNoBrands() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat((java.util.List<?>)response.getBody().data().get("content")).isEmpty(),
+                () -> assertThat(((Number)response.getBody().data().get("totalElements")).longValue()).isEqualTo(0L)
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=0&size=20",
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("size가 허용 범위를 벗어나면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenSizeOutOfRange() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=0&size=101",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("page가 음수면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenPageIsNegative() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=-1&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+    }
+
+    @DisplayName("브랜드 상세 - GET /api-admin/v1/brands/{brandId}")
+    @Nested
+    class ReadBrandDetail {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 등록·갱신 시각을 포함한 상세가 반환된다.")
+        @Test
+        void returnsOk_withDetailFields() {
+            // arrange
+            BrandModel savedBrand = saveBrand("감성 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data())
+                    .containsOnlyKeys("brandId", "name", "description", "createdAt", "updatedAt"),
+                () -> assertThat(response.getBody().data().get("name")).isEqualTo("감성 브랜드")
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel savedBrand = saveBrand("감성 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("대상 브랜드가 존재하지 않으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenTargetIsAbsent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
     }
