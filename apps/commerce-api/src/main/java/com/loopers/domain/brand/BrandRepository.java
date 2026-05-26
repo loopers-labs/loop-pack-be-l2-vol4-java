@@ -10,6 +10,8 @@ public interface BrandRepository {
 
     boolean existsActiveByNameAndIdNot(String name, Long id);
 
+    boolean existsActiveById(Long id);
+
     BrandModel getActiveById(Long id);
 
     Page<BrandModel> findActiveByPage(int page, int size);
