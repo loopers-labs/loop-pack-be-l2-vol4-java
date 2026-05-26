@@ -276,8 +276,8 @@ BRAND_ADMIN은 브랜드에 귀속되고, 브랜드 삭제 시 함께 소프트 
 
 | | Product → Brand | User → Brand |
 |--|--|--|
-| 관계 | 상품은 브랜드에 선택적으로 소속 | BRAND_ADMIN은 브랜드에 귀속 |
-| 브랜드 삭제 시 | 상품 소프트 딜리트 | BRAND_ADMIN 소프트 딜리트 |
+| 관계 | 브랜드 없이 등록 가능, 브랜드 지정 시 해당 브랜드 소속 | BRAND_ADMIN은 브랜드에 귀속 |
+| 브랜드 삭제 시 | 소속 상품 소프트 딜리트 | BRAND_ADMIN 소프트 딜리트 |
 | 구현 | `Long brandId` (nullable) | `Long brandId` (nullable) |
 
 두 경우 모두 `Long brandId`만 저장한다. 브랜드 이름 표시가 필요한 경우 Facade에서 조합한다.
