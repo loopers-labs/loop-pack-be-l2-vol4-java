@@ -21,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -132,6 +133,46 @@ class ProductFacadeIntegrationTest {
         }
     }
 
+    @DisplayName("상품을 단건 조회할 때, ")
+    @Nested
+    class GetProduct {
+
+        @DisplayName("좋아요가 없으면, 응답의 likeCount 는 0 이다.")
+        @Test
+        void returnsZeroLikeCount_whenProductHasNoLikes() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+
+            // when
+            ProductInfo result = productFacade.getProduct(productId);
+
+            // then
+            assertThat(result.likeCount()).isZero();
+        }
+
+        @DisplayName("좋아요가 누적되어 있으면, 누적된 likeCount 가 응답에 그대로 노출된다.")
+        @Test
+        void returnsAccumulatedLikeCount_whenLikesAreIncremented() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+            increaseLikes(productId, 3);
+
+            // when
+            ProductInfo result = productFacade.getProduct(productId);
+
+            // then
+            assertThat(result.likeCount()).isEqualTo(3L);
+        }
+
+        private void increaseLikes(Long productId, int times) {
+            ProductModel product = productJpaRepository.findById(productId).orElseThrow();
+            for (int i = 0; i < times; i++) {
+                product.incrementLikeCount();
+            }
+            productJpaRepository.save(product);
+        }
+    }
+
     @DisplayName("상품을 수정할 때, ")
     @Nested
     class UpdateProduct {
@@ -227,6 +268,29 @@ class ProductFacadeIntegrationTest {
             // then
             assertThat(result).extracting(ProductInfo::id)
                 .containsExactly(airmax.id(), chuck.id(), star.id());
+        }
+
+        @DisplayName("각 상품의 likeCount 가 응답에 포함된다.")
+        @Test
+        void includesLikeCountForEachProduct() {
+            // given
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            increaseLikes(airmax.id(), 5);
+            increaseLikes(chuck.id(), 2);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result)
+                .extracting(ProductInfo::id, ProductInfo::likeCount)
+                .containsExactlyInAnyOrder(
+                    tuple(airmax.id(), 5L),
+                    tuple(chuck.id(), 2L),
+                    tuple(star.id(), 0L)
+                );
         }
 
         @DisplayName("page 와 size 로 슬라이싱하면, 해당 페이지의 상품만 반환한다.")

@@ -27,6 +27,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public Optional<ProductModel> findActive(Long id) {
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
     public List<ProductModel> findAll(ProductSortType sort, int page, int size) {
         return productJpaRepository.findAll(PageRequest.of(page, size, toSort(sort))).getContent();
     }

@@ -23,7 +23,15 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductModel getProduct(Long id) {
         return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND,
+                "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public ProductModel getActive(Long id) {
+        return productRepository.findActive(id)
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND,
+                "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
