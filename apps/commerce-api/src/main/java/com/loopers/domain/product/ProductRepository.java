@@ -7,5 +7,6 @@ public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> find(Long id);
     List<ProductModel> findAll();
+    List<ProductModel> findAll(ProductSort sort);
     void delete(Long id);
 }

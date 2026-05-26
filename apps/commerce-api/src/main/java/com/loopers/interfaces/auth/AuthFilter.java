@@ -31,7 +31,14 @@ public class AuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !AUTH_REQUIRED_PATHS.contains(request.getRequestURI());
+        return !isAuthRequired(request);
+    }
+
+    private boolean isAuthRequired(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return AUTH_REQUIRED_PATHS.contains(path)
+            || path.equals("/api/v1/orders")
+            || path.matches("^/api/v1/products/[^/]+/likes$");
     }
 
     @Override

@@ -15,8 +15,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = new ProductModel(brandId, name, description, price, stock);
         return productRepository.save(product);
     }
 
@@ -26,9 +26,19 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
+    @Transactional
+    public ProductModel saveProduct(ProductModel product) {
+        return productRepository.save(product);
+    }
+
     @Transactional(readOnly = true)
     public List<ProductModel> getAllProducts() {
         return productRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductModel> getAllProducts(ProductSort sort) {
+        return productRepository.findAll(sort);
     }
 
     @Transactional
