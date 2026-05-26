@@ -10,12 +10,27 @@
 classDiagram
     class User {
         +UUID id
-        +String loginId
+        +LoginId loginId
         +String password
         +String name
-        +String email
-        +String birth
+        +Email email
+        +Birth birth
         +authenticate(password) boolean
+    }
+
+    class LoginId {
+        <<value object>>
+        +String value
+    }
+
+    class Email {
+        <<value object>>
+        +String value
+    }
+
+    class Birth {
+        <<value object>>
+        +String value
     }
 
     class Brand {
@@ -29,7 +44,7 @@ classDiagram
     class Product {
         +UUID id
         +String name
-        +Long price
+        +Money price
         +String description
         +Long likeCount
         +LocalDateTime deletedAt
@@ -37,6 +52,11 @@ classDiagram
         +Brand brand
         +Stock stock
         +softDelete() void
+    }
+
+    class Money {
+        <<value object>>
+        +Long amount
     }
 
     class Stock {
@@ -61,7 +81,8 @@ classDiagram
         +UUID id
         +UUID userId
         +OrderStatus status
-        +Long pgAmount
+        +Money pgAmount
+        +ShippingInfo shippingInfo
         +List~OrderItem~ items
         +confirm() void
         +fail() void
@@ -69,15 +90,38 @@ classDiagram
         +totalAmount() Long
     }
 
+    class ShippingInfo {
+        <<value object>>
+        +Receiver receiver
+        +Address address
+    }
+
+    class Receiver {
+        <<value object>>
+        +String name
+        +String phone
+    }
+
+    class Address {
+        <<value object>>
+        +String zipCode
+        +String address
+        +String detailAddress
+    }
+
     class OrderItem {
         +UUID id
         +UUID orderId
-        +UUID productId
+        +int quantity
+        +ProductSnapshot snapshot
+        +subtotal() Long
+    }
+
+    class ProductSnapshot {
+        <<value object>>
         +String productName
         +String brandName
-        +int quantity
-        +Long price
-        +subtotal() Long
+        +Money price
     }
 
     class Payment {
@@ -85,7 +129,7 @@ classDiagram
         +UUID orderId
         +String pgTransactionId
         +PaymentStatus status
-        +Long amount
+        +Money amount
     }
 
     class PaymentStatus {
@@ -102,11 +146,22 @@ classDiagram
         CANCELLED
     }
 
+    User *-- LoginId
+    User *-- Email
+    User *-- Birth
     Product --> Brand
     Product --> Stock
+    Product *-- Money
+    Order *-- Money
+    Order *-- ShippingInfo
+    ShippingInfo *-- Receiver
+    ShippingInfo *-- Address
     Order --> OrderItem
     Order --> OrderStatus
     Order --> Payment
+    OrderItem *-- ProductSnapshot
+    ProductSnapshot *-- Money
+    Payment *-- Money
     Payment --> PaymentStatus
     Like --> User
     Like --> Product
