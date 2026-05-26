@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -20,6 +22,7 @@ public class BrandFacade {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final BrandRepository brandRepository;
+    private final ProductRepository productRepository;
 
     public BrandCreateInfo createBrand(String name, String description) {
         if (brandRepository.existsActiveByName(name)) {
@@ -44,6 +47,14 @@ public class BrandFacade {
         brand.update(name, description);
 
         return BrandUpdateInfo.from(brand);
+    }
+
+    public void deleteBrand(Long brandId) {
+        brandRepository.findActiveById(brandId)
+            .ifPresent(brand -> {
+                brand.delete();
+                productRepository.findActiveByBrandId(brandId).forEach(ProductModel::delete);
+            });
     }
 
     @Transactional(readOnly = true)

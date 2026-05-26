@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.brand;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,5 +66,13 @@ public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
         Page<BrandInfo> brandsInfo = brandFacade.readBrands(page, size);
 
         return ApiResponse.success(BrandAdminV1Dto.PageResponse.from(brandsInfo));
+    }
+
+    @Override
+    @DeleteMapping("/{brandId}")
+    public ApiResponse<Void> deleteBrand(@PathVariable Long brandId) {
+        brandFacade.deleteBrand(brandId);
+
+        return ApiResponse.success();
     }
 }

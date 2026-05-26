@@ -141,6 +141,36 @@ class BrandRepositoryIntegrationTest {
         }
     }
 
+    @DisplayName("활성 브랜드를 식별자로 탐색할 때,")
+    @Nested
+    class FindActiveById {
+
+        @DisplayName("삭제되지 않은 브랜드면 해당 브랜드를 담은 Optional을 반환한다.")
+        @Test
+        void returnsPresent_whenBrandIsActive() {
+            // arrange
+            BrandModel savedBrand = brandRepository.save(createBrand("감성 브랜드"));
+
+            // act & assert
+            assertThat(brandRepository.findActiveById(savedBrand.getId())).isPresent();
+        }
+
+        @DisplayName("이미 삭제됐거나 없으면 빈 Optional을 반환한다.")
+        @Test
+        void returnsEmpty_whenBrandIsDeletedOrAbsent() {
+            // arrange
+            BrandModel deletedBrand = brandRepository.save(createBrand("삭제 브랜드"));
+            deletedBrand.delete();
+            brandJpaRepository.saveAndFlush(deletedBrand);
+
+            // act & assert
+            assertAll(
+                () -> assertThat(brandRepository.findActiveById(deletedBrand.getId())).isEmpty(),
+                () -> assertThat(brandRepository.findActiveById(-1L)).isEmpty()
+            );
+        }
+    }
+
     @DisplayName("활성 브랜드 존재 여부를 식별자로 조회할 때,")
     @Nested
     class ExistsActiveById {

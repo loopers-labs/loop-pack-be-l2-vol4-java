@@ -35,4 +35,17 @@ public class ProductFacade {
 
         return ProductCreateInfo.from(productRepository.save(newProduct));
     }
+
+    public ProductUpdateInfo updateProduct(Long productId, String name, String description, Integer price, Integer stock) {
+        ProductModel product = productRepository.getActiveById(productId);
+
+        product.update(name, description, price, stock);
+
+        return ProductUpdateInfo.from(product);
+    }
+
+    public void deleteProduct(Long productId) {
+        productRepository.findActiveById(productId)
+            .ifPresent(ProductModel::delete);
+    }
 }

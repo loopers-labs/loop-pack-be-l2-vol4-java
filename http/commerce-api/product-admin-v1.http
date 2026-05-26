@@ -73,3 +73,73 @@ X-Loopers-Ldap: loopers.admin
   "price": -1,
   "stock": 50
 }
+
+### 상품 수정 - 정상 (200 OK)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 관리자 인증 헤더 누락 (403 Forbidden)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 대상 미존재 (404 Not Found)
+PUT http://localhost:8080/api-admin/v1/products/99999
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 이름 범위 위반 (400 Bad Request)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 가격 음수 (400 Bad Request)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": -1,
+  "stock": 30
+}
+
+### 상품 삭제 - 정상 (200 OK)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 삭제 - 반복 요청 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
+DELETE http://localhost:8080/api-admin/v1/products/1

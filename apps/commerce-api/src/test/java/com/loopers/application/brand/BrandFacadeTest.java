@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,6 +23,8 @@ import org.springframework.data.domain.PageImpl;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -30,6 +33,9 @@ class BrandFacadeTest {
 
     @Mock
     private BrandRepository brandRepository;
+
+    @Mock
+    private ProductRepository productRepository;
 
     @InjectMocks
     private BrandFacade brandFacade;
@@ -133,6 +139,49 @@ class BrandFacadeTest {
                     .isEqualTo(ErrorType.CONFLICT),
                 () -> assertThat(brand.getName().value()).isEqualTo("기존 브랜드")
             );
+        }
+    }
+
+    @DisplayName("브랜드를 삭제할 때,")
+    @Nested
+    class DeleteBrand {
+
+        private final Long brandId = 1L;
+
+        @DisplayName("대상 브랜드가 활성 상태로 존재하면 브랜드와 소속 활성 상품이 모두 삭제된다.")
+        @Test
+        void deletesBrand_andCascadesProducts_whenBrandIsActive() {
+            // arrange
+            BrandModel brand = BrandModel.builder().rawName("감성 브랜드").rawDescription("감성 설명").build();
+            ProductModel product1 = ProductModel.builder()
+                .brandId(brandId).rawName("상품1").rawDescription("설명").rawPrice(39_000).rawStock(50).build();
+            ProductModel product2 = ProductModel.builder()
+                .brandId(brandId).rawName("상품2").rawDescription("설명").rawPrice(39_000).rawStock(50).build();
+            given(brandRepository.findActiveById(brandId)).willReturn(Optional.of(brand));
+            given(productRepository.findActiveByBrandId(brandId)).willReturn(List.of(product1, product2));
+
+            // act
+            brandFacade.deleteBrand(brandId);
+
+            // assert
+            assertAll(
+                () -> assertThat(brand.getDeletedAt()).isNotNull(),
+                () -> assertThat(product1.getDeletedAt()).isNotNull(),
+                () -> assertThat(product2.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("대상 브랜드가 없거나 이미 삭제되었으면 상품 조회·삭제도 하지 않는다(멱등).")
+        @Test
+        void doesNothing_whenBrandIsAbsent() {
+            // arrange
+            given(brandRepository.findActiveById(brandId)).willReturn(Optional.empty());
+
+            // act
+            brandFacade.deleteBrand(brandId);
+
+            // assert
+            then(productRepository).should(never()).findActiveByBrandId(any());
         }
     }
 

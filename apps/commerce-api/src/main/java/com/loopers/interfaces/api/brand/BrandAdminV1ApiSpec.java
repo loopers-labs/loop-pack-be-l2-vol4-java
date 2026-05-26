@@ -31,4 +31,10 @@ public interface BrandAdminV1ApiSpec {
         description = "관리자가 삭제되지 않은 브랜드를 등록 시각 내림차순으로 페이징 조회한다."
     )
     ApiResponse<BrandAdminV1Dto.PageResponse> readBrands(int page, int size);
+
+    @Operation(
+        summary = "브랜드 삭제",
+        description = "관리자가 브랜드를 삭제(soft delete)하고 소속 활성 상품도 같은 트랜잭션으로 함께 삭제한다. 존재하지 않거나 이미 삭제된 브랜드도 정상 응답으로 마무리한다(멱등)."
+    )
+    ApiResponse<Void> deleteBrand(Long brandId);
 }

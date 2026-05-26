@@ -21,7 +21,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.brand.BrandAdminV1Dto;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -37,6 +39,8 @@ class BrandAdminV1ApiE2ETest {
     private TestRestTemplate testRestTemplate;
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+    @Autowired
+    private ProductJpaRepository productJpaRepository;
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
@@ -78,6 +82,18 @@ class BrandAdminV1ApiE2ETest {
 
     private HttpEntity<Void> guestGet() {
         return new HttpEntity<>(new HttpHeaders());
+    }
+
+    private ProductModel saveProduct(Long brandId, String name) {
+        ProductModel product = ProductModel.builder()
+            .brandId(brandId)
+            .rawName(name)
+            .rawDescription("포근한 감성 가디건")
+            .rawPrice(39_000)
+            .rawStock(50)
+            .build();
+
+        return productJpaRepository.save(product);
     }
 
     @DisplayName("브랜드 등록 - POST /api-admin/v1/brands")
@@ -548,6 +564,100 @@ class BrandAdminV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+    }
+
+    @DisplayName("브랜드 삭제 - DELETE /api-admin/v1/brands/{brandId}")
+    @Nested
+    class DeleteBrand {
+
+        @DisplayName("정상 요청이면, 200 OK로 처리되고 브랜드와 소속 활성 상품이 함께 삭제되며 다른 브랜드 상품은 유지된다.")
+        @Test
+        void returnsOk_andCascadesProducts_whenRequestIsValid() {
+            // arrange
+            BrandModel targetBrand = saveBrand("삭제 대상 브랜드");
+            BrandModel otherBrand = saveBrand("다른 브랜드");
+            ProductModel product1 = saveProduct(targetBrand.getId(), "대상 상품1");
+            ProductModel product2 = saveProduct(targetBrand.getId(), "대상 상품2");
+            ProductModel otherBrandProduct = saveProduct(otherBrand.getId(), "다른 브랜드 상품");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + targetBrand.getId(),
+                HttpMethod.DELETE,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(brandJpaRepository.findById(targetBrand.getId()).orElseThrow().getDeletedAt()).isNotNull(),
+                () -> assertThat(productJpaRepository.findById(product1.getId()).orElseThrow().getDeletedAt()).isNotNull(),
+                () -> assertThat(productJpaRepository.findById(product2.getId()).orElseThrow().getDeletedAt()).isNotNull(),
+                () -> assertThat(productJpaRepository.findById(otherBrandProduct.getId()).orElseThrow().getDeletedAt()).isNull()
+            );
+        }
+
+        @DisplayName("동일한 브랜드에 삭제를 두 번 요청해도, 두 응답 모두 200 OK로 마무리된다(멱등).")
+        @Test
+        void returnsOk_whenDeletedTwice() {
+            // arrange
+            BrandModel targetBrand = saveBrand("삭제 대상 브랜드");
+            String endpoint = ENDPOINT_REGISTER + "/" + targetBrand.getId();
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> firstResponse = testRestTemplate.exchange(
+                endpoint, HttpMethod.DELETE, adminGet(), MAP_RESPONSE);
+            ResponseEntity<ApiResponse<Map<String, Object>>> secondResponse = testRestTemplate.exchange(
+                endpoint, HttpMethod.DELETE, adminGet(), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(secondResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(secondResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
+        }
+
+        @DisplayName("대상 브랜드가 존재하지 않아도, 200 OK로 마무리된다(멱등).")
+        @Test
+        void returnsOk_whenTargetIsAbsent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999",
+                HttpMethod.DELETE,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel targetBrand = saveBrand("삭제 대상 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + targetBrand.getId(),
+                HttpMethod.DELETE,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
     }

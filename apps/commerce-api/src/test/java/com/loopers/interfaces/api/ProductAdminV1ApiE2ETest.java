@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.product.ProductAdminV1Dto;
@@ -71,6 +72,18 @@ class ProductAdminV1ApiE2ETest {
             .build();
 
         return brandJpaRepository.save(brand);
+    }
+
+    private ProductModel saveProduct(Long brandId, String name) {
+        ProductModel product = ProductModel.builder()
+            .brandId(brandId)
+            .rawName(name)
+            .rawDescription("포근한 감성 가디건")
+            .rawPrice(39_000)
+            .rawStock(50)
+            .build();
+
+        return productJpaRepository.save(product);
     }
 
     @DisplayName("상품 등록 - POST /api-admin/v1/products")
@@ -250,6 +263,249 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(response.getBody().data()).containsOnlyKeys("productId"),
                 () -> assertThat(response.getBody().data().get("productId")).isNotNull(),
                 () -> assertThat(productJpaRepository.findAll()).hasSize(1)
+            );
+        }
+    }
+
+    @DisplayName("상품 수정 - PUT /api-admin/v1/products/{productId}")
+    @Nested
+    class UpdateProduct {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 productId가 반환되고 값이 갱신된다.")
+        @Test
+        void returnsOk_andUpdatesValues_whenRequestIsValid() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data().get("productId")).isNotNull(),
+                () -> assertThat(reloadedProduct.getName().value()).isEqualTo("리뉴얼 가디건"),
+                () -> assertThat(reloadedProduct.getPrice().value()).isEqualTo(42_000),
+                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(30)
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                jsonRequestWithoutAdmin(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("대상 상품이 존재하지 않으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenTargetIsAbsent() {
+            // arrange
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999",
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("이름이 100자를 초과하면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenNameExceedsMaxLength() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("가".repeat(101), "새 설명", 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("가격이 0 미만이면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenPriceIsNegative() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", -1, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("재고가 0 미만이면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenStockIsNegative() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", 42_000, -1);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+    }
+
+    @DisplayName("상품 삭제 - DELETE /api-admin/v1/products/{productId}")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("정상 요청이면, 200 OK로 처리되고 해당 상품은 활성 조회에서 제외된다.")
+        @Test
+        void returnsOk_andSoftDeletes_whenRequestIsValid() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.DELETE,
+                adminJsonRequest(null),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(reloadedProduct.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("동일한 상품에 삭제를 두 번 요청해도, 두 응답 모두 200 OK로 마무리된다(멱등).")
+        @Test
+        void returnsOk_whenDeletedTwice() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            String endpoint = ENDPOINT_REGISTER + "/" + savedProduct.getId();
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> firstResponse = testRestTemplate.exchange(
+                endpoint, HttpMethod.DELETE, adminJsonRequest(null), MAP_RESPONSE);
+            ResponseEntity<ApiResponse<Map<String, Object>>> secondResponse = testRestTemplate.exchange(
+                endpoint, HttpMethod.DELETE, adminJsonRequest(null), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(secondResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(secondResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
+        }
+
+        @DisplayName("대상 상품이 존재하지 않아도, 200 OK로 마무리된다(멱등).")
+        @Test
+        void returnsOk_whenTargetIsAbsent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999",
+                HttpMethod.DELETE,
+                adminJsonRequest(null),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                HttpMethod.DELETE,
+                jsonRequestWithoutAdmin(null),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
     }
