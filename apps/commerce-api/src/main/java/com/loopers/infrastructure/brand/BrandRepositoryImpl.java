@@ -46,14 +46,6 @@ public class BrandRepositoryImpl implements BrandRepository {
             Sort.Order.desc("id")
         ));
         Page<Brand> page = brandJpaRepository.findByDeletedAtIsNull(pageable);
-        return new PageResult<>(
-            page.getContent(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.getNumber(),
-            page.getSize(),
-            page.isFirst(),
-            page.isLast()
-        );
+        return PageResult.from(page);
     }
 }

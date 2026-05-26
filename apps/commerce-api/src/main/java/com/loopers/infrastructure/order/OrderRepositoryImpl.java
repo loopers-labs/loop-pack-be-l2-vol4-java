@@ -53,15 +53,7 @@ public class OrderRepositoryImpl implements OrderRepository {
 
     private PageResult<Order> toPageResult(Page<Long> orderIds) {
         List<Order> orders = findAllByIdsKeepingPageOrder(orderIds.getContent());
-        return new PageResult<>(
-            orders,
-            orderIds.getTotalElements(),
-            orderIds.getTotalPages(),
-            orderIds.getNumber(),
-            orderIds.getSize(),
-            orderIds.isFirst(),
-            orderIds.isLast()
-        );
+        return PageResult.from(orderIds, orders);
     }
 
     private PageRequest latestPageRequest(PageQuery query) {

@@ -56,15 +56,7 @@ public class ProductRepositoryImpl implements ProductRepository {
         Page<Product> page = brandId == null
             ? productJpaRepository.findByDeletedAtIsNull(pageable)
             : productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId, pageable);
-        return new PageResult<>(
-            page.getContent(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.getNumber(),
-            page.getSize(),
-            page.isFirst(),
-            page.isLast()
-        );
+        return PageResult.from(page);
     }
 
     @Override
@@ -110,14 +102,6 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     private PageResult<Product> toPageResult(Page<Product> page) {
-        return new PageResult<>(
-            page.getContent(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.getNumber(),
-            page.getSize(),
-            page.isFirst(),
-            page.isLast()
-        );
+        return PageResult.from(page);
     }
 }
