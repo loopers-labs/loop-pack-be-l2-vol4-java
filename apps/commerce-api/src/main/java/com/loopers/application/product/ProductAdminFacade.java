@@ -76,14 +76,10 @@ public class ProductAdminFacade {
             command.description(),
             command.price()
         );
-        ProductStock productStock = updateStock(product.getId(), command);
-        return ProductInfo.from(product, productStock);
-    }
-
-    private ProductStock updateStock(Long productId, UpdateProductCommand command) {
-        if (!command.hasStockChange()) {
-            return productStockService.getProductStock(productId);
+        ProductStock productStock = productStockService.getProductStock(product.getId());
+        if (command.hasStockChange()) {
+            productStock = productStockService.changeProductStock(product.getId(), command.stockQuantity());
         }
-        return productStockService.changeProductStock(productId, command.stockQuantity());
+        return ProductInfo.from(product, productStock);
     }
 }
