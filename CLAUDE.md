@@ -11,14 +11,33 @@
 - Application Layer는 경량(thin)으로 유지하며, 도메인 객체를 조합하는 orchestration 역할만 수행합니다.
 
 ### 아키텍처, 패키지 구성 전략
-- 본 프로젝트는 레이어드 아키텍처를 따르며, DIP (의존성 역전 원칙) 을 준수합니다.
-- API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
-- 패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
-  - 예시
-    > /interfaces/api (presentation 레이어 - API)
-      /application/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
-      /domain/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
-      /infrastructure/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
+- 본 프로젝트는 4티어 레이어드 아키텍처를 따릅니다: `interfaces → application → domain ← infrastructure`
+- DIP(의존성 역전 원칙)는 교체 가능성이 있는 곳에만 적용합니다.
+  - 적용: `Repository` 인터페이스, `PasswordEncryptor` 인터페이스
+  - 미적용: `Facade`, `DomainService` 등 구현체를 교체할 시나리오가 없는 곳
+- API request/response DTO와 응용 레이어의 DTO는 분리해 작성합니다.
+- 패키징 전략은 **도메인 중심(Domain-first, 약하게)** 으로 구성합니다.
+  - 최상위는 도메인 패키지, 그 안에 레이어 서브패키지를 둡니다.
+  - 레이어 서브패키지를 유지함으로써 레이어 경계를 코드 구조로 표현합니다.
+
+```
+com.loopers/
+├── support/                        ← 도메인 무관 공통 코드
+│   ├── error/                      (CoreException, ErrorType)
+│   ├── response/                   (ApiResponse, ApiControllerAdvice)
+│   └── auth/                       (CurrentUser, LoginUser, LoginUserResolver)
+│
+├── {domain}/                       ← user, brand, product, like, order
+│   ├── domain/                     (Model, Repository 인터페이스, Service)
+│   ├── application/                (Facade, Info DTO)
+│   ├── infrastructure/             (Repository 구현체, JpaRepository)
+│   └── interfaces/                 (Controller, DTO — 고객/어드민 파일명으로 구분)
+```
+
+- 어드민/고객 API는 같은 `interfaces/` 안에서 파일명으로 구분합니다.
+  - 고객: `BrandV1Controller.java`
+  - 어드민: `AdminBrandV1Controller.java`
+- `OrderItemModel`은 `order/domain/` 안에 위치합니다. (Order 없이 독립 존재 불가)
 
 
 
@@ -28,9 +47,9 @@
 
 | 종류 | 위치 | 어노테이션 | 특징 |
 |------|------|-----------|------|
-| 단위 테스트 | `domain/XxxModelTest` | 없음 (순수 Java) | Model 생성·유효성 검증 |
-| 통합 테스트 | `domain/XxxServiceIntegrationTest` | `@SpringBootTest` | 실제 DB(Testcontainers), `DatabaseCleanUp`으로 격리 |
-| E2E 테스트 | `interfaces/api/XxxApiE2ETest` | `@SpringBootTest(webEnvironment=RANDOM_PORT)` | `TestRestTemplate` 사용, 실제 HTTP 요청 |
+| 단위 테스트 | `{domain}/domain/XxxModelTest` | 없음 (순수 Java) | Model 생성·유효성 검증 |
+| 통합 테스트 | `{domain}/domain/XxxServiceIntegrationTest` | `@SpringBootTest` | 실제 DB(Testcontainers), `DatabaseCleanUp`으로 격리 |
+| E2E 테스트 | `{domain}/interfaces/XxxApiE2ETest` | `@SpringBootTest(webEnvironment=RANDOM_PORT)` | `TestRestTemplate` 사용, 실제 HTTP 요청 |
 
 - 테스트 메서드 이름은 `동사_when조건` 패턴을 따른다 (예: `returnsExampleInfo_whenValidIdIsProvided`)
 - 각 테스트는 `// arrange / act / assert` 주석으로 구분한다
