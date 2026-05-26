@@ -9,8 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserModelTest {
 
@@ -32,12 +31,11 @@ class UserModelTest {
             UserModel user = new UserModel(loginId, password, name, birthDate, email);
 
             // assert
-            assertAll(
-                () -> assertThat(user.getLoginId()).isEqualTo(loginId),
-                () -> assertThat(user.getName()).isEqualTo(name),
-                () -> assertThat(user.getBirthDate()).isEqualTo(birthDate),
-                () -> assertThat(user.getEmail()).isEqualTo(email)
-            );
+            assertThat(user)
+                .satisfies(u -> assertThat(u.getLoginId()).isEqualTo(loginId))
+                .satisfies(u -> assertThat(u.getName()).isEqualTo(name))
+                .satisfies(u -> assertThat(u.getBirthDate()).isEqualTo(birthDate))
+                .satisfies(u -> assertThat(u.getEmail()).isEqualTo(email));
         }
 
         @DisplayName("loginId가 빈값이면, BAD_REQUEST 예외가 발생한다.")
@@ -46,13 +44,13 @@ class UserModelTest {
             // arrange
             String blankLoginId = "   ";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel(blankLoginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("loginId에 특수문자가 포함되면, BAD_REQUEST 예외가 발생한다.")
@@ -61,13 +59,13 @@ class UserModelTest {
             // arrange
             String invalidLoginId = "user@01";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel(invalidLoginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("password가 빈값이면, BAD_REQUEST 예외가 발생한다.")
@@ -76,13 +74,13 @@ class UserModelTest {
             // arrange
             String blankPassword = "   ";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", blankPassword, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("password가 8자 미만이면, BAD_REQUEST 예외가 발생한다.")
@@ -91,13 +89,13 @@ class UserModelTest {
             // arrange
             String shortPassword = "Pass1!";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", shortPassword, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("password가 16자 초과이면, BAD_REQUEST 예외가 발생한다.")
@@ -106,13 +104,13 @@ class UserModelTest {
             // arrange
             String longPassword = "Password123456789!";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", longPassword, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("password에 영문/숫자/특수문자 외의 문자가 포함되면, BAD_REQUEST 예외가 발생한다.")
@@ -121,29 +119,60 @@ class UserModelTest {
             // arrange
             String invalidPassword = "패스워드1234!";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", invalidPassword, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("password에 생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("password에 생년월일 8자리(yyyyMMdd)가 포함되면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenPasswordContainsBirthDate() {
             // arrange
-            // birthDate: 1990-01-01 → "19900101" 이 비밀번호에 포함
             String passwordWithBirthDate = "Pass19900101!";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", passwordWithBirthDate, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
-            );
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
 
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        @DisplayName("password에 생년월일 6자리(yyMMdd)가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsBirthDate_6digits() {
+            // arrange
+            // birthDate: 1990-01-01 → "900101"
+            String passwordWithBirthDate = "Pass900101!!";
+
+            // act & assert
+            assertThatThrownBy(() ->
+                new UserModel("user01", passwordWithBirthDate, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("password에 생년월일 4자리 월일(MMdd)이 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenPasswordContainsBirthDate_4digits() {
+            // arrange
+            // birthDate: 1990-01-01 → "0101"
+            String passwordWithBirthDate = "Pass0101Word!";
+
+            // act & assert
+            assertThatThrownBy(() ->
+                new UserModel("user01", passwordWithBirthDate, "홍길동", LocalDate.of(1990, 1, 1), "user@example.com")
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("name이 빈값이면, BAD_REQUEST 예외가 발생한다.")
@@ -152,25 +181,25 @@ class UserModelTest {
             // arrange
             String blankName = "   ";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", "Password1!", blankName, LocalDate.of(1990, 1, 1), "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("birthDate가 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenBirthDateIsNull() {
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", "Password1!", "홍길동", null, "user@example.com")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("email이 빈값이면, BAD_REQUEST 예외가 발생한다.")
@@ -179,13 +208,13 @@ class UserModelTest {
             // arrange
             String blankEmail = "   ";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), blankEmail)
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("email 형식이 올바르지 않으면, BAD_REQUEST 예외가 발생한다.")
@@ -194,13 +223,13 @@ class UserModelTest {
             // arrange
             String invalidEmail = "not-an-email";
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
+            // act & assert
+            assertThatThrownBy(() ->
                 new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), invalidEmail)
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            )
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 
@@ -208,107 +237,57 @@ class UserModelTest {
     @Nested
     class UpdatePassword {
 
-        @DisplayName("유효한 새 비밀번호가 주어지면, 정상적으로 변경된다.")
+        @DisplayName("인코딩된 새 비밀번호가 주어지면, 정상적으로 변경된다.")
         @Test
-        void updatesPassword_whenNewPasswordIsValid() {
+        void updatesPassword_whenEncodedNewPasswordIsGiven() {
             // arrange
             UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
+            String encodedNew = "$2a$10$encodedHashValue1234567890abcdef";
 
             // act
-            user.updatePassword("Password1!", "NewPassword1!");
+            user.updatePassword(encodedNew);
 
             // assert
-            assertThat(user.matchesPassword("NewPassword1!")).isTrue();
+            assertThat(user.getPassword()).isEqualTo(encodedNew);
         }
 
-        @DisplayName("기존 비밀번호가 일치하지 않으면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("인코딩된 비밀번호가 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenOldPasswordNotMatches() {
+        void throwsBadRequest_whenEncodedPasswordIsNull() {
             // arrange
             UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("WrongPassword!", "NewPassword1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword(null))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("새 비밀번호가 빈값이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("인코딩된 비밀번호가 빈 문자열이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenNewPasswordIsBlank() {
+        void throwsBadRequest_whenEncodedPasswordIsEmpty() {
             // arrange
             UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("Password1!", "   ")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword(""))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("새 비밀번호가 8자 미만이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("인코딩된 비밀번호가 공백이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenNewPasswordIsTooShort() {
+        void throwsBadRequest_whenEncodedPasswordIsBlank() {
             // arrange
             UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
 
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("Password1!", "Pass1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("새 비밀번호가 16자 초과이면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenNewPasswordIsTooLong() {
-            // arrange
-            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("Password1!", "Password123456789!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("새 비밀번호에 생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenNewPasswordContainsBirthDate() {
-            // arrange
-            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("Password1!", "Pass19900101!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
-            // arrange
-            UserModel user = new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com");
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                user.updatePassword("Password1!", "Password1!")
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            // act & assert
+            assertThatThrownBy(() -> user.updatePassword("   "))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 

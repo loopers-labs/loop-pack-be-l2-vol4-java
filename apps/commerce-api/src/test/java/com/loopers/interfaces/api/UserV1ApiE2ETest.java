@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -17,8 +18,6 @@ import org.springframework.http.*;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserV1ApiE2ETest {
@@ -32,6 +31,9 @@ class UserV1ApiE2ETest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -62,10 +64,9 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user01")
-            );
+            assertThat(response)
+                .satisfies(r -> assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED))
+                .satisfies(r -> assertThat(r.getBody().data().loginId()).isEqualTo("user01"));
         }
 
         @DisplayName("중복된 loginId로 가입하면, 409 응답을 반환한다.")
@@ -112,6 +113,66 @@ class UserV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+
+        @DisplayName("loginId가 빈 문자열이면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenLoginIdIsBlank() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("password가 null이면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenPasswordIsNull() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "user01", null, "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("이메일 형식이 잘못되면, 400 응답을 반환한다.")
+        @Test
+        void returns400_whenEmailFormatIsInvalid() {
+            // arrange
+            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "invalid-email"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("GET /api/v1/users/me")
@@ -122,7 +183,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUserInfo_whenValidHeadersAreProvided() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -139,12 +200,11 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertAll(
-                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(response.getBody().data().loginId()).isEqualTo("user01"),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("홍길*"),
-                () -> assertThat(response.getBody().data().email()).isEqualTo("user@example.com")
-            );
+            assertThat(response)
+                .satisfies(r -> assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK))
+                .satisfies(r -> assertThat(r.getBody().data().loginId()).isEqualTo("user01"))
+                .satisfies(r -> assertThat(r.getBody().data().name()).isEqualTo("홍길*"))
+                .satisfies(r -> assertThat(r.getBody().data().email()).isEqualTo("user@example.com"));
         }
 
         @DisplayName("헤더가 없으면, 401 응답을 반환한다.")
@@ -161,11 +221,68 @@ class UserV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
+        @DisplayName("loginId 헤더가 공백이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenLoginIdHeaderIsBlank() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "   ");
+            headers.set(LOGIN_PW_HEADER, "Password1!");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("password 헤더가 공백이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenPasswordHeaderIsBlank() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "user01");
+            headers.set(LOGIN_PW_HEADER, "   ");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("loginId 헤더가 빈 문자열이면, 401 응답을 반환한다.")
+        @Test
+        void returns401_whenLoginIdHeaderIsEmpty() {
+            // arrange
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(LOGIN_ID_HEADER, "");
+            headers.set(LOGIN_PW_HEADER, "Password1!");
+
+            // act
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+                BASE_URL + "/me", HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
         @DisplayName("비밀번호가 틀리면, 401 응답을 반환한다.")
         @Test
         void returns401_whenPasswordIsWrong() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -194,7 +311,7 @@ class UserV1ApiE2ETest {
         @Test
         void returns200_whenPasswordUpdateSucceeds() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
@@ -215,14 +332,14 @@ class UserV1ApiE2ETest {
             );
 
             // assert
-            assertTrue(response.getStatusCode().is2xxSuccessful());
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
         @DisplayName("기존 비밀번호가 틀리면, 400 응답을 반환한다.")
         @Test
         void returns400_whenOldPasswordIsWrong() {
             // arrange
-            userRepository.save(new UserModel(
+            userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
