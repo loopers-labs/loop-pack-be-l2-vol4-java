@@ -8,8 +8,10 @@
 
 ## 핵심 규칙
 - 순수 인터페이스로 선언한다. 프레임워크 어노테이션(`@Repository` 등) 없음.
-- 메서드 이름은 도메인 어휘로 작성한다(`save`, `findById`, `findByLoginId`, `existsByLoginId`, `existsByEmail`).
-- 반환 타입은 단일 엔티티이면 `Optional<T>`, 존재 여부이면 `boolean`으로 한다.
+- 메서드 이름은 도메인 어휘로 작성한다(`save`, `getById`, `findByLoginId`, `existsByLoginId`, `existsByEmail`).
+- **`find*` vs `get*` 구분**: 없을 수 있는 조회는 `find*`로 `Optional<T>`을 반환하고, 존재가 보장돼야 하는 조회는 `get*`로 엔티티를 반환하되 없으면 `CoreException(ErrorType.NOT_FOUND)`을 던진다(예: `getById`, `getActiveById`). 존재 여부 확인은 `boolean`(`exists*`).
+  - "없으면 예외" 정책을 Repository가 책임지므로, Facade는 별도 `mustFind*` 헬퍼를 두지 않고 `get*`을 직접 호출한다. ("없으면 예외" 계약을 이름에 담는다.)
+  - 예외를 던지는 `get*`의 구현·동작은 `RepositoryImpl`이 가지며 통합 테스트(Testcontainers)로 검증한다.
 - 도메인 패키지(`domain.<domain>`)에 위치한다. `infrastructure` 패키지에 두지 않는다.
 - 도메인이 이 인터페이스에만 의존하므로, JPA·DB 구현체를 교체해도 도메인 코드는 변경되지 않는다.
 
@@ -19,9 +21,9 @@ public interface UserRepository {
 
     UserModel save(UserModel user);
 
-    Optional<UserModel> findById(Long id);
+    UserModel getById(Long id);              // 없으면 CoreException(NOT_FOUND)
 
-    Optional<UserModel> findByLoginId(String loginId);
+    Optional<UserModel> findByLoginId(String loginId);  // 없을 수 있음
 
     boolean existsByLoginId(String loginId);
 
@@ -32,5 +34,7 @@ public interface UserRepository {
 ## do / don't
 - ✅ 도메인 패키지 안에 인터페이스를 둔다.
 - ✅ 메서드 이름을 도메인 어휘로 유지한다.
+- ✅ 존재 보장 조회는 `get*`(없으면 NOT_FOUND), 없을 수 있는 조회는 `find*`(Optional)로 가른다.
+- ❌ Facade에 `mustFind*` 같은 존재 보장 헬퍼를 두지 않는다 — Repository `get*`이 그 책임을 갖는다.
 - ❌ 이 인터페이스에 `JpaRepository` 상속을 추가하지 않는다 (그건 `infrastructure`의 `JpaRepository` 역할).
 - ❌ `@Query`·파생 쿼리 어노테이션을 여기에 두지 않는다.
