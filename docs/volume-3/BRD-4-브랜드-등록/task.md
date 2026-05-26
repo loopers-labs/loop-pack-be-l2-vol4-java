@@ -6,7 +6,7 @@
 
 ## Phase F: Foundational (Brand aggregate 골격 + admin 인증 토대)
 
-- [X] T001 `BrandName` VO 작성 + 단위 테스트 — `main/.../domain/brand/BrandName.java`, `test/.../domain/brand/BrandNameTest.java` (1자·50자 통과 / 빈 문자열·51자 BAD_REQUEST, MIN=1·MAX=50 상수)
+- [X] T001 `Name` VO 작성 + 단위 테스트 — `main/.../domain/brand/Name.java`, `test/.../domain/brand/NameTest.java` (1자·50자 통과 / 빈 문자열·51자 BAD_REQUEST, MIN=1·MAX=50 상수)
 - [X] T002 설명(description)은 `BrandModel`의 `String @Column(columnDefinition="TEXT")` 필드로 직접 보유 — 검증·행위가 없어 VO 미도입(별도 파일·VO 단위 테스트 없음). 보존은 T003·T006에서 검증.
 - [X] T003 `BrandModel` 작성 + 단위 테스트 — `main/.../domain/brand/BrandModel.java`, `test/.../domain/brand/BrandModelTest.java` (`@Entity @Table(name="brands")` extends BaseEntity, `@Embedded` VO, `private @Builder(rawName, rawDescription)`, 생성 시 필드 보유)
 - [X] T004 `BrandRepository` 인터페이스 — `main/.../domain/brand/BrandRepository.java` (`save`, `existsActiveByName`)

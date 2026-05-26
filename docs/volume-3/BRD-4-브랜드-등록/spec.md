@@ -45,17 +45,17 @@
 ## 관련 엔티티
 
 - **Brand** (신규 aggregate): 이름·설명 보유. 자기 생성·soft delete 책임. 다른 브랜드와의 중복 검사는 응용 계층 책임.
-- **BrandName** (신규 VO): 1~50자 검증을 생성 시점에 단일화.
+- **Name** (신규 VO, 브랜드 이름): 1~50자 검증을 생성 시점에 단일화.
 - **설명(description)**: 검증·행위가 없어 VO 없이 `String` 필드로 직접 보유(선택).
 - **BrandRepository** (신규): 저장, 활성 브랜드 이름 존재 검사, 저장.
-- **신규 aggregate 골격 필요**: Brand(Model) / BrandName(VO) / BrandRepository.
+- **신규 aggregate 골격 필요**: Brand(Model) / Name(VO) / BrandRepository.
 - **신규 횡단 토대**: 관리자 인증 식별(`X-Loopers-Ldap` 헤더, 실패 시 FORBIDDEN) + `ErrorType.FORBIDDEN(403)` 추가. 이후 모든 admin 시나리오가 재사용.
 
 ## 테스트 계획
 
 | 레벨 | 대상 | 무엇을 단언하는가 |
 |------|------|------------------|
-| VO/Model 단위 | BrandName | 1자·50자 통과, 빈 문자열·51자 예외(errorType BAD_REQUEST) |
+| VO/Model 단위 | Name | 1자·50자 통과, 빈 문자열·51자 예외(errorType BAD_REQUEST) |
 | VO/Model 단위 | Brand | 생성 시 이름·설명(String) 보유, null 설명 허용 |
 | Service/Facade 단위 | 브랜드 등록 유스케이스 | 활성 동일 이름 존재 시 CONFLICT, 삭제된 동일 이름은 통과, 정상 시 저장 후 식별자 반환 |
 | Integration | BrandRepository | 저장·조회, 활성 이름 존재 검사가 삭제 행을 제외하는지 |

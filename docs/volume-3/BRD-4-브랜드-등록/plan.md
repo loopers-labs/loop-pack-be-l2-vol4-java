@@ -5,7 +5,7 @@
 
 ## 요약
 
-관리자가 `POST /api-admin/v1/brands`로 브랜드를 등록한다. User 도메인 참조 구현을 그대로 본떠 Brand aggregate(`BrandModel` + `BrandName` VO + `BrandRepository`, 설명은 검증 없어 `String` 직접 보유)를 신설하고, Facade가 활성 이름 중복을 선검사한다. 추가로 모든 admin 시나리오가 재사용할 **관리자 인증 토대**(`AdminAuthInterceptor` + `ErrorType.FORBIDDEN`)를 함께 도입한다. admin API는 표현 계층(Controller/Dto/ApiSpec)에서 public API와 분리하되, application `BrandFacade`는 단일로 둔다.
+관리자가 `POST /api-admin/v1/brands`로 브랜드를 등록한다. User 도메인 참조 구현을 그대로 본떠 Brand aggregate(`BrandModel` + `Name` VO + `BrandRepository`, 설명은 검증 없어 `String` 직접 보유)를 신설하고, Facade가 활성 이름 중복을 선검사한다. 추가로 모든 admin 시나리오가 재사용할 **관리자 인증 토대**(`AdminAuthInterceptor` + `ErrorType.FORBIDDEN`)를 함께 도입한다. admin API는 표현 계층(Controller/Dto/ApiSpec)에서 public API와 분리하되, application `BrandFacade`는 단일로 둔다.
 
 ## 기술 컨텍스트
 
@@ -15,7 +15,7 @@
 ## 컨벤션·결정 점검
 
 - [x] 호출 방향 interfaces → application → domain → infrastructure 준수 (Facade가 Repository 주입, 도메인 서비스 없음 — User 패턴)
-- [x] 검증은 VO `from()`에 단일화. DTO는 `@NotBlank`로 null/blank만 1차 방어, 길이(1~50)는 `BrandName.from()`이 단일 원천
+- [x] 검증은 VO `from()`에 단일화. DTO는 `@NotBlank`로 null/blank만 1차 방어, 길이(1~50)는 `Name.from()`이 단일 원천
 - [x] 인증: admin은 주입할 데이터 없는 순수 인가 게이트라 `AdminAuthInterceptor`가 `/api-admin/**` 경로를 가드 (값 주입이 필요한 회원 인증의 ArgumentResolver와 도구 분업). admin 컨트롤러에 인증 파라미터 없음
 - [x] 결정 7(soft delete): `BaseEntity` 상속으로 `deleted_at` 확보. 중복 검사는 `deletedAt IS NULL` 행만 대상
 - [x] 결정 B(설명): `description`은 검증·행위가 없어 VO 없이 `String` 컬럼으로 직접 보유, 값 그대로 저장(null 허용)
@@ -39,9 +39,9 @@
 - `application/brand/BrandCreateInfo.java` (신규) — `record BrandCreateInfo(Long brandId)` + `from(BrandModel)`.
 
 ### domain
-- `domain/brand/BrandModel.java` (신규) — `@Entity @Table(name="brands")` extends `BaseEntity`. `@Embedded BrandName name`, `@Column(columnDefinition="TEXT") String description`(검증·행위가 없어 VO 없이 원시 타입 직접 보유 — 결정 B). `@NoArgsConstructor(PROTECTED)`+`@AllArgsConstructor(PROTECTED)`. `private @Builder BrandModel(String rawName, String rawDescription)` → `this.name = BrandName.from(rawName); this.description = rawDescription`. (update/delete는 BRD-5/BRD-6 cycle에서 추가 — 이번 범위 밖. delete()는 BaseEntity 상속분 존재.)
+- `domain/brand/BrandModel.java` (신규) — `@Entity @Table(name="brands")` extends `BaseEntity`. `@Embedded Name name`, `@Column(columnDefinition="TEXT") String description`(검증·행위가 없어 VO 없이 원시 타입 직접 보유 — 결정 B). `@NoArgsConstructor(PROTECTED)`+`@AllArgsConstructor(PROTECTED)`. `private @Builder BrandModel(String rawName, String rawDescription)` → `this.name = Name.from(rawName); this.description = rawDescription`. (update/delete는 BRD-5/BRD-6 cycle에서 추가 — 이번 범위 밖. delete()는 BaseEntity 상속분 존재.)
 - VO:
-  - `domain/brand/BrandName.java` (신규) — `record @Embeddable`, `@Column(name="name", nullable=false, length=50)`. `from(value)`: null/blank → BAD_REQUEST; 길이 `MIN_LENGTH(1)`~`MAX_LENGTH(50)` 위반 → BAD_REQUEST(String.format).
+  - `domain/brand/Name.java` (신규) — `record @Embeddable`, `@Column(name="name", nullable=false, length=50)`. `from(value)`: null/blank → BAD_REQUEST; 길이 `MIN_LENGTH(1)`~`MAX_LENGTH(50)` 위반 → BAD_REQUEST(String.format).
 - `domain/brand/BrandRepository.java` (신규) — `BrandModel save(BrandModel)`, `boolean existsActiveByName(String name)`.
 - 도메인 서비스: **없음** (중복 검사는 Facade 책임 — User 패턴).
 
