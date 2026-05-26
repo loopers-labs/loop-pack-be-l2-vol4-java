@@ -14,7 +14,7 @@
 ## 컨벤션·결정 점검
 - [x] 호출 방향 interfaces → application → domain → infrastructure
 - [x] CRUD 네이밍: Facade·Controller 메서드 `updateBrand`
-- [x] 검증 단일화: 이름은 `BrandName.from()`, DTO는 `@NotBlank`로 null/blank 1차 방어
+- [x] 검증 단일화: 이름은 `Name.from()`, DTO는 `@NotBlank`로 null/blank 1차 방어
 - [x] admin 인증: `/api-admin/**` 인터셉터가 가드(컨트롤러 인증 파라미터 없음)
 - [x] 결정 7(soft delete): 대상·중복 검사 모두 `deletedAt IS NULL` 행만
 - [x] 설명 String 직접 보유(BRD-4 결정 계승), null 허용 교체
@@ -32,7 +32,7 @@
 - `application/brand/BrandUpdateInfo.java` (신규) — `record(Long brandId)` + `from(BrandModel)`.
 
 ### domain (편집)
-- `BrandModel.update(name, description)` (신규 메서드) — `this.name = BrandName.from(name); this.description = description;` [behavioral]
+- `BrandModel.update(name, description)` (신규 메서드) — `this.name = Name.from(name); this.description = description;` [behavioral]
 - `BrandRepository` (편집): `BrandModel getActiveById(Long id)`(없으면 NOT_FOUND, BRD-1/3 공유), `boolean existsActiveByNameAndIdNot(String name, Long id)` 추가.
 
 ### infrastructure (편집)
