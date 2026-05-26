@@ -12,17 +12,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/examples")
-public class ExampleV1Controller implements ExampleV1ApiSpec {
+public class ExampleController implements ExampleApiSpec {
 
     private final ExampleFacade exampleFacade;
 
     @GetMapping("/{exampleId}")
     @Override
-    public ApiResponse<ExampleV1Dto.ExampleResponse> getExample(
+    public ApiResponse<ExampleDto.ExampleResponse> getExample(
         @PathVariable(value = "exampleId") Long exampleId
     ) {
         ExampleInfo info = exampleFacade.getExample(exampleId);
-        ExampleV1Dto.ExampleResponse response = ExampleV1Dto.ExampleResponse.from(info);
+        ExampleDto.ExampleResponse response = ExampleDto.ExampleResponse.from(info);
         return ApiResponse.success(response);
     }
 }

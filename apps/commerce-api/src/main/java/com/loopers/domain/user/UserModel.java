@@ -43,8 +43,7 @@ public class UserModel extends BaseEntity {
     public UserModel(String loginId, String password, String name, LocalDate birthDate, String email) {
         this.loginId = new LoginId(loginId);
         this.birthDate = new BirthDate(birthDate);
-        new PlainPassword(password, birthDate);
-        this.password = password;
+        this.password = new PlainPassword(password, birthDate).value();
         this.name = new UserName(name);
         this.email = new Email(email);
     }
@@ -54,8 +53,7 @@ public class UserModel extends BaseEntity {
     }
 
     void updatePassword(String encodedNewPassword) {
-        new EncodedPassword(encodedNewPassword);
-        this.password = encodedNewPassword;
+        this.password = new EncodedPassword(encodedNewPassword).value();
     }
 
     public String getPassword() {

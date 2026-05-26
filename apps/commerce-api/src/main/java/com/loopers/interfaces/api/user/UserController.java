@@ -11,13 +11,13 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/users")
-public class UserV1Controller {
+public class UserController {
 
     private final UserFacade userFacade;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@Valid @RequestBody UserV1Dto.SignUpRequest request) {
+    public ApiResponse<UserDto.SignUpResponse> signUp(@Valid @RequestBody UserDto.SignUpRequest request) {
         UserInfo info = userFacade.signUp(
             request.loginId(),
             request.password(),
@@ -25,21 +25,21 @@ public class UserV1Controller {
             request.birthDate(),
             request.email()
         );
-        return ApiResponse.success(UserV1Dto.SignUpResponse.from(info));
+        return ApiResponse.success(UserDto.SignUpResponse.from(info));
     }
 
     @GetMapping("/me")
-    public ApiResponse<UserV1Dto.UserResponse> getUser(
+    public ApiResponse<UserDto.UserResponse> getUser(
         @RequestAttribute("userId") Long userId
     ) {
         UserInfo info = userFacade.getUser(userId);
-        return ApiResponse.success(UserV1Dto.UserResponse.from(info));
+        return ApiResponse.success(UserDto.UserResponse.from(info));
     }
 
     @PatchMapping("/me/password")
     public ApiResponse<Void> updatePassword(
         @RequestAttribute("userId") Long userId,
-        @Valid @RequestBody UserV1Dto.UpdatePasswordRequest request
+        @Valid @RequestBody UserDto.UpdatePasswordRequest request
     ) {
         userFacade.updatePassword(userId, request.oldPassword(), request.newPassword());
         return ApiResponse.success(null);

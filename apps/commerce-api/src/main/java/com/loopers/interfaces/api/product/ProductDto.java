@@ -2,7 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
 
-public class ProductV1Dto {
+public class ProductDto {
     public record CreateProductRequest(
         String name,
         String description,

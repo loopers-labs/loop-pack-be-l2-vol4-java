@@ -11,13 +11,13 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductV1Controller {
+public class ProductController {
 
     private final ProductFacade productFacade;
 
     @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
+    public ApiResponse<ProductDto.ProductResponse> createProduct(
+        @RequestBody ProductDto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
             request.name(),
@@ -25,32 +25,30 @@ public class ProductV1Controller {
             request.price(),
             request.stock()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductDto.ProductResponse.from(info));
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
+    public ApiResponse<ProductDto.ProductResponse> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductDto.ProductResponse.from(info));
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
+    public ApiResponse<List<ProductDto.ProductResponse>> getAllProducts() {
         List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
+        List<ProductDto.ProductResponse> responses = infos.stream()
+            .map(ProductDto.ProductResponse::from)
             .toList();
         return ApiResponse.success(responses);
     }
 
     @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
+    public ApiResponse<ProductDto.ProductResponse> updateProduct(
         @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
+        @RequestBody ProductDto.UpdateProductRequest request
     ) {
         ProductInfo info = productFacade.updateProduct(
             productId,
@@ -59,8 +57,7 @@ public class ProductV1Controller {
             request.price(),
             request.stock()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductDto.ProductResponse.from(info));
     }
 
     @DeleteMapping("/{productId}")

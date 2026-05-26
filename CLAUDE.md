@@ -1,5 +1,34 @@
 # CLAUDE.md
 
+## 로컬 환경 설정
+
+> 새 컴퓨터에서 프로젝트를 처음 실행할 때 참고
+
+### 필수 설치
+- JDK 21
+- MySQL
+
+### MySQL 설정
+```sql
+CREATE DATABASE loopers_test;
+CREATE USER 'application'@'localhost' IDENTIFIED BY 'application';
+GRANT ALL PRIVILEGES ON loopers_test.* TO 'application'@'localhost';
+```
+
+### Windows 환경변수 설정
+Docker 없이 로컬 MySQL로 테스트를 실행하기 위해 필요하다.
+```
+TESTCONTAINERS_FALLBACK_ENABLED=true
+```
+설정 방법: 시스템 환경변수 → 새로 만들기 → 변수명/값 입력
+
+### 테스트 실행
+```bash
+TESTCONTAINERS_FALLBACK_ENABLED=true ./gradlew :apps:commerce-api:test
+```
+
+---
+
 ## 개발 규칙
 
 ### 진행 Workflow - 증강 코딩

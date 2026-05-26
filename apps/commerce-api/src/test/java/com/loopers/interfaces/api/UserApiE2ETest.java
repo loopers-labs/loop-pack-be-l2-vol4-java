@@ -3,7 +3,7 @@ package com.loopers.interfaces.api;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.UserService;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +20,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class UserV1ApiE2ETest {
+class UserApiE2ETest {
 
     private static final String BASE_URL = "/api/v1/users";
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
@@ -51,13 +51,13 @@ class UserV1ApiE2ETest {
         @Test
         void returns201_whenSignUpSucceeds() {
             // arrange
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -78,13 +78,13 @@ class UserV1ApiE2ETest {
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 "user01", "Password2@", "김철수",
                 LocalDate.of(1995, 5, 5), "other@example.com"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -98,13 +98,13 @@ class UserV1ApiE2ETest {
         @Test
         void returns400_whenRequiredFieldIsMissing() {
             // arrange - loginId 없이 요청
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 null, "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -118,13 +118,13 @@ class UserV1ApiE2ETest {
         @Test
         void returns400_whenLoginIdIsBlank() {
             // arrange
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 "", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -138,13 +138,13 @@ class UserV1ApiE2ETest {
         @Test
         void returns400_whenPasswordIsNull() {
             // arrange
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 "user01", null, "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -158,13 +158,13 @@ class UserV1ApiE2ETest {
         @Test
         void returns400_whenEmailFormatIsInvalid() {
             // arrange
-            UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
+            UserDto.SignUpRequest request = new UserDto.SignUpRequest(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "invalid-email"
             );
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.SignUpResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.SignUpResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
                 new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {}
@@ -193,7 +193,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_PW_HEADER, "Password1!");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(headers),
                 new ParameterizedTypeReference<>() {}
@@ -211,7 +211,7 @@ class UserV1ApiE2ETest {
         @Test
         void returns401_whenHeadersAreMissing() {
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(null),
                 new ParameterizedTypeReference<>() {}
@@ -230,7 +230,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_PW_HEADER, "Password1!");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(headers),
                 new ParameterizedTypeReference<>() {}
@@ -249,7 +249,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_PW_HEADER, "   ");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(headers),
                 new ParameterizedTypeReference<>() {}
@@ -268,7 +268,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_PW_HEADER, "Password1!");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(headers),
                 new ParameterizedTypeReference<>() {}
@@ -292,7 +292,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_PW_HEADER, "WrongPassword!");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserDto.UserResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/me", HttpMethod.GET,
                 new HttpEntity<>(headers),
                 new ParameterizedTypeReference<>() {}
@@ -320,7 +320,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_ID_HEADER, "user01");
             headers.set(LOGIN_PW_HEADER, "Password1!");
 
-            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(
+            UserDto.UpdatePasswordRequest request = new UserDto.UpdatePasswordRequest(
                 "Password1!", "NewPassword1!"
             );
 
@@ -348,7 +348,7 @@ class UserV1ApiE2ETest {
             headers.set(LOGIN_ID_HEADER, "user01");
             headers.set(LOGIN_PW_HEADER, "Password1!");
 
-            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(
+            UserDto.UpdatePasswordRequest request = new UserDto.UpdatePasswordRequest(
                 "WrongPassword!", "NewPassword1!"
             );
 
@@ -367,7 +367,7 @@ class UserV1ApiE2ETest {
         @Test
         void returns401_whenHeadersAreMissing() {
             // arrange
-            UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(
+            UserDto.UpdatePasswordRequest request = new UserDto.UpdatePasswordRequest(
                 "Password1!", "NewPassword1!"
             );
 
