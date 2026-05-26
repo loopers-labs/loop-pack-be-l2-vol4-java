@@ -42,7 +42,7 @@ class UserServiceIntegrationTest {
         @Test
         void persistsUser_whenRequestIsValid() {
             // act
-            UserModel saved = userService.signUp(
+            User saved = userService.signUp(
                 VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
             );
 

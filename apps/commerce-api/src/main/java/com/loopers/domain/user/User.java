@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 @Getter
 @Entity
 @Table(name = "users")
-public class UserModel extends BaseEntity {
+public class User extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
     private static final Pattern BIRTH_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
@@ -43,9 +43,9 @@ public class UserModel extends BaseEntity {
     @Column(nullable = false)
     private String email;
 
-    protected UserModel() {}
+    protected User() {}
 
-    public UserModel(String loginId, EncodedPassword password, String name, String birthDate, String email) {
+    public User(String loginId, EncodedPassword password, String name, String birthDate, String email) {
         if (loginId == null || loginId.isBlank() || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID 형식이 올바르지 않습니다.");
         }

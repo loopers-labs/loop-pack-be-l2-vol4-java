@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class UserModelTest {
+class UserTest {
 
     private static final String VALID_LOGIN_ID = "chanhee";
     private static final EncodedPassword VALID_PASSWORD = new EncodedPassword("chan1234!");
@@ -24,7 +24,7 @@ class UserModelTest {
 
         @DisplayName("모든 정보가 입력되면 가입완료")
         @Test
-        void createsUserModel_whenAllFieldsAreValid() {
+        void createsUser_whenAllFieldsAreValid() {
             // arrange
             String loginId = VALID_LOGIN_ID;
             EncodedPassword password = VALID_PASSWORD;
@@ -33,14 +33,14 @@ class UserModelTest {
             String email = VALID_EMAIL;
 
             // act
-            UserModel userModel = new UserModel(loginId, password, name, birthDate, email);
+            User user = new User(loginId, password, name, birthDate, email);
 
             // assert
             assertAll(
-                    () -> assertThat(userModel).isNotNull(),
-                    () -> assertThat(userModel.getLoginId()).isEqualTo(loginId),
-                    () -> assertThat(userModel.getName()).isEqualTo(name),
-                    () -> assertThat(userModel.getEmail()).isEqualTo(email)
+                    () -> assertThat(user).isNotNull(),
+                    () -> assertThat(user.getLoginId()).isEqualTo(loginId),
+                    () -> assertThat(user.getName()).isEqualTo(name),
+                    () -> assertThat(user.getEmail()).isEqualTo(email)
             );
         }
 
@@ -52,7 +52,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(invalidLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+                new User(invalidLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             });
 
             // assert
@@ -67,7 +67,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(blankLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+                new User(blankLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             });
 
             // assert
@@ -79,7 +79,7 @@ class UserModelTest {
         void throwsBadRequest_whenPasswordIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, null, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+                new User(VALID_LOGIN_ID, null, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             });
 
             // assert
@@ -94,7 +94,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, blankName, VALID_BIRTH_DATE, VALID_EMAIL);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, blankName, VALID_BIRTH_DATE, VALID_EMAIL);
             });
 
             // assert
@@ -109,7 +109,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirthDate, VALID_EMAIL);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirthDate, VALID_EMAIL);
             });
 
             // assert
@@ -124,7 +124,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirthDate, VALID_EMAIL);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirthDate, VALID_EMAIL);
             });
 
             // assert
@@ -139,7 +139,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, blankBirthDate, VALID_EMAIL);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, blankBirthDate, VALID_EMAIL);
             });
 
             // assert
@@ -154,7 +154,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, invalidEmail);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, invalidEmail);
             });
 
             // assert
@@ -169,7 +169,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, blankEmail);
+                new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, blankEmail);
             });
 
             // assert

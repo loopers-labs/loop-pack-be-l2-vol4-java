@@ -51,18 +51,18 @@ class UserServiceTest {
             // arrange
             given(userRepository.existsByLoginId(VALID_LOGIN_ID)).willReturn(false);
             given(passwordEncoder.encode(any(RawPassword.class))).willReturn(ENCODED_PASSWORD);
-            given(userRepository.save(any(UserModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+            given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
             userService.signUp(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
 
             // assert
-            ArgumentCaptor<UserModel> savedCaptor = ArgumentCaptor.forClass(UserModel.class);
+            ArgumentCaptor<User> savedCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(1)).existsByLoginId(VALID_LOGIN_ID);
             verify(passwordEncoder, times(1)).encode(new RawPassword(VALID_RAW_PASSWORD));
             verify(userRepository, times(1)).save(savedCaptor.capture());
 
-            UserModel saved = savedCaptor.getValue();
+            User saved = savedCaptor.getValue();
             assertAll(
                     () -> assertThat(saved.getLoginId()).isEqualTo(VALID_LOGIN_ID),
                     () -> assertThat(saved.getPassword()).isEqualTo(ENCODED_PASSWORD),
@@ -87,7 +87,7 @@ class UserServiceTest {
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
                     () -> verify(userRepository, times(1)).existsByLoginId(VALID_LOGIN_ID),
                     () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
-                    () -> verify(userRepository, never()).save(any(UserModel.class))
+                    () -> verify(userRepository, never()).save(any(User.class))
             );
         }
 
@@ -106,7 +106,7 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                     () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
-                    () -> verify(userRepository, never()).save(any(UserModel.class))
+                    () -> verify(userRepository, never()).save(any(User.class))
             );
         }
     }
@@ -123,18 +123,18 @@ class UserServiceTest {
         @Test
         void changesPassword_whenRequestIsValid() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            User user = new User(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
             given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
             given(passwordEncoder.matches(NEW_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(false);
             given(passwordEncoder.encode(any(RawPassword.class))).willReturn(NEW_ENCODED);
-            given(userRepository.save(any(UserModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+            given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
             userService.changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, NEW_RAW_PASSWORD);
 
             // assert
-            ArgumentCaptor<UserModel> savedCaptor = ArgumentCaptor.forClass(UserModel.class);
+            ArgumentCaptor<User> savedCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(1)).save(savedCaptor.capture());
             assertThat(savedCaptor.getValue().getPassword()).isEqualTo(NEW_ENCODED);
         }
@@ -143,7 +143,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenOldPasswordDoesNotMatch() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            User user = new User(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
             given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(false);
 
@@ -155,7 +155,7 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
                     () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
-                    () -> verify(userRepository, never()).save(any(UserModel.class))
+                    () -> verify(userRepository, never()).save(any(User.class))
             );
         }
 
@@ -163,7 +163,7 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordEqualsCurrent() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            User user = new User(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
             given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
 
@@ -175,7 +175,7 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                     () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
-                    () -> verify(userRepository, never()).save(any(UserModel.class))
+                    () -> verify(userRepository, never()).save(any(User.class))
             );
         }
 
@@ -184,7 +184,7 @@ class UserServiceTest {
         void throwsBadRequest_whenNewPasswordContainsBirthDate() {
             // arrange
             String passwordWithBirthDate = "Pass19950510!";
-            UserModel user = new UserModel(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
+            User user = new User(VALID_LOGIN_ID, CURRENT_ENCODED, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL);
             given(userRepository.findByLoginId(VALID_LOGIN_ID)).willReturn(Optional.of(user));
             given(passwordEncoder.matches(VALID_RAW_PASSWORD, CURRENT_ENCODED)).willReturn(true);
             given(passwordEncoder.matches(passwordWithBirthDate, CURRENT_ENCODED)).willReturn(false);
@@ -197,7 +197,7 @@ class UserServiceTest {
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                     () -> verify(passwordEncoder, never()).encode(any(RawPassword.class)),
-                    () -> verify(userRepository, never()).save(any(UserModel.class))
+                    () -> verify(userRepository, never()).save(any(User.class))
             );
         }
     }
