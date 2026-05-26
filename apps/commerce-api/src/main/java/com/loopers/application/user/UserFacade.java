@@ -44,16 +44,13 @@ public class UserFacade {
 
     @Transactional(readOnly = true)
     public UserMyInfo readMyInfo(Long userId) {
-        return UserMyInfo.from(mustFindUserById(userId));
+        UserModel user = userRepository.getById(userId);
+
+        return UserMyInfo.from(user);
     }
 
     public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
-        UserModel user = mustFindUserById(userId);
+        UserModel user = userRepository.getById(userId);
         user.changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
-    }
-
-    private UserModel mustFindUserById(Long userId) {
-        return userRepository.findById(userId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
     }
 }

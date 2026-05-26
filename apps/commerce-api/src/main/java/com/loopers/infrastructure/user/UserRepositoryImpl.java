@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,8 +23,9 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public Optional<UserModel> findById(Long id) {
-        return userJpaRepository.findById(id);
+    public UserModel getById(Long id) {
+        return userJpaRepository.findById(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
     }
 
     @Override
