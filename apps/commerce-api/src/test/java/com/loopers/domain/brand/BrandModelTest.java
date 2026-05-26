@@ -32,7 +32,7 @@ class BrandModelTest {
 
             // assert
             assertAll(
-                () -> assertThat(brandModel.getName()).isEqualTo(BrandName.from(rawName)),
+                () -> assertThat(brandModel.getName()).isEqualTo(Name.from(rawName)),
                 () -> assertThat(brandModel.getDescription()).isEqualTo(rawDescription)
             );
         }
@@ -51,7 +51,7 @@ class BrandModelTest {
 
             // assert
             assertAll(
-                () -> assertThat(brandModel.getName()).isEqualTo(BrandName.from(rawName)),
+                () -> assertThat(brandModel.getName()).isEqualTo(Name.from(rawName)),
                 () -> assertThat(brandModel.getDescription()).isNull()
             );
         }
@@ -85,7 +85,7 @@ class BrandModelTest {
 
             // assert
             assertAll(
-                () -> assertThat(brandModel.getName()).isEqualTo(BrandName.from("새 브랜드")),
+                () -> assertThat(brandModel.getName()).isEqualTo(Name.from("새 브랜드")),
                 () -> assertThat(brandModel.getDescription()).isEqualTo("새 설명")
             );
         }
