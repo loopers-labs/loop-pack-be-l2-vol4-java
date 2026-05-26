@@ -31,6 +31,22 @@
 - 한 검증에 사유가 둘 이상이면 통합 메시지 대신 사유별로 별도 메시지를 작성한다.
 - 예: "로그인 ID는 4~20자만 허용됩니다." 와 "로그인 ID는 영문 및 숫자만 허용됩니다."를 분리.
 
+### 빌더·플루언트 체인 줄바꿈
+- 빌더 등 플루언트 체인은 한 줄에 몰지 않고, 시작 호출(`X.builder()`) 이후 각 호출(`.field(...)`·`.build()`)을 한 줄씩 끊어 작성한다.
+- 이어지는 호출은 다음 줄로 내리고 연속 들여쓰기(+4 스페이스)를 적용한다.
+- 메인·테스트 코드 구분 없이 동일하게 적용한다.
+- 예:
+```java
+// don't
+LikeModel like = LikeModel.builder().userId(userId).productId(productId).build();
+
+// do
+LikeModel like = LikeModel.builder()
+    .userId(userId)
+    .productId(productId)
+    .build();
+```
+
 ## 핵심 발췌
 ```java
 // 매직넘버 상수화 + String.format + 사유별 메시지 분리
@@ -57,7 +73,9 @@ public static LoginId from(String value) {
 - ✅ 임계값은 `private static final` 상수로 추출한다.
 - ✅ 변수가 들어가는 메시지는 `String.format`으로 작성한다.
 - ✅ 검증 사유별로 에러 메시지를 분리한다.
+- ✅ 빌더·플루언트 체인은 각 호출을 한 줄씩 끊어 작성한다.
 - ❌ 코드 동작을 반복 설명하는 인라인 주석을 달지 않는다.
 - ❌ 가독성을 위한 잉여 빈 줄이나 표시용 어노테이션 옵션을 쓰지 않는다.
 - ❌ 여러 검증 사유를 하나의 통합 메시지로 합치지 않는다.
 - ❌ 변수가 들어가는 메시지를 `+` 문자열 결합으로 작성하지 않는다.
+- ❌ 빌더·플루언트 체인을 한 줄에 몰아 작성하지 않는다.

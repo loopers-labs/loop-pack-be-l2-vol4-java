@@ -63,7 +63,10 @@ class BrandModelTest {
             String invalidName = "가".repeat(51);
 
             // act & assert
-            assertThatThrownBy(() -> BrandModel.builder().rawName(invalidName).rawDescription("설명").build())
+            assertThatThrownBy(() -> BrandModel.builder()
+                .rawName(invalidName)
+                .rawDescription("설명")
+                .build())
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -78,7 +81,10 @@ class BrandModelTest {
         @Test
         void updatesNameAndDescription() {
             // arrange
-            BrandModel brandModel = BrandModel.builder().rawName("기존 브랜드").rawDescription("기존 설명").build();
+            BrandModel brandModel = BrandModel.builder()
+                .rawName("기존 브랜드")
+                .rawDescription("기존 설명")
+                .build();
 
             // act
             brandModel.update("새 브랜드", "새 설명");
@@ -94,7 +100,10 @@ class BrandModelTest {
         @Test
         void throwsBadRequest_whenNewNameViolatesPolicy() {
             // arrange
-            BrandModel brandModel = BrandModel.builder().rawName("기존 브랜드").rawDescription("기존 설명").build();
+            BrandModel brandModel = BrandModel.builder()
+                .rawName("기존 브랜드")
+                .rawDescription("기존 설명")
+                .build();
 
             // act & assert
             assertThatThrownBy(() -> brandModel.update("가".repeat(51), "새 설명"))

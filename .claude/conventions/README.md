@@ -13,7 +13,7 @@
 |---|---|---|---|
 | common | [common/naming.md](common/naming.md) | 변수·클래스·메서드·정적 팩토리 네이밍 | 모든 코드 |
 | common | [common/architecture.md](common/architecture.md) | 호출 방향·레이어 경계·도메인 모델링·검증 단일화·인증·엔티티 비노출 | 모든 코드(설계 결정) |
-| common | [common/code-style.md](common/code-style.md) | 주석·`String.format`·매직넘버·에러 메시지 분리 | 모든 코드 |
+| common | [common/code-style.md](common/code-style.md) | 주석·`String.format`·매직넘버·에러 메시지 분리·플루언트 체인 줄바꿈 | 모든 코드 |
 | common | [common/testing.md](common/testing.md) | AssertJ 단언·3A 주석·BDDMockito·`@DisplayName`·에러 단언 범위·픽스처·`@Nested` | 모든 테스트 |
 | domain | [domain/model.md](domain/model.md) | `@Entity` 애그리거트 루트(불변식·VO 합성·빌더) | `*Model` |
 | domain | [domain/vo.md](domain/vo.md) | `@Embeddable` record VO(`from()` 검증·상수) | VO |

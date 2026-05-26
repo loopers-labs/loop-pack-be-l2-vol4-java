@@ -21,7 +21,10 @@ class LikeModelTest {
             Long productId = 2L;
 
             // act
-            LikeModel likeModel = LikeModel.of(userId, productId);
+            LikeModel likeModel = LikeModel.builder()
+                .userId(userId)
+                .productId(productId)
+                .build();
 
             // assert
             assertAll(

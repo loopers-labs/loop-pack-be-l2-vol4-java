@@ -72,7 +72,10 @@ class BrandRepositoryIntegrationTest {
             // arrange
             String description = "감성을 담은 브랜드";
             BrandModel savedBrand = brandRepository.save(
-                BrandModel.builder().rawName("감성 브랜드").rawDescription(description).build()
+                BrandModel.builder()
+                    .rawName("감성 브랜드")
+                    .rawDescription(description)
+                    .build()
             );
 
             // act

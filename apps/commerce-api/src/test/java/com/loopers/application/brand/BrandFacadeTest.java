@@ -92,7 +92,10 @@ class BrandFacadeTest {
         @Test
         void updatesBrand_whenTargetActiveAndNameAvailable() {
             // arrange
-            BrandModel brand = BrandModel.builder().rawName("기존 브랜드").rawDescription("기존 설명").build();
+            BrandModel brand = BrandModel.builder()
+                .rawName("기존 브랜드")
+                .rawDescription("기존 설명")
+                .build();
             given(brandRepository.getActiveById(brandId)).willReturn(brand);
             given(brandRepository.existsActiveByNameAndIdNot("새 브랜드", brandId)).willReturn(false);
 
@@ -127,7 +130,10 @@ class BrandFacadeTest {
         @Test
         void throwsConflict_whenNewNameDuplicatesOtherActive() {
             // arrange
-            BrandModel brand = BrandModel.builder().rawName("기존 브랜드").rawDescription("기존 설명").build();
+            BrandModel brand = BrandModel.builder()
+                .rawName("기존 브랜드")
+                .rawDescription("기존 설명")
+                .build();
             given(brandRepository.getActiveById(brandId)).willReturn(brand);
             given(brandRepository.existsActiveByNameAndIdNot("중복 브랜드", brandId)).willReturn(true);
 
@@ -152,11 +158,24 @@ class BrandFacadeTest {
         @Test
         void deletesBrand_andCascadesProducts_whenBrandIsActive() {
             // arrange
-            BrandModel brand = BrandModel.builder().rawName("감성 브랜드").rawDescription("감성 설명").build();
+            BrandModel brand = BrandModel.builder()
+                .rawName("감성 브랜드")
+                .rawDescription("감성 설명")
+                .build();
             ProductModel product1 = ProductModel.builder()
-                .brandId(brandId).rawName("상품1").rawDescription("설명").rawPrice(39_000).rawStock(50).build();
+                .brandId(brandId)
+                .rawName("상품1")
+                .rawDescription("설명")
+                .rawPrice(39_000)
+                .rawStock(50)
+                .build();
             ProductModel product2 = ProductModel.builder()
-                .brandId(brandId).rawName("상품2").rawDescription("설명").rawPrice(39_000).rawStock(50).build();
+                .brandId(brandId)
+                .rawName("상품2")
+                .rawDescription("설명")
+                .rawPrice(39_000)
+                .rawStock(50)
+                .build();
             given(brandRepository.findActiveById(brandId)).willReturn(Optional.of(brand));
             given(productRepository.findActiveByBrandId(brandId)).willReturn(List.of(product1, product2));
 
@@ -195,7 +214,10 @@ class BrandFacadeTest {
         @Test
         void returnsBrandInfo_whenActiveExists() {
             // arrange
-            BrandModel brand = BrandModel.builder().rawName("감성 브랜드").rawDescription("감성 설명").build();
+            BrandModel brand = BrandModel.builder()
+                .rawName("감성 브랜드")
+                .rawDescription("감성 설명")
+                .build();
             given(brandRepository.getActiveById(brandId)).willReturn(brand);
 
             // act
@@ -230,7 +252,10 @@ class BrandFacadeTest {
         @Test
         void returnsMappedPage() {
             // arrange
-            BrandModel brand = BrandModel.builder().rawName("감성 브랜드").rawDescription("감성 설명").build();
+            BrandModel brand = BrandModel.builder()
+                .rawName("감성 브랜드")
+                .rawDescription("감성 설명")
+                .build();
             given(brandRepository.findActiveByPage(0, 20))
                 .willReturn(new PageImpl<>(List.of(brand)));
 

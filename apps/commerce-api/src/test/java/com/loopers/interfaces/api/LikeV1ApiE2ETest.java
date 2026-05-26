@@ -212,7 +212,10 @@ class LikeV1ApiE2ETest {
             // arrange
             UserModel user = saveUser("testuser1", RAW_PASSWORD);
             ProductModel product = saveProduct("감성 가디건");
-            likeJpaRepository.save(LikeModel.of(user.getId(), product.getId()));
+            likeJpaRepository.save(LikeModel.builder()
+                .userId(user.getId())
+                .productId(product.getId())
+                .build());
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -260,7 +263,10 @@ class LikeV1ApiE2ETest {
             ProductModel product = saveProduct("감성 가디건");
             String endpoint = likesEndpoint(product.getId());
             HttpEntity<Void> request = memberRequest(user.getLoginId().value(), RAW_PASSWORD);
-            likeJpaRepository.save(LikeModel.of(user.getId(), product.getId()));
+            likeJpaRepository.save(LikeModel.builder()
+                .userId(user.getId())
+                .productId(product.getId())
+                .build());
 
             // act
             testRestTemplate.exchange(endpoint, HttpMethod.DELETE, request, MAP_RESPONSE);
@@ -281,8 +287,14 @@ class LikeV1ApiE2ETest {
             UserModel user1 = saveUser("testuser1", RAW_PASSWORD);
             UserModel user2 = saveUser("testuser2", RAW_PASSWORD);
             ProductModel product = saveProduct("감성 가디건");
-            likeJpaRepository.save(LikeModel.of(user1.getId(), product.getId()));
-            likeJpaRepository.save(LikeModel.of(user2.getId(), product.getId()));
+            likeJpaRepository.save(LikeModel.builder()
+                .userId(user1.getId())
+                .productId(product.getId())
+                .build());
+            likeJpaRepository.save(LikeModel.builder()
+                .userId(user2.getId())
+                .productId(product.getId())
+                .build());
 
             // act
             testRestTemplate.exchange(likesEndpoint(product.getId()), HttpMethod.DELETE,
