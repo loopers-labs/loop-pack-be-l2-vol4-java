@@ -5,8 +5,10 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -36,5 +38,12 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public Optional<OrderModel> find(Long id) {
         return orderJpaRepository.findById(id).map(OrderEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<OrderModel> findByUserId(Long userId, int page, int size) {
+        return orderJpaRepository.findByUserIdOrderByIdDesc(userId, PageRequest.of(page, size)).stream()
+                .map(OrderEntityMapper::toDomain)
+                .toList();
     }
 }

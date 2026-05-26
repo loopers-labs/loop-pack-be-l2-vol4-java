@@ -17,6 +17,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -132,6 +133,42 @@ class LikeV1ApiE2ETest {
                     () -> assertThat(afterLike.getBody().data().liked()).isTrue(),
                     () -> assertThat(afterUnlike.getBody().data().liked()).isFalse()
             );
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me/likes")
+    @Nested
+    class GetMyLikedProducts {
+
+        private static final ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> LIST_TYPE =
+                new ParameterizedTypeReference<>() {};
+
+        @DisplayName("좋아요한 상품 목록을 조회하면, 좋아요한 활성 상품이 반환된다.")
+        @Test
+        void returnsLikedProducts() {
+            HttpEntity<Void> auth = new HttpEntity<>(authHeaders("testid", "testPw1234"));
+            testRestTemplate.exchange(likePath(), HttpMethod.POST, auth, LIKE_TYPE);
+
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response = testRestTemplate.exchange(
+                    "/api/v1/users/me/likes", HttpMethod.GET, auth, LIST_TYPE);
+
+            assertAll(
+                    () -> assertThat(response.getBody().data()).hasSize(1),
+                    () -> assertThat(response.getBody().data().get(0).id()).isEqualTo(productId)
+            );
+        }
+
+        @DisplayName("좋아요 취소 후 조회하면, 목록에서 빠진다.")
+        @Test
+        void excludesUnliked() {
+            HttpEntity<Void> auth = new HttpEntity<>(authHeaders("testid", "testPw1234"));
+            testRestTemplate.exchange(likePath(), HttpMethod.POST, auth, LIKE_TYPE);
+            testRestTemplate.exchange(likePath(), HttpMethod.DELETE, auth, LIKE_TYPE);
+
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response = testRestTemplate.exchange(
+                    "/api/v1/users/me/likes", HttpMethod.GET, auth, LIST_TYPE);
+
+            assertThat(response.getBody().data()).isEmpty();
         }
     }
 }

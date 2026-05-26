@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.like;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -9,4 +10,6 @@ public interface LikeJpaRepository extends JpaRepository<LikeEntity, Long> {
     Optional<LikeEntity> findByUserIdAndProductId(Long userId, Long productId);
 
     List<LikeEntity> findByProductIdAndDeletedAtIsNull(Long productId);
+
+    List<LikeEntity> findByUserIdAndDeletedAtIsNullOrderByLikedAtDescIdDesc(Long userId, Pageable pageable);
 }

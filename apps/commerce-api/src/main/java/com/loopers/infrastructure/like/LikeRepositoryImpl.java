@@ -5,6 +5,7 @@ import com.loopers.domain.like.LikeRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -49,6 +50,13 @@ public class LikeRepositoryImpl implements LikeRepository {
     @Override
     public List<LikeModel> findActiveByProductId(Long productId) {
         return likeJpaRepository.findByProductIdAndDeletedAtIsNull(productId).stream()
+                .map(LikeEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<LikeModel> findActiveByUserId(Long userId, int page, int size) {
+        return likeJpaRepository.findByUserIdAndDeletedAtIsNullOrderByLikedAtDescIdDesc(userId, PageRequest.of(page, size)).stream()
                 .map(LikeEntityMapper::toDomain)
                 .toList();
     }

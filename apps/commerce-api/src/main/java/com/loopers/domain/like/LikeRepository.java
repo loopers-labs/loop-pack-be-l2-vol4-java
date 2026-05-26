@@ -11,4 +11,7 @@ public interface LikeRepository {
 
     /** 특정 상품의 활성 좋아요 전체 — Product 비활성 시 cascade 전파용 (01 §7.5). */
     List<LikeModel> findActiveByProductId(Long productId);
+
+    /** 특정 사용자의 활성 좋아요를 좋아요 시점 최신순으로 페이지 조회 (UC-07). */
+    List<LikeModel> findActiveByUserId(Long userId, int page, int size);
 }

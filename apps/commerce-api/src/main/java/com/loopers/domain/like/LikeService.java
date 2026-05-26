@@ -1,9 +1,12 @@
 package com.loopers.domain.like;
 
 import com.loopers.domain.product.ProductService;
+import com.loopers.support.page.PagePolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -53,6 +56,13 @@ public class LikeService {
         return likeRepository.findByUserIdAndProductId(userId, productId)
                 .map(LikeModel::isActive)
                 .orElse(false);
+    }
+
+    /** 본인 활성 좋아요 목록 — 좋아요 시점 최신순 페이지 조회 (UC-07). 상품 조합은 Facade가 한다. */
+    @Transactional(readOnly = true)
+    public List<LikeModel> getMyActiveLikes(Long userId, int page, int size) {
+        PagePolicy.validate(page, size);
+        return likeRepository.findActiveByUserId(userId, page, size);
     }
 
     /**

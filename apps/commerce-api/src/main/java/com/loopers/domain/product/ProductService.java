@@ -4,9 +4,11 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import com.loopers.support.page.PagePolicy;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -34,9 +36,17 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
+    /** 활성 상품을 Optional로 — 목록 조합 시 비활성/부재를 조용히 제외하기 위함 (UC-07). */
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public Optional<ProductModel> findActive(Long id) {
+        return productRepository.find(id).filter(ProductModel::isActive);
+    }
+
+    /** 활성 상품 목록 — 브랜드 필터·정렬·페이지 (UC-03). */
+    @Transactional(readOnly = true)
+    public List<ProductModel> getProducts(Long brandId, ProductSortType sort, int page, int size) {
+        PagePolicy.validate(page, size);
+        return productRepository.findActivePage(brandId, sort, page, size);
     }
 
     /** 특정 브랜드의 활성 상품 전체 (Brand→Product cascade 전파용 — 01 §7.5). */

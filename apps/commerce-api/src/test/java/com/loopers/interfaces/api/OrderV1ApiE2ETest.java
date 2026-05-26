@@ -154,4 +154,37 @@ class OrderV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
+
+    @DisplayName("GET /api/v1/orders (내 주문 목록)")
+    @Nested
+    class GetMyOrders {
+
+        private static final ParameterizedTypeReference<ApiResponse<List<OrderV1Dto.OrderResponse>>> LIST_TYPE =
+                new ParameterizedTypeReference<>() {};
+
+        @DisplayName("본인 주문 목록을 조회하면, 본인 주문만 반환된다.")
+        @Test
+        void returnsMyOrders() {
+            placeOrder("buyer", 1);
+            placeOrder("buyer", 2);
+
+            ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response = testRestTemplate.exchange(
+                    ORDERS_PATH, HttpMethod.GET,
+                    new HttpEntity<>(authHeaders("buyer", "testPw1234")), LIST_TYPE);
+
+            assertThat(response.getBody().data()).hasSize(2);
+        }
+
+        @DisplayName("주문이 없는 사용자는 빈 목록을 받는다.")
+        @Test
+        void returnsEmpty_whenNoOrders() {
+            placeOrder("buyer", 1);
+
+            ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response = testRestTemplate.exchange(
+                    ORDERS_PATH, HttpMethod.GET,
+                    new HttpEntity<>(authHeaders("other", "testPw1234")), LIST_TYPE);
+
+            assertThat(response.getBody().data()).isEmpty();
+        }
+    }
 }

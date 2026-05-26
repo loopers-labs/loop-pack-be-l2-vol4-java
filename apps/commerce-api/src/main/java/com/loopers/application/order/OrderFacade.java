@@ -42,4 +42,10 @@ public class OrderFacade {
     public OrderInfo getOrder(Long orderId) {
         return OrderInfo.from(orderService.getOrder(orderId));
     }
+
+    public List<OrderInfo> getMyOrders(Long userId, int page, int size) {
+        return orderService.getMyOrders(userId, page, size).stream()
+            .map(OrderInfo::from)
+            .toList();
+    }
 }

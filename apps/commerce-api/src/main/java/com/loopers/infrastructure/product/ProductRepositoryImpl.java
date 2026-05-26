@@ -2,9 +2,13 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -46,16 +50,30 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductModel> findAll() {
-        return productJpaRepository.findAll().stream()
+    public List<ProductModel> findActiveByBrandId(Long brandId) {
+        return productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId).stream()
                 .map(ProductEntityMapper::toDomain)
                 .toList();
     }
 
     @Override
-    public List<ProductModel> findActiveByBrandId(Long brandId) {
-        return productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId).stream()
-                .map(ProductEntityMapper::toDomain)
-                .toList();
+    public List<ProductModel> findActivePage(Long brandId, ProductSortType sort, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, toSort(sort));
+        List<ProductEntity> entities = (brandId == null)
+                ? productJpaRepository.findByDeletedAtIsNull(pageable)
+                : productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId, pageable);
+        return entities.stream().map(ProductEntityMapper::toDomain).toList();
+    }
+
+    /** 정렬 + id DESC tiebreaker로 페이지 경계 안정성 보장 (01 §7.2). */
+    private static Sort toSort(ProductSortType sort) {
+        Sort byIdDesc = Sort.by(Sort.Direction.DESC, "id");
+        ProductSortType effective = (sort == null) ? ProductSortType.LATEST : sort;
+        return switch (effective) {
+            case LATEST -> byIdDesc;
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price").and(byIdDesc);
+            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "price").and(byIdDesc);
+            case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likesCount").and(byIdDesc);
+        };
     }
 }

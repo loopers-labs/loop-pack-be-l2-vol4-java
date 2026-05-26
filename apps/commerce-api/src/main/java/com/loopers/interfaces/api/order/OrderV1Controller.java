@@ -38,6 +38,20 @@ public class OrderV1Controller {
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 
+    @GetMapping
+    public ApiResponse<List<OrderV1Dto.OrderResponse>> getMyOrders(
+        @RequestHeader("X-Loopers-LoginId") String loginId,
+        @RequestHeader("X-Loopers-LoginPw") String loginPw,
+        @RequestParam(value = "page", defaultValue = "0") int page,
+        @RequestParam(value = "size", defaultValue = "20") int size
+    ) {
+        Long userId = userFacade.authenticate(loginId, loginPw);
+        List<OrderV1Dto.OrderResponse> responses = orderFacade.getMyOrders(userId, page, size).stream()
+            .map(OrderV1Dto.OrderResponse::from)
+            .toList();
+        return ApiResponse.success(responses);
+    }
+
     @GetMapping("/{orderId}")
     public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
         @PathVariable(value = "orderId") Long orderId,

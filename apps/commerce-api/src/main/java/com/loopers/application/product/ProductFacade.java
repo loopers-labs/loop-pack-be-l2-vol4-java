@@ -5,6 +5,7 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,9 +40,8 @@ public class ProductFacade {
         return ProductDetailInfo.of(product, brand);
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
+    public List<ProductInfo> getProducts(Long brandId, ProductSortType sort, int page, int size) {
+        return productService.getProducts(brandId, sort, page, size).stream()
             .map(ProductInfo::from)
             .toList();
     }

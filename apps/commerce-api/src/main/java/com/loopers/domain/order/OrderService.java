@@ -6,6 +6,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.page.PagePolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,5 +71,12 @@ public class OrderService {
     public OrderModel getOrder(Long orderId) {
         return orderRepository.find(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
+    }
+
+    /** 본인 주문 목록 — 최신순 페이지 조회 (UC-09). */
+    @Transactional(readOnly = true)
+    public List<OrderModel> getMyOrders(Long userId, int page, int size) {
+        PagePolicy.validate(page, size);
+        return orderRepository.findByUserId(userId, page, size);
     }
 }
