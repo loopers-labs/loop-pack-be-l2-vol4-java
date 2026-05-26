@@ -42,4 +42,11 @@ public class ProductModel extends BaseEntity {
         this.price = Price.from(rawPrice);
         this.stock = Stock.from(rawStock);
     }
+
+    public void update(String rawName, String rawDescription, Integer rawPrice, Integer rawStock) {
+        this.name = Name.from(rawName);
+        this.description = rawDescription;
+        this.price = Price.from(rawPrice);
+        this.stock = Stock.from(rawStock);
+    }
 }

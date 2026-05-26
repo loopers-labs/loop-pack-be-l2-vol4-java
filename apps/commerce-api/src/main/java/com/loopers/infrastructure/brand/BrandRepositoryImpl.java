@@ -1,5 +1,7 @@
 package com.loopers.infrastructure.brand;
 
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -41,6 +43,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     public BrandModel getActiveById(Long id) {
         return brandJpaRepository.findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드가 존재하지 않습니다."));
+    }
+
+    @Override
+    public Optional<BrandModel> findActiveById(Long id) {
+        return brandJpaRepository.findByIdAndDeletedAtIsNull(id);
     }
 
     @Override

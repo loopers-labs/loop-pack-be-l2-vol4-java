@@ -1,5 +1,7 @@
 package com.loopers.domain.brand;
 
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 
 public interface BrandRepository {
@@ -13,6 +15,8 @@ public interface BrandRepository {
     boolean existsActiveById(Long id);
 
     BrandModel getActiveById(Long id);
+
+    Optional<BrandModel> findActiveById(Long id);
 
     Page<BrandModel> findActiveByPage(int page, int size);
 }

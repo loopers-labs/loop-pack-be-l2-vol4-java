@@ -13,4 +13,16 @@ public interface ProductAdminV1ApiSpec {
         description = "관리자가 소속 브랜드에 새로운 상품을 등록하고 생성된 상품 식별자를 반환한다."
     )
     ApiResponse<ProductAdminV1Dto.CreateResponse> createProduct(ProductAdminV1Dto.CreateRequest request);
+
+    @Operation(
+        summary = "상품 수정",
+        description = "관리자가 상품의 이름·설명·가격·재고를 수정하고 식별자를 반환한다. 소속 브랜드는 수정 대상이 아니다."
+    )
+    ApiResponse<ProductAdminV1Dto.UpdateResponse> updateProduct(Long productId, ProductAdminV1Dto.UpdateRequest request);
+
+    @Operation(
+        summary = "상품 삭제",
+        description = "관리자가 상품을 삭제(soft delete)한다. 존재하지 않거나 이미 삭제된 상품도 정상 응답으로 마무리한다(멱등)."
+    )
+    ApiResponse<Void> deleteProduct(Long productId);
 }

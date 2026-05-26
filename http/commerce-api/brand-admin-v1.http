@@ -60,3 +60,18 @@ X-Loopers-Ldap: loopers.admin
 
 ### 브랜드 상세 - 관리자 인증 헤더 누락 (403 Forbidden)
 GET http://localhost:8080/api-admin/v1/brands/1
+
+### 브랜드 삭제 - 정상 (200 OK, 소속 상품 cascade)
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 반복 요청 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 미존재 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/brands/99999
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
+DELETE http://localhost:8080/api-admin/v1/brands/1
