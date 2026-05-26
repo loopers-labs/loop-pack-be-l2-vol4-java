@@ -21,6 +21,7 @@
 |---|---|---|---|
 | `BAD_REQUEST` | 400 Bad Request | `"Bad Request"` | 형식 위반, 길이 초과, null 등 입력 오류 |
 | `UNAUTHENTICATED` | 401 Unauthorized | `"Unauthorized"` | 인증 실패 (헤더 누락, 비밀번호 불일치 등) |
+| `FORBIDDEN` | 403 Forbidden | `"Forbidden"` | 접근 권한 없음 (관리자 인증 헤더 누락·불일치 등) |
 | `NOT_FOUND` | 404 Not Found | `"Not Found"` | 존재하지 않는 리소스 조회 |
 | `CONFLICT` | 409 Conflict | `"Conflict"` | 중복 리소스 (로그인 ID·이메일 중복 등) |
 | `INTERNAL_ERROR` | 500 Internal Server Error | `"Internal Server Error"` | 예기치 않은 서버 오류 |
@@ -44,6 +45,7 @@ public enum ErrorType {
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(), "일시적인 오류가 발생했습니다."),
     BAD_REQUEST    (HttpStatus.BAD_REQUEST,           HttpStatus.BAD_REQUEST.getReasonPhrase(),           "잘못된 요청입니다."),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED,          HttpStatus.UNAUTHORIZED.getReasonPhrase(),          "인증되지 않은 사용자입니다."),
+    FORBIDDEN      (HttpStatus.FORBIDDEN,             HttpStatus.FORBIDDEN.getReasonPhrase(),             "접근 권한이 없습니다."),
     NOT_FOUND      (HttpStatus.NOT_FOUND,             HttpStatus.NOT_FOUND.getReasonPhrase(),             "존재하지 않는 요청입니다."),
     CONFLICT       (HttpStatus.CONFLICT,              HttpStatus.CONFLICT.getReasonPhrase(),              "이미 존재하는 리소스입니다.");
     ...

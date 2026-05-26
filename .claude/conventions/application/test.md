@@ -4,7 +4,8 @@
 Facade가 Repository·도메인 서비스·도메인 객체를 조합하는 유스케이스 흐름을 단위 테스트로 검증한다. 트랜잭션·영속성 접근이 Facade에 있으므로 Facade는 단위 테스트 대상이다.
 
 ## 정식 참조
-User 리팩터 후 `UserFacadeTest`로 채운다(살아있는 문서). 그 전까지는 아래 규칙이 원천이다.
+`apps/commerce-api/src/test/java/com/loopers/application/user/UserFacadeTest.java`,
+`apps/commerce-api/src/test/java/com/loopers/application/brand/BrandFacadeTest.java`
 
 ## 핵심 규칙
 - 클래스명은 `*FacadeTest`. `@ExtendWith(MockitoExtension.class)` + `@InjectMocks`로 Facade를 구성한다.

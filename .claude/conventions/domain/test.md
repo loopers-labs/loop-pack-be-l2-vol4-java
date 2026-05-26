@@ -4,9 +4,9 @@
 VO·Model·Service의 도메인 단위 테스트 작성 규칙. 외부 의존 없이 도메인 규칙 자체를 검증한다.
 
 ## 정식 참조
-`apps/commerce-api/src/test/java/com/loopers/domain/user/LoginIdTest.java`
-`apps/commerce-api/src/test/java/com/loopers/domain/user/UserModelTest.java`
-`apps/commerce-api/src/test/java/com/loopers/domain/user/UserServiceTest.java`
+`apps/commerce-api/src/test/java/com/loopers/domain/user/LoginIdTest.java`(VO),
+`apps/commerce-api/src/test/java/com/loopers/domain/user/UserModelTest.java`(Model)
+도메인 서비스 테스트(`*ServiceTest`)는 아직 표준 구현이 없다 — 첫 도메인 서비스 작성 후 이 자리에 채운다(`domain/service.md`와 동일한 살아있는 문서). 아래 `OrderPricingService` 발췌는 예시다.
 
 ## 핵심 규칙
 - 클래스명 컨벤션: VO는 `*Test`(예: `LoginIdTest`), Model은 `*ModelTest`, Service는 `*ServiceTest`.

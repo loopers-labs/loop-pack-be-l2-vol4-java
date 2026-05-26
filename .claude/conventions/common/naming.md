@@ -36,7 +36,7 @@
 - boolean 반환: `matches*`, `is*`, `has*` 접두사. 예: `matchesPassword(rawPassword, passwordEncrypter)`.
 - 값 반환: `*Value` 등 명사형 접미사. 예: `maskedValue()`.
 - `authenticate`, `mask` 같은 강한 행위 동사는 표현·인프라 계층(ArgumentResolver 등)의 몫이므로 도메인 모델에서 회피.
-- Repository 조회는 `find*`(없을 수 있어 `Optional` 반환)와 `get*`(존재 보장 — 없으면 `CoreException(NOT_FOUND)`)으로 가른다. 예: `findByLoginId`(Optional) vs `getById`/`getActiveById`(엔티티 또는 NOT_FOUND). 존재 보장이 필요한 Facade는 `get*`을 직접 호출하고 별도 `mustFind*` 헬퍼를 두지 않는다.
+- Repository 조회는 `find*`(없을 수 있어 `Optional` 반환)와 `get*`(존재 보장 — 없으면 `CoreException(NOT_FOUND)`)으로 가른다. 예: `findActiveByLoginId`(Optional) vs `getActiveById`(엔티티 또는 NOT_FOUND). soft delete 도메인은 살아있는 행만 거른다는 의미로 `*Active*`를 이름에 담는다. 존재 보장이 필요한 Facade는 `get*`을 직접 호출하고 별도 `mustFind*` 헬퍼를 두지 않는다.
 
 ### CRUD 메서드 어휘 (Controller·Facade)
 Controller와 Facade의 CRUD 유스케이스 메서드는 `create*`/`read*`/`update*`/`delete*` 동사로 통일한다.
