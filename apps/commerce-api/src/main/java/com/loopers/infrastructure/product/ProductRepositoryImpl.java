@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @Component
@@ -19,7 +20,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Optional<ProductModel> find(Long id) {
+    public Optional<ProductModel> find(UUID id) {
         return productJpaRepository.findById(id);
     }
 
@@ -29,7 +30,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public void delete(Long id) {
+    public void delete(UUID id) {
         productJpaRepository.deleteById(id);
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @Component
@@ -21,7 +22,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
+    public ProductModel getProduct(UUID id) {
         return productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
@@ -32,14 +33,14 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(UUID id, String name, String description, Long price, Integer stock) {
         ProductModel product = getProduct(id);
         product.update(name, description, price, stock);
         return productRepository.save(product);
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
+    public void deleteProduct(UUID id) {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);
     }

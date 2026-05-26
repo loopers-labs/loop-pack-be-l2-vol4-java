@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -31,7 +32,7 @@ public class ProductV1Controller {
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-        @PathVariable(value = "productId") Long productId
+        @PathVariable(value = "productId") UUID productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
@@ -49,7 +50,7 @@ public class ProductV1Controller {
 
     @PutMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
+        @PathVariable(value = "productId") UUID productId,
         @RequestBody ProductV1Dto.UpdateProductRequest request
     ) {
         ProductInfo info = productFacade.updateProduct(
@@ -65,7 +66,7 @@ public class ProductV1Controller {
 
     @DeleteMapping("/{productId}")
     public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
+        @PathVariable(value = "productId") UUID productId
     ) {
         productFacade.deleteProduct(productId);
         return ApiResponse.success(null);

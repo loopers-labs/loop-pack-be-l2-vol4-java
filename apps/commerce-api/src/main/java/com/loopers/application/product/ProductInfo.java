@@ -2,8 +2,10 @@ package com.loopers.application.product;
 
 import com.loopers.domain.product.ProductModel;
 
+import java.util.UUID;
+
 public record ProductInfo(
-    Long id,
+    UUID id,
     String name,
     String description,
     Long price,

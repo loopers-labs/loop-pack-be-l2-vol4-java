@@ -1,14 +1,14 @@
 package com.loopers.domain;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 /**
  * 생성/수정/삭제 정보를 자동으로 관리해준다.
@@ -19,8 +19,8 @@ import java.time.ZonedDateTime;
 public abstract class BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private final Long id = 0L;
+    @Column(columnDefinition = "BINARY(16)", updatable = false, nullable = false)
+    private UUID id;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private ZonedDateTime createdAt;
@@ -30,6 +30,10 @@ public abstract class BaseEntity {
 
     @Column(name = "deleted_at")
     private ZonedDateTime deletedAt;
+
+    protected BaseEntity() {
+        this.id = UuidCreator.getTimeOrderedEpoch();
+    }
 
     /**
      * 엔티티의 유효성을 검증한다.

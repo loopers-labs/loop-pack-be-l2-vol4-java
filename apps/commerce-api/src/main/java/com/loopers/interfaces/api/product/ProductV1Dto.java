@@ -2,6 +2,8 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
 
+import java.util.UUID;
+
 public class ProductV1Dto {
     public record CreateProductRequest(
         String name,
@@ -18,7 +20,7 @@ public class ProductV1Dto {
     ) {}
 
     public record ProductResponse(
-        Long id,
+        UUID id,
         String name,
         String description,
         Long price,

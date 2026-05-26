@@ -9,7 +9,7 @@
 ```mermaid
 classDiagram
     class User {
-        +Long id
+        +UUID id
         +String loginId
         +String password
         +String name
@@ -19,7 +19,7 @@ classDiagram
     }
 
     class Brand {
-        +Long id
+        +UUID id
         +String name
         +String description
         +LocalDateTime deletedAt
@@ -27,7 +27,7 @@ classDiagram
     }
 
     class Product {
-        +Long id
+        +UUID id
         +String name
         +Long price
         +String description
@@ -40,8 +40,8 @@ classDiagram
     }
 
     class Stock {
-        +Long id
-        +Long productId
+        +UUID id
+        +UUID productId
         +int totalQuantity
         +int reservedQuantity
         +availableQuantity() int
@@ -52,14 +52,14 @@ classDiagram
     }
 
     class Like {
-        +Long id
-        +Long userId
-        +Long productId
+        +UUID id
+        +UUID userId
+        +UUID productId
     }
 
     class Order {
-        +Long id
-        +Long userId
+        +UUID id
+        +UUID userId
         +OrderStatus status
         +Long pgAmount
         +List~OrderItem~ items
@@ -70,9 +70,9 @@ classDiagram
     }
 
     class OrderItem {
-        +Long id
-        +Long orderId
-        +Long productId
+        +UUID id
+        +UUID orderId
+        +UUID productId
         +String productName
         +String brandName
         +int quantity
@@ -81,8 +81,8 @@ classDiagram
     }
 
     class Payment {
-        +Long id
-        +Long orderId
+        +UUID id
+        +UUID orderId
         +String pgTransactionId
         +PaymentStatus status
         +Long amount

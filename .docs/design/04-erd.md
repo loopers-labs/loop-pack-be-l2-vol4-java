@@ -26,7 +26,7 @@
 ```mermaid
 erDiagram
     users["회원 (users)"] {
-        bigint id PK "회원 고유 ID | PK"
+        binary(16) id PK "회원 고유 ID | PK"
         varchar login_id UK "로그인 아이디 (영문/숫자 1~10자) | UNIQUE"
         varchar password "암호화된 비밀번호 (BCrypt)"
         varchar name "회원 이름"
@@ -36,7 +36,7 @@ erDiagram
     }
 
     brands["브랜드 (brands)"] {
-        bigint id PK "브랜드 고유 ID | PK"
+        binary(16) id PK "브랜드 고유 ID | PK"
         varchar name UK "브랜드명 | UNIQUE (삭제 후에도 재등록 불가)"
         varchar description "브랜드 설명"
         datetime created_at "등록일시"
@@ -44,8 +44,8 @@ erDiagram
     }
 
     products["상품 (products)"] {
-        bigint id PK "상품 고유 ID | PK"
-        bigint brand_id FK "브랜드 ID | FK → brands.id"
+        binary(16) id PK "상품 고유 ID | PK"
+        binary(16) brand_id FK "브랜드 ID | FK → brands.id"
         varchar name "상품명"
         bigint price "기본 판매가 (원)"
         text description "상품 설명"
@@ -56,23 +56,23 @@ erDiagram
     }
 
     stocks["재고 (stocks)"] {
-        bigint id PK "재고 고유 ID | PK"
-        bigint product_id FK "상품 ID | FK + UNIQUE (상품당 재고 1건)"
+        binary(16) id PK "재고 고유 ID | PK"
+        binary(16) product_id FK "상품 ID | FK + UNIQUE (상품당 재고 1건)"
         int total_quantity "실제 보유 수량 (결제 확정 시 차감)"
         int reserved_quantity "예약 중 수량 (주문 생성 시 증가)"
         datetime updated_at "최종 수정일시"
     }
 
     likes["좋아요 (likes)"] {
-        bigint id PK "좋아요 고유 ID | PK"
-        bigint user_id FK "회원 ID | FK → users.id"
-        bigint product_id FK "상품 ID | FK → products.id, 복합 UNIQUE (user_id, product_id)"
+        binary(16) id PK "좋아요 고유 ID | PK"
+        binary(16) user_id FK "회원 ID | FK → users.id"
+        binary(16) product_id FK "상품 ID | FK → products.id, 복합 UNIQUE (user_id, product_id)"
         datetime created_at "좋아요 등록일시"
     }
 
     orders["주문 (orders)"] {
-        bigint id PK "주문 고유 ID | PK"
-        bigint user_id FK "회원 ID | FK → users.id"
+        binary(16) id PK "주문 고유 ID | PK"
+        binary(16) user_id FK "회원 ID | FK → users.id"
         varchar status "PENDING/CONFIRMED/FAILED/CANCELLED | INDEX (status, created_at)"
         bigint pg_amount "PG 결제 금액 (= 주문 총액, 포인트 제거로 단일 금액)"
         varchar receiver_name "수령인 이름 | 주문 시점 스냅샷"
@@ -84,9 +84,9 @@ erDiagram
     }
 
     order_items["주문 상품 (order_items)"] {
-        bigint id PK "주문 상품 고유 ID | PK"
-        bigint order_id FK "주문 ID | FK → orders.id"
-        bigint product_id FK "상품 ID | FK → products.id"
+        binary(16) id PK "주문 상품 고유 ID | PK"
+        binary(16) order_id FK "주문 ID | FK → orders.id"
+        binary(16) product_id FK "상품 ID | FK → products.id"
         varchar product_name "상품명 | 주문 시점 스냅샷"
         varchar brand_name "브랜드명 | 주문 시점 스냅샷"
         int quantity "주문 수량"
@@ -94,8 +94,8 @@ erDiagram
     }
 
     payments["결제 (payments)"] {
-        bigint id PK "결제 고유 ID | PK"
-        bigint order_id FK "주문 ID | FK + UNIQUE (주문당 1건)"
+        binary(16) id PK "결제 고유 ID | PK"
+        binary(16) order_id FK "주문 ID | FK + UNIQUE (주문당 1건)"
         varchar pg_transaction_id UK "PG 트랜잭션 ID | UNIQUE"
         varchar status "결제 상태 (SUCCESS/FAILED)"
         bigint amount "결제 금액"
