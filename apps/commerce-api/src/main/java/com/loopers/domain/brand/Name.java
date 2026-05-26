@@ -7,7 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
 @Embeddable
-public record BrandName(
+public record Name(
     @Column(name = "name", nullable = false, length = 50)
     String value
 ) {
@@ -15,7 +15,7 @@ public record BrandName(
     private static final int MIN_LENGTH = 1;
     private static final int MAX_LENGTH = 50;
 
-    public static BrandName from(String value) {
+    public static Name from(String value) {
         if (value == null || value.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 이름은 필수입니다.");
         }
@@ -24,6 +24,6 @@ public record BrandName(
             throw new CoreException(ErrorType.BAD_REQUEST, String.format("브랜드 이름은 %d~%d자만 허용됩니다.", MIN_LENGTH, MAX_LENGTH));
         }
 
-        return new BrandName(value);
+        return new Name(value);
     }
 }

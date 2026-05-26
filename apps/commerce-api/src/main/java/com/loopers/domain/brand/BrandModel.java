@@ -20,19 +20,19 @@ import lombok.NoArgsConstructor;
 public class BrandModel extends BaseEntity {
 
     @Embedded
-    private BrandName name;
+    private Name name;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Builder
     private BrandModel(String rawName, String rawDescription) {
-        this.name = BrandName.from(rawName);
+        this.name = Name.from(rawName);
         this.description = rawDescription;
     }
 
     public void update(String rawName, String rawDescription) {
-        this.name = BrandName.from(rawName);
+        this.name = Name.from(rawName);
         this.description = rawDescription;
     }
 }

@@ -13,36 +13,36 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
-class BrandNameTest {
+class NameTest {
 
-    @DisplayName("BrandName을 생성할 때,")
+    @DisplayName("Name을 생성할 때,")
     @Nested
     class Create {
 
-        @DisplayName("1자면 입력값을 그대로 보존한 BrandName이 생성된다.")
+        @DisplayName("1자면 입력값을 그대로 보존한 Name이 생성된다.")
         @Test
-        void createsBrandName_whenValueIsMinLength() {
+        void createsName_whenValueIsMinLength() {
             // arrange
             String value = "나";
 
             // act
-            BrandName brandName = BrandName.from(value);
+            Name name = Name.from(value);
 
             // assert
-            assertThat(brandName.value()).isEqualTo(value);
+            assertThat(name.value()).isEqualTo(value);
         }
 
-        @DisplayName("50자면 입력값을 그대로 보존한 BrandName이 생성된다.")
+        @DisplayName("50자면 입력값을 그대로 보존한 Name이 생성된다.")
         @Test
-        void createsBrandName_whenValueIsMaxLength() {
+        void createsName_whenValueIsMaxLength() {
             // arrange
             String value = "가".repeat(50);
 
             // act
-            BrandName brandName = BrandName.from(value);
+            Name name = Name.from(value);
 
             // assert
-            assertThat(brandName.value()).isEqualTo(value);
+            assertThat(name.value()).isEqualTo(value);
         }
 
         @DisplayName("50자를 초과하면 BAD_REQUEST 예외가 발생한다.")
@@ -52,7 +52,7 @@ class BrandNameTest {
             String value = "가".repeat(51);
 
             // act & assert
-            assertThatThrownBy(() -> BrandName.from(value))
+            assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -64,7 +64,7 @@ class BrandNameTest {
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenValueIsNullOrBlank(String value) {
             // arrange & act & assert
-            assertThatThrownBy(() -> BrandName.from(value))
+            assertThatThrownBy(() -> Name.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
