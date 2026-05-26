@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -61,6 +62,13 @@ public class ProductService {
         Product product = getProduct(id);
         product.delete();
         productRepository.save(product);
+    }
+
+    @Transactional
+    public void deductStock(Long productId, long quantity) {
+        ProductStock stock = productStockRepository.findByProductIdForUpdate(productId);
+        stock.deduct(quantity);
+        productStockRepository.save(stock);
     }
 
     public void incrementLikeCount(Long productId) {

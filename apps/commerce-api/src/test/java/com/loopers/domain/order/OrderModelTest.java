@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+
 class OrderModelTest {
 
     @DisplayName("주문을 생성할 때,")
@@ -95,70 +96,32 @@ class OrderModelTest {
     @Nested
     class CreateOrderItem {
 
-        @DisplayName("유효한 정보를 주면, 정상적으로 생성된다.")
+        @DisplayName("유효한 정보를 주면, orderId 없이 정상적으로 생성된다.")
         @Test
-        void createsOrderItem_whenValidInfoIsProvided() {
-            OrderItem item = new OrderItem(1L, 10L, "청바지", BigDecimal.valueOf(50000), 3);
+        void createsOrderItem_withoutOrderId_whenValidInfoIsProvided() {
+            OrderItem item = new OrderItem(10L, "청바지", BigDecimal.valueOf(50000), 3);
 
             assertAll(
+                () -> assertThat(item.getOrderId()).isNull(),
                 () -> assertThat(item.getProductName()).isEqualTo("청바지"),
                 () -> assertThat(item.getProductPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000)),
                 () -> assertThat(item.getQuantity()).isEqualTo(3)
             );
         }
 
-        @DisplayName("주문 ID가 null이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("withOrderId()를 호출하면, orderId가 설정된 새 OrderItem이 반환된다.")
         @Test
-        void throwsBadRequest_whenOrderIdIsNull() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(null, 10L, "청바지", BigDecimal.valueOf(50000), 1));
+        void returnsNewOrderItemWithOrderId_whenWithOrderIdIsCalled() {
+            OrderItem item = new OrderItem(10L, "청바지", BigDecimal.valueOf(50000), 3);
 
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
+            OrderItem itemWithOrderId = item.withOrderId(1L);
 
-        @DisplayName("상품 ID가 null이면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenProductIdIsNull() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(1L, null, "청바지", BigDecimal.valueOf(50000), 1));
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("상품명이 비어있으면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenProductNameIsBlank() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(1L, 10L, "  ", BigDecimal.valueOf(50000), 1));
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("상품 가격이 음수이면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenProductPriceIsNegative() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(1L, 10L, "청바지", BigDecimal.valueOf(-1), 1));
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("수량이 0이면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenQuantityIsZero() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(1L, 10L, "청바지", BigDecimal.valueOf(50000), 0));
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("수량이 음수이면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenQuantityIsNegative() {
-            CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItem(1L, 10L, "청바지", BigDecimal.valueOf(50000), -1));
-
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            assertAll(
+                () -> assertThat(itemWithOrderId.getOrderId()).isEqualTo(1L),
+                () -> assertThat(itemWithOrderId.getProductName()).isEqualTo("청바지"),
+                () -> assertThat(itemWithOrderId.getProductPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000)),
+                () -> assertThat(itemWithOrderId.getQuantity()).isEqualTo(3)
+            );
         }
     }
 }

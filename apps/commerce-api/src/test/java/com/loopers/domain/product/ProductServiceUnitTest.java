@@ -99,6 +99,14 @@ class ProductServiceUnitTest {
         public Optional<ProductStock> findByProductId(Long productId) {
             return Optional.ofNullable(store.get(productId));
         }
+
+        @Override
+        public ProductStock findByProductIdForUpdate(Long productId) {
+            if (!store.containsKey(productId)) {
+                throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다.");
+            }
+            return store.get(productId);
+        }
     }
 
     @DisplayName("상품을 단건 조회할 때,")
