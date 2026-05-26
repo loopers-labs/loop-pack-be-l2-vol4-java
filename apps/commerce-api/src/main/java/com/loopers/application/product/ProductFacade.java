@@ -45,7 +45,6 @@ public class ProductFacade {
     }
 
     public void deleteProduct(Long productId) {
-        productRepository.findActiveById(productId)
-            .ifPresent(ProductModel::delete);
+        productRepository.findActiveById(productId).ifPresent(ProductModel::delete);
     }
 }

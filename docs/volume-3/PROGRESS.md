@@ -2,7 +2,7 @@
 
 소스: `docs/volume-2/` (01-requirements · 02-sequence-diagrams · 03-class-diagram · 04-erd)
 출력: `docs/volume-3/`
-현재: PRD-5 commit 완료 → 다음 PRD-6(상품 수정) 대기. (이번 cycle에 BrandName→Name VO 네이밍 통일 동반)
+현재: PRD-6·PRD-7·BRD-6 3개 cycle 완료 → 다음 LIK-1(좋아요 등록) 대기.
 
 총 22개 cycle. User 도메인은 volume-1에서 완료된 정식 참조 구현이라 대상에서 제외.
 
@@ -14,9 +14,9 @@
 | 4 | BRD-2 | 브랜드 목록(admin) | Brand | BRD-4 | commit | ✅ done |
 | 5 | BRD-3 | 브랜드 상세(admin) | Brand | BRD-4 | commit | ✅ done |
 | 6 | PRD-5 | 상품 등록 | Product | Brand | commit | ✅ done |
-| 7 | PRD-6 | 상품 수정 | Product | PRD-5 | - | ⬜ todo |
-| 8 | PRD-7 | 상품 삭제 | Product | PRD-5 | - | ⬜ todo |
-| 9 | BRD-6 | 브랜드 삭제(+상품 cascade) | Brand | Product(soft delete) | - | ⬜ todo |
+| 7 | PRD-6 | 상품 수정 | Product | PRD-5 | commit | ✅ done |
+| 8 | PRD-7 | 상품 삭제 | Product | PRD-5 | commit | ✅ done |
+| 9 | BRD-6 | 브랜드 삭제(+상품 cascade) | Brand | Product(soft delete) | commit | ✅ done |
 | 10 | LIK-1 | 좋아요 등록 | Like | Product, User | - | ⬜ todo |
 | 11 | LIK-2 | 좋아요 취소 | Like | Product, User | - | ⬜ todo |
 | 12 | PRD-1 | 상품 목록(public, 좋아요 수) | Product | Like(집계) | - | ⬜ todo |
