@@ -44,13 +44,13 @@ public class UserFacade {
 
     @Transactional(readOnly = true)
     public UserMyInfo readMyInfo(Long userId) {
-        UserModel user = userRepository.getById(userId);
+        UserModel user = userRepository.getActiveById(userId);
 
         return UserMyInfo.from(user);
     }
 
     public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
-        UserModel user = userRepository.getById(userId);
+        UserModel user = userRepository.getActiveById(userId);
         user.changePassword(currentRawPassword, newRawPassword, passwordEncrypter);
     }
 }
