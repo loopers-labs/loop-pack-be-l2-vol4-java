@@ -59,7 +59,6 @@ erDiagram
     varchar product_name
     int product_price
     int quantity
-    decimal subtotal_price
   }
 
   OUTBOX_EVENT {
