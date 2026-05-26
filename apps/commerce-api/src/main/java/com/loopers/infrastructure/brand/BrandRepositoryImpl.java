@@ -33,6 +33,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
+    public boolean existsActiveById(Long id) {
+        return brandJpaRepository.existsByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
     public BrandModel getActiveById(Long id) {
         return brandJpaRepository.findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드가 존재하지 않습니다."));
