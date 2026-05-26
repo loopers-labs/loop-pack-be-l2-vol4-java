@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.shared.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +16,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public Product createProduct(String name, String description, Long price, Integer stock) {
-        Product product = new Product(name, description, price, stock);
+    public Product createProduct(String name, String description, Money price, Integer stock, Long brandId) {
+        Product product = Product.create(name, description, price, stock, brandId);
         return productRepository.save(product);
     }
 
@@ -27,12 +28,17 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<Product> getAllProducts() {
-        return productRepository.findAll();
+    public List<Product> getProducts(Long brandId, ProductSortType sort, int page, int size) {
+        return productRepository.findAll(brandId, sort, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> getProductsByIds(List<Long> ids) {
+        return productRepository.findAllByIds(ids);
     }
 
     @Transactional
-    public Product updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public Product updateProduct(Long id, String name, String description, Money price, Integer stock) {
         Product product = getProduct(id);
         product.update(name, description, price, stock);
         return productRepository.save(product);
@@ -42,5 +48,10 @@ public class ProductService {
     public void deleteProduct(Long id) {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);
+    }
+
+    @Transactional
+    public void deleteProductsByBrand(Long brandId) {
+        productRepository.deleteByBrandId(brandId);
     }
 }

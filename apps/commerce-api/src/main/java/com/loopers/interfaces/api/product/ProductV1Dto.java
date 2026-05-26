@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductInfo;
 
 public class ProductV1Dto {
@@ -7,7 +8,8 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId
     ) {}
 
     public record UpdateProductRequest(
@@ -22,7 +24,8 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
@@ -30,7 +33,32 @@ public class ProductV1Dto {
                 info.name(),
                 info.description(),
                 info.price(),
-                info.stock()
+                info.stock(),
+                info.brandId()
+            );
+        }
+    }
+
+    public record ProductDetailResponse(
+        Long id,
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Long brandId,
+        String brandName,
+        long likeCount
+    ) {
+        public static ProductDetailResponse from(ProductDetailInfo info) {
+            return new ProductDetailResponse(
+                info.id(),
+                info.name(),
+                info.description(),
+                info.price(),
+                info.stock(),
+                info.brandId(),
+                info.brandName(),
+                info.likeCount()
             );
         }
     }
