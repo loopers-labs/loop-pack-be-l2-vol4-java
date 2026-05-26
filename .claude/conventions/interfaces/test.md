@@ -4,7 +4,8 @@
 실제 서버를 띄워 HTTP 요청·응답 전체 흐름을 검증하는 E2E 테스트. 컨트랙트(응답 구조·상태 코드·에러 코드)와 DB 상태 변화를 함께 확인한다.
 
 ## 정식 참조
-`apps/commerce-api/src/test/java/com/loopers/interfaces/api/UserV1ApiE2ETest.java`
+`apps/commerce-api/src/test/java/com/loopers/interfaces/api/UserV1ApiE2ETest.java`,
+`apps/commerce-api/src/test/java/com/loopers/interfaces/api/BrandAdminV1ApiE2ETest.java`(관리자 인증·페이징)
 
 ## 핵심 규칙
 
@@ -17,7 +18,8 @@
 호출 방식(`exchange` + `ParameterizedTypeReference`, `postForEntity` 금지), 요청 본문 typed record(`Map` 금지), 응답 본문(키 집합은 `Map` + `containsOnlyKeys`, 값 검증은 typed record), 픽스처(build+save를 묶어 `*JpaRepository.save` 직접 호출, `findById(saved.getId())`로 검증), ASCII 헤더, 단언 스타일·`@DisplayName`은 `common/testing.md`를 따른다. 아래는 E2E 레이어 고유 규칙만 정리한다.
 
 ### 인증 헤더
-- 인증이 필요한 호출은 `X-Loopers-LoginId`·`X-Loopers-LoginPw` 헤더를 헬퍼(예: `authJsonRequest(loginId, password, body)`)로 붙인다. 본문이 없는 GET은 헤더만 붙이는 변형(`authHeaders(loginId, password)`)을 쓴다. 값은 ASCII 한정.
+- 사용자 인증이 필요한 호출은 `X-Loopers-LoginId`·`X-Loopers-LoginPw` 헤더를 헬퍼(예: `authJsonRequest(loginId, password, body)`)로 붙인다. 본문이 없는 GET은 헤더만 붙이는 변형(`authHeaders(loginId, password)`)을 쓴다. 값은 ASCII 한정.
+- 관리자 API(`/api-admin/**`) 호출은 `X-Loopers-Ldap: loopers.admin` 헤더를 헬퍼로 붙인다(`LDAP_HEADER`/`ADMIN_LDAP` 상수). 헤더 누락·불일치로 403(`FORBIDDEN`)을 단언하는 케이스(`returnsForbidden_whenAdminHeaderIsMissing`)를 엔드포인트마다 함께 둔다.
 
 ### 테스트 구조
 - API 엔드포인트별로 `@Nested` 클래스로 그룹화한다.
@@ -72,7 +74,7 @@ class UserV1ApiE2ETest {
 
 ## do / don't
 - ✅ `@SpringBootTest(RANDOM_PORT)` + `TestRestTemplate`, `@AfterEach`에서 `truncateAllTables()`로 격리.
-- ✅ 인증 호출은 `X-Loopers-LoginId`·`X-Loopers-LoginPw` 헤더 헬퍼로(값 ASCII).
+- ✅ 사용자 인증 호출은 `X-Loopers-LoginId`·`X-Loopers-LoginPw`, 관리자 호출은 `X-Loopers-Ldap` 헤더 헬퍼로(값 ASCII). 관리자 헤더 누락 시 403 단언을 둔다.
 - ✅ 엔드포인트별 `@Nested` 그룹화, 반복 케이스는 `@ParameterizedTest` + `@MethodSource`.
 - ✅ 에러 단언은 statusCode + meta.result까지. 메시지 문구는 단언하지 않는다(보안 부재 단언 `doesNotContain`만 예외).
 - ✅ 실패 케이스는 DB 부작용 부재도 함께 단언한다.

@@ -26,7 +26,7 @@
 | infrastructure | [infrastructure/repositoryImpl.md](infrastructure/repositoryImpl.md) | `RepositoryImpl`+`JpaRepository`(위임·VO 파생쿼리)·port 어댑터 | `*RepositoryImpl`·`*JpaRepository` |
 | infrastructure | [infrastructure/test.md](infrastructure/test.md) | 통합 테스트(Testcontainers·`@Transactional` 미사용) | `*RepositoryIntegrationTest` |
 | interfaces | [interfaces/controller.md](interfaces/controller.md) | `@RestController`(ApiResponse 래핑·`@LoginUser`) | `*V1Controller` |
-| interfaces | [interfaces/dto.md](interfaces/dto.md) | `V1Dto` 중첩 record(Request/Response, Bean Validation 미도입) | `*V1Dto` |
+| interfaces | [interfaces/dto.md](interfaces/dto.md) | `V1Dto` 중첩 record(Request/Response, Request는 null/blank Bean Validation 1차 방어) | `*V1Dto` |
 | interfaces | [interfaces/apiSpec.md](interfaces/apiSpec.md) | SpringDoc 문서화 인터페이스 | `*V1ApiSpec` |
 | interfaces | [interfaces/test.md](interfaces/test.md) | E2E 테스트(TestRestTemplate·컨트랙트 단언) | `*V1ApiE2ETest` |
 | support | [support/exception.md](support/exception.md) | `CoreException`+`ErrorType`·`ApiControllerAdvice` 매핑 | 예외·에러 응답 |
