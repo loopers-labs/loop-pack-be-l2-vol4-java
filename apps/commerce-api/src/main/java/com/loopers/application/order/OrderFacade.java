@@ -11,9 +11,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,29 +26,51 @@ public class OrderFacade {
     private final StockService stockService;
     private final OrderService orderService;
 
-    @Transactional
     public OrderInfo placeOrder(Long userId, List<OrderLineCommand> lines) {
+        validateInput(lines);
+        userService.getById(userId);
+        Map<Long, ProductModel> productMap = loadProducts(lines);
+
+        List<OrderItem> items = lines.stream()
+            .map(line -> {
+                ProductModel product = productMap.get(line.productId());
+                return new OrderItem(product.getId(), product.getName(), product.getPrice(), line.quantity());
+            })
+            .toList();
+
+        OrderModel created = orderService.placeInitial(userId, items);
+
+        try {
+            stockService.decreaseAll(aggregateQuantities(lines));
+            OrderModel succeeded = orderService.markSucceeded(created.getId());
+            return OrderInfo.from(succeeded);
+        } catch (CoreException e) {
+            orderService.markFailed(created.getId(),
+                e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage());
+            throw e;
+        }
+    }
+
+    private void validateInput(List<OrderLineCommand> lines) {
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
-        userService.getById(userId);
+    }
 
+    private Map<Long, ProductModel> loadProducts(List<OrderLineCommand> lines) {
         List<Long> productIds = lines.stream().map(OrderLineCommand::productId).distinct().toList();
         List<ProductModel> products = productService.getAllByIds(productIds);
         if (products.size() != productIds.size()) {
             throw new CoreException(ErrorType.NOT_FOUND, "주문하려는 상품이 존재하지 않습니다.");
         }
-        Map<Long, ProductModel> productMap = products.stream()
-            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+        return products.stream().collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+    }
 
-        List<OrderItem> items = new ArrayList<>();
-        for (OrderLineCommand line : lines) {
-            ProductModel product = productMap.get(line.productId());
-            stockService.decrease(line.productId(), line.quantity());
-            items.add(new OrderItem(product.getId(), product.getName(), product.getPrice(), line.quantity()));
-        }
-
-        OrderModel saved = orderService.place(userId, items);
-        return OrderInfo.from(saved);
+    private Map<Long, Integer> aggregateQuantities(List<OrderLineCommand> lines) {
+        return lines.stream().collect(Collectors.toMap(
+            OrderLineCommand::productId,
+            OrderLineCommand::quantity,
+            Integer::sum
+        ));
     }
 }

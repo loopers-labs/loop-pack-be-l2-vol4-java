@@ -31,6 +31,9 @@ public class OrderModel extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
+    @Column(name = "failure_reason")
+    private String failureReason;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<OrderItem> items = new ArrayList<>();
 
@@ -54,5 +57,23 @@ public class OrderModel extends BaseEntity {
 
     public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
+    }
+
+    public void markSucceeded() {
+        ensureCreated("SUCCEEDED");
+        this.status = OrderStatus.SUCCEEDED;
+    }
+
+    public void markFailed(String reason) {
+        ensureCreated("FAILED");
+        this.status = OrderStatus.FAILED;
+        this.failureReason = reason;
+    }
+
+    private void ensureCreated(String target) {
+        if (this.status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.CONFLICT,
+                "[status = " + this.status + "] CREATED 상태에서만 " + target + "로 전이할 수 있습니다.");
+        }
     }
 }

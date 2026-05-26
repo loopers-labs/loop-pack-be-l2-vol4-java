@@ -18,9 +18,14 @@ public class StockService {
 
     @Transactional
     public void decrease(Long productId, int amount) {
-        StockModel stock = stockRepository.findByProductId(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
-        stock.decrease(amount);
+        doDecrease(productId, amount);
+    }
+
+    @Transactional
+    public void decreaseAll(Map<Long, Integer> quantitiesByProductId) {
+        quantitiesByProductId.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> doDecrease(entry.getKey(), entry.getValue()));
     }
 
     @Transactional
@@ -46,5 +51,11 @@ public class StockService {
             result.put(stock.getProductId(), stock.getQuantity());
         }
         return result;
+    }
+
+    private void doDecrease(Long productId, int amount) {
+        StockModel stock = stockRepository.findByProductId(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
+        stock.decrease(amount);
     }
 }

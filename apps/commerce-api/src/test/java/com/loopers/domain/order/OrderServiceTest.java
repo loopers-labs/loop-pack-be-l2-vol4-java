@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -27,49 +28,95 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    @DisplayName("주문 생성 시 Repository가 저장한 주문을 그대로 반환한다")
+    @DisplayName("placeInitial 시 Repository가 저장한 주문(CREATED)을 그대로 반환한다")
     @Test
-    void place_returnsSavedOrder() {
-        // given
+    void placeInitial_returnsSavedOrder() {
         List<OrderItem> items = List.of(new OrderItem(1L, "후드", 10_000L, 2));
-        when(orderRepository.save(any(OrderModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        // when
-        OrderModel result = orderService.place(1L, items);
+        OrderModel result = orderService.placeInitial(1L, items);
 
-        // then
-        assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED);
-        assertThat(result.getTotalAmount()).isEqualTo(20_000L);
+        assertAll(
+            () -> assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED),
+            () -> assertThat(result.getTotalAmount()).isEqualTo(20_000L)
+        );
     }
 
-    @DisplayName("ID로 조회 시")
+    @DisplayName("markSucceeded 시")
+    @Nested
+    class MarkSucceeded {
+
+        @DisplayName("존재하는 CREATED 주문이면 status를 SUCCEEDED로 전이한다")
+        @Test
+        void transitionsToSucceeded() {
+            OrderModel order = new OrderModel(1L, List.of(new OrderItem(1L, "후드", 10_000L, 1)));
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            orderService.markSucceeded(1L);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.SUCCEEDED);
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenMissing() {
+            when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+            CoreException ex = assertThrows(CoreException.class, () -> orderService.markSucceeded(999L));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("markFailed 시")
+    @Nested
+    class MarkFailed {
+
+        @DisplayName("존재하는 CREATED 주문이면 status를 FAILED로 전이하고 사유를 기록한다")
+        @Test
+        void transitionsToFailedWithReason() {
+            OrderModel order = new OrderModel(1L, List.of(new OrderItem(1L, "후드", 10_000L, 1)));
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            orderService.markFailed(1L, "재고가 부족합니다.");
+
+            assertAll(
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED),
+                () -> assertThat(order.getFailureReason()).isEqualTo("재고가 부족합니다.")
+            );
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenMissing() {
+            when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+            CoreException ex = assertThrows(CoreException.class, () -> orderService.markFailed(999L, "x"));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("getById 시")
     @Nested
     class GetById {
 
         @DisplayName("존재하는 주문이면 그대로 반환한다")
         @Test
         void returnsOrder_whenIdExists() {
-            // given
             OrderModel order = new OrderModel(1L, List.of(new OrderItem(1L, "후드", 10_000L, 1)));
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
-            // when
-            OrderModel result = orderService.getById(1L);
-
-            // then
-            assertThat(result).isSameAs(order);
+            assertThat(orderService.getById(1L)).isSameAs(order);
         }
 
         @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다")
         @Test
         void throwsNotFound_whenIdDoesNotExist() {
-            // given
             when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-            // when
             CoreException ex = assertThrows(CoreException.class, () -> orderService.getById(999L));
 
-            // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
