@@ -1,13 +1,8 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -15,10 +10,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 
+/**
+ * LikeService 통합 — like row 영속/멱등성만 검증.
+ * <p>상품 likeCount 갱신은 Facade 합성 책임이므로 {@code LikeFacadeIntegrationTest}에서 검증한다.
+ * (FK 제약 미사용 — 명세 D12 — 이라 product setup 없이 임의 productId 사용 가능.)</p>
+ */
 @SpringBootTest
 class LikeServiceIntegrationTest {
+
+    private static final Long USER_ID = 1L;
+    private static final Long PRODUCT_ID = 100L;
 
     @Autowired
     private LikeService likeService;
@@ -27,24 +29,7 @@ class LikeServiceIntegrationTest {
     private LikeJpaRepository likeJpaRepository;
 
     @Autowired
-    private BrandRepository brandRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
     private DatabaseCleanUp databaseCleanUp;
-
-    private Long userId;
-    private Long productId;
-
-    @BeforeEach
-    void setUp() {
-        userId = 1L;
-        BrandModel brand = brandRepository.save(new BrandModel("Loopers", "감성 라이프스타일 브랜드"));
-        ProductModel product = productRepository.save(new ProductModel(brand, "후드", "포근함", 49_000L));
-        productId = product.getId();
-    }
 
     @AfterEach
     void tearDown() {
@@ -55,35 +40,29 @@ class LikeServiceIntegrationTest {
     @Nested
     class Like {
 
-        @DisplayName("정상 등록되면 product_like 행이 추가되고 product.likeCount는 1 증가한다")
+        @DisplayName("새 좋아요면 product_like 행이 추가되고 true를 반환한다")
         @Test
-        void persistsLikeAndIncrementsCounter() {
+        void persistsRow_whenNotLikedYet() {
             // when
-            likeService.like(userId, productId);
+            boolean created = likeService.like(USER_ID, PRODUCT_ID);
 
             // then
-            ProductModel product = productRepository.findById(productId).orElseThrow();
-            assertAll(
-                () -> assertThat(likeJpaRepository.existsByUserIdAndProductId(userId, productId)).isTrue(),
-                () -> assertThat(product.getLikeCount()).isEqualTo(1)
-            );
+            assertThat(created).isTrue();
+            assertThat(likeJpaRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).isTrue();
         }
 
-        @DisplayName("이미 좋아요한 상태에서 다시 등록해도 멱등으로 likeCount는 그대로 1이다")
+        @DisplayName("이미 좋아요한 상태에서 다시 등록해도 멱등으로 row가 1개로 유지되고 false를 반환한다")
         @Test
         void isIdempotent_whenAlreadyLiked() {
             // given
-            likeService.like(userId, productId);
+            likeService.like(USER_ID, PRODUCT_ID);
 
             // when
-            likeService.like(userId, productId);
+            boolean created = likeService.like(USER_ID, PRODUCT_ID);
 
             // then
-            ProductModel product = productRepository.findById(productId).orElseThrow();
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isEqualTo(1),
-                () -> assertThat(product.getLikeCount()).isEqualTo(1)
-            );
+            assertThat(created).isFalse();
+            assertThat(likeJpaRepository.count()).isEqualTo(1);
         }
     }
 
@@ -91,32 +70,28 @@ class LikeServiceIntegrationTest {
     @Nested
     class Unlike {
 
-        @DisplayName("실제로 삭제되면 product_like 행이 사라지고 likeCount가 1 감소한다")
+        @DisplayName("실제로 삭제되면 row가 사라지고 true를 반환한다")
         @Test
-        void deletesLikeAndDecrementsCounter() {
+        void deletesRow_whenLiked() {
             // given
-            likeService.like(userId, productId);
+            likeService.like(USER_ID, PRODUCT_ID);
 
             // when
-            likeService.unlike(userId, productId);
+            boolean deleted = likeService.unlike(USER_ID, PRODUCT_ID);
 
             // then
-            ProductModel product = productRepository.findById(productId).orElseThrow();
-            assertAll(
-                () -> assertThat(likeJpaRepository.existsByUserIdAndProductId(userId, productId)).isFalse(),
-                () -> assertThat(product.getLikeCount()).isZero()
-            );
+            assertThat(deleted).isTrue();
+            assertThat(likeJpaRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).isFalse();
         }
 
-        @DisplayName("좋아요하지 않은 상품을 취소해도 멱등으로 likeCount는 0으로 유지된다")
+        @DisplayName("좋아요하지 않은 상품을 취소해도 멱등으로 false를 반환한다")
         @Test
         void isIdempotent_whenNothingToUnlike() {
             // when
-            likeService.unlike(userId, productId);
+            boolean deleted = likeService.unlike(USER_ID, PRODUCT_ID);
 
             // then
-            ProductModel product = productRepository.findById(productId).orElseThrow();
-            assertThat(product.getLikeCount()).isZero();
+            assertThat(deleted).isFalse();
         }
     }
 }

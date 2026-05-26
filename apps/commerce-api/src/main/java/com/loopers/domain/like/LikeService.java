@@ -1,6 +1,5 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,23 +9,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class LikeService {
 
     private final LikeRepository likeRepository;
-    private final ProductService productService;
 
     @Transactional
-    public void like(Long userId, Long productId) {
-        productService.getById(productId);
+    public boolean like(Long userId, Long productId) {
         if (likeRepository.existsByUserIdAndProductId(userId, productId)) {
-            return;
+            return false;
         }
         likeRepository.save(new LikeModel(userId, productId));
-        productService.incrementLikeCount(productId);
+        return true;
     }
 
     @Transactional
-    public void unlike(Long userId, Long productId) {
-        int deleted = likeRepository.deleteByUserIdAndProductId(userId, productId);
-        if (deleted > 0) {
-            productService.decrementLikeCount(productId);
-        }
+    public boolean unlike(Long userId, Long productId) {
+        return likeRepository.deleteByUserIdAndProductId(userId, productId) > 0;
     }
 }
