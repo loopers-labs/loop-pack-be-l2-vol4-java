@@ -21,7 +21,7 @@ erDiagram
         bigint id PK
         bigint brand_id FK
         varchar name
-        decimal price
+        decimal_15_4 price
         int like_count "반정규화 컬럼"
         boolean is_deleted "논리 삭제 플래그"
         datetime created_at
@@ -55,7 +55,7 @@ erDiagram
         bigint order_id FK
         bigint product_id "원본 상품 ID (단순 참조용)"
         varchar snapshot_name "주문 당시 상품명"
-        decimal snapshot_price "주문 당시 가격"
+        decimal_15_4 snapshot_price "주문 당시 가격"
         varchar snapshot_brand_name "주문 당시 브랜드명"
         int quantity
     }
