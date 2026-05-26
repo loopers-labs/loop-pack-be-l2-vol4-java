@@ -1,0 +1,5 @@
+### 브랜드 조회 (public) - 정상 (200 OK)
+GET http://localhost:8080/api/v1/brands/1
+
+### 브랜드 조회 (public) - 존재하지 않음 (404 Not Found)
+GET http://localhost:8080/api/v1/brands/99999

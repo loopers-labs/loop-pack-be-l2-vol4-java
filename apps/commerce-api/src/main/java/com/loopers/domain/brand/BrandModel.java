@@ -30,4 +30,9 @@ public class BrandModel extends BaseEntity {
         this.name = BrandName.from(rawName);
         this.description = rawDescription;
     }
+
+    public void update(String rawName, String rawDescription) {
+        this.name = BrandName.from(rawName);
+        this.description = rawDescription;
+    }
 }
