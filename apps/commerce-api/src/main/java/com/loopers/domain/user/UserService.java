@@ -1,10 +1,10 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.vo.PlainPassword;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordHasher;
 
     @Transactional
     public UserModel signUp(UserModel user) {
-        user.encodePassword(passwordEncoder);
+        user.encodePassword(passwordHasher);
         try {
             return userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
@@ -29,7 +29,7 @@ public class UserService {
     public UserModel getUser(String loginId, String rawPassword) {
         UserModel user = findUserOrThrow(loginId);
 
-        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+        if (!passwordHasher.matches(rawPassword, user.getPassword())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "비밀번호가 일치하지 않습니다.");
         }
 
@@ -46,14 +46,14 @@ public class UserService {
     public void updatePassword(String loginId, String oldRawPassword, String newRawPassword) {
         UserModel user = findUserOrThrow(loginId);
 
-        if (!passwordEncoder.matches(oldRawPassword, user.getPassword())) {
+        if (!passwordHasher.matches(oldRawPassword, user.getPassword())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
         }
-        if (passwordEncoder.matches(newRawPassword, user.getPassword())) {
+        if (passwordHasher.matches(newRawPassword, user.getPassword())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다르게 설정해야 합니다.");
         }
-        UserModel.validatePassword(newRawPassword, user.getBirthDate());
-        user.updatePassword(passwordEncoder.encode(newRawPassword));
+        new PlainPassword(newRawPassword, user.getBirthDate());
+        user.updatePassword(passwordHasher.hash(newRawPassword));
     }
 
     private UserModel findUserOrThrow(String loginId) {
