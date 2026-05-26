@@ -22,12 +22,11 @@ public class UserFacade {
         return UserInfo.from(user);
     }
 
-    public UserInfo getUser(UserCommand.GetUser command) {
-        return UserInfo.fromWithMaskedName(userService.getUser(command.loginId(), command.loginPassword()));
+    public UserInfo getUser(User user) {
+        return UserInfo.fromWithMaskedName(user);
     }
 
-    public void changePassword(UserCommand.ChangePassword command) {
-        User user = userService.getUser(command.loginId(), command.loginPassword());
+    public void changePassword(User user, UserCommand.ChangePassword command) {
         userService.changePassword(user, command.currentPassword(), command.newPassword());
     }
 }

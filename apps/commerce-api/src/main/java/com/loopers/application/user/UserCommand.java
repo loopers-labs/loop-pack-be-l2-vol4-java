@@ -12,14 +12,7 @@ public class UserCommand {
             String email
     ) {}
 
-    public record GetUser(
-            String loginId,
-            String loginPassword
-    ) {}
-
     public record ChangePassword(
-            String loginId,
-            String loginPassword,
             String currentPassword,
             String newPassword
     ) {}

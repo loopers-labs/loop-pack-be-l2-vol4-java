@@ -1,6 +1,9 @@
 package com.loopers.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.user.User;
+import com.loopers.domain.user.UserService;
+import com.loopers.support.error.CoreException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,8 +24,10 @@ public class UserAuthFilter extends OncePerRequestFilter {
 
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
+    static final String AUTHENTICATED_USER_ATTR = "authenticatedUser";
 
     private final ObjectMapper objectMapper;
+    private final UserService userService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -32,6 +37,14 @@ public class UserAuthFilter extends OncePerRequestFilter {
         String loginPw = request.getHeader(HEADER_LOGIN_PW);
 
         if (StringUtils.isBlank(loginId) || StringUtils.isBlank(loginPw)) {
+            writeUnauthorized(response);
+            return;
+        }
+
+        try {
+            User user = userService.getUser(loginId, loginPw);
+            request.setAttribute(AUTHENTICATED_USER_ATTR, user);
+        } catch (CoreException e) {
             writeUnauthorized(response);
             return;
         }

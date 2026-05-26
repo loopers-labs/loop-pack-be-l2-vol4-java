@@ -49,4 +49,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     public void deleteAllByBrandId(Long brandId) {
         productJpaRepository.deleteAllByBrandId(brandId);
     }
+
+    @Override
+    public void incrementLikeCount(Long id) {
+        productJpaRepository.incrementLikeCount(id);
+    }
+
+    @Override
+    public void decrementLikeCount(Long id) {
+        productJpaRepository.decrementLikeCount(id);
+    }
 }

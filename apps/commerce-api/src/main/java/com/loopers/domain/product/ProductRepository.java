@@ -10,4 +10,6 @@ public interface ProductRepository {
     Optional<Product> find(Long id);
     Page<Product> findAll(Long brandId, Pageable pageable);
     void deleteAllByBrandId(Long brandId);
+    void incrementLikeCount(Long id);
+    void decrementLikeCount(Long id);
 }

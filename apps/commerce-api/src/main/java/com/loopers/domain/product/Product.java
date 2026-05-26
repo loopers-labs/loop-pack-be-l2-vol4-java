@@ -42,14 +42,6 @@ public class Product extends BaseDomain {
         this.price = newPrice;
     }
 
-    public void incrementLikeCount() {
-        this.likeCount++;
-    }
-
-    public void decrementLikeCount() {
-        if (this.likeCount > 0) this.likeCount--;
-    }
-
     private void validate(Long brandId, String name, BigDecimal price) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");

@@ -76,6 +76,14 @@ class ProductServiceUnitTest {
                 .filter(p -> brandId.equals(p.getBrandId()))
                 .forEach(Product::delete);
         }
+
+        @Override
+        public void incrementLikeCount(Long id) {
+        }
+
+        @Override
+        public void decrementLikeCount(Long id) {
+        }
     }
 
     static class FakeProductStockRepository implements ProductStockRepository {

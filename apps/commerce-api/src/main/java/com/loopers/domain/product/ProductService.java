@@ -63,6 +63,14 @@ public class ProductService {
         productRepository.save(product);
     }
 
+    public void incrementLikeCount(Long productId) {
+        productRepository.incrementLikeCount(productId);
+    }
+
+    public void decrementLikeCount(Long productId) {
+        productRepository.decrementLikeCount(productId);
+    }
+
     public void deleteAllByBrandId(Long brandId) {
         productRepository.deleteAllByBrandId(brandId);
     }
