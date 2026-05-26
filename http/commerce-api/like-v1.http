@@ -1,0 +1,40 @@
+### 좋아요 등록 - 정상 (200 OK)
+POST http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 등록 - 반복 등록 (200 OK, 멱등)
+POST http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 등록 - 회원 인증 헤더 누락 (401 Unauthorized)
+POST http://localhost:8080/api/v1/products/1/likes
+
+### 좋아요 등록 - 상품 미존재 (404 Not Found)
+POST http://localhost:8080/api/v1/products/99999/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 취소 - 정상 (200 OK)
+DELETE http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 취소 - 멱등(좋아요 없이 취소) (200 OK)
+DELETE http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 취소 - 반복 취소 (200 OK, 멱등)
+DELETE http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요 취소 - 회원 인증 헤더 누락 (401 Unauthorized)
+DELETE http://localhost:8080/api/v1/products/1/likes
+
+### 좋아요 취소 - 상품 미존재 (404 Not Found)
+DELETE http://localhost:8080/api/v1/products/99999/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
