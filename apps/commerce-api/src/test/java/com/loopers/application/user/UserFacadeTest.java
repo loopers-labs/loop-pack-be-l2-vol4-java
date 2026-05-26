@@ -10,7 +10,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -124,7 +123,7 @@ class UserFacadeTest {
                 .rawEmail(rawEmail)
                 .passwordEncrypter(passwordEncrypter)
                 .build();
-            given(userRepository.findById(userId)).willReturn(Optional.of(storedUser));
+            given(userRepository.getById(userId)).willReturn(storedUser);
 
             // act
             UserMyInfo myInfo = userFacade.readMyInfo(userId);
@@ -143,7 +142,7 @@ class UserFacadeTest {
         void throwsNotFound_whenUserIdIsNotRegistered() {
             // arrange
             Long userId = 999L;
-            given(userRepository.findById(userId)).willReturn(Optional.empty());
+            given(userRepository.getById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
 
             // act & assert
             assertThatThrownBy(() -> userFacade.readMyInfo(userId))
@@ -165,7 +164,7 @@ class UserFacadeTest {
             String currentRawPassword = "Kyle!2030";
             String newRawPassword = "Newer!2031";
             UserModel user = mock(UserModel.class);
-            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(userRepository.getById(userId)).willReturn(user);
 
             // act
             userFacade.changePassword(userId, currentRawPassword, newRawPassword);
@@ -181,7 +180,7 @@ class UserFacadeTest {
             Long userId = 999L;
             String currentRawPassword = "Kyle!2030";
             String newRawPassword = "Newer!2031";
-            given(userRepository.findById(userId)).willReturn(Optional.empty());
+            given(userRepository.getById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
 
             // act & assert
             assertThatThrownBy(() -> userFacade.changePassword(userId, currentRawPassword, newRawPassword))

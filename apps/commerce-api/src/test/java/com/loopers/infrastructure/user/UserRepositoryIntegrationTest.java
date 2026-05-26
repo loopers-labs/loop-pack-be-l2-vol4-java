@@ -18,6 +18,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 
 @SpringBootTest
@@ -54,22 +56,21 @@ class UserRepositoryIntegrationTest {
     @Nested
     class Save {
 
-        @DisplayName("저장한 회원을 id로 다시 조회하면 같은 회원 정보를 그대로 가져온다.")
+        @DisplayName("저장한 회원을 식별자로 다시 조회하면 같은 회원 정보가 그대로 반환된다.")
         @Test
         void canBeFoundById_withSameUserFields() {
             // arrange & act
             UserModel savedUser = createUser("kyleKim", "kyle@example.com");
-            Optional<UserModel> foundUser = userRepository.findById(savedUser.getId());
+            UserModel foundUser = userRepository.getById(savedUser.getId());
 
             // assert
             assertAll(
-                () -> assertThat(foundUser).isPresent(),
-                () -> assertThat(foundUser.get().getId()).isEqualTo(savedUser.getId()),
-                () -> assertThat(foundUser.get().getLoginId()).isEqualTo(savedUser.getLoginId()),
-                () -> assertThat(foundUser.get().getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword()),
-                () -> assertThat(foundUser.get().getName()).isEqualTo(savedUser.getName()),
-                () -> assertThat(foundUser.get().getBirthDate()).isEqualTo(savedUser.getBirthDate()),
-                () -> assertThat(foundUser.get().getEmail()).isEqualTo(savedUser.getEmail())
+                () -> assertThat(foundUser.getId()).isEqualTo(savedUser.getId()),
+                () -> assertThat(foundUser.getLoginId()).isEqualTo(savedUser.getLoginId()),
+                () -> assertThat(foundUser.getEncryptedPassword()).isEqualTo(savedUser.getEncryptedPassword()),
+                () -> assertThat(foundUser.getName()).isEqualTo(savedUser.getName()),
+                () -> assertThat(foundUser.getBirthDate()).isEqualTo(savedUser.getBirthDate()),
+                () -> assertThat(foundUser.getEmail()).isEqualTo(savedUser.getEmail())
             );
         }
 
@@ -93,6 +94,24 @@ class UserRepositoryIntegrationTest {
             // act & assert
             assertThatThrownBy(() -> createUser("otherKim", "kyle@example.com"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+        }
+    }
+
+    @DisplayName("회원을 식별자로 조회할 때,")
+    @Nested
+    class GetById {
+
+        @DisplayName("저장되지 않은 식별자면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenIdIsNotSaved() {
+            // arrange
+            createUser("kyleKim", "kyle@example.com");
+
+            // act & assert
+            assertThatThrownBy(() -> userRepository.getById(-1L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 
