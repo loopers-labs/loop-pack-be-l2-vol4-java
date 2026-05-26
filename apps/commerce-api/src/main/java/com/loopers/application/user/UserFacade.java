@@ -37,6 +37,14 @@ public class UserFacade {
         userService.changePassword(user.getId(), currentPassword, newPassword);
     }
 
+    /**
+     * 인증 후 userId 반환 — Like/Order 등 사용자 식별이 필요한 진입점에서 사용.
+     * 자격 증명이 틀리면 UserService.authenticate가 UNAUTHORIZED를 던진다.
+     */
+    public Long authenticate(String loginId, String rawPassword) {
+        return userService.authenticate(loginId, rawPassword).getId();
+    }
+
     private static UserInfo toUserInfo(UserModel user) {
         return new UserInfo(
                 user.getLoginId().getValue(),
