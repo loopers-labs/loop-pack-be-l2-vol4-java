@@ -23,14 +23,14 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public UserModel getById(Long id) {
-        return userJpaRepository.findById(id)
+    public UserModel getActiveById(Long id) {
+        return userJpaRepository.findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
     }
 
     @Override
-    public Optional<UserModel> findByLoginId(String loginId) {
-        return userJpaRepository.findByLoginIdValue(loginId);
+    public Optional<UserModel> findActiveByLoginId(String loginId) {
+        return userJpaRepository.findByLoginIdValueAndDeletedAtIsNull(loginId);
     }
 
     @Override

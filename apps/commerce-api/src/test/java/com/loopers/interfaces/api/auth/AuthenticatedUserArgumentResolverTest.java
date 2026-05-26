@@ -63,7 +63,7 @@ class AuthenticatedUserArgumentResolverTest {
             UserModel storedUser = mock(UserModel.class);
             given(storedUser.getId()).willReturn(userId);
             given(storedUser.matchesPassword(rawPassword, passwordEncrypter)).willReturn(true);
-            given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
+            given(userRepository.findActiveByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act
             Object resolvedUser = resolver.resolveArgument(null, null, webRequest, null);
@@ -108,7 +108,7 @@ class AuthenticatedUserArgumentResolverTest {
             String rawLoginId = "kyleKim";
             request.addHeader("X-Loopers-LoginId", rawLoginId);
             request.addHeader("X-Loopers-LoginPw", "Kyle!2030");
-            given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.empty());
+            given(userRepository.findActiveByLoginId(rawLoginId)).willReturn(Optional.empty());
 
             // act & assert
             assertThatThrownBy(() -> resolver.resolveArgument(null, null, webRequest, null))
@@ -128,7 +128,7 @@ class AuthenticatedUserArgumentResolverTest {
 
             UserModel storedUser = mock(UserModel.class);
             given(storedUser.matchesPassword(wrongRawPassword, passwordEncrypter)).willReturn(false);
-            given(userRepository.findByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
+            given(userRepository.findActiveByLoginId(rawLoginId)).willReturn(Optional.of(storedUser));
 
             // act & assert
             assertThatThrownBy(() -> resolver.resolveArgument(null, null, webRequest, null))

@@ -29,6 +29,9 @@ class UserRepositoryIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private UserJpaRepository userJpaRepository;
+
+    @Autowired
     private PasswordEncrypter passwordEncrypter;
 
     @Autowired
@@ -61,7 +64,7 @@ class UserRepositoryIntegrationTest {
         void canBeFoundById_withSameUserFields() {
             // arrange & act
             UserModel savedUser = createUser("kyleKim", "kyle@example.com");
-            UserModel foundUser = userRepository.getById(savedUser.getId());
+            UserModel foundUser = userRepository.getActiveById(savedUser.getId());
 
             // assert
             assertAll(
@@ -97,9 +100,9 @@ class UserRepositoryIntegrationTest {
         }
     }
 
-    @DisplayName("회원을 식별자로 조회할 때,")
+    @DisplayName("활성 회원을 식별자로 조회할 때,")
     @Nested
-    class GetById {
+    class GetActiveById {
 
         @DisplayName("저장되지 않은 식별자면 NOT_FOUND 예외가 발생한다.")
         @Test
@@ -108,7 +111,22 @@ class UserRepositoryIntegrationTest {
             createUser("kyleKim", "kyle@example.com");
 
             // act & assert
-            assertThatThrownBy(() -> userRepository.getById(-1L))
+            assertThatThrownBy(() -> userRepository.getActiveById(-1L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("삭제된 회원이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserIsDeleted() {
+            // arrange
+            UserModel deletedUser = createUser("kyleKim", "kyle@example.com");
+            deletedUser.delete();
+            userJpaRepository.saveAndFlush(deletedUser);
+
+            // act & assert
+            assertThatThrownBy(() -> userRepository.getActiveById(deletedUser.getId()))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
@@ -151,9 +169,9 @@ class UserRepositoryIntegrationTest {
         }
     }
 
-    @DisplayName("로그인 ID로 회원을 조회할 때,")
+    @DisplayName("활성 회원을 로그인 ID로 조회할 때,")
     @Nested
-    class FindByLoginId {
+    class FindActiveByLoginId {
 
         @DisplayName("저장된 로그인 ID면 해당 회원을 담은 Optional을 반환한다.")
         @Test
@@ -162,7 +180,7 @@ class UserRepositoryIntegrationTest {
             UserModel savedUser = createUser("kyleKim", "kyle@example.com");
 
             // act
-            Optional<UserModel> foundUser = userRepository.findByLoginId("kyleKim");
+            Optional<UserModel> foundUser = userRepository.findActiveByLoginId("kyleKim");
 
             // assert
             assertAll(
@@ -179,7 +197,22 @@ class UserRepositoryIntegrationTest {
             createUser("kyleKim", "kyle@example.com");
 
             // act
-            Optional<UserModel> foundUser = userRepository.findByLoginId("unknown99");
+            Optional<UserModel> foundUser = userRepository.findActiveByLoginId("unknown99");
+
+            // assert
+            assertThat(foundUser).isEmpty();
+        }
+
+        @DisplayName("삭제된 회원의 로그인 ID면 비어 있는 Optional을 반환한다.")
+        @Test
+        void returnsEmpty_whenUserIsDeleted() {
+            // arrange
+            UserModel deletedUser = createUser("kyleKim", "kyle@example.com");
+            deletedUser.delete();
+            userJpaRepository.saveAndFlush(deletedUser);
+
+            // act
+            Optional<UserModel> foundUser = userRepository.findActiveByLoginId("kyleKim");
 
             // assert
             assertThat(foundUser).isEmpty();

@@ -123,7 +123,7 @@ class UserFacadeTest {
                 .rawEmail(rawEmail)
                 .passwordEncrypter(passwordEncrypter)
                 .build();
-            given(userRepository.getById(userId)).willReturn(storedUser);
+            given(userRepository.getActiveById(userId)).willReturn(storedUser);
 
             // act
             UserMyInfo myInfo = userFacade.readMyInfo(userId);
@@ -142,7 +142,7 @@ class UserFacadeTest {
         void throwsNotFound_whenUserIdIsNotRegistered() {
             // arrange
             Long userId = 999L;
-            given(userRepository.getById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
+            given(userRepository.getActiveById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
 
             // act & assert
             assertThatThrownBy(() -> userFacade.readMyInfo(userId))
@@ -164,7 +164,7 @@ class UserFacadeTest {
             String currentRawPassword = "Kyle!2030";
             String newRawPassword = "Newer!2031";
             UserModel user = mock(UserModel.class);
-            given(userRepository.getById(userId)).willReturn(user);
+            given(userRepository.getActiveById(userId)).willReturn(user);
 
             // act
             userFacade.changePassword(userId, currentRawPassword, newRawPassword);
@@ -180,7 +180,7 @@ class UserFacadeTest {
             Long userId = 999L;
             String currentRawPassword = "Kyle!2030";
             String newRawPassword = "Newer!2031";
-            given(userRepository.getById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
+            given(userRepository.getActiveById(userId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
 
             // act & assert
             assertThatThrownBy(() -> userFacade.changePassword(userId, currentRawPassword, newRawPassword))
