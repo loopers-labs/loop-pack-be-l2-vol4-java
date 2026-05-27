@@ -7,7 +7,6 @@ import com.loopers.domain.like.ProductLikeModel;
 import com.loopers.domain.like.ProductLikeRepository;
 import com.loopers.domain.like.ProductLikeResult;
 import com.loopers.domain.like.ProductLikeService;
-import com.loopers.domain.product.ProductCatalogService;
 import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -31,7 +30,6 @@ public class ProductLikeFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductLikeService productLikeService = new ProductLikeService();
-    private final ProductCatalogService productCatalogService = new ProductCatalogService();
 
     @Transactional
     public void likeProduct(String userLoginId, Long productId) {
@@ -62,20 +60,25 @@ public class ProductLikeFacade {
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getLikedProducts(String userLoginId) {
-        List<ProductModel> products = productLikeRepository.findAllByUserLoginId(userLoginId).stream()
+        List<ProductLikeModel> productLikes = productLikeRepository.findAllByUserLoginId(userLoginId);
+        Map<Long, ProductModel> productsById = productLikes.stream()
             .map(ProductLikeModel::getProductId)
             .distinct()
             .map(productRepository::find)
             .flatMap(Optional::stream)
-            .toList();
+            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
 
-        Map<Long, BrandModel> brandsById = products.stream()
+        Map<Long, BrandModel> brandsById = productsById.values().stream()
             .map(ProductModel::getBrandId)
             .distinct()
             .map(this::getBrand)
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
-        List<ProductDetail> productDetails = productCatalogService.getProductDetails(products, brandsById);
+        List<ProductDetail> productDetails = productLikeService.getLikedProductDetails(
+            productLikes,
+            productsById,
+            brandsById
+        );
         return productDetails.stream()
             .map(ProductInfo::from)
             .toList();
