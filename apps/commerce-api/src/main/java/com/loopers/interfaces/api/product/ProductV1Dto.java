@@ -5,19 +5,6 @@ import com.loopers.application.product.ProductInfo;
 import java.math.BigDecimal;
 
 public class ProductV1Dto {
-    public record CreateProductRequest(
-        Long brandId,
-        String name,
-        BigDecimal price,
-        Long stock
-    ) {}
-
-    public record UpdateProductRequest(
-        String name,
-        BigDecimal price,
-        Long stock
-    ) {}
-
     public record ProductResponse(
         Long id,
         String brandName,

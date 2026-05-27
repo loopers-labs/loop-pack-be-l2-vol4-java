@@ -1,12 +1,9 @@
-package com.loopers.domain.product;
+package com.loopers.domain.stock;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.SQLRestriction;
@@ -17,19 +14,16 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted_at IS NULL")
 public class StockModel extends BaseEntity {
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id")
-    private ProductModel product;
-
+    private Long productId;
     private Long quantity;
 
     protected StockModel() {
     }
 
-    public StockModel(ProductModel product, Long quantity) {
+    public StockModel(Long productId, Long quantity) {
         validate(quantity);
 
-        this.product = product;
+        this.productId = productId;
         this.quantity = quantity;
     }
 

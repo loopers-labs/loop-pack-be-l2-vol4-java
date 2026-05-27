@@ -23,25 +23,23 @@ class ProductModelTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 입력으로 상품이 생성되면 입력값이 설정되고 likeCount는 0으로 초기화되며 재고도 함께 생성된다.")
+        @DisplayName("정상 입력으로 상품이 생성되면 입력값이 설정되고 likeCount는 0으로 초기화된다.")
         @Test
         void createsProductModel_withGivenValuesAndLikeCountZero() {
             // given
             Long brandId = 1L;
             String name = "테스트 상품";
             BigDecimal price = BigDecimal.valueOf(1000);
-            Long quantity = 50L;
 
             // when
-            ProductModel product = new ProductModel(brandId, name, price, quantity);
+            ProductModel product = new ProductModel(brandId, name, price);
 
             // then
             assertAll(
                     () -> assertThat(product.getBrandId()).isEqualTo(brandId),
                     () -> assertThat(product.getName()).isEqualTo(name),
                     () -> assertThat(product.getPrice()).isEqualByComparingTo(price),
-                    () -> assertThat(product.getLikeCount()).isEqualTo(0L),
-                    () -> assertThat(product.getStock().getQuantity()).isEqualTo(quantity)
+                    () -> assertThat(product.getLikeCount()).isEqualTo(0L)
             );
         }
 
@@ -52,7 +50,7 @@ class ProductModelTest {
         void throwsBadRequest_whenNameIsNullOrBlank(String name) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new ProductModel(1L, name, BigDecimal.valueOf(1000), 0L));
+                    () -> new ProductModel(1L, name, BigDecimal.valueOf(1000)));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -64,7 +62,7 @@ class ProductModelTest {
         void throwsBadRequest_whenPriceIsNull(BigDecimal price) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new ProductModel(1L, "테스트 상품", price, 0L));
+                    () -> new ProductModel(1L, "테스트 상품", price));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -76,7 +74,7 @@ class ProductModelTest {
         void throwsBadRequest_whenPriceIsNegative(long price) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new ProductModel(1L, "테스트 상품", BigDecimal.valueOf(price), 0L));
+                    () -> new ProductModel(1L, "테스트 상품", BigDecimal.valueOf(price)));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -87,20 +85,19 @@ class ProductModelTest {
     @Nested
     class Update {
 
-        @DisplayName("정상 입력으로 상품명, 가격, 재고가 수정된다.")
+        @DisplayName("정상 입력으로 상품명과 가격이 수정된다.")
         @Test
-        void updatesProductModel_withNewNamePriceAndStock() {
+        void updatesProductModel_withNewNameAndPrice() {
             // given
-            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000), 10L);
+            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000));
 
             // when
-            product.update("수정 상품", BigDecimal.valueOf(2000), 30L);
+            product.update("수정 상품", BigDecimal.valueOf(2000));
 
             // then
             assertAll(
                     () -> assertThat(product.getName()).isEqualTo("수정 상품"),
-                    () -> assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(2000)),
-                    () -> assertThat(product.getStock().getQuantity()).isEqualTo(30L)
+                    () -> assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(2000))
             );
         }
 
@@ -110,11 +107,11 @@ class ProductModelTest {
         @ParameterizedTest
         void throwsBadRequest_whenNewNameIsNullOrBlank(String newName) {
             // given
-            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000), 10L);
+            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000));
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> product.update(newName, BigDecimal.valueOf(2000), 10L));
+                    () -> product.update(newName, BigDecimal.valueOf(2000)));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -125,11 +122,11 @@ class ProductModelTest {
         @ParameterizedTest
         void throwsBadRequest_whenNewPriceIsNull(BigDecimal newPrice) {
             // given
-            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000), 10L);
+            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000));
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> product.update("수정 상품", newPrice, 10L));
+                    () -> product.update("수정 상품", newPrice));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -140,11 +137,11 @@ class ProductModelTest {
         @ParameterizedTest
         void throwsBadRequest_whenNewPriceIsNegative(long newPrice) {
             // given
-            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000), 10L);
+            ProductModel product = new ProductModel(1L, "기존 상품", BigDecimal.valueOf(1000));
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> product.update("수정 상품", BigDecimal.valueOf(newPrice), 10L));
+                    () -> product.update("수정 상품", BigDecimal.valueOf(newPrice)));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -155,20 +152,17 @@ class ProductModelTest {
     @Nested
     class Delete {
 
-        @DisplayName("상품이 소프트 삭제되면 재고도 함께 소프트 삭제된다.")
+        @DisplayName("상품이 소프트 삭제되면 deletedAt이 설정된다.")
         @Test
-        void softDeletesStock_whenProductIsDeleted() {
+        void softDeletesProduct_whenDeleteIsCalled() {
             // given
-            ProductModel product = new ProductModel(1L, "상품", BigDecimal.valueOf(1000), 10L);
+            ProductModel product = new ProductModel(1L, "상품", BigDecimal.valueOf(1000));
 
             // when
             product.delete();
 
             // then
-            assertAll(
-                    () -> assertThat(product.getDeletedAt()).isNotNull(),
-                    () -> assertThat(product.getStock().getDeletedAt()).isNotNull()
-            );
+            assertThat(product.getDeletedAt()).isNotNull();
         }
     }
 }

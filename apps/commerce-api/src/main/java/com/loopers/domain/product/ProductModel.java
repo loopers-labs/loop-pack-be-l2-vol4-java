@@ -3,9 +3,7 @@ package com.loopers.domain.product;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.SQLRestriction;
@@ -23,34 +21,23 @@ public class ProductModel extends BaseEntity {
     private BigDecimal price;
     private Long likeCount;
 
-    @OneToOne(mappedBy = "product", cascade = CascadeType.PERSIST)
-    private StockModel stock;
-
     protected ProductModel() {
     }
 
-    public ProductModel(Long brandId, String name, BigDecimal price, Long quantity) {
+    public ProductModel(Long brandId, String name, BigDecimal price) {
         validate(name, price);
 
         this.brandId = brandId;
         this.name = name;
         this.price = price;
         this.likeCount = 0L;
-        this.stock = new StockModel(this, quantity);
     }
 
-    public void update(String newName, BigDecimal newPrice, Long newQuantity) {
+    public void update(String newName, BigDecimal newPrice) {
         validate(newName, newPrice);
 
         this.name = newName;
         this.price = newPrice;
-        this.stock.update(newQuantity);
-    }
-
-    @Override
-    public void delete() {
-        super.delete();
-        this.stock.delete();
     }
 
     private void validate(String name, BigDecimal price) {

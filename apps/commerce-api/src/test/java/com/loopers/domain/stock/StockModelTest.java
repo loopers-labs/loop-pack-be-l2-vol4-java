@@ -1,4 +1,4 @@
-package com.loopers.domain.product;
+package com.loopers.domain.stock;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -9,8 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,24 +16,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StockModelTest {
 
-    private static final ProductModel PRODUCT = new ProductModel(1L, "상품", BigDecimal.ONE, 0L);
+    private static final Long PRODUCT_ID = 1L;
 
     @DisplayName("재고를 생성할 때, ")
     @Nested
     class Create {
 
-        @DisplayName("정상 입력으로 재고가 생성되면 product와 quantity가 설정된다.")
+        @DisplayName("정상 입력으로 재고가 생성되면 productId와 quantity가 설정된다.")
         @Test
-        void createsStockModel_withProductAndQuantity() {
+        void createsStockModel_withProductIdAndQuantity() {
             // given
             long quantity = 10L;
 
             // when
-            StockModel stock = new StockModel(PRODUCT, quantity);
+            StockModel stock = new StockModel(PRODUCT_ID, quantity);
 
             // then
             assertAll(
-                    () -> assertThat(stock.getProduct()).isSameAs(PRODUCT),
+                    () -> assertThat(stock.getProductId()).isEqualTo(PRODUCT_ID),
                     () -> assertThat(stock.getQuantity()).isEqualTo(quantity)
             );
         }
@@ -46,7 +44,7 @@ class StockModelTest {
         void throwsBadRequest_whenQuantityIsNull(Long quantity) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new StockModel(PRODUCT, quantity));
+                    () -> new StockModel(PRODUCT_ID, quantity));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -58,7 +56,7 @@ class StockModelTest {
         void throwsBadRequest_whenQuantityIsNegative(long quantity) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new StockModel(PRODUCT, quantity));
+                    () -> new StockModel(PRODUCT_ID, quantity));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -73,7 +71,7 @@ class StockModelTest {
         @Test
         void updatesStockModel_withNewQuantity() {
             // given
-            StockModel stock = new StockModel(PRODUCT, 10L);
+            StockModel stock = new StockModel(PRODUCT_ID, 10L);
 
             // when
             stock.update(20L);
@@ -87,7 +85,7 @@ class StockModelTest {
         @ParameterizedTest
         void throwsBadRequest_whenNewQuantityIsNull(Long newQuantity) {
             // given
-            StockModel stock = new StockModel(PRODUCT, 10L);
+            StockModel stock = new StockModel(PRODUCT_ID, 10L);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -102,7 +100,7 @@ class StockModelTest {
         @ParameterizedTest
         void throwsBadRequest_whenNewQuantityIsNegative(long newQuantity) {
             // given
-            StockModel stock = new StockModel(PRODUCT, 10L);
+            StockModel stock = new StockModel(PRODUCT_ID, 10L);
 
             // when
             CoreException result = assertThrows(CoreException.class,

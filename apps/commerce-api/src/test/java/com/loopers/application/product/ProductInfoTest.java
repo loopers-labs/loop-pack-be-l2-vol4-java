@@ -1,6 +1,7 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductDetail;
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,22 +13,23 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 class ProductInfoTest {
 
-    @DisplayName("ProductDetail 로부터 ProductInfo 를 생성할 때, ")
+    @DisplayName("ProductModel 과 BrandModel 로부터 ProductInfo 를 생성할 때, ")
     @Nested
     class From {
 
         @DisplayName("각 모델의 필드를 ProductInfo 로 정확히 매핑한다.")
         @Test
-        void mapsFieldsFromProductDetail() {
+        void mapsFieldsFromProductModelAndBrandModel() {
             // given
-            ProductDetail detail = new ProductDetail(1L, "Nike", "에어맥스", BigDecimal.valueOf(150000), 0L);
+            ProductModel product = new ProductModel(1L, "에어맥스", BigDecimal.valueOf(150000));
+            BrandModel brand = new BrandModel("Nike");
 
             // when
-            ProductInfo result = ProductInfo.from(detail);
+            ProductInfo result = ProductInfo.from(product, brand);
 
             // then
             assertAll(
-                    () -> assertThat(result.id()).isEqualTo(1L),
+                    () -> assertThat(result.id()).isEqualTo(product.getId()),
                     () -> assertThat(result.brandName()).isEqualTo("Nike"),
                     () -> assertThat(result.name()).isEqualTo("에어맥스"),
                     () -> assertThat(result.price()).isEqualByComparingTo(BigDecimal.valueOf(150000)),
