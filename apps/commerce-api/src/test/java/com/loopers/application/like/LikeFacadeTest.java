@@ -1,13 +1,17 @@
 package com.loopers.application.like;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,11 +20,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
+import com.loopers.application.product.ProductSummaryInfo;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.projection.ProductSummary;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
@@ -134,6 +142,42 @@ class LikeFacadeTest {
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
                 () -> then(likeRepository).should(never()).deleteByUserIdAndProductId(any(), any())
+            );
+        }
+    }
+
+    @DisplayName("좋아요한 상품 목록을 조회할 때,")
+    @Nested
+    class ReadLikedProducts {
+
+        @DisplayName("경로 회원이 인증 회원과 일치하면 좋아요한 상품을 ProductSummaryInfo 페이지로 반환한다.")
+        @Test
+        void returnsSummaryInfoPage_whenPathUserMatchesAuthUser() {
+            // arrange
+            ProductSummary summary = new ProductSummary(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, 5, 2);
+            given(likeRepository.findLikedProductSummaries(1L, 0, 20)).willReturn(new PageImpl<>(List.of(summary)));
+
+            // act
+            Page<ProductSummaryInfo> result = likeFacade.readLikedProducts(1L, 1L, 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getContent()).hasSize(1),
+                () -> assertThat(result.getContent().get(0).likeCount()).isEqualTo(2),
+                () -> then(likeRepository).should().findLikedProductSummaries(1L, 0, 20)
+            );
+        }
+
+        @DisplayName("경로 회원이 인증 회원과 다르면 조회 없이 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenPathUserDiffersFromAuthUser() {
+            // act
+            Page<ProductSummaryInfo> result = likeFacade.readLikedProducts(1L, 2L, 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getTotalElements()).isEqualTo(0L),
+                () -> then(likeRepository).should(never()).findLikedProductSummaries(anyLong(), anyInt(), anyInt())
             );
         }
     }

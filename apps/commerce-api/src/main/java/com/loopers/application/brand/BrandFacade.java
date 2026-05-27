@@ -18,9 +18,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BrandFacade {
 
-    private static final int MIN_PAGE_SIZE = 1;
-    private static final int MAX_PAGE_SIZE = 100;
-
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
 
@@ -66,10 +63,6 @@ public class BrandFacade {
 
     @Transactional(readOnly = true)
     public Page<BrandInfo> readBrands(int page, int size) {
-        if (page < 0 || size < MIN_PAGE_SIZE || size > MAX_PAGE_SIZE) {
-            throw new CoreException(ErrorType.BAD_REQUEST, String.format("페이지 번호는 0 이상, 크기는 %d~%d만 허용됩니다.", MIN_PAGE_SIZE, MAX_PAGE_SIZE));
-        }
-
         Page<BrandModel> brandModels = brandRepository.findActiveByPage(page, size);
 
         return brandModels.map(BrandInfo::from);

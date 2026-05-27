@@ -77,7 +77,9 @@ class BrandV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data()).containsOnlyKeys("brandId", "name", "description"),
-                () -> assertThat(response.getBody().data().get("name")).isEqualTo("감성 브랜드")
+                () -> assertThat(((Number) response.getBody().data().get("brandId")).longValue()).isEqualTo(savedBrand.getId()),
+                () -> assertThat(response.getBody().data().get("name")).isEqualTo("감성 브랜드"),
+                () -> assertThat(response.getBody().data().get("description")).isEqualTo("감성을 담은 브랜드")
             );
         }
 
