@@ -79,4 +79,11 @@ public class OrderService {
         PagePolicy.validate(page, size);
         return orderRepository.findByUserId(userId, page, size);
     }
+
+    /** 전체 주문 모니터링 — 상태 필터(null=전체) + 최신순 페이지 (UC-12 Admin, §7.4 격리 예외). */
+    @Transactional(readOnly = true)
+    public List<OrderModel> getOrders(OrderStatus status, int page, int size) {
+        PagePolicy.validate(page, size);
+        return orderRepository.findAll(status, page, size);
+    }
 }

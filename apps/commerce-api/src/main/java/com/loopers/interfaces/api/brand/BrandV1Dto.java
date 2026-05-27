@@ -9,6 +9,11 @@ public class BrandV1Dto {
         String description
     ) {}
 
+    public record UpdateBrandRequest(
+        String name,
+        String description
+    ) {}
+
     public record BrandResponse(
         Long id,
         String name,

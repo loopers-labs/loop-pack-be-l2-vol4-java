@@ -28,6 +28,16 @@ public class BrandService {
     }
 
     /**
+     * 브랜드 이름·설명 수정 (UC-10 Admin). 활성 브랜드만 수정 가능 — 비활성/부재면 NOT_FOUND.
+     */
+    @Transactional
+    public BrandModel update(Long id, String name, String description) {
+        BrandModel brand = getActiveBrand(id);
+        brand.update(name, description);
+        return brandRepository.save(brand);
+    }
+
+    /**
      * 브랜드 soft delete (01 §7.5). 존재하지 않으면 NOT_FOUND. 멱등 — 이미 비활성이어도 안전.
      * 하위 상품/좋아요 cascade 전파는 BrandFacade가 조정한다.
      */

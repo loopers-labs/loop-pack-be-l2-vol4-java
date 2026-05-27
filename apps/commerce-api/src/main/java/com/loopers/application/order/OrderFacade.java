@@ -3,6 +3,7 @@ package com.loopers.application.order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.order.PaymentMethod;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentResult;
@@ -45,6 +46,13 @@ public class OrderFacade {
 
     public List<OrderInfo> getMyOrders(Long userId, int page, int size) {
         return orderService.getMyOrders(userId, page, size).stream()
+            .map(OrderInfo::from)
+            .toList();
+    }
+
+    /** 전체 주문 모니터링 (UC-12 Admin). */
+    public List<OrderInfo> getOrders(OrderStatus status, int page, int size) {
+        return orderService.getOrders(status, page, size).stream()
             .map(OrderInfo::from)
             .toList();
     }

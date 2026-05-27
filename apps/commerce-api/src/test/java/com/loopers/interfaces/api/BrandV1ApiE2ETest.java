@@ -109,4 +109,35 @@ class BrandV1ApiE2ETest {
             assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
+
+    @DisplayName("PUT /api/v1/brands/{brandId}")
+    @Nested
+    class UpdateBrand {
+
+        @DisplayName("활성 브랜드를 수정하면, 변경된 이름·설명이 반영된다.")
+        @Test
+        void updatesBrand() {
+            Long brandId = createBrand("나이키", "스포츠");
+
+            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
+                    BRANDS_PATH + "/" + brandId, HttpMethod.PUT,
+                    new HttpEntity<>(new BrandV1Dto.UpdateBrandRequest("나이키코리아", "수정됨")), BRAND_TYPE);
+
+            assertAll(
+                    () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                    () -> assertThat(response.getBody().data().name()).isEqualTo("나이키코리아"),
+                    () -> assertThat(response.getBody().data().description()).isEqualTo("수정됨")
+            );
+        }
+
+        @DisplayName("존재하지 않는 브랜드를 수정하면, 404를 반환한다.")
+        @Test
+        void returns404_whenNotExists() {
+            ResponseEntity<Object> response = testRestTemplate.exchange(
+                    BRANDS_PATH + "/9999", HttpMethod.PUT,
+                    new HttpEntity<>(new BrandV1Dto.UpdateBrandRequest("x", "y")), Object.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
 }

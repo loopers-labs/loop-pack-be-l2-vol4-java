@@ -74,6 +74,12 @@ public class BrandModel {
         this.deletedAt = null;
     }
 
+    /** 이름·설명 변경 (UC-10 Admin 수정). 생성과 동일한 검증을 적용한다. */
+    public void update(String name, String description) {
+        this.name = validateName(name);
+        this.description = validateDescription(description);
+    }
+
     public Long getId() {
         return id;
     }

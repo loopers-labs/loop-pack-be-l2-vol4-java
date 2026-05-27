@@ -2,6 +2,7 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -45,5 +46,14 @@ public class OrderRepositoryImpl implements OrderRepository {
         return orderJpaRepository.findByUserIdOrderByIdDesc(userId, PageRequest.of(page, size)).stream()
                 .map(OrderEntityMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<OrderModel> findAll(OrderStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size);
+        List<OrderEntity> entities = (status == null)
+                ? orderJpaRepository.findAllByOrderByIdDesc(pageable)
+                : orderJpaRepository.findByStatusOrderByIdDesc(status, pageable);
+        return entities.stream().map(OrderEntityMapper::toDomain).toList();
     }
 }
