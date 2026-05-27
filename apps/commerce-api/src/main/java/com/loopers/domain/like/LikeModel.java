@@ -7,7 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
@@ -50,10 +49,6 @@ public class LikeModel {
         }
         this.userId = userId;
         this.productId = productId;
-    }
-
-    @PrePersist
-    private void prePersist() {
         this.likedAt = ZonedDateTime.now();
     }
 }

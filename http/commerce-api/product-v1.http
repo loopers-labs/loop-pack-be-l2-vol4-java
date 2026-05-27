@@ -1,0 +1,78 @@
+### 상품 상세 조회 (사용자)
+GET {{commerce-api}}/api/v1/products/1
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 상품 목록 조회 (사용자, 브랜드 필터)
+GET {{commerce-api}}/api/v1/products?brandId=1&page=0&size=20
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 상품 목록 조회 (사용자, 최신순)
+GET {{commerce-api}}/api/v1/products?sort=createdAt,desc&page=0&size=20
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 상품 목록 조회 (어드민)
+GET {{commerce-api}}/api-admin/v1/products?page=0&size=20
+
+---
+
+### 상품 상세 조회 (어드민)
+GET {{commerce-api}}/api-admin/v1/products/1
+
+---
+
+### 상품 등록 (어드민)
+POST {{commerce-api}}/api-admin/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "나이키 에어맥스 2024",
+  "price": 150000,
+  "initialStock": 100
+}
+
+---
+
+### 상품 수정 (어드민)
+PUT {{commerce-api}}/api-admin/v1/products/1
+Content-Type: application/json
+
+{
+  "name": "나이키 에어맥스 2025",
+  "price": 160000
+}
+
+---
+
+### 상품 삭제 (어드민)
+DELETE {{commerce-api}}/api-admin/v1/products/1
+
+---
+
+### 좋아요 등록 (사용자)
+POST {{commerce-api}}/api/v1/products/1/likes
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 좋아요 취소 (사용자)
+DELETE {{commerce-api}}/api/v1/products/1/likes
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 내 좋아요 목록 조회 (사용자)
+GET {{commerce-api}}/api/v1/users/1/likes
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
