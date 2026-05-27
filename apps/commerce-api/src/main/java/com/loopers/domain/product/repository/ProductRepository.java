@@ -1,12 +1,10 @@
 package com.loopers.domain.product.repository;
 
-import com.loopers.domain.product.model.ProductModel;
+import com.loopers.domain.product.model.Product;
+
 import java.util.Optional;
-import java.util.List;
 
 public interface ProductRepository {
-    ProductModel save(ProductModel product);
-    Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
-    void delete(Long id);
+    Optional<Product> findById(Long id);
+    Product save(Product product);
 }
