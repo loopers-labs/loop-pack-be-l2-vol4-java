@@ -24,9 +24,8 @@
 
 > `Brand`, `Product`가 상속하는 추상 클래스. 먼저 만들어야 이후 작업이 가능하다.
 
-- [ ] `domain/SoftDeletableEntity` 추상 클래스 작성
-  - `deletedAt`, `softDelete()`, `isDeleted()` 포함
-  - `BaseEntity`를 상속
+- [x] `domain/SoftDeletableEntity` 추상 클래스 작성
+  - **참고:** `BaseEntity`에 이미 `deletedAt`, `delete()`, `restore()` 포함 → 별도 클래스 불필요
 
 ---
 
@@ -35,30 +34,43 @@
 > UC-01 (브랜드 조회), UC-10 (어드민 브랜드 관리) 기반.
 
 **도메인 모델**
-- [ ] `domain/brand/Brand` 엔티티
-  - `SoftDeletableEntity` 상속
-  - `name` 필드 (null/blank 검증)
+- [x] `domain/brand/model/Brand` 엔티티
+  - `BaseEntity` 상속 (`deletedAt` 포함)
+  - `name` 필드 (null/blank/20자 검증)
   - 정적 팩토리 메서드 `create(name)`
   - `update(name)` 메서드
 
 **Repository**
-- [ ] `domain/brand/BrandRepository` 인터페이스
-  - `findById(Long)`, `save(Brand)`, `softDeleteById(Long)`
+- [x] `domain/brand/repository/BrandRepository` 인터페이스
+  - `findById(Long)`, `save(Brand)`, `existsByName(String)`
 
 **도메인 서비스**
-- [ ] `domain/brand/BrandService`
-  - `getBrand(Long)` — 없거나 삭제됨 → `CoreException(NOT_FOUND)`
-  - `createBrand(name)` → `Brand`
-  - `updateBrand(Long, name)` → `Brand`
-  - `deleteBrand(Long)` — 브랜드 소프트딜리트 + 상품 cascade 소프트딜리트 위임
+- [x] `domain/brand/service/BrandDomainService`
+  - `validateDuplicateName(name)` — 중복 시 `CONFLICT`
+- [ ] getBrand / updateBrand / deleteBrand 흐름 (미구현, 필요 시 추가)
+
+**Application Layer**
+- [x] `application/brand/BrandApplicationService`
+  - `register(name)` — 중복 검증 + 저장 (`@Transactional`)
+- [x] `application/brand/BrandInfo` — 도메인→인터페이스 전달 계약 객체
+- [x] `application/brand/BrandFacade`
+  - `register(name)` → `BrandInfo` 반환
+
+**Interface Layer**
+- [x] `interfaces/api/brand/BrandV1Controller` — `POST /api-admin/v1/brands`
+- [x] `interfaces/api/brand/BrandV1Dto` — `RegisterRequest`, `BrandResponse`
+- [x] `interfaces/api/AdminInterceptor` — `X-Loopers-Ldap` 헤더 검증
+- [x] `support/config/WebMvcConfig` — `/api-admin/**` 인터셉터 등록
 
 **Infrastructure**
-- [ ] `infrastructure/brand/BrandJpaRepository`
-- [ ] `infrastructure/brand/BrandRepositoryImpl`
+- [x] `infrastructure/brand/persistence/BrandJpaRepository`
+- [x] `infrastructure/brand/persistence/BrandRepositoryImpl`
 
 **단위 테스트**
-- [ ] `domain/brand/BrandTest` — 생성/수정 검증, 소프트딜리트 검증
-- [ ] `domain/brand/BrandServiceTest` — 없는 ID 조회 예외, 정상 흐름
+- [x] `domain/brand/BrandTest` — 생성/수정 검증, 소프트딜리트 검증
+- [x] `domain/brand/BrandDomainServiceTest` — 중복 이름 예외
+- [x] `application/brand/BrandApplicationServiceTest` — 정상 등록, 중복 이름 예외
+- ~~`interfaces/api/BrandV1ApiE2ETest`~~ — 이번 주차 제외 (단위 테스트만 진행)
 
 ---
 
@@ -237,6 +249,8 @@
 ---
 
 ## 완료 기준
+
+> **이번 주차는 단위 테스트만 진행 (E2E 테스트 제외)**
 
 - [ ] `./gradlew :apps:commerce-api:test` 전체 통과
 - [ ] 각 도메인 단위 테스트에서 **정상/예외/경계 케이스** 모두 커버
