@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "product")
 public class Product extends BaseEntity {
 
+    @Column(name = "brand_id", nullable = false)
     private Long brandId;
 
     @Embedded

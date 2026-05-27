@@ -124,6 +124,8 @@ HTTP 외에 Batch/Kafka/internal job 이 같은 유스케이스를 직접 호출
 
 엔티티는 `modules/jpa` 의 `BaseEntity` 를 상속한다: IDENTITY id, `createdAt`/`updatedAt`/`deletedAt` (soft delete), `@PrePersist`/`@PreUpdate` 에서 호출되는 `protected guard()` 훅. `delete()`/`restore()` 는 멱등.
 
+Aggregate 내부의 생명주기가 함께 움직이는 구성요소는 객체 연관관계로 표현한다. 예: `Order -> OrderItem`. 다른 Aggregate 를 참조할 때는 JPA 연관관계 대신 ID 또는 주문 스냅샷 같은 값으로 연결해 결합을 낮춘다. 예: `Product.brandId`, `ProductStock.productId`, `Like.productId`, `OrderItemSnapshot.productId`. 단순 조회 조인은 Repository/Query 단계에서 처리하고, 도메인 모델에 다른 Aggregate 객체 참조를 편의상 추가하지 않는다.
+
 도메인 책임, 패키지 경계, Facade/Service 트랜잭션 위치 판단은 `/design` 을 따른다.
 
 ## Test Conventions
