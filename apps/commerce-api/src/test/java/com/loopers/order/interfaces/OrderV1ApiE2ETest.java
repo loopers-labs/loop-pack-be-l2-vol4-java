@@ -203,5 +203,36 @@ class OrderV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+
+        @DisplayName("다른 유저의 주문 ID이면, 403 Forbidden을 반환한다.")
+        @Test
+        void returnsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange — user1으로 주문 생성
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            OrderV1Dto.CreateRequest createRequest = new OrderV1Dto.CreateRequest(
+                List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1))
+            );
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created =
+                testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(createRequest, authHeaders()), responseType);
+            Long orderId = created.getBody().data().id();
+
+            // arrange — user2 회원가입
+            testRestTemplate.exchange(
+                "/api/v1/users", HttpMethod.POST,
+                new HttpEntity<>(new UserV1Dto.SignUpRequest("user2", PASSWORD, "김철수", "user2@example.com", "1995-05-05", Gender.MALE)),
+                Void.class
+            );
+            HttpHeaders user2Headers = new HttpHeaders();
+            user2Headers.set("X-Loopers-LoginId", "user2");
+            user2Headers.set("X-Loopers-LoginPw", PASSWORD);
+
+            // act — user2로 user1의 주문 조회
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                testRestTemplate.exchange(ENDPOINT + "/" + orderId, HttpMethod.GET, new HttpEntity<>(user2Headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
     }
 }

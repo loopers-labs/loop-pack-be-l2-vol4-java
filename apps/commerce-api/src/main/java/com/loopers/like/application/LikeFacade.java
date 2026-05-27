@@ -32,20 +32,24 @@ public class LikeFacade {
         }
 
         LikeModel like = new LikeModel(userId, productId);
-        return LikeInfo.from(likeRepository.save(like));
+        LikeInfo saved = LikeInfo.from(likeRepository.save(like));
+        productRepository.incrementLikeCount(productId);
+        return saved;
     }
 
     @Transactional
     public void cancelLike(Long userId, Long productId) {
         LikeModel like = likeService.getOrThrow(likeRepository.findByUserIdAndProductId(userId, productId));
         likeRepository.delete(like);
+        productRepository.decrementLikeCount(productId);
     }
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getLikedProducts(Long userId) {
-        return likeRepository.findAllByUserId(userId).stream()
-            .map(like -> productRepository.find(like.getProductId()))
-            .flatMap(java.util.Optional::stream)
+        List<LikeModel> likes = likeRepository.findAllByUserId(userId);
+        List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
+        // [fix] N+1 문제 → productId 목록으로 IN 쿼리 일괄 조회 (결정 10)
+        return productRepository.findAllByIds(productIds).stream()
             .map(ProductInfo::from)
             .toList();
     }

@@ -107,7 +107,7 @@ class OrderFacadeIntegrationTest {
             OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
-            OrderInfo result = orderFacade.getOrder(created.id());
+            OrderInfo result = orderFacade.getOrder(1L, created.id());
 
             // assert
             assertAll(
@@ -122,11 +122,27 @@ class OrderFacadeIntegrationTest {
         void throwsNotFound_whenOrderNotExists() {
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.getOrder(999L)
+                orderFacade.getOrder(1L, 999L)
             );
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("다른 유저의 주문 ID이면, FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.getOrder(2L, created.id())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 }

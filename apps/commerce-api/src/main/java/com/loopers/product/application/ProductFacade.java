@@ -1,13 +1,20 @@
 package com.loopers.product.application;
 
+import com.loopers.brand.domain.BrandModel;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.brand.domain.BrandService;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductService;
+import com.loopers.product.domain.SortCondition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -30,7 +37,33 @@ public class ProductFacade {
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long productId) {
         ProductModel product = productService.getOrThrow(productRepository.find(productId));
-        return ProductInfo.from(product);
+        String brandName = null;
+        if (product.getBrandId() != null) {
+            brandName = brandRepository.find(product.getBrandId())
+                .map(BrandModel::getName)
+                .orElse(null);
+        }
+        return ProductInfo.from(product, brandName);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductInfo> getProducts(SortCondition sort, Long brandId, int page, int size) {
+        List<ProductModel> products = productRepository.findAll(sort, brandId, page, size);
+
+        // N+1 방지 — brandId 목록으로 IN 쿼리 일괄 조회 (결정 10 참고)
+        List<Long> brandIds = products.stream()
+            .map(ProductModel::getBrandId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+        Map<Long, String> brandNameMap = brandRepository.findAllByIds(brandIds)
+            .stream()
+            .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
+
+        return products.stream()
+            .map(p -> ProductInfo.from(p, brandNameMap.get(p.getBrandId())))
+            .toList();
     }
 
     @Transactional

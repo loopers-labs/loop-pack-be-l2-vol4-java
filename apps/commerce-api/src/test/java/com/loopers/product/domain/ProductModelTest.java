@@ -180,6 +180,16 @@ class ProductModelTest {
             // act & assert
             assertDoesNotThrow(() -> new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
         }
+
+        @DisplayName("생성 시 likeCount는 0으로 초기화된다.")
+        @Test
+        void initializesLikeCountToZero_whenCreated() {
+            // act
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null);
+
+            // assert
+            assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
     }
 
     @DisplayName("재고를 차감할 때,")

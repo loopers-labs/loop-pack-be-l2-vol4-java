@@ -44,7 +44,7 @@ class LikeFacadeIntegrationTest {
     @Nested
     class AddLike {
 
-        @DisplayName("정상 요청이면, DB에 저장되고 LikeInfo를 반환한다.")
+        @DisplayName("정상 요청이면, DB에 저장되고 LikeInfo를 반환하며 likeCount가 증가한다.")
         @Test
         void returnsLikeInfo_whenRequestIsValid() {
             // arrange
@@ -59,6 +59,8 @@ class LikeFacadeIntegrationTest {
                 () -> assertThat(result.userId()).isEqualTo(1L),
                 () -> assertThat(result.productId()).isEqualTo(product.getId())
             );
+            ProductModel updated = productJpaRepository.findById(product.getId()).orElseThrow();
+            assertThat(updated.getLikeCount()).isEqualTo(1L);
         }
 
         @DisplayName("이미 좋아요한 상품이면, CONFLICT 예외가 발생한다.")
@@ -94,7 +96,7 @@ class LikeFacadeIntegrationTest {
     @Nested
     class CancelLike {
 
-        @DisplayName("좋아요한 상품이면, DB에서 삭제된다.")
+        @DisplayName("좋아요한 상품이면, DB에서 삭제되고 likeCount가 감소한다.")
         @Test
         void deletesLike_whenLikeExists() {
             // arrange
@@ -106,6 +108,8 @@ class LikeFacadeIntegrationTest {
 
             // assert
             assertThat(likeJpaRepository.findByUserIdAndProductId(1L, product.getId())).isEmpty();
+            ProductModel updated = productJpaRepository.findById(product.getId()).orElseThrow();
+            assertThat(updated.getLikeCount()).isEqualTo(0L);
         }
 
         @DisplayName("좋아요하지 않은 상품이면, NOT_FOUND 예외가 발생한다.")

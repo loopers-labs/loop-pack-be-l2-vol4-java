@@ -7,6 +7,8 @@ import com.loopers.order.domain.OrderService;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,8 +40,12 @@ public class OrderFacade {
     }
 
     @Transactional(readOnly = true)
-    public OrderInfo getOrder(Long orderId) {
+    public OrderInfo getOrder(Long userId, Long orderId) {
         OrderModel order = orderService.getOrThrow(orderRepository.find(orderId));
+        // [fix] 타인의 주문 조회 시 403 처리 누락
+        if (!order.getUserId().equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인의 주문만 조회할 수 있습니다.");
+        }
         return OrderInfo.from(order);
     }
 }

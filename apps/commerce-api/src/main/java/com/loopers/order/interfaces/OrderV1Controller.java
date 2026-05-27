@@ -40,7 +40,7 @@ public class OrderV1Controller {
         @CurrentUser LoginUser loginUser,
         @PathVariable Long orderId
     ) {
-        OrderInfo info = orderFacade.getOrder(orderId);
+        OrderInfo info = orderFacade.getOrder(loginUser.id(), orderId);
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 }
