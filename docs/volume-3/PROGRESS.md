@@ -2,7 +2,7 @@
 
 소스: `docs/volume-2/` (01-requirements · 02-sequence-diagrams · 03-class-diagram · 04-erd)
 출력: `docs/volume-3/`
-현재: PRD-1·PRD-2·PRD-3·PRD-4·LIK-3 5개 배치 commit 완료. 다음 배치(ORD-1~) 대기.
+현재: ORD-1~6(17~22번) 배치 진행 중 — 사용자 리뷰 반영 리팩터(연관 끊기·Active 조회·총액 facade 합산) 완료, 전체 테스트 green. 최종 확인 후 commit 대기.
 
 총 22개 cycle. User 도메인은 volume-1에서 완료된 정식 참조 구현이라 대상에서 제외.
 
@@ -24,12 +24,12 @@
 | 14 | PRD-3 | 상품 목록(admin) | Product | PRD-5 | commit | ✅ done |
 | 15 | PRD-4 | 상품 상세(admin) | Product | PRD-5 | commit | ✅ done |
 | 16 | LIK-3 | 좋아요한 상품 목록 | Like | PRD-1 projection | commit | ✅ done |
-| 17 | ORD-1 | 단건 주문 | Order | Product, User | - | ⬜ todo |
-| 18 | ORD-2 | 다중 항목 주문 | Order | ORD-1 | - | ⬜ todo |
-| 19 | ORD-4 | 본인 주문 상세 | Order | ORD-1 | - | ⬜ todo |
-| 20 | ORD-3 | 본인 주문 내역(날짜 범위) | Order | ORD-1 | - | ⬜ todo |
-| 21 | ORD-5 | 관리자 주문 목록 | Order | ORD-1, admin 인증 | - | ⬜ todo |
-| 22 | ORD-6 | 관리자 주문 상세 | Order | ORD-1, admin 인증 | - | ⬜ todo |
+| 17 | ORD-1 | 단건 주문 | Order | Product, User | review | 🔄 진행 |
+| 18 | ORD-2 | 다중 항목 주문 | Order | ORD-1 | review | 🔄 진행 |
+| 19 | ORD-4 | 본인 주문 상세 | Order | ORD-1 | review | 🔄 진행 |
+| 20 | ORD-3 | 본인 주문 내역(날짜 범위) | Order | ORD-1 | review | 🔄 진행 |
+| 21 | ORD-5 | 관리자 주문 목록 | Order | ORD-1, admin 인증 | review | 🔄 진행 |
+| 22 | ORD-6 | 관리자 주문 상세 | Order | ORD-1, admin 인증 | review | 🔄 진행 |
 
 `단계` = 8단계(spec→plan→task→analyze→implement→test→review→commit) 중 현재 위치, `상태` = ⬜ todo / 🔄 진행 / ✅ done.
 
