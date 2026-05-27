@@ -8,5 +8,6 @@ public interface OrderRepository {
     Optional<OrderModel> find(Long id);
     Optional<OrderModel> findByIdAndUserLoginId(Long id, String userLoginId);
     List<OrderModel> findAll();
+    List<OrderModel> findAll(int page, int size);
     List<OrderModel> findAllByUserLoginId(String userLoginId);
 }

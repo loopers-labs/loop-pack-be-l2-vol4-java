@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.application.common.PageCriteria;
 import com.loopers.domain.order.OrderProductCommand;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -26,9 +27,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Component
 public class OrderFacade {
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderService orderService = new OrderService();
@@ -47,7 +45,7 @@ public class OrderFacade {
             .filter(order -> isWithin(order, startAt, endAt))
             .toList();
 
-        return paginate(orders, page, size).stream()
+        return PageCriteria.of(page, size).slice(orders).stream()
             .map(OrderInfo::from)
             .toList();
     }
@@ -61,7 +59,8 @@ public class OrderFacade {
 
     @Transactional(readOnly = true)
     public List<OrderInfo> getAllOrders(Integer page, Integer size) {
-        return paginate(orderRepository.findAll(), page, size).stream()
+        PageCriteria pageCriteria = PageCriteria.of(page, size);
+        return orderRepository.findAll(pageCriteria.page(), pageCriteria.size()).stream()
             .map(OrderInfo::from)
             .toList();
     }
@@ -96,28 +95,5 @@ public class OrderFacade {
         }
 
         return true;
-    }
-
-    private List<OrderModel> paginate(List<OrderModel> orders, Integer page, Integer size) {
-        int requestedPage = page == null ? DEFAULT_PAGE : page;
-        int requestedSize = size == null ? DEFAULT_SIZE : size;
-        validatePage(requestedPage, requestedSize);
-
-        int fromIndex = requestedPage * requestedSize;
-        if (fromIndex >= orders.size()) {
-            return List.of();
-        }
-
-        int toIndex = Math.min(fromIndex + requestedSize, orders.size());
-        return orders.subList(fromIndex, toIndex);
-    }
-
-    private void validatePage(int page, int size) {
-        if (page < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 번호는 0 이상이어야 합니다.");
-        }
-        if (size < 1) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 크기는 1 이상이어야 합니다.");
-        }
     }
 }

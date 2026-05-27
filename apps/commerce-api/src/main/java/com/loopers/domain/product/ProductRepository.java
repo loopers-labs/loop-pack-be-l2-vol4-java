@@ -8,6 +8,8 @@ public interface ProductRepository {
     Optional<ProductModel> find(Long id);
     List<ProductModel> findAll();
     List<ProductModel> findAll(ProductSort sort);
+    List<ProductModel> findAll(ProductSort sort, int page, int size);
     List<ProductModel> findAllByBrandId(Long brandId);
     List<ProductModel> findAllByBrandId(Long brandId, ProductSort sort);
+    List<ProductModel> findAllByBrandId(Long brandId, ProductSort sort, int page, int size);
 }

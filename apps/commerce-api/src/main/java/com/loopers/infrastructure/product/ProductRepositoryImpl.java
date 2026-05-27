@@ -4,6 +4,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
@@ -36,6 +37,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAll(ProductSort sort, int page, int size) {
+        return productJpaRepository.findAllByDeletedAtIsNull(PageRequest.of(page, size, toJpaSort(sort)));
+    }
+
+    @Override
     public List<ProductModel> findAllByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
     }
@@ -43,6 +49,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public List<ProductModel> findAllByBrandId(Long brandId, ProductSort sort) {
         return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, toJpaSort(sort));
+    }
+
+    @Override
+    public List<ProductModel> findAllByBrandId(Long brandId, ProductSort sort, int page, int size) {
+        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(
+            brandId,
+            PageRequest.of(page, size, toJpaSort(sort))
+        );
     }
 
     private Sort toJpaSort(ProductSort sort) {

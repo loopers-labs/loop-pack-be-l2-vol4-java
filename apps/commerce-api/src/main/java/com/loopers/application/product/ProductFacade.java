@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.application.common.PageCriteria;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductCatalogService;
@@ -21,9 +22,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductCatalogService productCatalogService = new ProductCatalogService();
@@ -60,13 +58,13 @@ public class ProductFacade {
         }
 
         ProductSort productSort = ProductSort.from(sort);
+        PageCriteria pageCriteria = PageCriteria.of(page, size);
         List<ProductModel> products = brandId == null
-            ? productRepository.findAll(productSort)
-            : productRepository.findAllByBrandId(brandId, productSort);
+            ? productRepository.findAll(productSort, pageCriteria.page(), pageCriteria.size())
+            : productRepository.findAllByBrandId(brandId, productSort, pageCriteria.page(), pageCriteria.size());
 
-        List<ProductModel> pagedProducts = paginate(products, page, size);
-        Map<Long, BrandModel> brandsById = findBrandsByProduct(pagedProducts);
-        List<ProductDetail> productDetails = productCatalogService.getProductDetails(pagedProducts, brandsById);
+        Map<Long, BrandModel> brandsById = findBrandsByProduct(products);
+        List<ProductDetail> productDetails = productCatalogService.getProductDetails(products, brandsById);
         return productDetails.stream()
             .map(ProductInfo::from)
             .toList();
@@ -104,28 +102,5 @@ public class ProductFacade {
             .distinct()
             .map(this::getBrand)
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
-    }
-
-    private List<ProductModel> paginate(List<ProductModel> products, Integer page, Integer size) {
-        int requestedPage = page == null ? DEFAULT_PAGE : page;
-        int requestedSize = size == null ? DEFAULT_SIZE : size;
-        validatePage(requestedPage, requestedSize);
-
-        int fromIndex = requestedPage * requestedSize;
-        if (fromIndex >= products.size()) {
-            return List.of();
-        }
-
-        int toIndex = Math.min(fromIndex + requestedSize, products.size());
-        return products.subList(fromIndex, toIndex);
-    }
-
-    private void validatePage(int page, int size) {
-        if (page < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 번호는 0 이상이어야 합니다.");
-        }
-        if (size < 1) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 크기는 1 이상이어야 합니다.");
-        }
     }
 }
