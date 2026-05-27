@@ -8,6 +8,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -17,10 +19,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.projection.ProductAdminView;
+import com.loopers.domain.product.projection.ProductDetail;
+import com.loopers.domain.product.projection.ProductSummary;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -169,6 +177,144 @@ class ProductFacadeTest {
 
             // assert
             then(productRepository).should().findActiveById(productId);
+        }
+    }
+
+    @DisplayName("상품 목록을 조회할 때,")
+    @Nested
+    class ReadProducts {
+
+        @DisplayName("정상 요청이면 조회 결과를 ProductSummaryInfo 페이지로 변환해 반환한다.")
+        @Test
+        void returnsSummaryInfoPage_whenRequestIsValid() {
+            // arrange
+            ProductSummary summary = new ProductSummary(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, 5, 3);
+            given(productRepository.findActiveSummaries(null, ProductSortType.LATEST, 0, 20))
+                .willReturn(new PageImpl<>(List.of(summary)));
+
+            // act
+            Page<ProductSummaryInfo> result = productFacade.readProducts(null, ProductSortType.LATEST, 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getContent()).hasSize(1),
+                () -> assertThat(result.getContent().get(0).isAvailable()).isTrue(),
+                () -> assertThat(result.getContent().get(0).likeCount()).isEqualTo(3),
+                () -> then(productRepository).should().findActiveSummaries(null, ProductSortType.LATEST, 0, 20)
+            );
+        }
+
+        @DisplayName("재고가 0이면 가용 여부가 false로 변환된다.")
+        @Test
+        void marksUnavailable_whenStockIsZero() {
+            // arrange
+            ProductSummary summary = new ProductSummary(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, 0, 0);
+            given(productRepository.findActiveSummaries(null, ProductSortType.LATEST, 0, 20))
+                .willReturn(new PageImpl<>(List.of(summary)));
+
+            // act
+            Page<ProductSummaryInfo> result = productFacade.readProducts(null, ProductSortType.LATEST, 0, 20);
+
+            // assert
+            assertThat(result.getContent().get(0).isAvailable()).isFalse();
+        }
+    }
+
+    @DisplayName("상품 상세를 조회할 때,")
+    @Nested
+    class ReadProduct {
+
+        @DisplayName("활성 상품이면 상세 정보를 변환해 반환한다.")
+        @Test
+        void returnsDetailInfo_whenProductIsActive() {
+            // arrange
+            ProductDetail detail = new ProductDetail(1L, "감성 가디건", "포근한 가디건", 1L, "감성 브랜드", 39_000, 5, 2);
+            given(productRepository.getActiveDetailById(1L)).willReturn(detail);
+
+            // act
+            ProductDetailInfo result = productFacade.readProduct(1L);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.productId()).isEqualTo(1L),
+                () -> assertThat(result.isAvailable()).isTrue(),
+                () -> assertThat(result.likeCount()).isEqualTo(2)
+            );
+        }
+
+        @DisplayName("상품이 없거나 삭제되어 조회에 실패하면 NOT_FOUND 예외가 전파된다.")
+        @Test
+        void throwsNotFound_whenProductIsAbsent() {
+            // arrange
+            given(productRepository.getActiveDetailById(1L))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
+
+            // act & assert
+            assertThatThrownBy(() -> productFacade.readProduct(1L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("관리자 상품 목록을 조회할 때,")
+    @Nested
+    class ReadProductsForAdmin {
+
+        @DisplayName("정상 요청이면 조회 결과를 ProductAdminInfo 페이지로 변환해 반환한다.")
+        @Test
+        void returnsAdminInfoPage_whenRequestIsValid() {
+            // arrange
+            ProductAdminView view =
+                new ProductAdminView(1L, "감성 가디건", "설명", 1L, "감성 브랜드", 39_000, 50, ZonedDateTime.now(), ZonedDateTime.now());
+            given(productRepository.findActiveAdminViews(null, 0, 20)).willReturn(new PageImpl<>(List.of(view)));
+
+            // act
+            Page<ProductAdminInfo> result = productFacade.readProductsForAdmin(null, 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getContent()).hasSize(1),
+                () -> assertThat(result.getContent().get(0).stock()).isEqualTo(50),
+                () -> then(productRepository).should().findActiveAdminViews(null, 0, 20)
+            );
+        }
+    }
+
+    @DisplayName("관리자 상품 상세를 조회할 때,")
+    @Nested
+    class ReadProductForAdmin {
+
+        @DisplayName("활성 상품이면 상세 정보를 변환해 반환한다.")
+        @Test
+        void returnsAdminInfo_whenProductIsActive() {
+            // arrange
+            ProductAdminView view =
+                new ProductAdminView(1L, "감성 가디건", "설명", 1L, "감성 브랜드", 39_000, 50, ZonedDateTime.now(), ZonedDateTime.now());
+            given(productRepository.getActiveAdminViewById(1L)).willReturn(view);
+
+            // act
+            ProductAdminInfo result = productFacade.readProductForAdmin(1L);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.productId()).isEqualTo(1L),
+                () -> assertThat(result.stock()).isEqualTo(50)
+            );
+        }
+
+        @DisplayName("상품이 없거나 삭제되어 조회에 실패하면 NOT_FOUND 예외가 전파된다.")
+        @Test
+        void throwsNotFound_whenProductIsAbsent() {
+            // arrange
+            given(productRepository.getActiveAdminViewById(1L))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
+
+            // act & assert
+            assertThatThrownBy(() -> productFacade.readProductForAdmin(1L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }

@@ -1,5 +1,11 @@
 package com.loopers.interfaces.api.product;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+
+import com.loopers.application.product.ProductAdminInfo;
 import com.loopers.application.product.ProductCreateInfo;
 import com.loopers.application.product.ProductUpdateInfo;
 
@@ -55,6 +61,58 @@ public class ProductAdminV1Dto {
 
         public static UpdateResponse from(ProductUpdateInfo productUpdateInfo) {
             return new UpdateResponse(productUpdateInfo.productId());
+        }
+    }
+
+    public record BrandResponse(Long brandId, String name) {
+    }
+
+    public record DetailResponse(
+        Long productId,
+        String name,
+        String description,
+        BrandResponse brand,
+        Integer price,
+        Integer stock,
+        ZonedDateTime createdAt,
+        ZonedDateTime updatedAt
+    ) {
+
+        public static DetailResponse from(ProductAdminInfo productAdminInfo) {
+            return new DetailResponse(
+                productAdminInfo.productId(),
+                productAdminInfo.name(),
+                productAdminInfo.description(),
+                new BrandResponse(productAdminInfo.brandId(), productAdminInfo.brandName()),
+                productAdminInfo.price(),
+                productAdminInfo.stock(),
+                productAdminInfo.createdAt(),
+                productAdminInfo.updatedAt()
+            );
+        }
+    }
+
+    public record PageResponse(
+        List<DetailResponse> content,
+        int page,
+        int size,
+        long totalElements,
+        int totalPages
+    ) {
+
+        public static PageResponse from(Page<ProductAdminInfo> productsAdminInfo) {
+            List<DetailResponse> content = productsAdminInfo.getContent()
+                .stream()
+                .map(DetailResponse::from)
+                .toList();
+
+            return new PageResponse(
+                content,
+                productsAdminInfo.getNumber(),
+                productsAdminInfo.getSize(),
+                productsAdminInfo.getTotalElements(),
+                productsAdminInfo.getTotalPages()
+            );
         }
     }
 }

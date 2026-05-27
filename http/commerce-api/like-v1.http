@@ -38,3 +38,21 @@ DELETE http://localhost:8080/api/v1/products/1/likes
 DELETE http://localhost:8080/api/v1/products/99999/likes
 X-Loopers-LoginId: testuser
 X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요한 상품 목록 - 본인 (200 OK)
+GET http://localhost:8080/api/v1/users/1/likes?page=0&size=20
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요한 상품 목록 - 타인 식별자 (200 OK, 빈 목록)
+GET http://localhost:8080/api/v1/users/99999/likes?page=0&size=20
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 좋아요한 상품 목록 - 회원 인증 헤더 누락 (401 Unauthorized)
+GET http://localhost:8080/api/v1/users/1/likes?page=0&size=20
+
+### 좋아요한 상품 목록 - size 범위 초과 (400 Bad Request)
+GET http://localhost:8080/api/v1/users/1/likes?page=0&size=101
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030

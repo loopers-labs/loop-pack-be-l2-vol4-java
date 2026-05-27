@@ -1,8 +1,11 @@
 package com.loopers.application.like;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.loopers.application.product.ProductSummaryInfo;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
@@ -44,5 +47,15 @@ public class LikeFacade {
         ProductModel product = productRepository.getActiveById(productId);
 
         likeRepository.deleteByUserIdAndProductId(user.getId(), product.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductSummaryInfo> readLikedProducts(Long authUserId, Long pathUserId, int page, int size) {
+        if (!authUserId.equals(pathUserId)) {
+            return Page.empty(PageRequest.of(page, size));
+        }
+
+        return likeRepository.findLikedProductSummaries(authUserId, page, size)
+            .map(ProductSummaryInfo::from);
     }
 }

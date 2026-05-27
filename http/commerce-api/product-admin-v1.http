@@ -1,3 +1,29 @@
+### 상품 목록 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 상품 목록 - 브랜드 필터 (200 OK)
+GET http://localhost:8080/api-admin/v1/products?brandId=1&page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 상품 목록 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=20
+
+### 상품 목록 - size 범위 초과 (400 Bad Request)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=101
+X-Loopers-Ldap: loopers.admin
+
+### 상품 상세 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 상세 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/products/1
+
+### 상품 상세 - 미존재 (404 Not Found)
+GET http://localhost:8080/api-admin/v1/products/99999
+X-Loopers-Ldap: loopers.admin
+
 ### 상품 등록 - 정상 (201 Created)
 POST http://localhost:8080/api-admin/v1/products
 Content-Type: application/json

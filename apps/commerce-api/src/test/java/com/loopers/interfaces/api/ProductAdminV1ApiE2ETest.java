@@ -3,6 +3,7 @@ package com.loopers.interfaces.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
@@ -31,7 +32,7 @@ import com.loopers.utils.DatabaseCleanUp;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductAdminV1ApiE2ETest {
 
-    private static final String ENDPOINT_REGISTER = "/api-admin/v1/products";
+    private static final String ENDPOINT = "/api-admin/v1/products";
     private static final String LDAP_HEADER = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
     private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
@@ -86,6 +87,232 @@ class ProductAdminV1ApiE2ETest {
         return productJpaRepository.save(product);
     }
 
+    private HttpEntity<Void> adminGet() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(LDAP_HEADER, ADMIN_LDAP);
+
+        return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<Void> guestGet() {
+        return new HttpEntity<>(new HttpHeaders());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> contentOf(ResponseEntity<ApiResponse<Map<String, Object>>> response) {
+        return (List<Map<String, Object>>) response.getBody().data().get("content");
+    }
+
+    @DisplayName("상품 목록 - GET /api-admin/v1/products")
+    @Nested
+    class ReadProducts {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 삭제되지 않은 상품 목록과 페이지 메타가 반환되고 각 항목은 정확 재고·등록/갱신 시각을 포함한다.")
+        @Test
+        void returnsOk_withProductsAndMeta() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "상품1");
+            ProductModel deletedProduct = saveProduct(brand.getId(), "삭제 상품");
+            deletedProduct.delete();
+            productJpaRepository.saveAndFlush(deletedProduct);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            Map<String, Object> item = contentOf(response).get(0);
+            Map<?, ?> itemBrand = (Map<?, ?>) item.get("brand");
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data())
+                    .containsKeys("content", "page", "size", "totalElements", "totalPages"),
+                () -> assertThat(contentOf(response)).hasSize(1),
+                () -> assertThat(((Number) response.getBody().data().get("totalElements")).longValue()).isEqualTo(1L),
+                () -> assertThat(item)
+                    .containsOnlyKeys("productId", "name", "description", "brand", "price", "stock", "createdAt", "updatedAt"),
+                () -> assertThat(((Number) item.get("productId")).longValue()).isEqualTo(product.getId()),
+                () -> assertThat(item.get("name")).isEqualTo("상품1"),
+                () -> assertThat(item.get("description")).isEqualTo("포근한 감성 가디건"),
+                () -> assertThat(((Number) item.get("price")).intValue()).isEqualTo(39_000),
+                () -> assertThat(((Number) item.get("stock")).intValue()).isEqualTo(50),
+                () -> assertThat(((Number) itemBrand.get("brandId")).longValue()).isEqualTo(brand.getId()),
+                () -> assertThat(itemBrand.get("name")).isEqualTo("감성 브랜드"),
+                () -> assertThat(item.get("createdAt")).isNotNull(),
+                () -> assertThat(item.get("updatedAt")).isNotNull()
+            );
+        }
+
+        @DisplayName("brandId 필터를 지정하면, 해당 브랜드의 상품만 반환된다.")
+        @Test
+        void filtersByBrandId() {
+            // arrange
+            BrandModel brandA = saveBrand("브랜드 A");
+            BrandModel brandB = saveBrand("브랜드 B");
+            ProductModel productA = saveProduct(brandA.getId(), "A 상품");
+            saveProduct(brandB.getId(), "B 상품");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "?brandId=" + brandA.getId() + "&page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(contentOf(response)).hasSize(1),
+                () -> assertThat(((Number) contentOf(response).get(0).get("productId")).longValue())
+                    .isEqualTo(productA.getId())
+            );
+        }
+
+        @DisplayName("활성 상품이 없으면, 200 OK와 함께 빈 목록이 반환된다.")
+        @Test
+        void returnsOk_withEmptyContent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(contentOf(response)).isEmpty()
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "?page=0&size=20",
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+    }
+
+    @DisplayName("상품 상세 - GET /api-admin/v1/products/{productId}")
+    @Nested
+    class ReadProduct {
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 정확 재고·등록/갱신 시각을 포함한 상세가 반환된다.")
+        @Test
+        void returnsOk_withDetail() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.getId(),
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            Map<String, Object> data = response.getBody().data();
+            Map<?, ?> dataBrand = (Map<?, ?>) data.get("brand");
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data)
+                    .containsOnlyKeys("productId", "name", "description", "brand", "price", "stock", "createdAt", "updatedAt"),
+                () -> assertThat(((Number) data.get("productId")).longValue()).isEqualTo(product.getId()),
+                () -> assertThat(data.get("name")).isEqualTo("감성 가디건"),
+                () -> assertThat(data.get("description")).isEqualTo("포근한 감성 가디건"),
+                () -> assertThat(((Number) data.get("price")).intValue()).isEqualTo(39_000),
+                () -> assertThat(((Number) data.get("stock")).intValue()).isEqualTo(50),
+                () -> assertThat(((Number) dataBrand.get("brandId")).longValue()).isEqualTo(brand.getId()),
+                () -> assertThat(dataBrand.get("name")).isEqualTo("감성 브랜드"),
+                () -> assertThat(data.get("createdAt")).isNotNull(),
+                () -> assertThat(data.get("updatedAt")).isNotNull()
+            );
+        }
+
+        @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.getId(),
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("존재하지 않는 상품이면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenProductIsAbsent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/99999",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("삭제된 상품이면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenProductIsDeleted() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건");
+            product.delete();
+            productJpaRepository.saveAndFlush(product);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.getId(),
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+    }
+
     @DisplayName("상품 등록 - POST /api-admin/v1/products")
     @Nested
     class CreateProduct {
@@ -100,7 +327,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -126,7 +353,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 jsonRequestWithoutAdmin(requestBody),
                 MAP_RESPONSE
@@ -150,7 +377,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -175,7 +402,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -200,7 +427,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -225,7 +452,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -250,7 +477,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER,
+                ENDPOINT,
                 HttpMethod.POST,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -282,7 +509,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.PUT,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -311,7 +538,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.PUT,
                 jsonRequestWithoutAdmin(requestBody),
                 MAP_RESPONSE
@@ -333,7 +560,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/99999",
+                ENDPOINT + "/99999",
                 HttpMethod.PUT,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -357,7 +584,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.PUT,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -381,7 +608,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.PUT,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -405,7 +632,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.PUT,
                 adminJsonRequest(requestBody),
                 MAP_RESPONSE
@@ -432,7 +659,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.DELETE,
                 adminJsonRequest(null),
                 MAP_RESPONSE
@@ -453,7 +680,7 @@ class ProductAdminV1ApiE2ETest {
             // arrange
             BrandModel brand = saveBrand("감성 브랜드");
             ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
-            String endpoint = ENDPOINT_REGISTER + "/" + savedProduct.getId();
+            String endpoint = ENDPOINT + "/" + savedProduct.getId();
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> firstResponse = testRestTemplate.exchange(
@@ -474,7 +701,7 @@ class ProductAdminV1ApiE2ETest {
         void returnsOk_whenTargetIsAbsent() {
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/99999",
+                ENDPOINT + "/99999",
                 HttpMethod.DELETE,
                 adminJsonRequest(null),
                 MAP_RESPONSE
@@ -496,7 +723,7 @@ class ProductAdminV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "/" + savedProduct.getId(),
+                ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.DELETE,
                 jsonRequestWithoutAdmin(null),
                 MAP_RESPONSE

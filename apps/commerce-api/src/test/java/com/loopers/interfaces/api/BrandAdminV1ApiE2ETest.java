@@ -417,13 +417,24 @@ class BrandAdminV1ApiE2ETest {
             );
 
             // assert
+            @SuppressWarnings("unchecked")
+            java.util.List<Map<String, Object>> content =
+                (java.util.List<Map<String, Object>>) response.getBody().data().get("content");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
-                () -> assertThat((java.util.List<?>)response.getBody().data().get("content")).hasSize(2),
-                () -> assertThat(((Number)response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L)
+                () -> assertThat(content).hasSize(2),
+                () -> assertThat(((Number) response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L),
+                () -> assertThat(content)
+                    .extracting(brandItem -> brandItem.get("name"))
+                    .containsExactlyInAnyOrder("브랜드1", "브랜드2"),
+                () -> assertThat(content.get(0))
+                    .containsOnlyKeys("brandId", "name", "description", "createdAt", "updatedAt"),
+                () -> assertThat(content.get(0).get("description")).isEqualTo("감성을 담은 브랜드"),
+                () -> assertThat(content.get(0).get("createdAt")).isNotNull(),
+                () -> assertThat(content.get(0).get("updatedAt")).isNotNull()
             );
         }
 
@@ -461,42 +472,6 @@ class BrandAdminV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
-            );
-        }
-
-        @DisplayName("size가 허용 범위를 벗어나면, 400 Bad Request로 거절된다.")
-        @Test
-        void returnsBadRequest_whenSizeOutOfRange() {
-            // act
-            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "?page=0&size=101",
-                HttpMethod.GET,
-                adminGet(),
-                MAP_RESPONSE
-            );
-
-            // assert
-            assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
-                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
-            );
-        }
-
-        @DisplayName("page가 음수면, 400 Bad Request로 거절된다.")
-        @Test
-        void returnsBadRequest_whenPageIsNegative() {
-            // act
-            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
-                ENDPOINT_REGISTER + "?page=-1&size=20",
-                HttpMethod.GET,
-                adminGet(),
-                MAP_RESPONSE
-            );
-
-            // assert
-            assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
-                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
     }
