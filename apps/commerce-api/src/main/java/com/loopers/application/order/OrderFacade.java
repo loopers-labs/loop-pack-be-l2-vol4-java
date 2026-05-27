@@ -19,6 +19,8 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.Quantity;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -29,51 +31,21 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OrderFacade {
 
+    private final UserRepository userRepository;
     private final ProductRepository productRepository;
-
     private final BrandRepository brandRepository;
-
     private final OrderRepository orderRepository;
 
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands) {
+        UserModel user = userRepository.getActiveById(userId);
+
         validateNoDuplicateProduct(itemCommands);
-
-        List<OrderItemCommand> sortedItemCommands = itemCommands.stream()
-            .sorted(Comparator.comparing(OrderItemCommand::productId))
-            .toList();
-
-        List<OrderItemModel> orderItems = new ArrayList<>();
-
-        for (OrderItemCommand itemCommand : sortedItemCommands) {
-            Quantity quantity = Quantity.from(itemCommand.quantity());
-            ProductModel product = productRepository.getActiveById(itemCommand.productId());
-            BrandModel brand = brandRepository.getActiveById(product.getBrandId());
-
-            int decreasedCount = productRepository.decreaseStock(product.getId(), quantity.value());
-
-            if (decreasedCount == 0) {
-                throw new CoreException(ErrorType.CONFLICT, "상품 재고가 부족합니다.");
-            }
-
-            OrderItemModel orderItem = OrderItemModel.builder()
-                .productId(product.getId())
-                .productName(product.getName().value())
-                .productBrandName(brand.getName().value())
-                .unitPrice(product.getPrice().value())
-                .rawQuantity(quantity.value())
-                .build();
-
-            orderItems.add(orderItem);
-        }
-
-        int totalPrice = orderItems.stream()
-            .mapToInt(OrderItemModel::totalPrice)
-            .sum();
+        List<OrderItemModel> orderItems = createOrderItems(itemCommands);
 
         OrderModel order = OrderModel.builder()
-            .userId(userId)
+            .userId(user.getId())
             .orderedAt(ZonedDateTime.now())
-            .totalPrice(totalPrice)
+            .totalPrice(calculateTotalPrice(orderItems))
             .build();
 
         OrderModel savedOrder = orderRepository.save(order, orderItems);
@@ -90,6 +62,47 @@ public class OrderFacade {
         if (distinctProductCount < itemCommands.size()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "같은 상품은 한 번에 한 번만 주문할 수 있습니다.");
         }
+    }
+
+    private List<OrderItemModel> createOrderItems(List<OrderItemCommand> itemCommands) {
+        List<OrderItemCommand> sortedItemCommands = itemCommands.stream()
+            .sorted(Comparator.comparing(OrderItemCommand::productId)) // 동시 재고 차감 시 데드락 방지를 위해 id 기준으로 정렬
+            .toList();
+
+        List<OrderItemModel> orderItems = new ArrayList<>();
+
+        for (OrderItemCommand itemCommand : sortedItemCommands) {
+            Quantity quantity = Quantity.from(itemCommand.quantity());
+            ProductModel product = productRepository.getActiveById(itemCommand.productId());
+            BrandModel brand = brandRepository.getActiveById(product.getBrandId());
+
+            decreaseStock(product, quantity);
+
+            OrderItemModel orderItem = OrderItemModel.builder()
+                .productId(product.getId())
+                .productName(product.getName().value())
+                .productBrandName(brand.getName().value())
+                .unitPrice(product.getPrice().value())
+                .rawQuantity(quantity.value())
+                .build();
+            orderItems.add(orderItem);
+        }
+
+        return List.copyOf(orderItems);
+    }
+
+    private void decreaseStock(ProductModel product, Quantity quantity) {
+        int decreasedCount = productRepository.decreaseStock(product.getId(), quantity.value());
+
+        if (decreasedCount == 0) {
+            throw new CoreException(ErrorType.CONFLICT, "상품 재고가 부족합니다.");
+        }
+    }
+
+    private int calculateTotalPrice(List<OrderItemModel> orderItems) {
+        return orderItems.stream()
+            .mapToInt(OrderItemModel::totalPrice)
+            .sum();
     }
 
     @Transactional(readOnly = true)
