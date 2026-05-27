@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -37,13 +39,10 @@ public class ProductFacade {
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long productId) {
         ProductModel product = productService.getOrThrow(productRepository.find(productId));
-        String brandName = null;
-        if (product.getBrandId() != null) {
-            brandName = brandRepository.find(product.getBrandId())
-                .map(BrandModel::getName)
-                .orElse(null);
-        }
-        return ProductInfo.from(product, brandName);
+        Optional<BrandModel> brand = product.getBrandId() != null
+            ? brandRepository.find(product.getBrandId())
+            : Optional.empty();
+        return ProductInfo.from(product, productService.resolveBrandName(brand));
     }
 
     @Transactional(readOnly = true)
@@ -57,12 +56,12 @@ public class ProductFacade {
             .distinct()
             .toList();
 
-        Map<Long, String> brandNameMap = brandRepository.findAllByIds(brandIds)
+        Map<Long, BrandModel> brandMap = brandRepository.findAllByIds(brandIds)
             .stream()
-            .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
+            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
         return products.stream()
-            .map(p -> ProductInfo.from(p, brandNameMap.get(p.getBrandId())))
+            .map(p -> ProductInfo.from(p, productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.getBrandId())))))
             .toList();
     }
 

@@ -3,9 +3,13 @@ package com.loopers.brand.application;
 import com.loopers.brand.domain.BrandModel;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.brand.domain.BrandService;
+import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -13,6 +17,7 @@ public class BrandFacade {
 
     private final BrandService brandService;
     private final BrandRepository brandRepository;
+    private final ProductRepository productRepository;
 
     @Transactional
     public BrandInfo createBrand(String name, String description) {
@@ -36,7 +41,12 @@ public class BrandFacade {
     @Transactional
     public void deleteBrand(Long brandId) {
         BrandModel brand = brandService.getOrThrow(brandRepository.find(brandId));
-        brand.delete();
+        List<ProductModel> products = productRepository.findAllByBrandId(brandId);
+
+        // [fix] 브랜드 삭제 시 소속 상품 연쇄 소프트 딜리트 누락
+        brandService.deleteCascade(brand, products);
+
+        products.forEach(productRepository::save);
         brandRepository.save(brand);
     }
 }

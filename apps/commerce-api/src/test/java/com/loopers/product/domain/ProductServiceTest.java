@@ -1,5 +1,6 @@
 package com.loopers.product.domain;
 
+import com.loopers.brand.domain.BrandModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +49,34 @@ class ProductServiceTest {
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("resolveBrandName을 호출할 때,")
+    @Nested
+    class ResolveBrandName {
+
+        @DisplayName("BrandModel이 존재하면, 브랜드명을 반환한다.")
+        @Test
+        void returnsBrandName_whenBrandExists() {
+            // arrange
+            BrandModel brand = new BrandModel("나이키", "스포츠 브랜드");
+
+            // act
+            String result = productService.resolveBrandName(Optional.of(brand));
+
+            // assert
+            assertThat(result).isEqualTo("나이키");
+        }
+
+        @DisplayName("BrandModel이 존재하지 않으면, null을 반환한다.")
+        @Test
+        void returnsNull_whenBrandNotExists() {
+            // act
+            String result = productService.resolveBrandName(Optional.empty());
+
+            // assert
+            assertThat(result).isNull();
         }
     }
 }

@@ -1,12 +1,10 @@
 package com.loopers.order.application;
 
-import com.loopers.order.domain.OrderItemModel;
 import com.loopers.order.domain.OrderModel;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.OrderService;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
-import com.loopers.product.domain.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -21,21 +21,26 @@ public class OrderFacade {
 
     private final OrderService orderService;
     private final OrderRepository orderRepository;
-    private final ProductService productService;
     private final ProductRepository productRepository;
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
-        List<OrderItemModel> items = commands.stream()
-            .map(command -> {
-                ProductModel product = productService.getOrThrow(productRepository.find(command.productId()));
-                product.decreaseStock(command.quantity());
-                productRepository.save(product);
-                return new OrderItemModel(product.getId(), product.getName(), product.getPrice(), command.quantity());
-            })
+        List<Long> productIds = commands.stream()
+            .map(OrderItemCommand::productId)
             .toList();
 
-        OrderModel order = new OrderModel(userId, items);
+        Map<Long, Integer> quantities = commands.stream()
+            .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
+
+        // 상품 일괄 조회 후 누락 항목 검증 (N+1 방지)
+        List<ProductModel> products = productRepository.findAllByIds(productIds);
+        if (products.size() != productIds.size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
+        }
+
+        OrderModel order = orderService.createOrder(userId, products, quantities);
+
+        products.forEach(productRepository::save);
         return OrderInfo.from(orderRepository.save(order));
     }
 

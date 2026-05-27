@@ -19,6 +19,9 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     @Query("SELECT p FROM ProductModel p WHERE p.id IN :ids AND p.deletedAt IS NULL")
     List<ProductModel> findAllByIds(@Param("ids") List<Long> ids);
 
+    @Query("SELECT p FROM ProductModel p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
+    List<ProductModel> findAllByBrandId(@Param("brandId") Long brandId);
+
     @Modifying
     @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
     void incrementLikeCount(@Param("id") Long id);

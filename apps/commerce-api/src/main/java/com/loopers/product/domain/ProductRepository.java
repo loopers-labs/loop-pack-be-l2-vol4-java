@@ -8,6 +8,7 @@ public interface ProductRepository {
     Optional<ProductModel> find(Long id);
     List<ProductModel> findAll(SortCondition sort, Long brandId, int page, int size);
     List<ProductModel> findAllByIds(List<Long> ids);
+    List<ProductModel> findAllByBrandId(Long brandId);
     // [fix] 좋아요 등록·취소 시 likeCount 미연동 → 원자 UPDATE 메서드 추가
     void incrementLikeCount(Long productId);
     void decrementLikeCount(Long productId);

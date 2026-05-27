@@ -6,13 +6,12 @@ import com.loopers.like.domain.LikeService;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -27,11 +26,8 @@ public class LikeFacade {
     public LikeInfo addLike(Long userId, Long productId) {
         productService.getOrThrow(productRepository.find(productId));
 
-        if (likeRepository.findByUserIdAndProductId(userId, productId).isPresent()) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 좋아요한 상품입니다.");
-        }
-
-        LikeModel like = new LikeModel(userId, productId);
+        Optional<LikeModel> existing = likeRepository.findByUserIdAndProductId(userId, productId);
+        LikeModel like = likeService.createLike(existing, userId, productId);
         LikeInfo saved = LikeInfo.from(likeRepository.save(like));
         productRepository.incrementLikeCount(productId);
         return saved;
@@ -39,7 +35,7 @@ public class LikeFacade {
 
     @Transactional
     public void cancelLike(Long userId, Long productId) {
-        LikeModel like = likeService.getOrThrow(likeRepository.findByUserIdAndProductId(userId, productId));
+        LikeModel like = likeService.cancelLike(likeRepository.findByUserIdAndProductId(userId, productId));
         likeRepository.delete(like);
         productRepository.decrementLikeCount(productId);
     }
