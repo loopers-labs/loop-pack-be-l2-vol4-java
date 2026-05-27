@@ -10,9 +10,9 @@
 | 도메인 | 현재 상태 | 비고 |
 |---|---|---|
 | Member | ✅ 완성 | Member, Password, MemberService, MemberFacade |
-| Product | ⚠️ 재설계 필요 | `ProductModel`에 stock 포함 — 설계 문서와 불일치. Brand 연결 없음 |
-| Brand | ❌ 미구현 | 도메인 객체 없음 |
-| Stock | ❌ 미구현 | Product에 인라인으로 존재 → 분리 필요 |
+| Brand | ✅ 등록 완성 | Entity, DomainService, ApplicationService, Facade, Controller |
+| Product | ⚠️ 등록만 완성 | 재설계 완료. 조회/수정/삭제 미구현 |
+| Stock | ⚠️ 생성만 완성 | 독립 분리 완료. deductStock 미구현 |
 | Like | ❌ 미구현 | |
 | Order | ❌ 미구현 | |
 
@@ -47,7 +47,8 @@
 **도메인 서비스**
 - [x] `domain/brand/service/BrandDomainService`
   - `validateDuplicateName(name)` — 중복 시 `CONFLICT`
-- [ ] getBrand / updateBrand / deleteBrand 흐름 (미구현, 필요 시 추가)
+  - `getBrand(Long)` — 없으면 `NOT_FOUND`
+- [ ] updateBrand / deleteBrand 흐름 (미구현)
 
 **Application Layer**
 - [x] `application/brand/BrandApplicationService`
@@ -68,7 +69,7 @@
 
 **단위 테스트**
 - [x] `domain/brand/BrandTest` — 생성/수정 검증, 소프트딜리트 검증
-- [x] `domain/brand/BrandDomainServiceTest` — 중복 이름 예외
+- [x] `domain/brand/BrandDomainServiceTest` — 중복 이름 예외, getBrand NOT_FOUND
 - [x] `application/brand/BrandApplicationServiceTest` — 정상 등록, 중복 이름 예외
 - ~~`interfaces/api/BrandV1ApiE2ETest`~~ — 이번 주차 제외 (단위 테스트만 진행)
 
@@ -76,38 +77,47 @@
 
 ### Block 3. Product 도메인 재설계
 
-> 기존 `ProductModel`을 `Product`로 재작성. `stock` 인라인 제거, `brandId` / `likeCount` 추가.
+> 기존 `ProductModel`을 `Product`로 재작성. `stock` 인라인 제거, `brandId` / `likeCount` / `description` 추가.
 
 **도메인 모델**
-- [ ] `domain/product/Product` 엔티티 (기존 `ProductModel` 대체)
-  - `SoftDeletableEntity` 상속
-  - `brandId`, `name`, `price`, `likeCount` 필드
-  - `price > 0`, `likeCount >= 0` 제약
-  - 정적 팩토리 메서드 `create(brandId, name, price)`
-  - `update(name, price)` — 브랜드 변경 불가
+- [x] `domain/product/model/Product` 엔티티
+  - `BaseEntity` 상속 (`deletedAt` 포함)
+  - `brandId`, `name`, `description`, `price`, `likeCount` 필드
+  - `price > 0`, `likeCount >= 0` 제약, `name` 50자, `description` 200자
+  - 정적 팩토리 메서드 `create(brandId, name, description, price)`
+  - `update(name, description, price)` — 브랜드 변경 불가
   - `incrementLikeCount()`, `decrementLikeCount()` — `likeCount >= 0` 보장
 
 **Repository**
-- [ ] `domain/product/ProductRepository` 인터페이스 업데이트
-  - `findById`, `findByIds`, `findAll(brandId, sort, pageable)`, `save`, `softDeleteById`, `softDeleteAllByBrandId`
+- [x] `domain/product/repository/ProductRepository` 인터페이스
+  - `findById`, `save`
+- [ ] `findByIds`, `softDeleteAllByBrandId` — 추후 필요 시 추가
 
 **도메인 서비스**
-- [ ] `domain/product/ProductService` 업데이트
-  - `getProduct(Long)` — 없거나 삭제됨 → `NOT_FOUND`
-  - `getByIds(List<Long>)`, `getProducts(brandId, sort, pageable)`
-  - `createProduct(brandId, name, price)` → `Product`
-  - `updateProduct(Long, name, price)` → `Product`
-  - `deleteProduct(Long)`
-  - `incrementLikeCount(Long)`, `decrementLikeCount(Long)`
-  - `softDeleteByBrandId(Long)` — Brand cascade 삭제용
+- [x] `domain/product/service/ProductDomainService`
+  - `createProduct(brandId, name, description, price)` → `Product`
+- [ ] `getProduct(Long)` — NOT_FOUND 처리 (미구현)
+- [ ] `updateProduct`, `deleteProduct`, `incrementLikeCount`, `decrementLikeCount` (미구현)
+
+**Application Layer**
+- [x] `application/product/ProductApplicationService`
+  - `createProduct(brandId, name, description, price, initialQuantity)` — 브랜드 확인 + 상품 + 재고 트랜잭션
+- [x] `application/product/ProductInfo` — 도메인→인터페이스 전달 계약 객체
+- [x] `application/product/ProductFacade`
+  - `createProduct(...)` → `ProductInfo` 반환
+
+**Interface Layer**
+- [x] `interfaces/api/product/ProductV1Controller` — `POST /api-admin/v1/products`
+- [x] `interfaces/api/product/ProductV1Dto` — `RegisterRequest`, `ProductResponse`
 
 **Infrastructure**
-- [ ] `infrastructure/product/ProductJpaRepository` 업데이트
-- [ ] `infrastructure/product/ProductRepositoryImpl` 업데이트
+- [x] `infrastructure/product/ProductJpaRepository`
+- [x] `infrastructure/product/ProductRepositoryImpl`
 
 **단위 테스트**
-- [ ] `domain/product/ProductTest` — likeCount 증감 경계값, 음수 방지
-- [ ] `domain/product/ProductServiceTest` — 없는 ID, 삭제된 상품 조회 예외
+- [x] `domain/product/ProductTest` — 생성 검증, likeCount 증감 경계값
+- [x] `application/product/ProductApplicationServiceTest` — 정상 등록, 브랜드 없음 예외
+- [ ] `domain/product/ProductDomainServiceTest` — 없는 ID 조회 예외 (getProduct 구현 후)
 
 ---
 
@@ -116,31 +126,32 @@
 > `Product`에서 분리된 독립 도메인. 원자적 차감으로 동시성 처리.
 
 **도메인 모델**
-- [ ] `domain/stock/Stock` 엔티티
+- [x] `domain/stock/model/Stock` 엔티티
   - `BaseEntity` 상속
   - `productId`, `quantity` 필드
   - `quantity >= 0` 제약
-  - `isAvailable(int quantity)` — 조회 전용 (차감 전 guard로 사용하지 않음)
-  - `deduct(int quantity)` — `quantity < 0`이면 `StockInsufficientException`
+  - `isAvailable(int quantity)` — 조회 전용
+- [ ] `deduct(int quantity)` — 재고 부족 시 예외 (미구현)
 
 **Repository**
-- [ ] `domain/stock/StockRepository` 인터페이스
+- [x] `domain/stock/repository/StockRepository` 인터페이스
   - `findByProductId(Long)`, `save(Stock)`
-  - `deductStock(Long productId, int quantity) int` — `UPDATE ... WHERE quantity >= ?` 반환 affected rows
+- [ ] `deductStock(Long productId, int quantity) int` — 원자적 차감 (미구현)
 
 **도메인 서비스**
-- [ ] `domain/stock/StockService`
+- [x] `domain/stock/service/StockDomainService`
   - `createStock(Long productId, int initialQuantity)`
-  - `deductStock(Long productId, int quantity)` — affected rows = 0이면 `StockInsufficientException`
+- [ ] `deductStock(Long productId, int quantity)` — affected rows = 0이면 예외 (미구현)
 
 **Infrastructure**
-- [ ] `infrastructure/stock/StockJpaRepository`
-- [ ] `infrastructure/stock/StockRepositoryImpl`
-  - `deductStock`: `@Modifying @Query("UPDATE Stock s SET s.quantity = s.quantity - :qty WHERE s.productId = :id AND s.quantity >= :qty")`
+- [x] `infrastructure/stock/StockJpaRepository`
+- [x] `infrastructure/stock/StockRepositoryImpl`
+- [ ] `deductStock` 원자적 쿼리 (미구현)
 
 **단위 테스트**
-- [ ] `domain/stock/StockTest` — `isAvailable`, `deduct` 경계값 (0, 양수, 음수 시도)
-- [ ] `domain/stock/StockServiceTest` — 재고 부족 예외 흐름
+- [x] `domain/stock/StockTest` — `isAvailable` 경계값, 생성 검증
+- [x] `domain/stock/StockDomainServiceTest` — createStock 정상 흐름
+- [ ] `domain/stock/StockDomainServiceTest` — deductStock 재고 부족 예외 (미구현)
 
 ---
 
@@ -232,19 +243,17 @@
 
 ---
 
-### Block 7. ProductFacade 재설계 (상세 조회 조합)
+### Block 7. ProductFacade 확장 (상세 조회 조합)
 
-> `ProductFacade.getProductDetail()` = `Product + Brand + likeCount` 조합은 Application Layer 역할.
+> 상품 등록은 완성. 조회/수정/삭제 + 브랜드명 조합은 추후 추가.
 
-- [ ] `application/product/ProductFacade` 재작성
-  - `getProductDetail(Long productId)` → `Product` + `Brand` 조합 후 `ProductInfo` 반환
-  - `getProducts(Long brandId, sort, pageable)` → 목록 조회
-  - `createProduct(Long brandId, name, price, initialStock)` → `ProductService` + `StockService` 조합
-  - `updateProduct(Long productId, name, price)` → `ProductService` 위임
-  - `deleteProduct(Long productId)` → `ProductService` 위임
+- [x] `createProduct(...)` — 완성
+- [ ] `getProductDetail(Long productId)` → `Product` + `Brand` 조합 후 `ProductInfo` 반환
+- [ ] `getProducts(Long brandId, sort, pageable)` → 목록 조회
+- [ ] `updateProduct`, `deleteProduct`
 
 - [ ] `application/product/ProductInfo` 업데이트
-  - `brandName` 포함한 상세 정보 DTO
+  - `brandName` 포함한 상세 정보 DTO (현재는 `brandId`만 포함)
 
 ---
 
