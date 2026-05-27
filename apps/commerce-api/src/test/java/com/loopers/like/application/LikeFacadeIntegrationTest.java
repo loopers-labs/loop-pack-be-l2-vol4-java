@@ -48,7 +48,7 @@ class LikeFacadeIntegrationTest {
         @Test
         void returnsLikeInfo_whenRequestIsValid() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
 
             // act
             LikeInfo result = likeFacade.addLike(1L, product.getId());
@@ -67,7 +67,7 @@ class LikeFacadeIntegrationTest {
         @Test
         void throwsConflict_whenAlreadyLiked() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             likeFacade.addLike(1L, product.getId());
 
             // act
@@ -100,7 +100,7 @@ class LikeFacadeIntegrationTest {
         @Test
         void deletesLike_whenLikeExists() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             likeFacade.addLike(1L, product.getId());
 
             // act
@@ -133,7 +133,7 @@ class LikeFacadeIntegrationTest {
         @Test
         void returnsProductInfoList_whenLikedProductsExist() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             likeFacade.addLike(1L, product.getId());
 
             // act

@@ -1,10 +1,14 @@
 package com.loopers.order.application;
 
+import com.loopers.order.domain.OrderItemModel;
 import com.loopers.order.domain.OrderModel;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.OrderService;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.stock.domain.StockModel;
+import com.loopers.stock.domain.StockRepository;
+import com.loopers.stock.domain.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +20,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -25,6 +30,8 @@ public class OrderFacade {
     private final OrderService orderService;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final StockRepository stockRepository;
+    private final StockService stockService;
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
@@ -38,15 +45,51 @@ public class OrderFacade {
         Map<Long, Integer> quantities = commands.stream()
             .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
-        // 상품 일괄 조회 후 누락 항목 검증 (N+1 방지)
         List<ProductModel> products = productRepository.findAllByIds(productIds);
         if (products.size() != productIds.size()) {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
         }
 
         OrderModel order = orderService.createOrder(userId, products, quantities);
+        return OrderInfo.from(orderRepository.save(order));
+    }
 
-        products.forEach(productRepository::save);
+    @Transactional
+    public OrderInfo startPayment(Long userId, Long orderId) {
+        OrderModel order = orderService.getOrThrow(orderRepository.find(orderId));
+        orderService.checkOwnership(order, userId);
+
+        Map<Long, Integer> quantities = order.getItems().stream()
+            .collect(Collectors.toMap(OrderItemModel::getProductId, OrderItemModel::getQuantity));
+
+        List<Long> productIds = order.getItems().stream()
+            .map(OrderItemModel::getProductId)
+            .toList();
+
+        List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        stocks.forEach(stock -> stock.reserve(quantities.get(stock.getProductId())));
+        stocks.forEach(stockRepository::save);
+
+        return OrderInfo.from(order);
+    }
+
+    @Transactional
+    public OrderInfo confirmPayment(Long userId, Long orderId) {
+        OrderModel order = orderService.getOrThrow(orderRepository.find(orderId));
+        orderService.checkOwnership(order, userId);
+
+        Map<Long, Integer> quantities = order.getItems().stream()
+            .collect(Collectors.toMap(OrderItemModel::getProductId, OrderItemModel::getQuantity));
+
+        List<Long> productIds = order.getItems().stream()
+            .map(OrderItemModel::getProductId)
+            .toList();
+
+        List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        stocks.forEach(stock -> stock.confirm(quantities.get(stock.getProductId())));
+        stocks.forEach(stockRepository::save);
+
+        order.confirm();
         return OrderInfo.from(orderRepository.save(order));
     }
 

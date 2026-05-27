@@ -5,13 +5,18 @@ import com.loopers.like.domain.LikeRegistrationPolicy;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.like.domain.LikeService;
 import com.loopers.product.application.ProductInfo;
+import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.stock.domain.StockModel;
+import com.loopers.stock.domain.StockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -20,6 +25,7 @@ public class LikeFacade {
     private final LikeService likeService;
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
+    private final StockRepository stockRepository;
     private final LikeRegistrationPolicy likeRegistrationPolicy;
 
     @Transactional
@@ -45,8 +51,11 @@ public class LikeFacade {
         List<LikeModel> likes = likeRepository.findAllByUserId(userId);
         List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
         // [fix] N+1 문제 → productId 목록으로 IN 쿼리 일괄 조회 (결정 10)
-        return productRepository.findAllByIds(productIds).stream()
-            .map(ProductInfo::from)
+        List<ProductModel> products = productRepository.findAllByIds(productIds);
+        Map<Long, Integer> stockMap = stockRepository.findAllByProductIds(productIds).stream()
+            .collect(Collectors.toMap(StockModel::getProductId, StockModel::availableStock));
+        return products.stream()
+            .map(p -> ProductInfo.from(p, stockMap.getOrDefault(p.getId(), 0)))
             .toList();
     }
 }

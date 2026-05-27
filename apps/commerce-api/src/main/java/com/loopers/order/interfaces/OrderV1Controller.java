@@ -51,6 +51,24 @@ public class OrderV1Controller {
         return ApiResponse.success(responses);
     }
 
+    @PostMapping("/{orderId}/pay/start")
+    public ApiResponse<OrderV1Dto.OrderResponse> startPayment(
+        @CurrentUser LoginUser loginUser,
+        @PathVariable Long orderId
+    ) {
+        OrderInfo info = orderFacade.startPayment(loginUser.id(), orderId);
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
+    }
+
+    @PostMapping("/{orderId}/pay/confirm")
+    public ApiResponse<OrderV1Dto.OrderResponse> confirmPayment(
+        @CurrentUser LoginUser loginUser,
+        @PathVariable Long orderId
+    ) {
+        OrderInfo info = orderFacade.confirmPayment(loginUser.id(), orderId);
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
+    }
+
     @GetMapping("/{orderId}")
     public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
         @CurrentUser LoginUser loginUser,

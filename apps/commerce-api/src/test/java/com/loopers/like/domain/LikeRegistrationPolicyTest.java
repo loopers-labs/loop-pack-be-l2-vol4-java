@@ -37,7 +37,7 @@ class LikeRegistrationPolicyTest {
         @Test
         void throwsConflict_whenAlreadyLiked() {
             // arrange
-            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null);
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, null);
             LikeModel existing = new LikeModel(1L, product.getId());
 
             // act
@@ -53,7 +53,7 @@ class LikeRegistrationPolicyTest {
         @Test
         void doesNotThrow_whenProductExistsAndNotYetLiked() {
             // arrange
-            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null);
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, null);
 
             // act & assert
             assertDoesNotThrow(() ->

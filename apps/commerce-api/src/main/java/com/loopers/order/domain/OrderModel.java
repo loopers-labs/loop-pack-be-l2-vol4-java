@@ -39,7 +39,11 @@ public class OrderModel extends BaseEntity {
 
         this.userId = userId;
         this.items = items;
-        this.status = OrderStatus.ORDERED;
+        this.status = OrderStatus.PENDING_PAYMENT;
+    }
+
+    public void confirm() {
+        this.status = OrderStatus.CONFIRMED;
     }
 
     public Long getUserId() { return userId; }

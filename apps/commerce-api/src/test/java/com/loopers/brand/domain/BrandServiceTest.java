@@ -63,8 +63,8 @@ class BrandServiceTest {
         void softDeletesBrandAndProducts_whenCalled() {
             // arrange
             BrandModel brand = new BrandModel("나이키", "스포츠 브랜드");
-            ProductModel product1 = new ProductModel("에어맥스", "나이키 운동화", 100000L, 10, null);
-            ProductModel product2 = new ProductModel("에어포스", "나이키 운동화", 120000L, 5, null);
+            ProductModel product1 = new ProductModel("에어맥스", "나이키 운동화", 100000L, null);
+            ProductModel product2 = new ProductModel("에어포스", "나이키 운동화", 120000L, null);
 
             // act
             brandService.deleteCascade(brand, List.of(product1, product2));

@@ -27,7 +27,6 @@ public class OrderService {
         List<OrderItemModel> items = products.stream()
             .map(p -> {
                 int qty = quantities.getOrDefault(p.getId(), 0);
-                p.decreaseStock(qty);
                 return new OrderItemModel(p.getId(), p.getName(), p.getPrice(), qty);
             })
             .toList();

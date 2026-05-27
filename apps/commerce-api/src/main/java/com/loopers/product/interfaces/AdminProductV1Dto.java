@@ -6,7 +6,7 @@ public class AdminProductV1Dto {
 
     public record CreateRequest(String name, String description, Long price, Integer stock, Long brandId) {}
 
-    public record UpdateRequest(String name, String description, Long price, Integer stock) {}
+    public record UpdateRequest(String name, String description, Long price) {}
 
     public record ProductResponse(Long id, String name, String description, Long price, Integer stock, Long brandId) {
         public static ProductResponse from(ProductInfo info) {

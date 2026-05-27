@@ -19,9 +19,9 @@ class OrderModelTest {
     @Nested
     class Create {
 
-        @DisplayName("userId, items가 모두 유효하면, 각 필드가 올바르게 저장된다.")
+        @DisplayName("userId, items가 모두 유효하면, status는 PENDING_PAYMENT로 초기화된다.")
         @Test
-        void createsOrderModel_whenAllFieldsAreValid() {
+        void createsOrderModel_withPendingPaymentStatus_whenAllFieldsAreValid() {
             // arrange
             Long userId = 1L;
             List<OrderItemModel> items = List.of(
@@ -35,7 +35,7 @@ class OrderModelTest {
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(userId),
                 () -> assertThat(order.getItems()).hasSize(1),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.ORDERED)
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT)
             );
         }
 
@@ -78,4 +78,23 @@ class OrderModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("주문을 확정(confirm)할 때,")
+    @Nested
+    class Confirm {
+
+        @DisplayName("confirm()을 호출하면, status가 CONFIRMED로 변경된다.")
+        @Test
+        void changesStatusToConfirmed_whenConfirmIsCalled() {
+            // arrange
+            OrderModel order = new OrderModel(1L, List.of(new OrderItemModel(1L, "에어맥스", 150000L, 1)));
+
+            // act
+            order.confirm();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        }
+    }
+
 }

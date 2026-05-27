@@ -4,6 +4,8 @@ import com.loopers.brand.domain.BrandModel;
 import com.loopers.brand.infrastructure.BrandJpaRepository;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.infrastructure.ProductJpaRepository;
+import com.loopers.stock.domain.StockModel;
+import com.loopers.stock.infrastructure.StockJpaRepository;
 import com.loopers.support.response.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +37,9 @@ class AdminProductV1ApiE2ETest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private StockJpaRepository stockJpaRepository;
+
+    @Autowired
     private BrandJpaRepository brandJpaRepository;
 
     @Autowired
@@ -43,6 +48,12 @@ class AdminProductV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    private ProductModel savedProduct(String name) {
+        ProductModel product = productJpaRepository.save(new ProductModel(name, "나이키 운동화", 150000L, null));
+        stockJpaRepository.save(new StockModel(product.getId(), 100));
+        return product;
     }
 
     @DisplayName("POST /api/v1/admin/products")
@@ -65,6 +76,7 @@ class AdminProductV1ApiE2ETest {
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(response.getBody().data().id()).isNotNull(),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("에어맥스"),
+                () -> assertThat(response.getBody().data().stock()).isEqualTo(100),
                 () -> assertThat(response.getBody().data().brandId()).isNull()
             );
         }
@@ -85,7 +97,6 @@ class AdminProductV1ApiE2ETest {
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(response.getBody().data().id()).isNotNull(),
-                () -> assertThat(response.getBody().data().name()).isEqualTo("에어맥스"),
                 () -> assertThat(response.getBody().data().brandId()).isEqualTo(brand.getId())
             );
         }
@@ -129,8 +140,8 @@ class AdminProductV1ApiE2ETest {
         @Test
         void returnsUpdatedProductResponse_whenRequestIsValid() {
             // arrange
-            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
-            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("조던1", "나이키 농구화", 200000L, 50);
+            ProductModel saved = savedProduct("에어맥스");
+            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("조던1", "나이키 농구화", 200000L);
 
             // act
             ParameterizedTypeReference<ApiResponse<AdminProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -142,8 +153,7 @@ class AdminProductV1ApiE2ETest {
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("조던1"),
-                () -> assertThat(response.getBody().data().price()).isEqualTo(200000L),
-                () -> assertThat(response.getBody().data().stock()).isEqualTo(50)
+                () -> assertThat(response.getBody().data().price()).isEqualTo(200000L)
             );
         }
 
@@ -151,7 +161,7 @@ class AdminProductV1ApiE2ETest {
         @Test
         void returnsNotFound_whenProductNotExists() {
             // arrange
-            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("조던1", "나이키 농구화", 200000L, 50);
+            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("조던1", "나이키 농구화", 200000L);
 
             // act
             ParameterizedTypeReference<ApiResponse<AdminProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -166,8 +176,8 @@ class AdminProductV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenNameIsBlank() {
             // arrange
-            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
-            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("", "나이키 농구화", 200000L, 50);
+            ProductModel saved = savedProduct("에어맥스");
+            AdminProductV1Dto.UpdateRequest request = new AdminProductV1Dto.UpdateRequest("", "나이키 농구화", 200000L);
 
             // act
             ParameterizedTypeReference<ApiResponse<AdminProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -187,7 +197,7 @@ class AdminProductV1ApiE2ETest {
         @Test
         void returnsOk_whenRequestIsValid() {
             // arrange
-            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel saved = savedProduct("에어맥스");
 
             // act
             ResponseEntity<Void> response =

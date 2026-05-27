@@ -1,5 +1,6 @@
 package com.loopers.order.domain;
 
 public enum OrderStatus {
-    ORDERED
+    PENDING_PAYMENT,
+    CONFIRMED
 }

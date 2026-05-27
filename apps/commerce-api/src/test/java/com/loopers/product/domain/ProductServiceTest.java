@@ -30,7 +30,7 @@ class ProductServiceTest {
         @Test
         void returnsProduct_whenProductExists() {
             // arrange
-            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, 1L);
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 1L);
 
             // act
             ProductModel result = productService.getOrThrow(Optional.of(product));

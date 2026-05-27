@@ -7,6 +7,8 @@ import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductService;
 import com.loopers.product.domain.SortCondition;
+import com.loopers.stock.domain.StockModel;
+import com.loopers.stock.domain.StockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +28,16 @@ public class ProductFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final BrandService brandService;
+    private final StockRepository stockRepository;
 
     @Transactional
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock, Long brandId) {
+    public ProductInfo createProduct(String name, String description, Long price, Integer initialStock, Long brandId) {
         if (brandId != null) {
             brandService.getOrThrow(brandRepository.find(brandId));
         }
-        ProductModel product = new ProductModel(name, description, price, stock, brandId);
-        return ProductInfo.from(productRepository.save(product));
+        ProductModel product = productRepository.save(new ProductModel(name, description, price, brandId));
+        StockModel stock = stockRepository.save(new StockModel(product.getId(), initialStock));
+        return ProductInfo.from(product, stock.availableStock());
     }
 
     @Transactional(readOnly = true)
@@ -42,14 +46,23 @@ public class ProductFacade {
         Optional<BrandModel> brand = product.getBrandId() != null
             ? brandRepository.find(product.getBrandId())
             : Optional.empty();
-        return ProductInfo.from(product, productService.resolveBrandName(brand));
+        Integer availableStock = stockRepository.findByProductId(productId)
+            .map(StockModel::availableStock)
+            .orElse(0);
+        return ProductInfo.from(product, productService.resolveBrandName(brand), availableStock);
     }
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(SortCondition sort, Long brandId, int page, int size) {
         List<ProductModel> products = productRepository.findAll(sort, brandId, page, size);
 
-        // N+1 방지 — brandId 목록으로 IN 쿼리 일괄 조회 (결정 10 참고)
+        List<Long> productIds = products.stream()
+            .map(ProductModel::getId)
+            .toList();
+
+        Map<Long, Integer> stockMap = stockRepository.findAllByProductIds(productIds).stream()
+            .collect(Collectors.toMap(StockModel::getProductId, StockModel::availableStock));
+
         List<Long> brandIds = products.stream()
             .map(ProductModel::getBrandId)
             .filter(Objects::nonNull)
@@ -61,15 +74,23 @@ public class ProductFacade {
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
         return products.stream()
-            .map(p -> ProductInfo.from(p, productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.getBrandId())))))
+            .map(p -> ProductInfo.from(
+                p,
+                productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.getBrandId()))),
+                stockMap.getOrDefault(p.getId(), 0)
+            ))
             .toList();
     }
 
     @Transactional
-    public ProductInfo updateProduct(Long productId, String name, String description, Long price, Integer stock) {
+    public ProductInfo updateProduct(Long productId, String name, String description, Long price) {
         ProductModel product = productService.getOrThrow(productRepository.find(productId));
-        product.update(name, description, price, stock);
-        return ProductInfo.from(productRepository.save(product));
+        product.update(name, description, price);
+        productRepository.save(product);
+        Integer availableStock = stockRepository.findByProductId(productId)
+            .map(StockModel::availableStock)
+            .orElse(0);
+        return ProductInfo.from(product, availableStock);
     }
 
     @Transactional

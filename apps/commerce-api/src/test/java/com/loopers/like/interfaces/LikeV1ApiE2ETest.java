@@ -76,7 +76,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsLikeResponse_whenRequestIsValid() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             String url = "/api/v1/products/" + product.getId() + "/likes";
 
             // act
@@ -96,7 +96,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsConflict_whenAlreadyLiked() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             String url = "/api/v1/products/" + product.getId() + "/likes";
             testRestTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class);
 
@@ -125,7 +125,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenAuthHeaderIsMissing() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             String url = "/api/v1/products/" + product.getId() + "/likes";
 
             // act
@@ -146,7 +146,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsOk_whenRequestIsValid() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             String url = "/api/v1/products/" + product.getId() + "/likes";
             testRestTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class);
 
@@ -179,7 +179,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsProductList_whenLikedProductsExist() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
             testRestTemplate.exchange(
                 "/api/v1/products/" + product.getId() + "/likes",
                 HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class

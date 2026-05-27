@@ -20,7 +20,7 @@ class ProductExistsSpecificationTest {
         @Test
         void returnsTrue_whenProductExists() {
             // arrange
-            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null);
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, null);
 
             // act & assert
             assertThat(spec.isSatisfiedBy(Optional.of(product))).isTrue();

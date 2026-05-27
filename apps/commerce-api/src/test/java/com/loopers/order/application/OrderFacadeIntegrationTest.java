@@ -1,8 +1,11 @@
 package com.loopers.order.application;
 
+import com.loopers.order.domain.OrderStatus;
 import com.loopers.order.infrastructure.OrderJpaRepository;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.infrastructure.ProductJpaRepository;
+import com.loopers.stock.domain.StockModel;
+import com.loopers.stock.infrastructure.StockJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -32,6 +35,9 @@ class OrderFacadeIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private StockJpaRepository stockJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -39,15 +45,21 @@ class OrderFacadeIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private ProductModel savedProduct(int totalStock) {
+        ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+        stockJpaRepository.save(new StockModel(product.getId(), totalStock));
+        return product;
+    }
+
     @DisplayName("주문을 생성할 때,")
     @Nested
     class CreateOrder {
 
-        @DisplayName("정상 요청이면, DB에 저장되고 OrderInfo를 반환하며 재고가 감소한다.")
+        @DisplayName("정상 요청이면, PENDING_PAYMENT 상태로 저장되고 재고 변동이 없다.")
         @Test
-        void returnsOrderInfo_andDecreasesStock_whenRequestIsValid() {
+        void returnsOrderInfo_withPendingPaymentStatus_andNoStockChange_whenRequestIsValid() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = savedProduct(100);
 
             // act
             OrderInfo result = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 2)));
@@ -55,16 +67,12 @@ class OrderFacadeIntegrationTest {
             // assert
             assertAll(
                 () -> assertThat(result.id()).isNotNull(),
-                () -> assertThat(result.userId()).isEqualTo(1L),
-                () -> assertThat(result.status()).isEqualTo("ORDERED"),
-                () -> assertThat(result.items()).hasSize(1),
-                () -> assertThat(result.items().get(0).productName()).isEqualTo("에어맥스"),
-                () -> assertThat(result.items().get(0).quantity()).isEqualTo(2)
+                () -> assertThat(result.status()).isEqualTo(OrderStatus.PENDING_PAYMENT.name()),
+                () -> assertThat(result.items()).hasSize(1)
             );
 
-            // 재고 감소 확인
-            ProductModel updated = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertThat(updated.getStock()).isEqualTo(98);
+            StockModel stock = stockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            assertThat(stock.availableStock()).isEqualTo(100);
         }
 
         @DisplayName("존재하지 않는 productId가 포함되면, NOT_FOUND 예외가 발생한다.")
@@ -78,20 +86,127 @@ class OrderFacadeIntegrationTest {
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
+    }
 
-        @DisplayName("재고가 부족한 상품이면, BAD_REQUEST 예외가 발생한다.")
+    @DisplayName("결제를 시작(startPayment)할 때,")
+    @Nested
+    class StartPayment {
+
+        @DisplayName("정상 요청이면, 재고가 선점된다.")
+        @Test
+        void reservesStock_whenRequestIsValid() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)));
+
+            // act
+            orderFacade.startPayment(1L, order.id());
+
+            // assert
+            StockModel stock = stockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(stock.getReservedStock()).isEqualTo(5),
+                () -> assertThat(stock.availableStock()).isEqualTo(95)
+            );
+        }
+
+        @DisplayName("재고가 부족하면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenStockIsInsufficient() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 1, null));
+            ProductModel product = savedProduct(1);
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)));
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 2)))
+                orderFacade.startPayment(1L, order.id())
             );
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("존재하지 않는 orderId이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderNotExists() {
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.startPayment(1L, 999L)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("다른 유저의 주문이면, FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.startPayment(2L, order.id())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+    }
+
+    @DisplayName("결제를 확정(confirmPayment)할 때,")
+    @Nested
+    class ConfirmPayment {
+
+        @DisplayName("정상 요청이면, 재고가 확정 차감되고 주문 상태가 CONFIRMED로 변경된다.")
+        @Test
+        void confirmsStockAndChangesStatusToConfirmed_whenRequestIsValid() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 3)));
+            orderFacade.startPayment(1L, order.id());
+
+            // act
+            OrderInfo result = orderFacade.confirmPayment(1L, order.id());
+
+            // assert
+            assertThat(result.status()).isEqualTo(OrderStatus.CONFIRMED.name());
+
+            StockModel stock = stockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(stock.getTotalStock()).isEqualTo(97),
+                () -> assertThat(stock.getReservedStock()).isEqualTo(0)
+            );
+        }
+
+        @DisplayName("존재하지 않는 orderId이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderNotExists() {
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.confirmPayment(1L, 999L)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("다른 유저의 주문이면, FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenOrderBelongsToAnotherUser() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            orderFacade.startPayment(1L, order.id());
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.confirmPayment(2L, order.id())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 
@@ -103,7 +218,7 @@ class OrderFacadeIntegrationTest {
         @Test
         void returnsOrderInfo_whenOrderExists() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = savedProduct(100);
             OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
@@ -133,7 +248,7 @@ class OrderFacadeIntegrationTest {
         @Test
         void throwsForbidden_whenOrderBelongsToAnotherUser() {
             // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel product = savedProduct(100);
             OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act

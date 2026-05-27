@@ -59,8 +59,8 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsProductList_whenRequestIsValid() {
             // arrange
-            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
-            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, 50, null));
+            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, null));
 
             // act
             ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
@@ -79,8 +79,8 @@ class ProductV1ApiE2ETest {
         void returnsFilteredList_whenBrandIdIsProvided() {
             // arrange
             BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "스포츠 브랜드"));
-            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, brand.getId()));
-            productJpaRepository.save(new ProductModel("노브랜드상품", "브랜드 없음", 50000L, 10, null));
+            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, brand.getId()));
+            productJpaRepository.save(new ProductModel("노브랜드상품", "브랜드 없음", 50000L, null));
 
             // act
             ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
@@ -100,8 +100,8 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsByPriceAsc_whenSortByIsPriceAsc() {
             // arrange
-            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, 50, null));
-            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, null));
+            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
 
             // act
             ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
@@ -119,8 +119,8 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsByLikesDesc_whenSortByIsLikesDesc() {
             // arrange
-            ProductModel popular = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
-            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, 50, null));
+            ProductModel popular = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+            productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, null));
             // [fix] @Modifying 직접 호출은 트랜잭션 필요 → LikeFacade.addLike()로 대체
             likeFacade.addLike(1L, popular.getId());
 
@@ -157,7 +157,7 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsProductResponse_whenProductExists() {
             // arrange
-            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, null));
+            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
 
             // act
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};

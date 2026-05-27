@@ -35,7 +35,7 @@ public class AdminProductV1Controller {
         @RequestBody AdminProductV1Dto.UpdateRequest request
     ) {
         ProductInfo info = productFacade.updateProduct(
-            productId, request.name(), request.description(), request.price(), request.stock()
+            productId, request.name(), request.description(), request.price()
         );
         return ApiResponse.success(AdminProductV1Dto.ProductResponse.from(info));
     }
