@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Component
@@ -36,6 +37,11 @@ public class ProductService {
     @Transactional(readOnly = true)
     public long countByBrandId(Long brandId) {
         return productRepository.countByBrandId(brandId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Long> countByBrandIds(Collection<Long> brandIds) {
+        return productRepository.countByBrandIds(brandIds);
     }
 
     @Transactional

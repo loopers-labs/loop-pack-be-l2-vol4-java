@@ -16,15 +16,10 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     List<ProductModel> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
     long countByBrandIdAndDeletedAtIsNull(Long brandId);
 
-    @Query(
-        value = "SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL",
-        countQuery = "SELECT COUNT(p) FROM ProductModel p WHERE p.deletedAt IS NULL"
-    )
-    Page<ProductModel> searchAll(Pageable pageable);
+    @Query("SELECT p.brandId, COUNT(p) FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId IN :brandIds GROUP BY p.brandId")
+    List<Object[]> countGroupByBrandIdAndDeletedAtIsNull(@Param("brandIds") Collection<Long> brandIds);
 
-    @Query(
-        value = "SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId",
-        countQuery = "SELECT COUNT(p) FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId"
-    )
-    Page<ProductModel> searchByBrandId(@Param("brandId") Long brandId, Pageable pageable);
+    Page<ProductModel> findAllByDeletedAtIsNull(Pageable pageable);
+
+    Page<ProductModel> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 }

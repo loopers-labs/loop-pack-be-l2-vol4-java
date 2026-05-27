@@ -8,6 +8,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.Map;
+
 @RequiredArgsConstructor
 @Component
 public class BrandAdminFacade {
@@ -22,7 +25,9 @@ public class BrandAdminFacade {
     }
 
     public Page<BrandAdminInfo> search(Pageable pageable) {
-        return brandService.search(pageable)
-            .map(brand -> BrandAdminInfo.from(brand, productService.countByBrandId(brand.getId())));
+        Page<BrandModel> brands = brandService.search(pageable);
+        List<Long> brandIds = brands.getContent().stream().map(BrandModel::getId).toList();
+        Map<Long, Long> counts = productService.countByBrandIds(brandIds);
+        return brands.map(brand -> BrandAdminInfo.from(brand, counts.getOrDefault(brand.getId(), 0L)));
     }
 }

@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -46,13 +48,22 @@ public class ProductRepositoryImpl implements ProductRepository {
 
         // 옵티마이저가 인덱스를 명확히 타도록 쿼리를 분기한다. nullable 조건이 늘어나면 메서드가 2^N으로 증가하므로, QueryDSL 적용을 고려한다.
         return brandId == null
-            ? productJpaRepository.searchAll(sortedPageable)
-            : productJpaRepository.searchByBrandId(brandId, sortedPageable);
+            ? productJpaRepository.findAllByDeletedAtIsNull(sortedPageable)
+            : productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, sortedPageable);
     }
 
     @Override
     public long countByBrandId(Long brandId) {
         return productJpaRepository.countByBrandIdAndDeletedAtIsNull(brandId);
+    }
+
+    @Override
+    public Map<Long, Long> countByBrandIds(Collection<Long> brandIds) {
+        if (brandIds.isEmpty()) {
+            return Map.of();
+        }
+        return productJpaRepository.countGroupByBrandIdAndDeletedAtIsNull(brandIds).stream()
+            .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
     }
 
     /**
