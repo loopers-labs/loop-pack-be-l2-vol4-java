@@ -1,10 +1,10 @@
-package com.loopers.application.brand;
+package com.loopers.domain.brand;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
-public class BrandFinder {
+public class BrandService {
 
     private final BrandRepository brandRepository;
 
@@ -25,5 +25,25 @@ public class BrandFinder {
     public Map<Long, BrandModel> getMapByIds(Collection<Long> ids) {
         return brandRepository.findAllByIdIn(ids).stream()
                 .collect(Collectors.toMap(BrandModel::getId, b -> b));
+    }
+
+    public Page<BrandModel> findAll(Pageable pageable) {
+        return brandRepository.findAll(pageable);
+    }
+
+    public BrandModel create(String name) {
+        return brandRepository.save(new BrandModel(name));
+    }
+
+    public BrandModel update(Long id, String name) {
+        BrandModel brand = getById(id);
+        brand.update(name);
+        return brandRepository.save(brand);
+    }
+
+    public void delete(Long id) {
+        BrandModel brand = getById(id);
+        brand.delete();
+        brandRepository.save(brand);
     }
 }
