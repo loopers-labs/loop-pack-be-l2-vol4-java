@@ -1,7 +1,7 @@
 package com.loopers.interfaces.auth;
 
-import com.loopers.domain.user.UserModel;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.auth.AuthFacade;
+import com.loopers.application.auth.AuthenticatedUserInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.servlet.FilterChain;
@@ -29,7 +29,7 @@ public class AuthFilter extends OncePerRequestFilter {
     private static final String ADMIN_LDAP_HEADER = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP_VALUE = "loopers.admin";
 
-    private final UserService userService;
+    private final AuthFacade authFacade;
     private final AuthErrorResponseWriter authErrorResponseWriter;
 
     @Override
@@ -62,8 +62,8 @@ public class AuthFilter extends OncePerRequestFilter {
 
             String loginId = request.getHeader(LOGIN_ID_HEADER);
             String password = request.getHeader(LOGIN_PASSWORD_HEADER);
-            UserModel user = userService.authenticate(loginId, password);
-            request.setAttribute(LOGIN_USER_ATTRIBUTE, AuthenticatedUser.from(user));
+            AuthenticatedUserInfo user = authFacade.authenticate(loginId, password);
+            request.setAttribute(LOGIN_USER_ATTRIBUTE, new AuthenticatedUser(user.loginId()));
             filterChain.doFilter(request, response);
         } catch (CoreException e) {
             authErrorResponseWriter.write(response, e);
