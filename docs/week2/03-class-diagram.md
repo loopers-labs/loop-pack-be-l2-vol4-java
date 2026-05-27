@@ -161,7 +161,9 @@ classDiagram
         <<Aggregate Root>>
         brandId
         name
+        description
         price
+        update()
         delete()
     }
 

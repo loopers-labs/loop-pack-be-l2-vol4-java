@@ -37,6 +37,7 @@ erDiagram
         BIGINT id PK
         BIGINT brand_id FK
         VARCHAR name
+        VARCHAR description
         BIGINT price
     }
 
