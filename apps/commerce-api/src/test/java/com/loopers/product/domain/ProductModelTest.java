@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -16,11 +17,27 @@ class ProductModelTest {
     @Nested
     class Create {
 
-        @DisplayName("모든 필드가 유효하면, 정상 생성된다.")
+        @DisplayName("모든 필드가 유효하면, 각 필드가 올바르게 저장된다.")
         @Test
         void createsProductModel_whenAllFieldsAreValid() {
-            // act & assert
-            assertDoesNotThrow(() -> new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, 1L));
+            // arrange
+            String name = "에어맥스";
+            String description = "나이키 운동화";
+            Long price = 150000L;
+            Integer stock = 100;
+            Long brandId = 1L;
+
+            // act
+            ProductModel product = new ProductModel(name, description, price, stock, brandId);
+
+            // assert
+            assertAll(
+                () -> assertThat(product.getName()).isEqualTo(name),
+                () -> assertThat(product.getDescription()).isEqualTo(description),
+                () -> assertThat(product.getPrice()).isEqualTo(price),
+                () -> assertThat(product.getStock()).isEqualTo(stock),
+                () -> assertThat(product.getBrandId()).isEqualTo(brandId)
+            );
         }
 
         @DisplayName("가격이 0이면, 정상 생성된다.")
