@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -15,8 +16,12 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel createProduct(Long brandId, String name, BigDecimal price) {
+        ProductModel product = ProductModel.builder()
+                .brandId(brandId)
+                .name(name)
+                .price(price)
+                .build();
         return productRepository.save(product);
     }
 
@@ -32,15 +37,16 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(Long id, String name, BigDecimal price) {
         ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
+        product.update(name, price);
         return productRepository.save(product);
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductModel product = getProduct(id);
+        product.delete();
+        productRepository.save(product);
     }
 }
