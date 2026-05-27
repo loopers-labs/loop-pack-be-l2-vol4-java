@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 public class OrderRepositoryImpl implements OrderRepository {
 
     private final OrderJpaRepository orderJpaRepository;
-
     private final OrderItemJpaRepository orderItemJpaRepository;
 
     @Override
