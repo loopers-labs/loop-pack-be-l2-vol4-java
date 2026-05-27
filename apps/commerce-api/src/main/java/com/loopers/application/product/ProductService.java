@@ -1,5 +1,7 @@
-package com.loopers.domain.product;
+package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +42,7 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
+        getProduct(id);
         productRepository.delete(id);
     }
 }
