@@ -56,6 +56,12 @@ public class UserModel extends BaseEntity {
         this.gender = gender;
     }
 
+    public void validateOwner(Long userId) {
+        if (!this.getId().equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인만 접근할 수 있습니다.");
+        }
+    }
+
     public boolean matchesPassword(String password, PasswordEncryptor passwordEncryptor) {
         return this.password.matches(password, passwordEncryptor);
     }
