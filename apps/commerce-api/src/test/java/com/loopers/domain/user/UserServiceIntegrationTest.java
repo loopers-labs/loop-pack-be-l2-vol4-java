@@ -1,5 +1,6 @@
 package com.loopers.domain.user;
 
+import com.loopers.application.user.UserFacade;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -24,19 +25,19 @@ class UserServiceIntegrationTest {
     private static final String PASSWORD = "abc123!?";
     private static final LocalDate BIRTH = LocalDate.of(1990, 1, 15);
 
-    private final UserService userService;
+    private final UserFacade userFacade;
     private final UserJpaRepository userJpaRepository;
     private final PasswordHasher passwordHasher;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     UserServiceIntegrationTest(
-        UserService userService,
+        UserFacade userFacade,
         UserJpaRepository userJpaRepository,
         PasswordHasher passwordHasher,
         DatabaseCleanUp databaseCleanUp
     ) {
-        this.userService = userService;
+        this.userFacade = userFacade;
         this.userJpaRepository = userJpaRepository;
         this.passwordHasher = passwordHasher;
         this.databaseCleanUp = databaseCleanUp;
@@ -56,7 +57,7 @@ class UserServiceIntegrationTest {
             // arrange
 
             // act
-            userService.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
+            userFacade.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
 
             // assert
             UserModel savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
@@ -77,7 +78,7 @@ class UserServiceIntegrationTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.signup(LOGIN_ID, "short", "홍길동", BIRTH, "user@example.com");
+                userFacade.signup(LOGIN_ID, "short", "홍길동", BIRTH, "user@example.com");
             });
 
             // assert
@@ -95,10 +96,10 @@ class UserServiceIntegrationTest {
         @Test
         void savesNewPasswordHash_whenRequestIsValid() {
             // arrange
-            userService.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
+            userFacade.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
 
             // act
-            userService.changePassword(LOGIN_ID, PASSWORD, "new123!?");
+            userFacade.changePassword(LOGIN_ID, PASSWORD, "new123!?");
 
             // assert
             UserModel savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
@@ -112,11 +113,11 @@ class UserServiceIntegrationTest {
         @Test
         void doesNotChangePasswordHash_whenOldPasswordDoesNotMatch() {
             // arrange
-            userService.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
+            userFacade.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword(LOGIN_ID, "wrong123!", "new123!?");
+                userFacade.changePassword(LOGIN_ID, "wrong123!", "new123!?");
             });
 
             // assert

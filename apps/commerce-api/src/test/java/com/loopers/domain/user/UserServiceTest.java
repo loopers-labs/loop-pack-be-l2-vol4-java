@@ -7,27 +7,19 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
-
-    @Mock
-    private UserRepository userRepository;
 
     @Mock
     private PasswordPolicy passwordPolicy;
@@ -37,7 +29,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordPolicy, passwordHasher);
+        userService = new UserService(passwordPolicy, passwordHasher);
     }
 
     @DisplayName("회원가입할 때, ")
@@ -46,47 +38,41 @@ class UserServiceTest {
         @DisplayName("로그인 ID가 중복되면, CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
-            // arrange
-            when(userRepository.existsByLoginId("user1234")).thenReturn(true);
-
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.signup("user1234", "abc123!?", "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
+                userService.signup(
+                    "user1234",
+                    "abc123!?",
+                    "홍길동",
+                    LocalDate.of(1990, 1, 15),
+                    "user@example.com",
+                    true
+                );
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
-                () -> verify(userRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
 
-        @DisplayName("유효한 요청이면, 비밀번호 정책 검증 후 BCrypt 해시를 저장한다.")
+        @DisplayName("유효한 요청이면, 비밀번호 정책 검증 후 해시된 비밀번호를 가진 회원을 생성한다.")
         @Test
-        void savesUserWithHashedPassword_whenRequestIsValid() {
-            // arrange
-            when(userRepository.existsByLoginId("user1234")).thenReturn(false);
-            when(userRepository.save(any(UserModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
+        void createsUserWithHashedPassword_whenRequestIsValid() {
             // act
             UserModel result = userService.signup(
                 "user1234",
                 "abc123!?",
                 "홍길동",
                 LocalDate.of(1990, 1, 15),
-                "user@example.com"
+                "user@example.com",
+                false
             );
 
             // assert
-            ArgumentCaptor<UserModel> userCaptor = ArgumentCaptor.forClass(UserModel.class);
             verify(passwordPolicy).validate("abc123!?", LocalDate.of(1990, 1, 15));
-            verify(userRepository).save(userCaptor.capture());
-
-            UserModel savedUser = userCaptor.getValue();
             assertAll(
-                () -> assertThat(result).isSameAs(savedUser),
-                () -> assertThat(savedUser.getPasswordHash()).isEqualTo("hashed:abc123!?"),
-                () -> assertThat(savedUser.getPasswordHash()).isNotEqualTo("abc123!?")
+                () -> assertThat(result.getLoginId()).isEqualTo("user1234"),
+                () -> assertThat(result.getPasswordHash()).isEqualTo("hashed:abc123!?"),
+                () -> assertThat(result.getPasswordHash()).isNotEqualTo("abc123!?")
             );
         }
     }
@@ -99,25 +85,7 @@ class UserServiceTest {
         void throwsUnauthorized_whenCredentialIsBlank() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.authenticate("user1234", " ");
-            });
-
-            // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
-                () -> verify(userRepository, never()).findByLoginId(any())
-            );
-        }
-
-        @DisplayName("회원을 찾을 수 없으면, UNAUTHORIZED 예외가 발생한다.")
-        @Test
-        void throwsUnauthorized_whenUserDoesNotExist() {
-            // arrange
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.empty());
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> {
-                userService.authenticate("user1234", "abc123!?");
+                userService.validateCredential("user1234", " ");
             });
 
             // assert
@@ -129,29 +97,31 @@ class UserServiceTest {
         void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.authenticate("user1234", "wrong123!");
+                userService.authenticate(user, "wrong123!");
             });
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
-        @DisplayName("비밀번호가 일치하면, 회원을 반환한다.")
+        @DisplayName("비밀번호가 일치하면, 인증에 성공한다.")
         @Test
-        void returnsUser_whenPasswordMatches() {
+        void authenticates_whenPasswordMatches() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
-            // act
-            UserModel result = userService.authenticate("user1234", "abc123!?");
+            // act & assert
+            userService.authenticate(user, "abc123!?");
+        }
 
-            // assert
-            assertThat(result).isSameAs(user);
+        @DisplayName("로그인 ID와 비밀번호가 있으면, 인증 헤더 검증에 성공한다.")
+        @Test
+        void validatesCredential_whenCredentialExists() {
+            // act & assert
+            userService.validateCredential("user1234", "abc123!?");
         }
     }
 
@@ -163,18 +133,14 @@ class UserServiceTest {
         void throwsUnauthorized_whenOldPasswordIsBlank() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1234", " ", "new123!?");
+                userService.changePassword(user, " ", "new123!?");
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
-                () -> verify(userRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
         @DisplayName("현재 비밀번호가 일치하지 않으면, UNAUTHORIZED 예외가 발생한다.")
@@ -182,18 +148,14 @@ class UserServiceTest {
         void throwsUnauthorized_whenOldPasswordDoesNotMatch() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1234", "wrong123!", "new123!?");
+                userService.changePassword(user, "wrong123!", "new123!?");
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
-                () -> verify(userRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
         @DisplayName("새 비밀번호가 정책을 통과하지 못하면, BAD_REQUEST 예외가 발생한다.")
@@ -202,20 +164,16 @@ class UserServiceTest {
             // arrange
             LocalDate birth = LocalDate.of(1990, 1, 15);
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
             doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
                 .when(passwordPolicy).validate("short", birth);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1234", "abc123!?", "short");
+                userService.changePassword(user, "abc123!?", "short");
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                () -> verify(userRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("새 비밀번호가 현재 비밀번호와 같으면, BAD_REQUEST 예외가 발생한다.")
@@ -223,18 +181,14 @@ class UserServiceTest {
         void throwsBadRequest_whenNewPasswordIsSameAsOldPassword() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userService.changePassword("user1234", "abc123!?", "abc123!?");
+                userService.changePassword(user, "abc123!?", "abc123!?");
             });
 
             // assert
-            assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                () -> verify(userRepository, never()).save(any())
-            );
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("유효한 요청이면, 새 비밀번호 해시를 저장한다.")
@@ -242,16 +196,14 @@ class UserServiceTest {
         void changesPasswordHash_whenRequestIsValid() {
             // arrange
             UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
-            when(userRepository.findByLoginId("user1234")).thenReturn(Optional.of(user));
 
             // act
-            userService.changePassword("user1234", "abc123!?", "new123!?");
+            userService.changePassword(user, "abc123!?", "new123!?");
 
             // assert
             assertAll(
                 () -> assertThat(user.getPasswordHash()).isEqualTo("hashed:new123!?"),
-                () -> verify(passwordPolicy).validate("new123!?", user.getBirth()),
-                () -> verify(userRepository).save(user)
+                () -> verify(passwordPolicy).validate("new123!?", user.getBirth())
             );
         }
     }
