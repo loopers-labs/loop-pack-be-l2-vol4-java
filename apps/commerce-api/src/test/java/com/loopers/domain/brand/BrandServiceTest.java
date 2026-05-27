@@ -1,7 +1,5 @@
-package com.loopers.application.brand;
+package com.loopers.domain.brand;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,15 +18,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class BrandFinderTest {
+class BrandServiceTest {
 
-    private BrandFinder brandFinder;
+    private BrandService brandService;
     private BrandRepository brandRepository;
 
     @BeforeEach
     void setUp() {
         brandRepository = mock(BrandRepository.class);
-        brandFinder = new BrandFinder(brandRepository);
+        brandService = new BrandService(brandRepository);
     }
 
     @DisplayName("브랜드를 ID로 조회할 때, ")
@@ -44,7 +42,7 @@ class BrandFinderTest {
             when(brandRepository.findById(id)).thenReturn(Optional.of(brand));
 
             // when
-            BrandModel result = brandFinder.getById(id);
+            BrandModel result = brandService.getById(id);
 
             // then
             assertAll(
@@ -61,7 +59,7 @@ class BrandFinderTest {
             when(brandRepository.findById(id)).thenReturn(Optional.empty());
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> brandFinder.getById(id));
+            CoreException result = assertThrows(CoreException.class, () -> brandService.getById(id));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -76,19 +74,17 @@ class BrandFinderTest {
         @Test
         void returnsBrandMap_whenBrandExists() {
             // given
-            // BaseEntity.id는 항상 0L로 고정되므로 단일 브랜드로 검증
-            Long brandId = 0L;
-            Set<Long> ids = Set.of(brandId);
+            Set<Long> ids = Set.of(1L);
             BrandModel nike = new BrandModel("Nike");
             when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of(nike));
 
             // when
-            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
+            Map<Long, BrandModel> result = brandService.getMapByIds(ids);
 
             // then
             assertAll(
                     () -> assertThat(result).hasSize(1),
-                    () -> assertThat(result).containsEntry(brandId, nike)
+                    () -> assertThat(result).containsValue(nike)
             );
         }
 
@@ -96,18 +92,17 @@ class BrandFinderTest {
         @Test
         void returnsPartialBrandMap_whenSomeIdsDoNotExist() {
             // given
-            Long brandId = 0L;
-            Set<Long> ids = Set.of(brandId, 999L);
+            Set<Long> ids = Set.of(1L, 999L);
             BrandModel nike = new BrandModel("Nike");
             when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of(nike));
 
             // when
-            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
+            Map<Long, BrandModel> result = brandService.getMapByIds(ids);
 
             // then
             assertAll(
                     () -> assertThat(result).hasSize(1),
-                    () -> assertThat(result).containsKey(brandId)
+                    () -> assertThat(result).containsValue(nike)
             );
         }
 
@@ -119,7 +114,7 @@ class BrandFinderTest {
             when(brandRepository.findAllByIdIn(ids)).thenReturn(List.of());
 
             // when
-            Map<Long, BrandModel> result = brandFinder.getMapByIds(ids);
+            Map<Long, BrandModel> result = brandService.getMapByIds(ids);
 
             // then
             assertThat(result).isEmpty();
