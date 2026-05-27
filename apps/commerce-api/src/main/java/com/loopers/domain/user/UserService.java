@@ -27,13 +27,13 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserModel getUser(Long id) {
         return userRepository.findById(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND, "[id = " + id + "] 사용자를 찾을 수 없습니다."));
     }
 
     @Transactional
     public void changePassword(Long userId, String currentRawPassword, Password newPassword) {
         UserModel user = userRepository.findById(userId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + userId + "] 사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND, "[id = " + userId + "] 사용자를 찾을 수 없습니다."));
         if (!passwordEncoder.matches(currentRawPassword, user.getPassword().getValue())) {
             throw new CoreException(ErrorType.UNAUTHORIZED);
         }

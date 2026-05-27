@@ -21,6 +21,16 @@ public class StockService {
         return stockRepository.save(stock);
     }
 
+    @Transactional
+    public void decrease(Long productId, int amount) {
+        if (amount <= 0) {
+            throw new CoreException(ErrorType.INVALID_QUANTITY, "차감 수량은 1 이상이어야 합니다.");
+        }
+        StockModel stock = stockRepository.findByProductId(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
+        stock.decrease(amount);
+    }
+
     @Transactional(readOnly = true)
     public StockModel getByProductId(Long productId) {
         return stockRepository.findByProductId(productId)

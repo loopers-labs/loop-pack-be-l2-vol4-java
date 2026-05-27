@@ -212,9 +212,9 @@ class UserServiceTest {
             assertThat(user.getPassword().getValue()).isEqualTo(encodedNew);
         }
 
-        @DisplayName("존재하지 않는 userId 면, NOT_FOUND 예외를 던진다.")
+        @DisplayName("존재하지 않는 userId 면, USER_NOT_FOUND 예외를 던진다.")
         @Test
-        void throwsNotFound_whenUserDoesNotExist() {
+        void throwsUserNotFound_whenUserDoesNotExist() {
             // given
             Long userId = 999L;
             given(userRepository.findById(userId)).willReturn(Optional.empty());
@@ -225,7 +225,7 @@ class UserServiceTest {
             );
 
             // then
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
         }
 
         @DisplayName("현재 비밀번호가 DB 와 일치하지 않으면, UNAUTHORIZED 예외를 던진다.")
@@ -337,9 +337,9 @@ class UserServiceTest {
             assertThat(result).isSameAs(user);
         }
 
-        @DisplayName("존재하지 않는 ID 면, NOT_FOUND 예외를 던진다.")
+        @DisplayName("존재하지 않는 ID 면, USER_NOT_FOUND 예외를 던진다.")
         @Test
-        void throwsNotFound_whenIdDoesNotExist() {
+        void throwsUserNotFound_whenIdDoesNotExist() {
             // given
             Long userId = 999L;
             given(userRepository.findById(userId)).willReturn(Optional.empty());
@@ -350,7 +350,7 @@ class UserServiceTest {
             );
 
             // then
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.USER_NOT_FOUND);
         }
     }
 }

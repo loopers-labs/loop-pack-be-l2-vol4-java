@@ -35,7 +35,7 @@ public class StockModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
         }
         if (this.quantity < amount) {
-            throw new CoreException(ErrorType.CONFLICT, "재고가 부족합니다.");
+            throw new CoreException(ErrorType.OUT_OF_STOCK, "재고가 부족합니다.");
         }
         this.quantity -= amount;
     }

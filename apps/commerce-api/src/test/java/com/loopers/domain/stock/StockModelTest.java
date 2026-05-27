@@ -118,9 +118,9 @@ class StockModelTest {
             assertThat(stock.getQuantity()).isEqualTo(0);
         }
 
-        @DisplayName("잔량보다 큰 amount 가 주어지면, CONFLICT 예외가 발생한다.")
+        @DisplayName("잔량보다 큰 amount 가 주어지면, OUT_OF_STOCK 예외가 발생한다.")
         @Test
-        void throwsConflictException_whenAmountIsGreaterThanCurrent() {
+        void throwsOutOfStockException_whenAmountIsGreaterThanCurrent() {
             // given
             StockModel stock = new StockModel(1L, 5);
 
@@ -129,7 +129,7 @@ class StockModelTest {
 
             // then
             assertAll(
-                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.OUT_OF_STOCK),
                 () -> assertThat(result.getCustomMessage()).isEqualTo("재고가 부족합니다.")
             );
         }
