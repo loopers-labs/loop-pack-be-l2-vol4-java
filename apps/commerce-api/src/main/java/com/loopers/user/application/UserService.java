@@ -21,7 +21,7 @@ public class UserService {
     private final UserReader userReader;
 
     @Transactional
-    public User signUp(UserCommand.SignUp command) {
+    public UserResult.Detail signUp(UserCommand.SignUp command) {
         validateSignUp(command);
 
         String encodedPassword = passwordEncoder.encode(command.password());
@@ -32,7 +32,7 @@ public class UserService {
             command.birthDate(),
             command.email()
         );
-        return userRepository.save(user);
+        return UserResult.Detail.from(userRepository.save(user));
     }
 
     @Transactional(readOnly = true)
@@ -43,8 +43,8 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public User get(Long userId) {
-        return userReader.get(userId);
+    public UserResult.Detail get(Long userId) {
+        return UserResult.Detail.from(userReader.get(userId));
     }
 
     @Transactional

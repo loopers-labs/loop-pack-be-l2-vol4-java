@@ -120,37 +120,44 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("get 은 reader 의 결과를 그대로 반환한다")
-    void givenExistingProductId_whenGet_thenReturnsProduct() {
+    @DisplayName("get 은 reader 가 반환한 product 를 Detail 로 매핑해서 반환한다")
+    void givenExistingProductId_whenGet_thenReturnsProductDetail() {
         Product product = Product.create(BRAND_ID, "셔츠", "설명", 29_000L);
         when(productReader.get(1L)).thenReturn(product);
 
-        Product result = productService.get(1L);
+        ProductResult.Detail result = productService.get(1L);
 
-        assertThat(result).isSameAs(product);
+        assertAll(
+                () -> assertThat(result.name()).isEqualTo("셔츠"),
+                () -> assertThat(result.price()).isEqualTo(29_000L)
+        );
     }
 
     @Test
-    @DisplayName("getAll(LATEST) 은 repository 의 findAllOrderByLatest 결과를 반환한다")
-    void givenLatestOption_whenGetAll_thenReturnsLatestOrdered() {
+    @DisplayName("getAll(LATEST) 은 latest 정렬 product 들을 Detail 리스트로 매핑한다")
+    void givenLatestOption_whenGetAll_thenReturnsDetailsInLatestOrder() {
         Product a = Product.create(BRAND_ID, "A", "설명", 1000L);
         Product b = Product.create(BRAND_ID, "B", "설명", 2000L);
         when(productRepository.findAllOrderByLatest()).thenReturn(List.of(b, a));
 
-        List<Product> result = productService.getAll(ProductSortOption.LATEST);
+        List<ProductResult.Detail> result = productService.getAll(ProductSortOption.LATEST);
 
-        assertThat(result).containsExactly(b, a);
+        assertThat(result)
+                .extracting(ProductResult.Detail::name)
+                .containsExactly("B", "A");
     }
 
     @Test
-    @DisplayName("getAll(PRICE_ASC) 은 repository 의 findAllOrderByPriceAsc 결과를 반환한다")
-    void givenPriceAscOption_whenGetAll_thenReturnsPriceAscOrdered() {
+    @DisplayName("getAll(PRICE_ASC) 은 price asc product 들을 Detail 리스트로 매핑한다")
+    void givenPriceAscOption_whenGetAll_thenReturnsDetailsInPriceAscOrder() {
         Product cheap = Product.create(BRAND_ID, "싼것", "설명", 1000L);
         Product expensive = Product.create(BRAND_ID, "비싼것", "설명", 9000L);
         when(productRepository.findAllOrderByPriceAsc()).thenReturn(List.of(cheap, expensive));
 
-        List<Product> result = productService.getAll(ProductSortOption.PRICE_ASC);
+        List<ProductResult.Detail> result = productService.getAll(ProductSortOption.PRICE_ASC);
 
-        assertThat(result).containsExactly(cheap, expensive);
+        assertThat(result)
+                .extracting(ProductResult.Detail::name)
+                .containsExactly("싼것", "비싼것");
     }
 }

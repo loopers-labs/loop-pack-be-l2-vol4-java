@@ -1,7 +1,6 @@
 package com.loopers.user.interfaces.api;
 
 import com.loopers.user.application.UserCommand;
-import com.loopers.user.domain.User;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -11,9 +10,9 @@ import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDate;
 
-public class UserV1Dto {
+public class UserV1Request {
 
-    public record SignUpRequest(
+    public record SignUp(
         @NotBlank(message = "로그인 ID는 필수입니다.")
         @Pattern(regexp = "^[a-z0-9]{4,20}$", message = "로그인 ID는 영문 소문자와 숫자 4~20자여야 합니다.")
         String loginId,
@@ -39,46 +38,7 @@ public class UserV1Dto {
         }
     }
 
-    public record UserResponse(
-        Long id,
-        String loginId,
-        String name,
-        LocalDate birthDate,
-        String email
-    ) {
-        public static UserResponse from(User user) {
-            return new UserResponse(
-                user.getId(),
-                user.getLoginId(),
-                user.getName(),
-                user.getBirthDate(),
-                user.getEmail()
-            );
-        }
-    }
-
-    public record UserInfoResponse(
-        String loginId,
-        String name,
-        LocalDate birthDate,
-        String email
-    ) {
-        public static UserInfoResponse from(User user) {
-            return new UserInfoResponse(
-                user.getLoginId(),
-                maskLastCharacter(user.getName()),
-                user.getBirthDate(),
-                user.getEmail()
-            );
-        }
-
-        /** 이름의 마지막 글자를 * 로 마스킹한다. (예: "김루퍼" -> "김루*", "김" -> "*") */
-        private static String maskLastCharacter(String name) {
-            return name.substring(0, name.length() - 1) + "*";
-        }
-    }
-
-    public record UpdatePasswordRequest(
+    public record UpdatePassword(
         @NotBlank(message = "현재 비밀번호는 필수입니다.")
         String currentPassword,
 

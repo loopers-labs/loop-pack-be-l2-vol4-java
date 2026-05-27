@@ -1,9 +1,9 @@
 package com.loopers.product.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.product.application.ProductResult;
 import com.loopers.product.application.ProductService;
 import com.loopers.product.application.ProductSortOption;
-import com.loopers.product.domain.Product;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,39 +27,39 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     @PostMapping
     @Override
-    public ApiResponse<ProductV1Dto.ProductResponse> create(
-        @Valid @RequestBody ProductV1Dto.CreateRequest request
+    public ApiResponse<ProductV1Response.Detail> create(
+        @Valid @RequestBody ProductV1Request.Create request
     ) {
-        Product product = productService.create(request.toCommand());
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(product));
+        ProductResult.Detail result = productService.create(request.toCommand());
+        return ApiResponse.success(ProductV1Response.Detail.from(result));
     }
 
     @GetMapping("/{productId}")
     @Override
-    public ApiResponse<ProductV1Dto.ProductResponse> get(@PathVariable Long productId) {
-        Product product = productService.get(productId);
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(product));
+    public ApiResponse<ProductV1Response.Detail> get(@PathVariable Long productId) {
+        ProductResult.Detail result = productService.get(productId);
+        return ApiResponse.success(ProductV1Response.Detail.from(result));
     }
 
     @GetMapping
     @Override
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAll(
+    public ApiResponse<List<ProductV1Response.Detail>> getAll(
         @RequestParam(defaultValue = "LATEST") ProductSortOption sort
     ) {
-        List<ProductV1Dto.ProductResponse> responses = productService.getAll(sort).stream()
-                .map(ProductV1Dto.ProductResponse::from)
+        List<ProductV1Response.Detail> responses = productService.getAll(sort).stream()
+                .map(ProductV1Response.Detail::from)
                 .toList();
         return ApiResponse.success(responses);
     }
 
     @PutMapping("/{productId}")
     @Override
-    public ApiResponse<ProductV1Dto.ProductResponse> update(
+    public ApiResponse<ProductV1Response.Detail> update(
         @PathVariable Long productId,
-        @Valid @RequestBody ProductV1Dto.UpdateRequest request
+        @Valid @RequestBody ProductV1Request.Update request
     ) {
-        Product product = productService.update(request.toCommand(productId));
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(product));
+        ProductResult.Detail result = productService.update(request.toCommand(productId));
+        return ApiResponse.success(ProductV1Response.Detail.from(result));
     }
 
     @DeleteMapping("/{productId}")

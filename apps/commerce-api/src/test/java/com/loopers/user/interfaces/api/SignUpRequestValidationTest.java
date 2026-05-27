@@ -1,6 +1,5 @@
 package com.loopers.user.interfaces.api;
 
-import com.loopers.user.interfaces.api.UserV1Dto.SignUpRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -29,8 +28,8 @@ class SignUpRequestValidationTest {
         validatorFactory.close();
     }
 
-    private SignUpRequest validRequest() {
-        return new SignUpRequest(
+    private UserV1Request.SignUp validRequest() {
+        return new UserV1Request.SignUp(
             "loopers01",
             "Passw0rd!",
             "김루퍼",
@@ -39,7 +38,7 @@ class SignUpRequestValidationTest {
         );
     }
 
-    private boolean hasViolationOn(SignUpRequest request, String property) {
+    private boolean hasViolationOn(UserV1Request.SignUp request, String property) {
         return validator.validate(request).stream()
             .anyMatch(v -> v.getPropertyPath().toString().equals(property));
     }
@@ -53,7 +52,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("로그인 ID가 형식에 맞지 않으면 loginId 위반이 발생한다")
     void givenInvalidLoginId_whenValidate_thenHasLoginIdViolation() {
-        SignUpRequest request = new SignUpRequest(
+        UserV1Request.SignUp request = new UserV1Request.SignUp(
             "AB", "Passw0rd!", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
         );
         assertThat(hasViolationOn(request, "loginId")).isTrue();
@@ -62,7 +61,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("비밀번호가 형식에 맞지 않으면 password 위반이 발생한다")
     void givenInvalidPassword_whenValidate_thenHasPasswordViolation() {
-        SignUpRequest request = new SignUpRequest(
+        UserV1Request.SignUp request = new UserV1Request.SignUp(
             "loopers01", "short", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
         );
         assertThat(hasViolationOn(request, "password")).isTrue();
@@ -71,7 +70,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("이름이 형식에 맞지 않으면 name 위반이 발생한다")
     void givenInvalidName_whenValidate_thenHasNameViolation() {
-        SignUpRequest request = new SignUpRequest(
+        UserV1Request.SignUp request = new UserV1Request.SignUp(
             "loopers01", "Passw0rd!", "looper01", LocalDate.of(1995, 3, 21), "looper@example.com"
         );
         assertThat(hasViolationOn(request, "name")).isTrue();
@@ -80,7 +79,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("이메일 형식이 아니면 email 위반이 발생한다")
     void givenInvalidEmail_whenValidate_thenHasEmailViolation() {
-        SignUpRequest request = new SignUpRequest(
+        UserV1Request.SignUp request = new UserV1Request.SignUp(
             "loopers01", "Passw0rd!", "김루퍼", LocalDate.of(1995, 3, 21), "invalid-email"
         );
         assertThat(hasViolationOn(request, "email")).isTrue();
@@ -89,7 +88,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("생년월일이 미래이면 birthDate 위반이 발생한다")
     void givenFutureBirthDate_whenValidate_thenHasBirthDateViolation() {
-        SignUpRequest request = new SignUpRequest(
+        UserV1Request.SignUp request = new UserV1Request.SignUp(
             "loopers01", "Passw0rd!", "김루퍼", LocalDate.now().plusDays(1), "looper@example.com"
         );
         assertThat(hasViolationOn(request, "birthDate")).isTrue();
@@ -98,7 +97,7 @@ class SignUpRequestValidationTest {
     @Test
     @DisplayName("필수 필드가 null이면 각 필드에 위반이 발생한다")
     void givenNullFields_whenValidate_thenHasViolationForEachField() {
-        SignUpRequest request = new SignUpRequest(null, null, null, null, null);
+        UserV1Request.SignUp request = new UserV1Request.SignUp(null, null, null, null, null);
         assertThat(hasViolationOn(request, "loginId")).isTrue();
         assertThat(hasViolationOn(request, "password")).isTrue();
         assertThat(hasViolationOn(request, "name")).isTrue();

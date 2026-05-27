@@ -99,25 +99,30 @@ class BrandServiceTest {
     }
 
     @Test
-    @DisplayName("get 은 reader 의 결과를 그대로 반환한다")
-    void givenExistingBrandId_whenGet_thenReturnsBrand() {
+    @DisplayName("get 은 reader 가 반환한 brand 를 Detail 로 매핑해서 반환한다")
+    void givenExistingBrandId_whenGet_thenReturnsBrandDetail() {
         Brand brand = Brand.create("루퍼스", "설명");
         when(brandReader.get(1L)).thenReturn(brand);
 
-        Brand result = brandService.get(1L);
+        BrandResult.Detail result = brandService.get(1L);
 
-        assertThat(result).isSameAs(brand);
+        assertAll(
+                () -> assertThat(result.name()).isEqualTo("루퍼스"),
+                () -> assertThat(result.description()).isEqualTo("설명")
+        );
     }
 
     @Test
-    @DisplayName("getAll 은 repository 의 결과를 그대로 반환한다")
-    void givenBrands_whenGetAll_thenReturnsAllBrands() {
-        Brand a = Brand.create("A", "설명");
-        Brand b = Brand.create("B", "설명");
+    @DisplayName("getAll 은 repository 의 brand 들을 Detail 리스트로 매핑한다")
+    void givenBrands_whenGetAll_thenReturnsBrandDetails() {
+        Brand a = Brand.create("A", "설명A");
+        Brand b = Brand.create("B", "설명B");
         when(brandRepository.findAll()).thenReturn(List.of(a, b));
 
-        List<Brand> result = brandService.getAll();
+        List<BrandResult.Detail> result = brandService.getAll();
 
-        assertThat(result).containsExactly(a, b);
+        assertThat(result)
+                .extracting(BrandResult.Detail::name)
+                .containsExactly("A", "B");
     }
 }

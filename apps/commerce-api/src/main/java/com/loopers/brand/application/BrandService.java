@@ -20,16 +20,16 @@ public class BrandService {
     private final ProductStockRepository productStockRepository;
 
     @Transactional
-    public Brand create(BrandCommand.Create command) {
+    public BrandResult.Detail create(BrandCommand.Create command) {
         Brand brand = Brand.create(command.name(), command.description());
-        return brandRepository.save(brand);
+        return BrandResult.Detail.from(brandRepository.save(brand));
     }
 
     @Transactional
-    public Brand update(BrandCommand.Update command) {
+    public BrandResult.Detail update(BrandCommand.Update command) {
         Brand brand = brandReader.get(command.brandId());
         brand.update(command.name(), command.description());
-        return brand;
+        return BrandResult.Detail.from(brand);
     }
 
     @Transactional
@@ -41,12 +41,14 @@ public class BrandService {
     }
 
     @Transactional(readOnly = true)
-    public Brand get(Long brandId) {
-        return brandReader.get(brandId);
+    public BrandResult.Detail get(Long brandId) {
+        return BrandResult.Detail.from(brandReader.get(brandId));
     }
 
     @Transactional(readOnly = true)
-    public List<Brand> getAll() {
-        return brandRepository.findAll();
+    public List<BrandResult.Detail> getAll() {
+        return brandRepository.findAll().stream()
+                .map(BrandResult.Detail::from)
+                .toList();
     }
 }

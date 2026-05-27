@@ -41,14 +41,14 @@ class UserV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private UserV1Dto.SignUpRequest validRequest() {
-        return new UserV1Dto.SignUpRequest(
+    private UserV1Request.SignUp validRequest() {
+        return new UserV1Request.SignUp(
             "loopers01", "Passw0rd!", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
         );
     }
 
-    private ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> signUp(UserV1Dto.SignUpRequest request) {
-        ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+    private ResponseEntity<ApiResponse<UserV1Response.Detail>> signUp(UserV1Request.SignUp request) {
+        ParameterizedTypeReference<ApiResponse<UserV1Response.Detail>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), responseType);
     }
 
@@ -59,7 +59,7 @@ class UserV1ApiE2ETest {
         @DisplayName("유효한 정보로 회원가입하면, 200과 가입된 유저 정보를 반환한다.")
         @Test
         void givenValidRequest_whenSignUp_thenReturnsUserInfo() {
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = signUp(validRequest());
+            ResponseEntity<ApiResponse<UserV1Response.Detail>> response = signUp(validRequest());
 
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
@@ -85,7 +85,7 @@ class UserV1ApiE2ETest {
         void givenDuplicateLoginId_whenSignUp_thenThrowsConflict() {
             signUp(validRequest());
 
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = signUp(validRequest());
+            ResponseEntity<ApiResponse<UserV1Response.Detail>> response = signUp(validRequest());
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
@@ -93,11 +93,11 @@ class UserV1ApiE2ETest {
         @DisplayName("형식에 맞지 않는 정보로 가입하면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         void givenInvalidRequest_whenSignUp_thenThrowsBadRequest() {
-            UserV1Dto.SignUpRequest invalidRequest = new UserV1Dto.SignUpRequest(
+            UserV1Request.SignUp invalidRequest = new UserV1Request.SignUp(
                 "AB", "Passw0rd!", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
             );
 
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = signUp(invalidRequest);
+            ResponseEntity<ApiResponse<UserV1Response.Detail>> response = signUp(invalidRequest);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -114,8 +114,8 @@ class UserV1ApiE2ETest {
             return headers;
         }
 
-        private ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> requestMyInfo(HttpHeaders headers) {
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserInfoResponse>> responseType = new ParameterizedTypeReference<>() {};
+        private ResponseEntity<ApiResponse<UserV1Response.Masked>> requestMyInfo(HttpHeaders headers) {
+            ParameterizedTypeReference<ApiResponse<UserV1Response.Masked>> responseType = new ParameterizedTypeReference<>() {};
             return testRestTemplate.exchange(ENDPOINT + "/me", HttpMethod.GET, new HttpEntity<>(headers), responseType);
         }
 
@@ -124,7 +124,7 @@ class UserV1ApiE2ETest {
         void givenValidHeaders_whenGetMyInfo_thenReturnsMyInfo() {
             signUp(validRequest());
 
-            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+            ResponseEntity<ApiResponse<UserV1Response.Masked>> response =
                 requestMyInfo(authHeaders("loopers01", "Passw0rd!"));
 
             assertAll(
@@ -141,7 +141,7 @@ class UserV1ApiE2ETest {
         void givenWrongPassword_whenGetMyInfo_thenThrowsUnauthorized() {
             signUp(validRequest());
 
-            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+            ResponseEntity<ApiResponse<UserV1Response.Masked>> response =
                 requestMyInfo(authHeaders("loopers01", "WrongPass1!"));
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -150,7 +150,7 @@ class UserV1ApiE2ETest {
         @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
         @Test
         void givenMissingHeaders_whenGetMyInfo_thenThrowsUnauthorized() {
-            ResponseEntity<ApiResponse<UserV1Dto.UserInfoResponse>> response =
+            ResponseEntity<ApiResponse<UserV1Response.Masked>> response =
                 requestMyInfo(new HttpHeaders());
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -168,7 +168,7 @@ class UserV1ApiE2ETest {
             return headers;
         }
 
-        private ResponseEntity<ApiResponse<Void>> requestChange(HttpHeaders headers, UserV1Dto.UpdatePasswordRequest body) {
+        private ResponseEntity<ApiResponse<Void>> requestChange(HttpHeaders headers, UserV1Request.UpdatePassword body) {
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             return testRestTemplate.exchange(ENDPOINT + "/password", HttpMethod.PUT, new HttpEntity<>(body, headers), responseType);
         }
@@ -180,7 +180,7 @@ class UserV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = requestChange(
                 authHeaders("loopers01", "Passw0rd!"),
-                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "NewPass1!")
+                new UserV1Request.UpdatePassword("Passw0rd!", "NewPass1!")
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -193,7 +193,7 @@ class UserV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = requestChange(
                 authHeaders("loopers01", "Passw0rd!"),
-                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "short")
+                new UserV1Request.UpdatePassword("Passw0rd!", "short")
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -206,7 +206,7 @@ class UserV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = requestChange(
                 authHeaders("loopers01", "Passw0rd!"),
-                new UserV1Dto.UpdatePasswordRequest("WrongPass1!", "NewPass1!")
+                new UserV1Request.UpdatePassword("WrongPass1!", "NewPass1!")
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -217,7 +217,7 @@ class UserV1ApiE2ETest {
         void givenMissingHeaders_whenChangePassword_thenThrowsUnauthorized() {
             ResponseEntity<ApiResponse<Void>> response = requestChange(
                 new HttpHeaders(),
-                new UserV1Dto.UpdatePasswordRequest("Passw0rd!", "NewPass1!")
+                new UserV1Request.UpdatePassword("Passw0rd!", "NewPass1!")
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

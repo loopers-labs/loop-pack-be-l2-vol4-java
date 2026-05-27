@@ -1,7 +1,7 @@
 package com.loopers.brand.interfaces.api;
 
+import com.loopers.brand.application.BrandResult;
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.Brand;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,37 +25,37 @@ public class BrandV1Controller implements BrandV1ApiSpec {
 
     @PostMapping
     @Override
-    public ApiResponse<BrandV1Dto.BrandResponse> create(
-        @Valid @RequestBody BrandV1Dto.CreateRequest request
+    public ApiResponse<BrandV1Response.Detail> create(
+        @Valid @RequestBody BrandV1Request.Create request
     ) {
-        Brand brand = brandService.create(request.toCommand());
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(brand));
+        BrandResult.Detail result = brandService.create(request.toCommand());
+        return ApiResponse.success(BrandV1Response.Detail.from(result));
     }
 
     @GetMapping("/{brandId}")
     @Override
-    public ApiResponse<BrandV1Dto.BrandResponse> get(@PathVariable Long brandId) {
-        Brand brand = brandService.get(brandId);
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(brand));
+    public ApiResponse<BrandV1Response.Detail> get(@PathVariable Long brandId) {
+        BrandResult.Detail result = brandService.get(brandId);
+        return ApiResponse.success(BrandV1Response.Detail.from(result));
     }
 
     @GetMapping
     @Override
-    public ApiResponse<List<BrandV1Dto.BrandResponse>> getAll() {
-        List<BrandV1Dto.BrandResponse> responses = brandService.getAll().stream()
-                .map(BrandV1Dto.BrandResponse::from)
+    public ApiResponse<List<BrandV1Response.Detail>> getAll() {
+        List<BrandV1Response.Detail> responses = brandService.getAll().stream()
+                .map(BrandV1Response.Detail::from)
                 .toList();
         return ApiResponse.success(responses);
     }
 
     @PutMapping("/{brandId}")
     @Override
-    public ApiResponse<BrandV1Dto.BrandResponse> update(
+    public ApiResponse<BrandV1Response.Detail> update(
         @PathVariable Long brandId,
-        @Valid @RequestBody BrandV1Dto.UpdateRequest request
+        @Valid @RequestBody BrandV1Request.Update request
     ) {
-        Brand brand = brandService.update(request.toCommand(brandId));
-        return ApiResponse.success(BrandV1Dto.BrandResponse.from(brand));
+        BrandResult.Detail result = brandService.update(request.toCommand(brandId));
+        return ApiResponse.success(BrandV1Response.Detail.from(result));
     }
 
     @DeleteMapping("/{brandId}")

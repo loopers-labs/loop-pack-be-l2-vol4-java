@@ -23,7 +23,7 @@ public class ProductService {
     private final ProductReader productReader;
 
     @Transactional
-    public Product create(ProductCommand.Create command) {
+    public ProductResult.Detail create(ProductCommand.Create command) {
         if (!brandRepository.existsById(command.brandId())) {
             throw new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다.");
         }
@@ -33,14 +33,14 @@ public class ProductService {
         ProductStock stock = ProductStock.create(saved.getId(), command.initialStockQuantity());
         productStockRepository.save(stock);
 
-        return saved;
+        return ProductResult.Detail.from(saved);
     }
 
     @Transactional
-    public Product update(ProductCommand.Update command) {
+    public ProductResult.Detail update(ProductCommand.Update command) {
         Product product = productReader.get(command.productId());
         product.update(command.name(), command.description(), command.price());
-        return product;
+        return ProductResult.Detail.from(product);
     }
 
     @Transactional
@@ -52,15 +52,16 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Product get(Long productId) {
-        return productReader.get(productId);
+    public ProductResult.Detail get(Long productId) {
+        return ProductResult.Detail.from(productReader.get(productId));
     }
 
     @Transactional(readOnly = true)
-    public List<Product> getAll(ProductSortOption sortOption) {
-        return switch (sortOption) {
+    public List<ProductResult.Detail> getAll(ProductSortOption sortOption) {
+        List<Product> products = switch (sortOption) {
             case LATEST -> productRepository.findAllOrderByLatest();
             case PRICE_ASC -> productRepository.findAllOrderByPriceAsc();
         };
+        return products.stream().map(ProductResult.Detail::from).toList();
     }
 }

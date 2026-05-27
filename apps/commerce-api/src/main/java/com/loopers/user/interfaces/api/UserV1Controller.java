@@ -1,7 +1,7 @@
 package com.loopers.user.interfaces.api;
 
+import com.loopers.user.application.UserResult;
 import com.loopers.user.application.UserService;
-import com.loopers.user.domain.User;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,25 +22,25 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @PostMapping
     @Override
-    public ApiResponse<UserV1Dto.UserResponse> signUp(
-        @Valid @RequestBody UserV1Dto.SignUpRequest request
+    public ApiResponse<UserV1Response.Detail> signUp(
+        @Valid @RequestBody UserV1Request.SignUp request
     ) {
-        User user = userService.signUp(request.toCommand());
-        return ApiResponse.success(UserV1Dto.UserResponse.from(user));
+        UserResult.Detail result = userService.signUp(request.toCommand());
+        return ApiResponse.success(UserV1Response.Detail.from(result));
     }
 
     @GetMapping("/me")
     @Override
-    public ApiResponse<UserV1Dto.UserInfoResponse> getMyInfo(@AuthenticationPrincipal Long userId) {
-        User user = userService.get(userId);
-        return ApiResponse.success(UserV1Dto.UserInfoResponse.from(user));
+    public ApiResponse<UserV1Response.Masked> getMyInfo(@AuthenticationPrincipal Long userId) {
+        UserResult.Detail result = userService.get(userId);
+        return ApiResponse.success(UserV1Response.Masked.from(result));
     }
 
     @PutMapping("/password")
     @Override
     public ApiResponse<Void> changePassword(
         @AuthenticationPrincipal Long userId,
-        @Valid @RequestBody UserV1Dto.UpdatePasswordRequest request
+        @Valid @RequestBody UserV1Request.UpdatePassword request
     ) {
         userService.changePassword(request.toCommand(userId));
         return ApiResponse.success(null);
