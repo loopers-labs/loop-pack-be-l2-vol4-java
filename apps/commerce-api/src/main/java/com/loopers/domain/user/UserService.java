@@ -1,9 +1,5 @@
-package com.loopers.application.user;
+package com.loopers.domain.user;
 
-import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.PasswordEncryptor;
-import com.loopers.domain.user.UserModel;
-import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +10,6 @@ import org.springframework.stereotype.Component;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncryptor passwordEncryptor;
-    private final UserFinder userFinder;
 
     public UserModel create(String loginId, String loginPw, String name, String birthDate, String email, Gender gender) {
         if (userRepository.existsByLoginId(loginId)) {
@@ -23,11 +18,20 @@ public class UserService {
         return userRepository.save(new UserModel(loginId, loginPw, name, birthDate, email, gender, passwordEncryptor));
     }
 
+    public UserModel getLoginUser(String loginId, String loginPw) {
+        UserModel user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        if (!user.matchesPassword(loginPw, passwordEncryptor)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+        }
+        return user;
+    }
+
     public void changePassword(String loginId, String loginPw, String oldPassword, String newPassword) {
         if (!loginPw.equals(oldPassword)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
-        UserModel user = userFinder.getLoginUser(loginId, loginPw);
+        UserModel user = getLoginUser(loginId, loginPw);
         user.changePassword(newPassword, passwordEncryptor);
         userRepository.save(user);
     }

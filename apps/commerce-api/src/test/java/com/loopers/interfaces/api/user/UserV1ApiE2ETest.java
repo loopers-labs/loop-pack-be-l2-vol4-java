@@ -1,5 +1,9 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
@@ -21,6 +25,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,9 +37,12 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
     private static final String VALID_PASSWORD = "Password1!";
+    private static final String LOGIN_ID = "user01";
 
     private final TestRestTemplate testRestTemplate;
     private final UserRepository userRepository;
+    private final BrandRepository brandRepository;
+    private final ProductRepository productRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final PasswordEncryptor passwordEncryptor;
 
@@ -40,11 +50,15 @@ class UserV1ApiE2ETest {
     public UserV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         UserRepository userRepository,
+        BrandRepository brandRepository,
+        ProductRepository productRepository,
         DatabaseCleanUp databaseCleanUp,
         PasswordEncryptor passwordEncryptor
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userRepository = userRepository;
+        this.brandRepository = brandRepository;
+        this.productRepository = productRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.passwordEncryptor = passwordEncryptor;
     }
@@ -235,7 +249,96 @@ class UserV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /api/v1/users/me/password")
+    @DisplayName("GET /api/v1/users/{userId}/likes")
+    @Nested
+    class GetLikedProducts {
+
+        @DisplayName("좋아요한 상품이 있을 경우, 해당 상품 목록을 응답으로 반환한다.")
+        @Test
+        void returnsLikedProducts_whenLikesExist() {
+            // given
+            UserModel user = userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+            BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
+            ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            testRestTemplate.exchange(
+                "/api/v1/products/" + product.getId() + "/likes",
+                HttpMethod.POST,
+                authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                Void.class
+            );
+
+            // when
+            ParameterizedTypeReference<ApiResponse<List<UserV1Dto.LikedProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<UserV1Dto.LikedProductResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/users/" + user.getId() + "/likes",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                    responseType
+                );
+
+            // then
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data()).hasSize(1),
+                () -> assertThat(response.getBody().data().get(0).id()).isEqualTo(product.getId()),
+                () -> assertThat(response.getBody().data().get(0).brandName()).isEqualTo(brand.getName()),
+                () -> assertThat(response.getBody().data().get(0).name()).isEqualTo(product.getName())
+            );
+        }
+
+        @DisplayName("좋아요한 상품이 없을 경우, 빈 목록을 응답으로 반환한다.")
+        @Test
+        void returnsEmptyList_whenNoLikesExist() {
+            // given
+            UserModel user = userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<List<UserV1Dto.LikedProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<UserV1Dto.LikedProductResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/users/" + user.getId() + "/likes",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                    responseType
+                );
+
+            // then
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data()).isEmpty()
+            );
+        }
+
+        @DisplayName("다른 사용자의 좋아요 목록 조회 시 403 Forbidden 응답을 반환한다.")
+        @Test
+        void returnsForbidden_whenAccessingAnotherUsersLikes() {
+            // given
+            UserModel user = userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+            Long anotherUserId = user.getId() + 1;
+
+            // when
+            ParameterizedTypeReference<ApiResponse<List<UserV1Dto.LikedProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<UserV1Dto.LikedProductResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/users/" + anotherUserId + "/likes",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                    responseType
+                );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @DisplayName("PUT /api/v1/users/password")
     @Nested
     class ChangePassword {
         @DisplayName("정상 요청 시 성공 응답을 반환한다")
@@ -251,7 +354,7 @@ class UserV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
+                testRestTemplate.exchange("/api/v1/users/password", HttpMethod.PUT, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
 
             // then
             assertTrue(response.getStatusCode().is2xxSuccessful());
@@ -272,7 +375,7 @@ class UserV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response =
-                testRestTemplate.exchange("/api/v1/users/me/password", HttpMethod.PATCH, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
+                testRestTemplate.exchange("/api/v1/users/password", HttpMethod.PUT, authJsonEntity(request, loginId, VALID_PASSWORD), responseType);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
