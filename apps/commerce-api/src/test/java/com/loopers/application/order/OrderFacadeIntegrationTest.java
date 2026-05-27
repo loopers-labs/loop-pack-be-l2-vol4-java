@@ -1,10 +1,13 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.outbox.OutboxStatus;
 import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.infrastructure.order.OrderItemRepositoryImpl;
 import com.loopers.infrastructure.order.OrderJpaRepository;
+import com.loopers.infrastructure.outbox.OutboxJpaRepository;
+import com.loopers.infrastructure.outbox.OutboxRepositoryImpl;
 import com.loopers.infrastructure.product.ProductEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.product.ProductStockEntity;
@@ -26,6 +29,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 
@@ -50,8 +54,14 @@ class OrderFacadeIntegrationTest {
     @Autowired
     private OrderItemJpaRepository orderItemJpaRepository;
 
+    @Autowired
+    private OutboxJpaRepository outboxJpaRepository;
+
     @MockitoSpyBean
     private OrderItemRepositoryImpl orderItemRepositoryImpl;
+
+    @MockitoSpyBean
+    private OutboxRepositoryImpl outboxRepositoryImpl;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -158,6 +168,70 @@ class OrderFacadeIntegrationTest {
                 () -> assertThat(stock.getQuantity()).isEqualTo(10L),
                 () -> assertThat(orderJpaRepository.count()).isZero()
             );
+        }
+
+        @DisplayName("주문이 성공적으로 생성되면, ORDER.CREATED outbox 이벤트가 PENDING 상태로 저장된다.")
+        @Test
+        void savesOutboxEvent_whenOrderIsCreatedSuccessfully() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
+            productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
+
+            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+                new OrderCommand.Create.Item(product.getId(), 2)
+            ));
+
+            orderFacade.createOrder(command);
+
+            var outboxEvents = outboxJpaRepository.findAll();
+            assertAll(
+                () -> assertThat(outboxEvents).hasSize(1),
+                () -> assertThat(outboxEvents.get(0).getEventType()).isEqualTo("ORDER.CREATED"),
+                () -> assertThat(outboxEvents.get(0).getStatus()).isEqualTo(OutboxStatus.PENDING)
+            );
+        }
+
+        @DisplayName("outbox 이벤트 저장에 실패하면, 주문 생성과 재고 차감이 모두 롤백된다.")
+        @Test
+        void rollsBackOrderAndStock_whenOutboxEventSaveFails() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
+            productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
+
+            doThrow(new RuntimeException("Outbox 저장 실패")).when(outboxRepositoryImpl).save(any());
+
+            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+                new OrderCommand.Create.Item(product.getId(), 3)
+            ));
+
+            assertThrows(RuntimeException.class, () -> orderFacade.createOrder(command));
+
+            ProductStockEntity stock = productStockJpaRepository.findByProductId(product.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(stock.getQuantity()).isEqualTo(10L),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(outboxJpaRepository.count()).isZero()
+            );
+        }
+
+        @DisplayName("주문 상품 저장에 실패하면, outbox 이벤트도 함께 롤백된다.")
+        @Test
+        void rollsBackOutboxEvent_whenOrderItemSaveFails() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = productJpaRepository.save(
+                new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
+            productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
+
+            doThrow(new RuntimeException("OrderItem 저장 실패")).when(orderItemRepositoryImpl).saveAll(anyList());
+
+            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+                new OrderCommand.Create.Item(product.getId(), 3)
+            ));
+
+            assertThrows(RuntimeException.class, () -> orderFacade.createOrder(command));
+            assertThat(outboxJpaRepository.count()).isZero();
         }
 
         @DisplayName("여러 상품 중 하나라도 재고가 부족하면, 모든 재고 차감이 롤백된다.")

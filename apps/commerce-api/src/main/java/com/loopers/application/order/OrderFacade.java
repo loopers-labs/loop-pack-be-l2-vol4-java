@@ -3,6 +3,7 @@ package com.loopers.application.order;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.outbox.OutboxService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class OrderFacade {
 
     private final ProductService productService;
     private final OrderService orderService;
+    private final OutboxService outboxService;
 
     @Transactional
     public OrderInfo.Create createOrder(OrderCommand.Create command) {
@@ -39,6 +41,7 @@ public class OrderFacade {
         }
 
         Order order = orderService.createOrder(command.userId(), totalPrice, items);
+        outboxService.publishOrderCreatedEvent(order);
         return OrderInfo.Create.from(order);
     }
 }
