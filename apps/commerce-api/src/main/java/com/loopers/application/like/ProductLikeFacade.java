@@ -7,6 +7,7 @@ import com.loopers.domain.like.ProductLikeModel;
 import com.loopers.domain.like.ProductLikeRepository;
 import com.loopers.domain.like.ProductLikeResult;
 import com.loopers.domain.like.ProductLikeService;
+import com.loopers.domain.product.ProductCatalogService;
 import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -17,10 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -30,6 +28,7 @@ public class ProductLikeFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductLikeService productLikeService = new ProductLikeService();
+    private final ProductCatalogService productCatalogService = new ProductCatalogService();
 
     @Transactional
     public void likeProduct(String userLoginId, Long productId) {
@@ -61,24 +60,17 @@ public class ProductLikeFacade {
     @Transactional(readOnly = true)
     public List<ProductInfo> getLikedProducts(String userLoginId) {
         List<ProductLikeModel> productLikes = productLikeRepository.findAllByUserLoginId(userLoginId);
-        Map<Long, ProductModel> productsById = productLikes.stream()
+        List<Long> productIds = productLikes.stream()
             .map(ProductLikeModel::getProductId)
             .distinct()
-            .map(productRepository::find)
-            .flatMap(Optional::stream)
-            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+            .toList();
 
-        Map<Long, BrandModel> brandsById = productsById.values().stream()
-            .map(ProductModel::getBrandId)
-            .distinct()
-            .map(this::getBrand)
-            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
+        List<ProductModel> products = productRepository.findAllByIds(productIds);
+        List<ProductModel> likedProducts = productLikeService.getLikedProducts(productLikes, products);
+        List<Long> brandIds = productCatalogService.getBrandIds(likedProducts);
+        List<BrandModel> brands = brandRepository.findAllByIds(brandIds);
 
-        List<ProductDetail> productDetails = productLikeService.getLikedProductDetails(
-            productLikes,
-            productsById,
-            brandsById
-        );
+        List<ProductDetail> productDetails = productCatalogService.getProductDetails(likedProducts, brands);
         return productDetails.stream()
             .map(ProductInfo::from)
             .toList();
@@ -87,10 +79,5 @@ public class ProductLikeFacade {
     private ProductModel getProduct(Long id) {
         return productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
-    }
-
-    private BrandModel getBrand(Long id) {
-        return brandRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
     }
 }

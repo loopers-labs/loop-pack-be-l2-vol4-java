@@ -15,9 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -63,8 +60,9 @@ public class ProductFacade {
             ? productRepository.findAll(productSort, pageCriteria.page(), pageCriteria.size())
             : productRepository.findAllByBrandId(brandId, productSort, pageCriteria.page(), pageCriteria.size());
 
-        Map<Long, BrandModel> brandsById = findBrandsByProduct(products);
-        List<ProductDetail> productDetails = productCatalogService.getProductDetails(products, brandsById);
+        List<Long> brandIds = productCatalogService.getBrandIds(products);
+        List<BrandModel> brands = brandRepository.findAllByIds(brandIds);
+        List<ProductDetail> productDetails = productCatalogService.getProductDetails(products, brands);
         return productDetails.stream()
             .map(ProductInfo::from)
             .toList();
@@ -94,13 +92,5 @@ public class ProductFacade {
     private BrandModel getBrand(Long id) {
         return brandRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
-    }
-
-    private Map<Long, BrandModel> findBrandsByProduct(List<ProductModel> products) {
-        return products.stream()
-            .map(ProductModel::getBrandId)
-            .distinct()
-            .map(this::getBrand)
-            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
     }
 }

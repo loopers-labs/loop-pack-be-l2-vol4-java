@@ -6,6 +6,8 @@ import com.loopers.support.error.ErrorType;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ProductCatalogService {
 
@@ -13,7 +15,17 @@ public class ProductCatalogService {
         return new ProductDetail(product, brand);
     }
 
-    public List<ProductDetail> getProductDetails(List<ProductModel> products, Map<Long, BrandModel> brandsById) {
+    public List<Long> getBrandIds(List<ProductModel> products) {
+        return products.stream()
+            .map(ProductModel::getBrandId)
+            .distinct()
+            .toList();
+    }
+
+    public List<ProductDetail> getProductDetails(List<ProductModel> products, List<BrandModel> brands) {
+        Map<Long, BrandModel> brandsById = brands.stream()
+            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
+
         return products.stream()
             .map(product -> getProductDetail(product, findBrand(product, brandsById)))
             .toList();

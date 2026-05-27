@@ -1,18 +1,15 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductCatalogService;
-import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ProductLikeService {
-
-    private final ProductCatalogService productCatalogService = new ProductCatalogService();
 
     public ProductLikeResult likeProduct(
         String userLoginId,
@@ -37,17 +34,18 @@ public class ProductLikeService {
         return true;
     }
 
-    public List<ProductDetail> getLikedProductDetails(
+    public List<ProductModel> getLikedProducts(
         List<ProductLikeModel> productLikes,
-        Map<Long, ProductModel> productsById,
-        Map<Long, BrandModel> brandsById
+        List<ProductModel> products
     ) {
+        Map<Long, ProductModel> productsById = products.stream()
+            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+
         return productLikes.stream()
             .map(ProductLikeModel::getProductId)
             .distinct()
             .map(productsById::get)
             .filter(Objects::nonNull)
-            .map(product -> productCatalogService.getProductDetails(List.of(product), brandsById).get(0))
             .toList();
     }
 }

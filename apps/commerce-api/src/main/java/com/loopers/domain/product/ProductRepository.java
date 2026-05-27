@@ -6,6 +6,7 @@ import java.util.List;
 public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> find(Long id);
+    List<ProductModel> findAllByIds(List<Long> ids);
     List<ProductModel> findAll();
     List<ProductModel> findAll(ProductSort sort);
     List<ProductModel> findAll(ProductSort sort, int page, int size);

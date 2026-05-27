@@ -1,15 +1,13 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,36 +105,43 @@ class ProductLikeServiceTest {
         }
     }
 
-    @DisplayName("좋아요 상품 목록을 구성할 때, ")
+    @DisplayName("좋아요 상품 목록을 정렬할 때, ")
     @Nested
-    class GetLikedProductDetails {
+    class GetLikedProducts {
 
-        @DisplayName("좋아요 관계 순서대로 상품과 브랜드 정보를 조합한다.")
+        @DisplayName("좋아요 관계 순서대로 상품을 반환한다.")
         @Test
-        void returnsProductDetailsByProductLikes() {
+        void returnsProductsByProductLikes() {
             // arrange
             ProductLikeModel firstLike = new ProductLikeModel("user1234", 1L);
             ProductLikeModel secondLike = new ProductLikeModel("user1234", 2L);
             ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
             ProductModel secondProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
-            BrandModel firstBrand = new BrandModel("Loopers", "감성 이커머스 브랜드");
-            BrandModel secondBrand = new BrandModel("Daily", "데일리 브랜드");
+            setId(firstProduct, 1L);
+            setId(secondProduct, 2L);
 
             // act
-            List<ProductDetail> results = productLikeService.getLikedProductDetails(
+            List<ProductModel> results = productLikeService.getLikedProducts(
                 List.of(firstLike, secondLike),
-                Map.of(1L, firstProduct, 2L, secondProduct),
-                Map.of(10L, firstBrand, 20L, secondBrand)
+                List.of(firstProduct, secondProduct)
             );
 
             // assert
             assertAll(
                 () -> assertThat(results).hasSize(2),
-                () -> assertThat(results.get(0).product()).isSameAs(firstProduct),
-                () -> assertThat(results.get(0).brand()).isSameAs(firstBrand),
-                () -> assertThat(results.get(1).product()).isSameAs(secondProduct),
-                () -> assertThat(results.get(1).brand()).isSameAs(secondBrand)
+                () -> assertThat(results.get(0)).isSameAs(firstProduct),
+                () -> assertThat(results.get(1)).isSameAs(secondProduct)
             );
+        }
+    }
+
+    private void setId(ProductModel product, Long id) {
+        try {
+            Field idField = product.getClass().getSuperclass().getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(product, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
         }
     }
 }

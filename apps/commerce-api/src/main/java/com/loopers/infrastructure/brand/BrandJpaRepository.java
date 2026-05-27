@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface BrandJpaRepository extends JpaRepository<BrandModel, Long> {
     Optional<BrandModel> findByIdAndDeletedAtIsNull(Long id);
 
+    List<BrandModel> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
+
     List<BrandModel> findAllByDeletedAtIsNull();
 
     List<BrandModel> findAllByDeletedAtIsNull(Pageable pageable);
