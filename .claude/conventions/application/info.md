@@ -16,6 +16,8 @@ application 계층이 표현 계층으로 넘기는 출력 DTO. 도메인 모델
 - VO에 도메인 전용 메서드(예: `Name.maskedValue()`)가 있으면 Info 생성 시점에 호출해 이미 표현용으로 가공된 값을 담는다.
 - 같은 모델이라도 유스케이스별로 노출 필드가 다르면 Info를 분리한다(`UserSignUpInfo` 가입 결과 vs `UserMyInfo` 조회 결과).
 - 목록·페이지 응답에서도 `Info`는 단건 record 그대로 둔다. 컬렉션 변환은 Facade가 `List`/`Page`에 `.map(Info::from)`을 적용해 `List<Info>`/`Page<Info>`로 만든다(`application/facade.md`). `Info`에 컬렉션 래퍼나 페이지 메타(`totalPages` 등)를 담지 않는다 — 그건 표현 계층 `*V1Dto.PageResponse`의 책임이다.
+- **필드는 참조형으로 통일한다**(`Long`·`Integer`·`Boolean`·`String` 등). 조회로 항상 채워져 null이 안 나는 값이라도 원시형(`int`/`long`/`boolean`)을 섞지 않는다 — 기존 `*Info`(BrandInfo·UserMyInfo)와 일관성 유지. 같은 기준을 표현 계층 응답 record(`*V1Dto`)에도 적용한다.
+- 변환 원천은 `*Model`뿐 아니라 **도메인 read-model projection**(`domain.<domain>.projection`)일 수 있다(조회 유스케이스). `from(ProductSummary)`처럼 projection을 받아도 무방하다 — 표현 계층을 엔티티로부터 단절한다는 목적은 동일하게 충족된다.
 
 ## 핵심 발췌
 ```java
