@@ -1,7 +1,6 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 
 import java.time.ZonedDateTime;
@@ -30,21 +29,6 @@ public record ProductAdminInfo(
             stockQuantity,
             product.getCreatedAt(),
             product.getUpdatedAt()
-        );
-    }
-
-    public static ProductAdminInfo from(ProductDetail detail, int stockQuantity) {
-        return new ProductAdminInfo(
-            detail.product().getId(),
-            detail.product().getName(),
-            detail.product().getDescription(),
-            detail.product().getPrice(),
-            detail.brand().getId(),
-            detail.brand().getName(),
-            detail.product().getLikeCount(),
-            stockQuantity,
-            detail.product().getCreatedAt(),
-            detail.product().getUpdatedAt()
         );
     }
 }
