@@ -1,4 +1,4 @@
-package com.loopers.interfaces.api.member;
+package com.loopers.interfaces.api.user;
 
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -19,17 +19,17 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class MemberV1ApiE2ETest {
+class UserV1ApiE2ETest {
 
-    private static final String ENDPOINT_SIGNUP = "/v1/members/signup";
-    private static final String ENDPOINT_ME = "/v1/members/me";
-    private static final String ENDPOINT_PASSWORD = "/v1/members/me/password";
+    private static final String ENDPOINT_SIGNUP = "/v1/users/signup";
+    private static final String ENDPOINT_ME = "/v1/users/me";
+    private static final String ENDPOINT_PASSWORD = "/v1/users/me/password";
 
     private final TestRestTemplate testRestTemplate;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    public MemberV1ApiE2ETest(
+    public UserV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
             DatabaseCleanUp databaseCleanUp
     ) {
@@ -42,14 +42,14 @@ class MemberV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("POST /v1/members/signup")
+    @DisplayName("POST /v1/users/signup")
     @Nested
     class SignUp {
         @DisplayName("올바른 회원가입 요청을 보내면, 200 OK 응답을 받는다.")
         @Test
         void returnsOk_whenValidRequestIsProvided() {
             // arrange
-            MemberV1Dto.SignUpRequest signUpRequest = new MemberV1Dto.SignUpRequest(
+            UserV1Dto.SignUpRequest signUpRequest = new UserV1Dto.SignUpRequest(
                     "tester123",
                     "Password123!",
                     "테스터",
@@ -73,12 +73,12 @@ class MemberV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /v1/members/me")
+    @DisplayName("GET /v1/users/me")
     @Nested
     class GetMyInfo {
         @DisplayName("올바른 인증 정보를 헤더에 담아 요청하면, 마스킹된 회원 정보를 반환한다.")
         @Test
-        void returnsMaskedMemberInfo_whenValidCredentialsAreProvided() {
+        void returnsMaskedUserInfo_whenValidCredentialsAreProvided() {
             // arrange
             signUp("tester123", "Password123!", "테스터");
 
@@ -87,11 +87,11 @@ class MemberV1ApiE2ETest {
             headers.set("X-Loopers-LoginPw", "Password123!");
 
             // act
-            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
                     ENDPOINT_ME,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {}
+                    new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
             );
 
             // assert
@@ -113,11 +113,11 @@ class MemberV1ApiE2ETest {
             headers.set("X-Loopers-LoginPw", "WrongPassword!");
 
             // act
-            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
                     ENDPOINT_ME,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {}
+                    new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
             );
 
             // assert
@@ -128,7 +128,7 @@ class MemberV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /v1/members/me/password")
+    @DisplayName("PATCH /v1/users/me/password")
     @Nested
     class UpdatePassword {
         @DisplayName("올바른 비밀번호 변경 요청을 보내면, 200 OK 응답을 받고 이후 새 비밀번호로 조회가 가능하다.")
@@ -141,7 +141,7 @@ class MemberV1ApiE2ETest {
             headers.set("X-Loopers-LoginId", "tester123");
             headers.set("X-Loopers-LoginPw", "OldPassword123!");
 
-            MemberV1Dto.UpdatePasswordRequest updateRequest = new MemberV1Dto.UpdatePasswordRequest(
+            UserV1Dto.UpdatePasswordRequest updateRequest = new UserV1Dto.UpdatePasswordRequest(
                     "OldPassword123!",
                     "NewPassword123!"
             );
@@ -162,18 +162,18 @@ class MemberV1ApiE2ETest {
             newHeaders.set("X-Loopers-LoginId", "tester123");
             newHeaders.set("X-Loopers-LoginPw", "NewPassword123!");
 
-            ResponseEntity<ApiResponse<MemberV1Dto.MemberResponse>> getInfoResponse = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> getInfoResponse = testRestTemplate.exchange(
                     ENDPOINT_ME,
                     HttpMethod.GET,
                     new HttpEntity<>(newHeaders),
-                    new ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {}
+                    new ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
             );
             assertThat(getInfoResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
     }
 
     private void signUp(String loginId, String password, String name) {
-        MemberV1Dto.SignUpRequest request = new MemberV1Dto.SignUpRequest(
+        UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
                 loginId,
                 password,
                 name,

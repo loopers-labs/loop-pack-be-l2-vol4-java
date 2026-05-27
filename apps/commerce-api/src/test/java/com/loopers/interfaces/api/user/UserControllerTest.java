@@ -1,8 +1,8 @@
-package com.loopers.interfaces.api.member;
+package com.loopers.interfaces.api.user;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.application.member.MemberFacade;
-import com.loopers.application.member.MemberInfo;
+import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -26,8 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(MemberController.class)
-class MemberControllerTest {
+@WebMvcTest(UserController.class)
+class UserControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -36,7 +36,7 @@ class MemberControllerTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private MemberFacade memberFacade;
+    private UserFacade userFacade;
 
     @Test
     @DisplayName("회원가입 요청 시 200 OK를 반환하고 Facade를 호출한다.")
@@ -50,30 +50,30 @@ class MemberControllerTest {
         request.put("email", "tester01@example.com");
 
         // when & then
-        mockMvc.perform(post("/v1/members/signup")
+        mockMvc.perform(post("/v1/users/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(memberFacade).signUp(any(), any(), any(), any(), any());
+        verify(userFacade).signUp(any(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("내 정보 조회 시 200 OK와 회원 정보를 반환한다.")
-    void getMyInfo_ShouldReturnOkAndMemberInfo() throws Exception {
+    void getMyInfo_ShouldReturnOkAndUserInfo() throws Exception {
         // given
         String loginId = "tester01";
         String password = "Password123!";
-        MemberInfo response = new MemberInfo(
+        UserInfo response = new UserInfo(
                 "tester01",
                 "테스*",
                 LocalDate.of(1990, 1, 1),
                 "tester01@example.com"
         );
-        given(memberFacade.getMyInfo(loginId, password)).willReturn(response);
+        given(userFacade.getMyInfo(loginId, password)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/v1/members/me")
+        mockMvc.perform(get("/v1/users/me")
                         .header("X-Loopers-LoginId", loginId)
                         .header("X-Loopers-LoginPw", password))
                 .andExpect(status().isOk())
@@ -82,7 +82,7 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.birthDate").value("1990-01-01"))
                 .andExpect(jsonPath("$.data.email").value("tester01@example.com"));
 
-        verify(memberFacade).getMyInfo(loginId, password);
+        verify(userFacade).getMyInfo(loginId, password);
     }
 
     @Test
@@ -96,13 +96,13 @@ class MemberControllerTest {
         request.put("newPassword", "NewPassword123!");
 
         // when & then
-        mockMvc.perform(patch("/v1/members/me/password")
+        mockMvc.perform(patch("/v1/users/me/password")
                         .header("X-Loopers-LoginId", loginId)
                         .header("X-Loopers-LoginPw", password)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(memberFacade).updatePassword(eq(loginId), eq(password), any(), any());
+        verify(userFacade).updatePassword(eq(loginId), eq(password), any(), any());
     }
 }

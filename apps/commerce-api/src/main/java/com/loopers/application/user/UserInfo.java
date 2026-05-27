@@ -1,17 +1,17 @@
-package com.loopers.application.member;
+package com.loopers.application.user;
 
-import com.loopers.domain.member.MemberModel;
+import com.loopers.domain.user.UserModel;
 
 import java.time.LocalDate;
 
-public record MemberInfo(
+public record UserInfo(
         String loginId,
         String name,
         LocalDate birthDate,
         String email
 ) {
-    public static MemberInfo from(MemberModel model) {
-        return new MemberInfo(
+    public static UserInfo from(UserModel model) {
+        return new UserInfo(
                 model.getLoginId(),
                 model.getName(),
                 model.getBirthDate(),
@@ -19,8 +19,8 @@ public record MemberInfo(
         );
     }
 
-    public static MemberInfo fromMasked(MemberModel model) {
-        return new MemberInfo(
+    public static UserInfo fromMasked(UserModel model) {
+        return new UserInfo(
                 model.getLoginId(),
                 maskName(model.getName()),
                 model.getBirthDate(),

@@ -1,6 +1,6 @@
-package com.loopers.domain.member;
+package com.loopers.domain.user;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.BaseTimeEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
@@ -8,8 +8,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -18,10 +16,8 @@ import java.util.regex.Pattern;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE member SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
-@SQLRestriction("deleted_at IS NULL")
-@Table(name = "member")
-public class MemberModel extends BaseEntity {
+@Table(name = "users")
+public class UserModel extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,6 +32,10 @@ public class MemberModel extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
+
     @Column(nullable = false)
     private LocalDate birthDate;
 
@@ -48,7 +48,7 @@ public class MemberModel extends BaseEntity {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$");
 
     @Builder
-    public MemberModel(String loginId, String password, String name, LocalDate birthDate, String email) {
+    public UserModel(String loginId, String password, String name, UserRole role, LocalDate birthDate, String email) {
         validateLoginId(loginId);
         validateName(name);
         validateEmail(email);
@@ -57,6 +57,7 @@ public class MemberModel extends BaseEntity {
         this.loginId = loginId;
         this.password = password;
         this.name = name;
+        this.role = role != null ? role : UserRole.USER;
         this.birthDate = birthDate;
         this.email = email;
     }

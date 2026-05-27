@@ -1,10 +1,10 @@
-package com.loopers.interfaces.api.member;
+package com.loopers.interfaces.api.user;
 
-import com.loopers.application.member.MemberInfo;
+import com.loopers.application.user.UserInfo;
 
 import java.time.LocalDate;
 
-public class MemberV1Dto {
+public class UserV1Dto {
 
     public record SignUpRequest(
             String loginId,
@@ -21,14 +21,14 @@ public class MemberV1Dto {
     ) {
     }
 
-    public record MemberResponse(
+    public record UserResponse(
             String loginId,
             String name,
             LocalDate birthDate,
             String email
     ) {
-        public static MemberResponse from(MemberInfo info) {
-            return new MemberResponse(
+        public static UserResponse from(UserInfo info) {
+            return new UserResponse(
                     info.loginId(),
                     info.name(),
                     info.birthDate(),

@@ -1,21 +1,21 @@
-package com.loopers.interfaces.api.member;
+package com.loopers.interfaces.api.user;
 
-import com.loopers.application.member.MemberFacade;
-import com.loopers.application.member.MemberInfo;
+import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/v1/members")
-public class MemberController {
+@RequestMapping("/v1/users")
+public class UserController {
 
-    private final MemberFacade memberFacade;
+    private final UserFacade userFacade;
 
     @PostMapping("/signup")
-    public ApiResponse<Void> signUp(@RequestBody MemberV1Dto.SignUpRequest request) {
-        memberFacade.signUp(
+    public ApiResponse<Void> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
+        userFacade.signUp(
                 request.loginId(),
                 request.password(),
                 request.name(),
@@ -26,12 +26,12 @@ public class MemberController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<MemberV1Dto.MemberResponse> getMyInfo(
+    public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
             @RequestHeader("X-Loopers-LoginId") String loginId,
             @RequestHeader("X-Loopers-LoginPw") String password
     ) {
-        MemberInfo info = memberFacade.getMyInfo(loginId, password);
-        MemberV1Dto.MemberResponse response = MemberV1Dto.MemberResponse.from(info);
+        UserInfo info = userFacade.getMyInfo(loginId, password);
+        UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(info);
         return ApiResponse.success(response);
     }
 
@@ -39,9 +39,9 @@ public class MemberController {
     public ApiResponse<Void> updatePassword(
             @RequestHeader("X-Loopers-LoginId") String loginId,
             @RequestHeader("X-Loopers-LoginPw") String password,
-            @RequestBody MemberV1Dto.UpdatePasswordRequest request
+            @RequestBody UserV1Dto.UpdatePasswordRequest request
     ) {
-        memberFacade.updatePassword(
+        userFacade.updatePassword(
                 loginId,
                 password,
                 request.oldPassword(),

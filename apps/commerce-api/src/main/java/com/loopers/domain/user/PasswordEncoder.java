@@ -1,4 +1,4 @@
-package com.loopers.domain.member;
+package com.loopers.domain.user;
 
 public interface PasswordEncoder {
     String encode(String rawPassword);

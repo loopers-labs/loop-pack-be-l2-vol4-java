@@ -1,6 +1,6 @@
-package com.loopers.application.member;
+package com.loopers.application.user;
 
-import com.loopers.domain.member.MemberService;
+import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -8,9 +8,9 @@ import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
-public class MemberFacade {
+public class UserFacade {
 
-    private final MemberService memberService;
+    private final UserService userService;
 
     public void signUp(
             String loginId,
@@ -19,7 +19,7 @@ public class MemberFacade {
             LocalDate birthDate,
             String email
     ) {
-        memberService.signUp(
+        userService.signUp(
                 loginId,
                 password,
                 name,
@@ -28,8 +28,8 @@ public class MemberFacade {
         );
     }
 
-    public MemberInfo getMyInfo(String loginId, String password) {
-        return memberService.getMember(loginId, password);
+    public UserInfo getMyInfo(String loginId, String password) {
+        return userService.getUser(loginId, password);
     }
 
     public void updatePassword(
@@ -38,7 +38,7 @@ public class MemberFacade {
             String oldPassword,
             String newPassword
     ) {
-        memberService.updatePassword(
+        userService.updatePassword(
                 loginId,
                 password,
                 oldPassword,

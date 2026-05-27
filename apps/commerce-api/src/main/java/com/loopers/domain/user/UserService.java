@@ -1,6 +1,6 @@
-package com.loopers.domain.member;
+package com.loopers.domain.user;
 
-import com.loopers.application.member.MemberInfo;
+import com.loopers.application.user.UserInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -11,9 +11,9 @@ import java.time.LocalDate;
 
 @Component
 @RequiredArgsConstructor
-public class MemberService {
+public class UserService {
 
-    private final MemberRepository memberRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -24,21 +24,22 @@ public class MemberService {
             LocalDate birthDate,
             String email
     ) {
-        if (memberRepository.existsByLoginId(loginId)) {
+        if (userRepository.existsByLoginId(loginId)) {
             throw new CoreException(ErrorType.DUPLICATE_LOGIN_ID);
         }
 
-        MemberModel.validatePassword(password, birthDate);
+        UserModel.validatePassword(password, birthDate);
 
-        MemberModel member = MemberModel.builder()
+        UserModel user = UserModel.builder()
                 .loginId(loginId)
                 .password(passwordEncoder.encode(password))
                 .name(name)
+                .role(UserRole.USER)
                 .birthDate(birthDate)
                 .email(email)
                 .build();
 
-        memberRepository.save(member);
+        userRepository.save(user);
     }
 
     @Transactional
@@ -48,12 +49,12 @@ public class MemberService {
             String oldPassword,
             String newPassword
     ) {
-        MemberModel.validateLoginId(loginId);
+        UserModel.validateLoginId(loginId);
 
-        MemberModel member = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new CoreException(ErrorType.MEMBER_NOT_FOUND));
+        UserModel user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
 
@@ -61,20 +62,20 @@ public class MemberService {
             throw new CoreException(ErrorType.SAME_PASSWORD_AS_OLD);
         }
 
-        member.updatePassword(passwordEncoder.encode(newPassword), newPassword);
+        user.updatePassword(passwordEncoder.encode(newPassword), newPassword);
     }
 
     @Transactional(readOnly = true)
-    public MemberInfo getMember(String loginId, String password) {
-        MemberModel.validateLoginId(loginId);
+    public UserInfo getUser(String loginId, String password) {
+        UserModel.validateLoginId(loginId);
 
-        MemberModel member = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new CoreException(ErrorType.MEMBER_NOT_FOUND));
+        UserModel user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new CoreException(ErrorType.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(password, member.getPassword())) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
 
-        return MemberInfo.fromMasked(member);
+        return UserInfo.fromMasked(user);
     }
 }
