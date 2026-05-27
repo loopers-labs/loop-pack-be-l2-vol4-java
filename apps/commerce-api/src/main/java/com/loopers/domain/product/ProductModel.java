@@ -27,6 +27,9 @@ public class ProductModel extends BaseEntity {
     @Column(name = "price", nullable = false)
     private int price;
 
+    @Column(name = "like_count", nullable = false)
+    private long likeCount = 0;
+
     protected ProductModel() {}
 
     public ProductModel(BrandModel brand, String name, int price) {

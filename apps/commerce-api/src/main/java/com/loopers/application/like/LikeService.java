@@ -26,6 +26,7 @@ public class LikeService {
      * - 존재하지 않는 상품 → 404
      * - 삭제된 상품 → 400
      * - 이미 좋아요한 상품 → 정상 응답 (멱등)
+     * - 신규 좋아요 → products.like_count atomic 증가
      */
     @Transactional
     public void like(Long userId, Long productId) {
@@ -38,11 +39,13 @@ public class LikeService {
             return; // 이미 좋아요 — 멱등 처리
         }
         likeRepository.save(new LikeModel(userId, productId));
+        productRepository.incrementLikeCount(productId);
     }
 
     /**
      * FR-L-02. 좋아요 취소 (멱등)
      * - 이미 취소된 상태에서 재요청해도 정상 처리
+     * - 좋아요 취소 → products.like_count atomic 감소 (0 미만 방지)
      */
     @Transactional
     public void unlike(Long userId, Long productId) {
@@ -50,6 +53,7 @@ public class LikeService {
             return; // 이미 취소 상태 — 멱등 처리
         }
         likeRepository.deleteByUserIdAndProductId(userId, productId);
+        productRepository.decrementLikeCount(productId);
     }
 
     /**
@@ -74,15 +78,5 @@ public class LikeService {
             .filter(like -> activeProductMap.containsKey(like.getProductId()))
             .map(like -> LikeInfo.from(like, activeProductMap.get(like.getProductId())))
             .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public long countByProductId(Long productId) {
-        return likeRepository.countByProductId(productId);
-    }
-
-    @Transactional(readOnly = true)
-    public Map<Long, Long> countAllByProductIdIn(List<Long> productIds) {
-        return likeRepository.countAllByProductIdIn(productIds);
     }
 }

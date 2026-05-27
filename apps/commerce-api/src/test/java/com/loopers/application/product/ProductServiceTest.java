@@ -74,7 +74,8 @@ class ProductServiceTest {
                 () -> assertThat(result.name()).isEqualTo("나이키 에어맥스"),
                 () -> assertThat(result.price()).isEqualTo(150_000),
                 () -> assertThat(result.brandName()).isEqualTo("Nike"),
-                () -> assertThat(result.stockQuantity()).isEqualTo(100)
+                () -> assertThat(result.stockQuantity()).isEqualTo(100),
+                () -> assertThat(result.likeCount()).isEqualTo(0L)
             );
             then(productRepository).should().save(any(ProductModel.class));
             then(stockRepository).should().save(any(StockModel.class));

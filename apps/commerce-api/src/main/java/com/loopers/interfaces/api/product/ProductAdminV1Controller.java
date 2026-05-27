@@ -31,17 +31,14 @@ public class ProductAdminV1Controller {
         @PageableDefault(size = 20) Pageable pageable
     ) {
         return ApiResponse.success(
-            productService.getAll(pageable, brandId)
-                .map(info -> ProductV1Dto.ProductResponse.from(info, 0L))
+            productService.getAll(pageable, brandId).map(ProductV1Dto.ProductResponse::from)
         );
     }
 
     /** FR-PA-00. 상품 상세 조회 (어드민) */
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(@PathVariable Long productId) {
-        return ApiResponse.success(
-            ProductV1Dto.ProductResponse.from(productService.getById(productId), 0L)
-        );
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(productService.getById(productId)));
     }
 
     /** FR-PA-01. 상품 등록 */
@@ -49,9 +46,7 @@ public class ProductAdminV1Controller {
     public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
         @Valid @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
-        return ApiResponse.success(
-            ProductV1Dto.ProductResponse.from(productService.create(request.toCommand()), 0L)
-        );
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(productService.create(request.toCommand())));
     }
 
     /** FR-PA-02. 상품 수정 (브랜드 변경 불가) */
@@ -60,9 +55,7 @@ public class ProductAdminV1Controller {
         @PathVariable Long productId,
         @Valid @RequestBody ProductV1Dto.UpdateProductRequest request
     ) {
-        return ApiResponse.success(
-            ProductV1Dto.ProductResponse.from(productService.update(productId, request.toCommand()), 0L)
-        );
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(productService.update(productId, request.toCommand())));
     }
 
     /** FR-PA-03. 상품 삭제 (소프트 딜리트) */

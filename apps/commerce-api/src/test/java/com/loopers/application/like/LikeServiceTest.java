@@ -54,9 +54,9 @@ class LikeServiceTest {
     @Nested
     class Like {
 
-        @DisplayName("존재하는 활성 상품에 좋아요 시 LikeModel이 저장된다.")
+        @DisplayName("존재하는 활성 상품에 좋아요 시 LikeModel이 저장되고 likeCount가 증가한다.")
         @Test
-        void savesLike_whenProductIsActiveAndNotYetLiked() {
+        void savesLikeAndIncrementsCount_whenProductIsActiveAndNotYetLiked() {
             // arrange
             given(productRepository.findById(PRODUCT_ID)).willReturn(Optional.of(activeProduct));
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(false);
@@ -66,11 +66,12 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should().save(any(LikeModel.class));
+            then(productRepository).should().incrementLikeCount(PRODUCT_ID);
         }
 
         @DisplayName("이미 좋아요한 상품에 재요청 시 저장 없이 정상 처리된다 (멱등).")
         @Test
-        void doesNotSave_whenAlreadyLiked() {
+        void doesNotSaveOrIncrement_whenAlreadyLiked() {
             // arrange
             given(productRepository.findById(PRODUCT_ID)).willReturn(Optional.of(activeProduct));
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(true);
@@ -80,6 +81,7 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should(never()).save(any());
+            then(productRepository).should(never()).incrementLikeCount(any());
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요 시 NOT_FOUND 예외가 발생한다.")
@@ -96,6 +98,7 @@ class LikeServiceTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             then(likeRepository).should(never()).save(any());
+            then(productRepository).should(never()).incrementLikeCount(any());
         }
 
         @DisplayName("삭제된 상품에 좋아요 시 BAD_REQUEST 예외가 발생한다.")
@@ -112,6 +115,7 @@ class LikeServiceTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             then(likeRepository).should(never()).save(any());
+            then(productRepository).should(never()).incrementLikeCount(any());
         }
     }
 
@@ -119,9 +123,9 @@ class LikeServiceTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요가 존재하면 삭제된다.")
+        @DisplayName("좋아요가 존재하면 삭제되고 likeCount가 감소한다.")
         @Test
-        void deletesLike_whenLikeExists() {
+        void deletesLikeAndDecrementsCount_whenLikeExists() {
             // arrange
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(true);
 
@@ -130,11 +134,12 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should().deleteByUserIdAndProductId(USER_ID, PRODUCT_ID);
+            then(productRepository).should().decrementLikeCount(PRODUCT_ID);
         }
 
         @DisplayName("이미 취소된 상태에서 재요청 시 삭제 없이 정상 처리된다 (멱등).")
         @Test
-        void doesNotDelete_whenLikeDoesNotExist() {
+        void doesNotDeleteOrDecrement_whenLikeDoesNotExist() {
             // arrange
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(false);
 
@@ -143,6 +148,7 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should(never()).deleteByUserIdAndProductId(any(), any());
+            then(productRepository).should(never()).decrementLikeCount(any());
         }
     }
 
@@ -175,7 +181,6 @@ class LikeServiceTest {
             LikeModel likeForActive = new LikeModel(USER_ID, PRODUCT_ID);
             LikeModel likeForDeleted = new LikeModel(USER_ID, deletedProductId);
             given(likeRepository.findAllByUserId(USER_ID)).willReturn(List.of(likeForActive, likeForDeleted));
-            // activeProduct만 반환 (deletedProductId는 findAllActiveByIds에서 제외됨)
             given(productRepository.findAllActiveByIds(List.of(PRODUCT_ID, deletedProductId)))
                 .willReturn(List.of(activeProduct));
 

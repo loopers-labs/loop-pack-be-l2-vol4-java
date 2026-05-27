@@ -38,14 +38,14 @@ public class ProductV1Dto {
         int stockQuantity,
         long likeCount
     ) {
-        public static ProductResponse from(ProductInfo info, long likeCount) {
+        public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
                 info.id(),
                 info.name(),
                 info.price(),
                 info.brandName(),
                 info.stockQuantity(),
-                likeCount
+                info.likeCount()
             );
         }
     }

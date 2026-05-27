@@ -49,4 +49,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     public List<ProductModel> findAllByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrand_Id(brandId);
     }
+
+    @Override
+    public void incrementLikeCount(Long productId) {
+        productJpaRepository.incrementLikeCount(productId);
+    }
+
+    @Override
+    public void decrementLikeCount(Long productId) {
+        productJpaRepository.decrementLikeCount(productId);
+    }
 }
