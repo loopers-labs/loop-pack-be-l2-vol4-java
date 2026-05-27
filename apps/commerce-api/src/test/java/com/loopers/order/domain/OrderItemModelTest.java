@@ -129,12 +129,24 @@ class OrderItemModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("quantity가 0 이하이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("quantity가 0이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenQuantityIsZeroOrLess() {
+        void throwsBadRequest_whenQuantityIsZero() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 new OrderItemModel(1L, "에어맥스", 150000L, 0)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("quantity가 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQuantityIsNegative() {
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                new OrderItemModel(1L, "에어맥스", 150000L, -1)
             );
 
             // assert

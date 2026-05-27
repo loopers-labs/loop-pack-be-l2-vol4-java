@@ -272,4 +272,29 @@ class ProductModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("상품 정보를 수정할 때,")
+    @Nested
+    class Update {
+
+        // 각 필드 검증 규칙(null·빈 문자열·공백 불가, 0 이상 등)은 생성과 동일한 검증 로직을 사용하므로
+        // 규칙에 대한 상세 검증은 Create 테스트에서 담당한다. 여기서는 수정 자체가 정상 동작하는지만 확인한다.
+        @DisplayName("유효한 name, price, stock, description이면, 각 필드가 변경된다.")
+        @Test
+        void updatesFields_whenAllFieldsAreValid() {
+            // arrange
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, 100, 1L);
+
+            // act
+            product.update("조던1", "나이키 농구화", 200000L, 50);
+
+            // assert
+            assertAll(
+                () -> assertThat(product.getName()).isEqualTo("조던1"),
+                () -> assertThat(product.getDescription()).isEqualTo("나이키 농구화"),
+                () -> assertThat(product.getPrice()).isEqualTo(200000L),
+                () -> assertThat(product.getStock()).isEqualTo(50)
+            );
+        }
+    }
 }

@@ -48,6 +48,13 @@ class BrandModelTest {
             assertDoesNotThrow(() -> new BrandModel("나이키", ""));
         }
 
+        @DisplayName("설명이 공백이어도, 정상 생성된다.")
+        @Test
+        void createsBrandModel_whenDescriptionIsBlank() {
+            // act & assert
+            assertDoesNotThrow(() -> new BrandModel("나이키", "   "));
+        }
+
         @DisplayName("브랜드명이 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenNameIsNull() {
@@ -82,6 +89,29 @@ class BrandModelTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("브랜드 정보를 수정할 때,")
+    @Nested
+    class Update {
+
+        // name 검증 규칙(null·빈 문자열·공백 불가)은 생성과 동일한 검증 로직을 사용하므로
+        // 규칙에 대한 상세 검증은 Create 테스트에서 담당한다. 여기서는 수정 자체가 정상 동작하는지만 확인한다.
+        @DisplayName("유효한 name, description이면, name과 description이 변경된다.")
+        @Test
+        void updatesFields_whenNameAndDescriptionAreValid() {
+            // arrange
+            BrandModel brand = new BrandModel("나이키", "스포츠 브랜드");
+
+            // act
+            brand.update("아디다스", "글로벌 스포츠 브랜드");
+
+            // assert
+            assertAll(
+                () -> assertThat(brand.getName()).isEqualTo("아디다스"),
+                () -> assertThat(brand.getDescription()).isEqualTo("글로벌 스포츠 브랜드")
+            );
         }
     }
 }

@@ -45,6 +45,31 @@ public class ProductModel extends BaseEntity {
         this.brandId = brandId;
     }
 
+    public void update(String name, String description, Long price, Integer stock) {
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+        }
+        if (description == null || description.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
+        }
+        if (price == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 비어있을 수 없습니다.");
+        }
+        if (price < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+        }
+        if (stock == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 비어있을 수 없습니다.");
+        }
+        if (stock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.stock = stock;
+    }
+
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
