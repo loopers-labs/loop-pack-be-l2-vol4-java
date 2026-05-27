@@ -1,0 +1,85 @@
+### 상품 등록 - 정상
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "스트라이프 셔츠",
+  "description": "면 100% 소재의 캐주얼 셔츠",
+  "price": 29000,
+  "initialStockQuantity": 50
+}
+
+### 상품 등록 - 존재하지 않는 brandId (404)
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 9999,
+  "name": "셔츠",
+  "description": "설명",
+  "price": 29000,
+  "initialStockQuantity": 50
+}
+
+### 상품 등록 - 검증 실패 (이름 누락)
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "  ",
+  "description": "설명",
+  "price": 29000,
+  "initialStockQuantity": 50
+}
+
+### 상품 등록 - 검증 실패 (음수 가격)
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "셔츠",
+  "description": "설명",
+  "price": -1,
+  "initialStockQuantity": 50
+}
+
+### 상품 단건 조회
+GET {{commerce-api}}/api/v1/products/1
+
+### 상품 단건 조회 - 존재하지 않는 id (404)
+GET {{commerce-api}}/api/v1/products/9999
+
+### 상품 목록 조회 (기본 = LATEST)
+GET {{commerce-api}}/api/v1/products
+
+### 상품 목록 조회 - 가격 오름차순
+GET {{commerce-api}}/api/v1/products?sort=PRICE_ASC
+
+### 상품 수정
+PUT {{commerce-api}}/api/v1/products/1
+Content-Type: application/json
+
+{
+  "name": "프린트 셔츠",
+  "description": "패턴 프린트 캐주얼 셔츠",
+  "price": 35000
+}
+
+### 상품 수정 - 존재하지 않는 id (404)
+PUT {{commerce-api}}/api/v1/products/9999
+Content-Type: application/json
+
+{
+  "name": "셔츠",
+  "description": "설명",
+  "price": 29000
+}
+
+### 상품 삭제
+DELETE {{commerce-api}}/api/v1/products/1
+
+### 상품 삭제 - 존재하지 않는 id (404)
+DELETE {{commerce-api}}/api/v1/products/9999
