@@ -31,16 +31,10 @@ public class OrderFacade {
         userService.getById(userId);
         Map<Long, ProductModel> productMap = loadProducts(lines);
 
-        List<OrderItem> items = lines.stream()
-            .map(line -> {
-                ProductModel product = productMap.get(line.productId());
-                return new OrderItem(product.getId(), product.getName(), product.getPrice(), line.quantity());
-            })
-            .toList();
+        List<OrderItem> items = buildItems(lines, productMap);
         long totalAmount = items.stream().mapToLong(OrderItem::subtotal).sum();
 
         OrderModel created = orderService.placeInitial(userId, totalAmount, items);
-
         try {
             stockService.decreaseAll(aggregateQuantities(lines));
             OrderModel succeeded = orderService.markSucceeded(created.getId());
@@ -50,6 +44,15 @@ public class OrderFacade {
                 e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage());
             throw e;
         }
+    }
+
+    private List<OrderItem> buildItems(List<OrderLineCommand> lines, Map<Long, ProductModel> productMap) {
+        return lines.stream()
+            .map(line -> {
+                ProductModel product = productMap.get(line.productId());
+                return new OrderItem(product.getId(), product.getName(), product.getPrice(), line.quantity());
+            })
+            .toList();
     }
 
     private void validateInput(List<OrderLineCommand> lines) {
