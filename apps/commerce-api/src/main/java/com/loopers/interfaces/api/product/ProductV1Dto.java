@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductListItemInfo;
 
 public class ProductV1Dto {
     public record CreateProductRequest(
@@ -45,16 +46,43 @@ public class ProductV1Dto {
         }
     }
 
-    public record ProductDetailResponse(
+    public record ProductListItemResponse(
         Long id,
+        Long brandId,
         String name,
         String description,
         String imageUrl,
         Long price,
         Integer stock,
         Long likesCount,
+        boolean liked
+    ) {
+        public static ProductListItemResponse from(ProductListItemInfo info) {
+            return new ProductListItemResponse(
+                info.id(),
+                info.brandId(),
+                info.name(),
+                info.description(),
+                info.imageUrl(),
+                info.price(),
+                info.stock(),
+                info.likesCount(),
+                info.liked()
+            );
+        }
+    }
+
+    public record ProductDetailResponse(
+        Long id,
+        String name,
+        String description,
+        String imageUrl,
+        Long price,
+        boolean inStock,
+        Long likesCount,
         Long brandId,
-        String brandName
+        String brandName,
+        boolean liked
     ) {
         public static ProductDetailResponse from(ProductDetailInfo info) {
             return new ProductDetailResponse(
@@ -63,10 +91,11 @@ public class ProductV1Dto {
                 info.description(),
                 info.imageUrl(),
                 info.price(),
-                info.stock(),
+                info.inStock(),
                 info.likesCount(),
                 info.brandId(),
-                info.brandName()
+                info.brandName(),
+                info.liked()
             );
         }
     }

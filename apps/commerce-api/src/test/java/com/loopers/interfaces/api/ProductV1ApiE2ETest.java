@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.interfaces.api.product.ProductV1Dto;
+import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -137,6 +139,70 @@ class ProductV1ApiE2ETest {
                     PRODUCTS_PATH + "?sort=INVALID", HttpMethod.GET, HttpEntity.EMPTY, Object.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    // --- 좋아요 여부 표시 (UC-03 step3) ---
+
+    private static final ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductListItemResponse>>> ITEM_LIST_TYPE =
+            new ParameterizedTypeReference<>() {};
+
+    private HttpHeaders authHeaders(String loginId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-LoginId", loginId);
+        headers.set("X-Loopers-LoginPw", "testPw1234");
+        return headers;
+    }
+
+    private void signUp(String loginId, String name) {
+        testRestTemplate.postForEntity("/api/v1/users",
+                new UserV1Dto.SignUpRequest(loginId, "testPw1234", name, LocalDate.of(1992, 6, 24), "test@example.com"),
+                Object.class);
+    }
+
+    private void like(Long productId, String loginId) {
+        testRestTemplate.exchange(PRODUCTS_PATH + "/" + productId + "/like", HttpMethod.POST,
+                new HttpEntity<>(authHeaders(loginId)), Object.class);
+    }
+
+    private boolean likedOf(List<ProductV1Dto.ProductListItemResponse> items, Long productId) {
+        return items.stream().filter(i -> i.id().equals(productId)).findFirst().orElseThrow().liked();
+    }
+
+    @DisplayName("GET /api/v1/products — 좋아요 여부 표시")
+    @Nested
+    class LikedFlag {
+
+        @DisplayName("식별된 User는 본인이 좋아요한 상품만 liked=true로 본다.")
+        @Test
+        void userSeesLikedFlag() {
+            signUp("testid", "테스터");
+            Long brandId = createBrand("나이키");
+            Long liked = createProduct(brandId, "에어맥스", 139000L);
+            Long notLiked = createProduct(brandId, "조던", 199000L);
+            like(liked, "testid");
+
+            List<ProductV1Dto.ProductListItemResponse> items = testRestTemplate.exchange(
+                    PRODUCTS_PATH, HttpMethod.GET, new HttpEntity<>(authHeaders("testid")), ITEM_LIST_TYPE)
+                    .getBody().data();
+
+            assertThat(likedOf(items, liked)).isTrue();
+            assertThat(likedOf(items, notLiked)).isFalse();
+        }
+
+        @DisplayName("Guest(미인증)는 모든 상품을 liked=false로 본다.")
+        @Test
+        void guestSeesAllFalse() {
+            signUp("testid", "테스터");
+            Long brandId = createBrand("나이키");
+            Long productId = createProduct(brandId, "에어맥스", 139000L);
+            like(productId, "testid");
+
+            List<ProductV1Dto.ProductListItemResponse> items = testRestTemplate.exchange(
+                    PRODUCTS_PATH, HttpMethod.GET, HttpEntity.EMPTY, ITEM_LIST_TYPE).getBody().data();
+
+            assertThat(items).isNotEmpty();
+            assertThat(items).allSatisfy(i -> assertThat(i.liked()).isFalse());
         }
     }
 }

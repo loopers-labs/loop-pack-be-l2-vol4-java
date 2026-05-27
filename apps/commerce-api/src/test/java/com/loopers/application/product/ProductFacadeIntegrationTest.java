@@ -73,7 +73,7 @@ public class ProductFacadeIntegrationTest {
             BrandModel brand = brandService.register("나이키", "스포츠");
             ProductInfo product = productFacade.createProduct(brand.getId(), "에어맥스", "러닝화", "http://img/a.png", 139000L, 10);
 
-            ProductDetailInfo result = productFacade.getProductDetail(product.id());
+            ProductDetailInfo result = productFacade.getProductDetail(product.id(), null);
 
             assertAll(
                     () -> assertThat(result.id()).isEqualTo(product.id()),
@@ -93,10 +93,38 @@ public class ProductFacadeIntegrationTest {
             saved.delete();
             productRepository.save(saved);
 
-            Throwable thrown = catchThrowable(() -> productFacade.getProductDetail(product.id()));
+            Throwable thrown = catchThrowable(() -> productFacade.getProductDetail(product.id(), null));
 
             assertThat(thrown).isInstanceOf(CoreException.class);
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("재고가 0이면 inStock=false다. (UC-04 — 재고 수치 비노출)")
+        @Test
+        void inStockFalse_whenNoStock() {
+            BrandModel brand = brandService.register("나이키", "스포츠");
+            ProductInfo product = productFacade.createProduct(brand.getId(), "품절상품", "러닝화", null, 139000L, 0);
+
+            ProductDetailInfo result = productFacade.getProductDetail(product.id(), null);
+
+            assertThat(result.inStock()).isFalse();
+        }
+
+        @DisplayName("식별된 User의 좋아요 여부가 liked에 반영되고, Guest는 항상 false다.")
+        @Test
+        void likedReflectsUser() {
+            BrandModel brand = brandService.register("나이키", "스포츠");
+            ProductInfo product = productFacade.createProduct(brand.getId(), "에어맥스", "러닝화", null, 139000L, 10);
+            likeService.like(1L, product.id());
+
+            ProductDetailInfo asUser = productFacade.getProductDetail(product.id(), 1L);
+            ProductDetailInfo asGuest = productFacade.getProductDetail(product.id(), null);
+
+            assertAll(
+                    () -> assertThat(asUser.liked()).isTrue(),
+                    () -> assertThat(asUser.inStock()).isTrue(),
+                    () -> assertThat(asGuest.liked()).isFalse()
+            );
         }
     }
 
@@ -112,7 +140,7 @@ public class ProductFacadeIntegrationTest {
 
             productFacade.deleteProduct(product.id());
 
-            Throwable thrown = catchThrowable(() -> productFacade.getProductDetail(product.id()));
+            Throwable thrown = catchThrowable(() -> productFacade.getProductDetail(product.id(), null));
             assertThat(thrown).isInstanceOf(CoreException.class);
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }

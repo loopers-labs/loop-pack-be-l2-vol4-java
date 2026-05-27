@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -63,6 +65,12 @@ public class LikeService {
     public List<LikeModel> getMyActiveLikes(Long userId, int page, int size) {
         PagePolicy.validate(page, size);
         return likeRepository.findActiveByUserId(userId, page, size);
+    }
+
+    /** 주어진 상품들 중 사용자가 좋아요한 productId 집합 — 목록 좋아요 여부 batch 조회 (UC-03). */
+    @Transactional(readOnly = true)
+    public Set<Long> findLikedProductIds(Long userId, Collection<Long> productIds) {
+        return likeRepository.findLikedProductIds(userId, productIds);
     }
 
     /**

@@ -52,9 +52,9 @@ public class BrandFacadeIntegrationTest {
             assertAll(
                     () -> assertThat(((CoreException) catchThrowable(() -> brandService.getActiveBrand(brand.getId()))).getErrorType())
                             .isEqualTo(ErrorType.NOT_FOUND),
-                    () -> assertThat(((CoreException) catchThrowable(() -> productFacade.getProductDetail(p1.id()))).getErrorType())
+                    () -> assertThat(((CoreException) catchThrowable(() -> productFacade.getProductDetail(p1.id(), null))).getErrorType())
                             .isEqualTo(ErrorType.NOT_FOUND),
-                    () -> assertThat(((CoreException) catchThrowable(() -> productFacade.getProductDetail(p2.id()))).getErrorType())
+                    () -> assertThat(((CoreException) catchThrowable(() -> productFacade.getProductDetail(p2.id(), null))).getErrorType())
                             .isEqualTo(ErrorType.NOT_FOUND),
                     () -> assertThat(likeService.isLiked(1L, p1.id())).isFalse(),
                     () -> assertThat(likeService.isLiked(2L, p2.id())).isFalse()
@@ -75,7 +75,7 @@ public class BrandFacadeIntegrationTest {
 
             assertAll(
                     () -> assertThat(brandService.getActiveBrand(other.getId()).getId()).isEqualTo(other.getId()),
-                    () -> assertThatCode(() -> productFacade.getProductDetail(otherProduct.id())).doesNotThrowAnyException(),
+                    () -> assertThatCode(() -> productFacade.getProductDetail(otherProduct.id(), null)).doesNotThrowAnyException(),
                     () -> assertThat(likeService.isLiked(1L, otherProduct.id())).isTrue(),
                     () -> assertThat(likeService.isLiked(1L, targetProduct.id())).isFalse()
             );

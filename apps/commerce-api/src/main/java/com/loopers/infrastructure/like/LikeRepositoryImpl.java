@@ -8,8 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -59,5 +62,13 @@ public class LikeRepositoryImpl implements LikeRepository {
         return likeJpaRepository.findByUserIdAndDeletedAtIsNullOrderByLikedAtDescIdDesc(userId, PageRequest.of(page, size)).stream()
                 .map(LikeEntityMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Set<Long> findLikedProductIds(Long userId, Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(likeJpaRepository.findLikedProductIds(userId, productIds));
     }
 }

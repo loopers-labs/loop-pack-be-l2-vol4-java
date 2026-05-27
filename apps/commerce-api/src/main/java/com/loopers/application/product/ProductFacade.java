@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -33,16 +34,26 @@ public class ProductFacade {
 
     /**
      * 상품 상세 — 활성 Product + 활성 Brand 조합 (UC-04). 둘 중 하나라도 비활성/부재면 NOT_FOUND.
+     * userId가 있으면(식별된 User) 좋아요 여부를 함께 채운다. Guest(userId == null)는 liked=false.
      */
-    public ProductDetailInfo getProductDetail(Long id) {
+    public ProductDetailInfo getProductDetail(Long id, Long userId) {
         ProductModel product = productService.getActiveProduct(id);
         BrandModel brand = brandService.getActiveBrand(product.getBrandId());
-        return ProductDetailInfo.of(product, brand);
+        boolean liked = userId != null && likeService.isLiked(userId, id);
+        return ProductDetailInfo.of(product, brand, liked);
     }
 
-    public List<ProductInfo> getProducts(Long brandId, ProductSortType sort, int page, int size) {
-        return productService.getProducts(brandId, sort, page, size).stream()
-            .map(ProductInfo::from)
+    /**
+     * 상품 목록 (UC-03) — 정렬·페이지·브랜드 필터 + 식별된 User의 좋아요 여부.
+     * 좋아요 여부는 한 번의 batch 조회(IN)로 채워 N+1을 피한다. Guest(userId == null)는 전부 false.
+     */
+    public List<ProductListItemInfo> getProducts(Long brandId, ProductSortType sort, int page, int size, Long userId) {
+        List<ProductModel> products = productService.getProducts(brandId, sort, page, size);
+        Set<Long> likedIds = (userId == null)
+            ? Set.of()
+            : likeService.findLikedProductIds(userId, products.stream().map(ProductModel::getId).toList());
+        return products.stream()
+            .map(p -> ProductListItemInfo.of(p, likedIds.contains(p.getId())))
             .toList();
     }
 
