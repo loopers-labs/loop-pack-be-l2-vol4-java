@@ -1,6 +1,6 @@
 package com.loopers.config;
 
-import com.loopers.application.user.UserService;
+import com.loopers.user.application.UserService;
 import com.loopers.support.auth.HeaderAuthenticationFilter;
 import com.loopers.support.auth.UnauthorizedEntryPoint;
 import org.springframework.context.annotation.Bean;
