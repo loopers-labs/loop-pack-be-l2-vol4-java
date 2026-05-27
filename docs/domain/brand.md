@@ -13,5 +13,9 @@
 3. Brand 생성 후 저장
 4. 저장된 Brand 반환
 
+### 트랜잭션 경계
+- `validateDuplicateName()` + `save()` 가 하나의 트랜잭션으로 묶여야 한다
+- 중복 체크와 저장 사이에 다른 요청이 끼어들어 동일 이름이 저장되는 것을 방지
+
 ### 접근 제어
 - 어드민 전용 (`X-Loopers-Ldap: loopers.admin` 헤더)
