@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 public class ProductFacade {
 
     private final BrandRepository brandRepository;
-
     private final ProductRepository productRepository;
 
     public ProductCreateInfo createProduct(Long brandId, String name, String description, Integer price, Integer stock) {

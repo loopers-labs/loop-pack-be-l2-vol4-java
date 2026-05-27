@@ -21,9 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class LikeFacade {
 
     private final UserRepository userRepository;
-
     private final ProductRepository productRepository;
-
     private final LikeRepository likeRepository;
 
     public void createLike(Long userId, Long productId) {
