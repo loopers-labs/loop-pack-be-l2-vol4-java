@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import java.time.LocalDate;
@@ -33,11 +34,16 @@ import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 @ExtendWith(MockitoExtension.class)
 class OrderFacadeTest {
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private ProductRepository productRepository;
@@ -99,6 +105,7 @@ class OrderFacadeTest {
             // arrange
             ProductModel product = product(39_000);
             List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
             given(productRepository.getActiveById(productId)).willReturn(product);
             given(brandRepository.getActiveById(product.getBrandId())).willReturn(brand());
             given(productRepository.decreaseStock(product.getId(), 2)).willReturn(1);
@@ -117,6 +124,26 @@ class OrderFacadeTest {
                 () -> assertThat(orderInfo.totalPrice()).isEqualTo(78_000),
                 () -> then(productRepository).should().decreaseStock(product.getId(), 2),
                 () -> then(orderRepository).should().save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("주문 회원이 없거나 삭제되어 조회에 실패하면 NOT_FOUND 예외가 전파되고 재고 차감·저장이 일어나지 않는다.")
+        @Test
+        void throwsNotFound_whenUserIsAbsent() {
+            // arrange
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userRepository.getActiveById(userId))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "회원이 존재하지 않습니다."));
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.NOT_FOUND),
+                () -> then(productRepository).should(never()).getActiveById(anyLong()),
+                () -> then(productRepository).should(never()).decreaseStock(anyLong(), anyInt()),
+                () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
             );
         }
 
@@ -193,6 +220,7 @@ class OrderFacadeTest {
             ProductModel secondProduct = product(5_000);
             List<OrderItemCommand> itemCommands =
                 List.of(new OrderItemCommand(firstProductId, 1), new OrderItemCommand(secondProductId, 2));
+            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
             given(productRepository.getActiveById(firstProductId)).willReturn(firstProduct);
             given(productRepository.getActiveById(secondProductId)).willReturn(secondProduct);
             given(brandRepository.getActiveById(firstProduct.getBrandId())).willReturn(brand());
