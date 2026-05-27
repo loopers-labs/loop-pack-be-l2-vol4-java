@@ -103,27 +103,29 @@ Interfaces -> Application -> Domain <- Infrastructure
 
 ### 5.2 패키지 구성 기준
 
-패키지는 최상위 도메인 모듈을 먼저 나누고, 각 모듈 내부에 계층을 둔다.
+이 저장소의 구현 패키지는 기존 5계층을 먼저 유지하고, 각 계층 하위에 도메인 모듈 경계를 둔다.
 
 ```text
-catalog
-  interfaces
-  application
-  domain
-  infrastructure
-ordering
-  interfaces
-  application
-  domain
-  infrastructure
-payment
-  application
-  domain
-  infrastructure
-event
-  application
-  domain
-  infrastructure
+interfaces
+  api
+    catalog
+    ordering
+application
+  catalog
+  ordering
+  payment
+  event
+domain
+  catalog
+  ordering
+  payment
+  event
+infrastructure
+  catalog
+  ordering
+  payment
+  event
+support
 ```
 
 프로젝트의 `AGENTS.md` 또는 기존 구조가 더 구체적인 모듈 경계를 정의한다면 그 규칙을 우선한다.

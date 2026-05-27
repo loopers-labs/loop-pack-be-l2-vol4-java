@@ -47,9 +47,10 @@
 
 ## 아키텍처 기준
 
-- 장기적으로 큰 서비스를 만든다는 전제로 도메인 우선 모듈러 모놀리스를 사용한다.
-- 최상위 모듈은 `catalog`, `ordering`, `payment`, `event`로 나눈다.
-- 각 모듈 내부에는 `interfaces`, `application`, `domain`, `infrastructure` 계층을 둔다.
+- 장기적으로 큰 서비스를 만든다는 전제로 5계층 우선 패키지 구조 안에 도메인 모듈 경계를 둔다.
+- 최상위 패키지는 `interfaces`, `application`, `domain`, `infrastructure`, `support`를 유지한다.
+- 도메인 경계는 각 계층 하위 패키지의 `catalog`, `ordering`, `payment`, `event`로 나눈다.
+- 예: `domain.catalog.product`, `application.ordering.order`, `interfaces.api.catalog.product`.
 - 자세한 아키텍처 결정은 `.docs/architecture.md`를 기준으로 한다.
 
 ## 모듈 기준
@@ -65,7 +66,7 @@
 
 | 결정 | 내용 |
 | --- | --- |
-| 아키텍처 | 도메인 우선 모듈러 모놀리스 |
+| 아키텍처 | 5계층 우선 패키지 구조 안의 도메인 모듈 경계 |
 | 상품 좋아요 소속 | `ProductLike`는 `catalog` 모듈에 둔다. |
 | 포인트 도메인 | 이번 주차 설계 범위에서 제외한다. |
 | 회원 경계 | `User`는 volume-2의 새 도메인이 아니라 기존 `identity` 모듈의 `userId` 참조로만 다룬다. |

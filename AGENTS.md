@@ -14,8 +14,9 @@
 
 ## 3. 아키텍처 결정
 - 장기적으로 큰 서비스를 만든다는 전제로 도메인 우선 모듈러 모놀리스로 설계한다.
-- 최상위 모듈 경계는 `catalog`, `ordering`, `payment`, `event`로 나눈다.
-- 각 모듈 내부에는 `interfaces`, `application`, `domain`, `infrastructure` 계층을 둔다.
+- 최상위 패키지는 기존 5계층인 `interfaces`, `application`, `domain`, `infrastructure`, `support`를 유지한다.
+- 도메인 경계는 각 계층 하위 패키지의 `catalog`, `ordering`, `payment`, `event`로 나눈다.
+- 예: `com.loopers.domain.catalog.product`, `com.loopers.application.ordering.order`, `com.loopers.interfaces.api.catalog.product`.
 - 현재 구현 구조가 목표 구조와 다르면, 구현을 바로 바꾸지 말고 설계 문서에 목표 구조와 차이를 먼저 기록한다.
 
 ## 4. 문서 탐색 순서
@@ -74,12 +75,12 @@
 - 도메인 레이어는 JPA, Spring, HTTP 타입에 직접 의존하지 않는다.
 - 영속성 객체는 infrastructure의 `*JpaEntity`로 분리하고 repository adapter에서 도메인 엔티티와 매핑한다.
 - API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
-- 패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
+- 패키징 전략은 기존 5계층 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
   - 예시
-    > /interfaces/api (presentation 레이어 - API)
-      /application/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
-      /domain/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
-      /infrastructure/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
+    > /interfaces/api/catalog (presentation 레이어 - API)
+      /application/catalog/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
+      /domain/catalog/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
+      /infrastructure/catalog/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
 
 ## 10. 저장 처리 고도화 협의 규칙
 - 현재 3주차 `apps/commerce-api` 저장 처리는 RDB-only로 진행한다.

@@ -7,12 +7,13 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 날짜 | 2026-05-25 |
+| 날짜 | 2026-05-27 |
 | 브랜치 | `volume-3` |
-| 현재 단계 | 저장 처리 고도화 1번(재고 차감 동시성 제어) 확정 및 검증 완료 |
+| 현재 단계 | 5계층 우선 패키지 구조 복구 및 example 템플릿 제거 완료 |
 | 구현 범위 | `apps/commerce-api`는 이번 주차 RDB-only |
 | 제외 범위 | Redis, Kafka, cache, message broker 연동 제외 |
 | 모듈 경계 | `catalog`, `ordering`, `payment`, `event` |
+| 패키지 구조 | `interfaces`, `application`, `domain`, `infrastructure`, `support` 5계층 하위에 도메인 경계를 둠 |
 | 지속성 기준 | MySQL/JPA 기반 RDB 저장소와 outbox |
 
 ## 최근 결정
@@ -27,16 +28,19 @@
 - 저장 처리 관련 코드 변경 전 의도, 선택지, 영향 범위, 검증 방법을 먼저 설명한다.
 - 주문 생성 시 재고 차감 동시성 제어는 비관적 락 유지로 확정했다.
 - 재고 차감 대상 상품 ID는 정렬 후 조회하고, JPA `PESSIMISTIC_WRITE` 쿼리도 `order by p.id asc`로 고정해 잠금 순서를 일관되게 둔다.
+- 사용자 확인에 따라 최상위 패키지는 기존 5계층을 유지하고, `catalog`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다.
+- 3주차 구현 패키지를 `com.loopers.catalog.*` 형태에서 `com.loopers.domain.catalog.*`, `com.loopers.application.catalog.*` 형태로 정리했다.
+- 3주차 실제 도메인 구현이 자리 잡았으므로 템플릿 `example` API, domain, repository, facade, 관련 테스트를 제거했다.
 
 ## 수정 파일 요약
 
 | 구분 | 파일 |
 | --- | --- |
-| 구현 | `apps/commerce-api/src/main/java/com/loopers/catalog/**`, `ordering/**`, `payment/**`, `event/**`, `support/**` |
+| 구현 | `apps/commerce-api/src/main/java/com/loopers/{application,domain,infrastructure}/**`, `interfaces/api/{catalog,ordering}/**`, `support/**` |
 | 설정 | `apps/commerce-api/build.gradle.kts`, `apps/commerce-api/src/main/resources/application.yml` |
 | JPA 설정 | `modules/jpa/src/main/java/com/loopers/config/jpa/JpaConfig.java`, `modules/jpa/src/testFixtures/**` |
-| 테스트 | `apps/commerce-api/src/test/java/com/loopers/catalog/**`, `ordering/**`, `payment/**`, `event/**` |
-| 작업자 문서 | `AGENTS.md`, `workflow.md`, `.docs/worklog.md` |
+| 테스트 | `apps/commerce-api/src/test/java/com/loopers/{application,domain,infrastructure,interfaces}/**` |
+| 작업자 문서 | `AGENTS.md`, `workflow.md`, `.codeguide/loopers-3-week.md`, `.docs/README.md`, `.docs/design-review.md`, `.docs/architecture.md`, `.docs/domain.md`, `.docs/worklog.md` |
 | 제출 제외 | `AGENTS.md`, `.codeguide/**`, `.docs/**`, `workflow.md`, `modules:redis`, `modules:kafka`, `commerce-streamer` |
 
 ## 구현 요약
@@ -51,6 +55,9 @@
 - 주문 생성 재고 차감은 RDB pessimistic lock 기반으로 확정했고, 동일 상품 동시 주문 시 재고보다 많은 주문이 생성되지 않는 통합 테스트를 추가했다.
 - `ErrorType`은 Spring `HttpStatus` 직접 의존을 제거하고 API advice에서 HTTP 응답으로 매핑한다.
 - `PageResponse`에는 `hasPrevious`, `isFirst`, `isLast`를 추가했다.
+- 3주차 신규 구현 패키지는 최상위 도메인 우선 구조에서 5계층 우선 구조로 이동했다.
+- JPA repository scan은 새 구조의 공통 상위인 `com.loopers.infrastructure`만 사용하도록 정리했다.
+- `/api/v1/examples` 템플릿 API와 JPA `example` 엔티티는 제거했다.
 
 ## RDB-only 정리
 
@@ -59,16 +66,16 @@
 - `apps/commerce-api/src/main/resources/application.yml`에서 `redis.yml` import 제거.
 - `apps/commerce-api` 기준 `redis`, `kafka`, `RedisTemplate`, `KafkaTemplate` 문자열 검색 결과 0건.
 - Gradle runtimeClasspath 기준 `spring-data-redis`, `spring-kafka` 의존성 없음.
-- 새 3주차 도메인 패키지(`catalog`, `ordering`, `payment`, `event`, `support/domain`)는 Spring/JPA/HTTP 타입 직접 의존이 없다.
-- 기존 템플릿 `com.loopers.domain.example`에는 JPA 기반 legacy 예제가 남아 있으며, 3주차 신규 구현 범위에서는 제외한다.
+- 새 3주차 도메인 패키지(`domain.catalog`, `domain.ordering`, `domain.payment`, `domain.event`, `support/domain`)는 Spring/JPA/HTTP 타입 직접 의존이 없다.
+- 기존 템플릿 `example` 패키지와 테스트는 제거했다.
 
 ## 검증 결과
 
 | 명령 | 결과 | 메모 |
 | --- | --- | --- |
-| `docker compose -f docker\infra-compose.yml up -d mysql` | 성공 | Redis/Kafka 없이 MySQL 서비스만 실행 |
-| `$env:LOOPERS_TESTCONTAINERS_ENABLED='false'; $env:DATASOURCE_MYSQL_JPA_MAIN_JDBC_URL='jdbc:mysql://localhost:3306/loopers'; $env:DATASOURCE_MYSQL_JPA_MAIN_USERNAME='application'; $env:DATASOURCE_MYSQL_JPA_MAIN_PASSWORD='application'; .\gradlew.bat --no-daemon :apps:commerce-api:test --tests "com.loopers.ordering.application.order.OrderStockConcurrencyTest"` | 성공 | 동일 상품 동시 주문 oversell 방지 검증 |
-| `$env:LOOPERS_TESTCONTAINERS_ENABLED='false'; $env:DATASOURCE_MYSQL_JPA_MAIN_JDBC_URL='jdbc:mysql://localhost:3306/loopers'; $env:DATASOURCE_MYSQL_JPA_MAIN_USERNAME='application'; $env:DATASOURCE_MYSQL_JPA_MAIN_PASSWORD='application'; .\gradlew.bat --no-daemon :apps:commerce-api:test` | 성공 | 전체 commerce-api 테스트 통과 |
+| `$env:JAVA_HOME='C:\Users\woodo\.jdks\ms-21.0.9'; $env:PATH="$env:JAVA_HOME\bin;$env:PATH"; .\gradlew.bat --no-daemon :apps:commerce-api:compileJava :apps:commerce-api:compileTestJava` | 성공 | 패키지 이동 후 main/test 컴파일 통과 |
+| `$env:JAVA_HOME='C:\Users\woodo\.jdks\ms-21.0.9'; $env:PATH="$env:JAVA_HOME\bin;$env:PATH"; .\gradlew.bat --no-daemon :apps:commerce-api:test --tests "com.loopers.domain.catalog.*" --tests "com.loopers.domain.ordering.*" --tests "com.loopers.application.catalog.*"` | 성공 | example 제거 후 순수 도메인/카탈로그 애플리케이션 테스트 통과 |
+| `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"` | 실패 | Docker config 접근 거부 및 `docker_engine` pipe 없음. MySQL 상태 확인 불가 |
 
 ## 환경 메모
 
@@ -76,10 +83,10 @@
 - Gradle wrapper 실행은 sandbox 네트워크 제약 때문에 escalated 실행이 필요했다.
 - Java Testcontainers의 Windows npipe Docker API `info` 호출 timeout이 있어, 검증은 `LOOPERS_TESTCONTAINERS_ENABLED=false`와 외부 MySQL datasource 환경변수로 진행했다.
 - 외부 MySQL 검증 시 `DATASOURCE_MYSQL_JPA_MAIN_USERNAME=application`, `DATASOURCE_MYSQL_JPA_MAIN_PASSWORD=application`을 함께 지정해야 한다. 누락하면 `${MYSQL_USER}` placeholder가 남아 MySQL 인증에 실패한다.
-- 현재 Docker Compose에서 실행한 서비스는 `docker-mysql-1`뿐이다.
+- 현재 shell에서는 Docker daemon pipe를 찾지 못해 MySQL 컨테이너 상태를 확인하지 못했다.
 
 ## 다음 작업
 
-1. 저장 처리 고도화 2번 질문을 사용자와 Q&A로 확정한다.
-2. 필요하면 기존 template example 패키지를 3주차 아키텍처 기준에 맞게 별도 정리한다.
-3. 3주차 제출/커밋 범위를 확정한다.
+1. Docker/MySQL을 사용할 수 있는 상태에서 `:apps:commerce-api:test`를 다시 실행한다.
+2. 저장 처리 고도화 2번 질문을 사용자와 Q&A로 확정한다.
+3. 필요하면 기존 `product` legacy/template 패키지를 3주차 아키텍처 기준에 맞게 별도 정리한다.

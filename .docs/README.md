@@ -15,7 +15,7 @@
 | 2 | `.docs/design-review.md` | 빠진 설계 항목, 다음 질문 순서 |
 | 3 | `.docs/worklog.md` | 현재 작업 상태와 재개 지점 |
 | 4 | `.docs/domain.md` | 도메인 용어, 상태명, 모듈 소속 |
-| 5 | `.docs/architecture.md` | 도메인 우선 모듈러 모놀리스, Onion/Hexagonal/CQRS, JPA 분리 기준 |
+| 5 | `.docs/architecture.md` | 5계층 우선 패키지 구조, 도메인 경계, Onion/Hexagonal/CQRS, JPA 분리 기준 |
 | 6 | `.docs/dto-spec.md` | API DTO 계약과 페이지 응답 형태 |
 | 7 | `.codeguide/loopers-3-week.md` | 현재 구현 과제 기준 |
 | 8 | `.codeguide/service.md` | 전체 서비스 API 요구사항 기준 |
@@ -31,7 +31,7 @@
 - 현재 주차는 3주차 구현 단계다.
 - 3주차 구현 기준은 `.codeguide/loopers-3-week.md`, `.docs/domain.md`, `.docs/architecture.md`, `.docs/worklog.md`를 우선한다.
 - 1/2주차 가이드는 삭제하지 않고 legacy reference로 축약해 둔다.
-- 도메인 구현은 `catalog`, `ordering`, `payment`, `event` 경계와 POJO domain entity / infrastructure `*JpaEntity` 분리를 기준으로 한다.
+- 도메인 구현은 5계층 하위의 `catalog`, `ordering`, `payment`, `event` 경계와 POJO domain entity / infrastructure `*JpaEntity` 분리를 기준으로 한다.
 
 ## 설계 이력
 

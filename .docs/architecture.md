@@ -4,32 +4,30 @@
 
 ## 결정
 
-이번 설계는 장기적으로 큰 서비스를 만든다는 전제로 도메인 우선 모듈러 모놀리스를 사용한다.
+이번 설계는 장기적으로 큰 서비스를 만든다는 전제로 5계층 우선 패키지 구조 안에 도메인 모듈 경계를 둔다.
 
 ```text
-commerce
-  catalog
-    interfaces
-    application
-    domain
-    infrastructure
-
-  ordering
-    interfaces
-    application
-    domain
-    infrastructure
-
-  payment
-    interfaces
-    application
-    domain
-    infrastructure
-
-  event
-    application
-    domain
-    infrastructure
+com.loopers
+  interfaces
+    api
+      catalog
+      ordering
+  application
+    catalog
+    ordering
+    payment
+    event
+  domain
+    catalog
+    ordering
+    payment
+    event
+  infrastructure
+    catalog
+    ordering
+    payment
+    event
+  support
 ```
 
 ## 모듈 경계
@@ -58,9 +56,9 @@ commerce
 
 ## 의존 규칙
 
-- 같은 모듈 내부에서는 `interfaces -> application -> domain` 방향으로 의존한다.
+- 같은 도메인 경계 내부에서는 `interfaces -> application -> domain` 방향으로 의존한다.
 - `infrastructure`는 `domain`의 repository interface를 구현한다.
-- 다른 모듈의 `infrastructure`를 직접 참조하지 않는다.
+- 다른 도메인 경계의 `infrastructure`를 직접 참조하지 않는다.
 - 모듈 간 협력은 application 계층의 유스케이스 또는 명시적인 domain interface를 통해 연결한다.
 - 외부 시스템 연동은 `infrastructure`에 둔다.
 - 도메인 레이어는 JPA, Spring, HTTP 같은 프레임워크 타입을 직접 사용하지 않는다.
@@ -76,10 +74,10 @@ commerce
 | Onion | 도메인 엔티티와 VO가 중심이며, application/infrastructure가 바깥에서 의존한다. |
 | Hexagonal | Repository, PaymentGateway, DataPlatformClient는 domain port이고 구현체는 infrastructure adapter다. |
 | CQRS | command service와 query service를 분리해 변경 유스케이스와 조회 조합의 책임을 나눈다. |
-| Persistence 분리 | `catalog`, `ordering`, `payment`, `event` 도메인 객체는 JPA 어노테이션을 갖지 않고, infrastructure JPA entity가 DB 스키마를 담당한다. |
+| Persistence 분리 | `domain.catalog`, `domain.ordering`, `domain.payment`, `domain.event` 도메인 객체는 JPA 어노테이션을 갖지 않고, infrastructure JPA entity가 DB 스키마를 담당한다. |
 
 ## 현재 코드와의 관계
 
-기존 예제 코드는 최상위 계층 우선 패키지를 일부 유지하지만, 3주차 구현 대상인 `catalog`, `ordering`, `payment`, `event`는 도메인 우선 구조로 이전했다.
+현재 구현은 기존 5계층 패키지를 유지하고, 3주차 구현 대상인 `catalog`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다.
 
 3주차 구현 대상 도메인은 순수 도메인 엔티티와 infrastructure JPA 엔티티를 분리한다. 기존 예제 코드의 JPA Entity 구조는 과제 핵심 범위가 아니므로 별도 리팩터링 대상에서 제외한다.
