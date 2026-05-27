@@ -52,6 +52,6 @@ User + Product 간 관계.
 - [x] 1단계 — Brand 도메인
 - [x] 2단계 — Product 도메인 확장
 - [x] 3단계 — Product + Brand 도메인 서비스
-- [ ] 4단계 — Like 도메인
+- [x] 4단계 — Like 도메인
 - [ ] 5단계 — Order 도메인
 - [ ] 6단계 — Application Layer Facade
