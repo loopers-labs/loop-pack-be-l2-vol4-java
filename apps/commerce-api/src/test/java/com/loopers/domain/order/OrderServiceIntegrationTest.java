@@ -99,6 +99,21 @@ public class OrderServiceIntegrationTest {
             assertThat(thrown).isInstanceOf(CoreException.class);
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("존재하지 않는(또는 비활성) 상품이 포함되면 NOT_FOUND가 발생한다.")
+        @Test
+        void given_nonExistingProduct_when_placeOrderPending_then_throwsNotFound() {
+            Long valid = createProduct(10000L, 10);
+
+            Throwable thrown = catchThrowable(() -> orderService.placeOrderPending(USER_ID, PaymentMethod.CARD,
+                    List.of(new OrderLine(valid, 1), new OrderLine(9999L, 1))));
+
+            assertAll(
+                    () -> assertThat(thrown).isInstanceOf(CoreException.class),
+                    () -> assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND),
+                    () -> assertThat(stockOf(valid)).isEqualTo(10)   // 롤백 — 유효 상품 재고도 차감 안 됨
+            );
+        }
     }
 
     @Nested
