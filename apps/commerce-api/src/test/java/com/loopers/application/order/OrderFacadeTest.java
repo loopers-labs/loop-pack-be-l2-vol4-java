@@ -1,6 +1,7 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
@@ -21,14 +22,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class OrderFacadeTest {
@@ -39,6 +44,7 @@ class OrderFacadeTest {
     @Mock private OrderRepository orderRepository;
     @Mock private ProductRepository productRepository;
     @Mock private StockRepository stockRepository;
+    @Mock private OrderDomainService orderDomainService;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
@@ -58,40 +64,41 @@ class OrderFacadeTest {
     @Nested
     class CreateOrder {
 
-        @DisplayName("유효한 주문 생성 시 OrderInfo가 반환되고 재고가 차감된다.")
+        @DisplayName("유효한 주문 생성 시 OrderDomainService에 재고 검증과 주문 조립을 위임하고 OrderInfo가 반환된다.")
         @Test
         void returnsOrderInfoAndDecreaseStock_whenValidCommandProvided() {
             // arrange
-            OrderCreateCommand command = new OrderCreateCommand(
-                USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 2))
-            );
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 2)));
+            OrderModel builtOrder = new OrderModel(USER_ID); // Domain Service가 조립한 주문 엔티티
+
             given(productRepository.findAllActiveByIds(List.of(PRODUCT_ID))).willReturn(List.of(product));
             given(stockRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(stock));
-            given(orderRepository.save(any(OrderModel.class))).willAnswer(inv -> inv.getArgument(0));
+            given(orderDomainService.buildOrder(eq(USER_ID), any(), any())).willReturn(builtOrder);
+            given(orderRepository.save(builtOrder)).willReturn(builtOrder);
 
             // act
             OrderInfo result = orderFacade.createOrder(command);
 
-            // assert
+            // assert: OrderDomainService 위임 검증
+            then(orderDomainService).should().validateStocks(any(), any());
+            then(orderDomainService).should().buildOrder(eq(USER_ID), any(), any());
+
+            // assert: 재고 차감 (StockModel.decrease 실제 호출 확인)
+            assertThat(stock.getQuantity()).isEqualTo(98); // 100 - 2
+
+            // assert: 결과
             assertAll(
                 () -> assertThat(result.userId()).isEqualTo(USER_ID),
-                () -> assertThat(result.status()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(result.totalAmount()).isEqualTo(300_000), // 150_000 * 2
-                () -> assertThat(result.items()).hasSize(1),
-                () -> assertThat(result.items().get(0).productName()).isEqualTo("나이키 에어맥스"),
-                () -> assertThat(result.items().get(0).quantity()).isEqualTo(2)
+                () -> assertThat(result.status()).isEqualTo(OrderStatus.PENDING)
             );
-            assertThat(stock.getQuantity()).isEqualTo(98); // 100 - 2
         }
 
         @DisplayName("존재하지 않는 상품에 주문 시 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductDoesNotExist() {
             // arrange
-            OrderCreateCommand command = new OrderCreateCommand(
-                USER_ID, List.of(new OrderItemCommand(999L, 1))
-            );
-            given(productRepository.findAllActiveByIds(List.of(999L))).willReturn(List.of()); // 빈 결과
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of(new OrderItemCommand(999L, 1)));
+            given(productRepository.findAllActiveByIds(List.of(999L))).willReturn(List.of());
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -100,19 +107,18 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            then(orderRepository).should(org.mockito.Mockito.never()).save(any());
+            then(orderRepository).should(never()).save(any());
         }
 
-        @DisplayName("재고가 부족한 경우 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("재고가 부족한 경우 OrderDomainService가 BAD_REQUEST 예외를 던진다.")
         @Test
         void throwsBadRequest_whenStockIsInsufficient() {
             // arrange
-            StockModel lowStock = new StockModel(product, 1); // 재고 1개만 있음
-            OrderCreateCommand command = new OrderCreateCommand(
-                USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 5)) // 5개 요청
-            );
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 5)));
             given(productRepository.findAllActiveByIds(List.of(PRODUCT_ID))).willReturn(List.of(product));
-            given(stockRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(lowStock));
+            given(stockRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(stock));
+            willThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다."))
+                .given(orderDomainService).validateStocks(any(), any()); // Domain Service 위임 확인
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -121,7 +127,7 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            then(orderRepository).should(org.mockito.Mockito.never()).save(any());
+            then(orderRepository).should(never()).save(any());
         }
 
         @DisplayName("주문 항목이 비어있으면 BAD_REQUEST 예외가 발생한다.")
@@ -137,18 +143,14 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            then(productRepository).should(org.mockito.Mockito.never()).findAllActiveByIds(any());
+            then(productRepository).should(never()).findAllActiveByIds(any());
         }
 
         @DisplayName("삭제된 상품에 주문 시 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductIsDeleted() {
-            // arrange
-            product.delete(); // 삭제 처리
-            OrderCreateCommand command = new OrderCreateCommand(
-                USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 1))
-            );
-            // findAllActiveByIds는 삭제된 상품을 반환하지 않음
+            // arrange — findAllActiveByIds는 삭제된 상품을 반환하지 않음
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of(new OrderItemCommand(PRODUCT_ID, 1)));
             given(productRepository.findAllActiveByIds(List.of(PRODUCT_ID))).willReturn(List.of());
 
             // act
@@ -184,13 +186,13 @@ class OrderFacadeTest {
         @Test
         void throwsNotFound_whenOrderBelongsToOtherUser() {
             // arrange
-            OrderModel order = new OrderModel(99L); // 다른 사용자 주문
+            OrderModel order = new OrderModel(99L);
             ReflectionTestUtils.setField(order, "id", 1L);
             given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> orderFacade.getOrder(USER_ID, 1L) // USER_ID = 1L, 주문자 = 99L
+                () -> orderFacade.getOrder(USER_ID, 1L)
             );
 
             // assert

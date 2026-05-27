@@ -1,6 +1,6 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.OrderItemModel;
+import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
@@ -20,13 +20,18 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 주문 생성 Facade — Product / Stock / Order 도메인을 조합해 주문 흐름을 orchestration한다.
+ * 주문 Facade — Product / Stock / Order 도메인을 조합하는 Application Layer.
  *
- * 주문 생성 흐름:
- *   1. 전체 상품 조회 + 삭제/부재 확인
- *   2. 전체 재고 사전 확인 (한 건이라도 부족하면 전체 실패)
- *   3. 재고 일괄 차감
- *   4. 주문 + 주문 항목 스냅샷 저장
+ * 도메인 로직(재고 검증, 주문 엔티티 조립)은 OrderDomainService에 위임하고,
+ * 이 클래스는 Repository 조회·영속화와 흐름 제어(orchestration)만 담당한다.
+ *
+ * createOrder 흐름:
+ *   1. 활성 상품 배치 조회 + 존재 확인
+ *   2. 재고 배치 조회
+ *   3. [Domain] 재고 사전 검증 (전체 실패 원칙)
+ *   4. 재고 차감 (StockModel.decrease → dirty checking으로 자동 반영)
+ *   5. [Domain] 주문 엔티티 조립
+ *   6. 영속화 (CascadeType.ALL로 주문항목 함께 저장)
  */
 @RequiredArgsConstructor
 @Component
@@ -35,6 +40,7 @@ public class OrderFacade {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
+    private final OrderDomainService orderDomainService;
 
     /**
      * FR-O-01. 주문 생성
@@ -46,20 +52,19 @@ public class OrderFacade {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
 
-        // 1. 전체 상품 조회
+        // 1. 활성 상품 배치 조회
         List<Long> productIds = itemCommands.stream().map(OrderItemCommand::productId).toList();
         Map<Long, ProductModel> productMap = productRepository.findAllActiveByIds(productIds)
             .stream()
             .collect(Collectors.toMap(ProductModel::getId, p -> p));
 
-        // 존재하지 않는 상품 확인 (삭제된 상품 포함)
         for (Long pid : productIds) {
             if (!productMap.containsKey(pid)) {
                 throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다. id=" + pid);
             }
         }
 
-        // 2. 재고 조회 및 사전 확인 (한 건이라도 부족하면 전체 실패)
+        // 2. 재고 배치 조회
         Map<Long, StockModel> stockMap = itemCommands.stream()
             .collect(Collectors.toMap(
                 OrderItemCommand::productId,
@@ -68,39 +73,21 @@ public class OrderFacade {
                         "재고 정보를 찾을 수 없습니다. productId=" + cmd.productId()))
             ));
 
-        for (OrderItemCommand cmd : itemCommands) {
-            StockModel stock = stockMap.get(cmd.productId());
-            if (stock.getQuantity() < cmd.quantity()) {
-                throw new CoreException(ErrorType.BAD_REQUEST,
-                    "재고가 부족합니다. productId=" + cmd.productId()
-                        + " (요청: " + cmd.quantity() + ", 재고: " + stock.getQuantity() + ")");
-            }
-        }
+        Map<Long, Integer> quantityMap = itemCommands.stream()
+            .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
-        // 3. 재고 일괄 차감
-        for (OrderItemCommand cmd : itemCommands) {
-            stockMap.get(cmd.productId()).decrease(cmd.quantity());
-        }
+        // 3. 재고 사전 검증 (Domain Service 위임 — 한 건이라도 부족하면 전체 실패)
+        orderDomainService.validateStocks(stockMap, quantityMap);
 
-        // 4. 주문 + 주문 항목 생성
-        OrderModel order = new OrderModel(command.userId());
-        orderRepository.save(order); // 먼저 저장해서 PK 확보 (OrderItem FK 필요)
+        // 4. 재고 차감 (dirty checking으로 트랜잭션 커밋 시 자동 반영)
+        stockMap.forEach((productId, stock) -> stock.decrease(quantityMap.get(productId)));
 
-        for (OrderItemCommand cmd : itemCommands) {
-            ProductModel product = productMap.get(cmd.productId());
-            OrderItemModel item = new OrderItemModel(
-                order,
-                product.getId(),
-                product.getName(),
-                product.getPrice(),
-                product.getBrand().getName(),
-                cmd.quantity()
-            );
-            order.addItem(item);
-        }
+        // 5. 주문 엔티티 조립 (Domain Service 위임 — 스냅샷 포함 OrderModel 반환)
+        List<ProductModel> products = List.copyOf(productMap.values());
+        OrderModel order = orderDomainService.buildOrder(command.userId(), products, quantityMap);
 
-        orderRepository.save(order); // 항목 포함 저장
-        return OrderInfo.from(order);
+        // 6. 영속화 (CascadeType.ALL — 주문항목 한 번에 저장)
+        return OrderInfo.from(orderRepository.save(order));
     }
 
     /**
@@ -125,7 +112,7 @@ public class OrderFacade {
     }
 
     /**
-     * FR-OA-01. 주문 목록 조회 (어드민 — 전체)
+     * FR-OA-01. 주문 목록 조회 (어드민)
      */
     @Transactional(readOnly = true)
     public Page<OrderInfo> getAllOrders(Pageable pageable) {
@@ -133,7 +120,7 @@ public class OrderFacade {
     }
 
     /**
-     * FR-OA-02. 주문 상세 조회 (어드민 — 제약 없음)
+     * FR-OA-02. 주문 상세 조회 (어드민)
      */
     @Transactional(readOnly = true)
     public OrderInfo getOrderByAdmin(Long orderId) {

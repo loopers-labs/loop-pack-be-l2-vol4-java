@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +45,7 @@ class ProductServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private StockRepository stockRepository;
     @Mock private BrandRepository brandRepository;
+    @Mock private ProductDomainService productDomainService;
 
     private BrandModel brand;
     private ProductModel product;
@@ -105,6 +108,8 @@ class ProductServiceTest {
             // arrange
             brand.delete();
             given(brandRepository.findById(1L)).willReturn(Optional.of(brand));
+            willThrow(new CoreException(ErrorType.BAD_REQUEST, "삭제된 브랜드입니다."))
+                .given(productDomainService).validateBrand(brand); // Domain Service 위임 검증
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->

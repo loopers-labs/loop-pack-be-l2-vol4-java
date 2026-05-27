@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
@@ -24,12 +25,13 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final BrandRepository brandRepository;
+    private final ProductDomainService productDomainService;
 
     @Transactional
     public ProductInfo create(ProductCreateCommand command) {
         BrandModel brand = brandRepository.findById(command.brandId())
-            .filter(b -> !b.isDeleted())
             .orElseThrow(() -> new CoreException(ErrorType.BAD_REQUEST, "등록되지 않은 브랜드입니다."));
+        productDomainService.validateBrand(brand); // 삭제된 브랜드 검증 위임
 
         ProductModel product = new ProductModel(brand, command.name(), command.price());
         productRepository.save(product);

@@ -3,6 +3,7 @@ package com.loopers.application.like;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,7 @@ class LikeServiceTest {
 
     @Mock private LikeRepository likeRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private ProductDomainService productDomainService;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
@@ -108,6 +111,8 @@ class LikeServiceTest {
         void throwsBadRequest_whenProductIsDeleted() {
             // arrange
             given(productRepository.findById(PRODUCT_ID)).willReturn(Optional.of(deletedProduct));
+            willThrow(new CoreException(ErrorType.BAD_REQUEST, "삭제된 상품입니다."))
+                .given(productDomainService).validateProductActive(deletedProduct); // Domain Service 위임 검증
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
