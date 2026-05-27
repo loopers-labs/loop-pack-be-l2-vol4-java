@@ -1,12 +1,12 @@
 package com.loopers.domain.like;
 
+import com.loopers.domain.EntityTestSupport;
 import com.loopers.domain.product.ProductModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 
@@ -117,8 +117,8 @@ class ProductLikeServiceTest {
             ProductLikeModel secondLike = new ProductLikeModel("user1234", 2L);
             ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
             ProductModel secondProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
-            setId(firstProduct, 1L);
-            setId(secondProduct, 2L);
+            EntityTestSupport.setId(firstProduct, 1L);
+            EntityTestSupport.setId(secondProduct, 2L);
 
             // act
             List<ProductModel> results = productLikeService.getLikedProducts(
@@ -132,16 +132,6 @@ class ProductLikeServiceTest {
                 () -> assertThat(results.get(0)).isSameAs(firstProduct),
                 () -> assertThat(results.get(1)).isSameAs(secondProduct)
             );
-        }
-    }
-
-    private void setId(ProductModel product, Long id) {
-        try {
-            Field idField = product.getClass().getSuperclass().getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(product, id);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
         }
     }
 }

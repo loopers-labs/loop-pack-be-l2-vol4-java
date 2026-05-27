@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.EntityTestSupport;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,8 +73,8 @@ class ProductCatalogServiceTest {
             ProductModel secondProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
             BrandModel firstBrand = new BrandModel("Loopers", "감성 이커머스 브랜드");
             BrandModel secondBrand = new BrandModel("Daily", "데일리 브랜드");
-            setId(firstBrand, 10L);
-            setId(secondBrand, 20L);
+            EntityTestSupport.setId(firstBrand, 10L);
+            EntityTestSupport.setId(secondBrand, 20L);
 
             // act
             List<ProductDetail> results = productCatalogService.getProductDetails(
@@ -105,16 +105,6 @@ class ProductCatalogServiceTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
-    }
-
-    private void setId(BrandModel brand, Long id) {
-        try {
-            Field idField = brand.getClass().getSuperclass().getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(brand, id);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
         }
     }
 }

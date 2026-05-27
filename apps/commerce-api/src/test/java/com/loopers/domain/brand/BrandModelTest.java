@@ -67,6 +67,25 @@ class BrandModelTest {
                 () -> assertThat(brand.getDescription()).isEqualTo("새로운 브랜드 설명")
             );
         }
+
+        @DisplayName("브랜드 설명이 비어있으면, BAD_REQUEST 예외가 발생하고 기존 값은 유지된다.")
+        @Test
+        void throwsBadRequestException_whenDescriptionIsBlank() {
+            // arrange
+            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                brand.update("New Loopers", " ");
+            });
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(brand.getName()).isEqualTo("Loopers"),
+                () -> assertThat(brand.getDescription()).isEqualTo("감성 이커머스 브랜드")
+            );
+        }
     }
 
     @DisplayName("브랜드를 삭제할 때, ")

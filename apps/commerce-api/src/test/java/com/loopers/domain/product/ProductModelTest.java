@@ -181,4 +181,89 @@ class ProductModelTest {
             assertThat(product.getLikeCount()).isZero();
         }
     }
+
+    @DisplayName("상품 정보를 수정할 때, ")
+    @Nested
+    class Update {
+        @DisplayName("유효한 값이 주어지면, 상품 정보를 변경한다.")
+        @Test
+        void updatesProductInfo_whenFieldsAreValid() {
+            // arrange
+            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+
+            // act
+            product.update("셔츠", "가벼운 셔츠", 20_000L, 5);
+
+            // assert
+            assertAll(
+                () -> assertThat(product.getName()).isEqualTo("셔츠"),
+                () -> assertThat(product.getDescription()).isEqualTo("가벼운 셔츠"),
+                () -> assertThat(product.getPrice()).isEqualTo(20_000L),
+                () -> assertThat(product.getStock()).isEqualTo(5)
+            );
+        }
+
+        @DisplayName("상품명이 비어있으면, BAD_REQUEST 예외가 발생하고 기존 값은 유지된다.")
+        @Test
+        void throwsBadRequestException_whenNameIsBlank() {
+            // arrange
+            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                product.update(" ", "가벼운 셔츠", 20_000L, 5);
+            });
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(product.getName()).isEqualTo("니트"),
+                () -> assertThat(product.getDescription()).isEqualTo("부드러운 니트"),
+                () -> assertThat(product.getPrice()).isEqualTo(30_000L),
+                () -> assertThat(product.getStock()).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("가격이 음수이면, BAD_REQUEST 예외가 발생하고 기존 값은 유지된다.")
+        @Test
+        void throwsBadRequestException_whenPriceIsNegative() {
+            // arrange
+            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                product.update("셔츠", "가벼운 셔츠", -1L, 5);
+            });
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(product.getName()).isEqualTo("니트"),
+                () -> assertThat(product.getDescription()).isEqualTo("부드러운 니트"),
+                () -> assertThat(product.getPrice()).isEqualTo(30_000L),
+                () -> assertThat(product.getStock()).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("재고가 음수이면, BAD_REQUEST 예외가 발생하고 기존 값은 유지된다.")
+        @Test
+        void throwsBadRequestException_whenStockIsNegative() {
+            // arrange
+            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                product.update("셔츠", "가벼운 셔츠", 20_000L, -1);
+            });
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(product.getName()).isEqualTo("니트"),
+                () -> assertThat(product.getDescription()).isEqualTo("부드러운 니트"),
+                () -> assertThat(product.getPrice()).isEqualTo(30_000L),
+                () -> assertThat(product.getStock()).isEqualTo(10)
+            );
+        }
+    }
 }
