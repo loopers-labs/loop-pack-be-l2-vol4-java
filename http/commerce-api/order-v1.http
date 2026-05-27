@@ -1,0 +1,127 @@
+### 단건 주문 - 정상 (201 Created)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ]
+}
+
+### 단건 주문 - 회원 인증 헤더 누락 (401 Unauthorized)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ]
+}
+
+### 단건 주문 - 상품 미존재 (404 Not Found)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 99999, "quantity": 2 }
+  ]
+}
+
+### 단건 주문 - 수량 0 (400 Bad Request)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 0 }
+  ]
+}
+
+### 단건 주문 - 재고 초과 (409 Conflict)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 999999 }
+  ]
+}
+
+### 다중 항목 주문 - 정상 (201 Created)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 2, "quantity": 2 }
+  ]
+}
+
+### 다중 항목 주문 - 같은 상품 중복 (400 Bad Request)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 1, "quantity": 2 }
+  ]
+}
+
+### 다중 항목 주문 - 한 항목 재고 초과 (409 Conflict, 전체 원복)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 2, "quantity": 999999 }
+  ]
+}
+
+### 본인 주문 내역 - 기본 범위 (200 OK)
+GET http://localhost:8080/api/v1/orders?page=0&size=20
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 본인 주문 내역 - 날짜 범위 지정 (200 OK)
+GET http://localhost:8080/api/v1/orders?startAt=2026-01-01&endAt=2026-05-27&page=0&size=20
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 본인 주문 내역 - 시작일이 종료일보다 늦음 (400 Bad Request)
+GET http://localhost:8080/api/v1/orders?startAt=2026-02-10&endAt=2026-01-01&page=0&size=20
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 본인 주문 내역 - 회원 인증 헤더 누락 (401 Unauthorized)
+GET http://localhost:8080/api/v1/orders?page=0&size=20
+
+### 본인 주문 상세 - 정상 (200 OK)
+GET http://localhost:8080/api/v1/orders/1
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 본인 주문 상세 - 미존재 (404 Not Found)
+GET http://localhost:8080/api/v1/orders/99999
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 본인 주문 상세 - 회원 인증 헤더 누락 (401 Unauthorized)
+GET http://localhost:8080/api/v1/orders/1

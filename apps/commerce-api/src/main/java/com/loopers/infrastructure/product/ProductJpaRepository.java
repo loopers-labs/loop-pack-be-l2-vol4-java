@@ -6,7 +6,9 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.projection.ProductAdminView;
@@ -18,6 +20,15 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     Optional<ProductModel> findByIdAndDeletedAtIsNull(Long id);
 
     List<ProductModel> findByBrandIdAndDeletedAtIsNull(Long brandId);
+
+    @Transactional
+    @Modifying
+    @Query("""
+        UPDATE ProductModel p
+        SET p.stock.value = p.stock.value - :quantity
+        WHERE p.id = :productId AND p.deletedAt IS NULL AND p.stock.value >= :quantity
+        """)
+    int decreaseStock(Long productId, int quantity);
 
     @Query(value = """
         SELECT new com.loopers.domain.product.projection.ProductSummary(
