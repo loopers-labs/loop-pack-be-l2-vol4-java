@@ -15,6 +15,7 @@ public class ProductModel extends BaseEntity {
     private Long price;
     private Integer stock;
     private Long brandId;
+    private Long likeCount = 0L;
 
     protected ProductModel() {}
 
@@ -85,4 +86,5 @@ public class ProductModel extends BaseEntity {
     public Long getPrice() { return price; }
     public Integer getStock() { return stock; }
     public Long getBrandId() { return brandId; }
+    public Long getLikeCount() { return likeCount; }
 }
