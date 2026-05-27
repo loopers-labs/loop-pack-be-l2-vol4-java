@@ -1,0 +1,17 @@
+### 관리자 주문 목록 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/orders?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 주문 목록 - 관리자 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/orders?page=0&size=20
+
+### 관리자 주문 상세 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/orders/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 주문 상세 - 미존재 (404 Not Found)
+GET http://localhost:8080/api-admin/v1/orders/99999
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 주문 상세 - 관리자 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/orders/1
