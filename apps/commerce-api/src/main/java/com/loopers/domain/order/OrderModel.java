@@ -46,11 +46,18 @@ public class OrderModel extends BaseEntity {
     }
 
     /**
-     * 주문 항목을 추가하고 totalAmount를 갱신한다.
+     * 주문 항목을 컬렉션에 추가한다.
+     * 총 금액 계산은 OrderPricingService가 담당하며, applyTotal()로 별도 반영한다.
      */
     public void addItem(OrderItemModel item) {
         this.items.add(item);
-        this.totalAmount += item.totalPrice();
+    }
+
+    /**
+     * OrderPricingService가 계산한 총 금액을 주문에 반영한다.
+     */
+    public void applyTotal(int totalAmount) {
+        this.totalAmount = totalAmount;
     }
 
     public List<OrderItemModel> getItems() {

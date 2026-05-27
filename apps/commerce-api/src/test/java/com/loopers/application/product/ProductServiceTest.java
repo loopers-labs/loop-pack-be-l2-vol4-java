@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -50,12 +51,14 @@ class ProductServiceTest {
     private BrandModel brand;
     private ProductModel product;
     private StockModel stock;
+    private ProductDetail detail;
 
     @BeforeEach
     void setUp() {
         brand = new BrandModel("Nike", "스포츠 브랜드");
         product = new ProductModel(brand, "나이키 에어맥스", 150_000);
         stock = new StockModel(product, 100);
+        detail = new ProductDetail(null, "나이키 에어맥스", 150_000, "Nike", 100, 0L);
     }
 
     @DisplayName("create()를 호출할 때,")
@@ -70,6 +73,8 @@ class ProductServiceTest {
             given(brandRepository.findById(1L)).willReturn(Optional.of(brand));
             given(productRepository.save(any(ProductModel.class))).willReturn(product);
             given(stockRepository.save(any(StockModel.class))).willReturn(stock);
+            given(productDomainService.assembleDetail(any(ProductModel.class), any(StockModel.class)))
+                .willReturn(detail);
 
             // act
             ProductInfo result = productService.create(command);
@@ -109,7 +114,7 @@ class ProductServiceTest {
             brand.delete();
             given(brandRepository.findById(1L)).willReturn(Optional.of(brand));
             willThrow(new CoreException(ErrorType.BAD_REQUEST, "삭제된 브랜드입니다."))
-                .given(productDomainService).validateBrand(brand); // Domain Service 위임 검증
+                .given(productDomainService).validateBrand(brand);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -132,6 +137,7 @@ class ProductServiceTest {
             // arrange
             given(productRepository.findActiveById(1L)).willReturn(Optional.of(product));
             given(stockRepository.findByProductId(1L)).willReturn(Optional.of(stock));
+            given(productDomainService.assembleDetail(product, stock)).willReturn(detail);
 
             // act
             ProductInfo result = productService.getById(1L);
@@ -142,6 +148,7 @@ class ProductServiceTest {
                 () -> assertThat(result.brandName()).isEqualTo("Nike"),
                 () -> assertThat(result.stockQuantity()).isEqualTo(100)
             );
+            then(productDomainService).should().assembleDetail(product, stock);
         }
 
         @DisplayName("존재하지 않는 ID 조회 시 NOT_FOUND 예외가 발생한다.")
@@ -172,6 +179,7 @@ class ProductServiceTest {
             Page<ProductModel> page = new PageImpl<>(List.of(product), pageable, 1);
             given(productRepository.findAllActive(pageable, condition)).willReturn(page);
             given(stockRepository.findByProductId(product.getId())).willReturn(Optional.of(stock));
+            given(productDomainService.assembleDetail(product, stock)).willReturn(detail);
 
             // act
             Page<ProductInfo> result = productService.getAll(pageable, condition);
@@ -190,9 +198,11 @@ class ProductServiceTest {
         @Test
         void returnsUpdatedProductInfo_whenValidCommandProvided() {
             // arrange
+            ProductDetail updatedDetail = new ProductDetail(null, "뉴발란스 990", 200_000, "Nike", 100, 0L);
             given(productRepository.findActiveById(1L)).willReturn(Optional.of(product));
             given(productRepository.save(product)).willReturn(product);
             given(stockRepository.findByProductId(1L)).willReturn(Optional.of(stock));
+            given(productDomainService.assembleDetail(product, stock)).willReturn(updatedDetail);
 
             // act
             ProductInfo result = productService.update(1L, new ProductUpdateCommand("뉴발란스 990", 200_000));

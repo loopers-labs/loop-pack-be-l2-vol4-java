@@ -1,6 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.stock.StockModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ class ProductDomainServiceTest {
     private BrandModel deletedBrand;
     private ProductModel activeProduct;
     private ProductModel deletedProduct;
+    private StockModel stock;
 
     @BeforeEach
     void setUp() {
@@ -30,6 +32,8 @@ class ProductDomainServiceTest {
         activeProduct = new ProductModel(activeBrand, "나이키 에어맥스", 150_000);
         deletedProduct = new ProductModel(activeBrand, "단종 상품", 100_000);
         deletedProduct.delete();
+
+        stock = new StockModel(activeProduct, 50);
     }
 
     @DisplayName("validateBrand()를 호출할 때,")
@@ -69,6 +73,40 @@ class ProductDomainServiceTest {
                 () -> productDomainService.validateProductActive(deletedProduct)
             );
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("assembleDetail()를 호출할 때,")
+    @Nested
+    class AssembleDetail {
+
+        @DisplayName("Product + Brand + Stock 정보가 ProductDetail로 조합된다.")
+        @Test
+        void returnsProductDetail_withAllFields() {
+            // act
+            ProductDetail detail = productDomainService.assembleDetail(activeProduct, stock);
+
+            // assert
+            assertThat(detail.name()).isEqualTo("나이키 에어맥스");
+            assertThat(detail.price()).isEqualTo(150_000);
+            assertThat(detail.brandName()).isEqualTo("Nike");     // Brand 정보 포함
+            assertThat(detail.stockQuantity()).isEqualTo(50);     // Stock 정보 포함
+            assertThat(detail.likeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("좋아요 수가 반영된 상품의 detail에 likeCount가 포함된다.")
+        @Test
+        void includesLikeCount_whenProductHasLikes() {
+            // arrange — 직접 ProductModel 생성 (likeCount는 DB atomic UPDATE 대상이나 도메인 객체 조합 테스트용)
+            ProductModel likedProduct = new ProductModel(activeBrand, "인기 상품", 200_000);
+            StockModel likedStock = new StockModel(likedProduct, 10);
+
+            // act
+            ProductDetail detail = productDomainService.assembleDetail(likedProduct, likedStock);
+
+            // assert
+            assertThat(detail.brandName()).isEqualTo("Nike");
+            assertThat(detail.stockQuantity()).isEqualTo(10);
         }
     }
 }

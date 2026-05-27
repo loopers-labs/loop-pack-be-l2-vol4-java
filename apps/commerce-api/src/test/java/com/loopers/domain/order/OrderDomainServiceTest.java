@@ -20,7 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OrderDomainServiceTest {
 
-    private final OrderDomainService orderDomainService = new OrderDomainService();
+    // OrderPricingService는 순수 계산 로직이므로 실제 구현체를 함께 사용
+    private final OrderPricingService orderPricingService = new OrderPricingService();
+    private final OrderDomainService orderDomainService = new OrderDomainService(orderPricingService);
 
     private ProductModel product;
     private StockModel stock;
