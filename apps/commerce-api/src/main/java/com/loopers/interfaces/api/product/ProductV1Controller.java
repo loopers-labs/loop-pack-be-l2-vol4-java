@@ -1,20 +1,21 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductInfo;
 import com.loopers.application.product.ProductService;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
+/**
+ * 사용자 상품 API — 조회 전용.
+ * 등록·수정·삭제는 ProductAdminV1Controller 로 분리 예정.
+ */
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
@@ -22,45 +23,19 @@ public class ProductV1Controller {
 
     private final ProductService productService;
 
-    @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
-    ) {
-        ProductInfo info = ProductInfo.from(productService.createProduct(
-            request.name(), request.description(), request.price(), request.stock()
-        ));
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
-    }
-
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(@PathVariable Long productId) {
-        ProductInfo info = ProductInfo.from(productService.getProduct(productId));
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(productService.getById(productId)));
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductV1Dto.ProductResponse> responses = productService.getAllProducts().stream()
-            .map(ProductInfo::from)
-            .map(ProductV1Dto.ProductResponse::from)
-            .toList();
-        return ApiResponse.success(responses);
-    }
-
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
+    public ApiResponse<Page<ProductV1Dto.ProductResponse>> getAllProducts(
+        @RequestParam(required = false) Long brandId,
+        @PageableDefault(size = 20) Pageable pageable
     ) {
-        ProductInfo info = ProductInfo.from(productService.updateProduct(
-            productId, request.name(), request.description(), request.price(), request.stock()
-        ));
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
-    }
-
-    @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(@PathVariable Long productId) {
-        productService.deleteProduct(productId);
-        return ApiResponse.success(null);
+        return ApiResponse.success(
+            productService.getAll(pageable, brandId)
+                .map(ProductV1Dto.ProductResponse::from)
+        );
     }
 }
