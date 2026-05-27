@@ -146,10 +146,10 @@ public void deleteBrand(Long brandId) {
 void incrementLikeCount(Long productId);
 void decrementLikeCount(Long productId);
 
-// product/infrastructure/ProductRepositoryImpl.java
+// product/infrastructure/ProductJpaRepository.java  ← @Modifying @Query는 JpaRepository에 위치
 @Modifying
 @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
-void incrementLikeCount(@Param("id") Long productId);
+void incrementLikeCount(@Param("id") Long id);
 ```
 
 **이유**
@@ -159,6 +159,19 @@ void incrementLikeCount(@Param("id") Long productId);
 **파생 결정**
 - 클래스 다이어그램의 `ProductModel.likeAdded()` / `likeRemoved()`는 구현하지 않는다.
   필드를 직접 수정하지 않으므로 메서드 존재 이유가 없다.
+
+**⚠️ 구현 시 주의 — 누락되기 쉬운 지점**
+- 좋아요 등록·취소 후 `productRepository.incrementLikeCount()` / `decrementLikeCount()`를
+  **반드시 LikeFacade에서 명시적으로 호출**해야 한다.
+- JPA dirty checking은 `@Modifying @Query`로 실행된 원자 쿼리를 감지하지 않으므로,
+  Facade에서 직접 호출하지 않으면 likeCount가 갱신되지 않는다.
+
+```java
+// like/application/LikeFacade.java
+LikeInfo saved = LikeInfo.from(likeRepository.save(like));
+productRepository.incrementLikeCount(productId);   // ← 명시적 호출 필수
+return saved;
+```
 
 ---
 
@@ -183,6 +196,12 @@ void incrementLikeCount(@Param("id") Long productId);
 **⚠️ 구현 선행 조건**
 - `BaseEntity` / `SoftDeletableEntity` 분리는 **모든 Model 구현 전에** 완료해야 한다.
 - 이후에 수정하면 Entity 전체를 다시 손봐야 하므로, 가장 먼저 처리한다.
+
+**⚠️ 현재 미이행**
+- 현재 구현에서는 `modules/jpa/BaseEntity`에 `deletedAt`이 그대로 포함되어 있다.
+- `SoftDeletableEntity` 분리 작업이 이루어지지 않아, `LikeModel`, `OrderModel`, `OrderItemModel`도
+  소프트 딜리트 시나리오가 없음에도 불필요한 `deleted_at` 컬럼을 갖는다.
+- ERD 설계 의도와 실제 구현이 불일치하는 상태이며, 향후 리팩토링 대상이다.
 
 ---
 
@@ -425,22 +444,27 @@ public UserInfo signUp(...) {
 
 ```java
 // order/domain/OrderService.java — Repository 없음, 순수 도메인 로직만
-public OrderModel createOrder(Long userId, List<OrderItemCommand> commands) {
-    List<OrderItemModel> items = commands.stream()
-        .map(c -> new OrderItemModel(c.productId(), c.productName(), c.price(), c.quantity()))
-        .toList();
-    return new OrderModel(userId, items);  // 저장은 Facade가
+// 존재 검증처럼 도메인 규칙만 담당. 생성 로직은 OrderModel 생성자 또는 Facade가 직접 처리.
+public OrderModel getOrThrow(Optional<OrderModel> order) {
+    return order.orElseThrow(() -> new CoreException(NOT_FOUND, "주문이 존재하지 않습니다."));
 }
 
 // order/application/OrderFacade.java — 로드·저장·크로스 도메인 조율
 @Transactional
-public void createOrder(Long userId, List<OrderRequest> requests) {
+public OrderInfo createOrder(Long userId, List<OrderItemRequest> requests) {
     List<ProductModel> products = productRepository.findAllByIds(...); // Facade가 로드
-    products.forEach(p -> p.decrementStock(qty));                      // 크로스 도메인 로직
-    OrderModel order = orderService.createOrder(userId, toCommands(products)); // 도메인 로직 위임
-    orderRepository.save(order);                                       // Facade가 저장
+    products.forEach(p -> p.decreaseStock(qty));                       // 크로스 도메인 로직 (재고 차감)
+    List<OrderItemModel> items = products.stream()
+        .map(p -> new OrderItemModel(p.getId(), p.getName(), p.getPrice(), qty))
+        .toList();
+    OrderModel order = new OrderModel(userId, items);                  // Facade가 직접 생성
+    return OrderInfo.from(orderRepository.save(order));                // Facade가 저장
 }
 ```
+
+> ℹ️ `OrderService`는 현재 `getOrThrow()` 하나만 갖는다.
+> 주문 생성에서 '어떤 아이템으로 주문을 구성하는가'는 `OrderModel` 생성자에 캡슐화되고,
+> Facade가 로드·저장·크로스 도메인 조율을 모두 담당한다.
 
 **단순 조회의 경우 — finder 역할도 DomainService가 담당**
 
@@ -504,8 +528,8 @@ public ProductInfo getProductDetail(Long id) {
 |--|--|--|
 | **Model** | 비즈니스 규칙 위반 | `decrementStock` → 재고 부족 시 `BAD_REQUEST` |
 | **Service** | 존재 여부 검증 | `getOrThrow(Optional)` → 없으면 `NOT_FOUND` |
-| **Facade** | 권한·크로스 도메인 검증 | 본인 브랜드 상품인지 확인 → `FORBIDDEN` |
-| **Interfaces** | HTTP 요청 형식 검증 | `@Valid` DTO 검증 |
+| **Facade** | DB 조회가 필요한 권한·크로스 도메인 검증 | 주문 소유권 확인 (DB 조회 후 userId 비교) → `FORBIDDEN` |
+| **Interfaces** | HTTP 요청 형식 검증, DB 조회 없이 경로 변수만으로 판단 가능한 권한 확인 | `@Valid` DTO 검증; `userId` 불일치 → `FORBIDDEN` |
 
 **예시**
 
@@ -532,6 +556,71 @@ public void updateProduct(String loginId, Long productId, ...) {
     }
 }
 ```
+
+---
+
+## 결정 14. Like 도메인 API URL 구조
+
+**결정**
+
+| 기능 | HTTP 메서드 | URL |
+|------|------------|-----|
+| 좋아요 등록 | `POST` | `/api/v1/products/{productId}/likes` |
+| 좋아요 취소 | `DELETE` | `/api/v1/products/{productId}/likes` |
+| 내 좋아요 목록 | `GET` | `/api/v1/users/{userId}/likes` |
+
+**이유**
+- 좋아요는 **상품 하위 리소스**다. `products/{productId}/likes`는 "해당 상품에 달린 좋아요"를 표현한다.
+- 등록·취소 모두 productId가 경로에 있으므로 요청 body가 필요 없다.
+- 내 좋아요 목록은 **유저 하위 리소스**다. `users/{userId}/likes`는 "해당 유저가 누른 좋아요 목록"을 표현한다.
+- `GET /api/v1/likes/products`처럼 기능 중심으로 URL을 설계하면 리소스 중심 REST 원칙에서 벗어난다.
+
+**파생 결정**
+- `LikeV1Dto.AddLikeRequest` (productId 담는 body DTO)는 불필요해 삭제한다.
+- 타인의 좋아요 목록 조회 시도 → FORBIDDEN 반환. (→ 결정 15 참고)
+
+---
+
+## 결정 15. 본인 소유 리소스 접근 시 FORBIDDEN 처리
+
+**결정**
+- 본인 소유가 아닌 리소스를 조회하려 할 때 `FORBIDDEN(403)`을 반환한다.
+- `ErrorType.FORBIDDEN`을 신규 추가하고 `HttpStatus.FORBIDDEN(403)`으로 매핑한다.
+
+**적용 대상**
+
+| 엔드포인트 | 조건 | 처리 위치 |
+|-----------|------|----------|
+| `GET /api/v1/orders/{orderId}` | 주문의 userId ≠ 요청자 userId | `OrderFacade.getOrder()` |
+| `GET /api/v1/users/{userId}/likes` | 경로 변수 userId ≠ 요청자 userId | `LikeV1Controller.getLikedProducts()` |
+
+**구현**
+
+```java
+// order/application/OrderFacade.java
+public OrderInfo getOrder(Long userId, Long orderId) {
+    OrderModel order = orderService.getOrThrow(orderRepository.find(orderId));
+    // [fix] 타인의 주문 조회 시 403 처리 누락
+    if (!order.getUserId().equals(userId)) {
+        throw new CoreException(ErrorType.FORBIDDEN, "본인의 주문만 조회할 수 있습니다.");
+    }
+    return OrderInfo.from(order);
+}
+
+// like/interfaces/LikeV1Controller.java
+@GetMapping("/api/v1/users/{userId}/likes")
+public ApiResponse<List<ProductInfo>> getLikedProducts(@CurrentUser LoginUser loginUser, @PathVariable Long userId) {
+    if (!loginUser.id().equals(userId)) {
+        throw new CoreException(ErrorType.FORBIDDEN, "본인의 좋아요 목록만 조회할 수 있습니다.");
+    }
+    return ApiResponse.success(likeFacade.getLikedProducts(loginUser.id()));
+}
+```
+
+**처리 레이어 선택 이유**
+- 주문 소유권은 DB를 조회해야 알 수 있으므로 Facade(로드 후 비교)에서 처리한다.
+- 좋아요 목록은 경로 변수만 비교하면 되므로 Controller에서 바로 처리한다.
+  (결정 13의 레이어별 예외 책임 원칙과 일치한다: 권한은 Facade, HTTP 요청 형식은 Interfaces)
 
 ---
 
