@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 @Table(name = "product")
 public class ProductModel extends BaseEntity {
 
+    private Long brandId;
     private String name;
     private String description;
     private Long price;
@@ -17,7 +18,10 @@ public class ProductModel extends BaseEntity {
 
     protected ProductModel() {}
 
-    public ProductModel(String name, String description, Long price, Integer stock) {
+    public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
+        if (brandId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
+        }
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -31,10 +35,15 @@ public class ProductModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
         }
 
+        this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
         this.stock = stock;
+    }
+
+    public Long getBrandId() {
+        return brandId;
     }
 
     public String getName() {

@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -10,10 +11,13 @@ import java.util.List;
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
+    private final ProductService productService;
+    private final BrandService brandService;
+
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        brandService.getBrand(brandId);
+        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
         return ProductInfo.from(product);
     }
 

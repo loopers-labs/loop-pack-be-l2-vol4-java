@@ -20,6 +20,7 @@ public class ProductV1Controller {
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
