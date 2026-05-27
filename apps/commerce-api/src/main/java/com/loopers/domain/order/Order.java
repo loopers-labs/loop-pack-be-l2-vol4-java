@@ -1,6 +1,7 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.order.vo.Orderer;
 import com.loopers.domain.order.vo.OrderPrice;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -38,8 +39,8 @@ import java.util.stream.Collectors;
 )
 public class Order extends BaseEntity {
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Embedded
+    private Orderer orderer;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "order_total_price", nullable = false))
@@ -55,15 +56,12 @@ public class Order extends BaseEntity {
     private List<OrderItem> items = new ArrayList<>();
 
     private Order(Long userId, List<OrderItem> items) {
-        this.userId = userId;
+        this.orderer = Orderer.of(userId);
         this.items = new ArrayList<>(items);
         this.orderTotalPrice = calculateTotalPrice(items);
     }
 
     public static Order create(Long userId, List<OrderItem> items) {
-        if (userId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 비어있을 수 없습니다.");
-        }
         validateItems(items);
         return new Order(userId, items);
     }
@@ -72,8 +70,12 @@ public class Order extends BaseEntity {
         return Collections.unmodifiableList(items);
     }
 
+    public Long getUserId() {
+        return orderer.userId();
+    }
+
     public boolean isOrderedBy(Long userId) {
-        return this.userId.equals(userId);
+        return orderer.isSameUser(userId);
     }
 
     public long getOrderTotalPrice() {

@@ -28,14 +28,14 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
         value = """
             select o.id
             from Order o
-            where o.userId = :userId
+            where o.orderer.userId = :userId
               and (:startAt is null or o.createdAt >= :startAt)
               and (:endBefore is null or o.createdAt < :endBefore)
             """,
         countQuery = """
             select count(o)
             from Order o
-            where o.userId = :userId
+            where o.orderer.userId = :userId
               and (:startAt is null or o.createdAt >= :startAt)
               and (:endBefore is null or o.createdAt < :endBefore)
             """
