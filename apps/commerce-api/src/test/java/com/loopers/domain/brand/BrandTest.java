@@ -50,6 +50,28 @@ class BrandTest {
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("이름이 20자를 초과하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNameExceedsMaxLength() {
+            // Arrange & Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                Brand.create("a".repeat(21))
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이름이 정확히 20자이면, 정상적으로 생성된다.")
+        @Test
+        void createsBrand_whenNameIsExactlyMaxLength() {
+            // Arrange & Act
+            Brand brand = Brand.create("a".repeat(20));
+
+            // Assert
+            assertThat(brand.getName()).hasSize(20);
+        }
     }
 
     @DisplayName("브랜드 이름을 수정할 때, ")

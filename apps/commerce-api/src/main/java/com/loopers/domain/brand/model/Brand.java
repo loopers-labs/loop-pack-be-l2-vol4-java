@@ -38,5 +38,8 @@ public class Brand extends BaseEntity {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
         }
+        if (name.length() > 20) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 20자를 초과할 수 없습니다.");
+        }
     }
 }

@@ -22,4 +22,9 @@ public class BrandRepositoryImpl implements BrandRepository {
     public Brand save(Brand brand) {
         return brandJpaRepository.save(brand);
     }
+
+    @Override
+    public boolean existsByName(String name) {
+        return brandJpaRepository.existsByName(name);
+    }
 }
