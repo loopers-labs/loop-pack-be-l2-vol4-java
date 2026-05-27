@@ -71,8 +71,10 @@ class StockServiceConcurrencyIntegrationTest {
                         startGate.await();
                         stockService.decrease(PRODUCT_ID, 1);
                         successCount.incrementAndGet();
-                    } catch (Exception ignored) {
-                        // lock timeout / conflict 등은 본 시나리오에서 발생하지 않아야 한다
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } catch (Exception e) {
+                        throw new AssertionError("재고 충분 시나리오에서 예상치 못한 예외", e);
                     } finally {
                         doneGate.countDown();
                     }
