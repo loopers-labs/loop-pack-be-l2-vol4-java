@@ -36,7 +36,15 @@ public class UserController {
         return ApiResponse.success(UserDto.UserResponse.from(info));
     }
 
-    @PatchMapping("/me/password")
+    @DeleteMapping("/me")
+    public ApiResponse<Void> withdraw(
+        @RequestAttribute("userId") Long userId
+    ) {
+        userFacade.withdraw(userId);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/password")
     public ApiResponse<Void> updatePassword(
         @RequestAttribute("userId") Long userId,
         @Valid @RequestBody UserDto.UpdatePasswordRequest request

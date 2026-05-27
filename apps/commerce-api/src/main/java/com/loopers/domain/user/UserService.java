@@ -17,6 +17,9 @@ public class UserService {
 
     @Transactional
     public UserModel signUp(UserModel user) {
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 이메일입니다.");
+        }
         user.encodePassword(passwordHasher);
         try {
             return userRepository.save(user);
@@ -58,17 +61,10 @@ public class UserService {
     }
 
     @Transactional
-    public void updatePassword(String loginId, String oldRawPassword, String newRawPassword) {
-        UserModel user = findUserOrThrow(loginId);
-
-        if (!passwordHasher.matches(oldRawPassword, user.getPassword())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "기존 비밀번호가 일치하지 않습니다.");
-        }
-        if (passwordHasher.matches(newRawPassword, user.getPassword())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다르게 설정해야 합니다.");
-        }
-        String validatedPassword = new PlainPassword(newRawPassword, user.getBirthDate()).value();
-        user.updatePassword(passwordHasher.hash(validatedPassword));
+    public void withdraw(Long userId) {
+        UserModel user = userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userId = " + userId + "] 유저를 찾을 수 없습니다."));
+        user.delete();
     }
 
     private UserModel findUserOrThrow(String loginId) {

@@ -29,8 +29,12 @@ public class LoginInterceptor implements HandlerInterceptor {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 필요합니다.");
         }
 
-        UserInfo user = userFacade.getUser(loginId, password);
-        request.setAttribute(USER_ID_ATTRIBUTE, user.id());
+        try {
+            UserInfo user = userFacade.getUser(loginId, password);
+            request.setAttribute(USER_ID_ATTRIBUTE, user.id());
+        } catch (CoreException e) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다.");
+        }
 
         return true;
     }

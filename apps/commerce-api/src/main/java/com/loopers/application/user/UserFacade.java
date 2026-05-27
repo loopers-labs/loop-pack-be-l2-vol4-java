@@ -29,11 +29,11 @@ public class UserFacade {
         return UserInfo.from(user);
     }
 
-    public void updatePassword(String loginId, String oldPassword, String newPassword) {
-        userService.updatePassword(loginId, oldPassword, newPassword);
-    }
-
     public void updatePassword(Long userId, String oldPassword, String newPassword) {
         userService.updatePassword(userId, oldPassword, newPassword);
+    }
+
+    public void withdraw(Long userId) {
+        userService.withdraw(userId);
     }
 }

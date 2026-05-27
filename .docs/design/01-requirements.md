@@ -98,7 +98,7 @@
 | password | String | 8~16자, 영문 대소문자+숫자+특수문자, 아래 형식의 생년월일 포함 불가: yyyyMMdd(8자리) / yyMMdd(6자리) / MMdd(4자리, 월일) — 연도 단독 출현은 허용 |
 | name | String | 필수 |
 | birthDate | LocalDate | 필수, 포맷 검증 |
-| email | String | 이메일 포맷 검증, 중복 불가 (탈퇴 계정 포함) |
+| email | String | 이메일 포맷 검증, 중복 불가 (탈퇴 계정 제외, 활성 계정만) |
 
 **내 정보 조회 응답**
 - 반환: 로그인 ID, 이름, 생년월일, 이메일
@@ -111,7 +111,7 @@
 
 **회원 탈퇴**
 - Soft Delete (`deleted_at` 기록)
-- 탈퇴 후 동일 이메일/로그인 ID로 재가입 가능
+- 탈퇴 후 동일 로그인 ID로 재가입 가능
 - Unique 제약은 활성 계정(`deleted_at IS NULL`)에만 적용 (MySQL Generated Column 활용)
 
 ---
@@ -190,7 +190,7 @@
 
 | 도메인 | 정책 | 비고 |
 |--------|------|------|
-| Member | Soft Delete (`deleted_at`) | 탈퇴 후 주문 이력 보존. 탈퇴 후 동일 이메일/로그인 ID 재가입 가능 |
+| Member | Soft Delete (`deleted_at`) | 탈퇴 후 주문 이력 보존. 탈퇴 후 동일 로그인 ID / 이메일 재가입 가능 |
 | Order | Soft Delete (`deleted_at`) | 취소 주문 이력 보존 |
 | Product | Soft Delete (`deleted_at`) | 판매 중단 후 주문 내역 조회 가능 |
 | Brand | Soft Delete (`deleted_at`) | 브랜드 삭제 시 연결 상품 연쇄 Soft Delete |

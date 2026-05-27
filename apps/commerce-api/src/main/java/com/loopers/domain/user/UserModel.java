@@ -12,15 +12,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
+@SQLRestriction("deleted_at IS NULL")
 public class UserModel extends BaseEntity {
 
     @Embedded
-    @AttributeOverride(name = "value", column = @Column(name = "login_id", unique = true))
+    @AttributeOverride(name = "value", column = @Column(name = "login_id"))
     private LoginId loginId;
 
     @Column(name = "password")
