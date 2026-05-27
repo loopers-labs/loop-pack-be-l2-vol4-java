@@ -1,5 +1,6 @@
 package com.loopers.domain.brand;
 
+import com.loopers.domain.brand.model.Brand;
 import com.loopers.domain.brand.repository.BrandRepository;
 import com.loopers.domain.brand.service.BrandDomainService;
 import com.loopers.support.error.CoreException;
@@ -8,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +26,40 @@ class BrandDomainServiceTest {
     void setUp() {
         brandRepository = mock(BrandRepository.class);
         brandDomainService = new BrandDomainService(brandRepository);
+    }
+
+    @DisplayName("브랜드를 조회할 때, ")
+    @Nested
+    class GetBrand {
+
+        @DisplayName("존재하는 ID이면, 브랜드를 반환한다.")
+        @Test
+        void returnsBrand_whenIdExists() {
+            // Arrange
+            Brand brand = Brand.create("나이키");
+            when(brandRepository.findById(1L)).thenReturn(Optional.of(brand));
+
+            // Act
+            Brand result = brandDomainService.getBrand(1L);
+
+            // Assert
+            assertThat(result.getName()).isEqualTo("나이키");
+        }
+
+        @DisplayName("존재하지 않는 ID이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            // Arrange
+            when(brandRepository.findById(99L)).thenReturn(Optional.empty());
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                brandDomainService.getBrand(99L)
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
     }
 
     @DisplayName("브랜드 이름 중복을 검증할 때, ")
