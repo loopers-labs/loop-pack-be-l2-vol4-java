@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductModel;
 public record ProductListItemInfo(
     Long id,
     Long brandId,
+    String brandName,
     String name,
     String description,
     String imageUrl,
@@ -17,10 +18,11 @@ public record ProductListItemInfo(
     Long likesCount,
     boolean liked
 ) {
-    public static ProductListItemInfo of(ProductModel product, boolean liked) {
+    public static ProductListItemInfo of(ProductModel product, String brandName, boolean liked) {
         return new ProductListItemInfo(
             product.getId(),
             product.getBrandId(),
+            brandName,
             product.getName(),
             product.getDescription(),
             product.getImageUrl(),

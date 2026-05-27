@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class BrandService {
@@ -25,6 +28,12 @@ public class BrandService {
         return brandRepository.find(id)
                 .filter(BrandModel::isActive)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
+    }
+
+    /** 여러 브랜드 일괄 조회 — 상품 목록의 brandName batch 조합용 (UC-03, N+1 회피). */
+    @Transactional(readOnly = true)
+    public List<BrandModel> findByIds(Collection<Long> ids) {
+        return brandRepository.findByIds(ids);
     }
 
     /**

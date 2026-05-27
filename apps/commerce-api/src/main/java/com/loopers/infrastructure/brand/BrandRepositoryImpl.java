@@ -7,6 +7,8 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -42,5 +44,15 @@ public class BrandRepositoryImpl implements BrandRepository {
     @Override
     public Optional<BrandModel> find(Long id) {
         return brandJpaRepository.findById(id).map(BrandEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<BrandModel> findByIds(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return brandJpaRepository.findAllById(ids).stream()
+                .map(BrandEntityMapper::toDomain)
+                .toList();
     }
 }

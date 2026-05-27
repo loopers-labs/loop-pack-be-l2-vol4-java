@@ -49,6 +49,7 @@ public class ProductV1Dto {
     public record ProductListItemResponse(
         Long id,
         Long brandId,
+        String brandName,
         String name,
         String description,
         String imageUrl,
@@ -61,6 +62,7 @@ public class ProductV1Dto {
             return new ProductListItemResponse(
                 info.id(),
                 info.brandId(),
+                info.brandName(),
                 info.name(),
                 info.description(),
                 info.imageUrl(),

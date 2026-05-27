@@ -140,6 +140,19 @@ class ProductV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+
+        @DisplayName("목록 응답에 각 상품의 브랜드명이 포함된다. (batch 조합)")
+        @Test
+        void includesBrandName() {
+            Long brandId = createBrand("나이키");
+            createProduct(brandId, "에어맥스", 139000L);
+
+            List<ProductV1Dto.ProductListItemResponse> items = testRestTemplate.exchange(
+                    PRODUCTS_PATH, HttpMethod.GET, HttpEntity.EMPTY, ITEM_LIST_TYPE).getBody().data();
+
+            assertThat(items).hasSize(1);
+            assertThat(items.get(0).brandName()).isEqualTo("나이키");
+        }
     }
 
     // --- 좋아요 여부 표시 (UC-03 step3) ---

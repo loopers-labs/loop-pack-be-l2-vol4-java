@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -49,11 +51,19 @@ public class ProductFacade {
      */
     public List<ProductListItemInfo> getProducts(Long brandId, ProductSortType sort, int page, int size, Long userId) {
         List<ProductModel> products = productService.getProducts(brandId, sort, page, size);
+
+        // 브랜드명: brandId들을 모아 한 번에 조회(batch) → N+1 회피
+        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
+        Map<Long, String> brandNames = brandService.findByIds(brandIds).stream()
+            .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
+
+        // 좋아요 여부: 식별된 User만, 역시 batch
         Set<Long> likedIds = (userId == null)
             ? Set.of()
             : likeService.findLikedProductIds(userId, products.stream().map(ProductModel::getId).toList());
+
         return products.stream()
-            .map(p -> ProductListItemInfo.of(p, likedIds.contains(p.getId())))
+            .map(p -> ProductListItemInfo.of(p, brandNames.get(p.getBrandId()), likedIds.contains(p.getId())))
             .toList();
     }
 
