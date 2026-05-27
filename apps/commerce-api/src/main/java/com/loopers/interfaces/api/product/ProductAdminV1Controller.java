@@ -1,6 +1,8 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductService;
+import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.SortType;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +26,18 @@ public class ProductAdminV1Controller {
 
     private final ProductService productService;
 
-    /** FR-PA-00. 상품 목록 조회 (어드민) */
+    /** FR-PA-00. 상품 목록 조회 (어드민)
+     *  sort: latest(기본) | price_asc | likes_desc
+     */
     @GetMapping
     public ApiResponse<Page<ProductV1Dto.ProductResponse>> getProducts(
         @RequestParam(required = false) Long brandId,
+        @RequestParam(name = "sort", defaultValue = "latest") String sort,
         @PageableDefault(size = 20) Pageable pageable
     ) {
+        ProductSearchCondition condition = ProductSearchCondition.of(brandId, SortType.from(sort));
         return ApiResponse.success(
-            productService.getAll(pageable, brandId).map(ProductV1Dto.ProductResponse::from)
+            productService.getAll(pageable, condition).map(ProductV1Dto.ProductResponse::from)
         );
     }
 

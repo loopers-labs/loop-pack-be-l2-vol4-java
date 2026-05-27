@@ -2,9 +2,13 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.SortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -38,11 +42,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Page<ProductModel> findAllActive(Pageable pageable, Long brandId) {
-        if (brandId != null) {
-            return productJpaRepository.findAllByBrand_IdAndDeletedAtIsNull(brandId, pageable);
+    public Page<ProductModel> findAllActive(Pageable pageable, ProductSearchCondition condition) {
+        Sort sort = toSort(condition.sortType());
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        if (condition.brandId() != null) {
+            return productJpaRepository.findAllByBrand_IdAndDeletedAtIsNull(condition.brandId(), sorted);
         }
-        return productJpaRepository.findAllByDeletedAtIsNull(pageable);
+        return productJpaRepository.findAllByDeletedAtIsNull(sorted);
     }
 
     @Override
@@ -58,5 +65,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public void decrementLikeCount(Long productId) {
         productJpaRepository.decrementLikeCount(productId);
+    }
+
+    private Sort toSort(SortType sortType) {
+        return switch (sortType) {
+            case PRICE_ASC  -> Sort.by(Sort.Direction.ASC, "price");
+            case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount");
+            default         -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 }

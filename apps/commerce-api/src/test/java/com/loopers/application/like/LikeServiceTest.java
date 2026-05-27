@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ class LikeServiceTest {
     void setUp() {
         BrandModel brand = new BrandModel("Nike", "스포츠 브랜드");
         activeProduct = new ProductModel(brand, "나이키 에어맥스", 150_000);
+        ReflectionTestUtils.setField(activeProduct, "id", PRODUCT_ID); // JPA 없이 ID 주입
         deletedProduct = new ProductModel(brand, "단종 상품", 100_000);
         deletedProduct.delete();
     }

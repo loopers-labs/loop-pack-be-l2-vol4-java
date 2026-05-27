@@ -1,5 +1,6 @@
 package com.loopers.application.brand;
 
+import com.loopers.application.product.ProductService;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
@@ -35,6 +36,9 @@ class BrandServiceTest {
 
     @Mock
     private BrandRepository brandRepository;
+
+    @Mock
+    private ProductService productService;
 
     private BrandModel brand;
 
@@ -225,7 +229,7 @@ class BrandServiceTest {
     @Nested
     class Delete {
 
-        @DisplayName("존재하는 브랜드 삭제 시 소프트딜리트 후 저장된다.")
+        @DisplayName("존재하는 브랜드 삭제 시 소프트딜리트 후 저장되고, 소속 상품도 연쇄 삭제된다.")
         @Test
         void softDeletesBrand_whenBrandExists() {
             // arrange
@@ -238,6 +242,7 @@ class BrandServiceTest {
             // assert
             assertThat(brand.isDeleted()).isTrue();
             then(brandRepository).should().save(brand);
+            then(productService).should().deleteAllByBrandId(1L); // 연쇄 소프트딜리트 확인
         }
 
         @DisplayName("존재하지 않는 ID 삭제 시 NOT_FOUND 예외가 발생한다.")

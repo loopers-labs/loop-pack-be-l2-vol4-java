@@ -4,6 +4,8 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.SortType;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
@@ -161,12 +163,13 @@ class ProductServiceTest {
         void returnsPageOfProductInfo_whenProductsExist() {
             // arrange
             Pageable pageable = PageRequest.of(0, 20);
+            ProductSearchCondition condition = ProductSearchCondition.of(null, SortType.LATEST);
             Page<ProductModel> page = new PageImpl<>(List.of(product), pageable, 1);
-            given(productRepository.findAllActive(pageable, null)).willReturn(page);
+            given(productRepository.findAllActive(pageable, condition)).willReturn(page);
             given(stockRepository.findByProductId(product.getId())).willReturn(Optional.of(stock));
 
             // act
-            Page<ProductInfo> result = productService.getAll(pageable, null);
+            Page<ProductInfo> result = productService.getAll(pageable, condition);
 
             // assert
             assertThat(result.getTotalElements()).isEqualTo(1);

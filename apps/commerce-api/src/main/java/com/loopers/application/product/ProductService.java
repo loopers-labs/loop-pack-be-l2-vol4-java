@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSearchCondition;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
@@ -49,8 +50,8 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductInfo> getAll(Pageable pageable, Long brandId) {
-        return productRepository.findAllActive(pageable, brandId)
+    public Page<ProductInfo> getAll(Pageable pageable, ProductSearchCondition condition) {
+        return productRepository.findAllActive(pageable, condition)
             .map(product -> {
                 StockModel stock = stockRepository.findByProductId(product.getId())
                     .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));

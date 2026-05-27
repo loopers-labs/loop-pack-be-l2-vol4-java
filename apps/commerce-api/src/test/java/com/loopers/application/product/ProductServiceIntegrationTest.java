@@ -2,6 +2,8 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.SortType;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -129,7 +131,9 @@ class ProductServiceIntegrationTest {
             productService.delete(deleted.id());
 
             // act
-            Page<ProductInfo> result = productService.getAll(PageRequest.of(0, 20), null);
+            Page<ProductInfo> result = productService.getAll(
+                PageRequest.of(0, 20), ProductSearchCondition.of(null, SortType.LATEST)
+            );
 
             // assert
             assertThat(result.getTotalElements()).isEqualTo(1);
@@ -145,7 +149,9 @@ class ProductServiceIntegrationTest {
             productService.create(new ProductCreateCommand(anotherBrand.getId(), "아디다스 삼바", 120_000, 20));
 
             // act
-            Page<ProductInfo> result = productService.getAll(PageRequest.of(0, 20), savedBrand.getId());
+            Page<ProductInfo> result = productService.getAll(
+                PageRequest.of(0, 20), ProductSearchCondition.of(savedBrand.getId(), SortType.LATEST)
+            );
 
             // assert
             assertThat(result.getTotalElements()).isEqualTo(1);
