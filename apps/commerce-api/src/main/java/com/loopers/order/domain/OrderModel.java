@@ -1,0 +1,45 @@
+package com.loopers.order.domain;
+
+import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+
+import java.util.List;
+
+@Entity
+@Table(name = "orders")
+public class OrderModel extends BaseEntity {
+
+    private Long userId;
+
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItemModel> items;
+
+    protected OrderModel() {}
+
+    public OrderModel(Long userId, List<OrderItemModel> items) {
+        if (userId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "userId는 비어있을 수 없습니다.");
+        }
+        if (items == null || items.isEmpty()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
+        }
+
+        this.userId = userId;
+        this.items = items;
+        this.status = OrderStatus.ORDERED;
+    }
+
+    public Long getUserId() { return userId; }
+    public OrderStatus getStatus() { return status; }
+    public List<OrderItemModel> getItems() { return items; }
+}
