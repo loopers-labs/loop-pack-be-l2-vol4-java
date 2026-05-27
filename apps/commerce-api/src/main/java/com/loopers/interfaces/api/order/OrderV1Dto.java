@@ -4,14 +4,21 @@ import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderItemInfo;
 import com.loopers.application.order.OrderLineCommand;
 import com.loopers.domain.order.OrderStatus;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.time.ZonedDateTime;
 import java.util.List;
 
 public class OrderV1Dto {
 
-    public record CreateRequest(List<Line> items) {
-        public record Line(Long productId, Integer quantity) {
+    public record CreateRequest(@NotEmpty @Valid List<Line> items) {
+        public record Line(
+            @NotNull @Positive Long productId,
+            @NotNull @Positive Integer quantity
+        ) {
             public OrderLineCommand toCommand() {
                 return new OrderLineCommand(productId, quantity);
             }
