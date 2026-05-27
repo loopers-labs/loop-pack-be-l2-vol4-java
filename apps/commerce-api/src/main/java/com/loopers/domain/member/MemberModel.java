@@ -66,11 +66,6 @@ public class MemberModel extends BaseEntity {
         this.password = encryptedPassword;
     }
 
-    public String getMaskedName() {
-        if (name == null || name.isEmpty()) return name;
-        return name.substring(0, name.length() - 1) + "*";
-    }
-
     public static void validateLoginId(String loginId) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.INVALID_LOGIN_ID);

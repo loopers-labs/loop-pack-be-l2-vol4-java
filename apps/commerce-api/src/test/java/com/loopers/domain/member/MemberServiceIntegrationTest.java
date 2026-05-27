@@ -80,7 +80,23 @@ class MemberServiceIntegrationTest {
 
         // then
         assertThat(result.loginId()).isEqualTo(loginId);
-        assertThat(result.name()).isEqualTo("홍길*"); // 도메인 모델의 마스킹 규칙 적용 확인
+        assertThat(result.name()).isEqualTo("홍길*"); // 마스킹 확인
+    }
+
+    @Test
+    @DisplayName("이름이 2글자인 경우 끝자리만 마스킹된다.")
+    void getMember_TwoCharsName_ShouldMaskLast() {
+        // given
+        String loginId = "tester01";
+        String password = "Password123!";
+        String name = "홍길";
+        memberService.signUp(loginId, password, name, LocalDate.of(1990, 1, 1), "tester01@example.com");
+
+        // when
+        MemberInfo result = memberService.getMember(loginId, password);
+
+        // then
+        assertThat(result.name()).isEqualTo("홍*");
     }
 
     @Test

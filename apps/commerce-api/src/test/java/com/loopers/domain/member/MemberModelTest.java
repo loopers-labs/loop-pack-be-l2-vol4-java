@@ -181,32 +181,4 @@ class MemberModelTest {
                 .build();
         assertThat(member.getEmail()).isEqualTo(validEmail);
     }
-
-    @Test
-    @DisplayName("이름 마스킹이 정상적으로 수행된다.")
-    void getMaskedName_ShouldMaskName() {
-        MemberModel member = MemberModel.builder()
-                .loginId("tester01")
-                .password("Password123!")
-                .name("홍길동")
-                .birthDate(LocalDate.of(1990, 1, 1))
-                .email("tester@example.com")
-                .build();
-        
-        assertThat(member.getMaskedName()).isEqualTo("홍길*");
-    }
-
-    @Test
-    @DisplayName("이름이 2글자인 경우 끝자리만 마스킹된다.")
-    void getMaskedName_TwoChars_ShouldMaskLast() {
-        MemberModel member = MemberModel.builder()
-                .loginId("tester01")
-                .password("Password123!")
-                .name("홍길")
-                .birthDate(LocalDate.of(1990, 1, 1))
-                .email("tester@example.com")
-                .build();
-        
-        assertThat(member.getMaskedName()).isEqualTo("홍*");
-    }
 }

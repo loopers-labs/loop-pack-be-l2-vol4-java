@@ -75,6 +75,6 @@ public class MemberService {
             throw new CoreException(ErrorType.PASSWORD_MISMATCH);
         }
 
-        return MemberInfo.from(member);
+        return MemberInfo.fromMasked(member);
     }
 }

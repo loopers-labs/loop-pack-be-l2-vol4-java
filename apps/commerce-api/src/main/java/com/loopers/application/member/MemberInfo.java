@@ -13,9 +13,25 @@ public record MemberInfo(
     public static MemberInfo from(MemberModel model) {
         return new MemberInfo(
                 model.getLoginId(),
-                model.getMaskedName(),
+                model.getName(),
                 model.getBirthDate(),
                 model.getEmail()
         );
+    }
+
+    public static MemberInfo fromMasked(MemberModel model) {
+        return new MemberInfo(
+                model.getLoginId(),
+                maskName(model.getName()),
+                model.getBirthDate(),
+                model.getEmail()
+        );
+    }
+
+    private static String maskName(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        return name.substring(0, name.length() - 1) + "*";
     }
 }
