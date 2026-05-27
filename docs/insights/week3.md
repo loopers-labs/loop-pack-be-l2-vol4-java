@@ -133,3 +133,59 @@ register()
 
 - **오해:** Info 객체 = HTTP 응답 DTO → interface 레이어 소속
 - **정정:** `BrandInfo`는 HTTP와 무관한 application 레이어의 출력 계약 객체다. HTTP 응답 형태는 `BrandResponse`(interface 레이어)가 담당한다.
+
+---
+
+---
+
+> 날짜: 2026-05-28
+
+---
+
+## 개념 정리
+
+### `GenerationType.IDENTITY`에서 save() 후 getId()는 DB를 다시 조회하는가?
+
+**아니다.** `IDENTITY` 전략은 `save()` 호출 시 즉시 INSERT를 실행하고, DB가 생성한 ID를 JPA가 곧바로 엔티티 객체 메모리에 채워준다.
+
+```java
+Product product = productDomainService.createProduct(...);  // 여기서 INSERT + ID 채워짐
+stockDomainService.createStock(product.getId(), qty);        // 메모리 필드 읽기, DB 조회 없음
+```
+
+`SEQUENCE` 전략이었다면 Hibernate가 INSERT를 지연할 수 있어 다를 수 있지만, `IDENTITY`는 항상 즉시 실행이므로 안전하다.
+
+---
+
+### 상품 등록 시 트랜잭션을 어디서 묶는가?
+
+상품 저장과 재고 생성은 반드시 같이 성공하거나 같이 실패해야 한다. 한쪽만 성공하면 시스템 불일치 상태가 된다.
+
+```java
+// ProductApplicationService
+@Transactional
+public Product createProduct(...) {
+    brandDomainService.getBrand(brandId);       // 브랜드 존재 확인
+    Product product = productDomainService.createProduct(...);  // 상품 저장
+    stockDomainService.createStock(product.getId(), qty);       // 재고 생성
+    return product;
+}
+```
+
+`@Transactional`은 ApplicationService에. DomainService들은 이 트랜잭션 안에서 같이 실행된다.
+
+---
+
+## 설계 결정
+
+### 브랜드 삭제 시 상품 cascade는 Product 재설계 이후에 추가한다
+
+- **결정:** 브랜드 삭제 API 구현 시 브랜드 소프트딜리트만 처리. 상품 cascade 처리는 Product 도메인 재설계(Block 3) 완료 후 `BrandApplicationService.delete()`에 추가
+- **이유:** 현재 Product 도메인이 재설계 중이라 cascade 코드를 지금 작성하면 이중 작업이 발생함. ProductService의 `softDeleteByBrandId()`가 완성된 후 연결하는 것이 안전함
+
+---
+
+### Product 도메인을 ProductModel에서 Product로 전면 재설계한다
+
+- **결정:** 기존 `ProductModel`(stock 인라인, brandId 없음)을 삭제하고 `Product` 엔티티로 재작성
+- **이유:** week2 설계 문서 기준과 불일치. `Stock`을 독립 도메인으로 분리하고 `brandId`, `likeCount`를 추가해 설계 의도대로 맞춤
