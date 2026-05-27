@@ -552,7 +552,7 @@ public ProductInfo getProductDetail(Long id) {
 
 | 레이어 | 책임 | 예시 |
 |--|--|--|
-| **Model** | 비즈니스 규칙 위반 | `decrementStock` → 재고 부족 시 `BAD_REQUEST` |
+| **Model / VO** | 비즈니스 규칙 위반 | `ProductModel.decreaseStock` → `Stock.decrease()`가 재고 부족 시 `BAD_REQUEST`; `Price` 생성 시 null·음수 검증 (→ 결정 16 참고) |
 | **Service** | 존재 여부 검증 | `getOrThrow(Optional)` → 없으면 `NOT_FOUND` |
 | **Facade** | DB 조회가 필요한 권한·크로스 도메인 검증 | 주문 소유권 확인 (DB 조회 후 userId 비교) → `FORBIDDEN` |
 | **Interfaces** | HTTP 요청 형식 검증, DB 조회 없이 경로 변수만으로 판단 가능한 권한 확인 | `@Valid` DTO 검증; `userId` 불일치 → `FORBIDDEN` |
@@ -650,6 +650,89 @@ public ApiResponse<List<ProductInfo>> getLikedProducts(@CurrentUser LoginUser lo
 
 ---
 
+## 결정 16. Value Object — Price, Stock
+
+**결정**
+- `Price`(가격)와 `Stock`(재고)를 `product/domain/`에 Value Object(VO)로 분리한다.
+- Java `record`로 구현하며, JPA Entity 필드(`Long price`, `Integer stock`)는 그대로 유지한다.
+
+**도입 배경 — 중복 문제**
+
+VO 도입 전, 동일한 검증 로직이 세 곳에 분산되어 있었다:
+
+```java
+// ProductModel 생성자
+if (price == null) throw new CoreException(BAD_REQUEST, "가격은 비어있을 수 없습니다.");
+if (price < 0)    throw new CoreException(BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+
+// ProductModel.update() — 동일 검증 반복
+// OrderItemModel 생성자 — 동일 검증 반복
+```
+
+재고 차감 규칙(`decreaseStock`)도 `ProductModel` 안에 직접 구현되어 있어,
+재고 개념의 규칙이 Entity 전체에 산재했다.
+
+**설계**
+
+```java
+// product/domain/Price.java — 가격 검증 내재화
+public record Price(Long value) {
+    public Price {
+        if (value == null) throw new CoreException(BAD_REQUEST, "가격은 비어있을 수 없습니다.");
+        if (value < 0)    throw new CoreException(BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+    }
+}
+
+// product/domain/Stock.java — 재고 검증 + 차감 규칙 내재화
+public record Stock(Integer value) {
+    public Stock {
+        if (value == null) throw new CoreException(BAD_REQUEST, "재고는 비어있을 수 없습니다.");
+        if (value < 0)    throw new CoreException(BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+    }
+
+    public Stock decrease(int quantity) {
+        if (quantity <= 0) throw new CoreException(BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
+        if (this.value < quantity) throw new CoreException(BAD_REQUEST, "재고가 부족합니다.");
+        return new Stock(this.value - quantity);
+    }
+}
+```
+
+**JPA 필드와의 관계**
+
+`ProductModel`의 JPA 필드(`Long price`, `Integer stock`)는 그대로 유지한다.
+DB 스키마 변경 없이 도입할 수 있으며, 생성·수정·차감 시 VO를 경유해 검증한 뒤 primitive 값을 저장한다.
+
+```java
+// ProductModel 생성자·update
+this.price = new Price(price).value();
+this.stock = new Stock(stock).value();
+
+// ProductModel.decreaseStock
+this.stock = new Stock(this.stock).decrease(quantity).value();
+```
+
+**효과**
+
+| | Before | After |
+|---|---|---|
+| 가격 검증 | 생성자·`update`·`OrderItemModel` 3곳에 중복 | `Price` 1곳 |
+| 재고 음수 방지 | `ProductModel`에 산재 | `Stock` 자체가 불변으로 보장 |
+| 차감 규칙 | `ProductModel.decreaseStock`에 직접 구현 | `Stock.decrease()`로 캡슐화 |
+| 검증 규칙 변경 시 | 여러 파일 수정 필요 | `Price` / `Stock` 1곳만 수정 |
+
+**테스트 책임 분리**
+
+| 테스트 파일 | 담당 |
+|---|---|
+| `PriceTest` | 가격 null·음수·0·양수 생성 케이스 |
+| `StockTest` | 재고 null·음수·0·양수 생성 케이스 + 차감 케이스 |
+| `ProductModelTest` | 상품명·설명 검증 (ProductModel 고유 책임) + 정상 생성·수정 확인 |
+
+가격·재고 검증 테스트가 `ProductModelTest`에서 `PriceTest`/`StockTest`로 이동해 책임이 명확해졌다.
+
+---
+
 ## 전체 패키지 스케치
 
 ```
@@ -706,7 +789,9 @@ com.loopers/
 │   │   ├── ProductModel.java
 │   │   ├── ProductRepository.java
 │   │   ├── ProductService.java
-│   │   └── SortCondition.java
+│   │   ├── SortCondition.java
+│   │   ├── Price.java          ← VO
+│   │   └── Stock.java          ← VO
 │   ├── application/
 │   │   ├── ProductFacade.java
 │   │   └── ProductInfo.java

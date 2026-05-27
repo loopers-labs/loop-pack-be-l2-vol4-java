@@ -26,23 +26,10 @@ public class ProductModel extends BaseEntity {
         if (description == null || description.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
         }
-        if (price == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 비어있을 수 없습니다.");
-        }
-        if (price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (stock == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 비어있을 수 없습니다.");
-        }
-        if (stock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
-        }
-
         this.name = name;
         this.description = description;
-        this.price = price;
-        this.stock = stock;
+        this.price = new Price(price).value();
+        this.stock = new Stock(stock).value();
         this.brandId = brandId;
     }
 
@@ -53,32 +40,14 @@ public class ProductModel extends BaseEntity {
         if (description == null || description.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
         }
-        if (price == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 비어있을 수 없습니다.");
-        }
-        if (price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (stock == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 비어있을 수 없습니다.");
-        }
-        if (stock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
-        }
         this.name = name;
         this.description = description;
-        this.price = price;
-        this.stock = stock;
+        this.price = new Price(price).value();
+        this.stock = new Stock(stock).value();
     }
 
     public void decreaseStock(int quantity) {
-        if (quantity <= 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
-        }
-        if (this.stock < quantity) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
-        }
-        this.stock -= quantity;
+        this.stock = new Stock(this.stock).decrease(quantity).value();
     }
 
     public String getName() { return name; }
