@@ -22,8 +22,19 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public Optional<ProductModel> findById(Long id) {
+        return productJpaRepository.findById(id);
+    }
+
+    @Override
     public Optional<ProductModel> findActiveById(Long id) {
         return productJpaRepository.findByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
+    public List<ProductModel> findAllActiveByIds(List<Long> ids) {
+        if (ids.isEmpty()) return List.of();
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids);
     }
 
     @Override

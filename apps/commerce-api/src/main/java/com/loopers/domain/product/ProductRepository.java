@@ -8,7 +8,9 @@ import java.util.Optional;
 
 public interface ProductRepository {
     ProductModel save(ProductModel product);
-    Optional<ProductModel> findActiveById(Long id);
+    Optional<ProductModel> findById(Long id);           // 삭제 여부 무관 (소유권 검증 등)
+    Optional<ProductModel> findActiveById(Long id);     // 활성 상품만
     Page<ProductModel> findAllActive(Pageable pageable, Long brandId);
+    List<ProductModel> findAllActiveByIds(List<Long> ids);
     List<ProductModel> findAllByBrandId(Long brandId);
 }
