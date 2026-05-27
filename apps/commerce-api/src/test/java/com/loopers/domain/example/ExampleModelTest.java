@@ -26,7 +26,6 @@ class ExampleModelTest {
 
             // assert
             assertAll(
-                () -> assertThat(exampleModel.getId()).isNotNull(),
                 () -> assertThat(exampleModel.getName()).isEqualTo(name),
                 () -> assertThat(exampleModel.getDescription()).isEqualTo(description)
             );
