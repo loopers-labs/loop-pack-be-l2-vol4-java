@@ -15,6 +15,7 @@
 - **soft delete 필터링은 이름에 담는다**: `deletedAt IS NULL`만 조회하는 연산은 `*Active*`로 명시한다(예: `getActiveById`, `findActiveByLoginId`, `existsActiveByName`). 활성 필터링은 숨은 동작이 아니라 메서드 이름으로 드러낸다. 단, DB 전체 컬럼 unique 제약이 걸린 중복 검사(`existsByLoginId`/`existsByEmail`)는 전체 행을 대상으로 두어 제약과 정합을 맞춘다.
 - 도메인 패키지(`domain.<domain>`)에 위치한다. `infrastructure` 패키지에 두지 않는다.
 - 도메인이 이 인터페이스에만 의존하므로, JPA·DB 구현체를 교체해도 도메인 코드는 변경되지 않는다.
+- **read-model projection**: 조회 전용 결과(좋아요 수 집계·브랜드명 조인 등 엔티티에 없는 형태)를 반환할 때는 엔티티·VO가 아닌 순수 `record`를 `domain.<domain>.projection` 하위 패키지에 두고 Repository가 그 타입을 반환한다(예: `ProductSummary`·`ProductDetail`·`ProductAdminView`). 파생값은 projection 생성자에서 계산할 수 있다(예: 위임 생성자가 `stock`을 받아 `isAvailable = stock > 0`). 엔티티 반환만으로 충분하면 projection을 만들지 않는다.
 
 ## 핵심 발췌
 ```java

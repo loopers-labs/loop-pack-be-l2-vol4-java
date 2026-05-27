@@ -2,7 +2,7 @@
 
 소스: `docs/volume-2/` (01-requirements · 02-sequence-diagrams · 03-class-diagram · 04-erd)
 출력: `docs/volume-3/`
-현재: LIK-1·LIK-2 2개 cycle 완료 → 다음 PRD-1(상품 목록, public) 대기.
+현재: PRD-1·PRD-2·PRD-3·PRD-4·LIK-3 5개 배치 commit 완료. 다음 배치(ORD-1~) 대기.
 
 총 22개 cycle. User 도메인은 volume-1에서 완료된 정식 참조 구현이라 대상에서 제외.
 
@@ -19,11 +19,11 @@
 | 9 | BRD-6 | 브랜드 삭제(+상품 cascade) | Brand | Product(soft delete) | commit | ✅ done |
 | 10 | LIK-1 | 좋아요 등록 | Like | Product, User | commit | ✅ done |
 | 11 | LIK-2 | 좋아요 취소 | Like | Product, User | commit | ✅ done |
-| 12 | PRD-1 | 상품 목록(public, 좋아요 수) | Product | Like(집계) | - | ⬜ todo |
-| 13 | PRD-2 | 상품 상세(public, 좋아요 수) | Product | Like(집계) | - | ⬜ todo |
-| 14 | PRD-3 | 상품 목록(admin) | Product | PRD-5 | - | ⬜ todo |
-| 15 | PRD-4 | 상품 상세(admin) | Product | PRD-5 | - | ⬜ todo |
-| 16 | LIK-3 | 좋아요한 상품 목록 | Like | PRD-1 projection | - | ⬜ todo |
+| 12 | PRD-1 | 상품 목록(public, 좋아요 수) | Product | Like(집계) | commit | ✅ done |
+| 13 | PRD-2 | 상품 상세(public, 좋아요 수) | Product | Like(집계) | commit | ✅ done |
+| 14 | PRD-3 | 상품 목록(admin) | Product | PRD-5 | commit | ✅ done |
+| 15 | PRD-4 | 상품 상세(admin) | Product | PRD-5 | commit | ✅ done |
+| 16 | LIK-3 | 좋아요한 상품 목록 | Like | PRD-1 projection | commit | ✅ done |
 | 17 | ORD-1 | 단건 주문 | Order | Product, User | - | ⬜ todo |
 | 18 | ORD-2 | 다중 항목 주문 | Order | ORD-1 | - | ⬜ todo |
 | 19 | ORD-4 | 본인 주문 상세 | Order | ORD-1 | - | ⬜ todo |
