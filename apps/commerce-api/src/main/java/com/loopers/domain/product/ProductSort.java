@@ -2,41 +2,22 @@ package com.loopers.domain.product;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 
+@RequiredArgsConstructor
 public enum ProductSort {
-    LATEST {
-        @Override
-        public Sort toSort() {
-            return Sort.by(Sort.Direction.DESC, "createdAt");
-        }
-    },
-    PRICE_ASC {
-        @Override
-        public Sort toSort() {
-            return Sort.by(Sort.Direction.ASC, "price");
-        }
-    },
-    PRICE_DESC {
-        @Override
-        public Sort toSort() {
-            return Sort.by(Sort.Direction.DESC, "price");
-        }
-    },
-    LIKE_ASC {
-        @Override
-        public Sort toSort() {
-            return Sort.by(Sort.Direction.ASC, "likeCount");
-        }
-    },
-    LIKE_DESC {
-        @Override
-        public Sort toSort() {
-            return Sort.by(Sort.Direction.DESC, "likeCount");
-        }
-    };
+    LATEST(Sort.by(Sort.Direction.DESC, "createdAt")),
+    PRICE_ASC(Sort.by(Sort.Direction.ASC, "price")),
+    PRICE_DESC(Sort.by(Sort.Direction.DESC, "price")),
+    LIKE_ASC(Sort.by(Sort.Direction.ASC, "likeCount")),
+    LIKE_DESC(Sort.by(Sort.Direction.DESC, "likeCount"));
 
-    public abstract Sort toSort();
+    private final Sort sort;
+
+    public Sort toSort() {
+        return sort;
+    }
 
     public static ProductSort from(String value) {
         if (value == null) {
