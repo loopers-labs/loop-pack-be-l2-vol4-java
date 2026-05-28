@@ -36,21 +36,18 @@ public class StockService {
     public void confirm(UUID productId, int qty) {
         StockModel stock = getByProductId(productId);
         stock.confirm(qty);
-        stockRepository.save(stock);
     }
 
     /** 결제 실패/만료 — reserved만 해제 */
     public void release(UUID productId, int qty) {
         StockModel stock = getByProductId(productId);
         stock.release(qty);
-        stockRepository.save(stock);
     }
 
     /** 주문 취소(confirm 이후) — total 복구 */
     public void restore(UUID productId, int qty) {
         StockModel stock = getByProductId(productId);
         stock.restore(qty);
-        stockRepository.save(stock);
     }
 
     /**

@@ -40,12 +40,11 @@ public class BrandService {
     public BrandModel update(UUID id, String name, String description) {
         BrandModel brand = get(id);
         brand.update(name, description);
-        return brandRepository.save(brand);
+        return brand;
     }
 
     public void delete(UUID id) {
         BrandModel brand = get(id);
         brand.delete();
-        brandRepository.save(brand);
     }
 }

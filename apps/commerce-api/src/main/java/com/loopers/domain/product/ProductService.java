@@ -45,13 +45,12 @@ public class ProductService {
     public ProductModel update(UUID id, String name, String description, Long price) {
         ProductModel product = get(id);
         product.update(name, description, price);
-        return productRepository.save(product);
+        return product;
     }
 
     public void delete(UUID id) {
         ProductModel product = get(id);
         product.delete();
-        productRepository.save(product);
     }
 
     /**
@@ -60,9 +59,6 @@ public class ProductService {
      */
     public void deleteByBrand(UUID brandId) {
         List<ProductModel> products = productRepository.findAllByBrandId(brandId);
-        products.forEach(p -> {
-            p.delete();
-            productRepository.save(p);
-        });
+        products.forEach(ProductModel::delete);
     }
 }
