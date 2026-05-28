@@ -1,24 +1,23 @@
 package com.loopers.application.product;
 
+import com.loopers.application.brand.BrandInfo;
+import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductStockModel;
 
-public record ProductInfo(
+public record ProductDetailInfo(
         Long id,
-        Long brandId,
         String name,
         String description,
         Long price,
-        Integer stock
+        BrandInfo brand
 ) {
-    public static ProductInfo from(ProductModel product, ProductStockModel stock) {
-        return new ProductInfo(
+    public static ProductDetailInfo from(ProductModel product, BrandModel brand) {
+        return new ProductDetailInfo(
                 product.getId(),
-                product.getBrandId(),
                 product.getName().value(),
                 product.getDescription().value(),
                 product.getPrice().value(),
-                stock.getStock().value()
+                BrandInfo.from(brand)
         );
     }
 }

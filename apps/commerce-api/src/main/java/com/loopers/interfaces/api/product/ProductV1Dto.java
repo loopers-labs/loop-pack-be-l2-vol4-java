@@ -1,36 +1,36 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductDetailInfo;
+import com.loopers.application.product.ProductSummaryInfo;
+import com.loopers.interfaces.api.brand.BrandV1Dto;
 
 public class ProductV1Dto {
-    public record CreateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
 
-    public record UpdateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
-
-    public record ProductResponse(
-        Long id,
-        String name,
-        String description,
-        Long price,
-        Integer stock
+    public record ProductSummaryResponse(
+            Long id,
+            Long brandId,
+            String name,
+            Long price
     ) {
-        public static ProductResponse from(ProductInfo info) {
-            return new ProductResponse(
-                info.id(),
-                info.name(),
-                info.description(),
-                info.price(),
-                info.stock()
+        public static ProductSummaryResponse from(ProductSummaryInfo info) {
+            return new ProductSummaryResponse(info.id(), info.brandId(), info.name(), info.price());
+        }
+    }
+
+    public record ProductDetailResponse(
+            Long id,
+            String name,
+            String description,
+            Long price,
+            BrandV1Dto.BrandResponse brand
+    ) {
+        public static ProductDetailResponse from(ProductDetailInfo info) {
+            return new ProductDetailResponse(
+                    info.id(),
+                    info.name(),
+                    info.description(),
+                    info.price(),
+                    BrandV1Dto.BrandResponse.from(info.brand())
             );
         }
     }

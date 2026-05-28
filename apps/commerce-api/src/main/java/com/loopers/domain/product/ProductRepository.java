@@ -1,11 +1,15 @@
 package com.loopers.domain.product;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.Optional;
-import java.util.List;
 
 public interface ProductRepository {
+
     ProductModel save(ProductModel product);
+
     Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
-    void delete(Long id);
+
+    Page<ProductModel> search(Long brandId, ProductSortType sort, Pageable pageable);
 }
