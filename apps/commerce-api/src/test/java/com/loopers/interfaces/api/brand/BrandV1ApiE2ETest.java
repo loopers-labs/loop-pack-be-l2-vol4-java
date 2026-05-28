@@ -249,6 +249,34 @@ class BrandV1ApiE2ETest {
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         }
+
+        @DisplayName("브랜드명이 null이면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNameIsNull() {
+            // given
+            BrandAdminV1Dto.CreateBrandRequest request = new BrandAdminV1Dto.CreateBrandRequest(null);
+
+            // when
+            ResponseEntity<Void> response =
+                testRestTemplate.exchange(ADMIN_BASE_URL, HttpMethod.POST, adminJsonEntity(request), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("브랜드명이 빈 문자열이면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNameIsBlank() {
+            // given
+            BrandAdminV1Dto.CreateBrandRequest request = new BrandAdminV1Dto.CreateBrandRequest("   ");
+
+            // when
+            ResponseEntity<Void> response =
+                testRestTemplate.exchange(ADMIN_BASE_URL, HttpMethod.POST, adminJsonEntity(request), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("PUT /api-admin/v1/brands/{brandId}")
@@ -289,6 +317,36 @@ class BrandV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("브랜드명이 null이면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNameIsNull() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            BrandAdminV1Dto.UpdateBrandRequest request = new BrandAdminV1Dto.UpdateBrandRequest(null);
+
+            // when
+            ResponseEntity<Void> response =
+                testRestTemplate.exchange(ADMIN_BASE_URL + "/" + brand.getId(), HttpMethod.PUT, adminJsonEntity(request), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("브랜드명이 빈 문자열이면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNameIsBlank() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            BrandAdminV1Dto.UpdateBrandRequest request = new BrandAdminV1Dto.UpdateBrandRequest("   ");
+
+            // when
+            ResponseEntity<Void> response =
+                testRestTemplate.exchange(ADMIN_BASE_URL + "/" + brand.getId(), HttpMethod.PUT, adminJsonEntity(request), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 

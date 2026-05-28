@@ -292,5 +292,61 @@ class LikeV1ApiE2ETest {
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
+
+        @DisplayName("LOGIN_ID 헤더가 없으면 400 Bad Request를 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
+            // when
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_PW, LOGIN_PW);
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                BASE_URL + "/1/likes",
+                HttpMethod.DELETE,
+                new HttpEntity<>(null, headers),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("LOGIN_PW 헤더가 없으면 400 Bad Request를 반환한다")
+        @Test
+        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
+            // when
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.LOGIN_ID, LOGIN_ID);
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                BASE_URL + "/1/likes",
+                HttpMethod.DELETE,
+                new HttpEntity<>(null, headers),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 틀리면 400 Bad Request를 반환한다")
+        @Test
+        void returnsBadRequest_whenPasswordIsWrong() {
+            // given
+            userRepository.save(new UserModel(
+                LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+            BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
+            ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+
+            // when
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                BASE_URL + "/" + product.getId() + "/likes",
+                HttpMethod.DELETE,
+                authHeaderEntity(LOGIN_ID, "WrongPass1!"),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 }

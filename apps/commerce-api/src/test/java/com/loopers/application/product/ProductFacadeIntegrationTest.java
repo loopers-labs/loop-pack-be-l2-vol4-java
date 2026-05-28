@@ -250,4 +250,76 @@ class ProductFacadeIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
+
+    @DisplayName("브랜드별 상품 목록을 조회할 때,")
+    @Nested
+    class GetProductsByBrandId {
+
+        @DisplayName("존재하는 브랜드 ID이면 해당 브랜드의 상품 목록이 반환된다.")
+        @Test
+        void returnsProductInfoPage_whenBrandExists() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel productA = saveProduct(brand.getId(), "상품A", BigDecimal.valueOf(10000));
+            ProductModel productB = saveProduct(brand.getId(), "상품B", BigDecimal.valueOf(20000));
+            saveStock(productA.getId(), 5L);
+            saveStock(productB.getId(), 3L);
+
+            // when
+            Page<ProductInfo> result = productFacade.getProductsByBrandId(brand.getId(), PageRequest.of(0, 20));
+
+            // then
+            assertAll(
+                    () -> assertThat(result.getTotalElements()).isEqualTo(2),
+                    () -> assertThat(result.getContent()).allMatch(info -> info.brandName().equals("Nike"))
+            );
+        }
+
+        @DisplayName("존재하지 않는 브랜드 ID이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenBrandDoesNotExist() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productFacade.getProductsByBrandId(999L, PageRequest.of(0, 20)));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("관리자용 상품을 단건 조회할 때,")
+    @Nested
+    class GetProductForAdmin {
+
+        @DisplayName("존재하는 상품 ID이면 재고를 포함한 ProductAdminInfo가 반환된다.")
+        @Test
+        void returnsProductAdminInfo_whenProductExists() {
+            // given
+            BrandModel brand = saveBrand("Adidas");
+            ProductModel product = saveProduct(brand.getId(), "울트라부스트", BigDecimal.valueOf(200000));
+            saveStock(product.getId(), 7L);
+
+            // when
+            ProductAdminInfo result = productFacade.getProductForAdmin(product.getId());
+
+            // then
+            assertAll(
+                    () -> assertThat(result.id()).isEqualTo(product.getId()),
+                    () -> assertThat(result.brandName()).isEqualTo("Adidas"),
+                    () -> assertThat(result.name()).isEqualTo("울트라부스트"),
+                    () -> assertThat(result.stock()).isEqualTo(7L)
+            );
+        }
+
+        @DisplayName("존재하지 않는 상품 ID이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenProductDoesNotExist() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productFacade.getProductForAdmin(999L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }

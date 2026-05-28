@@ -126,6 +126,20 @@ class StockServiceTest {
             // then
             assertThat(result.getQuantity()).isEqualTo(30L);
         }
+
+        @DisplayName("존재하지 않는 재고라면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenStockDoesNotExist() {
+            // given
+            Long productId = 999L;
+            when(stockRepository.findByProductId(productId)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> stockService.update(productId, 30L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
     }
 
     @DisplayName("재고를 삭제할 때,")
@@ -143,6 +157,52 @@ class StockServiceTest {
 
             // when & then
             assertDoesNotThrow(() -> stockService.delete(productId));
+        }
+
+        @DisplayName("존재하지 않는 재고라면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenStockDoesNotExist() {
+            // given
+            Long productId = 999L;
+            when(stockRepository.findByProductId(productId)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> stockService.delete(productId));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("재고를 차감할 때,")
+    @Nested
+    class DecreaseStock {
+
+        @DisplayName("재고가 충분하면 예외 없이 완료된다.")
+        @Test
+        void decreasesStock_whenStockIsSufficient() {
+            // given
+            Long productId = 1L;
+            Long quantity = 3L;
+            when(stockRepository.decreaseQuantity(productId, quantity)).thenReturn(1);
+
+            // when & then
+            assertDoesNotThrow(() -> stockService.decreaseStock(productId, quantity));
+        }
+
+        @DisplayName("재고가 부족하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenStockIsInsufficient() {
+            // given
+            Long productId = 1L;
+            Long quantity = 10L;
+            when(stockRepository.decreaseQuantity(productId, quantity)).thenReturn(0);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> stockService.decreaseStock(productId, quantity));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }

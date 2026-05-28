@@ -6,6 +6,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +18,9 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -118,6 +124,113 @@ class BrandServiceTest {
 
             // then
             assertThat(result).isEmpty();
+        }
+    }
+
+    @DisplayName("브랜드 목록을 페이지 조회할 때, ")
+    @Nested
+    class FindAll {
+
+        @DisplayName("브랜드가 있으면 페이지 목록이 반환된다.")
+        @Test
+        void returnsBrandPage_whenBrandsExist() {
+            // given
+            Pageable pageable = PageRequest.of(0, 20);
+            BrandModel nike = new BrandModel("Nike");
+            Page<BrandModel> page = new PageImpl<>(List.of(nike));
+            when(brandRepository.findAll(pageable)).thenReturn(page);
+
+            // when
+            Page<BrandModel> result = brandService.findAll(pageable);
+
+            // then
+            assertThat(result.getContent()).hasSize(1);
+        }
+    }
+
+    @DisplayName("브랜드를 생성할 때, ")
+    @Nested
+    class Create {
+
+        @DisplayName("정상 입력이면 저장된 브랜드가 반환된다.")
+        @Test
+        void returnsBrand_whenValidInput() {
+            // given
+            BrandModel brand = new BrandModel("Nike");
+            when(brandRepository.save(any(BrandModel.class))).thenReturn(brand);
+
+            // when
+            BrandModel result = brandService.create("Nike");
+
+            // then
+            assertThat(result.getName()).isEqualTo("Nike");
+        }
+    }
+
+    @DisplayName("브랜드를 수정할 때, ")
+    @Nested
+    class Update {
+
+        @DisplayName("존재하는 브랜드이면 수정된 브랜드가 반환된다.")
+        @Test
+        void returnsBrand_whenBrandExists() {
+            // given
+            Long id = 1L;
+            BrandModel brand = new BrandModel("Nike");
+            when(brandRepository.findById(id)).thenReturn(Optional.of(brand));
+            when(brandRepository.save(brand)).thenReturn(brand);
+
+            // when
+            BrandModel result = brandService.update(id, "Adidas");
+
+            // then
+            assertThat(result.getName()).isEqualTo("Adidas");
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenBrandDoesNotExist() {
+            // given
+            Long id = 999L;
+            when(brandRepository.findById(id)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> brandService.update(id, "Adidas"));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("브랜드를 삭제할 때, ")
+    @Nested
+    class Delete {
+
+        @DisplayName("존재하는 브랜드이면 예외 없이 완료된다.")
+        @Test
+        void deletesBrand_whenBrandExists() {
+            // given
+            Long id = 1L;
+            BrandModel brand = new BrandModel("Nike");
+            when(brandRepository.findById(id)).thenReturn(Optional.of(brand));
+            when(brandRepository.save(brand)).thenReturn(brand);
+
+            // when & then
+            assertDoesNotThrow(() -> brandService.delete(id));
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenBrandDoesNotExist() {
+            // given
+            Long id = 999L;
+            when(brandRepository.findById(id)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> brandService.delete(id));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
