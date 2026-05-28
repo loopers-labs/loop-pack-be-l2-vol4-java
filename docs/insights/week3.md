@@ -251,3 +251,64 @@ Facade의 의존성은 DomainService / ApplicationService만으로 구성해야 
 
 - **결정:** DomainService는 비즈니스 규칙 판단이 필요한 코드만. ApplicationService는 Repository를 직접 주입해 단순 find+save 처리 가능
 - **이유:** "ApplicationService는 Repository 주입 금지"는 학습용 제약이었고, 실무에서는 비즈니스 규칙 없는 단순 CRUD는 ApplicationService에서 직접 처리하는 것이 더 자연스럽다. find+save를 억지로 DomainService에 넣으면 역할이 불명확해진다.
+
+---
+
+> 날짜: 2026-05-28 (계속)
+
+---
+
+## 개념 정리
+
+### 좋아요 취소 — 존재하지 않는 경우에도 200을 반환해야 하는가?
+
+**그렇다.** HTTP 스펙에서 DELETE는 멱등(idempotent)해야 한다. 이미 취소됐거나 애초에 좋아요가 없어도 "좋아요 없는 상태"라는 목적은 달성된다.
+
+- 네트워크 재시도, 낙관적 UI 업데이트 시나리오에서 에러 없이 처리 가능
+- GitHub, Twitter 등 실서비스 토글형 API가 이 방식을 따름
+- 반면 "서버 상태와 클라이언트 불일치를 명시적으로 알려야 한다"는 관점에서 404를 반환하는 케이스도 있음
+
+결론: **멱등 200이 실무 표준**이지만, 응답 바디에 `deleted: false` 를 포함해 처리 여부를 알려주는 방법도 있다. 클라이언트가 그 값을 실제로 쓰는지에 따라 필요성이 갈림.
+
+---
+
+### 고객 vs 어드민 — 같은 리소스에 다른 정보 범위를 제공하는 이유
+
+API 소비자(고객 / 어드민)의 **목적이 다르기 때문**이다.
+
+| 필드 | 고객 | 어드민 |
+|---|---|---|
+| `createdAt`, `updatedAt` | ❌ (운영 데이터) | ✅ |
+| `stock` 수량 | ❌ (노출 불필요) | ✅ |
+| `inStock` (boolean) | ✅ (구매 결정용) | ❌ |
+| `brandName` | ✅ | ✅ |
+
+고객은 탐색/구매 결정에 필요한 최소 정보만, 어드민은 운영 관리에 필요한 모든 정보를 받는다. 같은 도메인 모델에서 출발하더라도 응답 DTO를 분리해 각 소비자에게 맞는 뷰를 제공한다.
+
+---
+
+### 조합 없는 Facade — 레이어를 유지하는 게 의미 있는가?
+
+Facade의 본래 가치는 **여러 서비스 조합 + 도메인 객체 → Info 변환**이다. 단순 위임만 하는 경우엔 레이어의 가치가 희미해진다.
+
+```java
+// 이런 Facade는 가치가 거의 없음
+public Page<ProductInfo> getProducts(...) {
+    return productApplicationService.getProducts(...);
+}
+```
+
+실무 선택지:
+1. **일관성 우선** — 모든 도메인이 Controller → Facade → ApplicationService 패턴을 따름. 나중에 조합 로직이 생길 때 자리가 있음
+2. **실용성 우선** — 조합 없으면 Controller → ApplicationService 직접 호출. CQRS 패턴에서 Query는 Repository 직접 조회하기도 함
+
+**판단 기준:** Facade가 아무것도 안 한다면 레이어로서의 존재 이유를 다시 물어야 한다. 단, 프로젝트 전체 아키텍처 일관성이 있다면 유지하는 것도 합리적이다.
+
+---
+
+## 설계 결정
+
+### 상품/브랜드 목록 조회 시 N+1 방지를 위해 배치 조회를 사용한다
+
+- **결정:** 상품 목록 조회 시 브랜드명과 재고를 상품별로 따로 조회하지 않고, `findAllByIdIn()` / `findAllByProductIdIn()`으로 한 번에 배치 조회 후 Map으로 조합
+- **이유:** 상품 페이지(20개)마다 브랜드/재고 조회가 각각 20번씩 나가는 N+1을 방지하기 위해. JOIN 쿼리가 불가능한 구조(Product에 Brand `@ManyToOne` 없음)에서 실용적인 대안
