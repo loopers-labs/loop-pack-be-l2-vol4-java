@@ -2,6 +2,7 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSort;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -25,7 +26,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Product> findAll(Long brandId, String sort, int page, int size) {
+    public List<Product> findAll(Long brandId, ProductSort sort, int page, int size) {
         return queryFactory
             .selectFrom(product)
             .where(brandIdEq(brandId))
@@ -49,11 +50,11 @@ public class ProductRepositoryImpl implements ProductRepository {
         return brandId == null ? null : product.brandId.eq(brandId);
     }
 
-    private OrderSpecifier<?> toOrder(String sort) {
-        return switch (sort == null ? "latest" : sort) {
-            case "price_asc"  -> product.price.amount.asc();
-            case "likes_desc" -> product.likeCount.desc();
-            default           -> product.createdAt.desc();
+    private OrderSpecifier<?> toOrder(ProductSort sort) {
+        return switch (sort == null ? ProductSort.LATEST : sort) {
+            case PRICE_ASC -> product.price.amount.asc();
+            case LIKES_DESC -> product.likeCount.desc();
+            case LATEST -> product.createdAt.desc();
         };
     }
 }

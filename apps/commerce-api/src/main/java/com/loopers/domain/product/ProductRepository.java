@@ -5,6 +5,6 @@ import java.util.Optional;
 
 public interface ProductRepository {
     Optional<Product> findById(Long id);
-    List<Product> findAll(Long brandId, String sort, int page, int size);
+    List<Product> findAll(Long brandId, ProductSort sort, int page, int size);
     long count(Long brandId);
 }

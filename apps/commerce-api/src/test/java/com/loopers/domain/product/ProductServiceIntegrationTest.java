@@ -84,7 +84,7 @@ class ProductServiceIntegrationTest {
             Product p3 = productJpaRepository.save(new Product("상품3", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 1L));
 
             // act
-            List<Product> result = productService.getProducts(null, "latest", 0, 10);
+            List<Product> result = productService.getProducts(null, ProductSort.LATEST, 0, 10);
 
             // assert (최신 등록 = 마지막 저장이 먼저)
             assertThat(result).extracting(Product::getId)
@@ -100,7 +100,7 @@ class ProductServiceIntegrationTest {
             Product expensive = productJpaRepository.save(new Product("고가", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 1L));
 
             // act
-            List<Product> result = productService.getProducts(null, "price_asc", 0, 10);
+            List<Product> result = productService.getProducts(null, ProductSort.PRICE_ASC, 0, 10);
 
             // assert
             assertThat(result).extracting(Product::getId)
@@ -116,7 +116,7 @@ class ProductServiceIntegrationTest {
             Product adidas = productJpaRepository.save(new Product("아디다스", null, new Money(BigDecimal.valueOf(3000)), new Stock(1), 2L));
 
             // act
-            List<Product> result = productService.getProducts(1L, "latest", 0, 10);
+            List<Product> result = productService.getProducts(1L, ProductSort.LATEST, 0, 10);
 
             // assert
             assertThat(result).extracting(Product::getId).containsExactly(nikeB.getId(), nikeA.getId());
@@ -132,7 +132,7 @@ class ProductServiceIntegrationTest {
             }
 
             // act — price_asc(1000..5000) 중 page=1, size=2 → 3·4번째
-            List<Product> result = productService.getProducts(null, "price_asc", 1, 2);
+            List<Product> result = productService.getProducts(null, ProductSort.PRICE_ASC, 1, 2);
 
             // assert
             assertThat(result).extracting(Product::getName).containsExactly("상품3", "상품4");

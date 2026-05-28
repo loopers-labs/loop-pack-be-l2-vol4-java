@@ -21,7 +21,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<Product> getProducts(Long brandId, String sort, int page, int size) {
+    public List<Product> getProducts(Long brandId, ProductSort sort, int page, int size) {
         return productRepository.findAll(brandId, sort, page, size);
     }
 
