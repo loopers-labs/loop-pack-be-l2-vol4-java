@@ -1,6 +1,8 @@
 package com.loopers.domain.user;
 
+import com.loopers.infrastructure.user.UserJpaEntity;
 import com.loopers.infrastructure.user.UserJpaRepository;
+import com.loopers.infrastructure.user.UserMapper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -46,7 +48,7 @@ class UserServiceIntegrationTest {
 
     private void saveDefaultUser() {
         UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder);
-        userJpaRepository.save(userModel);
+        userJpaRepository.save(UserMapper.toJpaEntity(userModel));
     }
 
     @DisplayName("회원가입")
