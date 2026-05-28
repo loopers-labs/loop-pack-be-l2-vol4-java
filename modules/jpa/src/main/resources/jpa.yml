@@ -49,15 +49,23 @@ datasource:
 ---
 spring.config.activate.on-profile: test
 
+# 통합 테스트 기본은 H2 인메모리 — Docker 의존 없이 빠르게 부팅.
+# MySQL-only 동작(FOR UPDATE 락, 격리 수준, MySQL 함수 등)을 검증하는 테스트만
+# @Import(MySqlTestContainersConfig.class)로 옵트인해 Testcontainers를 사용한다.
 spring:
   jpa:
     show-sql: true
     hibernate:
       ddl-auto: create
+    database-platform: org.hibernate.dialect.MySQLDialect
 
 datasource:
   mysql-jpa:
     main:
+      driver-class-name: org.h2.Driver
+      jdbc-url: jdbc:h2:mem:loopers;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+      username: sa
+      password:
       maximum-pool-size: 10
       minimum-idle: 5
 

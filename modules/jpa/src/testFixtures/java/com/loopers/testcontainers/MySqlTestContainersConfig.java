@@ -1,10 +1,12 @@
 package com.loopers.testcontainers;
 
-import org.springframework.context.annotation.Configuration;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-@Configuration
+/**
+ * MySQL-only 동작 검증이 필요한 테스트에서만 {@code @Import(MySqlTestContainersConfig.class)}로 옵트인한다.
+ * 기본 통합 테스트는 H2 인메모리(jpa.yml test profile)로 동작한다.
+ */
 public class MySqlTestContainersConfig {
 
     private static final MySQLContainer<?> mySqlContainer;
