@@ -30,7 +30,17 @@ public class OrderMapper {
 
     public static OrderEntity toDomain(OrderJpaEntity order, List<OrderItemJpaEntity> items) {
         List<OrderItemEntity> domainItems = items.stream()
-                .map(OrderMapper::toItemDomain)
+                .map(item -> OrderItemEntity.of(
+                        item.getId(),
+                        item.getOrderId(),
+                        item.getProductId(),
+                        item.getProductName(),
+                        item.getProductPrice(),
+                        item.getQuantity(),
+                        item.getCreatedAt(),
+                        item.getUpdatedAt(),
+                        item.getDeletedAt()
+                ))
                 .toList();
         return OrderEntity.of(
                 order.getId(),
@@ -40,20 +50,6 @@ public class OrderMapper {
                 order.getCreatedAt(),
                 order.getUpdatedAt(),
                 order.getDeletedAt()
-        );
-    }
-
-    private static OrderItemEntity toItemDomain(OrderItemJpaEntity item) {
-        return OrderItemEntity.of(
-                item.getId(),
-                item.getOrderId(),
-                item.getProductId(),
-                item.getProductName(),
-                item.getProductPrice(),
-                item.getQuantity(),
-                item.getCreatedAt(),
-                item.getUpdatedAt(),
-                item.getDeletedAt()
         );
     }
 }
