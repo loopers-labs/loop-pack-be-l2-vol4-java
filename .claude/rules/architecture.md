@@ -167,6 +167,7 @@ Application Service가 직접 처리하지 말아야 할 책임:
 - 여러 Aggregate를 비교하거나 조합해야 하는 규칙
 - 정책성 계산 또는 판정 로직
 - 객체 내부에 넣으면 부자연스러운 도메인 로직
+- Domain Service는 Repository에 의존하지 않는다. Repository 조회/저장, 트랜잭션 경계, 외부 연동 조율은 application 계층의 Service 또는 Facade가 담당한다.
 
 기준:
 
@@ -174,6 +175,7 @@ Application Service가 직접 처리하지 말아야 할 책임:
 Entity 또는 Value Object가 자연스럽게 책임질 수 있으면 객체 내부에 둔다.
 여러 객체를 아우르는 순수 도메인 규칙이면 Domain Service로 둔다.
 흐름 제어, 트랜잭션, 외부 연동은 Application Service로 둔다.
+Repository 의존이 필요하면 Domain Service가 아니라 application 계층의 Service 또는 Facade로 둔다.
 ```
 
 ## Aggregate 간 참조 규칙

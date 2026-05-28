@@ -66,17 +66,18 @@
 
 ### application
 
-- `<domain>.application` 하위에 Facade 와 Info 를 둔다.
+- `<domain>.application` 하위에 Facade, Service, Info 를 둔다.
 - Facade 는 유스케이스 흐름, 트랜잭션 경계, 여러 도메인 서비스 조합을 담당한다.
+- Repository 조회/저장을 수행하는 Service 는 application 계층에 둔다.
 - 외부로 반환하는 조회 결과는 `Info` 객체로 표현한다.
 - 단순 위임만 반복되는 Facade 는 만들지 않는다.
 
 ### domain
 
-- `<domain>.domain` 하위에 Model, Service, Repository 인터페이스를 둔다.
-- 도메인 규칙은 Model 또는 Service 내부에 둔다.
+- `<domain>.domain` 하위에 Model, Domain Service, Repository 인터페이스를 둔다.
+- Aggregate, Domain Service, Repository 의존 방향 등 DDD 책임 분리는 `.claude/rules/architecture.md` 를 따른다.
 - Repository 는 도메인 계약만 표현하고 JPA, Redis, Kafka 세부 타입에 의존하지 않는다.
-- 도메인 계층은 `interfaces` 또는 `infrastructure` 계층에 의존하지 않는다.
+- 도메인 계층은 `interfaces`, `application`, `infrastructure` 계층에 의존하지 않는다.
 
 ### infrastructure
 
@@ -92,7 +93,7 @@
 
 - `@Transactional` 은 Application 계층의 단일 진입점인 Facade 에만 둔다. `Controller → Facade → Service` 흐름에서 트랜잭션 경계는 Facade 이다.
 - 기본은 클래스 단위 `@Transactional`(쓰기)로 부여하고, readOnly 등 전파 속성이 달라지는 메서드에만 메서드 단위로 `@Transactional(readOnly = true)` 를 두어 오버라이드한다.
-- domain 계층의 서비스(Repository 를 조합하는 서비스, 순수 Domain Service 모두)에는 `@Transactional` 을 두지 않는다. 도메인 서비스는 호출자(Facade)의 트랜잭션에 전파되어 동작한다.
+- domain 계층의 Domain Service 에는 `@Transactional` 을 두지 않는다. 도메인 서비스는 호출자(Facade)의 트랜잭션에 전파되어 동작한다.
 - 트랜잭션 전파는 프록시 기반이므로, 트랜잭션 안에서 빈 경계를 넘어 호출되는 기능(유스케이스) 메서드는 `private` 로 선언하지 않는다(`public`). `private` 메서드는 프록시가 어드바이스할 수 없고, 동일 빈 내부 자기호출(self-invocation)은 프록시를 우회한다.
 - 조회 전용 트랜잭션은 `@Transactional(readOnly = true)` 를 사용한다.
 - 외부 시스템 호출이 포함되면 DB 트랜잭션과 외부 호출 경계를 명확히 분리한다.
