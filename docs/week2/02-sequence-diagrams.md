@@ -119,11 +119,13 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as BrandAdminController
-    participant Service as BrandService
+    participant Service as BrandAdminService
     participant Repository as BrandRepository
 
-    Admin->>Controller: 브랜드 관리 조회 요청
+    Admin->>Auth: 브랜드 관리 조회 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 브랜드 관리 조회
     Service->>Repository: 브랜드 목록 또는 상세 조회
     Repository-->>Service: 브랜드 정보
@@ -141,15 +143,18 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as BrandAdminController
-    participant Service as BrandService
+    participant Service as BrandAdminService
     participant BrandRepository as BrandRepository
     participant ProductRepository as ProductRepository
 
-    Admin->>Controller: 브랜드 삭제 요청
+    Admin->>Auth: 브랜드 삭제 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 브랜드 삭제
-    Service->>BrandRepository: 브랜드 조회
-    BrandRepository-->>Service: 브랜드
+    Note over Service,BrandRepository: soft delete는 deleted_at을 채우는 UPDATE이므로 대상 존재를 먼저 확인
+    Service->>BrandRepository: 브랜드 조회 (존재 확인)
+    BrandRepository-->>Service: 브랜드 (없으면 404)
     Service->>ProductRepository: brandId에 속한 상품 삭제
     Service->>BrandRepository: 브랜드 삭제
     Service-->>Controller: 삭제 결과
@@ -174,6 +179,7 @@ sequenceDiagram
 
     Client->>Controller: 상품 조회 요청
     Controller->>Service: 상품 조회
+    Note over Service,ProductRepository: 사용자 조회는 판매중지(SUSPENDED)·삭제 상품을 제외
     Service->>ProductRepository: 상품 조회
     ProductRepository-->>Service: 상품 정보
     Service-->>Controller: 상품 정보
@@ -190,11 +196,13 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as ProductAdminController
-    participant Service as ProductService
+    participant Service as ProductAdminService
     participant ProductRepository as ProductRepository
 
-    Admin->>Controller: 상품 관리 조회 요청
+    Admin->>Auth: 상품 관리 조회 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 상품 관리 조회
     Service->>ProductRepository: 상품과 재고 조회
     ProductRepository-->>Service: 상품과 재고 정보
@@ -212,15 +220,18 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as ProductAdminController
-    participant Service as ProductService
+    participant Service as ProductAdminService
     participant BrandRepository as BrandRepository
     participant ProductRepository as ProductRepository
 
-    Admin->>Controller: 상품 등록 요청
+    Admin->>Auth: 상품 등록 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 상품 등록
     Service->>BrandRepository: 브랜드 존재 확인
     BrandRepository-->>Service: 브랜드 존재 여부
+    Note over Service,ProductRepository: 초기 status=ON_SALE, 대표 이미지·초기 재고 함께 저장
     Service->>ProductRepository: 상품과 초기 재고 저장
     ProductRepository-->>Service: 저장된 상품
     Service-->>Controller: 등록 결과
@@ -237,14 +248,17 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as ProductAdminController
-    participant Service as ProductService
+    participant Service as ProductAdminService
     participant ProductRepository as ProductRepository
 
-    Admin->>Controller: 상품 삭제 요청
+    Admin->>Auth: 상품 삭제 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 상품 삭제
-    Service->>ProductRepository: 상품 조회
-    ProductRepository-->>Service: 상품
+    Note over Service,ProductRepository: soft delete는 deleted_at을 채우는 UPDATE이므로 대상 존재를 먼저 확인
+    Service->>ProductRepository: 상품 조회 (존재 확인)
+    ProductRepository-->>Service: 상품 (없으면 404)
     Service->>ProductRepository: 상품 삭제
     Service-->>Controller: 삭제 결과
     Controller-->>Admin: 응답
@@ -273,9 +287,11 @@ sequenceDiagram
     Controller->>Service: 좋아요 등록
     Service->>ProductRepository: 상품 조회
     ProductRepository-->>Service: 상품
+    Note over Service: 삭제·SUSPENDED 상품이면 좋아요 등록 거부
     Service->>LikeRepository: 좋아요 조회
     LikeRepository-->>Service: 좋아요 상태
     Service->>LikeRepository: 좋아요 생성 또는 복구
+    Note over Service,LikeRepository: 커밋 후(AFTER_COMMIT) 이벤트 발행 →<br/>projection 핸들러가 해당 상품 recount해 Product.likeCount 갱신 (비동기)
     Service-->>Controller: 처리 결과
     Controller-->>Client: 응답
 ```
@@ -301,6 +317,7 @@ sequenceDiagram
     Service->>LikeRepository: 좋아요 조회
     LikeRepository-->>Service: 좋아요 상태
     Service->>LikeRepository: 좋아요 취소
+    Note over Service,LikeRepository: 커밋 후(AFTER_COMMIT) 이벤트 발행 →<br/>projection 핸들러가 해당 상품 recount해 Product.likeCount 갱신 (비동기)
     Service-->>Controller: 처리 결과
     Controller-->>Client: 응답
 ```
@@ -309,7 +326,7 @@ sequenceDiagram
 
 ### 좋아요 목록 조회
 
-이 다이어그램은 사용자가 자신이 좋아요한 상품 목록을 조회하는 흐름을 확인하기 위한 것이다. 삭제된 상품은 좋아요 목록에서 제외한다.
+이 다이어그램은 사용자가 자신이 좋아요한 상품 목록을 조회하는 흐름을 확인하기 위한 것이다. 삭제된 상품은 목록에서 제외하고, 판매중지(`SUSPENDED`) 상품은 '판매중지' 표시로 노출한다.
 
 ```mermaid
 sequenceDiagram
@@ -328,11 +345,12 @@ sequenceDiagram
     LikeRepository-->>Service: 좋아요 목록
     Service->>ProductRepository: 좋아요한 상품 조회
     ProductRepository-->>Service: 상품 목록
+    Note over Service,ProductRepository: 삭제 상품 제외, SUSPENDED는 '판매중지' 표시로 노출
     Service-->>Controller: 상품 목록
     Controller-->>Client: 응답
 ```
 
-이 흐름에서 `Like`는 상품을 직접 소유하지 않는다. 좋아요 목록 조회는 Like 관계를 기준으로 현재 조회 가능한 상품을 다시 조회한다.
+이 흐름에서 `Like`는 상품을 직접 소유하지 않는다. 좋아요 목록 조회는 Like 관계를 기준으로 상품을 다시 조회하며, 삭제된 상품은 제외하고 판매중지(`SUSPENDED`) 상품은 '판매중지' 상태로 표시한다.
 
 ## Orders
 
@@ -365,12 +383,13 @@ sequenceDiagram
         ProductStock-->>Service: 차감 완료 (재고 부족 시 예외)
     end
 
-    Service->>Order: create(userId, 상품 스냅샷 정보)
-    Note over Order: OrderItem 스냅샷 구성 (productId, productName, brandId, brandName, price, quantity)<br/>totalAmount 계산, status=PENDING
+    Service->>Order: create(userId, 상품 스냅샷 정보, ShippingDestination, paymentMethod)
+    Note over Order: orderNumber 생성(yyyyMMdd+일별 시퀀스)<br/>OrderItem 스냅샷(productId, productName, brandId, brandName, price, quantity)<br/>ShippingDestination·paymentMethod 저장, totalAmount 계산, status=PENDING
     Order-->>Service: 주문 Aggregate
 
     Service->>OrderRepository: 주문 저장
     OrderRepository-->>Service: 주문
+    Note over Service: (결제 도메인 추가 시) PaymentService.pay() 호출 지점<br/>현재 범위에서는 stub — 상태 전이 없이 PENDING 종료
     Service-->>Controller: 주문 생성 결과
     Controller-->>Client: 응답
 ```
@@ -480,11 +499,13 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin as 관리자
+    participant Auth as AdminAuthentication
     participant Controller as OrderAdminController
-    participant Service as OrderService
+    participant Service as OrderAdminService
     participant OrderRepository as OrderRepository
 
-    Admin->>Controller: 주문 관리 조회 요청
+    Admin->>Auth: 주문 관리 조회 요청 (관리자 인증 헤더 전달)
+    Auth->>Controller: 요청 전달 (LDAP 인증 가정)
     Controller->>Service: 전체 주문 조회
     Service->>OrderRepository: 전체 주문 조회
     OrderRepository-->>Service: 주문 목록
