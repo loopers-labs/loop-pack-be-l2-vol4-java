@@ -29,32 +29,28 @@ public class ProductFacade {
     }
 
     public ProductInfo getProduct(Long id) {
-        ProductEntity product = productService.getProduct(id);
-        BrandEntity brand = brandService.getBrand(product.getBrandId());
-        InventoryEntity inventory = inventoryService.getByProductId(id);
-        return ProductInfo.from(product, brand, inventory);
+        return assembleProductInfo(productService.getProduct(id));
     }
 
     public Page<ProductInfo> getAllProducts(Long brandId, Pageable pageable) {
-        return productService.getAllProducts(brandId, pageable)
-                .map(product -> {
-                    BrandEntity brand = brandService.getBrand(product.getBrandId());
-                    InventoryEntity inventory = inventoryService.getByProductId(product.getId());
-                    return ProductInfo.from(product, brand, inventory);
-                });
+        return productService.getAllProducts(brandId, pageable).map(this::assembleProductInfo);
     }
 
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer quantity) {
         ProductEntity product = productService.updateProduct(id, name, description, price);
         inventoryService.updateQuantity(id, quantity);
-        BrandEntity brand = brandService.getBrand(product.getBrandId());
-        InventoryEntity inventory = inventoryService.getByProductId(id);
-        return ProductInfo.from(product, brand, inventory);
+        return assembleProductInfo(product);
     }
 
     public void deleteProduct(Long id) {
         productService.deleteProduct(id);
         inventoryService.deleteByProduct(id);
         likeService.deleteAllByProduct(id);
+    }
+
+    private ProductInfo assembleProductInfo(ProductEntity product) {
+        BrandEntity brand = brandService.getBrand(product.getBrandId());
+        InventoryEntity inventory = inventoryService.getByProductId(product.getId());
+        return ProductInfo.from(product, brand, inventory);
     }
 }
