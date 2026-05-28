@@ -3,11 +3,9 @@ package com.loopers.domain.user;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
 public class UserEntity extends BaseEntity {
@@ -15,29 +13,25 @@ public class UserEntity extends BaseEntity {
     private static final Pattern USER_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[가-힣]+$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-    private static final DateTimeFormatter FULL_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final DateTimeFormatter YEARLESS_DATE_FORMAT = DateTimeFormatter.ofPattern("yyMMdd");
-    private static final DateTimeFormatter MONTH_DAY_FORMAT = DateTimeFormatter.ofPattern("MMdd");
 
     private String userId;
     private String name;
     private String email;
-    private String password;
+    private PasswordVO password;
     private LocalDate birthDate;
 
     protected UserEntity() {}
 
-    public UserEntity(String userId, String password, String name, LocalDate birthDate, String email, PasswordEncoder passwordEncoder) {
+    public UserEntity(String userId, PasswordVO password, String name, LocalDate birthDate, String email) {
         validateUserId(userId);
         validateName(name);
         validateEmail(email);
-        validatePassword(password, birthDate);
 
         this.userId = userId;
+        this.password = password;
         this.name = name;
         this.email = email;
         this.birthDate = birthDate;
-        this.password = passwordEncoder.encode(password);
     }
 
     public static UserEntity of(Long id, String userId, String name, String email, String encodedPassword,
@@ -46,7 +40,7 @@ public class UserEntity extends BaseEntity {
         model.userId = userId;
         model.name = name;
         model.email = email;
-        model.password = encodedPassword;
+        model.password = PasswordVO.fromEncoded(encodedPassword);
         model.birthDate = birthDate;
         model.reconstruct(id, createdAt, updatedAt, deletedAt);
         return model;
@@ -65,7 +59,7 @@ public class UserEntity extends BaseEntity {
     }
 
     public String getPassword() {
-        return password;
+        return password.value();
     }
 
     public LocalDate getBirthDate() {
@@ -76,12 +70,8 @@ public class UserEntity extends BaseEntity {
         return name.substring(0, name.length() - 1) + "*";
     }
 
-    public void changePassword(String newPassword, PasswordEncoder passwordEncoder) {
-        if (passwordEncoder.matches(newPassword, this.password)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
-        }
-        validatePassword(newPassword, this.birthDate);
-        this.password = passwordEncoder.encode(newPassword);
+    public void changePassword(PasswordVO newPassword) {
+        this.password = newPassword;
     }
 
     private void validateUserId(String userId) {
@@ -108,32 +98,6 @@ public class UserEntity extends BaseEntity {
         }
         if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "올바른 이메일 형식이 아닙니다.");
-        }
-    }
-
-    private void validatePassword(String password, LocalDate birthDate) {
-        if (password == null || password.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
-        }
-        if (password.length() < 8 || password.length() > 16) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8자 이상 16자 이하여야 합니다.");
-        }
-        validatePasswordNotContainsBirthDate(password, birthDate);
-    }
-
-    private void validatePasswordNotContainsBirthDate(String password, LocalDate birthDate) {
-        String fullDate = birthDate.format(FULL_DATE_FORMAT);
-        String yearlessDate = birthDate.format(YEARLESS_DATE_FORMAT);
-        String monthDay = birthDate.format(MONTH_DAY_FORMAT);
-
-        if (password.contains(fullDate) || password.contains(yearlessDate) || password.contains(monthDay)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
-        }
-    }
-
-    public void authenticate(String rawPassword, PasswordEncoder passwordEncoder) {
-        if (!passwordEncoder.matches(rawPassword, password)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
         }
     }
 }

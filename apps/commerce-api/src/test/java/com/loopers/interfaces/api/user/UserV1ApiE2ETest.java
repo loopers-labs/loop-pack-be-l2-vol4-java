@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.domain.user.PasswordVO;
 import com.loopers.domain.user.UserEntity;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.infrastructure.user.UserMapper;
@@ -58,6 +59,13 @@ public class UserV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private void createDefaultUser() {
+        PasswordVO passwordVO = PasswordVO.fromEncoded(passwordEncoder.encode(DEFAULT_PASSWORD));
+        userJpaRepository.save(UserMapper.toJpaEntity(
+            new UserEntity(DEFAULT_USER_ID, passwordVO, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL)
+        ));
+    }
+
     @DisplayName("POST /api/v1/users")
     @Nested
     class Signup {
@@ -80,7 +88,7 @@ public class UserV1ApiE2ETest {
         @Test
         void failSignup_whenExistingUserIdIsProvided() {
             // arrange
-            userJpaRepository.save(UserMapper.toJpaEntity(new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder)));
+            createDefaultUser();
             UserV1Dto.SignupRequest signupRequest = new UserV1Dto.SignupRequest(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
 
             // act
@@ -100,7 +108,7 @@ public class UserV1ApiE2ETest {
         @Test
         void returnsMyInfo_whenValidHeaderIsProvided() {
             // arrange
-            userJpaRepository.save(UserMapper.toJpaEntity(new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder)));
+            createDefaultUser();
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
@@ -134,7 +142,7 @@ public class UserV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenPasswordDoesNotMatch() {
             // arrange
-            userJpaRepository.save(UserMapper.toJpaEntity(new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder)));
+            createDefaultUser();
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, "wrongPassword1!");
@@ -186,7 +194,7 @@ public class UserV1ApiE2ETest {
         @Test
         void returnsNewPasswordInHeader_whenValidPasswordIsProvided() {
             // arrange
-            userJpaRepository.save(UserMapper.toJpaEntity(new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder)));
+            createDefaultUser();
             String newPassword = "newPass99@";
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
@@ -222,7 +230,7 @@ public class UserV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            userJpaRepository.save(UserMapper.toJpaEntity(new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder)));
+            createDefaultUser();
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
