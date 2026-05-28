@@ -21,6 +21,7 @@ public class StockService {
         doDecrease(productId, amount);
     }
 
+    /** productId 오름차순 처리 — 동시 호출에서 락 순서를 통일해 데드락을 회피한다. */
     @Transactional
     public void decreaseAll(Map<Long, Integer> quantitiesByProductId) {
         quantitiesByProductId.entrySet().stream()
