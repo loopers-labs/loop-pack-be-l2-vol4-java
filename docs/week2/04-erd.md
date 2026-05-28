@@ -31,6 +31,7 @@ erDiagram
     STOCKS {
         bigint product_id PK, FK
         int quantity
+        datetime created_at
         datetime updated_at
     }
 

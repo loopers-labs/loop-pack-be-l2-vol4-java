@@ -1,18 +1,32 @@
 ```mermaid
 classDiagram
+    class BaseTimeEntity {
+        <<abstract>>
+        +LocalDateTime createdAt
+        +LocalDateTime updatedAt
+    }
+
+    class BaseSoftDeleteEntity {
+        <<abstract>>
+        +boolean isDeleted
+        +delete()
+    }
+
+    BaseSoftDeleteEntity --|> BaseTimeEntity
+
     class User {
         +Long id
         +String loginId
         +String password
         +Role role
     }
+    User --|> BaseTimeEntity
     
     class Brand {
         +Long id
         +String name
-        +boolean isDeleted
-        +delete()
     }
+    Brand --|> BaseSoftDeleteEntity
     
     class Product {
         +Long id
@@ -20,30 +34,31 @@ classDiagram
         +String name
         +BigDecimal price
         +int likeCount
-        +boolean isDeleted
         +increaseLikeCount()
         +decreaseLikeCount()
-        +delete()
     }
+    Product --|> BaseSoftDeleteEntity
     
     class Stock {
         +Long productId
         +int quantity
         +decrease(int amount)
     }
+    Stock --|> BaseTimeEntity
     
     class ProductLike {
         +Long id
         +Long userId
         +Long productId
     }
+    ProductLike --|> BaseTimeEntity
     
     class Order {
         +Long id
         +Long userId
         +OrderStatus status
-        +LocalDateTime createdAt
     }
+    Order --|> BaseTimeEntity
     
     class OrderItem {
         +Long id
@@ -54,6 +69,7 @@ classDiagram
         +String snapshotBrandName
         +int quantity
     }
+    OrderItem --|> BaseTimeEntity
 
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains
