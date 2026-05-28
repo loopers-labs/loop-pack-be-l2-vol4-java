@@ -189,3 +189,65 @@ public Product createProduct(...) {
 
 - **결정:** 기존 `ProductModel`(stock 인라인, brandId 없음)을 삭제하고 `Product` 엔티티로 재작성
 - **이유:** week2 설계 문서 기준과 불일치. `Stock`을 독립 도메인으로 분리하고 `brandId`, `likeCount`를 추가해 설계 의도대로 맞춤
+
+---
+
+> 날짜: 2026-05-29
+
+---
+
+## 개념 정리
+
+### JPA Dirty Checking — @Transactional 안에서 save()를 생략해도 되는가?
+
+**된다.** `@Transactional` 안에서 `findById()`로 가져온 엔티티는 **managed 상태**다. 트랜잭션이 커밋될 때 JPA가 변경사항을 자동 감지(Dirty Checking)해서 UPDATE 쿼리를 날린다.
+
+```java
+@Transactional
+public void addLike(Long memberId, Long productId) {
+    Product product = productRepository.findById(productId)...  // managed 상태
+    if (added) {
+        product.incrementLikeCount();  // 변경만 해도 트랜잭션 커밋 시 자동 UPDATE
+        // productRepository.save(product) — 없어도 됨
+    }
+}
+```
+
+단, 단위 테스트에서 `verify(repository).save()`로 저장 여부를 검증하려면 명시적 save()가 필요하다. 이 경우 테스트 설계와 실제 코드의 트레이드오프가 생긴다.
+
+---
+
+### DomainService에 두어야 할 코드의 기준은 무엇인가?
+
+**"단일 Entity 혼자서 판단할 수 없는 비즈니스 규칙"** 이 기준이다.
+
+- `existsByName` → "이름이 겹치면 안 된다" 판단 → DomainService ✅
+- 좋아요 멱등 처리 → "이미 있으면 저장 안 한다" 판단 → DomainService ✅
+- `findById + entity메서드 + save` → 판단 없이 그냥 실행 → ApplicationService 직접 ✅
+
+**DB에 접근한다**고 DomainService에 두는 게 아니다. **DB에 접근해서 비즈니스 규칙을 판단한다**가 기준이다.
+
+---
+
+### Facade가 Repository에 직접 의존해도 되는가?
+
+**안 된다.** Facade는 DomainService / ApplicationService를 **조합**하는 계층이다. Repository에 직접 의존하면 레이어 경계가 흐려진다.
+
+```java
+// ❌ Facade에서 Repository 직접 사용
+Product product = productRepository.findById(like.getProductId())...
+
+// ✅ DomainService를 통해 접근
+Product product = productDomainService.getProduct(like.getProductId());
+```
+
+Facade의 의존성은 DomainService / ApplicationService만으로 구성해야 한다.
+
+---
+
+## 설계 결정
+
+### DomainService 기준을 재정의하고 ApplicationService의 Repository 주입을 허용한다
+
+- **결정:** DomainService는 비즈니스 규칙 판단이 필요한 코드만. ApplicationService는 Repository를 직접 주입해 단순 find+save 처리 가능
+- **이유:** "ApplicationService는 Repository 주입 금지"는 학습용 제약이었고, 실무에서는 비즈니스 규칙 없는 단순 CRUD는 ApplicationService에서 직접 처리하는 것이 더 자연스럽다. find+save를 억지로 DomainService에 넣으면 역할이 불명확해진다.
