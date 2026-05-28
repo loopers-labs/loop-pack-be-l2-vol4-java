@@ -36,10 +36,9 @@ public class ProductFacade {
         return productService.getAllProducts(brandId, pageable).map(this::assembleProductInfo);
     }
 
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer quantity) {
-        ProductEntity product = productService.updateProduct(id, name, description, price);
+    public void updateProduct(Long id, String name, String description, Long price, Integer quantity) {
+        productService.updateProduct(id, name, description, price);
         inventoryService.updateQuantity(id, quantity);
-        return assembleProductInfo(product);
     }
 
     public void deleteProduct(Long id) {

@@ -189,17 +189,18 @@ class ProductFacadeIntegrationTest {
     @Nested
     class UpdateProduct {
 
-        @DisplayName("[ECP] 유효한 요청으로 수정하면 변경된 ProductInfo를 반환한다.")
+        @DisplayName("[ECP] 유효한 요청으로 수정하면 상품 정보가 변경된다.")
         @Test
-        void returnsUpdatedProductInfo_whenRequestIsValid() {
+        void updatesProduct_whenRequestIsValid() {
             // arrange
             BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
             ProductInfo created = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
 
             // act
-            ProductInfo result = productFacade.updateProduct(created.id(), "에어포스", "새 설명", 90_000L, 20);
+            productFacade.updateProduct(created.id(), "에어포스", "새 설명", 90_000L, 20);
 
             // assert
+            ProductInfo result = productFacade.getProduct(created.id());
             assertAll(
                     () -> assertEquals("에어포스", result.name()),
                     () -> assertEquals("새 설명", result.description()),
