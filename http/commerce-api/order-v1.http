@@ -19,8 +19,8 @@ X-Loopers-LoginPw: abc123!@#
 
 ###
 
-### [User] 내 주문 목록 날짜 필터 조회
-GET {{commerce-api}}/api/v1/orders?startAt=2024-01-01T00:00:00Z&endAt=2099-12-31T23:59:59Z&page=0&size=20
+### [User] 내 주문 목록 날짜 필터 조회 (YYYY-MM-DD)
+GET {{commerce-api}}/api/v1/orders?startAt=2024-01-01&endAt=2024-12-31&page=0&size=20
 X-Loopers-LoginId: usertest123
 X-Loopers-LoginPw: abc123!@#
 

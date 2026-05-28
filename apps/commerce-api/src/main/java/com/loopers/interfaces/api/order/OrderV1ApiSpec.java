@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 
 @Tag(name = "Order V1 API", description = "주문 생성·조회 API. X-Loopers-LoginId / X-Loopers-LoginPw 헤더 필요.")
 public interface OrderV1ApiSpec {
@@ -38,10 +38,10 @@ public interface OrderV1ApiSpec {
     })
     ApiResponse<PageResult<OrderV1Dto.OrderResponse>> getOrders(
             @Parameter(hidden = true) Long userId,
-            @Parameter(description = "조회 시작 일시 (ISO-8601, 예: 2024-01-01T00:00:00+09:00)")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime startAt,
-            @Parameter(description = "조회 종료 일시 (ISO-8601)")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime endAt,
+            @Parameter(description = "조회 시작 날짜 (YYYY-MM-DD, 예: 2024-01-01). 당일 00:00:00 KST 이후 포함.")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
+            @Parameter(description = "조회 종료 날짜 (YYYY-MM-DD, 예: 2024-01-31). 당일 23:59:59 KST 이전 포함.")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt,
             @Parameter(description = "페이지 번호 (0-based, 기본값: 0)") int page,
             @Parameter(description = "페이지 크기 (기본값: 20)") int size
     );

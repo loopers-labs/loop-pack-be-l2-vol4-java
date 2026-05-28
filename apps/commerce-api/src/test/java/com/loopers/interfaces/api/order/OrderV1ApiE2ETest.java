@@ -225,7 +225,7 @@ class OrderV1ApiE2ETest {
                     new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<PageResult<OrderV1Dto.OrderResponse>>> response =
                     testRestTemplate.exchange(
-                            "/api/v1/orders?startAt=2020-01-01T00:00:00Z&endAt=2099-12-31T23:59:59Z&page=0&size=20",
+                            "/api/v1/orders?startAt=2020-01-01&endAt=2099-12-31&page=0&size=20",
                             HttpMethod.GET, new HttpEntity<>(userHeaders()), type
                     );
 

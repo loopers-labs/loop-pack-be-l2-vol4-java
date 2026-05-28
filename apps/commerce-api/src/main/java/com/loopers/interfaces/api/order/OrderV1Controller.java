@@ -11,6 +11,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
@@ -33,17 +36,21 @@ public class OrderV1Controller implements OrderV1ApiSpec {
         );
     }
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     @GetMapping
     public ApiResponse<PageResult<OrderV1Dto.OrderResponse>> getOrders(
             @LoginUser Long userId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime startAt,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime endAt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
+        ZonedDateTime startDateTime = startAt != null ? startAt.atStartOfDay(KST) : null;
+        ZonedDateTime endDateTime = endAt != null ? endAt.atTime(LocalTime.MAX).atZone(KST) : null;
         return ApiResponse.success(
                 PageResult.from(
-                        orderFacade.getOrders(userId, startAt, endAt, PageRequest.of(page, size))
+                        orderFacade.getOrders(userId, startDateTime, endDateTime, PageRequest.of(page, size))
                                 .map(OrderV1Dto.OrderResponse::from)
                 )
         );

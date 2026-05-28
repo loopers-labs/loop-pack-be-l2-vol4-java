@@ -162,7 +162,7 @@ infrastructure/
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
 | POST | `/api/v1/orders` | 주문 생성 | User |
-| GET | `/api/v1/orders?startAt=&endAt=&page=0&size=20` | 내 주문 목록 | User |
+| GET | `/api/v1/orders?startAt=2026-05-01&endAt=2026-05-31&page=0&size=20` | 내 주문 목록 (`startAt`/`endAt`은 날짜만, YYYY-MM-DD) | User |
 | GET | `/api/v1/orders/{orderId}` | 주문 단건 조회 | User |
 | GET | `/api-admin/v1/orders?page=0&size=20` | 주문 목록 (Admin) | Admin |
 | GET | `/api-admin/v1/orders/{orderId}` | 주문 단건 조회 (Admin) | Admin |
@@ -561,7 +561,7 @@ LikeFacade.removeLike(userId, productId)
 | `GET /api/v1/products` | `sort` 파라미터 추가 (섹션 7 참고) |
 | `GET /api-admin/v1/products` | |
 | `GET /api/v1/users/{userId}/likes` | |
-| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 ([ADR-010](./adr/010-order-list-query-spec.md)) |
+| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 — **날짜만 (YYYY-MM-DD)** ([ADR-010](./adr/010-order-list-query-spec.md)) |
 | `GET /api-admin/v1/orders` | |
 
 ### 예외
