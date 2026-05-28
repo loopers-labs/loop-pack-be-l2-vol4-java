@@ -5,6 +5,7 @@ import com.loopers.brand.application.BrandCommand;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
+import com.loopers.product.domain.ProductStatus;
 import com.loopers.user.application.UserCommand;
 import com.loopers.user.application.UserService;
 import com.loopers.utils.DatabaseCleanUp;
@@ -43,6 +44,7 @@ class LikeV1ApiE2ETest {
 
     private Long productId;
     private Long deletedProductId;
+    private Long suspendedProductId;
 
     @Autowired
     public LikeV1ApiE2ETest(
@@ -72,6 +74,10 @@ class LikeV1ApiE2ETest {
                 new ProductCommand.Create(brandId, "삭제될 상품", "설명", 10_000L, null, 10)
         ).id();
         productAdminService.delete(deletedProductId);
+        suspendedProductId = productAdminService.create(
+                new ProductCommand.Create(brandId, "판매중지될 상품", "설명", 15_000L, null, 5)
+        ).id();
+        productAdminService.suspend(suspendedProductId);
     }
 
     @AfterEach
@@ -154,6 +160,14 @@ class LikeV1ApiE2ETest {
         }
 
         @Test
+        @DisplayName("판매중지 상품에 좋아요를 등록하면 404 NOT_FOUND 를 받는다")
+        void givenSuspendedProduct_whenRegister_thenThrowsNotFound() {
+            ResponseEntity<ApiResponse<Void>> response = register(suspendedProductId, authHeaders());
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @Test
         @DisplayName("인증 헤더가 없으면 401 UNAUTHORIZED 를 받는다")
         void givenMissingHeaders_whenRegister_thenThrowsUnauthorized() {
             ResponseEntity<ApiResponse<Void>> response = register(productId, new HttpHeaders());
@@ -212,6 +226,25 @@ class LikeV1ApiE2ETest {
                     () -> assertThat(response.getBody().data())
                             .extracting(LikeV1Response.LikedProduct::productId)
                             .containsExactly(productId)
+            );
+        }
+
+        @Test
+        @DisplayName("좋아요한 상품이 판매중지되면 목록에 status=SUSPENDED 로 남는다 (찜 보존)")
+        void givenLikedProductBecomesSuspended_whenGetMyLikes_thenStillListedAsSuspended() {
+            register(productId, authHeaders());
+            productAdminService.suspend(productId);
+
+            ResponseEntity<ApiResponse<List<LikeV1Response.LikedProduct>>> response = getMyLikes(authHeaders());
+
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(response.getBody().data())
+                            .singleElement()
+                            .satisfies(p -> {
+                                assertThat(p.productId()).isEqualTo(productId);
+                                assertThat(p.status()).isEqualTo(ProductStatus.SUSPENDED);
+                            })
             );
         }
 

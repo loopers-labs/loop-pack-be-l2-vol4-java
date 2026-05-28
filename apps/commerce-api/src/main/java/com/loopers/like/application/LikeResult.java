@@ -1,6 +1,7 @@
 package com.loopers.like.application;
 
 import com.loopers.product.domain.Product;
+import com.loopers.product.domain.ProductStatus;
 
 public class LikeResult {
 
@@ -9,7 +10,8 @@ public class LikeResult {
         Long brandId,
         String name,
         String description,
-        long price
+        long price,
+        ProductStatus status
     ) {
         public static LikedProduct from(Product product) {
             return new LikedProduct(
@@ -17,7 +19,8 @@ public class LikeResult {
                 product.getBrandId(),
                 product.getName(),
                 product.getDescription(),
-                product.getPrice()
+                product.getPrice(),
+                product.getStatus()
             );
         }
     }

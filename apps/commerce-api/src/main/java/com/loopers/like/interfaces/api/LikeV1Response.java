@@ -1,6 +1,7 @@
 package com.loopers.like.interfaces.api;
 
 import com.loopers.like.application.LikeResult;
+import com.loopers.product.domain.ProductStatus;
 
 public class LikeV1Response {
 
@@ -9,7 +10,8 @@ public class LikeV1Response {
         Long brandId,
         String name,
         String description,
-        long price
+        long price,
+        ProductStatus status
     ) {
         public static LikedProduct from(LikeResult.LikedProduct result) {
             return new LikedProduct(
@@ -17,7 +19,8 @@ public class LikeV1Response {
                 result.brandId(),
                 result.name(),
                 result.description(),
-                result.price()
+                result.price(),
+                result.status()
             );
         }
     }
