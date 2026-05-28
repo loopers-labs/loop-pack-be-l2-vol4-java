@@ -5,7 +5,9 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class OrderEntity extends BaseEntity {
 
@@ -65,12 +67,11 @@ public class OrderEntity extends BaseEntity {
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
-        long distinctCount = items.stream()
-                .map(OrderItemEntity::getProductId)
-                .distinct()
-                .count();
-        if (distinctCount != items.size()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목에 중복된 상품이 있습니다.");
+        Set<Long> productIds = new HashSet<>();
+        for (OrderItemEntity item : items) {
+            if (!productIds.add(item.getProductId())) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목에 중복된 상품이 있습니다.");
+            }
         }
     }
 }
