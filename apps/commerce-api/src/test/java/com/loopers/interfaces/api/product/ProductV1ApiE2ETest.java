@@ -150,6 +150,57 @@ class ProductV1ApiE2ETest {
             );
         }
 
+        @DisplayName("likes_desc 정렬 조건이면, 상품 목록을 좋아요 수가 높은 순으로 반환한다.")
+        @Test
+        void returnsProductsSortedByLikeCountDesc_whenSortIsLikesDesc() {
+            // arrange
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity lessLikedProduct = saveProduct(
+                Product.reconstruct(null, brand.getId(), "양말", "부드러운 양말", 5_000L, 10, 1, false)
+            );
+            ProductJpaEntity mostLikedProduct = saveProduct(
+                Product.reconstruct(null, brand.getId(), "코트", "따뜻한 코트", 90_000L, 10, 5, false)
+            );
+            ProductJpaEntity unlikedProduct = saveProduct(
+                Product.reconstruct(null, brand.getId(), "니트", "부드러운 니트", 30_000L, 10, 0, false)
+            );
+
+            // act
+            ResponseEntity<ApiResponse<List<ProductDto.List.V1.Response>>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_PRODUCTS + "?sort=likes_desc",
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    productListResponseType()
+                );
+
+            // assert
+            List<ProductDto.List.V1.Response> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data).hasSize(3),
+                () -> assertThat(data.get(0).id()).isEqualTo(mostLikedProduct.getId()),
+                () -> assertThat(data.get(1).id()).isEqualTo(lessLikedProduct.getId()),
+                () -> assertThat(data.get(2).id()).isEqualTo(unlikedProduct.getId())
+            );
+        }
+
+        @DisplayName("존재하지 않는 브랜드 ID로 필터링하면, 404 NOT_FOUND 응답을 받는다.")
+        @Test
+        void throwsNotFound_whenBrandFilterDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_PRODUCTS + "?brandId=999999",
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    voidResponseType()
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
         @DisplayName("지원하지 않는 정렬 조건이면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         void throwsBadRequest_whenSortIsNotSupported() {
@@ -307,6 +358,10 @@ class ProductV1ApiE2ETest {
 
     private ProductJpaEntity saveProduct(Long brandId, String name, String description, Long price, Integer stock) {
         return productJpaRepository.save(ProductJpaEntity.from(new Product(brandId, name, description, price, stock)));
+    }
+
+    private ProductJpaEntity saveProduct(Product product) {
+        return productJpaRepository.save(ProductJpaEntity.from(product));
     }
 
     private void signup(String loginId, String password) {
