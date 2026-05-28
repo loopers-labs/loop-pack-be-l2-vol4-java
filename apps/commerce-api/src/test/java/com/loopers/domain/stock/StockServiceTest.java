@@ -33,12 +33,12 @@ class StockServiceTest {
     @Nested
     class Decrease {
 
-        @DisplayName("재고가 존재하고 차감 가능하면 quantity가 감소한다")
+        @DisplayName("재고가 존재하고 차감 가능하면 quantity가 감소한다 (FOR UPDATE 경로 사용)")
         @Test
         void decreasesQuantity_whenStockExistsAndSufficient() {
             // given
             StockModel stock = new StockModel(PRODUCT_ID, 10);
-            when(stockRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.of(stock));
+            when(stockRepository.findByProductIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(stock));
 
             // when
             stockService.decrease(PRODUCT_ID, 3);
@@ -51,7 +51,7 @@ class StockServiceTest {
         @Test
         void throwsNotFound_whenStockDoesNotExist() {
             // given
-            when(stockRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.empty());
+            when(stockRepository.findByProductIdForUpdate(PRODUCT_ID)).thenReturn(Optional.empty());
 
             // when
             CoreException ex = assertThrows(CoreException.class, () -> stockService.decrease(PRODUCT_ID, 1));
@@ -65,7 +65,7 @@ class StockServiceTest {
         void throwsConflict_whenStockIsInsufficient() {
             // given
             StockModel stock = new StockModel(PRODUCT_ID, 2);
-            when(stockRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.of(stock));
+            when(stockRepository.findByProductIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(stock));
 
             // when
             CoreException ex = assertThrows(CoreException.class, () -> stockService.decrease(PRODUCT_ID, 3));
@@ -79,12 +79,12 @@ class StockServiceTest {
     @Nested
     class Increase {
 
-        @DisplayName("재고가 존재하면 quantity가 증가한다")
+        @DisplayName("재고가 존재하면 quantity가 증가한다 (FOR UPDATE 경로 — decrease와 동일 행)")
         @Test
         void increasesQuantity_whenStockExists() {
             // given
             StockModel stock = new StockModel(PRODUCT_ID, 10);
-            when(stockRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.of(stock));
+            when(stockRepository.findByProductIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(stock));
 
             // when
             stockService.increase(PRODUCT_ID, 5);
@@ -97,7 +97,7 @@ class StockServiceTest {
         @Test
         void throwsNotFound_whenStockDoesNotExist() {
             // given
-            when(stockRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.empty());
+            when(stockRepository.findByProductIdForUpdate(PRODUCT_ID)).thenReturn(Optional.empty());
 
             // when
             CoreException ex = assertThrows(CoreException.class, () -> stockService.increase(PRODUCT_ID, 1));

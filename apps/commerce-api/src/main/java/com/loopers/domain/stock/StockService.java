@@ -29,9 +29,10 @@ public class StockService {
             .forEach(entry -> doDecrease(entry.getKey(), entry.getValue()));
     }
 
+    /** 운영 보충/보상 경로. decrease와 동일 행을 다루므로 lost update 방지를 위해 차감과 같은 FOR UPDATE 경로 사용. */
     @Transactional
     public void increase(Long productId, int amount) {
-        StockModel stock = stockRepository.findByProductId(productId)
+        StockModel stock = stockRepository.findByProductIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
         stock.increase(amount);
     }
@@ -55,7 +56,7 @@ public class StockService {
     }
 
     private void doDecrease(Long productId, int amount) {
-        StockModel stock = stockRepository.findByProductId(productId)
+        StockModel stock = stockRepository.findByProductIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
         stock.decrease(amount);
     }
