@@ -40,7 +40,8 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id);
-        productRepository.delete(id);
+        ProductEntity product = getProduct(id);
+        product.delete();
+        productRepository.save(product);
     }
 }

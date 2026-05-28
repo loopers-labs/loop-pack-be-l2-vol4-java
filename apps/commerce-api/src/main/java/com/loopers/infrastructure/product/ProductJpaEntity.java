@@ -6,6 +6,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+import java.time.ZonedDateTime;
+
 @Entity
 @Table(name = "product")
 @Getter
@@ -28,10 +30,8 @@ public class ProductJpaEntity extends BaseJpaEntity {
 
     protected ProductJpaEntity() {}
 
-    ProductJpaEntity(Long id, Long brandId, String name, String description, Long price, Long likeCount) {
-        if (id != null) {
-            setId(id);
-        }
+    ProductJpaEntity(Long id, Long brandId, String name, String description, Long price, Long likeCount, ZonedDateTime deletedAt) {
+        super(id, deletedAt);
         this.brandId = brandId;
         this.name = name;
         this.description = description;

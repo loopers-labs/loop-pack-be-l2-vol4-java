@@ -11,6 +11,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
+
     private final ProductJpaRepository productJpaRepository;
 
     @Override
@@ -20,18 +21,14 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Optional<ProductEntity> find(Long id) {
-        return productJpaRepository.findById(id).map(ProductMapper::toDomain);
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .map(ProductMapper::toDomain);
     }
 
     @Override
     public List<ProductEntity> findAll() {
-        return productJpaRepository.findAll().stream()
+        return productJpaRepository.findAllByDeletedAtIsNull().stream()
                 .map(ProductMapper::toDomain)
                 .toList();
-    }
-
-    @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
     }
 }

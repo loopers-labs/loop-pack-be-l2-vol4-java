@@ -11,7 +11,8 @@ public class ProductMapper {
                 entity.getName(),
                 entity.getDescription(),
                 entity.getPrice(),
-                entity.getLikeCount()
+                entity.getLikeCount(),
+                entity.getDeletedAt()
         );
     }
 
