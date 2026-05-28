@@ -33,8 +33,7 @@ public class UserFacade {
     }
 
     public void changePassword(String loginId, String currentPassword, String newPassword) {
-        UserModel user = userService.authenticate(loginId, currentPassword);
-        userService.changePassword(user.getId(), currentPassword, newPassword);
+        userService.changePassword(loginId, currentPassword, newPassword);
     }
 
     /**

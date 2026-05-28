@@ -2,6 +2,7 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,25 @@ public class ProductQueryService {
 
         return products.stream()
                 .map(p -> new ProductListEntry(p, brandNames.get(p.getBrandId()), likedIds.contains(p.getId())))
+                .toList();
+    }
+
+    /**
+     * 내가 좋아요한 상품 목록 (UC-07) — 좋아요 시점 최신순. 좋아요는 살아있어도 상품·브랜드가
+     * 비활성된 경우 결과에서 제외하며, 상품 활성 검증은 batch(IN)로 한 번에 처리해 N+1을 피한다.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductModel> getMyLikedProducts(Long userId, int page, int size) {
+        List<LikeModel> likes = likeService.getMyActiveLikes(userId, page, size);
+        if (likes.isEmpty()) return List.of();
+
+        List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
+        Map<Long, ProductModel> activeById = productService.findActiveByIds(productIds).stream()
+                .collect(Collectors.toMap(ProductModel::getId, p -> p));
+
+        return likes.stream()
+                .map(l -> activeById.get(l.getProductId()))
+                .filter(Objects::nonNull)
                 .toList();
     }
 }

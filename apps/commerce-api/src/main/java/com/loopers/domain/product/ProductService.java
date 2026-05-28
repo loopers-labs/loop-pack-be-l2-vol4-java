@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.loopers.support.page.PagePolicy;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,6 +54,12 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductModel> getActiveProductsByBrand(Long brandId) {
         return productRepository.findActiveByBrandId(brandId);
+    }
+
+    /** 활성 상품 batch 조회 — 좋아요한 상품 목록 조합 N+1 회피 (UC-07). */
+    @Transactional(readOnly = true)
+    public List<ProductModel> findActiveByIds(Collection<Long> ids) {
+        return productRepository.findActiveByIds(ids);
     }
 
     @Transactional

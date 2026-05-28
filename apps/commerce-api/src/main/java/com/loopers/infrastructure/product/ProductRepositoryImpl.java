@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +53,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public List<ProductModel> findActiveByBrandId(Long brandId) {
         return productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId).stream()
+                .map(ProductEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<ProductModel> findActiveByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return productJpaRepository.findByIdInAndDeletedAtIsNull(ids).stream()
                 .map(ProductEntityMapper::toDomain)
                 .toList();
     }

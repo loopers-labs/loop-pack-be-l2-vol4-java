@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.List;
 
@@ -12,4 +13,7 @@ public interface ProductRepository {
 
     /** 활성 상품 목록 — 브랜드 필터(null=전체) + 정렬 + 페이지 (UC-03). */
     List<ProductModel> findActivePage(Long brandId, ProductSortType sort, int page, int size);
+
+    /** 주어진 id 들 중 활성 상품만 batch 조회 — 좋아요한 상품 목록 조합 N+1 회피 (UC-07). */
+    List<ProductModel> findActiveByIds(Collection<Long> ids);
 }
