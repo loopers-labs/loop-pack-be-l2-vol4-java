@@ -112,7 +112,7 @@ sequenceDiagram
     participant LS as LikeService
     participant LR as LikeRepository
 
-    사용자->>C: POST /api/v1/products/{productId}/likes
+    사용자->>C: PUT /api/v1/products/{productId}/likes
     C->>F: like(loginId, productId)
     F->>LS: like(userId, productId)
     activate LS
