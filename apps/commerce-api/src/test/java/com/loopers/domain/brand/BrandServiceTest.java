@@ -215,7 +215,6 @@ class BrandServiceTest {
             // arrange
             BrandEntity existing = brandEntity();
             when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(existing));
-            when(brandRepository.save(existing)).thenReturn(existing);
 
             // act
             brandService.delete(BRAND_ID);
