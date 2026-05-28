@@ -3,16 +3,13 @@ package com.loopers.domain.user;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
-@Entity
-@Table(name = "users")
 public class UserModel extends BaseEntity {
 
     private static final Pattern USER_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
@@ -41,6 +38,18 @@ public class UserModel extends BaseEntity {
         this.email = email;
         this.birthDate = birthDate;
         this.password = passwordEncoder.encode(password);
+    }
+
+    public static UserModel of(Long id, String userId, String name, String email, String encodedPassword,
+            LocalDate birthDate, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+        UserModel model = new UserModel();
+        model.userId = userId;
+        model.name = name;
+        model.email = email;
+        model.password = encodedPassword;
+        model.birthDate = birthDate;
+        model.reconstruct(id, createdAt, updatedAt, deletedAt);
+        return model;
     }
 
     public String getUserId() {
