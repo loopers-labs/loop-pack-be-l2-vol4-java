@@ -43,3 +43,105 @@
 
 - 어드민만 가능 (`X-Loopers-Ldap: loopers.admin`)
 - `AdminInterceptor`가 `/api-admin/**` 경로에서 일괄 처리
+
+---
+
+## 상품 목록 조회 (고객)
+
+### 입력 필드
+- `brandId`: 선택, 특정 브랜드 상품만 필터링
+- `sort`: 필수, `latest`(기본값) / `price_asc` / `likes_desc`
+- `page`: 기본값 0
+- `size`: 기본값 20
+
+### 비즈니스 규칙
+- 없음 (단순 페이징 조회)
+- `sort` 값이 정의된 값 외의 경우 → `BAD_REQUEST`
+
+### 유스케이스 흐름
+1. `ProductRepository.findAllWithBrand(brandId, sort, pageable)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 각 상품의 재고 조회 → `inStock = stock.quantity > 0`
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 인증 불필요
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandName`, `likeCount`, `inStock`
+
+---
+
+## 상품 상세 조회 (고객)
+
+### 입력 필드
+- `productId`: Path variable
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `ProductRepository.findByIdWithBrand(productId)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 재고 조회 → `inStock = stock.quantity > 0`
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 인증 불필요
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandName`, `likeCount`, `inStock`
+
+---
+
+## 상품 목록 조회 (어드민)
+
+### 입력 필드
+- `brandId`: 선택, 특정 브랜드 상품만 필터링
+- `page`: 기본값 0
+- `size`: 기본값 20
+
+### 비즈니스 규칙
+- 없음
+
+### 유스케이스 흐름
+1. `ProductRepository.findAllWithBrand(brandId, pageable)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 각 상품의 재고 수량 조회
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandId`, `brandName`, `likeCount`, `stock`(수량), `createdAt`, `updatedAt`
+
+---
+
+## 상품 상세 조회 (어드민)
+
+### 입력 필드
+- `productId`: Path variable
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `ProductRepository.findByIdWithBrand(productId)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 재고 수량 조회
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandId`, `brandName`, `likeCount`, `stock`(수량), `createdAt`, `updatedAt`

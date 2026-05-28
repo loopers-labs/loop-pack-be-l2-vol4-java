@@ -19,3 +19,73 @@
 
 ### 접근 제어
 - 어드민 전용 (`X-Loopers-Ldap: loopers.admin` 헤더)
+
+---
+
+## 브랜드 상세 조회 (고객)
+
+### 입력 필드
+- `brandId`: Path variable, 존재하는 브랜드 ID
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 브랜드 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `BrandDomainService.getBrand(brandId)` — 브랜드 존재 확인 및 조회
+2. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)` — 단순 조회
+
+### 접근 제어
+- 인증 불필요 (비로그인 사용자도 접근 가능)
+
+### 응답 필드
+- `id`, `name`
+
+---
+
+## 브랜드 목록 조회 (어드민)
+
+### 입력 필드
+- `page`: 기본값 0
+- `size`: 기본값 20
+
+### 비즈니스 규칙
+- 없음 (단순 페이징 조회)
+
+### 유스케이스 흐름
+1. `BrandRepository.findAll(pageable)` — 페이징 조회
+2. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `createdAt`, `updatedAt`
+
+---
+
+## 브랜드 상세 조회 (어드민)
+
+### 입력 필드
+- `brandId`: Path variable, 존재하는 브랜드 ID
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 브랜드 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `BrandDomainService.getBrand(brandId)` — 브랜드 존재 확인 및 조회
+2. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `createdAt`, `updatedAt`
