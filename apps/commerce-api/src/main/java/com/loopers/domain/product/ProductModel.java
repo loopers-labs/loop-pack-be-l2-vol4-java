@@ -37,6 +37,9 @@ public class ProductModel extends BaseSoftDeleteEntity {
     @Column(nullable = false)
     private int likeCount = 0;
 
+    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL)
+    private StockModel stock;
+
     @Builder
     public ProductModel(Long brandId, String name, BigDecimal price) {
         validateBrandId(brandId);
