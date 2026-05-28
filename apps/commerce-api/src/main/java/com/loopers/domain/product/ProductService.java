@@ -26,6 +26,14 @@ public class ProductService {
         return productRepository.findAllByIds(ids);
     }
 
+    public List<ProductModel> findAllByIdsOrThrow(List<Long> ids) {
+        List<ProductModel> found = productRepository.findAllByIds(ids);
+        if (found.size() != ids.size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
+        }
+        return found;
+    }
+
     public List<ProductModel> findAllByBrandId(Long brandId) {
         return productRepository.findAllByBrandId(brandId);
     }
