@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :apps:commerce-api:compileTestJava)",
+      "Bash(./gradlew :apps:commerce-api:compileJava)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.product.ProductFacadeIntegrationTest\")",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.like.LikeFacadeIntegrationTest\")"
+    ]
+  }
+}

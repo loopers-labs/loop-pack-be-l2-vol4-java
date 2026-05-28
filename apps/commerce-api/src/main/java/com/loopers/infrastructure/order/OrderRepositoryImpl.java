@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,8 +39,18 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Page<OrderEntity> findAllByUserId(Long userId, Pageable pageable) {
-        return orderJpaRepository.findAllByUserIdAndDeletedAtIsNull(userId, pageable)
+    public Page<OrderEntity> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
+        return orderJpaRepository.findAllByUserIdWithDateRange(userId, startAt, endAt, pageable)
+                .map(order -> {
+                    List<OrderItemJpaEntity> items =
+                            orderItemJpaRepository.findAllByOrderIdAndDeletedAtIsNull(order.getId());
+                    return OrderMapper.toDomain(order, items);
+                });
+    }
+
+    @Override
+    public Page<OrderEntity> findAll(Pageable pageable) {
+        return orderJpaRepository.findAllByDeletedAtIsNull(pageable)
                 .map(order -> {
                     List<OrderItemJpaEntity> items =
                             orderItemJpaRepository.findAllByOrderIdAndDeletedAtIsNull(order.getId());

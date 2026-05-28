@@ -149,13 +149,13 @@ class OrderServiceTest {
     // getOrders
     // ─────────────────────────────────────────────
 
-    @DisplayName("주문 목록 조회")
+    @DisplayName("주문 목록 조회 (Customer)")
     @Nested
     class GetOrders {
 
-        @DisplayName("[ECP] userId로 조회하면 해당 유저의 주문 목록이 페이지로 반환된다.")
+        @DisplayName("[ECP] 날짜 필터 없이 userId로 조회하면 해당 유저의 주문 목록이 반환된다.")
         @Test
-        void returnsOrderPage_whenOrdersExist() {
+        void returnsOrderPage_whenNoDateFilter() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
             List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
@@ -163,11 +163,11 @@ class OrderServiceTest {
                     savedOrder(ORDER_ID, USER_ID, items),
                     savedOrder(ORDER_ID + 1, USER_ID, items)
             );
-            given(orderRepository.findAllByUserId(USER_ID, pageable))
+            given(orderRepository.findAllByUserId(USER_ID, null, null, pageable))
                     .willReturn(new PageImpl<>(orders, pageable, 2));
 
             // act
-            Page<OrderEntity> result = orderService.getOrders(USER_ID, pageable);
+            Page<OrderEntity> result = orderService.getOrders(USER_ID, null, null, pageable);
 
             // assert
             assertAll(
@@ -175,7 +175,26 @@ class OrderServiceTest {
                     () -> assertTrue(result.getContent().stream()
                             .allMatch(o -> o.getUserId().equals(USER_ID)))
             );
-            verify(orderRepository).findAllByUserId(USER_ID, pageable);
+            verify(orderRepository).findAllByUserId(USER_ID, null, null, pageable);
+        }
+
+        @DisplayName("[ADR-010] startAt/endAt 날짜 필터를 전달하면 해당 Repository 메서드가 호출된다.")
+        @Test
+        void delegatesToRepository_whenDateFilterProvided() {
+            // arrange
+            PageRequest pageable = PageRequest.of(0, 20);
+            ZonedDateTime startAt = ZonedDateTime.now().minusDays(7);
+            ZonedDateTime endAt = ZonedDateTime.now();
+            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            given(orderRepository.findAllByUserId(USER_ID, startAt, endAt, pageable))
+                    .willReturn(new PageImpl<>(List.of(savedOrder(ORDER_ID, USER_ID, items)), pageable, 1));
+
+            // act
+            Page<OrderEntity> result = orderService.getOrders(USER_ID, startAt, endAt, pageable);
+
+            // assert
+            assertEquals(1, result.getTotalElements());
+            verify(orderRepository).findAllByUserId(USER_ID, startAt, endAt, pageable);
         }
 
         @DisplayName("[ECP] 주문이 없는 유저 조회 시 빈 페이지가 반환된다.")
@@ -183,11 +202,55 @@ class OrderServiceTest {
         void returnsEmptyPage_whenNoOrdersExist() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
-            given(orderRepository.findAllByUserId(USER_ID, pageable))
+            given(orderRepository.findAllByUserId(USER_ID, null, null, pageable))
                     .willReturn(Page.empty(pageable));
 
             // act
-            Page<OrderEntity> result = orderService.getOrders(USER_ID, pageable);
+            Page<OrderEntity> result = orderService.getOrders(USER_ID, null, null, pageable);
+
+            // assert
+            assertTrue(result.getContent().isEmpty());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // getAllOrders
+    // ─────────────────────────────────────────────
+
+    @DisplayName("전체 주문 목록 조회 (Admin)")
+    @Nested
+    class GetAllOrders {
+
+        @DisplayName("[ECP] 전체 주문 목록을 페이지로 반환한다.")
+        @Test
+        void returnsAllOrdersPage() {
+            // arrange
+            PageRequest pageable = PageRequest.of(0, 20);
+            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderEntity> orders = List.of(
+                    savedOrder(ORDER_ID, USER_ID, items),
+                    savedOrder(ORDER_ID + 1, 2L, items)
+            );
+            given(orderRepository.findAll(pageable))
+                    .willReturn(new PageImpl<>(orders, pageable, 2));
+
+            // act
+            Page<OrderEntity> result = orderService.getAllOrders(pageable);
+
+            // assert
+            assertEquals(2, result.getTotalElements());
+            verify(orderRepository).findAll(pageable);
+        }
+
+        @DisplayName("[ECP] 주문이 없으면 빈 페이지가 반환된다.")
+        @Test
+        void returnsEmptyPage_whenNoOrdersExist() {
+            // arrange
+            PageRequest pageable = PageRequest.of(0, 20);
+            given(orderRepository.findAll(pageable)).willReturn(Page.empty(pageable));
+
+            // act
+            Page<OrderEntity> result = orderService.getAllOrders(pageable);
 
             // assert
             assertTrue(result.getContent().isEmpty());

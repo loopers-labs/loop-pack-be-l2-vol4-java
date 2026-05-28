@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -28,7 +29,12 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderEntity> getOrders(Long userId, Pageable pageable) {
-        return orderRepository.findAllByUserId(userId, pageable);
+    public Page<OrderEntity> getOrders(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
+        return orderRepository.findAllByUserId(userId, startAt, endAt, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderEntity> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable);
     }
 }
