@@ -20,7 +20,7 @@ public abstract class BaseJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private final Long id = 0L;
+    private Long id;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private ZonedDateTime createdAt;
@@ -35,6 +35,10 @@ public abstract class BaseJpaEntity {
      * 엔티티의 유효성을 검증한다.
      * 이 메소드는 PrePersist 및 PreUpdate 시점에 호출된다.
      */
+    protected void setId(Long id) {
+        this.id = id;
+    }
+
     protected void guard() {}
 
     @PrePersist
