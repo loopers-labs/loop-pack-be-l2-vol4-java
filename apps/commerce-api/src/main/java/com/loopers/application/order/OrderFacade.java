@@ -53,13 +53,13 @@ public class OrderFacade {
         }
 
         // 1. 활성 상품 배치 조회
-        List<Long> productIds = itemCommands.stream().map(OrderItemCommand::productId).toList();
-        Map<Long, ProductModel> productMap = productRepository.findAllActiveByIds(productIds)
+        List<Long> reqProductIds = itemCommands.stream().map(OrderItemCommand::productId).toList();
+        Map<Long, ProductModel> existProductMap = productRepository.findAllActiveByIds(reqProductIds)
             .stream()
             .collect(Collectors.toMap(ProductModel::getId, p -> p));
 
-        for (Long pid : productIds) {
-            if (!productMap.containsKey(pid)) {
+        for (Long pid : reqProductIds) {
+            if (!existProductMap.containsKey(pid)) {
                 throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다. id=" + pid);
             }
         }
@@ -83,7 +83,7 @@ public class OrderFacade {
         stockMap.forEach((productId, stock) -> stock.decrease(quantityMap.get(productId)));
 
         // 5. 주문 엔티티 조립 (Domain Service 위임 — 스냅샷 포함 OrderModel 반환)
-        List<ProductModel> products = List.copyOf(productMap.values());
+        List<ProductModel> products = List.copyOf(existProductMap.values());
         OrderModel order = orderDomainService.buildOrder(command.userId(), products, quantityMap);
 
         // 6. 영속화 (CascadeType.ALL — 주문항목 한 번에 저장)
