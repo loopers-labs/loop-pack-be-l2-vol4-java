@@ -29,11 +29,14 @@ public class PaymentFacade {
         return PaymentInfo.from(payment);
     }
 
-    /** 결제 실패 — PENDING이면 재고 해제 + 주문 실패 (멱등) + 결제 저장 */
+    /** 결제 실패 — PENDING이면 재고 해제 + 주문 실패 (멱등) + 결제 저장 (멱등) */
     public PaymentInfo fail(UUID orderId, String pgTransactionId, Long amount) {
         OrderModel order = orderService.get(orderId);
         orderStockService.failOrder(order);
-        PaymentModel payment = paymentService.save(new PaymentModel(orderId, pgTransactionId, PaymentStatus.FAILED, amount));
+        PaymentModel payment = paymentService.saveIfAbsent(
+            orderId,
+            new PaymentModel(orderId, pgTransactionId, PaymentStatus.FAILED, amount)
+        );
         return PaymentInfo.from(payment);
     }
 }
