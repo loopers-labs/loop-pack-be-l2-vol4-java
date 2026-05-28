@@ -14,6 +14,12 @@ public class BrandApplicationService {
     private final BrandDomainService brandDomainService;
     private final BrandRepository brandRepository;
 
+    // 브랜드 조회
+    @Transactional(readOnly = true)
+    public Brand getBrand(Long brandId) {
+        return brandDomainService.getBrand(brandId);
+    }
+
     // 브랜드 등록
     @Transactional
     public Brand register(String name) {

@@ -29,6 +29,41 @@ class BrandApplicationServiceTest {
         brandApplicationService = new BrandApplicationService(brandDomainService, brandRepository);
     }
 
+    @DisplayName("브랜드를 조회할 때, ")
+    @Nested
+    class GetBrand {
+
+        @DisplayName("존재하는 ID이면, 브랜드를 반환한다.")
+        @Test
+        void returnsBrand_whenIdExists() {
+            // Arrange
+            Brand brand = Brand.create("나이키");
+            when(brandDomainService.getBrand(1L)).thenReturn(brand);
+
+            // Act
+            Brand result = brandApplicationService.getBrand(1L);
+
+            // Assert
+            assertThat(result.getName()).isEqualTo("나이키");
+        }
+
+        @DisplayName("존재하지 않는 ID이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            // Arrange
+            when(brandDomainService.getBrand(999L))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                brandApplicationService.getBrand(999L)
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("브랜드를 등록할 때, ")
     @Nested
     class Register {
