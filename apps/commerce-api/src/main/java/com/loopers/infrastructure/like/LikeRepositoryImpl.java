@@ -22,6 +22,11 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
+    public LikeModel saveAndFlush(LikeModel like) {
+        return likeJpaRepository.saveAndFlush(like);
+    }
+
+    @Override
     public Optional<LikeModel> findByUserIdAndProductId(UUID userId, UUID productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId);
     }

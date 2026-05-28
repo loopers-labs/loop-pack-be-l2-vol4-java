@@ -10,6 +10,8 @@ public interface LikeRepository {
 
     LikeModel save(LikeModel like);
 
+    LikeModel saveAndFlush(LikeModel like);
+
     Optional<LikeModel> findByUserIdAndProductId(UUID userId, UUID productId);
 
     boolean existsByUserIdAndProductId(UUID userId, UUID productId);

@@ -1,6 +1,7 @@
 package com.loopers.domain.like;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,18 @@ public class LikeService {
         return likeRepository.findByUserIdAndProductId(userId, productId);
     }
 
-    /** 좋아요 저장 — 이미 존재하면 기존 반환 (멱등) */
+    /**
+     * 좋아요 저장 — 이미 존재하면 기존 반환 (멱등).
+     * saveAndFlush로 즉시 DB 전송 → 동시 중복 INSERT 시 DataIntegrityViolationException을
+     * try-catch 내에서 포착 → 기존 레코드 반환.
+     */
     public LikeModel like(UUID userId, UUID productId) {
-        return likeRepository.findByUserIdAndProductId(userId, productId)
-            .orElseGet(() -> likeRepository.save(new LikeModel(userId, productId)));
+        try {
+            return likeRepository.findByUserIdAndProductId(userId, productId)
+                .orElseGet(() -> likeRepository.saveAndFlush(new LikeModel(userId, productId)));
+        } catch (DataIntegrityViolationException e) {
+            return likeRepository.findByUserIdAndProductId(userId, productId).orElseThrow();
+        }
     }
 
     /**
