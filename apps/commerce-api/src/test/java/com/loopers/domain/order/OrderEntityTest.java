@@ -37,9 +37,9 @@ public class OrderEntityTest {
             );
         }
 
-        @DisplayName("생성 시 status는 COMPLETED이다.")
+        @DisplayName("생성 시 status는 PENDING이다.")
         @Test
-        void createsOrderEntity_withCompletedStatus() {
+        void createsOrderEntity_withPendingStatus() {
             // arrange
             List<OrderItemEntity> items = List.of(createItem(1L));
 
@@ -47,7 +47,7 @@ public class OrderEntityTest {
             OrderEntity order = new OrderEntity(VALID_USER_ID, items);
 
             // assert
-            assertEquals(OrderStatus.COMPLETED, order.getStatus());
+            assertEquals(OrderStatus.PENDING, order.getStatus());
         }
 
         @DisplayName("userId가 null이면 예외가 발생한다.")

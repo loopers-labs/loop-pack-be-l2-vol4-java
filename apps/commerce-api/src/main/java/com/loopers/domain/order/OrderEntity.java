@@ -21,7 +21,7 @@ public class OrderEntity extends BaseEntity {
         validateUserId(userId);
         validateItems(items);
         this.userId = userId;
-        this.status = OrderStatus.COMPLETED;
+        this.status = OrderStatus.PENDING;
         this.items = items;
     }
 
