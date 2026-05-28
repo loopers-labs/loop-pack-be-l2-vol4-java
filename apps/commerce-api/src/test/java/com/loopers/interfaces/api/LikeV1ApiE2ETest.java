@@ -34,8 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class LikeV1ApiE2ETest {
 
     private static final String USERS_URL    = "/api/v1/users";
-    private static final String BRANDS_URL   = "/api/v1/admin/brands";
-    private static final String PRODUCTS_URL = "/api/v1/admin/products";
+    private static final String BRANDS_URL   = "/api-admin/v1/brands";
+    private static final String PRODUCTS_URL = "/api-admin/v1/products";
 
     @Autowired
     private TestRestTemplate testRestTemplate;

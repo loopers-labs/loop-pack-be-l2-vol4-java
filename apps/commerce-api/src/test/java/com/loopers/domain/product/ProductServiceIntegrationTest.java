@@ -140,7 +140,7 @@ class ProductServiceIntegrationTest {
             productService.deleteByBrand(brand.getId());
 
             // assert — 고객 목록 조회 시 빈 결과
-            Page<ProductModel> activeList = productService.getActiveList(PageRequest.of(0, 10));
+            Page<ProductModel> activeList = productService.getActiveList(null, PageRequest.of(0, 10));
             assertThat(activeList.getTotalElements()).isZero();
         }
     }
@@ -158,7 +158,7 @@ class ProductServiceIntegrationTest {
             productService.delete(deleted.getId());
 
             // act
-            Page<ProductModel> page = productService.getActiveList(PageRequest.of(0, 10));
+            Page<ProductModel> page = productService.getActiveList(null, PageRequest.of(0, 10));
 
             // assert
             assertAll(

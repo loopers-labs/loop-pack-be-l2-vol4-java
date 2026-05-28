@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductV1ApiE2ETest {
 
-    private static final String ADMIN_BRAND_URL   = "/api/v1/admin/brands";
-    private static final String ADMIN_PRODUCT_URL = "/api/v1/admin/products";
+    private static final String ADMIN_BRAND_URL   = "/api-admin/v1/brands";
+    private static final String ADMIN_PRODUCT_URL = "/api-admin/v1/products";
     private static final String CUSTOMER_URL      = "/api/v1/products";
 
     @Autowired
@@ -137,6 +137,35 @@ class ProductV1ApiE2ETest {
             );
 
             // assert — 삭제 1건 제외 → 2건만
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getTotalElements()).isEqualTo(2)
+            );
+        }
+
+        @DisplayName("brandId 필터로 조회 시, 해당 브랜드 상품만 반환된다.")
+        @Test
+        void returnsFilteredProducts_whenBrandIdProvided() {
+            // arrange
+            UUID brandId1 = createBrand();
+            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
+                ADMIN_BRAND_URL, HttpMethod.POST,
+                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명")),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID brandId2 = brandResp.getBody().data().id();
+
+            createProduct(brandId1);
+            createProduct(brandId1);
+            createProduct(brandId2);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = testRestTemplate.exchange(
+                CUSTOMER_URL + "?brandId=" + brandId1 + "&page=0&size=10", HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {}
+            );
+
+            // assert — brandId1 상품 2건만
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().getTotalElements()).isEqualTo(2)

@@ -29,7 +29,10 @@
       "Bash(git -C \"C:/loopers\" add .docs/design/04-erd.md)",
       "Bash(git -C \"C:/loopers\" add .docs/design/)",
       "Bash(xargs grep -l \"class.*Model\\\\|class.*Repository\\\\|class.*Service\\\\|class.*Controller\")",
-      "Bash(xargs grep -l \"order\\\\|Order\")"
+      "Bash(xargs grep -l \"order\\\\|Order\")",
+      "Bash(gh api *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

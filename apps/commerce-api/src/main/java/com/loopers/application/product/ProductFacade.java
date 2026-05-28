@@ -46,17 +46,17 @@ public class ProductFacade {
         return ProductInfo.from(product, stock);
     }
 
-    /** 어드민 목록 — 삭제된 상품 포함 */
-    public Page<ProductInfo> getList(Pageable pageable) {
-        return productService.getList(pageable).map(product -> {
+    /** 어드민 목록 — 삭제된 상품 포함, brandId null이면 전체 */
+    public Page<ProductInfo> getList(UUID brandId, Pageable pageable) {
+        return productService.getList(brandId, pageable).map(product -> {
             StockModel stock = stockService.getByProductId(product.getId());
             return ProductInfo.from(product, stock);
         });
     }
 
-    /** 고객 목록 — 활성 상품만 */
-    public Page<ProductInfo> getActiveList(Pageable pageable) {
-        return productService.getActiveList(pageable).map(product -> {
+    /** 고객 목록 — 활성 상품만, brandId null이면 전체 */
+    public Page<ProductInfo> getActiveList(UUID brandId, Pageable pageable) {
+        return productService.getActiveList(brandId, pageable).map(product -> {
             StockModel stock = stockService.getByProductId(product.getId());
             return ProductInfo.from(product, stock);
         });

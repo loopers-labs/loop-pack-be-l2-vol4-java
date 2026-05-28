@@ -39,8 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class OrderV1ApiE2ETest {
 
     private static final String USERS_URL    = "/api/v1/users";
-    private static final String BRANDS_URL   = "/api/v1/admin/brands";
-    private static final String PRODUCTS_URL = "/api/v1/admin/products";
+    private static final String BRANDS_URL   = "/api-admin/v1/brands";
+    private static final String PRODUCTS_URL = "/api-admin/v1/products";
     private static final String ORDERS_URL   = "/api/v1/orders";
     private static final String PAYMENTS_CONFIRM_URL = "/api/v1/payments/confirm";
     private static final String PAYMENTS_FAIL_URL    = "/api/v1/payments/fail";

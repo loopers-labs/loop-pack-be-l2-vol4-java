@@ -24,4 +24,10 @@ public interface ProductRepository {
 
     /** 브랜드 소프트딜리트 시 cascade 처리용 — 브랜드 산하 전체 상품 조회 */
     List<ProductModel> findAllByBrandId(UUID brandId);
+
+    /** 고객 목록 — 브랜드 필터 + 활성 상품만 */
+    Page<ProductModel> findAllActiveByBrandId(UUID brandId, Pageable pageable);
+
+    /** 어드민 목록 — 브랜드 필터 (삭제 포함) */
+    Page<ProductModel> findAllByBrandIdPaged(UUID brandId, Pageable pageable);
 }

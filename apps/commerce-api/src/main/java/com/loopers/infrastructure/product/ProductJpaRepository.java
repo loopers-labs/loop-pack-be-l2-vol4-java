@@ -19,4 +19,10 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, UUID> 
 
     @Query("SELECT p FROM ProductModel p WHERE p.brand.id = :brandId AND p.deletedAt IS NULL")
     List<ProductModel> findAllByBrandIdAndDeletedAtIsNull(@Param("brandId") UUID brandId);
+
+    @Query("SELECT p FROM ProductModel p WHERE p.brand.id = :brandId AND p.deletedAt IS NULL")
+    Page<ProductModel> findAllByBrandIdAndDeletedAtIsNull(@Param("brandId") UUID brandId, Pageable pageable);
+
+    @Query("SELECT p FROM ProductModel p WHERE p.brand.id = :brandId")
+    Page<ProductModel> findAllByBrandIdPaged(@Param("brandId") UUID brandId, Pageable pageable);
 }

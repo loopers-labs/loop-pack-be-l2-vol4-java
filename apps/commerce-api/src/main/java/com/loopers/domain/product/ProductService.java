@@ -32,13 +32,19 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
-    /** 어드민 목록 */
-    public Page<ProductModel> getList(Pageable pageable) {
+    /** 어드민 목록 — brandId null이면 전체, 있으면 브랜드 필터 */
+    public Page<ProductModel> getList(UUID brandId, Pageable pageable) {
+        if (brandId != null) {
+            return productRepository.findAllByBrandIdPaged(brandId, pageable);
+        }
         return productRepository.findAll(pageable);
     }
 
-    /** 고객 목록 — 활성 상품만 */
-    public Page<ProductModel> getActiveList(Pageable pageable) {
+    /** 고객 목록 — 활성 상품만, brandId null이면 전체, 있으면 브랜드 필터 */
+    public Page<ProductModel> getActiveList(UUID brandId, Pageable pageable) {
+        if (brandId != null) {
+            return productRepository.findAllActiveByBrandId(brandId, pageable);
+        }
         return productRepository.findAllActive(pageable);
     }
 

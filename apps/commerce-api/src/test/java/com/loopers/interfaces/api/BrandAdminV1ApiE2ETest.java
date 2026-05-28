@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BrandAdminV1ApiE2ETest {
 
-    private static final String BASE_URL = "/api/v1/admin/brands";
+    private static final String BASE_URL = "/api-admin/v1/brands";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -50,7 +50,7 @@ class BrandAdminV1ApiE2ETest {
         return response.getBody().data().id();
     }
 
-    @DisplayName("POST /api/v1/admin/brands")
+    @DisplayName("POST /api-admin/v1/brands")
     @Nested
     class Create {
 
@@ -105,7 +105,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/brands/{id}")
+    @DisplayName("GET /api-admin/v1/brands/{id}")
     @Nested
     class Get {
 
@@ -163,7 +163,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/brands")
+    @DisplayName("GET /api-admin/v1/brands")
     @Nested
     class GetList {
 
@@ -191,7 +191,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PUT /api/v1/admin/brands/{id}")
+    @DisplayName("PUT /api-admin/v1/brands/{id}")
     @Nested
     class Update {
 
@@ -218,7 +218,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("DELETE /api/v1/admin/brands/{id}")
+    @DisplayName("DELETE /api-admin/v1/brands/{id}")
     @Nested
     class Delete {
 

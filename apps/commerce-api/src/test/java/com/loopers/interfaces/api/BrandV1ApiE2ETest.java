@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BrandV1ApiE2ETest {
 
-    private static final String ADMIN_BASE_URL    = "/api/v1/admin/brands";
+    private static final String ADMIN_BASE_URL    = "/api-admin/v1/brands";
     private static final String CUSTOMER_BASE_URL = "/api/v1/brands";
 
     @Autowired

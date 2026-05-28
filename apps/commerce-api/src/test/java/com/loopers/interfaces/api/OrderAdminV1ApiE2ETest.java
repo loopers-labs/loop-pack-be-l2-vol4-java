@@ -35,10 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class OrderAdminV1ApiE2ETest {
 
     private static final String USERS_URL    = "/api/v1/users";
-    private static final String BRANDS_URL   = "/api/v1/admin/brands";
-    private static final String PRODUCTS_URL = "/api/v1/admin/products";
+    private static final String BRANDS_URL   = "/api-admin/v1/brands";
+    private static final String PRODUCTS_URL = "/api-admin/v1/products";
     private static final String ORDERS_URL   = "/api/v1/orders";
-    private static final String ADMIN_ORDERS_URL = "/api/v1/admin/orders";
+    private static final String ADMIN_ORDERS_URL = "/api-admin/v1/orders";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -99,7 +99,7 @@ class OrderAdminV1ApiE2ETest {
         );
     }
 
-    @DisplayName("GET /api/v1/admin/orders — 어드민 주문 목록 조회")
+    @DisplayName("GET /api-admin/v1/orders — 어드민 주문 목록 조회")
     @Nested
     class GetAdminOrderList {
 

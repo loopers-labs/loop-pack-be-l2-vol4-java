@@ -15,13 +15,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/v1/admin/products")
+@RequestMapping("/api-admin/v1/products")
 public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
     private final ProductFacade productFacade;
@@ -43,8 +44,11 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
     @GetMapping
     @Override
-    public ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>> getList(Pageable pageable) {
-        Page<ProductInfo> page = productFacade.getList(pageable);
+    public ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>> getList(
+        @RequestParam(required = false) UUID brandId,
+        Pageable pageable
+    ) {
+        Page<ProductInfo> page = productFacade.getList(brandId, pageable);
         return ApiResponse.success(PageResponse.from(page.map(ProductV1Dto.AdminProductResponse::from)));
     }
 

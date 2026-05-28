@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductAdminV1ApiE2ETest {
 
-    private static final String BRAND_URL   = "/api/v1/admin/brands";
-    private static final String PRODUCT_URL = "/api/v1/admin/products";
+    private static final String BRAND_URL   = "/api-admin/v1/brands";
+    private static final String PRODUCT_URL = "/api-admin/v1/products";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -64,7 +64,7 @@ class ProductAdminV1ApiE2ETest {
         return response.getBody().data().id();
     }
 
-    @DisplayName("POST /api/v1/admin/products")
+    @DisplayName("POST /api-admin/v1/products")
     @Nested
     class Create {
 
@@ -129,7 +129,7 @@ class ProductAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/products/{id}")
+    @DisplayName("GET /api-admin/v1/products/{id}")
     @Nested
     class Get {
 
@@ -182,7 +182,7 @@ class ProductAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/products")
+    @DisplayName("GET /api-admin/v1/products")
     @Nested
     class GetList {
 
@@ -208,9 +208,38 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().getContent()).hasSize(2)
             );
         }
+
+        @DisplayName("brandId 필터 조회 시, 해당 브랜드 상품만 반환된다.")
+        @Test
+        void returnsFilteredList_whenBrandIdProvided() {
+            // arrange
+            UUID brandId1 = createBrand();
+            ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
+                BRAND_URL, HttpMethod.POST,
+                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명")),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID brandId2 = brandResp.getBody().data().id();
+
+            createProduct(brandId1);
+            createProduct(brandId1);
+            createProduct(brandId2);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>>> response = testRestTemplate.exchange(
+                PRODUCT_URL + "?brandId=" + brandId1 + "&page=0&size=10", HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {}
+            );
+
+            // assert — brandId1 상품 2건만
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getTotalElements()).isEqualTo(2)
+            );
+        }
     }
 
-    @DisplayName("PUT /api/v1/admin/products/{id}")
+    @DisplayName("PUT /api-admin/v1/products/{id}")
     @Nested
     class Update {
 
@@ -237,7 +266,7 @@ class ProductAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("DELETE /api/v1/admin/products/{id}")
+    @DisplayName("DELETE /api-admin/v1/products/{id}")
     @Nested
     class Delete {
 

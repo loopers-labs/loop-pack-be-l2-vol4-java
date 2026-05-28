@@ -18,8 +18,8 @@ public interface ProductAdminV1ApiSpec {
     @Operation(summary = "상품 단건 조회 (어드민 — 삭제된 상품 포함)")
     ApiResponse<ProductV1Dto.AdminProductResponse> get(UUID id);
 
-    @Operation(summary = "상품 목록 조회 (어드민 — 삭제된 상품 포함)")
-    ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>> getList(Pageable pageable);
+    @Operation(summary = "상품 목록 조회 (어드민 — 삭제된 상품 포함)", description = "brandId 필터 지원")
+    ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>> getList(UUID brandId, Pageable pageable);
 
     @Operation(summary = "상품 수정")
     ApiResponse<ProductV1Dto.AdminProductResponse> update(UUID id, @Valid ProductV1Dto.UpdateRequest request);

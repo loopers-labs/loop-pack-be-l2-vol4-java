@@ -21,7 +21,7 @@ import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/v1/admin/brands")
+@RequestMapping("/api-admin/v1/brands")
 public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
 
     private final BrandFacade brandFacade;
