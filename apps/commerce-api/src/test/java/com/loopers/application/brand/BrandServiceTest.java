@@ -1,8 +1,8 @@
 package com.loopers.application.brand;
 
-import com.loopers.application.product.ProductService;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +38,7 @@ class BrandServiceTest {
     private BrandRepository brandRepository;
 
     @Mock
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     private BrandModel brand;
 
@@ -242,7 +242,7 @@ class BrandServiceTest {
             // assert
             assertThat(brand.isDeleted()).isTrue();
             then(brandRepository).should().save(brand);
-            then(productService).should().deleteAllByBrandId(1L); // 연쇄 소프트딜리트 확인
+            then(productRepository).should().softDeleteAllByBrandId(1L);
         }
 
         @DisplayName("존재하지 않는 ID 삭제 시 NOT_FOUND 예외가 발생한다.")

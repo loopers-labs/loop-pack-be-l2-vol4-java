@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -113,8 +112,6 @@ class ProductServiceTest {
             // arrange
             brand.delete();
             given(brandRepository.findById(1L)).willReturn(Optional.of(brand));
-            willThrow(new CoreException(ErrorType.BAD_REQUEST, "삭제된 브랜드입니다."))
-                .given(productDomainService).validateBrand(brand);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -265,38 +262,4 @@ class ProductServiceTest {
         }
     }
 
-    @DisplayName("deleteAllByBrandId()를 호출할 때,")
-    @Nested
-    class DeleteAllByBrandId {
-
-        @DisplayName("해당 브랜드의 활성 상품이 모두 소프트딜리트된다.")
-        @Test
-        void softDeletesAllProducts_whenBrandHasActiveProducts() {
-            // arrange
-            ProductModel product2 = new ProductModel(brand, "나이키 조던", 200_000);
-            given(productRepository.findAllByBrandId(1L)).willReturn(List.of(product, product2));
-            given(productRepository.save(any(ProductModel.class))).willReturn(product);
-
-            // act
-            productService.deleteAllByBrandId(1L);
-
-            // assert
-            assertThat(product.isDeleted()).isTrue();
-            assertThat(product2.isDeleted()).isTrue();
-        }
-
-        @DisplayName("이미 삭제된 상품은 중복 삭제되지 않는다.")
-        @Test
-        void skipsAlreadyDeletedProducts() {
-            // arrange
-            product.delete();
-            given(productRepository.findAllByBrandId(1L)).willReturn(List.of(product));
-
-            // act
-            productService.deleteAllByBrandId(1L);
-
-            // assert: 이미 삭제된 상품이라 save가 호출되지 않아야 함
-            then(productRepository).should(never()).save(any());
-        }
-    }
 }

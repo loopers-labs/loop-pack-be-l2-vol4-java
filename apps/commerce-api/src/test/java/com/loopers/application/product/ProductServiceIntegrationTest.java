@@ -202,25 +202,4 @@ class ProductServiceIntegrationTest {
         }
     }
 
-    @DisplayName("deleteAllByBrandId()를 호출할 때,")
-    @Nested
-    class DeleteAllByBrandId {
-
-        @DisplayName("브랜드 소속 상품이 모두 소프트딜리트된다.")
-        @Test
-        void softDeletesAllProductsOfBrand_whenCalled() {
-            // arrange
-            ProductInfo p1 = createProduct("나이키 에어맥스", 150_000, 10);
-            ProductInfo p2 = createProduct("나이키 조던", 200_000, 5);
-
-            // act
-            productService.deleteAllByBrandId(savedBrand.getId());
-
-            // assert
-            assertAll(
-                () -> assertThat(productJpaRepository.findById(p1.id()).orElseThrow().isDeleted()).isTrue(),
-                () -> assertThat(productJpaRepository.findById(p2.id()).orElseThrow().isDeleted()).isTrue()
-            );
-        }
-    }
 }

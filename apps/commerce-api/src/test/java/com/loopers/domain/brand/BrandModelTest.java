@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BrandModelTest {
@@ -114,6 +115,32 @@ class BrandModelTest {
             CoreException result = assertThrows(CoreException.class, () ->
                 brand.update("  ", "설명")
             );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("validateActive()를 호출할 때,")
+    @Nested
+    class ValidateActive {
+
+        @DisplayName("활성 브랜드는 예외 없이 통과한다.")
+        @Test
+        void doesNotThrow_whenBrandIsActive() {
+            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            assertDoesNotThrow(brand::validateActive);
+        }
+
+        @DisplayName("삭제된 브랜드는 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBrandIsDeleted() {
+            // arrange
+            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            brand.delete();
+
+            // act
+            CoreException result = assertThrows(CoreException.class, brand::validateActive);
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

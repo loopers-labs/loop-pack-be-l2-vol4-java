@@ -63,9 +63,9 @@ class OrderItemModelTest {
     @Nested
     class AddItem {
 
-        @DisplayName("항목 추가 시 totalAmount가 누적된다.")
+        @DisplayName("항목이 items 컬렉션에 추가된다.")
         @Test
-        void accumulatesTotalAmount_whenItemAdded() {
+        void addsItemToList_whenCalled() {
             // arrange
             OrderItemModel item1 = new OrderItemModel(order, 10L, "상품A", 10_000, "브랜드", 2);
             OrderItemModel item2 = new OrderItemModel(order, 11L, "상품B", 20_000, "브랜드", 1);
@@ -74,9 +74,9 @@ class OrderItemModelTest {
             order.addItem(item1);
             order.addItem(item2);
 
-            // assert
-            assertThat(order.getTotalAmount()).isEqualTo(40_000); // 20_000 + 20_000
+            // assert — 총액 계산은 OrderPricingService 담당, addItem은 컬렉션 관리만 수행
             assertThat(order.getItems()).hasSize(2);
+            assertThat(order.getTotalAmount()).isEqualTo(0);
         }
     }
 }
