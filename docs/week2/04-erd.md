@@ -4,10 +4,10 @@
 
 ```mermaid
 erDiagram
-    users ||--o{ likes : "누른다"
+    users ||--o{ product_likes : "누른다"
     users ||--o{ orders : "주문한다"
     brands ||--o{ products : "보유한다"
-    products ||--o{ likes : "대상이 된다"
+    products ||--o{ product_likes : "대상이 된다"
     products ||--o{ order_items : "담긴다"
     orders ||--|{ order_items : "포함한다"
 
@@ -43,7 +43,7 @@ erDiagram
         timestamp updated_at "NOT NULL"
     }
 
-    likes {
+    product_likes {
         bigint user_id PK, FK "NOT NULL"
         bigint product_id PK, FK "NOT NULL"
         timestamp created_at "NOT NULL"
@@ -52,7 +52,7 @@ erDiagram
     orders {
         bigint id PK
         bigint user_id FK "NOT NULL"
-        varchar(20) status "NOT NULL / COMPLETED"
+        varchar(20) status "NOT NULL / CREATED"
         bigint total_amount "NOT NULL / CHECK >= 0 / 원"
         timestamp created_at "NOT NULL / 주문 시각"
         timestamp updated_at "NOT NULL"
@@ -112,7 +112,7 @@ erDiagram
 | created_at | TIMESTAMP | NOT NULL | 생성 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
-### 좋아요 — `likes`
+### 좋아요 — `product_likes`
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
@@ -128,7 +128,7 @@ erDiagram
 |------|------|------|------|
 | id | BIGINT | PK, IDENTITY | 대리키 |
 | user_id | BIGINT | FK→users.id, NOT NULL | 주문자 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'COMPLETED', CHECK (status = 'COMPLETED') | 주문 상태 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'CREATED', CHECK (status = 'CREATED') | 주문 상태 |
 | total_amount | BIGINT | NOT NULL, CHECK (total_amount >= 0) | 주문 총액(원) |
 | created_at | TIMESTAMP | NOT NULL | 주문 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
