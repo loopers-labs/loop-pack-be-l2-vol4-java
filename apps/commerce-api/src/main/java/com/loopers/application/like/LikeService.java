@@ -2,7 +2,6 @@ package com.loopers.application.like;
 
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
-import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -21,7 +20,6 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
-    private final ProductDomainService productDomainService;
 
     /**
      * FR-L-01. 좋아요 등록 (멱등)
@@ -34,7 +32,7 @@ public class LikeService {
     public void like(Long userId, Long productId) {
         ProductModel product = productRepository.findById(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
-        productDomainService.validateProductActive(product); // 삭제 상품 검증 위임
+        product.validateActive();
 
         if (likeRepository.existsByUserIdAndProductId(userId, productId)) {
             return; // 이미 좋아요 — 멱등 처리

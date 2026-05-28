@@ -1,8 +1,8 @@
 package com.loopers.application.brand;
 
-import com.loopers.application.product.ProductService;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BrandService {
 
     private final BrandRepository brandRepository;
-    private final ProductService productService;
+    private final ProductRepository productRepository;
 
     @Transactional
     public BrandInfo create(BrandCreateCommand command) {
@@ -58,6 +58,6 @@ public class BrandService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
         brand.delete();
         brandRepository.save(brand);
-        productService.deleteAllByBrandId(id);
+        productRepository.softDeleteAllByBrandId(id);
     }
 }

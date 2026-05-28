@@ -17,8 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @RequiredArgsConstructor
 @Component
 public class ProductService {
@@ -32,7 +30,7 @@ public class ProductService {
     public ProductInfo create(ProductCreateCommand command) {
         BrandModel brand = brandRepository.findById(command.brandId())
             .orElseThrow(() -> new CoreException(ErrorType.BAD_REQUEST, "등록되지 않은 브랜드입니다."));
-        productDomainService.validateBrand(brand);
+        brand.validateActive();
 
         ProductModel product = new ProductModel(brand, command.name(), command.price());
         productRepository.save(product);
@@ -86,17 +84,5 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
         product.delete();
         productRepository.save(product);
-    }
-
-    /** 브랜드 삭제 시 소속 상품을 연쇄 소프트딜리트한다. */
-    @Transactional
-    public void deleteAllByBrandId(Long brandId) {
-        List<ProductModel> products = productRepository.findAllByBrandId(brandId);
-        products.stream()
-            .filter(p -> !p.isDeleted())
-            .forEach(p -> {
-                p.delete();
-                productRepository.save(p);
-            });
     }
 }

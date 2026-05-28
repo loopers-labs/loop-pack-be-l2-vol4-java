@@ -51,6 +51,12 @@ public class ProductModel extends BaseEntity {
         return getDeletedAt() != null;
     }
 
+    public void validateActive() {
+        if (isDeleted()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "삭제된 상품입니다.");
+        }
+    }
+
     /** 브랜드는 수정 불가 (FR-PA-02) */
     public void update(String name, int price) {
         if (name == null || name.isBlank()) {

@@ -33,6 +33,12 @@ public class BrandModel extends BaseEntity {
         return getDeletedAt() != null;
     }
 
+    public void validateActive() {
+        if (isDeleted()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "삭제된 브랜드로는 상품을 등록할 수 없습니다.");
+        }
+    }
+
     public void update(String name, String description) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 필수입니다.");

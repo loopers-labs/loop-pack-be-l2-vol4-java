@@ -13,6 +13,7 @@ public interface ProductRepository {
     Page<ProductModel> findAllActive(Pageable pageable, ProductSearchCondition condition);
     List<ProductModel> findAllActiveByIds(List<Long> ids);
     List<ProductModel> findAllByBrandId(Long brandId);
+    void softDeleteAllByBrandId(Long brandId);
     void incrementLikeCount(Long productId);
     void decrementLikeCount(Long productId);
 }

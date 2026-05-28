@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,6 +56,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public List<ProductModel> findAllByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrand_Id(brandId);
+    }
+
+    @Override
+    public void softDeleteAllByBrandId(Long brandId) {
+        productJpaRepository.softDeleteAllByBrandId(brandId, ZonedDateTime.now());
     }
 
     @Override
