@@ -37,8 +37,13 @@ public class InventoryService {
     public void deductAll(Map<Long, Integer> productQuantities) {
         List<Long> productIds = productQuantities.keySet().stream().sorted().toList();
         List<InventoryEntity> inventories = inventoryRepository.findAllByProductIdsWithLock(productIds);
-        inventories.forEach(inventory -> inventory.deduct(productQuantities.get(inventory.getProductId())));
-        inventories.forEach(inventoryRepository::save);
+        if (inventories.size() != productIds.size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 재고가 포함되어 있습니다.");
+        }
+        inventories.forEach(inventory -> {
+            inventory.deduct(productQuantities.get(inventory.getProductId()));
+            inventoryRepository.save(inventory);
+        });
     }
 
     @Transactional
