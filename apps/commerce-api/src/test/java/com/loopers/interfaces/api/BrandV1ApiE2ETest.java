@@ -2,7 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.loopers.application.brand.BrandFacade;
-import com.loopers.application.brand.BrandInfo;
+import com.loopers.application.brand.BrandAdminInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
@@ -59,7 +59,7 @@ class BrandV1ApiE2ETest {
         @Test
         void returnsBrand_whenBrandExistsAndIsActive() {
             // given
-            BrandInfo created = brandFacade.create("나이키", "Just Do It");
+            BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
 
             // when
             ParameterizedTypeReference<ApiResponse<BrandV1Dto.CustomerResponse>> responseType =
@@ -82,7 +82,7 @@ class BrandV1ApiE2ETest {
         @Test
         void doesNotExposeOperationalMeta_inResponseJson() {
             // given
-            BrandInfo created = brandFacade.create("나이키", "Just Do It");
+            BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
 
             // when
             ResponseEntity<JsonNode> response = testRestTemplate.exchange(
@@ -127,7 +127,7 @@ class BrandV1ApiE2ETest {
         @Test
         void returnsNotFound_whenBrandIsSoftDeleted() {
             // given
-            BrandInfo created = brandFacade.create("나이키", "Just Do It");
+            BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
             BrandModel brand = brandJpaRepository.findById(created.id()).orElseThrow();
             brand.delete();
             brandJpaRepository.save(brand);

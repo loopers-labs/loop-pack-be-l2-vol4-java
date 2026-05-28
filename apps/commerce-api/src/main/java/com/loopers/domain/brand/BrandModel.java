@@ -27,6 +27,26 @@ public class BrandModel extends BaseEntity {
         this.description = description;
     }
 
+    public void changeName(String name) {
+        requireNotDeleted();
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
+        }
+        this.name = name;
+    }
+
+    public void changeDescription(String description) {
+        requireNotDeleted();
+        this.description = description;
+    }
+
+    private void requireNotDeleted() {
+        if (getDeletedAt() != null) {
+            throw new CoreException(ErrorType.BRAND_NOT_FOUND,
+                "[id = " + getId() + "] 삭제된 브랜드는 변경할 수 없습니다.");
+        }
+    }
+
     public String getName() {
         return name;
     }

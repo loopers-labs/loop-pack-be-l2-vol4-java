@@ -83,6 +83,115 @@ class BrandServiceTest {
         }
     }
 
+    @DisplayName("브랜드 수정 시, ")
+    @Nested
+    class Update {
+
+        @DisplayName("이름과 설명이 모두 유효하면, 둘 다 변경된다.")
+        @Test
+        void updatesNameAndDescription_whenBothAreGiven() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.findActive(brandId)).willReturn(Optional.of(brand));
+            given(brandRepository.existsByNameAndIdNot("아디다스", brandId)).willReturn(false);
+
+            // when
+            BrandModel result = brandService.update(brandId, "아디다스", "Impossible is Nothing");
+
+            // then
+            assertAll(
+                () -> assertThat(result.getName()).isEqualTo("아디다스"),
+                () -> assertThat(result.getDescription()).isEqualTo("Impossible is Nothing")
+            );
+        }
+
+        @DisplayName("이름만 전달되면, 이름만 변경되고 설명은 유지된다.")
+        @Test
+        void updatesOnlyName_whenDescriptionIsNull() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.findActive(brandId)).willReturn(Optional.of(brand));
+            given(brandRepository.existsByNameAndIdNot("아디다스", brandId)).willReturn(false);
+
+            // when
+            BrandModel result = brandService.update(brandId, "아디다스", null);
+
+            // then
+            assertAll(
+                () -> assertThat(result.getName()).isEqualTo("아디다스"),
+                () -> assertThat(result.getDescription()).isEqualTo("Just Do It")
+            );
+        }
+
+        @DisplayName("설명만 전달되면, 설명만 변경되고 이름은 유지된다.")
+        @Test
+        void updatesOnlyDescription_whenNameIsNull() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.findActive(brandId)).willReturn(Optional.of(brand));
+
+            // when
+            BrandModel result = brandService.update(brandId, null, "새 슬로건");
+
+            // then
+            assertAll(
+                () -> assertThat(result.getName()).isEqualTo("나이키"),
+                () -> assertThat(result.getDescription()).isEqualTo("새 슬로건")
+            );
+        }
+
+        @DisplayName("새 이름이 다른 브랜드와 중복되면, DUPLICATE_BRAND_NAME 예외를 던진다.")
+        @Test
+        void throwsDuplicateBrandName_whenNewNameIsTakenByAnotherBrand() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.findActive(brandId)).willReturn(Optional.of(brand));
+            given(brandRepository.existsByNameAndIdNot("아디다스", brandId)).willReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandService.update(brandId, "아디다스", null));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.DUPLICATE_BRAND_NAME);
+        }
+
+        @DisplayName("새 이름이 자기 자신의 현재 이름과 같으면, 중복 체크를 통과한다.")
+        @Test
+        void doesNotThrow_whenNewNameIsSameAsItsOwn() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.findActive(brandId)).willReturn(Optional.of(brand));
+            given(brandRepository.existsByNameAndIdNot("나이키", brandId)).willReturn(false);
+
+            // when
+            BrandModel result = brandService.update(brandId, "나이키", null);
+
+            // then
+            assertThat(result.getName()).isEqualTo("나이키");
+        }
+
+        @DisplayName("활성 상태가 아닌 (존재하지 않거나 삭제된) 브랜드이면, BRAND_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsBrandNotFound_whenBrandIsNotActive() {
+            // given
+            Long brandId = 999L;
+            given(brandRepository.findActive(brandId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandService.update(brandId, "아디다스", null));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);
+        }
+    }
+
     @DisplayName("활성 브랜드 조회 시, ")
     @Nested
     class GetActive {
