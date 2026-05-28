@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api-admin/v1/products")
-public class ProductAdminV1Controller {
+public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
     private final ProductFacade productFacade;
 

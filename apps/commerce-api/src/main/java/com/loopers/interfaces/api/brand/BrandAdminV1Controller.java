@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api-admin/v1/brands")
-public class BrandAdminV1Controller {
+public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
 
     private final BrandFacade brandFacade;
 

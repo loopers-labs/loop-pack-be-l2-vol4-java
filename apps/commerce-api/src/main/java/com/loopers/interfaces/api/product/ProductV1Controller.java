@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductV1Controller {
+public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductFacade productFacade;
 
