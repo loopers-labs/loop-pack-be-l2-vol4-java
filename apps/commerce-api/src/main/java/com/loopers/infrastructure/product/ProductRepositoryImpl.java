@@ -3,6 +3,8 @@ package com.loopers.infrastructure.product;
 import com.loopers.domain.product.ProductEntity;
 import com.loopers.domain.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,8 +28,23 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductEntity> findAll() {
-        return productJpaRepository.findAllByDeletedAtIsNull().stream()
+    public Page<ProductEntity> findAll(Long brandId, Pageable pageable) {
+        if (brandId != null) {
+            return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, pageable)
+                    .map(ProductMapper::toDomain);
+        }
+        return productJpaRepository.findAllByDeletedAtIsNull(pageable)
+                .map(ProductMapper::toDomain);
+    }
+
+    @Override
+    public List<Long> findIdsByBrandId(Long brandId) {
+        return productJpaRepository.findIdsByBrandId(brandId);
+    }
+
+    @Override
+    public List<ProductEntity> findAllByIds(List<Long> ids) {
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids).stream()
                 .map(ProductMapper::toDomain)
                 .toList();
     }

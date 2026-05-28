@@ -3,6 +3,8 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +25,17 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductEntity getProduct(Long id) {
         return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductEntity> getAllProducts() {
-        return productRepository.findAll();
+    public Page<ProductEntity> getAllProducts(Long brandId, Pageable pageable) {
+        return productRepository.findAll(brandId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> findIdsByBrand(Long brandId) {
+        return productRepository.findIdsByBrandId(brandId);
     }
 
     @Transactional
@@ -43,5 +50,12 @@ public class ProductService {
         ProductEntity product = getProduct(id);
         product.delete();
         productRepository.save(product);
+    }
+
+    @Transactional
+    public void deleteAll(List<Long> ids) {
+        List<ProductEntity> products = productRepository.findAllByIds(ids);
+        products.forEach(ProductEntity::delete);
+        products.forEach(productRepository::save);
     }
 }
