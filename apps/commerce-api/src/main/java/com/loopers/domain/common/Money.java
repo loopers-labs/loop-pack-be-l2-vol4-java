@@ -14,7 +14,10 @@ public record Money(long value) {
         }
     }
 
-    public static Money of(long value) {
+    public static Money of(Long value) {
+        if (value == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "금액은 비어있을 수 없습니다.");
+        }
         return new Money(value);
     }
 

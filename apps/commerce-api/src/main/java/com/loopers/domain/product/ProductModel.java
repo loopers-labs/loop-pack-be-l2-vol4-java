@@ -2,9 +2,11 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.common.Money;
+import com.loopers.infrastructure.jpa.MoneyConverter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -23,6 +25,7 @@ public class ProductModel extends BaseEntity {
     @Column(name = "description", nullable = false)
     private String description;
 
+    @Convert(converter = MoneyConverter.class)
     @Column(name = "price", nullable = false)
     private Money price;
 
@@ -40,9 +43,6 @@ public class ProductModel extends BaseEntity {
         }
         if (description == null || description.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
-        }
-        if (price == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 비어있을 수 없습니다.");
         }
         this.brandId = brandId;
         this.name = name;

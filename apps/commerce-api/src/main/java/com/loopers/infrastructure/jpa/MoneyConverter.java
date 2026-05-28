@@ -4,8 +4,8 @@ import com.loopers.domain.common.Money;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
-/** Money ↔ BIGINT. autoApply로 모든 Money 필드에 자동 적용 (DDL 변경 불요). */
-@Converter(autoApply = true)
+/** Money ↔ BIGINT. 사용처에서 @Convert(converter = MoneyConverter.class)로 명시 적용. */
+@Converter
 public class MoneyConverter implements AttributeConverter<Money, Long> {
 
     @Override

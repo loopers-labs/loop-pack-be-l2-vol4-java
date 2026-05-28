@@ -2,10 +2,12 @@ package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.common.Money;
+import com.loopers.infrastructure.jpa.MoneyConverter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -29,6 +31,7 @@ public class OrderModel extends BaseEntity {
     @Column(name = "status", nullable = false)
     private OrderStatus status;
 
+    @Convert(converter = MoneyConverter.class)
     @Column(name = "total_amount", nullable = false)
     private Money totalAmount;
 

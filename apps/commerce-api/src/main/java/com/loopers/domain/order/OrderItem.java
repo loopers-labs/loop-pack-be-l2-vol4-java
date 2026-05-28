@@ -1,9 +1,11 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.common.Money;
+import com.loopers.infrastructure.jpa.MoneyConverter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -37,6 +39,7 @@ public class OrderItem {
     @Column(name = "product_name", nullable = false)
     private String productName;
 
+    @Convert(converter = MoneyConverter.class)
     @Column(name = "unit_price", nullable = false)
     private Money unitPrice;
 
@@ -54,9 +57,6 @@ public class OrderItem {
         }
         if (productName == null || productName.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목의 상품명은 비어있을 수 없습니다.");
-        }
-        if (unitPrice == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "단가는 비어있을 수 없습니다.");
         }
         if (quantity == null || quantity <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "수량은 1개 이상이어야 합니다.");
