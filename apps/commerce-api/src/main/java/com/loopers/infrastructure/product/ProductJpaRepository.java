@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.product;
 
-import com.loopers.domain.product.ProductModel;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,18 +7,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
-    Optional<ProductModel> findByIdAndDeletedAtIsNull(Long id);
+public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Long> {
+    Optional<ProductJpaEntity> findByIdAndDeletedAtIsNull(Long id);
 
-    List<ProductModel> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
+    List<ProductJpaEntity> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
-    List<ProductModel> findAllByDeletedAtIsNull(Sort sort);
+    List<ProductJpaEntity> findAllByDeletedAtIsNull(Sort sort);
 
-    List<ProductModel> findAllByDeletedAtIsNull(Pageable pageable);
+    List<ProductJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
 
-    List<ProductModel> findAllByBrandIdAndDeletedAtIsNull(Long brandId);
+    List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId);
 
-    List<ProductModel> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Sort sort);
+    List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Sort sort);
 
-    List<ProductModel> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
+    List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 }

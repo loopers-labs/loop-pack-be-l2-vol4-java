@@ -1,30 +1,35 @@
 package com.loopers.domain.brand;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
-@Entity
-@Table(name = "brand")
-public class BrandModel extends BaseEntity {
+public class Brand {
 
-    @Column(nullable = false)
+    private Long id;
     private String name;
-
-    @Column(nullable = false)
     private String description;
+    private boolean deleted;
 
-    protected BrandModel() {}
+    public Brand(String name, String description) {
+        this(null, name, description, false);
+    }
 
-    public BrandModel(String name, String description) {
+    private Brand(Long id, String name, String description, boolean deleted) {
         validateName(name);
         validateDescription(description);
 
+        this.id = id;
         this.name = name;
         this.description = description;
+        this.deleted = deleted;
+    }
+
+    public static Brand reconstruct(Long id, String name, String description, boolean deleted) {
+        return new Brand(id, name, description, deleted);
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getName() {
@@ -36,7 +41,11 @@ public class BrandModel extends BaseEntity {
     }
 
     public boolean isVisible() {
-        return getDeletedAt() == null;
+        return !deleted;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
     }
 
     public void update(String newName, String newDescription) {
@@ -45,6 +54,10 @@ public class BrandModel extends BaseEntity {
 
         this.name = newName;
         this.description = newDescription;
+    }
+
+    public void delete() {
+        this.deleted = true;
     }
 
     private void validateName(String name) {

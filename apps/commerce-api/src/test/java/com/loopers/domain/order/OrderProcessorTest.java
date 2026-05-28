@@ -1,6 +1,6 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +31,7 @@ class OrderProcessorTest {
         @Test
         void createsOrderAndDeductsStock_whenAllProductsAreAvailable() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             OrderResult result = orderProcessor.createOrder(
@@ -41,7 +41,7 @@ class OrderProcessorTest {
             );
 
             // assert
-            OrderModel order = result.order();
+            Order order = result.order();
             assertAll(
                 () -> assertThat(order.getOrderLines()).hasSize(1),
                 () -> assertThat(order.getTotalAmount()).isEqualTo(60_000L),
@@ -54,8 +54,8 @@ class OrderProcessorTest {
         @Test
         void createsAvailableOrderLinesAndReturnsFailures_whenSomeProductsAreOutOfStock() {
             // arrange
-            ProductModel availableProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel outOfStockProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 1);
+            Product availableProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product outOfStockProduct = new Product(20L, "셔츠", "가벼운 셔츠", 20_000L, 1);
 
             // act
             OrderResult result = orderProcessor.createOrder(
@@ -98,7 +98,7 @@ class OrderProcessorTest {
         @Test
         void throwsConflictException_whenNoProductCanBeOrdered() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 1);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 1);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {

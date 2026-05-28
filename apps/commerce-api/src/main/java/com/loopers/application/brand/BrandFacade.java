@@ -1,6 +1,6 @@
 package com.loopers.application.brand;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -33,7 +33,7 @@ public class BrandFacade {
 
     @Transactional
     public BrandInfo updateBrand(Long id, String name, String description) {
-        BrandModel brand = brandService.updateBrand(id, name, description);
+        Brand brand = brandService.updateBrand(id, name, description);
         return BrandInfo.from(brand);
     }
 

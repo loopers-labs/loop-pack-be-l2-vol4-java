@@ -17,19 +17,19 @@ public class OrderService {
         return orderWriter.placeOrder(userLoginId, commands);
     }
 
-    public List<OrderModel> getOrders(String userLoginId, LocalDate startAt, LocalDate endAt, Integer page, Integer size) {
+    public List<Order> getOrders(String userLoginId, LocalDate startAt, LocalDate endAt, Integer page, Integer size) {
         return orderReader.getOrders(userLoginId, startAt, endAt, page, size);
     }
 
-    public OrderModel getOrder(String userLoginId, Long orderId) {
+    public Order getOrder(String userLoginId, Long orderId) {
         return orderReader.getOrder(userLoginId, orderId);
     }
 
-    public List<OrderModel> getAllOrders(Integer page, Integer size) {
+    public List<Order> getAllOrders(Integer page, Integer size) {
         return orderReader.getAllOrders(page, size);
     }
 
-    public OrderModel getOrder(Long orderId) {
+    public Order getOrder(Long orderId) {
         return orderReader.getOrder(orderId);
     }
 }

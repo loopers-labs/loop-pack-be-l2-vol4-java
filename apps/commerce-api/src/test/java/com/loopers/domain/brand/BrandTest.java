@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class BrandModelTest {
+class BrandTest {
 
     @DisplayName("브랜드 모델을 생성할 때, ")
     @Nested
@@ -23,7 +23,7 @@ class BrandModelTest {
             String description = "감성 이커머스 브랜드";
 
             // act
-            BrandModel brand = new BrandModel(name, description);
+            Brand brand = new Brand(name, description);
 
             // assert
             assertAll(
@@ -41,7 +41,7 @@ class BrandModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new BrandModel(name, "감성 이커머스 브랜드");
+                new Brand(name, "감성 이커머스 브랜드");
             });
 
             // assert
@@ -56,7 +56,7 @@ class BrandModelTest {
         @Test
         void updatesBrandInfo_whenFieldsAreValid() {
             // arrange
-            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
 
             // act
             brand.update("New Loopers", "새로운 브랜드 설명");
@@ -72,7 +72,7 @@ class BrandModelTest {
         @Test
         void throwsBadRequestException_whenDescriptionIsBlank() {
             // arrange
-            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -95,7 +95,7 @@ class BrandModelTest {
         @Test
         void returnsInvisible_whenBrandIsDeleted() {
             // arrange
-            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
 
             // act
             brand.delete();

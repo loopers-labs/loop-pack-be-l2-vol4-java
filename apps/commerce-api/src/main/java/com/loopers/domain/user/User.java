@@ -1,52 +1,49 @@
 package com.loopers.domain.user;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.util.regex.Pattern;
 
-@Entity
-@Table(name = "users")
-public class UserModel extends BaseEntity {
+public class User {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]{4,20}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final LocalDate MIN_BIRTH = LocalDate.of(1900, 1, 1);
 
-    @Column(name = "login_id", nullable = false, unique = true)
+    private Long id;
     private String loginId;
-
-    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
-
-    @Column(nullable = false)
     private String name;
-
-    @Column(nullable = false)
     private LocalDate birth;
-
-    @Column(nullable = false)
     private String email;
 
-    protected UserModel() {}
+    public User(String loginId, String passwordHash, String name, LocalDate birth, String email) {
+        this(null, loginId, passwordHash, name, birth, email);
+    }
 
-    public UserModel(String loginId, String passwordHash, String name, LocalDate birth, String email) {
+    private User(Long id, String loginId, String passwordHash, String name, LocalDate birth, String email) {
         validateLoginId(loginId);
         validatePasswordHash(passwordHash);
         validateName(name);
         validateBirth(birth);
         validateEmail(email);
 
+        this.id = id;
         this.loginId = loginId;
         this.passwordHash = passwordHash;
         this.name = name;
         this.birth = birth;
         this.email = email;
+    }
+
+    public static User reconstruct(Long id, String loginId, String passwordHash, String name, LocalDate birth, String email) {
+        return new User(id, loginId, passwordHash, name, birth, email);
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getLoginId() {

@@ -1,6 +1,6 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.springframework.stereotype.Component;
@@ -15,11 +15,11 @@ public class OrderProcessor {
     public OrderResult createOrder(
         String userLoginId,
         List<OrderProductCommand> commands,
-        Map<Long, ProductModel> productsById
+        Map<Long, Product> productsById
     ) {
         validateCommands(commands);
 
-        List<OrderLineModel> orderLines = new ArrayList<>();
+        List<OrderLine> orderLines = new ArrayList<>();
         List<OrderFailure> failures = new ArrayList<>();
 
         for (OrderProductCommand command : commands) {
@@ -30,7 +30,7 @@ public class OrderProcessor {
             throw new CoreException(ErrorType.CONFLICT, "주문 가능한 상품이 없습니다.");
         }
 
-        OrderModel order = new OrderModel(userLoginId, orderLines);
+        Order order = new Order(userLoginId, orderLines);
         return new OrderResult(order, List.copyOf(failures));
     }
 
@@ -42,17 +42,17 @@ public class OrderProcessor {
 
     private void tryOrderProduct(
         OrderProductCommand command,
-        Map<Long, ProductModel> productsById,
-        List<OrderLineModel> orderLines,
+        Map<Long, Product> productsById,
+        List<OrderLine> orderLines,
         List<OrderFailure> failures
     ) {
         try {
-            ProductModel product = productsById.get(command.productId());
+            Product product = productsById.get(command.productId());
             if (product == null) {
                 throw new CoreException(ErrorType.NOT_FOUND, "[id = " + command.productId() + "] 상품을 찾을 수 없습니다.");
             }
             product.deductStock(command.quantity());
-            orderLines.add(new OrderLineModel(
+            orderLines.add(new OrderLine(
                 command.productId(),
                 product.getName(),
                 product.getPrice(),

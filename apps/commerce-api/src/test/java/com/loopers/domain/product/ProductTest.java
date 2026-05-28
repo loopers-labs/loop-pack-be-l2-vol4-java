@@ -10,14 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class ProductModelTest {
+class ProductTest {
 
-    @DisplayName("상품 모델을 생성할 때, ")
+    @DisplayName("상품을 생성할 때, ")
     @Nested
     class Create {
         @DisplayName("모든 값이 유효하면, 정상적으로 생성된다.")
         @Test
-        void createsProductModel_whenAllFieldsAreValid() {
+        void createsProduct_whenAllFieldsAreValid() {
             // arrange
             String name = "니트";
             String description = "부드러운 니트";
@@ -26,7 +26,7 @@ class ProductModelTest {
             Long brandId = 1L;
 
             // act
-            ProductModel product = new ProductModel(brandId, name, description, price, stock);
+            Product product = new Product(brandId, name, description, price, stock);
 
             // assert
             assertAll(
@@ -47,7 +47,7 @@ class ProductModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ProductModel(1L, "니트", "부드러운 니트", price, 10);
+                new Product(1L, "니트", "부드러운 니트", price, 10);
             });
 
             // assert
@@ -62,7 +62,7 @@ class ProductModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ProductModel(brandId, "니트", "부드러운 니트", 30_000L, 10);
+                new Product(brandId, "니트", "부드러운 니트", 30_000L, 10);
             });
 
             // assert
@@ -77,7 +77,7 @@ class ProductModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ProductModel(1L, "니트", "부드러운 니트", 30_000L, stock);
+                new Product(1L, "니트", "부드러운 니트", 30_000L, stock);
             });
 
             // assert
@@ -92,7 +92,7 @@ class ProductModelTest {
         @Test
         void deductsStock_whenStockIsEnough() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             product.deductStock(3);
@@ -105,7 +105,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenQuantityIsLessThanOne() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -123,7 +123,7 @@ class ProductModelTest {
         @Test
         void throwsConflictException_whenQuantityIsGreaterThanStock() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 2);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 2);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -145,7 +145,7 @@ class ProductModelTest {
         @Test
         void increasesLikeCount() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             product.increaseLikeCount();
@@ -158,7 +158,7 @@ class ProductModelTest {
         @Test
         void decreasesLikeCount() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
             product.increaseLikeCount();
 
             // act
@@ -172,7 +172,7 @@ class ProductModelTest {
         @Test
         void keepsLikeCountZero_whenDecreaseRequestedAtZero() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             product.decreaseLikeCount();
@@ -189,7 +189,7 @@ class ProductModelTest {
         @Test
         void updatesProductInfo_whenFieldsAreValid() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             product.update("셔츠", "가벼운 셔츠", 20_000L, 5);
@@ -207,7 +207,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenNameIsBlank() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -228,7 +228,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenPriceIsNegative() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -249,7 +249,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenStockIsNegative() {
             // arrange
-            ProductModel product = new ProductModel(1L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(1L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {

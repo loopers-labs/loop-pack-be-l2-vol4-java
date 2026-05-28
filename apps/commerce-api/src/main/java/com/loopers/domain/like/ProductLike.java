@@ -1,34 +1,33 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
-@Entity
-@Table(
-    name = "product_like",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_login_id", "product_id"})
-)
-public class ProductLikeModel extends BaseEntity {
+public class ProductLike {
 
-    @Column(name = "user_login_id", nullable = false)
+    private Long id;
     private String userLoginId;
-
-    @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    protected ProductLikeModel() {}
+    public ProductLike(String userLoginId, Long productId) {
+        this(null, userLoginId, productId);
+    }
 
-    public ProductLikeModel(String userLoginId, Long productId) {
+    private ProductLike(Long id, String userLoginId, Long productId) {
         validateUserLoginId(userLoginId);
         validateProductId(productId);
 
+        this.id = id;
         this.userLoginId = userLoginId;
         this.productId = productId;
+    }
+
+    public static ProductLike reconstruct(Long id, String userLoginId, Long productId) {
+        return new ProductLike(id, userLoginId, productId);
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getUserLoginId() {

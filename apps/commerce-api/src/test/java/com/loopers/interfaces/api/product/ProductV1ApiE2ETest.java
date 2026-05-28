@@ -1,8 +1,10 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
+import com.loopers.infrastructure.brand.BrandJpaEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.UserDto;
@@ -64,8 +66,8 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsProductWithBrandAndLikeCount_whenProductExists() {
             // arrange
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> response =
@@ -125,9 +127,9 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsProductsSortedByPriceAsc_whenSortIsPriceAsc() {
             // arrange
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel expensiveProduct = saveProduct(brand.getId(), "코트", "따뜻한 코트", 90_000L, 10);
-            ProductModel cheapProduct = saveProduct(brand.getId(), "양말", "부드러운 양말", 5_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity expensiveProduct = saveProduct(brand.getId(), "코트", "따뜻한 코트", 90_000L, 10);
+            ProductJpaEntity cheapProduct = saveProduct(brand.getId(), "양말", "부드러운 양말", 5_000L, 10);
 
             // act
             ResponseEntity<ApiResponse<List<ProductDto.List.V1.Response>>> response =
@@ -173,8 +175,8 @@ class ProductV1ApiE2ETest {
         void increasesLikeCount_whenUserLikesProduct() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             ResponseEntity<ApiResponse<Void>> likeResponse =
@@ -205,8 +207,8 @@ class ProductV1ApiE2ETest {
         void keepsLikeCount_whenUserLikesSameProductAgain() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
             HttpEntity<Void> authenticatedRequest = new HttpEntity<>(authHeaders("user1234", "abc123!?"));
 
             // act
@@ -239,8 +241,8 @@ class ProductV1ApiE2ETest {
         @Test
         void throwsUnauthorized_whenCredentialHeaderIsMissing() {
             // arrange
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             ResponseEntity<ApiResponse<Void>> response =
@@ -264,8 +266,8 @@ class ProductV1ApiE2ETest {
         void decreasesLikeCount_whenUserUnlikesProduct() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
             HttpEntity<Void> authenticatedRequest = new HttpEntity<>(authHeaders("user1234", "abc123!?"));
             testRestTemplate.exchange(
                 ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
@@ -299,12 +301,12 @@ class ProductV1ApiE2ETest {
         }
     }
 
-    private BrandModel saveBrand(String name, String description) {
-        return brandJpaRepository.save(new BrandModel(name, description));
+    private BrandJpaEntity saveBrand(String name, String description) {
+        return brandJpaRepository.save(BrandJpaEntity.from(new Brand(name, description)));
     }
 
-    private ProductModel saveProduct(Long brandId, String name, String description, Long price, Integer stock) {
-        return productJpaRepository.save(new ProductModel(brandId, name, description, price, stock));
+    private ProductJpaEntity saveProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        return productJpaRepository.save(ProductJpaEntity.from(new Product(brandId, name, description, price, stock)));
     }
 
     private void signup(String loginId, String password) {

@@ -12,19 +12,23 @@ public class ProductService {
     private final ProductReader productReader;
     private final ProductWriter productWriter;
 
-    public ProductDetailView createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+    public Product createProduct(Long brandId, String name, String description, Long price, Integer stock) {
         return productWriter.createProduct(brandId, name, description, price, stock);
     }
 
-    public ProductDetailView getProduct(Long id) {
+    public Product getProduct(Long id) {
         return productReader.getProduct(id);
     }
 
-    public List<ProductDetailView> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
+    public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         return productReader.getAllProducts(brandId, sort, page, size);
     }
 
-    public ProductDetailView updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public List<Product> getProductsByIds(List<Long> ids) {
+        return productReader.getProductsByIds(ids);
+    }
+
+    public Product updateProduct(Long id, String name, String description, Long price, Integer stock) {
         return productWriter.updateProduct(id, name, description, price, stock);
     }
 

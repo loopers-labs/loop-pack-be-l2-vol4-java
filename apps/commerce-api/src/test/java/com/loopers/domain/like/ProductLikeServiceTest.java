@@ -1,9 +1,7 @@
 package com.loopers.domain.like;
 
 import com.loopers.domain.EntityTestSupport;
-import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.product.ProductBrandProcessor;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,18 +26,13 @@ class ProductLikeServiceTest {
     @Mock
     private ProductRepository productRepository;
 
-    @Mock
-    private BrandRepository brandRepository;
-
     private ProductLikeService productLikeService;
 
     @BeforeEach
     void setUp() {
         productLikeService = new ProductLikeService(
             productLikeRepository,
-            productRepository,
-            brandRepository,
-            new ProductBrandProcessor()
+            productRepository
         );
     }
 
@@ -50,7 +43,7 @@ class ProductLikeServiceTest {
         @Test
         void createsLikeAndIncreasesProductLikeCount_whenLikeDoesNotExist() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             ProductLikeResult result = productLikeService.createLike("user1234", 1L, product, Optional.empty());
@@ -68,8 +61,8 @@ class ProductLikeServiceTest {
         @Test
         void doesNotIncreaseProductLikeCount_whenLikeAlreadyExists() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductLikeModel productLike = new ProductLikeModel("user1234", 1L);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            ProductLike productLike = new ProductLike("user1234", 1L);
 
             // act
             ProductLikeResult result = productLikeService.createLike(
@@ -95,9 +88,9 @@ class ProductLikeServiceTest {
         @Test
         void decreasesProductLikeCount_whenLikeExists() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
             product.increaseLikeCount();
-            ProductLikeModel productLike = new ProductLikeModel("user1234", 1L);
+            ProductLike productLike = new ProductLike("user1234", 1L);
 
             // act
             boolean result = productLikeService.deleteLike(product, Optional.of(productLike));
@@ -113,7 +106,7 @@ class ProductLikeServiceTest {
         @Test
         void doesNothing_whenLikeDoesNotExist() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             boolean result = productLikeService.deleteLike(product, Optional.empty());
@@ -134,15 +127,15 @@ class ProductLikeServiceTest {
         @Test
         void returnsProductsByProductLikes() {
             // arrange
-            ProductLikeModel firstLike = new ProductLikeModel("user1234", 1L);
-            ProductLikeModel secondLike = new ProductLikeModel("user1234", 2L);
-            ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel secondProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
+            ProductLike firstLike = new ProductLike("user1234", 1L);
+            ProductLike secondLike = new ProductLike("user1234", 2L);
+            Product firstProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product secondProduct = new Product(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
             EntityTestSupport.setId(firstProduct, 1L);
             EntityTestSupport.setId(secondProduct, 2L);
 
             // act
-            List<ProductModel> results = productLikeService.getLikedProducts(
+            List<Product> results = productLikeService.getLikedProducts(
                 List.of(firstLike, secondLike),
                 List.of(firstProduct, secondProduct)
             );

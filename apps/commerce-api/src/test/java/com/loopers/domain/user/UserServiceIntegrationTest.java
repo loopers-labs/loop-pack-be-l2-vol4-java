@@ -1,6 +1,7 @@
 package com.loopers.domain.user;
 
 import com.loopers.application.user.UserFacade;
+import com.loopers.infrastructure.user.UserJpaEntity;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -60,7 +61,7 @@ class UserServiceIntegrationTest {
             userFacade.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
 
             // assert
-            UserModel savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
+            UserJpaEntity savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
             assertAll(
                 () -> assertThat(savedUser.getLoginId()).isEqualTo(LOGIN_ID),
                 () -> assertThat(savedUser.getName()).isEqualTo("홍길동"),
@@ -102,7 +103,7 @@ class UserServiceIntegrationTest {
             userFacade.changePassword(LOGIN_ID, PASSWORD, "new123!?");
 
             // assert
-            UserModel savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
+            UserJpaEntity savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
             assertAll(
                 () -> assertThat(passwordHasher.matches(PASSWORD, savedUser.getPasswordHash())).isFalse(),
                 () -> assertThat(passwordHasher.matches("new123!?", savedUser.getPasswordHash())).isTrue()
@@ -121,7 +122,7 @@ class UserServiceIntegrationTest {
             });
 
             // assert
-            UserModel savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
+            UserJpaEntity savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED),
                 () -> assertThat(passwordHasher.matches(PASSWORD, savedUser.getPasswordHash())).isTrue(),

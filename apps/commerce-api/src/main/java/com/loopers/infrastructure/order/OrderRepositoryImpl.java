@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.order;
 
-import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -16,32 +16,49 @@ public class OrderRepositoryImpl implements OrderRepository {
     private final OrderJpaRepository orderJpaRepository;
 
     @Override
-    public OrderModel save(OrderModel order) {
-        return orderJpaRepository.save(order);
+    public Order save(Order order) {
+        OrderJpaEntity orderJpaEntity = order.getId() == null
+            ? OrderJpaEntity.from(order)
+            : orderJpaRepository.findById(order.getId())
+                .map(existingOrder -> {
+                    existingOrder.update(order);
+                    return existingOrder;
+                })
+                .orElseGet(() -> OrderJpaEntity.from(order));
+
+        return orderJpaRepository.save(orderJpaEntity).toDomain();
     }
 
     @Override
-    public Optional<OrderModel> find(Long id) {
-        return orderJpaRepository.findById(id);
+    public Optional<Order> find(Long id) {
+        return orderJpaRepository.findById(id)
+            .map(OrderJpaEntity::toDomain);
     }
 
     @Override
-    public Optional<OrderModel> findByIdAndUserLoginId(Long id, String userLoginId) {
-        return orderJpaRepository.findByIdAndUserLoginId(id, userLoginId);
+    public Optional<Order> findByIdAndUserLoginId(Long id, String userLoginId) {
+        return orderJpaRepository.findByIdAndUserLoginId(id, userLoginId)
+            .map(OrderJpaEntity::toDomain);
     }
 
     @Override
-    public List<OrderModel> findAll() {
-        return orderJpaRepository.findAllByOrderByCreatedAtDesc();
+    public List<Order> findAll() {
+        return orderJpaRepository.findAllByOrderByCreatedAtDesc().stream()
+            .map(OrderJpaEntity::toDomain)
+            .toList();
     }
 
     @Override
-    public List<OrderModel> findAll(int page, int size) {
-        return orderJpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+    public List<Order> findAll(int page, int size) {
+        return orderJpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size)).stream()
+            .map(OrderJpaEntity::toDomain)
+            .toList();
     }
 
     @Override
-    public List<OrderModel> findAllByUserLoginId(String userLoginId) {
-        return orderJpaRepository.findAllByUserLoginIdOrderByCreatedAtDesc(userLoginId);
+    public List<Order> findAllByUserLoginId(String userLoginId) {
+        return orderJpaRepository.findAllByUserLoginIdOrderByCreatedAtDesc(userLoginId).stream()
+            .map(OrderJpaEntity::toDomain)
+            .toList();
     }
 }

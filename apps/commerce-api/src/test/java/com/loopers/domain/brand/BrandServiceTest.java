@@ -1,6 +1,6 @@
 package com.loopers.domain.brand;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,18 +39,18 @@ class BrandServiceTest {
         @Test
         void deletesBrandAndProducts() {
             // arrange
-            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
-            ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel secondProduct = new ProductModel(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
+            Product firstProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product secondProduct = new Product(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
 
             // act
             brandService.deleteBrandWithProducts(brand, List.of(firstProduct, secondProduct));
 
             // assert
             assertAll(
-                () -> assertThat(brand.getDeletedAt()).isNotNull(),
-                () -> assertThat(firstProduct.getDeletedAt()).isNotNull(),
-                () -> assertThat(secondProduct.getDeletedAt()).isNotNull()
+                () -> assertThat(brand.isVisible()).isFalse(),
+                () -> assertThat(firstProduct.isVisible()).isFalse(),
+                () -> assertThat(secondProduct.isVisible()).isFalse()
             );
         }
     }

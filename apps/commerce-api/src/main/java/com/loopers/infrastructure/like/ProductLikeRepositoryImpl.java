@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.like;
 
-import com.loopers.domain.like.ProductLikeModel;
+import com.loopers.domain.like.ProductLike;
 import com.loopers.domain.like.ProductLikeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,22 +15,29 @@ public class ProductLikeRepositoryImpl implements ProductLikeRepository {
     private final ProductLikeJpaRepository productLikeJpaRepository;
 
     @Override
-    public ProductLikeModel save(ProductLikeModel productLike) {
-        return productLikeJpaRepository.save(productLike);
+    public ProductLike save(ProductLike productLike) {
+        return productLikeJpaRepository.save(ProductLikeJpaEntity.from(productLike))
+            .toDomain();
     }
 
     @Override
-    public Optional<ProductLikeModel> find(String userLoginId, Long productId) {
-        return productLikeJpaRepository.findByUserLoginIdAndProductId(userLoginId, productId);
+    public Optional<ProductLike> find(String userLoginId, Long productId) {
+        return productLikeJpaRepository.findByUserLoginIdAndProductId(userLoginId, productId)
+            .map(ProductLikeJpaEntity::toDomain);
     }
 
     @Override
-    public List<ProductLikeModel> findAllByUserLoginId(String userLoginId) {
-        return productLikeJpaRepository.findAllByUserLoginId(userLoginId);
+    public List<ProductLike> findAllByUserLoginId(String userLoginId) {
+        return productLikeJpaRepository.findAllByUserLoginId(userLoginId).stream()
+            .map(ProductLikeJpaEntity::toDomain)
+            .toList();
     }
 
     @Override
-    public void delete(ProductLikeModel productLike) {
-        productLikeJpaRepository.delete(productLike);
+    public void delete(ProductLike productLike) {
+        productLikeJpaRepository.findByUserLoginIdAndProductId(
+            productLike.getUserLoginId(),
+            productLike.getProductId()
+        ).ifPresent(productLikeJpaRepository::delete);
     }
 }

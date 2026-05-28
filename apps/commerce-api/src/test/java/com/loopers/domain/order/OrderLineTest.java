@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class OrderLineModelTest {
+class OrderLineTest {
 
     @DisplayName("주문 상품 라인을 생성할 때, ")
     @Nested
@@ -19,7 +19,7 @@ class OrderLineModelTest {
         @Test
         void createsOrderLineModel_whenAllFieldsAreValid() {
             // act
-            OrderLineModel orderLine = new OrderLineModel(1L, "니트", 30_000L, 2);
+            OrderLine orderLine = new OrderLine(1L, "니트", 30_000L, 2);
 
             // assert
             assertAll(
@@ -36,7 +36,7 @@ class OrderLineModelTest {
         void throwsBadRequestException_whenQuantityIsLessThanOne() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new OrderLineModel(1L, "니트", 30_000L, 0);
+                new OrderLine(1L, "니트", 30_000L, 0);
             });
 
             // assert

@@ -61,7 +61,7 @@ class UserServiceTest {
         @Test
         void createsUserWithHashedPassword_whenRequestIsValid() {
             // act
-            UserModel result = userService.signup(
+            User result = userService.signup(
                 "user1234",
                 "abc123!?",
                 "홍길동",
@@ -99,7 +99,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -114,7 +114,7 @@ class UserServiceTest {
         @Test
         void authenticates_whenPasswordMatches() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act & assert
             userService.authenticate(user, "abc123!?");
@@ -135,7 +135,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenOldPasswordIsBlank() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -150,7 +150,7 @@ class UserServiceTest {
         @Test
         void throwsUnauthorized_whenOldPasswordDoesNotMatch() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -166,7 +166,7 @@ class UserServiceTest {
         void throwsBadRequest_whenNewPasswordViolatesPolicy() {
             // arrange
             LocalDate birth = LocalDate.of(1990, 1, 15);
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
             doThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호 정책 위반"))
                 .when(passwordPolicy).validate("short", birth);
 
@@ -183,7 +183,7 @@ class UserServiceTest {
         @Test
         void throwsBadRequest_whenNewPasswordIsSameAsOldPassword() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
@@ -198,7 +198,7 @@ class UserServiceTest {
         @Test
         void changesPasswordHash_whenRequestIsValid() {
             // arrange
-            UserModel user = user("user1234", passwordHasher.encode("abc123!?"));
+            User user = user("user1234", passwordHasher.encode("abc123!?"));
 
             // act
             userService.changePassword(user, "abc123!?", "new123!?");
@@ -211,8 +211,8 @@ class UserServiceTest {
         }
     }
 
-    private UserModel user(String loginId, String passwordHash) {
-        return new UserModel(
+    private User user(String loginId, String passwordHash) {
+        return new User(
             loginId,
             passwordHash,
             "홍길동",

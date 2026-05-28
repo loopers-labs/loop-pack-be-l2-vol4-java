@@ -1,25 +1,33 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
-@Entity
-@Table(name = "product")
-public class ProductModel extends BaseEntity {
+public class Product {
 
+    private Long id;
     private Long brandId;
     private String name;
     private String description;
     private Long price;
     private Integer stock;
     private Integer likeCount;
+    private boolean deleted;
 
-    protected ProductModel() {}
+    public Product(Long brandId, String name, String description, Long price, Integer stock) {
+        this(null, brandId, name, description, price, stock, 0, false);
+    }
 
-    public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
+    private Product(
+        Long id,
+        Long brandId,
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Integer likeCount,
+        boolean deleted
+    ) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
         }
@@ -35,13 +43,35 @@ public class ProductModel extends BaseEntity {
         if (stock == null || stock < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
         }
+        if (likeCount == null || likeCount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "좋아요 수는 0 이상이어야 합니다.");
+        }
 
+        this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
         this.stock = stock;
-        this.likeCount = 0;
+        this.likeCount = likeCount;
+        this.deleted = deleted;
+    }
+
+    public static Product reconstruct(
+        Long id,
+        Long brandId,
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Integer likeCount,
+        boolean deleted
+    ) {
+        return new Product(id, brandId, name, description, price, stock, likeCount, deleted);
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public Long getBrandId() {
@@ -69,7 +99,11 @@ public class ProductModel extends BaseEntity {
     }
 
     public boolean isVisible() {
-        return getDeletedAt() == null;
+        return !deleted;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
     }
 
     public void deductStock(Integer quantity) {
@@ -111,5 +145,9 @@ public class ProductModel extends BaseEntity {
         this.description = newDescription;
         this.price = newPrice;
         this.stock = newStock;
+    }
+
+    public void delete() {
+        this.deleted = true;
     }
 }

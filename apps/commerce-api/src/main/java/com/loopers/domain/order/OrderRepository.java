@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository {
-    OrderModel save(OrderModel order);
-    Optional<OrderModel> find(Long id);
-    Optional<OrderModel> findByIdAndUserLoginId(Long id, String userLoginId);
-    List<OrderModel> findAll();
-    List<OrderModel> findAll(int page, int size);
-    List<OrderModel> findAllByUserLoginId(String userLoginId);
+    Order save(Order order);
+    Optional<Order> find(Long id);
+    Optional<Order> findByIdAndUserLoginId(Long id, String userLoginId);
+    List<Order> findAll();
+    List<Order> findAll(int page, int size);
+    List<Order> findAllByUserLoginId(String userLoginId);
 }

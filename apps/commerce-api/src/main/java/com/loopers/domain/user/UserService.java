@@ -15,31 +15,31 @@ public class UserService {
     private final PasswordPolicy passwordPolicy;
     private final PasswordHasher passwordHasher;
 
-    public UserModel register(String loginId, String password, String name, LocalDate birth, String email) {
+    public User register(String loginId, String password, String name, LocalDate birth, String email) {
         boolean loginIdExists = userRepository.existsByLoginId(loginId);
-        UserModel user = signup(loginId, password, name, birth, email, loginIdExists);
+        User user = signup(loginId, password, name, birth, email, loginIdExists);
         return userRepository.save(user);
     }
 
-    public UserModel getMyInfo(String loginId) {
+    public User getMyInfo(String loginId) {
         return getUser(loginId);
     }
 
     public void changePassword(String loginId, String oldPassword, String newPassword) {
-        UserModel user = getUser(loginId);
+        User user = getUser(loginId);
         changePassword(user, oldPassword, newPassword);
         userRepository.save(user);
     }
 
-    public UserModel authenticate(String loginId, String password) {
+    public User authenticate(String loginId, String password) {
         validateCredential(loginId, password);
-        UserModel user = userRepository.findByLoginId(loginId)
+        User user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다."));
         authenticate(user, password);
         return user;
     }
 
-    public UserModel signup(
+    public User signup(
         String loginId,
         String password,
         String name,
@@ -53,7 +53,7 @@ public class UserService {
 
         passwordPolicy.validate(password, birth);
         String passwordHash = passwordHasher.encode(password);
-        return new UserModel(loginId, passwordHash, name, birth, email);
+        return new User(loginId, passwordHash, name, birth, email);
     }
 
     public void validateCredential(String loginId, String password) {
@@ -62,13 +62,13 @@ public class UserService {
         }
     }
 
-    public void authenticate(UserModel user, String password) {
+    public void authenticate(User user, String password) {
         if (!passwordHasher.matches(password, user.getPasswordHash())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다.");
         }
     }
 
-    public void changePassword(UserModel user, String oldPassword, String newPassword) {
+    public void changePassword(User user, String oldPassword, String newPassword) {
         if (oldPassword == null || oldPassword.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
@@ -83,7 +83,7 @@ public class UserService {
         user.changePasswordHash(passwordHasher.encode(newPassword));
     }
 
-    private UserModel getUser(String loginId) {
+    private User getUser(String loginId) {
         return userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
     }

@@ -1,7 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.EntityTestSupport;
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,13 +15,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class ProductBrandProcessorTest {
+class ProductBrandProcessServiceTest {
 
-    private ProductBrandProcessor productBrandProcessor;
+    private ProductBrandProcessService productBrandProcessService;
 
     @BeforeEach
     void setUp() {
-        productBrandProcessor = new ProductBrandProcessor();
+        productBrandProcessService = new ProductBrandProcessService();
     }
 
     @DisplayName("상품 상세를 구성할 때, ")
@@ -31,11 +31,11 @@ class ProductBrandProcessorTest {
         @Test
         void returnsProductDetailWithBrand() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
 
             // act
-            ProductDetailView result = productBrandProcessor.getProductDetailView(product, brand);
+            ProductDetailView result = productBrandProcessService.getProductDetailView(product, brand);
 
             // assert
             assertAll(
@@ -52,12 +52,12 @@ class ProductBrandProcessorTest {
         @Test
         void returnsDistinctBrandIds() {
             // arrange
-            ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel secondProduct = new ProductModel(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
-            ProductModel thirdProduct = new ProductModel(20L, "코트", "따뜻한 코트", 90_000L, 3);
+            Product firstProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product secondProduct = new Product(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
+            Product thirdProduct = new Product(20L, "코트", "따뜻한 코트", 90_000L, 3);
 
             // act
-            List<Long> result = productBrandProcessor.getBrandIds(
+            List<Long> result = productBrandProcessService.getBrandIds(
                 List.of(firstProduct, secondProduct, thirdProduct)
             );
 
@@ -69,15 +69,15 @@ class ProductBrandProcessorTest {
         @Test
         void returnsProductDetailsWithBrand() {
             // arrange
-            ProductModel firstProduct = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel secondProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
-            BrandModel firstBrand = new BrandModel("Loopers", "감성 이커머스 브랜드");
-            BrandModel secondBrand = new BrandModel("Daily", "데일리 브랜드");
+            Product firstProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product secondProduct = new Product(20L, "셔츠", "가벼운 셔츠", 20_000L, 5);
+            Brand firstBrand = new Brand("Loopers", "감성 이커머스 브랜드");
+            Brand secondBrand = new Brand("Daily", "데일리 브랜드");
             EntityTestSupport.setId(firstBrand, 10L);
             EntityTestSupport.setId(secondBrand, 20L);
 
             // act
-            List<ProductDetailView> results = productBrandProcessor.getProductDetailViews(
+            List<ProductDetailView> results = productBrandProcessService.getProductDetailViews(
                 List.of(firstProduct, secondProduct),
                 List.of(firstBrand, secondBrand)
             );
@@ -96,11 +96,11 @@ class ProductBrandProcessorTest {
         @Test
         void throwsNotFound_whenBrandDoesNotExist() {
             // arrange
-            ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                productBrandProcessor.getProductDetailViews(List.of(product), List.of());
+                productBrandProcessService.getProductDetailViews(List.of(product), List.of());
             });
 
             // assert

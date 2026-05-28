@@ -1,8 +1,10 @@
 package com.loopers.interfaces.api.order;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
+import com.loopers.infrastructure.brand.BrandJpaEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.UserDto;
@@ -64,8 +66,8 @@ class OrderV1ApiE2ETest {
         void createsOrderAndDeductsStock_whenProductsAreAvailable() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
             OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
                 List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2))
             );
@@ -79,7 +81,7 @@ class OrderV1ApiE2ETest {
                     orderResponseType()
                 );
 
-            ProductModel savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            ProductJpaEntity savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
 
             // assert
             OrderDto.Create.V1.Response data = response.getBody().data();
@@ -99,9 +101,9 @@ class OrderV1ApiE2ETest {
         void createsOrderWithAvailableProductsAndReturnsFailures_whenSomeProductsAreOutOfStock() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel availableProduct = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
-            ProductModel outOfStockProduct = saveProduct(brand.getId(), "셔츠", "가벼운 셔츠", 20_000L, 1);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity availableProduct = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            ProductJpaEntity outOfStockProduct = saveProduct(brand.getId(), "셔츠", "가벼운 셔츠", 20_000L, 1);
             OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
                 List.of(
                     new OrderDto.Create.V1.ProductRequest(availableProduct.getId(), 2),
@@ -118,8 +120,8 @@ class OrderV1ApiE2ETest {
                     orderResponseType()
                 );
 
-            ProductModel savedAvailableProduct = productJpaRepository.findById(availableProduct.getId()).orElseThrow();
-            ProductModel savedOutOfStockProduct = productJpaRepository.findById(outOfStockProduct.getId()).orElseThrow();
+            ProductJpaEntity savedAvailableProduct = productJpaRepository.findById(availableProduct.getId()).orElseThrow();
+            ProductJpaEntity savedOutOfStockProduct = productJpaRepository.findById(outOfStockProduct.getId()).orElseThrow();
 
             // assert
             OrderDto.Create.V1.Response data = response.getBody().data();
@@ -139,8 +141,8 @@ class OrderV1ApiE2ETest {
         void throwsConflict_whenNoProductCanBeOrdered() {
             // arrange
             signup("user1234", "abc123!?");
-            BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 1);
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 1);
             OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
                 List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2))
             );
@@ -200,12 +202,12 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    private BrandModel saveBrand(String name, String description) {
-        return brandJpaRepository.save(new BrandModel(name, description));
+    private BrandJpaEntity saveBrand(String name, String description) {
+        return brandJpaRepository.save(BrandJpaEntity.from(new Brand(name, description)));
     }
 
-    private ProductModel saveProduct(Long brandId, String name, String description, Long price, Integer stock) {
-        return productJpaRepository.save(new ProductModel(brandId, name, description, price, stock));
+    private ProductJpaEntity saveProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        return productJpaRepository.save(ProductJpaEntity.from(new Product(brandId, name, description, price, stock)));
     }
 
     private void signup(String loginId, String password) {

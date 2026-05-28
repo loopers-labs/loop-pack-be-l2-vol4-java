@@ -1,8 +1,8 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.order.OrderFailure;
-import com.loopers.domain.order.OrderLineModel;
-import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.OrderLine;
+import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderResult;
 import com.loopers.domain.order.OrderStatus;
 
@@ -17,7 +17,7 @@ public record OrderInfo(
     List<OrderFailureInfo> failures
 ) {
     public static OrderInfo from(OrderResult result) {
-        OrderModel order = result.order();
+        Order order = result.order();
         return new OrderInfo(
             order.getId(),
             order.getUserLoginId(),
@@ -32,7 +32,7 @@ public record OrderInfo(
         );
     }
 
-    public static OrderInfo from(OrderModel order) {
+    public static OrderInfo from(Order order) {
         return new OrderInfo(
             order.getId(),
             order.getUserLoginId(),
@@ -52,7 +52,7 @@ public record OrderInfo(
         Integer quantity,
         Long amount
     ) {
-        public static OrderLineInfo from(OrderLineModel orderLine) {
+        public static OrderLineInfo from(OrderLine orderLine) {
             return new OrderLineInfo(
                 orderLine.getProductId(),
                 orderLine.getProductName(),

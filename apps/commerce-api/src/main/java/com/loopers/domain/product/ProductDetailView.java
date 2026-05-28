@@ -1,9 +1,9 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 
 public record ProductDetailView(
-    ProductModel product,
-    BrandModel brand
+    Product product,
+    Brand brand
 ) {
 }

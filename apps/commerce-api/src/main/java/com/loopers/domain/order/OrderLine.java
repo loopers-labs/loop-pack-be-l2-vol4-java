@@ -1,40 +1,39 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 
-@Entity
-@Table(name = "order_line")
-public class OrderLineModel extends BaseEntity {
+public class OrderLine {
 
-    @Column(name = "product_id", nullable = false)
+    private Long id;
     private Long productId;
-
-    @Column(name = "product_name", nullable = false)
     private String productName;
-
-    @Column(nullable = false)
     private Long price;
-
-    @Column(nullable = false)
     private Integer quantity;
 
-    protected OrderLineModel() {}
+    public OrderLine(Long productId, String productName, Long price, Integer quantity) {
+        this(null, productId, productName, price, quantity);
+    }
 
-    public OrderLineModel(Long productId, String productName, Long price, Integer quantity) {
+    private OrderLine(Long id, Long productId, String productName, Long price, Integer quantity) {
         validateProductId(productId);
         validateProductName(productName);
         validatePrice(price);
         validateQuantity(quantity);
 
+        this.id = id;
         this.productId = productId;
         this.productName = productName;
         this.price = price;
         this.quantity = quantity;
+    }
+
+    public static OrderLine reconstruct(Long id, Long productId, String productName, Long price, Integer quantity) {
+        return new OrderLine(id, productId, productName, price, quantity);
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public Long getProductId() {

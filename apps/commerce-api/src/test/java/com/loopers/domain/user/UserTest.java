@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class UserModelTest {
+class UserTest {
 
     @DisplayName("회원 모델을 생성할 때, ")
     @Nested
@@ -28,11 +28,11 @@ class UserModelTest {
             String email = "user@example.com";
 
             // act
-            UserModel user = new UserModel(loginId, passwordHash, name, birth, email);
+            User user = new User(loginId, passwordHash, name, birth, email);
 
             // assert
             assertAll(
-                () -> assertThat(user.getId()).isNotNull(),
+                () -> assertThat(user.getId()).isNull(),
                 () -> assertThat(user.getLoginId()).isEqualTo(loginId),
                 () -> assertThat(user.getPasswordHash()).isEqualTo(passwordHash),
                 () -> assertThat(user.getName()).isEqualTo(name),
@@ -49,7 +49,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(loginId, "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
+                new User(loginId, "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
             });
 
             // assert
@@ -64,7 +64,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel(loginId, "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
+                new User(loginId, "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
             });
 
             // assert
@@ -79,7 +79,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel("user1234", "$2a$10$hashedPassword", name, LocalDate.of(1990, 1, 15), "user@example.com");
+                new User("user1234", "$2a$10$hashedPassword", name, LocalDate.of(1990, 1, 15), "user@example.com");
             });
 
             // assert
@@ -94,7 +94,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel("user1234", "$2a$10$hashedPassword", "홍길동", birth, "user@example.com");
+                new User("user1234", "$2a$10$hashedPassword", "홍길동", birth, "user@example.com");
             });
 
             // assert
@@ -109,7 +109,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel("user1234", "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), email);
+                new User("user1234", "$2a$10$hashedPassword", "홍길동", LocalDate.of(1990, 1, 15), email);
             });
 
             // assert
@@ -124,7 +124,7 @@ class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new UserModel("user1234", passwordHash, "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
+                new User("user1234", passwordHash, "홍길동", LocalDate.of(1990, 1, 15), "user@example.com");
             });
 
             // assert
@@ -139,7 +139,7 @@ class UserModelTest {
         @Test
         void returnsMaskedName() {
             // arrange
-            UserModel user = new UserModel(
+            User user = new User(
                 "user1234",
                 "$2a$10$hashedPassword",
                 "홍길동",
@@ -158,7 +158,7 @@ class UserModelTest {
         @Test
         void returnsSingleAsterisk_whenNameHasOneCharacter() {
             // arrange
-            UserModel user = new UserModel(
+            User user = new User(
                 "user1234",
                 "$2a$10$hashedPassword",
                 "홍",
@@ -181,7 +181,7 @@ class UserModelTest {
         @Test
         void changesPasswordHash_whenPasswordHashIsValid() {
             // arrange
-            UserModel user = new UserModel(
+            User user = new User(
                 "user1234",
                 "$2a$10$oldPasswordHash",
                 "홍길동",
