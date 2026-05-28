@@ -234,6 +234,7 @@ sequenceDiagram
     participant OrderV1Controller
     participant OrderFacade
     participant ProductService
+    participant InventoryService
     participant OrderService
     participant ProductRepository
     participant InventoryRepository
@@ -257,11 +258,11 @@ sequenceDiagram
     OrderRepository-->>OrderService: OrderEntity
     OrderService-->>OrderFacade: OrderEntity
 
-    OrderFacade->>ProductService: deductInventories(productId-quantity 쌍)
-    Note over ProductService: productId 오름차순 정렬 (데드락 방어)
-    ProductService->>InventoryRepository: findAllByProductIds(productIds) FOR UPDATE
-    Note over InventoryRepository: WHERE product_id IN (...) FOR UPDATE
-    ProductService->>ProductService: 각 inventory.deduct(quantity)
+    OrderFacade->>InventoryService: deductAll(productId-quantity 쌍)
+    Note over InventoryService: productId 오름차순 정렬 (데드락 방어, ADR-014)
+    InventoryService->>InventoryRepository: findAllByProductIds(productIds) FOR UPDATE
+    Note over InventoryRepository: WHERE product_id IN (...) ORDER BY product_id FOR UPDATE
+    InventoryService->>InventoryService: 각 inventory.deduct(quantity)
 
     Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 재고 부족 시 전체 Rollback ──
 

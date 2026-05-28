@@ -621,3 +621,4 @@ LikeFacade.removeLike(userId, productId)
 | ADR-015 | orderStatus (보류) | `adr/015-order-status-single-value.md` |
 | ADR-016 | Admin 인증 — 테이블 미생성, 헤더 고정값 검증 | `adr/016-admin-auth-header.md` |
 | ADR-017 | 타인의 주문 접근 — 404 반환 정책 | `adr/017-order-ownership-check.md` |
+| ADR-018 | InventoryService 도입 — 재고 차감 책임 분리 | `adr/018-inventory-service-boundary.md` |
