@@ -100,4 +100,92 @@ class ProductStockServiceIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
+
+    @DisplayName("재고 차감할 때")
+    @Nested
+    class DecreaseStock {
+
+        @DisplayName("재고가 충분하면, 차감되어 남은 재고가 반영된다.")
+        @Test
+        void decreases_whenSufficient() {
+            // given
+            productStockService.createStock(1L, 10);
+
+            // when
+            productStockService.decreaseStock(1L, 3);
+
+            // then
+            ProductStockModel found = productStockService.getStock(1L);
+            assertThat(found.getStock().value()).isEqualTo(7);
+        }
+
+        @DisplayName("재고가 부족하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenInsufficient() {
+            // given
+            productStockService.createStock(1L, 2);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productStockService.decreaseStock(1L, 5));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("차감 수량이 0 이하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNonPositive() {
+            // given
+            productStockService.createStock(1L, 10);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productStockService.decreaseStock(1L, 0));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("존재하지 않는 productId면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenNoStock() {
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productStockService.decreaseStock(99L, 1));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("재고 복구할 때")
+    @Nested
+    class IncreaseStock {
+
+        @DisplayName("복구 수량만큼 재고가 증가한다.")
+        @Test
+        void increases() {
+            // given
+            productStockService.createStock(1L, 5);
+
+            // when
+            productStockService.increaseStock(1L, 3);
+
+            // then
+            ProductStockModel found = productStockService.getStock(1L);
+            assertThat(found.getStock().value()).isEqualTo(8);
+        }
+
+        @DisplayName("복구 수량이 0 이하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenNonPositive() {
+            // given
+            productStockService.createStock(1L, 5);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productStockService.increaseStock(1L, 0));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }
