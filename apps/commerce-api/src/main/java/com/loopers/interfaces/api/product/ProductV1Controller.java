@@ -23,10 +23,10 @@ public class ProductV1Controller {
             request.brandId(),
             request.name(),
             request.description(),
-            request.price()
+            request.price(),
+            request.quantity()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @GetMapping("/{productId}")
@@ -34,8 +34,7 @@ public class ProductV1Controller {
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @GetMapping
@@ -57,10 +56,10 @@ public class ProductV1Controller {
             productId,
             request.name(),
             request.description(),
-            request.price()
+            request.price(),
+            request.quantity()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @DeleteMapping("/{productId}")
