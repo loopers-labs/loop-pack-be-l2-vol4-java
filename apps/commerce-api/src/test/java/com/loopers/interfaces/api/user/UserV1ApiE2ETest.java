@@ -122,9 +122,9 @@ public class UserV1ApiE2ETest {
             Assertions.assertThat(response.getBody().data().name()).isEqualTo("홍길*");
         }
 
-        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 404 Not Found를 반환한다.")
+        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsNotFound_whenUserIdDoesNotExist() {
+        void throwsUnauthorized_whenUserIdDoesNotExist() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, "nonexistent");
@@ -135,12 +135,12 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("비밀번호가 일치하지 않는 헤더로 요청하면, 400 Bad Request를 반환한다.")
+        @DisplayName("비밀번호가 일치하지 않는 헤더로 요청하면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsBadRequest_whenPasswordDoesNotMatch() {
+        void throwsUnauthorized_whenPasswordDoesNotMatch() {
             // arrange
             createDefaultUser();
             HttpHeaders headers = new HttpHeaders();
@@ -152,12 +152,12 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 400 Bad Request를 반환한다.")
+        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsBadRequest_whenLoginIdHeaderIsMissing() {
+        void throwsUnauthorized_whenLoginIdHeaderIsMissing() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
@@ -167,12 +167,12 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("X-Loopers-LoginPw 헤더가 없으면, 400 Bad Request를 반환한다.")
+        @DisplayName("X-Loopers-LoginPw 헤더가 없으면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsBadRequest_whenLoginPwHeaderIsMissing() {
+        void throwsUnauthorized_whenLoginPwHeaderIsMissing() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
@@ -182,7 +182,7 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 
@@ -209,9 +209,9 @@ public class UserV1ApiE2ETest {
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
-        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 404 Not Found를 반환한다.")
+        @DisplayName("존재하지 않는 userId 헤더로 요청하면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsNotFound_whenUserIdDoesNotExist() {
+        void throwsUnauthorized_whenUserIdDoesNotExist() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, "nonexistent");
@@ -223,7 +223,7 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
         @DisplayName("현재 비밀번호가 일치하지 않으면, 400 Bad Request를 반환한다.")
@@ -244,9 +244,9 @@ public class UserV1ApiE2ETest {
             Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
 
-        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 400 Bad Request를 반환한다.")
+        @DisplayName("X-Loopers-LoginId 헤더가 없으면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsBadRequest_whenLoginIdHeaderIsMissing() {
+        void throwsUnauthorized_whenLoginIdHeaderIsMissing() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_PW, DEFAULT_PASSWORD);
@@ -257,12 +257,12 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
-        @DisplayName("X-Loopers-LoginPw 헤더가 없으면, 400 Bad Request를 반환한다.")
+        @DisplayName("X-Loopers-LoginPw 헤더가 없으면, 401 Unauthorized를 반환한다.")
         @Test
-        void throwsBadRequest_whenLoginPwHeaderIsMissing() {
+        void throwsUnauthorized_whenLoginPwHeaderIsMissing() {
             // arrange
             HttpHeaders headers = new HttpHeaders();
             headers.set(HEADER_LOGIN_ID, DEFAULT_USER_ID);
@@ -273,7 +273,7 @@ public class UserV1ApiE2ETest {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(changePasswordRequest, headers), responseType);
 
             // assert
-            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 }
