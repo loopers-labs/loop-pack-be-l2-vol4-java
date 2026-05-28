@@ -38,6 +38,6 @@ public class UserService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "없는 사용자입니다."));
         userModel.authenticate(currentPassword, passwordEncoder);
         userModel.changePassword(newPassword, passwordEncoder);
-        return userModel;
+        return userRepository.save(userModel);
     }
 }
