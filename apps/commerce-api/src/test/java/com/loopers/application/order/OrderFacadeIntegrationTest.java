@@ -126,7 +126,7 @@ class OrderFacadeIntegrationTest {
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
-        @DisplayName("[ECP] 재고보다 많은 수량을 주문하면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("[ECP] 재고보다 많은 수량을 주문하면 BAD_REQUEST 예외가 발생한다. (재고 차감 시점 검증)")
         @Test
         void throwsBadRequest_whenQuantityExceedsInventory() {
             // arrange
@@ -141,7 +141,7 @@ class OrderFacadeIntegrationTest {
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
 
-        @DisplayName("[ECP] 품절 상품(재고 0)을 주문하면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("[ECP] 품절 상품(재고 0)을 주문하면 BAD_REQUEST 예외가 발생한다. (재고 차감 시점 검증)")
         @Test
         void throwsBadRequest_whenProductIsOutOfStock() {
             // arrange

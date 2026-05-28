@@ -1,6 +1,5 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.inventory.InventoryEntity;
 import com.loopers.domain.inventory.InventoryService;
 import com.loopers.domain.order.OrderEntity;
 import com.loopers.domain.order.OrderItemEntity;
@@ -32,10 +31,6 @@ public class OrderFacade {
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
         List<OrderItemEntity> items = commands.stream().map(command -> {
             ProductEntity product = productService.getProduct(command.productId());
-            InventoryEntity inventory = inventoryService.getByProductId(command.productId());
-            if (inventory.getQuantity() < command.quantity()) {
-                throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
-            }
             return new OrderItemEntity(product.getId(), product.getName(), product.getPrice(), command.quantity());
         }).toList();
 
