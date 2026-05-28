@@ -14,13 +14,13 @@ public record OrderInfo(
     BigDecimal totalAmount,
     List<OrderItemInfo> items
 ) {
-    public static OrderInfo from(Order order, List<OrderItem> items) {
+    public static OrderInfo from(Order order) {
         return new OrderInfo(
             order.getId(),
             order.getUserId(),
             order.getStatus(),
             order.getTotalAmount().getAmount(),
-            items.stream().map(OrderItemInfo::from).toList()
+            order.getItems().stream().map(OrderItemInfo::from).toList()
         );
     }
 

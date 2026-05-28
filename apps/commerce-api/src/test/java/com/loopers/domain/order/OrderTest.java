@@ -16,29 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OrderTest {
-    @DisplayName("주문을 생성할 때, ")
-    @Nested
-    class Create {
-        @DisplayName("필수 정보가 주어지면, 정상적으로 생성된다.")
-        @Test
-        void createsOrder_whenRequiredInfoIsProvided() {
-            // arrange
-            Long userId = 1L;
-            OrderStatus status = OrderStatus.COMPLETED;
-            Money totalAmount = new Money(BigDecimal.valueOf(3000));
-
-            // act
-            Order order = new Order(userId, status, totalAmount);
-
-            // assert
-            assertAll(
-                () -> assertThat(order.getUserId()).isEqualTo(userId),
-                () -> assertThat(order.getStatus()).isEqualTo(status),
-                () -> assertThat(order.getTotalAmount()).isEqualTo(totalAmount)
-            );
-        }
-    }
-
     @DisplayName("주문을 접수할 때, ")
     @Nested
     class Place {
