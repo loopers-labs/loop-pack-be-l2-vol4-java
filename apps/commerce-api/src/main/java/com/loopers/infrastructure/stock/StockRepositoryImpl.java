@@ -25,6 +25,11 @@ public class StockRepositoryImpl implements StockRepository {
     }
 
     @Override
+    public Optional<StockModel> findByProductIdForUpdate(UUID productId) {
+        return stockJpaRepository.findByProductIdForUpdate(productId);
+    }
+
+    @Override
     public int reserve(UUID productId, int qty) {
         return stockJpaRepository.reserve(productId, qty);
     }

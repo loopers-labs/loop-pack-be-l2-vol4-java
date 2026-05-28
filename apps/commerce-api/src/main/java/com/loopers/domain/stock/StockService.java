@@ -32,21 +32,24 @@ public class StockService {
         }
     }
 
-    /** 결제 확정 — total--, reserved-- */
+    /** 결제 확정 — total--, reserved-- (비관적 락으로 lost update 방지) */
     public void confirm(UUID productId, int qty) {
-        StockModel stock = getByProductId(productId);
+        StockModel stock = stockRepository.findByProductIdForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고 정보를 찾을 수 없습니다."));
         stock.confirm(qty);
     }
 
-    /** 결제 실패/만료 — reserved만 해제 */
+    /** 결제 실패/만료 — reserved만 해제 (비관적 락으로 lost update 방지) */
     public void release(UUID productId, int qty) {
-        StockModel stock = getByProductId(productId);
+        StockModel stock = stockRepository.findByProductIdForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고 정보를 찾을 수 없습니다."));
         stock.release(qty);
     }
 
-    /** 주문 취소(confirm 이후) — total 복구 */
+    /** 주문 취소(confirm 이후) — total 복구 (비관적 락으로 lost update 방지) */
     public void restore(UUID productId, int qty) {
-        StockModel stock = getByProductId(productId);
+        StockModel stock = stockRepository.findByProductIdForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고 정보를 찾을 수 없습니다."));
         stock.restore(qty);
     }
 

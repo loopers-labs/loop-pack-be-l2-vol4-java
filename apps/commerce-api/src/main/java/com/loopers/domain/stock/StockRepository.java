@@ -9,6 +9,12 @@ public interface StockRepository {
     Optional<StockModel> findByProductId(UUID productId);
 
     /**
+     * 비관적 락(SELECT FOR UPDATE) 조회.
+     * confirm / release / restore 등 조회 후 차감 연산에 사용.
+     */
+    Optional<StockModel> findByProductIdForUpdate(UUID productId);
+
+    /**
      * 원자적 조건부 재고 예약.
      * UPDATE stocks SET reserved_quantity = reserved_quantity + qty
      *   WHERE product_id = :productId AND (total_quantity - reserved_quantity) >= qty
