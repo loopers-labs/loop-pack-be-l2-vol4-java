@@ -45,4 +45,11 @@ public abstract class BaseEntity {
     public boolean isDeleted() {
         return this.deletedAt != null;
     }
+
+    protected void reconstruct(Long id, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+        this.id = id;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
+    }
 }
