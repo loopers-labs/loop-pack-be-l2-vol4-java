@@ -180,10 +180,15 @@ support/error
 
 ### 의존 방향 다이어그램 규칙
 
-- Mermaid 구조도의 화살표는 반환 흐름이 아니라 참조/import 또는 호출 의존 방향만 표현한다.
+- Mermaid 구조도의 화살표는 반환 흐름이 아니라 API 유스케이스 호출 흐름, 소스 import 의존, 또는 adapter binding 방향을 표현한다.
 - 양방향 화살표는 순환 참조 또는 다이어그램 표현 오류로 본다.
-- 기본 레이어 의존 방향은 `interfaces -> application -> domain -> infrastructure`로 표현한다.
-- `interfaces -> domain` 직접 참조는 상위 레이어가 하위 레이어를 참조하는 것이므로 허용한다.
+- 현재 구조는 순수 4-tier layered architecture가 아니라 DDD + Ports & Adapters 기준으로 본다.
+- API 유스케이스 호출 흐름은 `interfaces -> application -> domain -> repository port -> infrastructure adapter`로 표현한다.
+- 소스 import 의존 방향은 `interfaces -> application -> domain`, `infrastructure -> domain`이다.
+- `domain`은 `infrastructure` 구현체, Spring Data JPA, `*JpaEntity`를 import하지 않는다.
+- `infrastructure`는 domain Repository port 구현과 domain 객체-`*JpaEntity` 매핑을 위해 `domain`을 import할 수 있다.
+- 다이어그램의 `*Repository -> *RepositoryImpl` 화살표는 소스 import가 아니라 port-adapter binding을 의미한다.
+- `interfaces -> domain` 직접 참조는 허용한다.
 
 ### 에러 처리
 
