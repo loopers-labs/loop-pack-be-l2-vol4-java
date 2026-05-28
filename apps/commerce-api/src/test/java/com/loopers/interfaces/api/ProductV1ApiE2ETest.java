@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,10 +44,16 @@ class ProductV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
+        return headers;
+    }
+
     private UUID createBrand() {
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
             ADMIN_BRAND_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         return response.getBody().data().id();
@@ -57,7 +64,7 @@ class ProductV1ApiE2ETest {
             ADMIN_PRODUCT_URL, HttpMethod.POST,
             new HttpEntity<>(new ProductV1Dto.CreateRequest(
                 brandId, ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-            )),
+            ), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         return response.getBody().data().id();
@@ -94,7 +101,7 @@ class ProductV1ApiE2ETest {
             // arrange
             UUID brandId = createBrand();
             UUID productId = createProduct(brandId);
-            testRestTemplate.exchange(ADMIN_PRODUCT_URL + "/" + productId, HttpMethod.DELETE, null, new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(ADMIN_PRODUCT_URL + "/" + productId, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {});
 
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -128,7 +135,7 @@ class ProductV1ApiE2ETest {
             createProduct(brandId);
             createProduct(brandId);
             UUID deletedId = createProduct(brandId);
-            testRestTemplate.exchange(ADMIN_PRODUCT_URL + "/" + deletedId, HttpMethod.DELETE, null, new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(ADMIN_PRODUCT_URL + "/" + deletedId, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {});
 
             // act
             ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = testRestTemplate.exchange(
@@ -150,7 +157,7 @@ class ProductV1ApiE2ETest {
             UUID brandId1 = createBrand();
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
                 ADMIN_BRAND_URL, HttpMethod.POST,
-                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명")),
+                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명"), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID brandId2 = brandResp.getBody().data().id();

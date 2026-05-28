@@ -18,6 +18,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import org.springframework.http.HttpHeaders;
+
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,11 +41,17 @@ class BrandAdminV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
+        return headers;
+    }
+
     /** 브랜드 생성 후 응답 바디에서 ID 추출 */
     private UUID createBrand(String name, String description) {
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
             BASE_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(name, description)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(name, description), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -60,7 +68,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
-                new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION)),
+                new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -79,7 +87,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
-                new HttpEntity<>(new BrandV1Dto.CreateRequest("", BrandFixture.DESCRIPTION)),
+                new HttpEntity<>(new BrandV1Dto.CreateRequest("", BrandFixture.DESCRIPTION), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -96,7 +104,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
-                new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, "다른 설명")),
+                new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, "다른 설명"), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -118,7 +126,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + id, HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -136,7 +144,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + UUID.randomUUID(), HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -149,12 +157,12 @@ class BrandAdminV1ApiE2ETest {
         void returnsBrand_whenDeleted() {
             // arrange — 생성 후 삭제
             UUID id = createBrand(BrandFixture.NAME, BrandFixture.DESCRIPTION);
-            testRestTemplate.exchange(BASE_URL + "/" + id, HttpMethod.DELETE, null, new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(BASE_URL + "/" + id, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {});
 
             // act
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + id, HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -178,7 +186,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> response = testRestTemplate.exchange(
                 BASE_URL + "?page=0&size=2", HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -205,7 +213,7 @@ class BrandAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
                 BASE_URL + "/" + id, HttpMethod.PUT,
-                new HttpEntity<>(updateRequest),
+                new HttpEntity<>(updateRequest, adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -231,7 +239,7 @@ class BrandAdminV1ApiE2ETest {
             // act — 삭제
             ResponseEntity<ApiResponse<Void>> deleteResponse = testRestTemplate.exchange(
                 BASE_URL + "/" + id, HttpMethod.DELETE,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK);

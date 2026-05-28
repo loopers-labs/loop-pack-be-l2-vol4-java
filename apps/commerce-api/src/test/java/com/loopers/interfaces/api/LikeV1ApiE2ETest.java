@@ -60,7 +60,7 @@ class LikeV1ApiE2ETest {
         // 브랜드 + 상품 생성
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
             BRANDS_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         UUID brandId = brandResp.getBody().data().id();
@@ -69,7 +69,7 @@ class LikeV1ApiE2ETest {
             PRODUCTS_URL, HttpMethod.POST,
             new HttpEntity<>(new ProductV1Dto.CreateRequest(
                 brandId, ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-            )),
+            ), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         productId = productResp.getBody().data().id();
@@ -84,6 +84,12 @@ class LikeV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
         headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
+        return headers;
+    }
+
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
         return headers;
     }
 

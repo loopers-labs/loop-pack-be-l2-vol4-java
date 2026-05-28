@@ -20,6 +20,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import org.springframework.http.HttpHeaders;
+
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,10 +44,16 @@ class ProductAdminV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
+        return headers;
+    }
+
     private UUID createBrand() {
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
             BRAND_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -57,7 +65,7 @@ class ProductAdminV1ApiE2ETest {
             PRODUCT_URL, HttpMethod.POST,
             new HttpEntity<>(new ProductV1Dto.CreateRequest(
                 brandId, ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-            )),
+            ), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -79,7 +87,7 @@ class ProductAdminV1ApiE2ETest {
                 PRODUCT_URL, HttpMethod.POST,
                 new HttpEntity<>(new ProductV1Dto.CreateRequest(
                     brandId, ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-                )),
+                ), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -101,7 +109,7 @@ class ProductAdminV1ApiE2ETest {
                 PRODUCT_URL, HttpMethod.POST,
                 new HttpEntity<>(new ProductV1Dto.CreateRequest(
                     UUID.randomUUID(), ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-                )),
+                ), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -120,7 +128,7 @@ class ProductAdminV1ApiE2ETest {
                 PRODUCT_URL, HttpMethod.POST,
                 new HttpEntity<>(new ProductV1Dto.CreateRequest(
                     brandId, "", ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-                )),
+                ), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -143,7 +151,7 @@ class ProductAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "/" + productId, HttpMethod.GET,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
 
             // assert
@@ -159,7 +167,7 @@ class ProductAdminV1ApiE2ETest {
         void throwsNotFound_whenNotExists() {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "/" + UUID.randomUUID(), HttpMethod.GET,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
@@ -170,12 +178,12 @@ class ProductAdminV1ApiE2ETest {
             // arrange
             UUID brandId = createBrand();
             UUID productId = createProduct(brandId);
-            testRestTemplate.exchange(PRODUCT_URL + "/" + productId, HttpMethod.DELETE, null, new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(PRODUCT_URL + "/" + productId, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {});
 
             // act
             ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "/" + productId, HttpMethod.GET,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -198,7 +206,7 @@ class ProductAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "?page=0&size=2", HttpMethod.GET,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
 
             // assert
@@ -216,7 +224,7 @@ class ProductAdminV1ApiE2ETest {
             UUID brandId1 = createBrand();
             ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
                 BRAND_URL, HttpMethod.POST,
-                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명")),
+                new HttpEntity<>(new BrandV1Dto.CreateRequest("다른브랜드", "설명"), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID brandId2 = brandResp.getBody().data().id();
@@ -228,7 +236,7 @@ class ProductAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.AdminProductResponse>>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "?brandId=" + brandId1 + "&page=0&size=10", HttpMethod.GET,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
 
             // assert — brandId1 상품 2건만
@@ -253,7 +261,7 @@ class ProductAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> response = testRestTemplate.exchange(
                 PRODUCT_URL + "/" + productId, HttpMethod.PUT,
-                new HttpEntity<>(new ProductV1Dto.UpdateRequest("변경된 상품명", "변경된 설명", 200_000L)),
+                new HttpEntity<>(new ProductV1Dto.UpdateRequest("변경된 상품명", "변경된 설명", 200_000L), adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -280,7 +288,7 @@ class ProductAdminV1ApiE2ETest {
             // act — 삭제
             ResponseEntity<ApiResponse<Void>> deleteResponse = testRestTemplate.exchange(
                 PRODUCT_URL + "/" + productId, HttpMethod.DELETE,
-                null, new ParameterizedTypeReference<>() {}
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
             );
             assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 

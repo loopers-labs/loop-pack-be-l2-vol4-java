@@ -17,6 +17,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import org.springframework.http.HttpHeaders;
+
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,11 +41,17 @@ class BrandV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
+        return headers;
+    }
+
     /** 어드민 API로 브랜드 생성 후 ID 반환 */
     private UUID createBrand(String name, String description) {
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response = testRestTemplate.exchange(
             ADMIN_BASE_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(name, description)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(name, description), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -80,7 +88,7 @@ class BrandV1ApiE2ETest {
         void throwsNotFound_whenDeleted() {
             // arrange — 생성 후 소프트딜리트
             UUID id = createBrand(BrandFixture.NAME, BrandFixture.DESCRIPTION);
-            testRestTemplate.exchange(ADMIN_BASE_URL + "/" + id, HttpMethod.DELETE, null, new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(ADMIN_BASE_URL + "/" + id, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {});
 
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(

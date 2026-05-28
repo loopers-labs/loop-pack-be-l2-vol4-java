@@ -58,7 +58,7 @@ class OrderAdminV1ApiE2ETest {
 
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> brandResp = testRestTemplate.exchange(
             BRANDS_URL, HttpMethod.POST,
-            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION)),
+            new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         UUID brandId = brandResp.getBody().data().id();
@@ -67,7 +67,7 @@ class OrderAdminV1ApiE2ETest {
             PRODUCTS_URL, HttpMethod.POST,
             new HttpEntity<>(new ProductV1Dto.CreateRequest(
                 brandId, ProductFixture.NAME, ProductFixture.DESCRIPTION, ProductFixture.PRICE, ProductFixture.INITIAL_QUANTITY
-            )),
+            ), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
         productId = productResp.getBody().data().id();
@@ -82,6 +82,12 @@ class OrderAdminV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
         headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
+        return headers;
+    }
+
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-Ldap", "loopers.admin");
         return headers;
     }
 
@@ -113,7 +119,7 @@ class OrderAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<PageResponse<OrderV1Dto.AdminOrderResponse>>> response = testRestTemplate.exchange(
                 ADMIN_ORDERS_URL + "?page=0&size=10", HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -128,7 +134,7 @@ class OrderAdminV1ApiE2ETest {
         void returnsEmpty_whenNoOrders() {
             ResponseEntity<ApiResponse<PageResponse<OrderV1Dto.AdminOrderResponse>>> response = testRestTemplate.exchange(
                 ADMIN_ORDERS_URL + "?page=0&size=10", HttpMethod.GET,
-                null,
+                new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -136,6 +142,47 @@ class OrderAdminV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().getTotalElements()).isEqualTo(0)
             );
+        }
+    }
+
+    @DisplayName("GET /api-admin/v1/orders/{orderId} — 어드민 주문 단건 조회")
+    @Nested
+    class GetAdminOrder {
+
+        @DisplayName("존재하는 주문이면, 200 + 주문 상세를 반환한다.")
+        @Test
+        void returnsOrder_whenExists() {
+            // arrange
+            createOrder();
+            ResponseEntity<ApiResponse<PageResponse<OrderV1Dto.AdminOrderResponse>>> listResp = testRestTemplate.exchange(
+                ADMIN_ORDERS_URL + "?page=0&size=10", HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID orderId = listResp.getBody().data().getContent().get(0).id();
+
+            // act
+            ResponseEntity<ApiResponse<OrderV1Dto.AdminOrderResponse>> response = testRestTemplate.exchange(
+                ADMIN_ORDERS_URL + "/" + orderId, HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().id()).isEqualTo(orderId)
+            );
+        }
+
+        @DisplayName("존재하지 않는 주문이면, 404를 반환한다.")
+        @Test
+        void returnsNotFound_whenNotExists() {
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ADMIN_ORDERS_URL + "/" + UUID.randomUUID(), HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }

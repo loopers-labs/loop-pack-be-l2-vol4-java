@@ -70,6 +70,11 @@ public class OrderFacade {
         return orderService.getListByUser(userId, startAt, endAt, pageable).map(OrderInfo::from);
     }
 
+    /** 어드민 주문 단건 조회 — 소유권 무관 */
+    public OrderInfo getById(UUID orderId) {
+        return OrderInfo.from(orderService.get(orderId));
+    }
+
     /** 어드민 주문 목록 조회 — 전체 */
     public Page<OrderInfo> getList(Pageable pageable) {
         return orderService.getList(pageable).map(OrderInfo::from);

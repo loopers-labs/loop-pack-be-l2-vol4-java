@@ -6,8 +6,11 @@ import com.loopers.interfaces.api.common.response.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -15,6 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
 
     private final OrderFacade orderFacade;
+
+    @GetMapping("/{orderId}")
+    @Override
+    public ApiResponse<OrderV1Dto.AdminOrderResponse> get(@PathVariable UUID orderId) {
+        return ApiResponse.success(OrderV1Dto.AdminOrderResponse.from(orderFacade.getById(orderId)));
+    }
 
     @GetMapping
     @Override
