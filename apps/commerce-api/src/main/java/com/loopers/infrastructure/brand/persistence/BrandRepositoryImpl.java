@@ -3,6 +3,8 @@ package com.loopers.infrastructure.brand.persistence;
 import com.loopers.domain.brand.model.Brand;
 import com.loopers.domain.brand.repository.BrandRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -16,6 +18,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     @Override
     public Optional<Brand> findById(Long id) {
         return brandJpaRepository.findById(id);
+    }
+
+    @Override
+    public Page<Brand> findAll(Pageable pageable) {
+        return brandJpaRepository.findAll(pageable);
     }
 
     @Override

@@ -7,6 +7,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +26,27 @@ class BrandFacadeTest {
     void setUp() {
         brandApplicationService = mock(BrandApplicationService.class);
         brandFacade = new BrandFacade(brandApplicationService);
+    }
+
+    @DisplayName("브랜드 목록을 조회할 때, ")
+    @Nested
+    class GetBrands {
+
+        @DisplayName("페이징 요청이 주어지면, BrandInfo 목록을 반환한다.")
+        @Test
+        void returnsBrandInfoPage_whenPageableIsGiven() {
+            // Arrange
+            Brand brand = Brand.create("나이키");
+            PageRequest pageable = PageRequest.of(0, 20);
+            when(brandApplicationService.getBrands(pageable)).thenReturn(new PageImpl<>(List.of(brand)));
+
+            // Act
+            Page<BrandInfo> result = brandFacade.getBrands(0, 20);
+
+            // Assert
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).name()).isEqualTo("나이키");
+        }
     }
 
     @DisplayName("브랜드를 조회할 때, ")

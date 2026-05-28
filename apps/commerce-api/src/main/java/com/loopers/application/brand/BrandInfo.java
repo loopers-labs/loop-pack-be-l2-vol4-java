@@ -2,12 +2,16 @@ package com.loopers.application.brand;
 
 import com.loopers.domain.brand.model.Brand;
 
+import java.time.ZonedDateTime;
+
 public record BrandInfo(
         Long id,
-        String name
+        String name,
+        ZonedDateTime createdAt,
+        ZonedDateTime updatedAt
 ) {
 
     public static BrandInfo from(Brand brand) {
-        return new BrandInfo(brand.getId(), brand.getName());
+        return new BrandInfo(brand.getId(), brand.getName(), brand.getCreatedAt(), brand.getUpdatedAt());
     }
 }

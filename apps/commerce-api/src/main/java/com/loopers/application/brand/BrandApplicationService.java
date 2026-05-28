@@ -4,6 +4,8 @@ import com.loopers.domain.brand.model.Brand;
 import com.loopers.domain.brand.repository.BrandRepository;
 import com.loopers.domain.brand.service.BrandDomainService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +16,13 @@ public class BrandApplicationService {
     private final BrandDomainService brandDomainService;
     private final BrandRepository brandRepository;
 
-    // 브랜드 조회
+    // 브랜드 목록 조회
+    @Transactional(readOnly = true)
+    public Page<Brand> getBrands(Pageable pageable) {
+        return brandRepository.findAll(pageable);
+    }
+
+    // 브랜드 단건 조회
     @Transactional(readOnly = true)
     public Brand getBrand(Long brandId) {
         return brandDomainService.getBrand(brandId);
