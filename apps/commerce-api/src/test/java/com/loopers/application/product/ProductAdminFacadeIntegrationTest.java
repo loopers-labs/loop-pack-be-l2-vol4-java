@@ -7,6 +7,8 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,8 @@ import org.springframework.data.domain.PageRequest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 class ProductAdminFacadeIntegrationTest {
@@ -41,6 +45,7 @@ class ProductAdminFacadeIntegrationTest {
     private DatabaseCleanUp databaseCleanUp;
 
     private Long brandId;
+    private Long cheapId;
 
     @BeforeEach
     void setUp() {
@@ -51,6 +56,7 @@ class ProductAdminFacadeIntegrationTest {
         ProductModel cheap = productRepository.save(new ProductModel(brand.getId(),"맨투맨", "심플", 30_000L));
         ProductModel mid = productRepository.save(new ProductModel(brand.getId(),"후드", "포근함", 50_000L));
         ProductModel expensive = productRepository.save(new ProductModel(brand.getId(),"패딩", "겨울", 70_000L));
+        cheapId = cheap.getId();
 
         // 좋아요 수: 맨투맨 0, 후드 5, 패딩 2
         for (int i = 0; i < 5; i++) mid.increaseLike();
@@ -97,6 +103,38 @@ class ProductAdminFacadeIntegrationTest {
             // then
             List<Long> likeCounts = page.getContent().stream().map(ProductAdminInfo::likeCount).toList();
             assertThat(likeCounts).containsExactly(5L, 2L, 0L);
+        }
+    }
+
+    @DisplayName("어드민 상품 단건 조회 시")
+    @Nested
+    class GetProduct {
+
+        @DisplayName("상품·브랜드·재고 수량이 합성되어 ProductAdminInfo로 반환된다")
+        @Test
+        void returnsProductWithBrandAndStock() {
+            // when
+            ProductAdminInfo info = productAdminFacade.getProduct(cheapId);
+
+            // then
+            assertAll(
+                () -> assertThat(info.id()).isEqualTo(cheapId),
+                () -> assertThat(info.name()).isEqualTo("맨투맨"),
+                () -> assertThat(info.brandId()).isEqualTo(brandId),
+                () -> assertThat(info.brandName()).isEqualTo("Loopers"),
+                () -> assertThat(info.stockQuantity()).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("상품이 존재하지 않으면 NOT_FOUND가 발생한다")
+        @Test
+        void throwsNotFound_whenProductMissing() {
+            // when
+            CoreException ex = assertThrows(CoreException.class,
+                () -> productAdminFacade.getProduct(99_999L));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
