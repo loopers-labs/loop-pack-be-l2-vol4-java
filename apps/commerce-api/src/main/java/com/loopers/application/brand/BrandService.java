@@ -1,5 +1,7 @@
-package com.loopers.domain.brand;
+package com.loopers.application.brand;
 
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;

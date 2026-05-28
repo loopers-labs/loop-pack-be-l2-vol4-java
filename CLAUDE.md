@@ -114,9 +114,22 @@ TESTCONTAINERS_FALLBACK_ENABLED=true ./gradlew :apps:commerce-api:test
 
 ```
 /interfaces/api       # presentation 레이어 - API
-/application/..       # application 레이어 - 도메인 레이어를 조합해 기능 제공
-/domain/..            # domain 레이어 - 도메인 객체, 엔티티, Repository 인터페이스
+/application/..       # application 레이어 - ApplicationService, Facade, Info DTO
+/domain/..            # domain 레이어 - Model, Repository 인터페이스 (DomainService 필요 시 포함)
 /infrastructure/..    # infrastructure 레이어 - JPA, Redis 등 Repository 구현체
+```
+
+### 서비스 명칭 및 책임 구분
+
+| 명칭 | 위치 | 책임 | Repository 의존 |
+|------|------|------|----------------|
+| `XDomainService` | `domain/..` | 순수 도메인 로직 (POJO). 여러 도메인 객체에 걸친 비즈니스 규칙 | ❌ |
+| `XService` | `application/..` | 단일 애그리거트 유스케이스 처리. Repository를 통한 영속성 조작 | ✅ |
+| `XFacade` | `application/..` | 여러 Service를 조합해 기능 제공. Controller가 호출하는 진입점 | ❌ (Service 통해 간접 사용) |
+
+**의존 방향:**
+```
+interfaces → application(Facade → Service) → domain(Model, Repository 인터페이스) ← infrastructure
 ```
 
 ---

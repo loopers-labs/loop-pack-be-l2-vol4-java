@@ -1,5 +1,8 @@
-package com.loopers.domain.user;
+package com.loopers.application.user;
 
+import com.loopers.domain.user.PasswordHasher;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.vo.PlainPassword;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
