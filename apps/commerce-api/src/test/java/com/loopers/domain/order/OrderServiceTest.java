@@ -81,6 +81,15 @@ class OrderServiceTest {
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
 
+        @DisplayName("[Error Guessing] null 항목으로 주문 생성 시 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenItemsAreNull() {
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> orderService.createOrder(USER_ID, null));
+            assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
+        }
+
         @DisplayName("[ECP] 중복된 productId가 포함된 항목으로 주문 생성 시 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenDuplicateProductIdExists() {
