@@ -68,10 +68,28 @@ class OrderRepositoryIntegrationTest {
             .build();
     }
 
+    private OrderModel orderOf(Long userId, ZonedDateTime orderedAt, List<OrderItemModel> orderItems) {
+        int totalPrice = orderItems.stream()
+            .mapToInt(OrderItemModel::totalPrice)
+            .sum();
+
+        return OrderModel.builder()
+            .userId(userId)
+            .orderedAt(orderedAt)
+            .totalPrice(totalPrice)
+            .build();
+    }
+
     private OrderModel saveOrder(Long userId) {
         List<OrderItemModel> orderItems = new ArrayList<>(List.of(orderItem(10L, 10_000, 1)));
 
         return orderRepository.save(orderOf(userId, orderItems), orderItems);
+    }
+
+    private OrderModel saveOrderAt(Long userId, ZonedDateTime orderedAt) {
+        List<OrderItemModel> orderItems = new ArrayList<>(List.of(orderItem(10L, 10_000, 1)));
+
+        return orderRepository.save(orderOf(userId, orderedAt, orderItems), orderItems);
     }
 
     private ZonedDateTime startOfToday() {
@@ -265,6 +283,43 @@ class OrderRepositoryIntegrationTest {
                 () -> assertThat(firstPage.getContent()).hasSize(2)
             );
         }
+
+        @DisplayName("2건 이상의 주문이 있으면 주문 시각 내림차순으로 반환된다.")
+        @Test
+        void returnsSortedByOrderedAtDesc() {
+            // arrange
+            ZonedDateTime earlier = startOfToday().plusHours(1);
+            ZonedDateTime later = startOfToday().plusHours(3);
+            OrderModel firstSaved = saveOrderAt(1L, earlier);
+            OrderModel secondSaved = saveOrderAt(1L, later);
+
+            // act
+            Page<OrderModel> orders = orderRepository.findActiveByUserIdAndOrderedAtBetween(1L, startOfToday(), startOfTomorrow(), 0, 10);
+
+            // assert
+            assertThat(orders.getContent())
+                .extracting(OrderModel::getId)
+                .containsExactly(secondSaved.getId(), firstSaved.getId());
+        }
+
+        @DisplayName("시작 경계 시각의 주문은 포함되고 종료 경계 시각의 주문은 제외된다.")
+        @Test
+        void includesStartBoundary_andExcludesEndBoundary() {
+            // arrange
+            ZonedDateTime rangeStart = startOfToday().plusHours(6);
+            ZonedDateTime rangeEnd = startOfToday().plusHours(12);
+            OrderModel atStart = saveOrderAt(1L, rangeStart);
+            saveOrderAt(1L, rangeEnd);
+
+            // act
+            Page<OrderModel> orders = orderRepository.findActiveByUserIdAndOrderedAtBetween(1L, rangeStart, rangeEnd, 0, 10);
+
+            // assert
+            assertAll(
+                () -> assertThat(orders.getTotalElements()).isEqualTo(1),
+                () -> assertThat(orders.getContent().get(0).getId()).isEqualTo(atStart.getId())
+            );
+        }
     }
 
     @DisplayName("전체 활성 주문을 페이지로 조회할 때,")
@@ -286,6 +341,42 @@ class OrderRepositoryIntegrationTest {
 
             // assert
             assertThat(firstPage.getTotalElements()).isEqualTo(2);
+        }
+
+        @DisplayName("2건 이상의 주문이 있으면 주문 시각 내림차순으로 반환된다.")
+        @Test
+        void returnsSortedByOrderedAtDesc() {
+            // arrange
+            ZonedDateTime earlier = ZonedDateTime.now().minusHours(2);
+            ZonedDateTime later = ZonedDateTime.now();
+            OrderModel firstSaved = saveOrderAt(1L, earlier);
+            OrderModel secondSaved = saveOrderAt(2L, later);
+
+            // act
+            Page<OrderModel> page = orderRepository.findActiveByPage(0, 10);
+
+            // assert
+            assertThat(page.getContent())
+                .extracting(OrderModel::getId)
+                .containsExactly(secondSaved.getId(), firstSaved.getId());
+        }
+
+        @DisplayName("조회된 주문의 헤더 레벨 필드(userId·status·totalPrice)가 저장한 값과 일치한다.")
+        @Test
+        void returnsCorrectHeaderFields() {
+            // arrange
+            saveOrder(5L);
+
+            // act
+            Page<OrderModel> page = orderRepository.findActiveByPage(0, 10);
+            OrderModel found = page.getContent().get(0);
+
+            // assert
+            assertAll(
+                () -> assertThat(found.getUserId()).isEqualTo(5L),
+                () -> assertThat(found.getStatus()).isEqualTo(OrderStatus.CREATED),
+                () -> assertThat(found.getTotalPrice()).isEqualTo(10_000)
+            );
         }
     }
 

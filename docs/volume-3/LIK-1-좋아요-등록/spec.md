@@ -43,9 +43,9 @@
 
 ## 관련 엔티티
 
-- **Like** (신규 aggregate): 회원 식별자(userId)·상품 식별자(productId)를 보유. 자기 생성 책임(정적 팩토리). 회원·상품 존재 검증은 응용 계층 책임. `userId`·`productId`는 다른 aggregate로의 식별자 참조라 VO 없이 `Long`으로 직접 보유(`ProductModel.brandId` 선례). 취소(hard delete)는 LIK-2 범위.
+- **Like** (신규 aggregate): 회원 식별자(userId)·상품 식별자(productId)를 보유. `@Builder`로 생성. 회원·상품 존재 검증은 응용 계층 책임. `userId`·`productId`는 다른 aggregate로의 식별자 참조라 VO 없이 `Long`으로 직접 보유(`ProductModel.brandId` 선례). 취소(hard delete)는 LIK-2 범위.
 - **LikeRepository** (신규): 저장, 회원·상품 조합 존재 여부 조회. (취소용 삭제는 LIK-2.)
-- **재사용**: `ProductRepository`(상품 활성 존재 검증 — 없으면 응용 계층이 NOT_FOUND), `@LoginUser AuthenticatedUser`(회원 인증), `ErrorType`(NOT_FOUND·UNAUTHENTICATED).
+- **재사용**: `UserRepository`(회원 존재 검증 — 없으면 응용 계층이 NOT_FOUND), `ProductRepository`(상품 활성 존재 검증 — 없으면 응용 계층이 NOT_FOUND), `@LoginUser AuthenticatedUser`(회원 인증), `ErrorType`(NOT_FOUND·UNAUTHENTICATED).
 
 ## 테스트 계획
 

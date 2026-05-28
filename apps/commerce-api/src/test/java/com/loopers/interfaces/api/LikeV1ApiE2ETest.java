@@ -297,11 +297,14 @@ class LikeV1ApiE2ETest {
                 .build());
 
             // act
-            testRestTemplate.exchange(likesEndpoint(product.getId()), HttpMethod.DELETE,
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                likesEndpoint(product.getId()), HttpMethod.DELETE,
                 memberRequest(user1.getLoginId().value(), RAW_PASSWORD), MAP_RESPONSE);
 
             // assert
             assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(likeJpaRepository.existsByUserIdAndProductId(user1.getId(), product.getId())).isFalse(),
                 () -> assertThat(likeJpaRepository.existsByUserIdAndProductId(user2.getId(), product.getId())).isTrue()
             );

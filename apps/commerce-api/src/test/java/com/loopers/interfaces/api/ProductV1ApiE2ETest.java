@@ -140,6 +140,8 @@ class ProductV1ApiE2ETest {
 
             // assert
             assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).hasSize(1),
                 () -> assertThat(contentOf(response).get(0).get("isAvailable")).isEqualTo(false)
             );
@@ -164,9 +166,13 @@ class ProductV1ApiE2ETest {
             );
 
             // assert
-            assertThat(contentOf(response))
-                .extracting(item -> ((Number) item.get("productId")).longValue())
-                .containsExactly(mostLiked.getId(), leastLiked.getId());
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(contentOf(response))
+                    .extracting(item -> ((Number) item.get("productId")).longValue())
+                    .containsExactly(mostLiked.getId(), leastLiked.getId())
+            );
         }
 
         @DisplayName("가격 오름차순으로 요청하면, 가격이 낮은 순으로 정렬되어 반환된다.")
@@ -186,9 +192,13 @@ class ProductV1ApiE2ETest {
             );
 
             // assert
-            assertThat(contentOf(response))
-                .extracting(item -> ((Number) item.get("price")).intValue())
-                .containsExactly(10_000, 30_000);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(contentOf(response))
+                    .extracting(item -> ((Number) item.get("price")).intValue())
+                    .containsExactly(10_000, 30_000)
+            );
         }
 
         @DisplayName("brandId 필터를 지정하면, 해당 브랜드의 상품만 반환된다.")
@@ -210,6 +220,8 @@ class ProductV1ApiE2ETest {
 
             // assert
             assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).hasSize(1),
                 () -> assertThat(((Number) contentOf(response).get(0).get("productId")).longValue())
                     .isEqualTo(productA.getId())
@@ -230,8 +242,35 @@ class ProductV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty(),
                 () -> assertThat(((Number) response.getBody().data().get("totalElements")).longValue()).isEqualTo(0L)
+            );
+        }
+
+        @DisplayName("최신 등록 순으로 요청하면, 등록 시각 내림차순(가장 최근 등록이 먼저)으로 정렬되어 반환된다.")
+        @Test
+        void sortsByLatest() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel firstRegistered = saveProduct(brand.getId(), "먼저 등록된 상품", 20_000, 5);
+            ProductModel lastRegistered = saveProduct(brand.getId(), "나중 등록된 상품", 30_000, 5);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "?page=0&size=20",
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(contentOf(response))
+                    .extracting(item -> ((Number) item.get("productId")).longValue())
+                    .containsExactly(lastRegistered.getId(), firstRegistered.getId())
             );
         }
 
@@ -249,6 +288,7 @@ class ProductV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -280,6 +320,7 @@ class ProductV1ApiE2ETest {
             Map<?, ?> dataBrand = (Map<?, ?>) data.get("brand");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(data)
                     .containsOnlyKeys("productId", "name", "description", "brand", "price", "isAvailable", "likeCount"),
                 () -> assertThat(((Number) data.get("productId")).longValue()).isEqualTo(product.getId()),
@@ -290,6 +331,30 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(dataBrand.get("name")).isEqualTo("감성 브랜드"),
                 () -> assertThat(data.get("isAvailable")).isEqualTo(true),
                 () -> assertThat(((Number) data.get("likeCount")).intValue()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("재고가 0인 상품이면, 200 OK와 함께 isAvailable=false로 반환된다.")
+        @Test
+        void returnsOk_withUnavailable_whenStockIsZero() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "품절 가디건", 39_000, 0);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.getId(),
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            Map<String, Object> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(data.get("isAvailable")).isEqualTo(false)
             );
         }
 
@@ -307,6 +372,7 @@ class ProductV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -331,6 +397,7 @@ class ProductV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }

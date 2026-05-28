@@ -304,6 +304,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -325,6 +326,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -347,6 +349,30 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("이름이 빈 값이면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenNameIsBlank() {
+            // arrange
+            BrandModel savedBrand = saveBrand("기존 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("   ", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + savedBrand.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -370,7 +396,33 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode())
+            );
+        }
+
+        @DisplayName("삭제된 브랜드와 동일한 이름으로 수정하면, 200 OK로 정상 처리된다.")
+        @Test
+        void returnsOk_whenNewNameMatchesDeletedBrand() {
+            // arrange
+            BrandModel deletedBrand = saveBrand("삭제된 브랜드");
+            deletedBrand.delete();
+            brandJpaRepository.saveAndFlush(deletedBrand);
+            BrandModel target = saveBrand("수정 대상 브랜드");
+            BrandAdminV1Dto.UpdateRequest requestBody = new BrandAdminV1Dto.UpdateRequest("삭제된 브랜드", "새 설명");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + target.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
             );
         }
 
@@ -390,7 +442,10 @@ class BrandAdminV1ApiE2ETest {
             );
 
             // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
         }
     }
 
@@ -398,11 +453,12 @@ class BrandAdminV1ApiE2ETest {
     @Nested
     class ReadBrands {
 
-        @DisplayName("정상 요청이면, 200 OK와 함께 삭제되지 않은 브랜드 목록과 페이지 메타가 반환된다.")
+        @DisplayName("정상 요청이면, 200 OK와 함께 삭제되지 않은 브랜드 목록이 등록 시각 내림차순으로 반환된다.")
         @Test
-        void returnsOk_withActiveBrandsAndMeta() {
+        void returnsOk_withActiveBrandsAndMeta() throws InterruptedException {
             // arrange
             saveBrand("브랜드1");
+            Thread.sleep(10);
             saveBrand("브랜드2");
             BrandModel deletedBrand = saveBrand("브랜드3");
             deletedBrand.delete();
@@ -429,12 +485,34 @@ class BrandAdminV1ApiE2ETest {
                 () -> assertThat(((Number) response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L),
                 () -> assertThat(content)
                     .extracting(brandItem -> brandItem.get("name"))
-                    .containsExactlyInAnyOrder("브랜드1", "브랜드2"),
+                    .containsExactly("브랜드2", "브랜드1"),
                 () -> assertThat(content.get(0))
                     .containsOnlyKeys("brandId", "name", "description", "createdAt", "updatedAt"),
                 () -> assertThat(content.get(0).get("description")).isEqualTo("감성을 담은 브랜드"),
                 () -> assertThat(content.get(0).get("createdAt")).isNotNull(),
                 () -> assertThat(content.get(0).get("updatedAt")).isNotNull()
+            );
+        }
+
+        @DisplayName("size를 지정하지 않으면, 기본 20건으로 페이징된다.")
+        @Test
+        void returnsOk_withDefaultSize_whenSizeIsOmitted() {
+            // arrange
+            saveBrand("브랜드1");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "?page=0",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(((Number) response.getBody().data().get("size")).intValue()).isEqualTo(20)
             );
         }
 
@@ -452,6 +530,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat((java.util.List<?>)response.getBody().data().get("content")).isEmpty(),
                 () -> assertThat(((Number)response.getBody().data().get("totalElements")).longValue()).isEqualTo(0L)
             );
@@ -471,6 +550,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -497,6 +577,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsOnlyKeys("brandId", "name", "description", "createdAt", "updatedAt"),
                 () -> assertThat(response.getBody().data().get("name")).isEqualTo("감성 브랜드")
@@ -520,6 +601,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -538,6 +620,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -632,6 +715,7 @@ class BrandAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }

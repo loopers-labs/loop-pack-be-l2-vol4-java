@@ -50,6 +50,15 @@ class BrandV1ApiE2ETest {
         return brandJpaRepository.save(brand);
     }
 
+    private BrandModel saveBrandWithoutDescription(String name) {
+        BrandModel brand = BrandModel.builder()
+            .rawName(name)
+            .rawDescription(null)
+            .build();
+
+        return brandJpaRepository.save(brand);
+    }
+
     private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE =
         new ParameterizedTypeReference<>() {
         };
@@ -108,9 +117,33 @@ class BrandV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(deletedResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(deletedResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(deletedResponse.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode()),
                 () -> assertThat(absentResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(absentResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(absentResponse.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("설명이 null인 브랜드를 조회하면, 응답의 description이 null로 반환된다.")
+        @Test
+        void returnsNullDescription_whenDescriptionIsNull() {
+            // arrange
+            BrandModel savedBrand = saveBrandWithoutDescription("설명없는 브랜드");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_BRANDS + "/" + savedBrand.getId(),
+                HttpMethod.GET,
+                null,
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data().get("description")).isNull()
             );
         }
     }

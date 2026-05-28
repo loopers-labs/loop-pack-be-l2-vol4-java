@@ -130,6 +130,7 @@ class ProductAdminV1ApiE2ETest {
             Map<?, ?> itemBrand = (Map<?, ?>) item.get("brand");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(1),
@@ -167,6 +168,8 @@ class ProductAdminV1ApiE2ETest {
 
             // assert
             assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).hasSize(1),
                 () -> assertThat(((Number) contentOf(response).get(0).get("productId")).longValue())
                     .isEqualTo(productA.getId())
@@ -187,6 +190,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -205,6 +209,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -234,6 +239,7 @@ class ProductAdminV1ApiE2ETest {
             Map<?, ?> dataBrand = (Map<?, ?>) data.get("brand");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(data)
                     .containsOnlyKeys("productId", "name", "description", "brand", "price", "stock", "createdAt", "updatedAt"),
                 () -> assertThat(((Number) data.get("productId")).longValue()).isEqualTo(product.getId()),
@@ -245,6 +251,36 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(dataBrand.get("name")).isEqualTo("감성 브랜드"),
                 () -> assertThat(data.get("createdAt")).isNotNull(),
                 () -> assertThat(data.get("updatedAt")).isNotNull()
+            );
+        }
+
+        @DisplayName("재고가 0인 상품이면, 200 OK와 함께 stock=0으로 반환된다.")
+        @Test
+        void returnsOk_withZeroStock_whenStockIsZero() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = productJpaRepository.save(ProductModel.builder()
+                .brandId(brand.getId())
+                .rawName("품절 가디건")
+                .rawDescription("포근한 감성 가디건")
+                .rawPrice(39_000)
+                .rawStock(0)
+                .build());
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.getId(),
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            Map<String, Object> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(((Number) data.get("stock")).intValue()).isEqualTo(0)
             );
         }
 
@@ -266,6 +302,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -284,6 +321,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -308,6 +346,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -527,6 +566,59 @@ class ProductAdminV1ApiE2ETest {
             );
         }
 
+        @DisplayName("설명을 null로 수정하면, 200 OK와 함께 설명이 null로 갱신된다.")
+        @Test
+        void returnsOk_andUpdatesDescriptionToNull_whenDescriptionIsNull() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", null, 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(reloadedProduct.getDescription()).isNull()
+            );
+        }
+
+        @DisplayName("가격 0·재고 0(경계 최소값)으로 수정하면, 200 OK와 함께 정상 갱신된다.")
+        @Test
+        void returnsOk_whenPriceAndStockAreZero() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("리뉴얼 가디건", "새 설명", 0, 0);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(reloadedProduct.getPrice().value()).isEqualTo(0),
+                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(0)
+            );
+        }
+
         @DisplayName("관리자 인증 헤더가 없으면, 403 Forbidden으로 거절된다.")
         @Test
         void returnsForbidden_whenAdminHeaderIsMissing() {
@@ -547,6 +639,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -569,6 +662,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -593,6 +687,32 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+
+        @DisplayName("이름이 빈 값(blank)이면, 400 Bad Request로 거절된다.")
+        @Test
+        void returnsBadRequest_whenNameIsBlank() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
+            ProductAdminV1Dto.UpdateRequest requestBody =
+                new ProductAdminV1Dto.UpdateRequest("   ", "새 설명", 42_000, 30);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + savedProduct.getId(),
+                HttpMethod.PUT,
+                adminJsonRequest(requestBody),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -617,6 +737,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -641,6 +762,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -650,7 +772,7 @@ class ProductAdminV1ApiE2ETest {
     @Nested
     class DeleteProduct {
 
-        @DisplayName("정상 요청이면, 200 OK로 처리되고 해당 상품은 활성 조회에서 제외된다.")
+        @DisplayName("정상 요청이면, 200 OK로 처리되고 해당 상품은 활성 목록·상세 조회에서 제외된다.")
         @Test
         void returnsOk_andSoftDeletes_whenRequestIsValid() {
             // arrange
@@ -658,20 +780,36 @@ class ProductAdminV1ApiE2ETest {
             ProductModel savedProduct = saveProduct(brand.getId(), "감성 가디건");
 
             // act
-            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<Map<String, Object>>> deleteResponse = testRestTemplate.exchange(
                 ENDPOINT + "/" + savedProduct.getId(),
                 HttpMethod.DELETE,
                 adminJsonRequest(null),
                 MAP_RESPONSE
             );
 
-            // assert
-            ProductModel reloadedProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+            // assert — 삭제 응답
             assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
-                () -> assertThat(reloadedProduct.getDeletedAt()).isNotNull()
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(deleteResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
             );
+
+            // assert — 활성 목록에서 제외됨
+            ResponseEntity<ApiResponse<Map<String, Object>>> listResponse = testRestTemplate.exchange(
+                ENDPOINT + "?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+            assertThat(contentOf(listResponse)).isEmpty();
+
+            // assert — 활성 상세에서 404
+            ResponseEntity<ApiResponse<Map<String, Object>>> detailResponse = testRestTemplate.exchange(
+                ENDPOINT + "/" + savedProduct.getId(),
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+            assertThat(detailResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
 
         @DisplayName("동일한 상품에 삭제를 두 번 요청해도, 두 응답 모두 200 OK로 마무리된다(멱등).")
@@ -691,6 +829,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(firstResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(secondResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(secondResponse.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
             );
@@ -732,6 +871,7 @@ class ProductAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
