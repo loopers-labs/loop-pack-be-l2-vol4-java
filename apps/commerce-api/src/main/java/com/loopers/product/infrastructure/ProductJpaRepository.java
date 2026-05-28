@@ -1,6 +1,7 @@
 package com.loopers.product.infrastructure;
 
 import com.loopers.product.domain.Product;
+import com.loopers.product.domain.ProductStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,8 +12,11 @@ import java.util.Optional;
 
 public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
+    Optional<Product> findByIdAndStatusAndDeletedAtIsNull(Long id, ProductStatus status);
+    List<Product> findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(ProductStatus status);
+    List<Product> findAllByStatusAndDeletedAtIsNullOrderByPriceAsc(ProductStatus status);
+    List<Product> findAllByStatusAndDeletedAtIsNullOrderByLikeCountDesc(ProductStatus status);
     List<Product> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
-    List<Product> findAllByDeletedAtIsNullOrderByPriceAsc();
     List<Product> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
     @Modifying(clearAutomatically = true)

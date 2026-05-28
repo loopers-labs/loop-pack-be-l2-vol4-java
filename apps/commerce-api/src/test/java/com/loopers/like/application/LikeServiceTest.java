@@ -34,7 +34,7 @@ class LikeServiceTest {
     private final LikeService likeService = new LikeService(likeRepository, productRepository, productReader);
 
     private Product activeProduct() {
-        return Product.create(1L, "셔츠", "설명", 10_000L);
+        return Product.create(1L, "셔츠", "설명", 10_000L, null);
     }
 
     @Test
@@ -132,8 +132,8 @@ class LikeServiceTest {
     void givenActiveLikes_whenGetMyLikes_thenReturnsLikedProducts() {
         Like l1 = Like.create(USER_ID, 10L);
         Like l2 = Like.create(USER_ID, 20L);
-        Product p1 = Product.create(1L, "P1", "설명", 1000L);
-        Product p2 = Product.create(1L, "P2", "설명", 2000L);
+        Product p1 = Product.create(1L, "P1", "설명", 1000L, null);
+        Product p2 = Product.create(1L, "P2", "설명", 2000L, null);
         when(likeRepository.findActiveByUserId(USER_ID)).thenReturn(List.of(l1, l2));
         when(productRepository.findAllByIdIn(List.of(10L, 20L))).thenReturn(List.of(p1, p2));
 

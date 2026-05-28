@@ -5,6 +5,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,23 +30,45 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private long price;
 
-    private Product(Long brandId, String name, String description, long price) {
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ProductStatus status;
+
+    @Column
+    private String thumbnailUrl;
+
+    @Column(nullable = false)
+    private long likeCount;
+
+    private Product(Long brandId, String name, String description, long price, String thumbnailUrl) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.thumbnailUrl = thumbnailUrl;
+        this.status = ProductStatus.ON_SALE;
+        this.likeCount = 0L;
         validate();
     }
 
-    public static Product create(Long brandId, String name, String description, long price) {
-        return new Product(brandId, name, description, price);
+    public static Product create(Long brandId, String name, String description, long price, String thumbnailUrl) {
+        return new Product(brandId, name, description, price, thumbnailUrl);
     }
 
-    public void update(String name, String description, long price) {
+    public void update(String name, String description, long price, String thumbnailUrl) {
         this.name = name;
         this.description = description;
         this.price = price;
+        this.thumbnailUrl = thumbnailUrl;
         validate();
+    }
+
+    public void suspend() {
+        this.status = ProductStatus.SUSPENDED;
+    }
+
+    public void resume() {
+        this.status = ProductStatus.ON_SALE;
     }
 
     private void validate() {

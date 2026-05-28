@@ -6,8 +6,11 @@ import java.util.Optional;
 public interface ProductRepository {
     Product save(Product product);
     Optional<Product> findById(Long id);
+    Optional<Product> findActiveById(Long id);
+    List<Product> findAllOnSaleOrderByLatest();
+    List<Product> findAllOnSaleOrderByPriceAsc();
+    List<Product> findAllOnSaleOrderByLikeCountDesc();
     List<Product> findAllOrderByLatest();
-    List<Product> findAllOrderByPriceAsc();
     List<Product> findAllByIdIn(List<Long> ids);
     int softDeleteByBrandId(Long brandId);
 }

@@ -2,6 +2,7 @@ package com.loopers.product.infrastructure;
 
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,13 +26,28 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Product> findAllOrderByLatest() {
-        return productJpaRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc();
+    public Optional<Product> findActiveById(Long id) {
+        return productJpaRepository.findByIdAndStatusAndDeletedAtIsNull(id, ProductStatus.ON_SALE);
     }
 
     @Override
-    public List<Product> findAllOrderByPriceAsc() {
-        return productJpaRepository.findAllByDeletedAtIsNullOrderByPriceAsc();
+    public List<Product> findAllOnSaleOrderByLatest() {
+        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(ProductStatus.ON_SALE);
+    }
+
+    @Override
+    public List<Product> findAllOnSaleOrderByPriceAsc() {
+        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByPriceAsc(ProductStatus.ON_SALE);
+    }
+
+    @Override
+    public List<Product> findAllOnSaleOrderByLikeCountDesc() {
+        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByLikeCountDesc(ProductStatus.ON_SALE);
+    }
+
+    @Override
+    public List<Product> findAllOrderByLatest() {
+        return productJpaRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc();
     }
 
     @Override

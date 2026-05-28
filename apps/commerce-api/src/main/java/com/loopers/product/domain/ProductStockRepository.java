@@ -6,6 +6,7 @@ import java.util.Optional;
 public interface ProductStockRepository {
     ProductStock save(ProductStock stock);
     Optional<ProductStock> findByProductId(Long productId);
+    List<ProductStock> findAllByProductIdIn(List<Long> productIds);
     Optional<ProductStock> findByProductIdForUpdate(Long productId);
     int softDeleteByBrandId(Long brandId);
 }

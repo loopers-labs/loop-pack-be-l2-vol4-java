@@ -1,17 +1,16 @@
 package com.loopers.product.application;
 
-import com.loopers.brand.domain.BrandRepository;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -19,49 +18,30 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductStockRepository productStockRepository;
-    private final BrandRepository brandRepository;
     private final ProductReader productReader;
-
-    @Transactional
-    public ProductResult.Detail create(ProductCommand.Create command) {
-        if (!brandRepository.existsById(command.brandId())) {
-            throw new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다.");
-        }
-        Product product = Product.create(command.brandId(), command.name(), command.description(), command.price());
-        Product saved = productRepository.save(product);
-
-        ProductStock stock = ProductStock.create(saved.getId(), command.initialStockQuantity());
-        productStockRepository.save(stock);
-
-        return ProductResult.Detail.from(saved);
-    }
-
-    @Transactional
-    public ProductResult.Detail update(ProductCommand.Update command) {
-        Product product = productReader.get(command.productId());
-        product.update(command.name(), command.description(), command.price());
-        return ProductResult.Detail.from(product);
-    }
-
-    @Transactional
-    public void delete(Long productId) {
-        Product product = productReader.get(productId);
-        ProductStock stock = productReader.getStock(productId);
-        product.delete();
-        stock.delete();
-    }
 
     @Transactional(readOnly = true)
     public ProductResult.Detail get(Long productId) {
-        return ProductResult.Detail.from(productReader.get(productId));
+        Product product = productReader.getActive(productId);
+        int stockQuantity = productReader.getStock(productId).getQuantity();
+        return ProductResult.Detail.from(product, stockQuantity);
     }
 
     @Transactional(readOnly = true)
     public List<ProductResult.Detail> getAll(ProductSortOption sortOption) {
         List<Product> products = switch (sortOption) {
-            case LATEST -> productRepository.findAllOrderByLatest();
-            case PRICE_ASC -> productRepository.findAllOrderByPriceAsc();
+            case LATEST -> productRepository.findAllOnSaleOrderByLatest();
+            case PRICE_ASC -> productRepository.findAllOnSaleOrderByPriceAsc();
+            case LIKES_DESC -> productRepository.findAllOnSaleOrderByLikeCountDesc();
         };
-        return products.stream().map(ProductResult.Detail::from).toList();
+
+        Map<Long, Integer> stockByProductId = productStockRepository
+                .findAllByProductIdIn(products.stream().map(Product::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(ProductStock::getProductId, ProductStock::getQuantity));
+
+        return products.stream()
+                .map(product -> ProductResult.Detail.from(product, stockByProductId.getOrDefault(product.getId(), 0)))
+                .toList();
     }
 }

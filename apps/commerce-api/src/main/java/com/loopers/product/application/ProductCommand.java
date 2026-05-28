@@ -7,6 +7,7 @@ public class ProductCommand {
         String name,
         String description,
         long price,
+        String thumbnailUrl,
         int initialStockQuantity
     ) {
     }
@@ -15,7 +16,8 @@ public class ProductCommand {
         Long productId,
         String name,
         String description,
-        long price
+        long price,
+        String thumbnailUrl
     ) {
     }
 }

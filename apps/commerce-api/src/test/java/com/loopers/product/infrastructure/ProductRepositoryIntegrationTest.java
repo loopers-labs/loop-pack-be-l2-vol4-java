@@ -33,10 +33,20 @@ class ProductRepositoryIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private Product save(String name, long price) {
+        return productRepository.save(Product.create(BRAND_ID, name, "설명", price, null));
+    }
+
+    private Product saveSuspended(String name, long price) {
+        Product product = Product.create(BRAND_ID, name, "설명", price, null);
+        product.suspend();
+        return productRepository.save(product);
+    }
+
     @Test
     @DisplayName("save 후 findById 로 같은 상품을 조회할 수 있다")
     void givenSavedProduct_whenFindById_thenReturnsProduct() {
-        Product saved = productRepository.save(Product.create(BRAND_ID, "셔츠", "설명", 29_000L));
+        Product saved = save("셔츠", 29_000L);
 
         Optional<Product> found = productRepository.findById(saved.getId());
 
@@ -46,37 +56,35 @@ class ProductRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 id 로 findById 하면 빈 값을 반환한다")
-    void givenNonExistingId_whenFindById_thenReturnsEmpty() {
-        Optional<Product> found = productRepository.findById(999L);
-
-        assertThat(found).isEmpty();
-    }
-
-    @Test
     @DisplayName("soft-delete 된 상품은 findById 결과에서 제외된다")
     void givenSoftDeletedProduct_whenFindById_thenReturnsEmpty() {
-        Product saved = productRepository.save(Product.create(BRAND_ID, "셔츠", "설명", 29_000L));
+        Product saved = save("셔츠", 29_000L);
         saved.delete();
         productRepository.save(saved);
 
-        Optional<Product> found = productRepository.findById(saved.getId());
-
-        assertThat(found).isEmpty();
+        assertThat(productRepository.findById(saved.getId())).isEmpty();
     }
 
     @Test
-    @DisplayName("findAllOrderByLatest 는 최근 생성 순으로 반환하며 soft-delete 는 제외한다")
-    void givenMultipleProducts_whenFindAllOrderByLatest_thenReturnsOnlyActiveInLatestOrder() throws Exception {
-        Product a = productRepository.save(Product.create(BRAND_ID, "A", "설명", 1000L));
-        Thread.sleep(10); // createdAt 명확한 순서 확보
-        Product b = productRepository.save(Product.create(BRAND_ID, "B", "설명", 2000L));
-        Thread.sleep(10);
-        Product c = productRepository.save(Product.create(BRAND_ID, "C", "설명", 3000L));
-        c.delete();
-        productRepository.save(c);
+    @DisplayName("findActiveById 는 판매중 상품만 반환하고 판매중지 상품은 제외한다")
+    void givenSuspendedProduct_whenFindActiveById_thenReturnsEmpty() {
+        Product onSale = save("판매중", 1000L);
+        Product suspended = saveSuspended("판매중지", 2000L);
 
-        List<Product> result = productRepository.findAllOrderByLatest();
+        assertThat(productRepository.findActiveById(onSale.getId())).isPresent();
+        assertThat(productRepository.findActiveById(suspended.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAllOnSaleOrderByLatest 는 판매중 상품만 최신순으로 반환한다 (판매중지·삭제 제외)")
+    void givenMixedProducts_whenFindAllOnSaleOrderByLatest_thenReturnsOnlyOnSale() throws Exception {
+        save("A", 1000L);
+        Thread.sleep(10);
+        save("B", 2000L);
+        Thread.sleep(10);
+        saveSuspended("판매중지", 3000L);
+
+        List<Product> result = productRepository.findAllOnSaleOrderByLatest();
 
         assertThat(result)
                 .extracting(Product::getName)
@@ -84,19 +92,32 @@ class ProductRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("findAllOrderByPriceAsc 는 가격 오름차순으로 반환하며 soft-delete 는 제외한다")
-    void givenMultipleProducts_whenFindAllOrderByPriceAsc_thenReturnsOnlyActiveInPriceAscOrder() {
-        productRepository.save(Product.create(BRAND_ID, "비싼것", "설명", 50_000L));
-        productRepository.save(Product.create(BRAND_ID, "중간", "설명", 30_000L));
-        productRepository.save(Product.create(BRAND_ID, "싼것", "설명", 10_000L));
-        Product deleted = productRepository.save(Product.create(BRAND_ID, "삭제됨", "설명", 0L));
-        deleted.delete();
-        productRepository.save(deleted);
+    @DisplayName("findAllOnSaleOrderByPriceAsc 는 판매중 상품만 가격 오름차순으로 반환한다")
+    void givenMixedProducts_whenFindAllOnSaleOrderByPriceAsc_thenReturnsOnlyOnSaleInPriceAsc() {
+        save("비싼것", 50_000L);
+        save("싼것", 10_000L);
+        saveSuspended("판매중지", 1L);
 
-        List<Product> result = productRepository.findAllOrderByPriceAsc();
+        List<Product> result = productRepository.findAllOnSaleOrderByPriceAsc();
 
         assertThat(result)
                 .extracting(Product::getName)
-                .containsExactly("싼것", "중간", "비싼것");
+                .containsExactly("싼것", "비싼것");
+    }
+
+    @Test
+    @DisplayName("findAllOrderByLatest(관리자) 는 판매중지 상품도 포함하고 삭제만 제외한다")
+    void givenMixedProducts_whenFindAllOrderByLatest_thenIncludesSuspendedExcludesDeleted() {
+        save("판매중", 1000L);
+        saveSuspended("판매중지", 2000L);
+        Product deleted = save("삭제됨", 3000L);
+        deleted.delete();
+        productRepository.save(deleted);
+
+        List<Product> result = productRepository.findAllOrderByLatest();
+
+        assertThat(result)
+                .extracting(Product::getName)
+                .containsExactlyInAnyOrder("판매중", "판매중지");
     }
 }

@@ -8,11 +8,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductStockJpaRepository extends JpaRepository<ProductStock, Long> {
 
     Optional<ProductStock> findByProductIdAndDeletedAtIsNull(Long productId);
+
+    List<ProductStock> findAllByProductIdInAndDeletedAtIsNull(List<Long> productIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM ProductStock s WHERE s.productId = :productId AND s.deletedAt IS NULL")

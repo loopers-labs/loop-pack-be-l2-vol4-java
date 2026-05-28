@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
-public class ProductV1Request {
+public class ProductAdminV1Request {
 
     public record Create(
         @NotNull(message = "brandId 는 필수입니다.")
@@ -22,11 +22,14 @@ public class ProductV1Request {
         @PositiveOrZero(message = "가격은 0 이상이어야 합니다.")
         long price,
 
+        @Size(max = 500, message = "썸네일 URL은 500자 이내여야 합니다.")
+        String thumbnailUrl,
+
         @PositiveOrZero(message = "초기 재고는 0 이상이어야 합니다.")
         int initialStockQuantity
     ) {
         public ProductCommand.Create toCommand() {
-            return new ProductCommand.Create(brandId, name, description, price, initialStockQuantity);
+            return new ProductCommand.Create(brandId, name, description, price, thumbnailUrl, initialStockQuantity);
         }
     }
 
@@ -39,10 +42,13 @@ public class ProductV1Request {
         String description,
 
         @PositiveOrZero(message = "가격은 0 이상이어야 합니다.")
-        long price
+        long price,
+
+        @Size(max = 500, message = "썸네일 URL은 500자 이내여야 합니다.")
+        String thumbnailUrl
     ) {
         public ProductCommand.Update toCommand(Long productId) {
-            return new ProductCommand.Update(productId, name, description, price);
+            return new ProductCommand.Update(productId, name, description, price, thumbnailUrl);
         }
     }
 }

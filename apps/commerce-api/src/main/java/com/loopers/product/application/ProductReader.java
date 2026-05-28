@@ -21,6 +21,11 @@ public class ProductReader {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
     }
 
+    public Product getActive(Long productId) {
+        return productRepository.findActiveById(productId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+    }
+
     public ProductStock getStock(Long productId) {
         return productStockRepository.findByProductId(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품 재고를 찾을 수 없습니다."));

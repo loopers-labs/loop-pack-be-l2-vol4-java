@@ -1,30 +1,32 @@
 package com.loopers.product.interfaces.api;
 
-import com.loopers.product.application.ProductDisplayStatus;
 import com.loopers.product.application.ProductResult;
+import com.loopers.product.domain.ProductStatus;
 
-public class ProductV1Response {
+public class ProductAdminV1Response {
 
-    public record Detail(
+    public record AdminDetail(
         Long id,
         Long brandId,
         String name,
         String description,
         long price,
-        ProductDisplayStatus displayStatus,
+        ProductStatus status,
         String thumbnailUrl,
-        long likeCount
+        long likeCount,
+        int stockQuantity
     ) {
-        public static Detail from(ProductResult.Detail result) {
-            return new Detail(
+        public static AdminDetail from(ProductResult.AdminDetail result) {
+            return new AdminDetail(
                 result.id(),
                 result.brandId(),
                 result.name(),
                 result.description(),
                 result.price(),
-                result.displayStatus(),
+                result.status(),
                 result.thumbnailUrl(),
-                result.likeCount()
+                result.likeCount(),
+                result.stockQuantity()
             );
         }
     }
