@@ -10,6 +10,7 @@ Claude Code 는 아래 import 를 통해 위 문서들을 함께 컨텍스트에
 @AGENTS.md
 @.claude/rules/tech-stack.md
 @.claude/rules/module-structure.md
+@.claude/rules/architecture.md
 @.claude/rules/references.md
 
 ## Claude Code 전용 지침
