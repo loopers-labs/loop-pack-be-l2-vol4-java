@@ -55,9 +55,12 @@
 
 ## 패키지 / 레이어 규칙
 
+도메인 코드는 `<domain>.<layer>` 형태의 도메인 우선 패키지 구조를 따른다.
+공통 API 응답과 공통 API Advice 처럼 특정 도메인에 속하지 않는 API 구성요소는 `common.interfaces.api` 하위에 둔다.
+
 ### interfaces
 
-- `interfaces.api.<domain>` 하위에 Controller, DTO, Swagger Spec, Advice 를 둔다.
+- `<domain>.interfaces.api` 하위에 Controller, DTO, Swagger Spec 을 둔다.
 - Request/Response DTO 는 외부 API 계약으로 보고 domain model 과 분리한다.
 - 입력 검증은 Bean Validation 애너테이션을 우선 사용한다.
 - Controller 에서 domain model 을 직접 반환하지 않는다.
@@ -65,21 +68,21 @@
 
 ### application
 
-- `application.<domain>` 하위에 Facade 와 Info 를 둔다.
+- `<domain>.application` 하위에 Facade 와 Info 를 둔다.
 - Facade 는 유스케이스 흐름, 트랜잭션 경계, 여러 도메인 서비스 조합을 담당한다.
 - 외부로 반환하는 조회 결과는 `Info` 객체로 표현한다.
 - 단순 위임만 반복되는 Facade 는 만들지 않는다.
 
 ### domain
 
-- `domain.<domain>` 하위에 Model, Service, Repository 인터페이스를 둔다.
+- `<domain>.domain` 하위에 Model, Service, Repository 인터페이스를 둔다.
 - 도메인 규칙은 Model 또는 Service 내부에 둔다.
 - Repository 는 도메인 계약만 표현하고 JPA, Redis, Kafka 세부 타입에 의존하지 않는다.
 - 도메인 계층은 `interfaces` 또는 `infrastructure` 계층에 의존하지 않는다.
 
 ### infrastructure
 
-- `infrastructure.<domain>` 하위에 Repository 구현체와 JpaRepository 를 둔다.
+- `<domain>.infrastructure` 하위에 Repository 구현체와 JpaRepository 를 둔다.
 - QueryDSL, JPA, Redis, Kafka 세부 구현은 이 계층에 한정한다.
 - domain 계층의 Repository 계약을 구현한다.
 - 외부 시스템 연동 예외는 도메인/애플리케이션에서 해석 가능한 형태로 변환한다.
