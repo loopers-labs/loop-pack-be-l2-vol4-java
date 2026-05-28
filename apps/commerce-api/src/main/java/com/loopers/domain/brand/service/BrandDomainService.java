@@ -23,4 +23,10 @@ public class BrandDomainService {
             throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 브랜드명입니다.");
         }
     }
+
+    public void validateDuplicateNameExcluding(String name, Long excludeId) {
+        if (brandRepository.existsByNameAndIdNot(name, excludeId)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 브랜드명입니다.");
+        }
+    }
 }

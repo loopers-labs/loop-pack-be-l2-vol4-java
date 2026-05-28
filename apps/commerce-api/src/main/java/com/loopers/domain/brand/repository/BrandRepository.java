@@ -13,4 +13,5 @@ public interface BrandRepository {
     Page<Brand> findAll(Pageable pageable);
     Brand save(Brand brand);
     boolean existsByName(String name);
+    boolean existsByNameAndIdNot(String name, Long excludeId);
 }

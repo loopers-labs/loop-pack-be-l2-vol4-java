@@ -26,4 +26,13 @@ public class BrandFacade {
         Brand brand = brandApplicationService.register(name);
         return BrandInfo.from(brand);
     }
+
+    public BrandInfo updateBrand(Long brandId, String name) {
+        Brand brand = brandApplicationService.updateBrand(brandId, name);
+        return BrandInfo.from(brand);
+    }
+
+    public void deleteBrand(Long brandId) {
+        brandApplicationService.deleteBrand(brandId);
+    }
 }
