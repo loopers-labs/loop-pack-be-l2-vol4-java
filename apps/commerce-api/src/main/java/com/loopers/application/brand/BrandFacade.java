@@ -1,6 +1,7 @@
 package com.loopers.application.brand;
 
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import java.util.UUID;
 public class BrandFacade {
 
     private final BrandService brandService;
+    private final ProductService productService;
 
     public BrandInfo create(String name, String description) {
         return BrandInfo.from(brandService.create(name, description));
@@ -37,7 +39,9 @@ public class BrandFacade {
         return BrandInfo.from(brandService.update(id, name, description));
     }
 
+    /** 브랜드 소프트딜리트 + 산하 상품 cascade 소프트딜리트 */
     public void delete(UUID id) {
         brandService.delete(id);
+        productService.deleteByBrand(id);
     }
 }
