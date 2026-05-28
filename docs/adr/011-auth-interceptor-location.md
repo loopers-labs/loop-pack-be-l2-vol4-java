@@ -1,7 +1,7 @@
 # ADR-011: 인증 인터셉터 위치 — support/auth
 
 - 날짜: 2026-05-21
-- 상태: 승인됨
+- 상태: 대체됨 → [ADR-020](./020-auth-interceptor-location-revised.md)
 
 ## 결정
 
