@@ -7,7 +7,7 @@ import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.product.ProductV1Dto;
+import com.loopers.interfaces.api.product.ProductDto;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -34,8 +34,8 @@ public class UserV1Controller {
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
-    public ApiResponse<UserV1Dto.UserResponse> signup(
-        @Valid @RequestBody UserV1Dto.SignupRequest request
+    public ApiResponse<UserDto.Register.V1.Response> signup(
+        @Valid @RequestBody UserDto.Register.V1.Request request
     ) {
         UserInfo info = userFacade.signup(
             request.loginId(),
@@ -44,30 +44,30 @@ public class UserV1Controller {
             request.birth(),
             request.email()
         );
-        UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(info);
+        UserDto.Register.V1.Response response = UserDto.Register.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 
     @GetMapping("/me")
-    public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
+    public ApiResponse<UserDto.GetMyInfo.V1.Response> getMyInfo(
         @LoginUser AuthenticatedUser user
     ) {
         UserInfo info = userFacade.getMyInfo(user.loginId());
-        UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(info);
+        UserDto.GetMyInfo.V1.Response response = UserDto.GetMyInfo.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 
     @RequestMapping(value = "/password", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ApiResponse<Void> changePassword(
         @LoginUser AuthenticatedUser user,
-        @Valid @RequestBody UserV1Dto.ChangePasswordRequest request
+        @Valid @RequestBody UserDto.ChangePassword.V1.Request request
     ) {
         userFacade.changePassword(user.loginId(), request.oldPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 
     @GetMapping("/{userId}/likes")
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getLikedProducts(
+    public ApiResponse<List<ProductDto.List.V1.Response>> getLikedProducts(
         @LoginUser AuthenticatedUser user,
         @PathVariable(value = "userId") String userId
     ) {
@@ -76,8 +76,8 @@ public class UserV1Controller {
         }
 
         List<ProductInfo> infos = productLikeFacade.getLikedProducts(user.loginId());
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
+        List<ProductDto.List.V1.Response> responses = infos.stream()
+            .map(ProductDto.List.V1.Response::from)
             .toList();
         return ApiResponse.success(responses);
     }

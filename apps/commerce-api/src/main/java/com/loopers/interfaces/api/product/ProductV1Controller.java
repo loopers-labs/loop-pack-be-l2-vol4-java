@@ -20,24 +20,24 @@ public class ProductV1Controller {
     private final ProductLikeFacade productLikeFacade;
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
+    public ApiResponse<ProductDto.Get.V1.Response> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
+        ProductDto.Get.V1.Response response = ProductDto.Get.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts(
+    public ApiResponse<List<ProductDto.List.V1.Response>> getAllProducts(
         @RequestParam(value = "brandId", required = false) Long brandId,
         @RequestParam(value = "sort", required = false) String sort,
         @RequestParam(value = "page", required = false) Integer page,
         @RequestParam(value = "size", required = false) Integer size
     ) {
         List<ProductInfo> infos = productFacade.getAllProducts(brandId, sort, page, size);
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
+        List<ProductDto.List.V1.Response> responses = infos.stream()
+            .map(ProductDto.List.V1.Response::from)
             .toList();
         return ApiResponse.success(responses);
     }

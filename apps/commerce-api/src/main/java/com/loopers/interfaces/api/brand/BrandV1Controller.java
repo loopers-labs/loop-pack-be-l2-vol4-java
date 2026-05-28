@@ -17,11 +17,11 @@ public class BrandV1Controller {
     private final BrandFacade brandFacade;
 
     @GetMapping("/{brandId}")
-    public ApiResponse<BrandV1Dto.BrandResponse> getBrand(
+    public ApiResponse<BrandDto.Get.V1.Response> getBrand(
         @PathVariable(value = "brandId") Long brandId
     ) {
         BrandInfo info = brandFacade.getBrand(brandId);
-        BrandV1Dto.BrandResponse response = BrandV1Dto.BrandResponse.from(info);
+        BrandDto.Get.V1.Response response = BrandDto.Get.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 }

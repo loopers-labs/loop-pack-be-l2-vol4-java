@@ -5,7 +5,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,12 +66,12 @@ class OrderV1ApiE2ETest {
             signup("user1234", "abc123!?");
             BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
             ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                List.of(new OrderV1Dto.OrderProductRequest(product.getId(), 2))
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2))
             );
 
             // act
-            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+            ResponseEntity<ApiResponse<OrderDto.Create.V1.Response>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
@@ -82,7 +82,7 @@ class OrderV1ApiE2ETest {
             ProductModel savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
 
             // assert
-            OrderV1Dto.OrderResponse data = response.getBody().data();
+            OrderDto.Create.V1.Response data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.userLoginId()).isEqualTo("user1234"),
@@ -102,15 +102,15 @@ class OrderV1ApiE2ETest {
             BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
             ProductModel availableProduct = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
             ProductModel outOfStockProduct = saveProduct(brand.getId(), "셔츠", "가벼운 셔츠", 20_000L, 1);
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
                 List.of(
-                    new OrderV1Dto.OrderProductRequest(availableProduct.getId(), 2),
-                    new OrderV1Dto.OrderProductRequest(outOfStockProduct.getId(), 3)
+                    new OrderDto.Create.V1.ProductRequest(availableProduct.getId(), 2),
+                    new OrderDto.Create.V1.ProductRequest(outOfStockProduct.getId(), 3)
                 )
             );
 
             // act
-            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+            ResponseEntity<ApiResponse<OrderDto.Create.V1.Response>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
@@ -122,7 +122,7 @@ class OrderV1ApiE2ETest {
             ProductModel savedOutOfStockProduct = productJpaRepository.findById(outOfStockProduct.getId()).orElseThrow();
 
             // assert
-            OrderV1Dto.OrderResponse data = response.getBody().data();
+            OrderDto.Create.V1.Response data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.orderLines()).hasSize(1),
@@ -141,8 +141,8 @@ class OrderV1ApiE2ETest {
             signup("user1234", "abc123!?");
             BrandModel brand = saveBrand("Loopers", "감성 이커머스 브랜드");
             ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 1);
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                List.of(new OrderV1Dto.OrderProductRequest(product.getId(), 2))
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2))
             );
 
             // act
@@ -162,8 +162,8 @@ class OrderV1ApiE2ETest {
         @Test
         void throwsUnauthorized_whenCredentialHeaderIsMissing() {
             // arrange
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                List.of(new OrderV1Dto.OrderProductRequest(1L, 1))
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(1L, 1))
             );
 
             // act
@@ -184,7 +184,7 @@ class OrderV1ApiE2ETest {
         void throwsBadRequest_whenProductsAreEmpty() {
             // arrange
             signup("user1234", "abc123!?");
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of());
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(List.of());
 
             // act
             ResponseEntity<ApiResponse<Void>> response =
@@ -209,7 +209,7 @@ class OrderV1ApiE2ETest {
     }
 
     private void signup(String loginId, String password) {
-        UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+        UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
             loginId,
             password,
             "홍길동",
@@ -226,7 +226,7 @@ class OrderV1ApiE2ETest {
         return headers;
     }
 
-    private ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> orderResponseType() {
+    private ParameterizedTypeReference<ApiResponse<OrderDto.Create.V1.Response>> orderResponseType() {
         return new ParameterizedTypeReference<>() {};
     }
 

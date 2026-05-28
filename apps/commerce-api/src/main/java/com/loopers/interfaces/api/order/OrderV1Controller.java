@@ -27,36 +27,36 @@ public class OrderV1Controller {
     private final OrderFacade orderFacade;
 
     @PostMapping
-    public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
+    public ApiResponse<OrderDto.Create.V1.Response> createOrder(
         @LoginUser AuthenticatedUser user,
-        @Valid @RequestBody OrderV1Dto.CreateOrderRequest request
+        @Valid @RequestBody OrderDto.Create.V1.Request request
     ) {
         OrderInfo info = orderFacade.createOrder(user.loginId(), request.toCommands());
-        OrderV1Dto.OrderResponse response = OrderV1Dto.OrderResponse.from(info);
+        OrderDto.Create.V1.Response response = OrderDto.Create.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 
     @GetMapping
-    public ApiResponse<List<OrderV1Dto.OrderResponse>> getOrders(
+    public ApiResponse<List<OrderDto.List.V1.Response>> getOrders(
         @LoginUser AuthenticatedUser user,
         @RequestParam(value = "startAt", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
         @RequestParam(value = "endAt", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt,
         @RequestParam(value = "page", required = false) Integer page,
         @RequestParam(value = "size", required = false) Integer size
     ) {
-        List<OrderV1Dto.OrderResponse> responses = orderFacade.getOrders(user.loginId(), startAt, endAt, page, size).stream()
-            .map(OrderV1Dto.OrderResponse::from)
+        List<OrderDto.List.V1.Response> responses = orderFacade.getOrders(user.loginId(), startAt, endAt, page, size).stream()
+            .map(OrderDto.List.V1.Response::from)
             .toList();
         return ApiResponse.success(responses);
     }
 
     @GetMapping("/{orderId}")
-    public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
+    public ApiResponse<OrderDto.Get.V1.Response> getOrder(
         @LoginUser AuthenticatedUser user,
         @PathVariable(value = "orderId") Long orderId
     ) {
         OrderInfo info = orderFacade.getOrder(user.loginId(), orderId);
-        OrderV1Dto.OrderResponse response = OrderV1Dto.OrderResponse.from(info);
+        OrderDto.Get.V1.Response response = OrderDto.Get.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 }

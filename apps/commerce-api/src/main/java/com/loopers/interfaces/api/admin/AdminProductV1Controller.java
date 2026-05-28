@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.admin;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.product.ProductV1Dto;
+import com.loopers.interfaces.api.product.ProductDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,29 +26,29 @@ public class AdminProductV1Controller {
     private final ProductFacade productFacade;
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
+    public ApiResponse<List<ProductDto.List.V1.Response>> getProducts(
         @RequestParam(value = "brandId", required = false) Long brandId,
         @RequestParam(value = "sort", required = false) String sort,
         @RequestParam(value = "page", required = false) Integer page,
         @RequestParam(value = "size", required = false) Integer size
     ) {
-        List<ProductV1Dto.ProductResponse> responses = productFacade.getAllProducts(brandId, sort, page, size).stream()
-            .map(ProductV1Dto.ProductResponse::from)
+        List<ProductDto.List.V1.Response> responses = productFacade.getAllProducts(brandId, sort, page, size).stream()
+            .map(ProductDto.List.V1.Response::from)
             .toList();
         return ApiResponse.success(responses);
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
+    public ApiResponse<ProductDto.Get.V1.Response> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        return ApiResponse.success(ProductDto.Get.V1.Response.from(info));
     }
 
     @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @Valid @RequestBody ProductV1Dto.CreateProductRequest request
+    public ApiResponse<ProductDto.Create.V1.Response> createProduct(
+        @Valid @RequestBody ProductDto.Create.V1.Request request
     ) {
         ProductInfo info = productFacade.createProduct(
             request.brandId(),
@@ -57,13 +57,13 @@ public class AdminProductV1Controller {
             request.price(),
             request.stock()
         );
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        return ApiResponse.success(ProductDto.Create.V1.Response.from(info));
     }
 
     @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
+    public ApiResponse<ProductDto.Update.V1.Response> updateProduct(
         @PathVariable(value = "productId") Long productId,
-        @Valid @RequestBody ProductV1Dto.UpdateProductRequest request
+        @Valid @RequestBody ProductDto.Update.V1.Request request
     ) {
         ProductInfo info = productFacade.updateProduct(
             productId,
@@ -72,7 +72,7 @@ public class AdminProductV1Controller {
             request.price(),
             request.stock()
         );
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        return ApiResponse.success(ProductDto.Update.V1.Response.from(info));
     }
 
     @DeleteMapping("/{productId}")

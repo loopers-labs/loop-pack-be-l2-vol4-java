@@ -5,7 +5,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,7 +68,7 @@ class ProductV1ApiE2ETest {
             ProductModel product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
 
             // act
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response =
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_PRODUCTS + "/" + product.getId(),
                     HttpMethod.GET,
@@ -77,7 +77,7 @@ class ProductV1ApiE2ETest {
                 );
 
             // assert
-            ProductV1Dto.ProductResponse data = response.getBody().data();
+            ProductDto.Get.V1.Response data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.id()).isEqualTo(product.getId()),
@@ -96,7 +96,7 @@ class ProductV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenRequiredFieldsAreMissing() {
             // arrange
-            ProductV1Dto.CreateProductRequest request = new ProductV1Dto.CreateProductRequest(
+            ProductDto.Create.V1.Request request = new ProductDto.Create.V1.Request(
                 null,
                 "",
                 "",
@@ -130,7 +130,7 @@ class ProductV1ApiE2ETest {
             ProductModel cheapProduct = saveProduct(brand.getId(), "양말", "부드러운 양말", 5_000L, 10);
 
             // act
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ResponseEntity<ApiResponse<List<ProductDto.List.V1.Response>>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_PRODUCTS + "?sort=price_asc",
                     HttpMethod.GET,
@@ -139,7 +139,7 @@ class ProductV1ApiE2ETest {
                 );
 
             // assert
-            List<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            List<ProductDto.List.V1.Response> data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data).hasSize(2),
@@ -185,7 +185,7 @@ class ProductV1ApiE2ETest {
                     voidResponseType()
                 );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse =
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> productResponse =
                 testRestTemplate.exchange(
                     ENDPOINT_PRODUCTS + "/" + product.getId(),
                     HttpMethod.GET,
@@ -223,7 +223,7 @@ class ProductV1ApiE2ETest {
                 voidResponseType()
             );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse =
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> productResponse =
                 testRestTemplate.exchange(
                     ENDPOINT_PRODUCTS + "/" + product.getId(),
                     HttpMethod.GET,
@@ -283,7 +283,7 @@ class ProductV1ApiE2ETest {
                     voidResponseType()
                 );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse =
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> productResponse =
                 testRestTemplate.exchange(
                     ENDPOINT_PRODUCTS + "/" + product.getId(),
                     HttpMethod.GET,
@@ -308,7 +308,7 @@ class ProductV1ApiE2ETest {
     }
 
     private void signup(String loginId, String password) {
-        UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+        UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
             loginId,
             password,
             "홍길동",
@@ -331,11 +331,11 @@ class ProductV1ApiE2ETest {
         return headers;
     }
 
-    private ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> productResponseType() {
+    private ParameterizedTypeReference<ApiResponse<ProductDto.Get.V1.Response>> productResponseType() {
         return new ParameterizedTypeReference<>() {};
     }
 
-    private ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> productListResponseType() {
+    private ParameterizedTypeReference<ApiResponse<List<ProductDto.List.V1.Response>>> productListResponseType() {
         return new ParameterizedTypeReference<>() {};
     }
 
