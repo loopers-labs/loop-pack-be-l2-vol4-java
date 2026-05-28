@@ -1,6 +1,6 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserEntity;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ public class UserFacade {
     }
 
     public UserInfo getUser(String userId, String password) {
-        UserModel user = userService.getUser(userId, password);
+        UserEntity user = userService.getUser(userId, password);
         return UserInfo.from(user);
     }
 

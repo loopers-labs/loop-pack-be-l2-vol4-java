@@ -1,10 +1,10 @@
 package com.loopers.infrastructure.user;
 
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserEntity;
 
 public class UserMapper {
 
-    public static UserJpaEntity toJpaEntity(UserModel model) {
+    public static UserJpaEntity toJpaEntity(UserEntity model) {
         return new UserJpaEntity(
                 model.getId(),
                 model.getUserId(),
@@ -15,8 +15,8 @@ public class UserMapper {
         );
     }
 
-    public static UserModel toDomain(UserJpaEntity entity) {
-        return UserModel.of(
+    public static UserEntity toDomain(UserJpaEntity entity) {
+        return UserEntity.of(
                 entity.getId(),
                 entity.getUserId(),
                 entity.getName(),
