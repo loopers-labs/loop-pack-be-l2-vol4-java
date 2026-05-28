@@ -12,8 +12,8 @@ import java.util.List;
 public class ProductFacade {
     private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price) {
+        ProductModel product = productService.createProduct(brandId, name, description, price);
         return ProductInfo.from(product);
     }
 
@@ -29,8 +29,8 @@ public class ProductFacade {
             .toList();
     }
 
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
+    public ProductInfo updateProduct(Long id, String name, String description, Long price) {
+        ProductModel product = productService.updateProduct(id, name, description, price);
         return ProductInfo.from(product);
     }
 
