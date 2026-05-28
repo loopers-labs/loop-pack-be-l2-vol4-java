@@ -2,7 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.user.User;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserService;
 import com.loopers.support.error.CoreException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

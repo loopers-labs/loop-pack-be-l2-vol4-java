@@ -5,6 +5,8 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
@@ -37,5 +39,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     public List<Order> findAllByUserIdAndPeriod(Long userId, ZonedDateTime startAt, ZonedDateTime endAt) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt)
             .stream().map(OrderEntity::toDomain).toList();
+    }
+
+    @Override
+    public Page<Order> findAll(Pageable pageable) {
+        return orderJpaRepository.findAll(pageable).map(OrderEntity::toDomain);
     }
 }

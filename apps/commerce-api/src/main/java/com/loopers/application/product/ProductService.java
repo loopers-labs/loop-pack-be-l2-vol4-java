@@ -1,5 +1,10 @@
-package com.loopers.domain.product;
+package com.loopers.application.product;
 
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSort;
+import com.loopers.domain.product.ProductStock;
+import com.loopers.domain.product.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;

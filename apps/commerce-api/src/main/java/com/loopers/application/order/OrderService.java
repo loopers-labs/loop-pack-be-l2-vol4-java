@@ -1,8 +1,14 @@
-package com.loopers.domain.order;
+package com.loopers.application.order;
 
+import com.loopers.domain.order.Order;
+import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderItemRepository;
+import com.loopers.domain.order.OrderRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,5 +46,9 @@ public class OrderService {
 
     public List<OrderItem> getOrderItems(Long orderId) {
         return orderItemRepository.findAllByOrderId(orderId);
+    }
+
+    public Page<Order> getOrdersForAdmin(Pageable pageable) {
+        return orderRepository.findAll(pageable);
     }
 }

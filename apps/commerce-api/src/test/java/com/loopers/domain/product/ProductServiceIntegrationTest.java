@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import com.loopers.application.product.ProductService;
 import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductEntity;

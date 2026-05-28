@@ -2,10 +2,12 @@ package com.loopers.application.order;
 
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
-import com.loopers.domain.order.OrderService;
+import com.loopers.application.order.OrderService;
+import com.loopers.application.product.ProductService;
 import com.loopers.domain.outbox.OutboxService;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,5 +45,14 @@ public class OrderFacade {
         Order order = orderService.createOrder(command.userId(), totalPrice, items);
         outboxService.publishOrderCreatedEvent(order);
         return OrderInfo.Create.from(order);
+    }
+
+    public OrderInfo.Detail getOrder(Long orderId, Long userId) {
+        Order order = orderService.getOrder(orderId);
+        if (!order.getUserId().equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인의 주문만 조회할 수 있습니다.");
+        }
+        List<OrderItem> items = orderService.getOrderItems(orderId);
+        return OrderInfo.Detail.from(order, items);
     }
 }

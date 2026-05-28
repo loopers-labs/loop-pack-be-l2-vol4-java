@@ -1,8 +1,8 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandService;
+import com.loopers.application.brand.BrandService;
+import com.loopers.application.product.ProductService;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.product.ProductStock;
 import lombok.RequiredArgsConstructor;

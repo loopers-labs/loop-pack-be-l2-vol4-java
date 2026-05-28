@@ -1,8 +1,8 @@
 package com.loopers.application.like;
 
-import com.loopers.domain.like.LikeService;
+import com.loopers.application.like.LikeService;
+import com.loopers.application.product.ProductService;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;

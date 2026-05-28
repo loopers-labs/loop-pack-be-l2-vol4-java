@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.brand;
 import com.loopers.application.brand.BrandCommand;
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
-import com.loopers.domain.brand.BrandService;
+import com.loopers.application.brand.BrandService;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

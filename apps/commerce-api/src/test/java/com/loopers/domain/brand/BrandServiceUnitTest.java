@@ -1,5 +1,6 @@
 package com.loopers.domain.brand;
 
+import com.loopers.application.brand.BrandService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
