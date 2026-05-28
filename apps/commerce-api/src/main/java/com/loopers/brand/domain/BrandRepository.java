@@ -8,5 +8,6 @@ public interface BrandRepository {
     Optional<Brand> findById(Long id);
     List<Brand> findAll();
     boolean existsById(Long id);
+    boolean existsByName(String name);
     int softDeleteById(Long id);
 }

@@ -34,7 +34,7 @@ class BrandRepositoryIntegrationTest {
     @Test
     @DisplayName("save 후 findById 로 같은 브랜드를 조회할 수 있다")
     void givenSavedBrand_whenFindById_thenReturnsBrand() {
-        Brand saved = brandRepository.save(Brand.create("루퍼스", "트렌디한 라이프스타일"));
+        Brand saved = brandRepository.save(Brand.create("루퍼스", "트렌디한 라이프스타일", null));
 
         Optional<Brand> found = brandRepository.findById(saved.getId());
 
@@ -54,7 +54,7 @@ class BrandRepositoryIntegrationTest {
     @Test
     @DisplayName("soft-delete 된 브랜드는 findById 결과에서 제외된다")
     void givenSoftDeletedBrand_whenFindById_thenReturnsEmpty() {
-        Brand saved = brandRepository.save(Brand.create("루퍼스", "설명"));
+        Brand saved = brandRepository.save(Brand.create("루퍼스", "설명", null));
         saved.delete();
         brandRepository.save(saved);
 
@@ -66,9 +66,9 @@ class BrandRepositoryIntegrationTest {
     @Test
     @DisplayName("findAll 은 활성 브랜드만 반환한다 (soft-delete 제외)")
     void givenActiveAndDeletedBrands_whenFindAll_thenReturnsOnlyActiveBrands() {
-        brandRepository.save(Brand.create("활성-A", "설명"));
-        brandRepository.save(Brand.create("활성-B", "설명"));
-        Brand deleted = brandRepository.save(Brand.create("삭제됨", "설명"));
+        brandRepository.save(Brand.create("활성-A", "설명", null));
+        brandRepository.save(Brand.create("활성-B", "설명", null));
+        Brand deleted = brandRepository.save(Brand.create("삭제됨", "설명", null));
         deleted.delete();
         brandRepository.save(deleted);
 

@@ -22,7 +22,7 @@ class BrandReaderTest {
     @Test
     @DisplayName("존재하는 brandId 로 조회하면 해당 브랜드를 반환한다")
     void givenExistingBrandId_whenGet_thenReturnsBrand() {
-        Brand brand = Brand.create("루퍼스", "설명");
+        Brand brand = Brand.create("루퍼스", "설명", null);
         when(brandRepository.findById(1L)).thenReturn(Optional.of(brand));
 
         Brand result = brandReader.get(1L);

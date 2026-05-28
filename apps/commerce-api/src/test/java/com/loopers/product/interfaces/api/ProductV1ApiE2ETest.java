@@ -1,7 +1,7 @@
 package com.loopers.product.interfaces.api;
 
+import com.loopers.brand.application.BrandAdminService;
 import com.loopers.brand.application.BrandCommand;
-import com.loopers.brand.application.BrandService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -29,21 +29,21 @@ class ProductV1ApiE2ETest {
     private static final String ENDPOINT = "/api/v1/products";
 
     private final TestRestTemplate testRestTemplate;
-    private final BrandService brandService;
+    private final BrandAdminService brandAdminService;
     private final DatabaseCleanUp databaseCleanUp;
 
     private Long brandId;
 
     @Autowired
-    public ProductV1ApiE2ETest(TestRestTemplate testRestTemplate, BrandService brandService, DatabaseCleanUp databaseCleanUp) {
+    public ProductV1ApiE2ETest(TestRestTemplate testRestTemplate, BrandAdminService brandAdminService, DatabaseCleanUp databaseCleanUp) {
         this.testRestTemplate = testRestTemplate;
-        this.brandService = brandService;
+        this.brandAdminService = brandAdminService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
     @BeforeEach
     void setUp() {
-        brandId = brandService.create(new BrandCommand.Create("루퍼스", "설명")).id();
+        brandId = brandAdminService.create(new BrandCommand.Create("루퍼스", "설명", null)).id();
     }
 
     @AfterEach

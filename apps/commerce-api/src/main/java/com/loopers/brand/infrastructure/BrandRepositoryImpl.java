@@ -35,6 +35,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
+    public boolean existsByName(String name) {
+        return brandJpaRepository.existsByName(name);
+    }
+
+    @Override
     public int softDeleteById(Long id) {
         return brandJpaRepository.softDeleteById(id);
     }

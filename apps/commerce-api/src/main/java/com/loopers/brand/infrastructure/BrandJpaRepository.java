@@ -13,6 +13,7 @@ public interface BrandJpaRepository extends JpaRepository<Brand, Long> {
     Optional<Brand> findByIdAndDeletedAtIsNull(Long id);
     List<Brand> findAllByDeletedAtIsNull();
     boolean existsByIdAndDeletedAtIsNull(Long id);
+    boolean existsByName(String name);
 
     @Modifying(clearAutomatically = true)
     @Query("""

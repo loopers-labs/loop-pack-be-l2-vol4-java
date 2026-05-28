@@ -1,7 +1,7 @@
 package com.loopers.like.interfaces.api;
 
+import com.loopers.brand.application.BrandAdminService;
 import com.loopers.brand.application.BrandCommand;
-import com.loopers.brand.application.BrandService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductCommand;
 import com.loopers.product.application.ProductService;
@@ -37,7 +37,7 @@ class LikeV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final UserService userService;
-    private final BrandService brandService;
+    private final BrandAdminService brandAdminService;
     private final ProductService productService;
     private final DatabaseCleanUp databaseCleanUp;
 
@@ -48,13 +48,13 @@ class LikeV1ApiE2ETest {
     public LikeV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
             UserService userService,
-            BrandService brandService,
+            BrandAdminService brandAdminService,
             ProductService productService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userService = userService;
-        this.brandService = brandService;
+        this.brandAdminService = brandAdminService;
         this.productService = productService;
         this.databaseCleanUp = databaseCleanUp;
     }
@@ -64,7 +64,7 @@ class LikeV1ApiE2ETest {
         userService.signUp(new UserCommand.SignUp(
                 LOGIN_ID, RAW_PASSWORD, "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
         ));
-        Long brandId = brandService.create(new BrandCommand.Create("루퍼스", "설명")).id();
+        Long brandId = brandAdminService.create(new BrandCommand.Create("루퍼스", "설명", null)).id();
         productId = productService.create(
                 new ProductCommand.Create(brandId, "셔츠", "설명", 29_000L, 50)
         ).id();

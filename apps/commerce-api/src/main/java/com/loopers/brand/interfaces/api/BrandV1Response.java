@@ -7,10 +7,11 @@ public class BrandV1Response {
     public record Detail(
         Long id,
         String name,
-        String description
+        String description,
+        String logoUrl
     ) {
         public static Detail from(BrandResult.Detail result) {
-            return new Detail(result.id(), result.name(), result.description());
+            return new Detail(result.id(), result.name(), result.description(), result.logoUrl());
         }
     }
 }

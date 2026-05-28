@@ -1,5 +1,7 @@
 package com.loopers.brand.interfaces.api;
 
+import com.loopers.brand.domain.Brand;
+import com.loopers.brand.domain.BrandRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -10,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,11 +27,13 @@ class BrandV1ApiE2ETest {
     private static final String ENDPOINT = "/api/v1/brands";
 
     private final TestRestTemplate testRestTemplate;
+    private final BrandRepository brandRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    public BrandV1ApiE2ETest(TestRestTemplate testRestTemplate, DatabaseCleanUp databaseCleanUp) {
+    public BrandV1ApiE2ETest(TestRestTemplate testRestTemplate, BrandRepository brandRepository, DatabaseCleanUp databaseCleanUp) {
         this.testRestTemplate = testRestTemplate;
+        this.brandRepository = brandRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -39,57 +42,9 @@ class BrandV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private ResponseEntity<ApiResponse<BrandV1Response.Detail>> create(BrandV1Request.Create request) {
-        ParameterizedTypeReference<ApiResponse<BrandV1Response.Detail>> type = new ParameterizedTypeReference<>() {};
-        return testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), type);
-    }
-
     private ResponseEntity<ApiResponse<BrandV1Response.Detail>> getById(Long brandId) {
         ParameterizedTypeReference<ApiResponse<BrandV1Response.Detail>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(ENDPOINT + "/" + brandId, HttpMethod.GET, null, type);
-    }
-
-    @DisplayName("POST /api/v1/brands")
-    @Nested
-    class Create {
-
-        @Test
-        @DisplayName("유효한 요청으로 등록하면 200 과 등록된 브랜드 정보를 반환한다")
-        void givenValidRequest_whenCreate_thenReturnsBrand() {
-            BrandV1Request.Create request = new BrandV1Request.Create("루퍼스", "트렌디한 라이프스타일");
-
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response = create(request);
-
-            assertAll(
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(response.getBody().data().id()).isNotNull(),
-                    () -> assertThat(response.getBody().data().name()).isEqualTo("루퍼스"),
-                    () -> assertThat(response.getBody().data().description()).isEqualTo("트렌디한 라이프스타일")
-            );
-        }
-
-        @Test
-        @DisplayName("description 없이 등록해도 200 을 받는다")
-        void givenRequestWithoutDescription_whenCreate_thenReturnsBrand() {
-            BrandV1Request.Create request = new BrandV1Request.Create("루퍼스", null);
-
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response = create(request);
-
-            assertAll(
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(response.getBody().data().description()).isNull()
-            );
-        }
-
-        @Test
-        @DisplayName("이름이 비어있으면 400 BAD_REQUEST 응답을 받는다")
-        void givenBlankName_whenCreate_thenThrowsBadRequest() {
-            BrandV1Request.Create request = new BrandV1Request.Create("  ", "설명");
-
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response = create(request);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
     }
 
     @DisplayName("GET /api/v1/brands/{brandId}")
@@ -97,16 +52,17 @@ class BrandV1ApiE2ETest {
     class GetOne {
 
         @Test
-        @DisplayName("존재하는 brandId 로 조회하면 200 과 브랜드 정보를 반환한다")
+        @DisplayName("존재하는 brandId 로 조회하면 200 과 브랜드 정보(로고 포함)를 반환한다")
         void givenExistingBrandId_whenGet_thenReturnsBrand() {
-            Long brandId = create(new BrandV1Request.Create("루퍼스", "설명")).getBody().data().id();
+            Brand saved = brandRepository.save(Brand.create("루퍼스", "설명", "https://cdn.loopers.com/l.png"));
 
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response = getById(brandId);
+            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response = getById(saved.getId());
 
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(response.getBody().data().id()).isEqualTo(brandId),
-                    () -> assertThat(response.getBody().data().name()).isEqualTo("루퍼스")
+                    () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
+                    () -> assertThat(response.getBody().data().name()).isEqualTo("루퍼스"),
+                    () -> assertThat(response.getBody().data().logoUrl()).isEqualTo("https://cdn.loopers.com/l.png")
             );
         }
 
@@ -124,10 +80,10 @@ class BrandV1ApiE2ETest {
     class GetAll {
 
         @Test
-        @DisplayName("등록된 브랜드 목록을 200 으로 반환한다")
+        @DisplayName("등록된 브랜드 목록을 200 으로 반환한다 (인증 불필요)")
         void givenSavedBrands_whenGetAll_thenReturnsAllBrands() {
-            create(new BrandV1Request.Create("A", "설명"));
-            create(new BrandV1Request.Create("B", "설명"));
+            brandRepository.save(Brand.create("A", "설명", null));
+            brandRepository.save(Brand.create("B", "설명", null));
 
             ParameterizedTypeReference<ApiResponse<List<BrandV1Response.Detail>>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<List<BrandV1Response.Detail>>> response =
@@ -139,82 +95,6 @@ class BrandV1ApiE2ETest {
                             .extracting(BrandV1Response.Detail::name)
                             .containsExactlyInAnyOrder("A", "B")
             );
-        }
-    }
-
-    @DisplayName("PUT /api/v1/brands/{brandId}")
-    @Nested
-    class Update {
-
-        private ResponseEntity<ApiResponse<BrandV1Response.Detail>> update(Long brandId, BrandV1Request.Update request) {
-            ParameterizedTypeReference<ApiResponse<BrandV1Response.Detail>> type = new ParameterizedTypeReference<>() {};
-            return testRestTemplate.exchange(ENDPOINT + "/" + brandId, HttpMethod.PUT, new HttpEntity<>(request), type);
-        }
-
-        @Test
-        @DisplayName("유효한 요청으로 수정하면 200 과 변경된 브랜드 정보를 반환한다")
-        void givenValidRequest_whenUpdate_thenReturnsUpdatedBrand() {
-            Long brandId = create(new BrandV1Request.Create("루퍼스", "설명")).getBody().data().id();
-
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response =
-                    update(brandId, new BrandV1Request.Update("뉴루퍼스", "새 설명"));
-
-            assertAll(
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(response.getBody().data().name()).isEqualTo("뉴루퍼스"),
-                    () -> assertThat(response.getBody().data().description()).isEqualTo("새 설명")
-            );
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 brandId 를 수정하면 404 NOT_FOUND 응답을 받는다")
-        void givenNonExistingBrandId_whenUpdate_thenThrowsNotFound() {
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response =
-                    update(999L, new BrandV1Request.Update("뉴루퍼스", "설명"));
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        }
-
-        @Test
-        @DisplayName("이름이 비어있으면 400 BAD_REQUEST 응답을 받는다")
-        void givenBlankName_whenUpdate_thenThrowsBadRequest() {
-            Long brandId = create(new BrandV1Request.Create("루퍼스", "설명")).getBody().data().id();
-
-            ResponseEntity<ApiResponse<BrandV1Response.Detail>> response =
-                    update(brandId, new BrandV1Request.Update("  ", "설명"));
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("DELETE /api/v1/brands/{brandId}")
-    @Nested
-    class Delete {
-
-        private ResponseEntity<ApiResponse<Void>> delete(Long brandId) {
-            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
-            return testRestTemplate.exchange(ENDPOINT + "/" + brandId, HttpMethod.DELETE, null, type);
-        }
-
-        @Test
-        @DisplayName("존재하는 brandId 를 삭제하면 200 응답 후 더 이상 조회되지 않는다")
-        void givenExistingBrandId_whenDelete_thenBrandIsNotFoundAfterwards() {
-            Long brandId = create(new BrandV1Request.Create("루퍼스", "설명")).getBody().data().id();
-
-            ResponseEntity<ApiResponse<Void>> deleteResponse = delete(brandId);
-
-            assertAll(
-                    () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(getById(brandId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
-            );
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 brandId 를 삭제하면 404 NOT_FOUND 응답을 받는다")
-        void givenNonExistingBrandId_whenDelete_thenThrowsNotFound() {
-            ResponseEntity<ApiResponse<Void>> response = delete(999L);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }
