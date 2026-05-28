@@ -19,7 +19,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/v1/users/me",
                 "/api/v1/users/me/password",
                 "/api/v1/products/*/likes",
-                "/api/v1/users/*/likes"
+                "/api/v1/users/*/likes",
+                "/api/v1/orders",
+                "/api/v1/orders/*",
+                "/api/v1/orders/*/cancel"
             );
     }
 }
