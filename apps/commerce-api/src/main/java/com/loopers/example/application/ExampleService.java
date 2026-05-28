@@ -1,18 +1,18 @@
-package com.loopers.example.domain;
+package com.loopers.example.application;
 
+import com.loopers.example.domain.ExampleModel;
+import com.loopers.example.domain.ExampleRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
-@Component
+@Service
 public class ExampleService {
 
     private final ExampleRepository exampleRepository;
 
-    @Transactional(readOnly = true)
     public ExampleModel getExample(Long id) {
         return exampleRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 예시를 찾을 수 없습니다."));

@@ -5,12 +5,14 @@ import com.loopers.product.domain.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
+
     private final ProductJpaRepository productJpaRepository;
 
     @Override
@@ -29,7 +31,12 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public List<ProductModel> findByBrandId(Long brandId) {
+        return productJpaRepository.findByBrandId(brandId);
+    }
+
+    @Override
+    public List<ProductModel> findAllByIds(Collection<Long> ids) {
+        return productJpaRepository.findAllById(ids);
     }
 }

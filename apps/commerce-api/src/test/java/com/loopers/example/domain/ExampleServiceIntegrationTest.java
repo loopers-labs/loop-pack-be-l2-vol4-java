@@ -1,5 +1,6 @@
 package com.loopers.example.domain;
 
+import com.loopers.example.application.ExampleService;
 import com.loopers.example.infrastructure.ExampleJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
