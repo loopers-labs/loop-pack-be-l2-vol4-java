@@ -38,9 +38,7 @@ public class InventoryEntity extends BaseEntity {
     }
 
     public void deduct(Integer amount) {
-        if (amount == null || amount <= 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
-        }
+        validateDeductAmount(amount);
         if (amount > this.quantity) {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
         }
@@ -61,6 +59,12 @@ public class InventoryEntity extends BaseEntity {
     private void validateQuantity(Integer quantity) {
         if (quantity == null || quantity < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고 수량은 0 이상이어야 합니다.");
+        }
+    }
+
+    private void validateDeductAmount(Integer amount) {
+        if (amount == null || amount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
         }
     }
 }
