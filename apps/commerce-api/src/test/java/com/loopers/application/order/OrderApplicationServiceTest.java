@@ -6,6 +6,8 @@ import com.loopers.domain.member.model.Member;
 import com.loopers.domain.member.service.MemberService;
 import com.loopers.domain.order.model.Order;
 import com.loopers.domain.order.model.OrderItem;
+import com.loopers.domain.order.model.OrderItemSnapshot;
+import com.loopers.domain.order.model.OrderItemStatus;
 import com.loopers.domain.order.repository.OrderItemRepository;
 import com.loopers.domain.order.repository.OrderItemSnapshotRepository;
 import com.loopers.domain.order.repository.OrderRepository;
@@ -14,6 +16,9 @@ import com.loopers.domain.product.repository.ProductRepository;
 import com.loopers.domain.stock.repository.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -198,6 +203,134 @@ class OrderApplicationServiceTest {
 
             // Assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("주문 목록을 조회할 때, ")
+    @Nested
+    class GetOrders {
+
+        @DisplayName("정상 요청이면, 해당 회원의 주문 목록(요약)을 반환한다.")
+        @Test
+        void returnsOrderSummaries_whenMemberExists() {
+            // Arrange
+            Member member = mock(Member.class);
+            when(member.getId()).thenReturn(1L);
+            when(memberService.getMember("user1")).thenReturn(member);
+
+            Order order = mock(Order.class);
+            when(order.getId()).thenReturn(10L);
+            when(order.getTotalAmount()).thenReturn(100_000L);
+            when(order.getCreatedAt()).thenReturn(null);
+
+            Page<Order> orderPage = new PageImpl<>(List.of(order), PageRequest.of(0, 20), 1);
+            when(orderRepository.findAllByMemberId(eq(1L), any(), any(), any())).thenReturn(orderPage);
+
+            // Act
+            Page<OrderSummary> result = orderApplicationService.getOrders("user1", null, null, 0, 20);
+
+            // Assert
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).orderId()).isEqualTo(10L);
+            assertThat(result.getContent().get(0).totalAmount()).isEqualTo(100_000L);
+        }
+
+        @DisplayName("존재하지 않는 회원이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenMemberDoesNotExist() {
+            // Arrange
+            when(memberService.getMember("unknown"))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+
+            // Act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                orderApplicationService.getOrders("unknown", null, null, 0, 20)
+            );
+
+            // Assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("주문 상세를 조회할 때, ")
+    @Nested
+    class GetOrder {
+
+        @DisplayName("본인 주문이면, 주문 상세(items 포함)를 반환한다.")
+        @Test
+        void returnsOrderDetail_whenOrderBelongsToMember() {
+            // Arrange
+            Member member = mock(Member.class);
+            when(member.getId()).thenReturn(1L);
+            when(memberService.getMember("user1")).thenReturn(member);
+
+            Order order = mock(Order.class);
+            when(order.getId()).thenReturn(10L);
+            when(order.getMemberId()).thenReturn(1L);
+            when(order.getTotalAmount()).thenReturn(100_000L);
+            when(order.getCreatedAt()).thenReturn(null);
+            when(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order));
+
+            OrderItem item = mock(OrderItem.class);
+            when(item.getId()).thenReturn(100L);
+            when(item.getQuantity()).thenReturn(2);
+            when(item.getStatus()).thenReturn(OrderItemStatus.ORDERED);
+            when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+
+            OrderItemSnapshot snapshot = mock(OrderItemSnapshot.class);
+            when(snapshot.getOrderItemId()).thenReturn(100L);
+            when(snapshot.getProductName()).thenReturn("에어맥스");
+            when(snapshot.getBrandName()).thenReturn("나이키");
+            when(snapshot.getPrice()).thenReturn(50_000L);
+            when(orderItemSnapshotRepository.findAllByOrderItemIdIn(List.of(100L))).thenReturn(List.of(snapshot));
+
+            // Act
+            OrderDetail result = orderApplicationService.getOrder("user1", 10L);
+
+            // Assert
+            assertThat(result.orderId()).isEqualTo(10L);
+            assertThat(result.items()).hasSize(1);
+            assertThat(result.items().get(0).productName()).isEqualTo("에어맥스");
+            assertThat(result.items().get(0).status()).isEqualTo(OrderItemStatus.ORDERED);
+        }
+
+        @DisplayName("존재하지 않는 주문이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderDoesNotExist() {
+            // Arrange
+            Member member = mock(Member.class);
+            when(member.getId()).thenReturn(1L);
+            when(memberService.getMember("user1")).thenReturn(member);
+            when(orderRepository.findById(999L)).thenReturn(java.util.Optional.empty());
+
+            // Act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                orderApplicationService.getOrder("user1", 999L)
+            );
+
+            // Assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("타인의 주문이면, FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenOrderBelongsToOtherMember() {
+            // Arrange
+            Member member = mock(Member.class);
+            when(member.getId()).thenReturn(1L);
+            when(memberService.getMember("user1")).thenReturn(member);
+
+            Order order = mock(Order.class);
+            when(order.getMemberId()).thenReturn(99L); // 다른 회원
+            when(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order));
+
+            // Act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                orderApplicationService.getOrder("user1", 10L)
+            );
+
+            // Assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 }

@@ -57,6 +57,70 @@
 
 ---
 
+## 주문 목록 조회 (UC-08)
+
+### 입력 필드
+- `loginId`: Header (X-Loopers-LoginId), null 불가
+- `startAt`: Query param, nullable (없으면 시작 제한 없음)
+- `endAt`: Query param, nullable (없으면 종료 제한 없음)
+- `page`: Query param, default 0
+- `size`: Query param, default 20
+
+### 유스케이스 흐름 (ApplicationService)
+1. `MemberService.getMember(loginId)` — 회원 조회 (없으면 NOT_FOUND)
+2. `OrderRepository.findAllByMemberId(memberId, startAt, endAt, pageable)` — 페이지네이션 목록 조회
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 회원만 가능 (`X-Loopers-LoginId` 헤더 필수)
+
+### 응답 필드 (각 주문)
+- `orderId`: Long
+- `totalAmount`: Long
+- `orderedAt`: ZonedDateTime (createdAt)
+
+---
+
+## 주문 상세 조회 (UC-09)
+
+### 입력 필드
+- `loginId`: Header (X-Loopers-LoginId), null 불가
+- `orderId`: PathVariable, null 불가
+
+### 비즈니스 규칙 (ApplicationService)
+- 존재하지 않는 orderId → NOT_FOUND
+- 본인의 주문이 아닌 경우 → FORBIDDEN
+
+### 유스케이스 흐름 (ApplicationService)
+1. `MemberService.getMember(loginId)` — 회원 조회 (없으면 NOT_FOUND)
+2. `OrderRepository.findById(orderId)` — 주문 조회 (없으면 NOT_FOUND)
+3. `order.memberId != member.id` → FORBIDDEN
+4. `OrderItemRepository.findAllByOrderId(orderId)` — 주문 항목 목록
+5. `OrderItemSnapshotRepository.findAllByOrderItemIdIn(orderItemIds)` — 스냅샷 일괄 조회
+6. item + snapshot 조합해 응답 생성
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 회원만 가능 (`X-Loopers-LoginId` 헤더 필수)
+- 타인 주문 접근 → 403 FORBIDDEN
+
+### 응답 필드
+- `orderId`: Long
+- `totalAmount`: Long
+- `orderedAt`: ZonedDateTime
+- `items[]`:
+  - `productName`: String (스냅샷)
+  - `brandName`: String (스냅샷)
+  - `price`: Long (스냅샷, 주문 당시 가격)
+  - `quantity`: int
+  - `status`: OrderItemStatus
+
+---
+
 ## 신규 도메인 모델
 
 ### Order

@@ -16,9 +16,12 @@ import com.loopers.domain.stock.repository.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -104,5 +107,43 @@ public class OrderApplicationService {
         orderItemSnapshotRepository.saveAll(snapshots);
 
         return savedOrder.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderSummary> getOrders(String loginId, ZonedDateTime startAt, ZonedDateTime endAt, int page, int size) {
+        Member member = memberService.getMember(loginId);
+        Page<Order> orders = orderRepository.findAllByMemberId(member.getId(), startAt, endAt, PageRequest.of(page, size));
+        return orders.map(OrderSummary::from);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderDetail getOrder(String loginId, Long orderId) {
+        Member member = memberService.getMember(loginId);
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 주문입니다."));
+
+        if (!order.getMemberId().equals(member.getId())) {
+            throw new CoreException(ErrorType.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        List<OrderItem> items = orderItemRepository.findAllByOrderId(orderId);
+        List<Long> itemIds = items.stream().map(OrderItem::getId).toList();
+        Map<Long, OrderItemSnapshot> snapshotMap = orderItemSnapshotRepository.findAllByOrderItemIdIn(itemIds).stream()
+            .collect(Collectors.toMap(OrderItemSnapshot::getOrderItemId, s -> s));
+
+        List<OrderDetail.OrderItemInfo> itemInfos = items.stream()
+            .map(item -> {
+                OrderItemSnapshot snapshot = snapshotMap.get(item.getId());
+                return new OrderDetail.OrderItemInfo(
+                    snapshot.getProductName(),
+                    snapshot.getBrandName(),
+                    snapshot.getPrice(),
+                    item.getQuantity(),
+                    item.getStatus()
+                );
+            })
+            .toList();
+
+        return new OrderDetail(order.getId(), order.getTotalAmount(), order.getCreatedAt(), itemInfos);
     }
 }

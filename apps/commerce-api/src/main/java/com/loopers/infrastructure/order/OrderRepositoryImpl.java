@@ -3,8 +3,11 @@ package com.loopers.infrastructure.order;
 import com.loopers.domain.order.model.Order;
 import com.loopers.domain.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -21,5 +24,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public Optional<Order> findById(Long id) {
         return orderJpaRepository.findById(id);
+    }
+
+    @Override
+    public Page<Order> findAllByMemberId(Long memberId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
+        return orderJpaRepository.findAllByMemberId(memberId, startAt, endAt, pageable);
     }
 }

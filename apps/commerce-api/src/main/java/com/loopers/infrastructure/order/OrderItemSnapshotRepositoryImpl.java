@@ -17,4 +17,9 @@ public class OrderItemSnapshotRepositoryImpl implements OrderItemSnapshotReposit
     public List<OrderItemSnapshot> saveAll(List<OrderItemSnapshot> snapshots) {
         return orderItemSnapshotJpaRepository.saveAll(snapshots);
     }
+
+    @Override
+    public List<OrderItemSnapshot> findAllByOrderItemIdIn(List<Long> orderItemIds) {
+        return orderItemSnapshotJpaRepository.findAllByOrderItemIdIn(orderItemIds);
+    }
 }

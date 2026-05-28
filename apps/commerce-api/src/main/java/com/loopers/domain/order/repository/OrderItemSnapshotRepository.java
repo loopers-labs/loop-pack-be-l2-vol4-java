@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface OrderItemSnapshotRepository {
     List<OrderItemSnapshot> saveAll(List<OrderItemSnapshot> snapshots);
+    List<OrderItemSnapshot> findAllByOrderItemIdIn(List<Long> orderItemIds);
 }
