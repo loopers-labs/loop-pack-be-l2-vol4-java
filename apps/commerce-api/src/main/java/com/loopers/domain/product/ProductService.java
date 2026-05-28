@@ -18,8 +18,7 @@ public class ProductService {
 
     @Transactional
     public ProductEntity createProduct(Long brandId, String name, String description, Long price) {
-        ProductEntity product = new ProductEntity(brandId, name, description, price);
-        return productRepository.save(product);
+        return productRepository.save(new ProductEntity(brandId, name, description, price));
     }
 
     @Transactional(readOnly = true)
@@ -54,8 +53,9 @@ public class ProductService {
 
     @Transactional
     public void deleteAll(List<Long> ids) {
-        List<ProductEntity> products = productRepository.findAllByIds(ids);
-        products.forEach(ProductEntity::delete);
-        products.forEach(productRepository::save);
+        productRepository.findAllByIds(ids).forEach(product -> {
+            product.delete();
+            productRepository.save(product);
+        });
     }
 }
