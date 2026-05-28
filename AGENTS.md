@@ -1,8 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code when working with code in this repository.
-`AGENTS.md` is the primary source of truth. Keep this file aligned with `AGENTS.md`; if the two files conflict, follow `AGENTS.md`.
-
 # Project Agent Instructions
 
 ## 기본 작업 원칙
