@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class ProductModelTest {
+public class ProductEntityTest {
 
     private static final Long VALID_BRAND_ID = 1L;
     private static final String VALID_NAME = "에어맥스 90";
@@ -22,9 +22,9 @@ public class ProductModelTest {
 
         @DisplayName("유효한 값이 주어지면, 정상적으로 생성된다.")
         @Test
-        void createsProductModel_whenRequestIsValid() {
+        void createsProductEntity_whenRequestIsValid() {
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
 
             // assert
             assertAll(
@@ -41,7 +41,7 @@ public class ProductModelTest {
         void throwsException_whenBrandIdIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(null, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(null, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -53,7 +53,7 @@ public class ProductModelTest {
         void throwsException_whenNameIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, null, VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, null, VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -65,7 +65,7 @@ public class ProductModelTest {
         void throwsException_whenNameIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, "", VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, "", VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -77,7 +77,7 @@ public class ProductModelTest {
         void throwsException_whenNameHasLeadingWhitespace() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, " " + VALID_NAME, VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, " " + VALID_NAME, VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -89,7 +89,7 @@ public class ProductModelTest {
         void throwsException_whenNameHasTrailingWhitespace() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME + " ", VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME + " ", VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -101,7 +101,7 @@ public class ProductModelTest {
         void throwsException_whenNameIsWhitespaceOnly() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, "   ", VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, "   ", VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -110,12 +110,12 @@ public class ProductModelTest {
 
         @DisplayName("name이 1자이면, 정상적으로 생성된다. (BVA 하한)")
         @Test
-        void createsProductModel_whenNameIsOneChar() {
+        void createsProductEntity_whenNameIsOneChar() {
             // arrange
             String name = "신";
 
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE);
 
             // assert
             assertEquals(name, product.getName());
@@ -123,12 +123,12 @@ public class ProductModelTest {
 
         @DisplayName("name이 정확히 100자이면, 정상적으로 생성된다. (BVA 상한)")
         @Test
-        void createsProductModel_whenNameIsExactly100Chars() {
+        void createsProductEntity_whenNameIsExactly100Chars() {
             // arrange
             String name = "가".repeat(100);
 
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE);
 
             // assert
             assertEquals(name, product.getName());
@@ -142,7 +142,7 @@ public class ProductModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, name, VALID_DESCRIPTION, VALID_PRICE)
             );
 
             // assert
@@ -154,7 +154,7 @@ public class ProductModelTest {
         void throwsException_whenDescriptionIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME, null, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME, null, VALID_PRICE)
             );
 
             // assert
@@ -166,7 +166,7 @@ public class ProductModelTest {
         void throwsException_whenDescriptionIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME, "", VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME, "", VALID_PRICE)
             );
 
             // assert
@@ -175,12 +175,12 @@ public class ProductModelTest {
 
         @DisplayName("description이 1자이면, 정상적으로 생성된다. (BVA 하한)")
         @Test
-        void createsProductModel_whenDescriptionIsOneChar() {
+        void createsProductEntity_whenDescriptionIsOneChar() {
             // arrange
             String description = "설";
 
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE);
 
             // assert
             assertEquals(description, product.getDescription());
@@ -188,12 +188,12 @@ public class ProductModelTest {
 
         @DisplayName("description이 정확히 500자이면, 정상적으로 생성된다. (BVA 상한)")
         @Test
-        void createsProductModel_whenDescriptionIsExactly500Chars() {
+        void createsProductEntity_whenDescriptionIsExactly500Chars() {
             // arrange
             String description = "설".repeat(500);
 
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE);
 
             // assert
             assertEquals(description, product.getDescription());
@@ -207,7 +207,7 @@ public class ProductModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME, description, VALID_PRICE)
             );
 
             // assert
@@ -219,7 +219,7 @@ public class ProductModelTest {
         void throwsException_whenPriceIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, null)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, null)
             );
 
             // assert
@@ -231,7 +231,7 @@ public class ProductModelTest {
         void throwsException_whenPriceIsNegative() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, -1L)
+                new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, -1L)
             );
 
             // assert
@@ -240,9 +240,9 @@ public class ProductModelTest {
 
         @DisplayName("price가 0이면, 정상적으로 생성된다. (BVA 하한)")
         @Test
-        void createsProductModel_whenPriceIsZero() {
+        void createsProductEntity_whenPriceIsZero() {
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 0L);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 0L);
 
             // assert
             assertEquals(0L, product.getPrice());
@@ -250,9 +250,9 @@ public class ProductModelTest {
 
         @DisplayName("price가 1이면, 정상적으로 생성된다. (BVA 하한+1)")
         @Test
-        void createsProductModel_whenPriceIsOne() {
+        void createsProductEntity_whenPriceIsOne() {
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 1L);
+            ProductEntity product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 1L);
 
             // assert
             assertEquals(1L, product.getPrice());
@@ -263,16 +263,16 @@ public class ProductModelTest {
     @Nested
     class Update {
 
-        ProductModel product;
+        ProductEntity product;
 
         @BeforeEach
         void setup() {
-            product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
+            product = new ProductEntity(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
         }
 
         @DisplayName("유효한 값이 주어지면, 정상적으로 수정된다.")
         @Test
-        void updatesProductModel_whenRequestIsValid() {
+        void updatesProductEntity_whenRequestIsValid() {
             // arrange
             String newName = "에어포스 1";
             String newDescription = "나이키 농구화";
@@ -351,7 +351,7 @@ public class ProductModelTest {
 
         @DisplayName("새 name이 정확히 100자이면, 정상적으로 수정된다. (BVA 상한)")
         @Test
-        void updatesProductModel_whenNewNameIsExactly100Chars() {
+        void updatesProductEntity_whenNewNameIsExactly100Chars() {
             // arrange
             String newName = "가".repeat(100);
 
@@ -400,7 +400,7 @@ public class ProductModelTest {
 
         @DisplayName("새 description이 정확히 500자이면, 정상적으로 수정된다. (BVA 상한)")
         @Test
-        void updatesProductModel_whenNewDescriptionIsExactly500Chars() {
+        void updatesProductEntity_whenNewDescriptionIsExactly500Chars() {
             // arrange
             String newDescription = "설".repeat(500);
 
@@ -449,7 +449,7 @@ public class ProductModelTest {
 
         @DisplayName("새 price가 0이면, 정상적으로 수정된다. (BVA 하한)")
         @Test
-        void updatesProductModel_whenNewPriceIsZero() {
+        void updatesProductEntity_whenNewPriceIsZero() {
             // act
             product.update(VALID_NAME, VALID_DESCRIPTION, 0L);
 
@@ -459,7 +459,7 @@ public class ProductModelTest {
 
         @DisplayName("새 price가 1이면, 정상적으로 수정된다. (BVA 하한+1)")
         @Test
-        void updatesProductModel_whenNewPriceIsOne() {
+        void updatesProductEntity_whenNewPriceIsOne() {
             // act
             product.update(VALID_NAME, VALID_DESCRIPTION, 1L);
 
