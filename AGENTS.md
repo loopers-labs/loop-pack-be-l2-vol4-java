@@ -16,6 +16,7 @@
 - **이름**: `loopers-java-spring-template` (group `com.loopers`)
 - **구성**: `commerce-api`, `commerce-streamer`, `commerce-batch` 세 개의 Spring Boot 앱 + 재사용 인프라 모듈(`jpa`, `redis`, `kafka`) + add-on(`jackson`, `logging`, `monitoring`).
 - 상세 트리 / 패키지 컨벤션: [`.claude/rules/module-structure.md`](.claude/rules/module-structure.md)
+- 아키텍처 / 도메인 & 객체 설계 원칙: [`.claude/rules/architecture.md`](.claude/rules/architecture.md)
 - 기술 스택 / 버전 표: [`.claude/rules/tech-stack.md`](.claude/rules/tech-stack.md)
 - 상세 코드 컨벤션: [`.claude/rules/code-conventions.md`](.claude/rules/code-conventions.md)
 - 외부 문서·접속 정보: [`.claude/rules/references.md`](.claude/rules/references.md)
