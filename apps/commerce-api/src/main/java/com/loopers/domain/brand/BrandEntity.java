@@ -6,23 +6,23 @@ import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
 
-public class BrandModel extends BaseEntity {
+public class BrandEntity extends BaseEntity {
 
     private String name;
     private String description;
 
-    protected BrandModel() {}
+    protected BrandEntity() {}
 
-    public BrandModel(String name, String description) {
+    public BrandEntity(String name, String description) {
         validateName(name);
         validateDescription(description);
         this.name = name;
         this.description = description;
     }
 
-    public static BrandModel of(Long id, String name, String description,
+    public static BrandEntity of(Long id, String name, String description,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
-        BrandModel model = new BrandModel();
+        BrandEntity model = new BrandEntity();
         model.name = name;
         model.description = description;
         model.reconstruct(id, createdAt, updatedAt, deletedAt);

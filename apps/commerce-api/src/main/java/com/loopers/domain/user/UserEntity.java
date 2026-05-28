@@ -10,7 +10,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
-public class UserModel extends BaseEntity {
+public class UserEntity extends BaseEntity {
 
     private static final Pattern USER_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[가-힣]+$");
@@ -25,9 +25,9 @@ public class UserModel extends BaseEntity {
     private String password;
     private LocalDate birthDate;
 
-    protected UserModel() {}
+    protected UserEntity() {}
 
-    public UserModel(String userId, String password, String name, LocalDate birthDate, String email, PasswordEncoder passwordEncoder) {
+    public UserEntity(String userId, String password, String name, LocalDate birthDate, String email, PasswordEncoder passwordEncoder) {
         validateUserId(userId);
         validateName(name);
         validateEmail(email);
@@ -40,9 +40,9 @@ public class UserModel extends BaseEntity {
         this.password = passwordEncoder.encode(password);
     }
 
-    public static UserModel of(Long id, String userId, String name, String email, String encodedPassword,
+    public static UserEntity of(Long id, String userId, String name, String email, String encodedPassword,
             LocalDate birthDate, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
-        UserModel model = new UserModel();
+        UserEntity model = new UserEntity();
         model.userId = userId;
         model.name = name;
         model.email = email;

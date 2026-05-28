@@ -6,7 +6,7 @@ import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
 
-public class ProductModel extends BaseEntity {
+public class ProductEntity extends BaseEntity {
 
     private Long brandId;
     private String name;
@@ -14,9 +14,9 @@ public class ProductModel extends BaseEntity {
     private Long price;
     private Long likeCount;
 
-    protected ProductModel() {}
+    protected ProductEntity() {}
 
-    public ProductModel(Long brandId, String name, String description, Long price) {
+    public ProductEntity(Long brandId, String name, String description, Long price) {
         validateBrandId(brandId);
         validateName(name);
         validateDescription(description);
@@ -28,9 +28,9 @@ public class ProductModel extends BaseEntity {
         this.likeCount = 0L;
     }
 
-    public static ProductModel of(Long id, Long brandId, String name, String description, Long price, Long likeCount,
+    public static ProductEntity of(Long id, Long brandId, String name, String description, Long price, Long likeCount,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
-        ProductModel model = new ProductModel();
+        ProductEntity model = new ProductEntity();
         model.brandId = brandId;
         model.name = name;
         model.description = description;

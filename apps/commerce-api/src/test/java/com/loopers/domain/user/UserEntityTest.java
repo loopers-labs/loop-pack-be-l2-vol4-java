@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-public class UserModelTest {
+public class UserEntityTest {
 
     private static final String DEFAULT_USER_ID = "usertest123";
     private static final String DEFAULT_NAME = "홍길동";
@@ -41,9 +41,9 @@ public class UserModelTest {
 
         @DisplayName("정상적인 요청이 온 경우, 정상적으로 생성된다.")
         @Test
-        void createsUserModel_whenRequestIsValid() {
+        void createsUserEntity_whenRequestIsValid() {
             // act
-            UserModel userModel = new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER);
+            UserEntity userModel = new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER);
 
             // assert
             assertAll(
@@ -57,14 +57,14 @@ public class UserModelTest {
 
         @DisplayName("Stub: Bcrypt 연산 없이 비밀번호 규칙 검증만 집중하는 테스트")
         @Test
-        void createsUserModel_withStubEncoder() {
+        void createsUserEntity_withStubEncoder() {
             // arrange
             PasswordEncoder stubEncoder = mock(PasswordEncoder.class);
             String hashPassword = "stubbed_hash";
             when(stubEncoder.encode(anyString())).thenReturn(hashPassword);
 
             // act
-            UserModel userModel = new UserModel(userId, password, name, birthDate, email, stubEncoder);
+            UserEntity userModel = new UserEntity(userId, password, name, birthDate, email, stubEncoder);
 
             // assert - 검증 로직
             assertEquals(DEFAULT_USER_ID, userModel.getUserId());
@@ -79,7 +79,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -94,7 +94,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -109,7 +109,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -124,7 +124,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -139,7 +139,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -154,7 +154,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -169,7 +169,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -184,7 +184,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -199,7 +199,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -214,7 +214,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -229,7 +229,7 @@ public class UserModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new UserModel(userId, password, name, birthDate, email, PASSWORD_ENCODER)
+                new UserEntity(userId, password, name, birthDate, email, PASSWORD_ENCODER)
             );
 
             // assert
@@ -240,11 +240,11 @@ public class UserModelTest {
     @DisplayName("비밀번호 변경 테스트")
     @Nested
     class ChangePassword {
-        UserModel userModel;
+        UserEntity userModel;
 
         @BeforeEach
         void setup() {
-            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
+            userModel = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
         }
 
         @DisplayName("올바른 현재 비밀번호와 새 비밀번호가 주어지면, 비밀번호가 변경된다.")
@@ -296,7 +296,7 @@ public class UserModelTest {
         @Test
         void returnsMaskedName_whenNameHasThreeChars() {
             // arrange
-            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
+            UserEntity userModel = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
 
             // act
             String maskedName = userModel.getMaskedName();
@@ -309,7 +309,7 @@ public class UserModelTest {
         @Test
         void returnsMaskedName_whenNameHasTwoChars() {
             // arrange
-            UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, "홍길", DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
+            UserEntity userModel = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, "홍길", DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
 
             // act
             String maskedName = userModel.getMaskedName();
@@ -322,11 +322,11 @@ public class UserModelTest {
     @DisplayName("비밀번호 인증 테스트")
     @Nested
     class Authenticate {
-        UserModel userModel;
+        UserEntity userModel;
 
         @BeforeEach
         void setup() {
-            userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
+            userModel = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, PASSWORD_ENCODER);
         }
 
         @DisplayName("정상적인 비밀번호를 주면 인증이 성공한다.")
@@ -346,7 +346,7 @@ public class UserModelTest {
             when(mockEncoder.encode(anyString())).thenReturn(hashPassword);
             when(mockEncoder.matches(DEFAULT_PASSWORD, hashPassword)).thenReturn(true);
 
-            UserModel user = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, mockEncoder);
+            UserEntity user = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, mockEncoder);
 
             // act
             user.authenticate(DEFAULT_PASSWORD, mockEncoder);

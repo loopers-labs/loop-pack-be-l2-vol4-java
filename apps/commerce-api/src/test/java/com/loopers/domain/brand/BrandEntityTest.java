@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class BrandModelTest {
+public class BrandEntityTest {
 
     private static final String VALID_NAME = "나이키";
     private static final String VALID_DESCRIPTION = "스포츠 브랜드";
@@ -19,9 +19,9 @@ public class BrandModelTest {
 
         @DisplayName("유효한 name과 description이 주어지면, 정상적으로 생성된다.")
         @Test
-        void createsBrandModel_whenRequestIsValid() {
+        void createsBrandEntity_whenRequestIsValid() {
             // act
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // assert
             assertAll(
@@ -35,7 +35,7 @@ public class BrandModelTest {
         void throwsException_whenNameIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(null, VALID_DESCRIPTION)
+                new BrandEntity(null, VALID_DESCRIPTION)
             );
 
             // assert
@@ -47,7 +47,7 @@ public class BrandModelTest {
         void throwsException_whenNameIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel("", VALID_DESCRIPTION)
+                new BrandEntity("", VALID_DESCRIPTION)
             );
 
             // assert
@@ -59,7 +59,7 @@ public class BrandModelTest {
         void throwsException_whenNameHasLeadingWhitespace() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(" " + VALID_NAME, VALID_DESCRIPTION)
+                new BrandEntity(" " + VALID_NAME, VALID_DESCRIPTION)
             );
 
             // assert
@@ -71,7 +71,7 @@ public class BrandModelTest {
         void throwsException_whenNameHasTrailingWhitespace() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(VALID_NAME + " ", VALID_DESCRIPTION)
+                new BrandEntity(VALID_NAME + " ", VALID_DESCRIPTION)
             );
 
             // assert
@@ -80,12 +80,12 @@ public class BrandModelTest {
 
         @DisplayName("name이 1자이면, 정상적으로 생성된다. (BVA 하한)")
         @Test
-        void createsBrandModel_whenNameIsOneChar() {
+        void createsBrandEntity_whenNameIsOneChar() {
             // arrange
             String name = "나";
 
             // act
-            BrandModel brand = new BrandModel(name, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(name, VALID_DESCRIPTION);
 
             // assert
             assertEquals(name, brand.getName());
@@ -93,12 +93,12 @@ public class BrandModelTest {
 
         @DisplayName("name이 정확히 100자이면, 정상적으로 생성된다. (BVA 상한)")
         @Test
-        void createsBrandModel_whenNameIsExactly100Chars() {
+        void createsBrandEntity_whenNameIsExactly100Chars() {
             // arrange
             String name = "가".repeat(100);
 
             // act
-            BrandModel brand = new BrandModel(name, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(name, VALID_DESCRIPTION);
 
             // assert
             assertEquals(name, brand.getName());
@@ -112,7 +112,7 @@ public class BrandModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(name, VALID_DESCRIPTION)
+                new BrandEntity(name, VALID_DESCRIPTION)
             );
 
             // assert
@@ -124,7 +124,7 @@ public class BrandModelTest {
         void throwsException_whenNameIsWhitespaceOnly() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel("   ", VALID_DESCRIPTION)
+                new BrandEntity("   ", VALID_DESCRIPTION)
             );
 
             // assert
@@ -136,7 +136,7 @@ public class BrandModelTest {
         void throwsException_whenDescriptionIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(VALID_NAME, null)
+                new BrandEntity(VALID_NAME, null)
             );
 
             // assert
@@ -148,7 +148,7 @@ public class BrandModelTest {
         void throwsException_whenDescriptionIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(VALID_NAME, "")
+                new BrandEntity(VALID_NAME, "")
             );
 
             // assert
@@ -157,12 +157,12 @@ public class BrandModelTest {
 
         @DisplayName("description이 1자이면, 정상적으로 생성된다. (BVA 하한)")
         @Test
-        void createsBrandModel_whenDescriptionIsOneChar() {
+        void createsBrandEntity_whenDescriptionIsOneChar() {
             // arrange
             String description = "설";
 
             // act
-            BrandModel brand = new BrandModel(VALID_NAME, description);
+            BrandEntity brand = new BrandEntity(VALID_NAME, description);
 
             // assert
             assertEquals(description, brand.getDescription());
@@ -170,12 +170,12 @@ public class BrandModelTest {
 
         @DisplayName("description이 정확히 500자이면, 정상적으로 생성된다. (BVA 상한)")
         @Test
-        void createsBrandModel_whenDescriptionIsExactly500Chars() {
+        void createsBrandEntity_whenDescriptionIsExactly500Chars() {
             // arrange
             String description = "설".repeat(500);
 
             // act
-            BrandModel brand = new BrandModel(VALID_NAME, description);
+            BrandEntity brand = new BrandEntity(VALID_NAME, description);
 
             // assert
             assertEquals(description, brand.getDescription());
@@ -189,7 +189,7 @@ public class BrandModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new BrandModel(VALID_NAME, description)
+                new BrandEntity(VALID_NAME, description)
             );
 
             // assert
@@ -203,9 +203,9 @@ public class BrandModelTest {
 
         @DisplayName("유효한 name과 description이 주어지면, 정상적으로 수정된다.")
         @Test
-        void updatesBrandModel_whenRequestIsValid() {
+        void updatesBrandEntity_whenRequestIsValid() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
             String newName = "아디다스";
             String newDescription = "독일 스포츠 브랜드";
 
@@ -223,7 +223,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameIsNull() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -238,7 +238,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameIsEmpty() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -253,7 +253,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameHasLeadingWhitespace() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -268,7 +268,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameHasTrailingWhitespace() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -283,7 +283,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameIsWhitespaceOnly() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -296,9 +296,9 @@ public class BrandModelTest {
 
         @DisplayName("새 name이 정확히 100자이면, 정상적으로 수정된다. (BVA 상한)")
         @Test
-        void updatesBrandModel_whenNewNameIsExactly100Chars() {
+        void updatesBrandEntity_whenNewNameIsExactly100Chars() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
             String newName = "가".repeat(100);
 
             // act
@@ -312,7 +312,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewNameExceeds100Chars() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -327,7 +327,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewDescriptionIsNull() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -342,7 +342,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewDescriptionIsEmpty() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
@@ -355,9 +355,9 @@ public class BrandModelTest {
 
         @DisplayName("새 description이 정확히 500자이면, 정상적으로 수정된다. (BVA 상한)")
         @Test
-        void updatesBrandModel_whenNewDescriptionIsExactly500Chars() {
+        void updatesBrandEntity_whenNewDescriptionIsExactly500Chars() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
             String newDescription = "설".repeat(500);
 
             // act
@@ -371,7 +371,7 @@ public class BrandModelTest {
         @Test
         void throwsException_whenNewDescriptionExceeds500Chars() {
             // arrange
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            BrandEntity brand = new BrandEntity(VALID_NAME, VALID_DESCRIPTION);
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->

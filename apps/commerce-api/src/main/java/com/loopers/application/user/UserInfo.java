@@ -1,6 +1,6 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserEntity;
 
 import java.time.LocalDate;
 
@@ -10,7 +10,7 @@ public record UserInfo(
     LocalDate birthDate,
     String email
 ) {
-    public static UserInfo from(UserModel user) {
+    public static UserInfo from(UserEntity user) {
         return new UserInfo(
             user.getUserId(),
             user.getMaskedName(),

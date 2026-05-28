@@ -47,7 +47,7 @@ class UserServiceIntegrationTest {
     }
 
     private void saveDefaultUser() {
-        UserModel userModel = new UserModel(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder);
+        UserEntity userModel = new UserEntity(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL, passwordEncoder);
         userJpaRepository.save(UserMapper.toJpaEntity(userModel));
     }
 
@@ -59,7 +59,7 @@ class UserServiceIntegrationTest {
         @Test
         void createUser_whenValidArgumentsAreProvided() {
             // act
-            UserModel userModel = userService.signup(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
+            UserEntity userModel = userService.signup(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL);
 
             // assert
             assertAll(
@@ -102,7 +102,7 @@ class UserServiceIntegrationTest {
         @Test
         void getUser_whenValidArgumentsAreProvided() {
             // act
-            UserModel userModel = userService.getUser(DEFAULT_USER_ID, DEFAULT_PASSWORD);
+            UserEntity userModel = userService.getUser(DEFAULT_USER_ID, DEFAULT_PASSWORD);
 
             // assert
             assertAll(
@@ -162,7 +162,7 @@ class UserServiceIntegrationTest {
             String newPassword = "newpassword!@#";
 
             // act
-            UserModel userModel = userService.changePassword(DEFAULT_USER_ID, DEFAULT_PASSWORD, newPassword);
+            UserEntity userModel = userService.changePassword(DEFAULT_USER_ID, DEFAULT_PASSWORD, newPassword);
 
             // assert
             assertTrue(passwordEncoder.matches(newPassword, userModel.getPassword()));
