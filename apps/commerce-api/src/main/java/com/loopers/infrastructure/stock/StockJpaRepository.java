@@ -13,7 +13,7 @@ public interface StockJpaRepository extends JpaRepository<StockModel, UUID> {
 
     Optional<StockModel> findByProductId(UUID productId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE StockModel s
         SET s.reservedQuantity = s.reservedQuantity + :qty
@@ -22,7 +22,7 @@ public interface StockJpaRepository extends JpaRepository<StockModel, UUID> {
         """)
     int reserve(@Param("productId") UUID productId, @Param("qty") int qty);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE StockModel s
         SET s.totalQuantity = :newTotal

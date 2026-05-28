@@ -7,8 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -18,45 +16,38 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-    @Transactional
     public ProductModel create(BrandModel brand, String name, String description, Long price) {
         return productRepository.save(new ProductModel(brand, name, description, price));
     }
 
     /** 어드민용 — 삭제된 상품 포함 */
-    @Transactional(readOnly = true)
     public ProductModel get(UUID id) {
         return productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     /** 고객용 — 활성 상품만 */
-    @Transactional(readOnly = true)
     public ProductModel getActive(UUID id) {
         return productRepository.findActive(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     /** 어드민 목록 */
-    @Transactional(readOnly = true)
     public Page<ProductModel> getList(Pageable pageable) {
         return productRepository.findAll(pageable);
     }
 
     /** 고객 목록 — 활성 상품만 */
-    @Transactional(readOnly = true)
     public Page<ProductModel> getActiveList(Pageable pageable) {
         return productRepository.findAllActive(pageable);
     }
 
-    @Transactional
     public ProductModel update(UUID id, String name, String description, Long price) {
         ProductModel product = get(id);
         product.update(name, description, price);
         return productRepository.save(product);
     }
 
-    @Transactional
     public void delete(UUID id) {
         ProductModel product = get(id);
         product.delete();
@@ -67,7 +58,6 @@ public class ProductService {
      * 브랜드 소프트딜리트 시 cascade 처리.
      * BrandFacade.delete()에서 brandService.delete() 이후 호출.
      */
-    @Transactional
     public void deleteByBrand(UUID brandId) {
         List<ProductModel> products = productRepository.findAllByBrandId(brandId);
         products.forEach(p -> {
