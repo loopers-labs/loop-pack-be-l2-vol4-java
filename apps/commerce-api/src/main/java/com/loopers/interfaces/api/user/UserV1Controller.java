@@ -1,8 +1,7 @@
 package com.loopers.interfaces.api.user;
 
-import com.loopers.application.user.UserCommand;
-import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
+import com.loopers.application.user.UserService;
 import com.loopers.domain.user.User;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.LoginUser;
@@ -14,18 +13,17 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/users")
 public class UserV1Controller {
 
-    private final UserFacade userFacade;
+    private final UserService userService;
 
     @PostMapping
     public ApiResponse<UserV1Dto.UserResponse> join(@RequestBody UserV1Dto.UserJoinRequest request) {
-        UserInfo userInfo = userFacade.join(request.toCommand());
-        return ApiResponse.success(UserV1Dto.UserResponse.from(userInfo));
+        User user = userService.join(request.loginId(), request.loginPassword(), request.name(), request.birthday(), request.email());
+        return ApiResponse.success(UserV1Dto.UserResponse.from(UserInfo.from(user)));
     }
 
     @GetMapping("/me")
     public ApiResponse<UserV1Dto.UserResponse> getInfo(@LoginUser User user) {
-        UserInfo userInfo = userFacade.getUser(user);
-        return ApiResponse.success(UserV1Dto.UserResponse.from(userInfo));
+        return ApiResponse.success(UserV1Dto.UserResponse.from(UserInfo.fromWithMaskedName(user)));
     }
 
     @PutMapping("/password")
@@ -33,7 +31,7 @@ public class UserV1Controller {
             @LoginUser User user,
             @RequestBody UserV1Dto.ChangePasswordRequest request
     ) {
-        userFacade.changePassword(user, new UserCommand.ChangePassword(request.currentPassword(), request.newPassword()));
+        userService.changePassword(user, request.currentPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 }

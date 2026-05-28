@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductCommand;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductService;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductAdminV1Controller {
 
     private final ProductFacade productFacade;
+    private final ProductService productService;
 
     @GetMapping
     public ApiResponse<Page<ProductAdminV1Dto.ProductResponse>> getProducts(
@@ -71,7 +73,7 @@ public class ProductAdminV1Controller {
     public ApiResponse<Void> deleteProduct(
         @PathVariable Long productId
     ) {
-        productFacade.deleteProduct(productId);
+        productService.deleteProduct(productId);
         return ApiResponse.success(null);
     }
 }

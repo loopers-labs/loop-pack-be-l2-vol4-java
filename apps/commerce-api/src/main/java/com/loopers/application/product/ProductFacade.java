@@ -18,11 +18,6 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
 
-    public ProductInfo getProduct(Long id) {
-        Product product = productService.getProduct(id);
-        return ProductInfo.from(product);
-    }
-
     public ProductInfo getProductWithStock(Long id) {
         Product product = productService.getProduct(id);
         ProductStock stock = productService.getProductStock(id);
@@ -53,11 +48,6 @@ public class ProductFacade {
             id, command.brandId(), command.name(), command.price(), command.stock());
         ProductStock stock = productService.getProductStock(product.getId());
         return ProductInfo.from(product, stock);
-    }
-
-    @Transactional
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
     }
 
 }

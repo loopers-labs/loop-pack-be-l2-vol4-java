@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
@@ -24,11 +25,13 @@ public class BrandService {
         return brandRepository.findAll(pageable);
     }
 
+    @Transactional
     public Brand createBrand(String name, String description) {
         Brand brand = new Brand(name, description);
         return brandRepository.save(brand);
     }
 
+    @Transactional
     public Brand updateBrand(Long id, String name, String description) {
         Brand brand = getBrand(id);
         brand.update(name, description);

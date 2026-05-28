@@ -1,6 +1,5 @@
 package com.loopers.interfaces.api.brand;
 
-import com.loopers.application.brand.BrandCommand;
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.application.brand.BrandService;
@@ -47,7 +46,7 @@ public class BrandAdminV1Controller {
     public ApiResponse<BrandAdminV1Dto.BrandResponse> createBrand(
         @RequestBody @Valid BrandAdminV1Dto.BrandCreateRequest request
     ) {
-        BrandInfo info = brandFacade.createBrand(new BrandCommand.Create(request.name(), request.description()));
+        BrandInfo info = BrandInfo.from(brandService.createBrand(request.name(), request.description()));
         return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
 
@@ -56,7 +55,7 @@ public class BrandAdminV1Controller {
         @PathVariable Long brandId,
         @RequestBody @Valid BrandAdminV1Dto.BrandUpdateRequest request
     ) {
-        BrandInfo info = brandFacade.updateBrand(new BrandCommand.Update(brandId, request.name(), request.description()));
+        BrandInfo info = BrandInfo.from(brandService.updateBrand(brandId, request.name(), request.description()));
         return ApiResponse.success(BrandAdminV1Dto.BrandResponse.from(info));
     }
 

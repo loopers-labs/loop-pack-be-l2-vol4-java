@@ -1,6 +1,5 @@
 package com.loopers.application.brand;
 
-import com.loopers.domain.brand.Brand;
 import com.loopers.application.brand.BrandService;
 import com.loopers.application.product.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -13,18 +12,6 @@ public class BrandFacade {
 
     private final BrandService brandService;
     private final ProductService productService;
-
-    @Transactional
-    public BrandInfo createBrand(BrandCommand.Create command) {
-        Brand brand = brandService.createBrand(command.name(), command.description());
-        return BrandInfo.from(brand);
-    }
-
-    @Transactional
-    public BrandInfo updateBrand(BrandCommand.Update command) {
-        Brand brand = brandService.updateBrand(command.brandId(), command.name(), command.description());
-        return BrandInfo.from(brand);
-    }
 
     @Transactional
     public void deleteBrand(Long id) {
