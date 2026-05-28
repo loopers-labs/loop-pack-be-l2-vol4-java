@@ -1,4 +1,4 @@
-package com.loopers.domain.product;
+package com.loopers.domain.inventory;
 
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
