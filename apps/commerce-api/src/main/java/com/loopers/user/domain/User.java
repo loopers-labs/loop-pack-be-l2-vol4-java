@@ -17,7 +17,8 @@ import java.time.LocalDate;
 @Table(
         name = "users",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_users_login_id", columnNames = "login_id")
+                @UniqueConstraint(name = "uk_users_login_id", columnNames = "login_id"),
+                @UniqueConstraint(name = "uk_users_email", columnNames = "email")
         }
 )
 @Getter
@@ -36,7 +37,7 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private LocalDate birthDate;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     private User(String loginId, String password, String name, LocalDate birthDate, String email) {

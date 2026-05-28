@@ -79,6 +79,18 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("이미 존재하는 이메일로 회원가입하면 CONFLICT 예외가 발생하고 저장하지 않는다")
+    void givenDuplicateEmail_whenSignUp_thenThrowsConflictAndDoesNotSave() {
+        when(userRepository.existsByEmail("looper@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.signUp(signUpCommand()))
+            .isInstanceOf(CoreException.class)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("생년월일이 포함된 비밀번호로 회원가입하면 BAD_REQUEST 예외가 발생하고 저장하지 않는다")
     void givenPasswordContainingBirthDate_whenSignUp_thenThrowsBadRequestAndDoesNotSave() {
         UserCommand.SignUp command = new UserCommand.SignUp(

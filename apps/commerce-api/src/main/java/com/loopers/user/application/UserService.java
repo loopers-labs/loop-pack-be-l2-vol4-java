@@ -58,6 +58,9 @@ public class UserService {
         if (userRepository.existsByLoginId(command.loginId())) {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 로그인 ID입니다.");
         }
+        if (userRepository.existsByEmail(command.email())) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 이메일입니다.");
+        }
         if (UserPasswordPolicy.containsBirthDate(command.password(), command.birthDate())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
         }
