@@ -2,8 +2,8 @@ package com.loopers.application.like;
 
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
-import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductFacade;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.user.UserEntity;
 import com.loopers.domain.user.UserService;
@@ -170,7 +170,7 @@ class LikeFacadeIntegrationTest {
             likeFacade.addLike(user.getId(), product.id());
 
             // act
-            Page<ProductInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
 
             // assert
             assertAll(
@@ -201,7 +201,7 @@ class LikeFacadeIntegrationTest {
             UserEntity user = createUser("testuser1");
 
             // act
-            Page<ProductInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent()).isEmpty();
