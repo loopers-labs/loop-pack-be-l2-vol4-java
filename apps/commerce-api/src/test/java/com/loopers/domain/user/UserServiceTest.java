@@ -84,6 +84,15 @@ class UserServiceTest {
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
             verify(userRepository).findByUserId(DEFAULT_USER_ID);
         }
+
+        @DisplayName("[새 동작] 비밀번호에 허용되지 않는 문자가 포함되면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenPasswordContainsInvalidCharacters() {
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class, () ->
+                    userService.signup(DEFAULT_USER_ID, "한글Password1!", DEFAULT_NAME, DEFAULT_BIRTH_DATE, DEFAULT_EMAIL));
+            assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
+        }
     }
 
     @DisplayName("회원 정보 조회")
@@ -189,6 +198,20 @@ class UserServiceTest {
             // act & assert
             CoreException exception = assertThrows(CoreException.class, () ->
                     userService.changePassword(DEFAULT_USER_ID, DEFAULT_PASSWORD, DEFAULT_PASSWORD));
+            assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
+        }
+
+        @DisplayName("[새 동작] 새 비밀번호에 허용되지 않는 문자가 포함되면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenNewPasswordContainsInvalidCharacters() {
+            // arrange
+            given(userRepository.findByUserId(DEFAULT_USER_ID)).willReturn(Optional.of(savedUser()));
+            given(passwordEncoder.matches(DEFAULT_PASSWORD, ENCODED_PASSWORD)).willReturn(true);
+            given(passwordEncoder.matches("한글Password1!", ENCODED_PASSWORD)).willReturn(false);
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class, () ->
+                    userService.changePassword(DEFAULT_USER_ID, DEFAULT_PASSWORD, "한글Password1!"));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
     }
