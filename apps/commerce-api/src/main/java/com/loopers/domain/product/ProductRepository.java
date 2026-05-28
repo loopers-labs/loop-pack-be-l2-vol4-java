@@ -7,5 +7,4 @@ public interface ProductRepository {
     ProductEntity save(ProductEntity product);
     Optional<ProductEntity> find(Long id);
     List<ProductEntity> findAll();
-    void delete(Long id);
 }
