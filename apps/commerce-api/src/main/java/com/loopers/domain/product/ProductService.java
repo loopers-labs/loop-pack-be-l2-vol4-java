@@ -3,10 +3,10 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -15,32 +15,31 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel create(ProductModel product) {
         return productRepository.save(product);
     }
 
     @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
-        return productRepository.find(id)
+    public ProductModel getById(Long id) {
+        return productRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public Page<ProductModel> getAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
+        return productRepository.findAll(brandId, sort, pageRequest);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
-        return productRepository.save(product);
+    public ProductModel update(Long id, String name, Long price) {
+        ProductModel product = getById(id);
+        product.update(name, price);
+        return product;
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+    public void delete(Long id) {
+        ProductModel product = getById(id);
+        product.delete();
     }
 }

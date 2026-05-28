@@ -3,34 +3,21 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductInfo;
 
 public class ProductDto {
-    public record CreateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
-
-    public record UpdateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
 
     public record ProductResponse(
         Long id,
         String name,
-        String description,
         Long price,
-        Integer stock
+        Long brandId,
+        int likeCount
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
                 info.id(),
                 info.name(),
-                info.description(),
                 info.price(),
-                info.stock()
+                info.brandId(),
+                info.likeCount()
             );
         }
     }

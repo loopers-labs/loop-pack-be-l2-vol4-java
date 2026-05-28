@@ -1,11 +1,12 @@
 package com.loopers.domain.product;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+
 import java.util.Optional;
-import java.util.List;
 
 public interface ProductRepository {
     ProductModel save(ProductModel product);
-    Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
-    void delete(Long id);
+    Optional<ProductModel> findById(Long id);
+    Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest);
 }
