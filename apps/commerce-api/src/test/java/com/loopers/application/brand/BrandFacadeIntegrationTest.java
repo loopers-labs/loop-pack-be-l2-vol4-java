@@ -1,5 +1,6 @@
 package com.loopers.application.brand;
 
+import com.loopers.domain.brand.BrandModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -77,6 +78,59 @@ class BrandFacadeIntegrationTest {
                 () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.DUPLICATE_BRAND_NAME),
                 () -> assertThat(brandJpaRepository.count()).isEqualTo(1)
             );
+        }
+    }
+
+    @DisplayName("고객이 브랜드를 조회할 때, ")
+    @Nested
+    class GetForCustomer {
+
+        @DisplayName("존재하는 active 브랜드 id 로 조회하면, BrandInfo 가 반환된다.")
+        @Test
+        void returnsBrandInfo_whenBrandExistsAndIsActive() {
+            // given
+            BrandInfo created = brandFacade.create("나이키", "Just Do It");
+
+            // when
+            BrandInfo result = brandFacade.getForCustomer(created.id());
+
+            // then
+            assertAll(
+                () -> assertThat(result.id()).isEqualTo(created.id()),
+                () -> assertThat(result.name()).isEqualTo("나이키"),
+                () -> assertThat(result.description()).isEqualTo("Just Do It")
+            );
+        }
+
+        @DisplayName("존재하지 않는 id 로 조회하면, BRAND_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsBrandNotFound_whenBrandDoesNotExist() {
+            // given
+            Long missingId = 9_999L;
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandFacade.getForCustomer(missingId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);
+        }
+
+        @DisplayName("soft-delete 된 브랜드 id 로 조회하면, BRAND_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsBrandNotFound_whenBrandIsSoftDeleted() {
+            // given
+            BrandInfo created = brandFacade.create("나이키", "Just Do It");
+            BrandModel brand = brandJpaRepository.findById(created.id()).orElseThrow();
+            brand.delete();
+            brandJpaRepository.save(brand);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandFacade.getForCustomer(created.id()));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);
         }
     }
 }

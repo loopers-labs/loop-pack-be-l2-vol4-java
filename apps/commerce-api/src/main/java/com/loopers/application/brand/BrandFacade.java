@@ -17,4 +17,10 @@ public class BrandFacade {
         BrandModel brand = brandService.create(name, description);
         return BrandInfo.from(brand);
     }
+
+    @Transactional(readOnly = true)
+    public BrandInfo getForCustomer(Long id) {
+        BrandModel brand = brandService.getActive(id);
+        return BrandInfo.from(brand);
+    }
 }

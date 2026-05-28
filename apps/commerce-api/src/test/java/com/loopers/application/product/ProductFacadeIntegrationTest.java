@@ -64,14 +64,11 @@ class ProductFacadeIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
-    /*
     private void softDeleteBrand(Long id) {
         BrandModel brand = brandJpaRepository.findById(id).orElseThrow();
         brand.delete();
         brandJpaRepository.save(brand);
     }
-    */
 
     @DisplayName("상품을 등록할 때, ")
     @Nested
@@ -121,15 +118,11 @@ class ProductFacadeIntegrationTest {
             );
         }
 
-        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
-        /*
         @DisplayName("soft-deleted 된 brandId 가 주어지면, BRAND_NOT_FOUND 예외가 발생하고 Product 와 Stock 은 저장되지 않는다.")
         @Test
         void throwsBrandNotFound_whenBrandIsSoftDeleted() {
             // given
-            BrandModel brand = brandJpaRepository.findById(brandId).orElseThrow();
-            brand.delete();
-            brandJpaRepository.save(brand);
+            softDeleteBrand(brandId);
 
             // when
             CoreException exception = assertThrows(CoreException.class,
@@ -142,7 +135,6 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(stockJpaRepository.count()).isZero()
             );
         }
-        */
     }
 
     @DisplayName("상품을 단건 조회할 때, ")
@@ -202,8 +194,6 @@ class ProductFacadeIntegrationTest {
             assertThat(result.purchasable()).isTrue();
         }
 
-        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
-        /*
         @DisplayName("brand 가 soft-delete 되어도, 응답의 brand 정보는 그대로 노출된다.")
         @Test
         void exposesBrand_whenBrandIsSoftDeleted() {
@@ -220,7 +210,6 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(result.brand().name()).isEqualTo("나이키")
             );
         }
-        */
 
         private void increaseLikes(Long productId, int times) {
             ProductModel product = productJpaRepository.findById(productId).orElseThrow();
@@ -368,8 +357,6 @@ class ProductFacadeIntegrationTest {
                 .containsExactly(second.id(), first.id());
         }
 
-        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
-        /*
         @DisplayName("brand 가 soft-delete 되어도, 목록 응답의 각 상품 brand 정보는 그대로 노출된다.")
         @Test
         void exposesBrandForEachProduct_whenBrandIsSoftDeleted() {
@@ -386,7 +373,6 @@ class ProductFacadeIntegrationTest {
                 .extracting(info -> info.brand().id(), info -> info.brand().name())
                 .containsOnly(tuple(brandId, "나이키"));
         }
-        */
 
         private void increaseLikes(Long productId, int times) {
             ProductModel product = productJpaRepository.findById(productId).orElseThrow();
