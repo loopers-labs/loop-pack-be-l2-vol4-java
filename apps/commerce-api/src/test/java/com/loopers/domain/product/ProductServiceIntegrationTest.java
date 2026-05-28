@@ -267,4 +267,59 @@ class ProductServiceIntegrationTest {
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
+
+    @DisplayName("좋아요 수 증가")
+    @Nested
+    class IncrementLikeCount {
+
+        @DisplayName("[ECP] 존재하는 상품의 likeCount가 1 증가한다.")
+        @Test
+        void incrementsLikeCount_whenProductExists() {
+            // arrange
+            ProductEntity product = productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+
+            // act
+            productService.incrementLikeCount(product.getId());
+
+            // assert
+            assertEquals(1L, productService.getProduct(product.getId()).getLikeCount());
+        }
+
+        @DisplayName("[ECP] 존재하지 않는 id이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenProductNotExists() {
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> productService.incrementLikeCount(999L));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
+        }
+    }
+
+    @DisplayName("좋아요 수 감소")
+    @Nested
+    class DecrementLikeCount {
+
+        @DisplayName("[ECP] 존재하는 상품의 likeCount가 1 감소한다.")
+        @Test
+        void decrementsLikeCount_whenProductExists() {
+            // arrange
+            ProductEntity product = productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+            productService.incrementLikeCount(product.getId());
+
+            // act
+            productService.decrementLikeCount(product.getId());
+
+            // assert
+            assertEquals(0L, productService.getProduct(product.getId()).getLikeCount());
+        }
+
+        @DisplayName("[ECP] 존재하지 않는 id이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenProductNotExists() {
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> productService.decrementLikeCount(999L));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
+        }
+    }
 }
