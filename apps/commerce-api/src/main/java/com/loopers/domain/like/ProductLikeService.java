@@ -3,7 +3,7 @@ package com.loopers.domain.like;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductBrandProcessor;
-import com.loopers.domain.product.ProductDetail;
+import com.loopers.domain.product.ProductDetailView;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -52,7 +52,7 @@ public class ProductLikeService {
         }
     }
 
-    public List<ProductDetail> getLikedProductDetails(String userLoginId) {
+    public List<ProductDetailView> getLikedProductDetailViews(String userLoginId) {
         List<ProductLikeModel> productLikes = productLikeRepository.findAllByUserLoginId(userLoginId);
         List<Long> productIds = productLikes.stream()
             .map(ProductLikeModel::getProductId)
@@ -63,7 +63,7 @@ public class ProductLikeService {
         List<ProductModel> likedProducts = getLikedProducts(productLikes, products);
         List<Long> brandIds = productBrandProcessor.getBrandIds(likedProducts);
         List<BrandModel> brands = brandRepository.findAllByIds(brandIds);
-        return productBrandProcessor.getProductDetails(likedProducts, brands);
+        return productBrandProcessor.getProductDetailViews(likedProducts, brands);
     }
 
     public ProductLikeResult createLike(

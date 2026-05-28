@@ -18,13 +18,13 @@ public class ProductReader {
     private final BrandRepository brandRepository;
     private final ProductBrandProcessor productBrandProcessor;
 
-    public ProductDetail getProduct(Long id) {
+    public ProductDetailView getProduct(Long id) {
         ProductModel product = getProductModel(id);
         BrandModel brand = getBrand(product.getBrandId());
-        return productBrandProcessor.getProductDetail(product, brand);
+        return productBrandProcessor.getProductDetailView(product, brand);
     }
 
-    public List<ProductDetail> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
+    public List<ProductDetailView> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         if (brandId != null) {
             getBrand(brandId);
         }
@@ -37,7 +37,7 @@ public class ProductReader {
 
         List<Long> brandIds = productBrandProcessor.getBrandIds(products);
         List<BrandModel> brands = brandRepository.findAllByIds(brandIds);
-        return productBrandProcessor.getProductDetails(products, brands);
+        return productBrandProcessor.getProductDetailViews(products, brands);
     }
 
     ProductModel getProductModel(Long id) {

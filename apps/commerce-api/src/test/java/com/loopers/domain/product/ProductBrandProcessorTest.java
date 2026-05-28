@@ -26,7 +26,7 @@ class ProductBrandProcessorTest {
 
     @DisplayName("상품 상세를 구성할 때, ")
     @Nested
-    class GetProductDetail {
+    class GetProductDetailView {
         @DisplayName("상품과 브랜드 정보를 조합한다.")
         @Test
         void returnsProductDetailWithBrand() {
@@ -35,7 +35,7 @@ class ProductBrandProcessorTest {
             BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
 
             // act
-            ProductDetail result = productBrandProcessor.getProductDetail(product, brand);
+            ProductDetailView result = productBrandProcessor.getProductDetailView(product, brand);
 
             // assert
             assertAll(
@@ -77,7 +77,7 @@ class ProductBrandProcessorTest {
             EntityTestSupport.setId(secondBrand, 20L);
 
             // act
-            List<ProductDetail> results = productBrandProcessor.getProductDetails(
+            List<ProductDetailView> results = productBrandProcessor.getProductDetailViews(
                 List.of(firstProduct, secondProduct),
                 List.of(firstBrand, secondBrand)
             );
@@ -100,7 +100,7 @@ class ProductBrandProcessorTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                productBrandProcessor.getProductDetails(List.of(product), List.of());
+                productBrandProcessor.getProductDetailViews(List.of(product), List.of());
             });
 
             // assert

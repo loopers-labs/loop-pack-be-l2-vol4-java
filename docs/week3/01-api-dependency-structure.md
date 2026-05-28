@@ -90,7 +90,7 @@ flowchart LR
         PageCriteria
         ProductModel
         BrandModel
-        ProductDetail
+        ProductDetailView
     end
 
     subgraph infrastructure
@@ -107,7 +107,7 @@ flowchart LR
     ProductDto -->|"from(ProductInfo)"| ProductInfo
 
     ProductFacade -->|"use case call"| ProductService
-    ProductFacade -->|"from(ProductDetail)"| ProductInfo
+    ProductFacade -->|"from(ProductDetailView)"| ProductInfo
 
     ProductService -->|"read entry"| ProductReader
     ProductService -->|"write entry"| ProductWriter
@@ -121,7 +121,7 @@ flowchart LR
     ProductWriter -->|"state change"| ProductModel
     ProductWriter -->|"combine product + brand"| ProductBrandProcessor
     ProductBrandProcessor -->|"read brand data"| BrandModel
-    ProductBrandProcessor -->|"compose"| ProductDetail
+    ProductBrandProcessor -->|"compose"| ProductDetailView
 
     ProductRepository -->|"adapter"| ProductRepositoryImpl
     ProductRepositoryImpl -->|"Spring Data"| ProductJpaRepository
@@ -230,7 +230,7 @@ flowchart LR
         ProductLikeModel
         ProductModel
         ProductLikeResult
-        ProductDetail
+        ProductDetailView
     end
 
     subgraph infrastructure
@@ -250,7 +250,7 @@ flowchart LR
     ProductDto -->|"from(ProductInfo)"| ProductInfo
 
     ProductLikeFacade -->|"use case call"| ProductLikeService
-    ProductLikeFacade -->|"from(ProductDetail)"| ProductInfo
+    ProductLikeFacade -->|"from(ProductDetailView)"| ProductInfo
 
     ProductLikeService -->|"save/find/delete"| ProductLikeRepository
     ProductLikeService -->|"find/save product"| ProductRepository
@@ -259,7 +259,7 @@ flowchart LR
     ProductLikeService -->|"create/delete relation"| ProductLikeModel
     ProductLikeService -->|"increase/decrease count"| ProductModel
     ProductLikeService -->|"decision result"| ProductLikeResult
-    ProductBrandProcessor -->|"compose"| ProductDetail
+    ProductBrandProcessor -->|"compose"| ProductDetailView
 
     ProductLikeRepository -->|"adapter"| ProductLikeRepositoryImpl
     ProductLikeRepositoryImpl -->|"Spring Data"| ProductLikeJpaRepository

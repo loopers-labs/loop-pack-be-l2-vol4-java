@@ -12,18 +12,18 @@ public class ProductWriter {
     private final ProductReader productReader;
     private final ProductBrandProcessor productBrandProcessor;
 
-    public ProductDetail createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+    public ProductDetailView createProduct(Long brandId, String name, String description, Long price, Integer stock) {
         BrandModel brand = productReader.getBrand(brandId);
         ProductModel product = productRepository.save(new ProductModel(brandId, name, description, price, stock));
-        return productBrandProcessor.getProductDetail(product, brand);
+        return productBrandProcessor.getProductDetailView(product, brand);
     }
 
-    public ProductDetail updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductDetailView updateProduct(Long id, String name, String description, Long price, Integer stock) {
         ProductModel product = productReader.getProductModel(id);
         product.update(name, description, price, stock);
         ProductModel savedProduct = productRepository.save(product);
         BrandModel brand = productReader.getBrand(savedProduct.getBrandId());
-        return productBrandProcessor.getProductDetail(savedProduct, brand);
+        return productBrandProcessor.getProductDetailView(savedProduct, brand);
     }
 
     public void deleteProduct(Long id) {

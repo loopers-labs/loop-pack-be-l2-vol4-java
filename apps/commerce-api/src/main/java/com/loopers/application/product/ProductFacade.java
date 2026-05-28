@@ -1,6 +1,6 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductDetail;
+import com.loopers.domain.product.ProductDetailView;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -42,8 +42,8 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductDetail productDetail = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(productDetail);
+        ProductDetailView productDetailView = productService.updateProduct(id, name, description, price, stock);
+        return ProductInfo.from(productDetailView);
     }
 
     @Transactional

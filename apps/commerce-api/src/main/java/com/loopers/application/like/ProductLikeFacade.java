@@ -26,7 +26,7 @@ public class ProductLikeFacade {
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getLikedProducts(String userLoginId) {
-        return productLikeService.getLikedProductDetails(userLoginId).stream()
+        return productLikeService.getLikedProductDetailViews(userLoginId).stream()
             .map(ProductInfo::from)
             .toList();
     }

@@ -2,7 +2,7 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
 
-public record ProductDetail(
+public record ProductDetailView(
     ProductModel product,
     BrandModel brand
 ) {
