@@ -14,6 +14,13 @@ public class ProductV1Dto {
         int initialQuantity
     ) {}
 
+    public record UpdateRequest(
+        Long brandId,
+        String name,
+        String description,
+        Long price
+    ) {}
+
     public record ProductResponse(
         Long id,
         Long brandId,

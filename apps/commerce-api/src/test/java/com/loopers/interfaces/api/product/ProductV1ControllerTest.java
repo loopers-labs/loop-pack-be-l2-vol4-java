@@ -16,8 +16,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class ProductV1ControllerTest {
 
@@ -119,6 +119,68 @@ class ProductV1ControllerTest {
             // Assert
             assertThat(result.data().getContent()).hasSize(1);
             assertThat(result.data().getContent().get(0).brandId()).isEqualTo(2L);
+        }
+    }
+
+    @DisplayName("상품 수정 시, ")
+    @Nested
+    class UpdateProduct {
+
+        @DisplayName("정상 요청이면, 성공 응답을 반환한다.")
+        @Test
+        void returnsSuccess_whenInputIsValid() {
+            // Arrange
+            var request = new ProductV1Dto.UpdateRequest(null, "조던", "농구화", 200_000L);
+            doNothing().when(productFacade).updateProduct(1L, "조던", "농구화", 200_000L);
+
+            // Act
+            var result = productV1Controller.updateProduct(1L, request);
+
+            // Assert
+            assertThat(result.data()).isNull();
+        }
+
+        @DisplayName("요청에 brandId가 포함되면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenBrandIdIncluded() {
+            // Arrange
+            var request = new ProductV1Dto.UpdateRequest(1L, "조던", "농구화", 200_000L);
+
+            // Act & Assert
+            CoreException ex = assertThrows(CoreException.class,
+                () -> productV1Controller.updateProduct(1L, request));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("상품 삭제 시, ")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("존재하는 상품이면, 성공 응답을 반환한다.")
+        @Test
+        void returnsSuccess_whenProductExists() {
+            // Arrange
+            doNothing().when(productFacade).deleteProduct(1L);
+
+            // Act
+            var result = productV1Controller.deleteProduct(1L);
+
+            // Assert
+            assertThat(result.data()).isNull();
+        }
+
+        @DisplayName("존재하지 않는 상품이면, NOT_FOUND 예외가 전파된다.")
+        @Test
+        void propagatesNotFound_whenProductDoesNotExist() {
+            // Arrange
+            doThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."))
+                .when(productFacade).deleteProduct(999L);
+
+            // Act & Assert
+            CoreException ex = assertThrows(CoreException.class,
+                () -> productV1Controller.deleteProduct(999L));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }

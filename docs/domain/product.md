@@ -46,6 +46,61 @@
 
 ---
 
+## 상품 수정 (어드민)
+
+### 입력 필드
+- `productId`: Path variable, null 불가
+- `name`: null/blank 불가, 최대 50자
+- `description`: null/blank 불가, 최대 200자
+- `price`: null 불가, 1 이상
+- `brandId`: 요청 바디에 포함 시 → `BAD_REQUEST` (수정 불가 필드)
+
+### 비즈니스 규칙 (Entity)
+- `name`, `description`, `price` 검증은 `Product.update()` 내부 처리
+- `brandId` 변경은 Entity가 허용하지 않음
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름 (ApplicationService)
+1. Request에 `brandId` 포함 시 → `BAD_REQUEST`
+2. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 `NOT_FOUND`)
+3. `product.update(name, description, price)` — Entity 검증 + 수정
+4. Dirty Checking으로 자동 저장 (`save()` 불필요)
+
+### 트랜잭션 경계
+- `@Transactional` 위치: `ProductApplicationService.updateProduct()`
+- 단일 엔티티 수정 → 하나의 트랜잭션
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+---
+
+## 상품 삭제 (어드민)
+
+### 입력 필드
+- `productId`: Path variable, null 불가
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND` (`@SQLRestriction`으로 조회 자체가 실패)
+
+### 유스케이스 흐름 (ApplicationService)
+1. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 `NOT_FOUND`)
+2. `product.delete()` — 소프트딜리트 (`deletedAt` = now, 멱등)
+3. `StockRepository.softDeleteByProductId(productId)` — Stock 소프트딜리트
+4. `LikeRepository.deleteAllByProductId(productId)` — Like 하드딜리트 (물리 삭제)
+
+### 트랜잭션 경계
+- `@Transactional` 위치: `ProductApplicationService.deleteProduct()`
+- 상품 삭제 + 재고 소프트딜리트 + 좋아요 하드딜리트를 **하나의 트랜잭션**으로 묶음
+- 이유: 상품만 삭제되고 재고·좋아요가 남으면 데이터 불일치
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+---
+
 ## 상품 목록 조회 (고객)
 
 ### 입력 필드

@@ -32,4 +32,9 @@ public class LikeRepositoryImpl implements LikeRepository {
     public void deleteByUserIdAndProductId(Long userId, Long productId) {
         likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
     }
+
+    @Override
+    public void deleteAllByProductId(Long productId) {
+        likeJpaRepository.deleteAllByProductId(productId);
+    }
 }

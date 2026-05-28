@@ -23,4 +23,12 @@ public class ProductFacade {
         Product product = productApplicationService.createProduct(brandId, name, description, price, initialQuantity);
         return ProductInfo.from(product);
     }
+
+    public void updateProduct(Long productId, String name, String description, Long price) {
+        productApplicationService.updateProduct(productId, name, description, price);
+    }
+
+    public void deleteProduct(Long productId) {
+        productApplicationService.deleteProduct(productId);
+    }
 }

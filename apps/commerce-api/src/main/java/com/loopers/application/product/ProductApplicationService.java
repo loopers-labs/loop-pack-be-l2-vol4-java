@@ -3,6 +3,7 @@ package com.loopers.application.product;
 import com.loopers.domain.brand.model.Brand;
 import com.loopers.domain.brand.repository.BrandRepository;
 import com.loopers.domain.brand.service.BrandDomainService;
+import com.loopers.domain.like.repository.LikeRepository;
 import com.loopers.domain.product.model.Product;
 import com.loopers.domain.product.repository.ProductRepository;
 import com.loopers.domain.product.service.ProductDomainService;
@@ -29,6 +30,7 @@ public class ProductApplicationService {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final StockRepository stockRepository;
+    private final LikeRepository likeRepository;
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long productId) {
@@ -63,5 +65,19 @@ public class ProductApplicationService {
         Product product = productDomainService.createProduct(brandId, name, description, price);
         stockDomainService.createStock(product.getId(), initialQuantity);
         return product;
+    }
+
+    @Transactional
+    public void updateProduct(Long productId, String name, String description, Long price) {
+        Product product = productDomainService.getProduct(productId);
+        product.update(name, description, price);
+    }
+
+    @Transactional
+    public void deleteProduct(Long productId) {
+        Product product = productDomainService.getProduct(productId);
+        product.delete();
+        stockRepository.softDeleteAllByProductIdIn(List.of(productId));
+        likeRepository.deleteAllByProductId(productId);
     }
 }

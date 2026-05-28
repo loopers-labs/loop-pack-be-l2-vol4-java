@@ -3,6 +3,7 @@ package com.loopers.application.product;
 import com.loopers.domain.brand.model.Brand;
 import com.loopers.domain.brand.repository.BrandRepository;
 import com.loopers.domain.brand.service.BrandDomainService;
+import com.loopers.domain.like.repository.LikeRepository;
 import com.loopers.domain.product.model.Product;
 import com.loopers.domain.product.repository.ProductRepository;
 import com.loopers.domain.product.service.ProductDomainService;
@@ -20,11 +21,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -39,6 +38,7 @@ class ProductApplicationServiceTest {
     private ProductRepository productRepository;
     private BrandRepository brandRepository;
     private StockRepository stockRepository;
+    private LikeRepository likeRepository;
     private ProductApplicationService productApplicationService;
 
     @BeforeEach
@@ -49,9 +49,10 @@ class ProductApplicationServiceTest {
         productRepository = mock(ProductRepository.class);
         brandRepository = mock(BrandRepository.class);
         stockRepository = mock(StockRepository.class);
+        likeRepository = mock(LikeRepository.class);
         productApplicationService = new ProductApplicationService(
             brandDomainService, productDomainService, stockDomainService,
-            productRepository, brandRepository, stockRepository
+            productRepository, brandRepository, stockRepository, likeRepository
         );
     }
 
@@ -125,6 +126,80 @@ class ProductApplicationServiceTest {
             assertThat(result.getContent().get(0).name()).isEqualTo("에어맥스");
             assertThat(result.getContent().get(0).brandName()).isEqualTo("나이키");
             assertThat(result.getContent().get(0).inStock()).isTrue();
+        }
+    }
+
+    @DisplayName("상품을 수정할 때, ")
+    @Nested
+    class UpdateProduct {
+
+        @DisplayName("정상 입력이면, 상품의 이름/설명/가격이 수정된다.")
+        @Test
+        void updatesProduct_whenInputIsValid() {
+            // Arrange
+            Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
+            when(productDomainService.getProduct(1L)).thenReturn(product);
+
+            // Act
+            productApplicationService.updateProduct(1L, "조던", "농구화", 200_000L);
+
+            // Assert
+            assertThat(product.getName()).isEqualTo("조던");
+            assertThat(product.getDescription()).isEqualTo("농구화");
+            assertThat(product.getPrice()).isEqualTo(200_000L);
+        }
+
+        @DisplayName("존재하지 않는 상품이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenProductDoesNotExist() {
+            // Arrange
+            when(productDomainService.getProduct(999L))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+
+            // Act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                productApplicationService.updateProduct(999L, "이름", "설명", 100L)
+            );
+
+            // Assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("상품을 삭제할 때, ")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("존재하는 상품이면, 상품이 소프트딜리트되고 재고와 좋아요도 함께 삭제된다.")
+        @Test
+        void deletesProductAndCascades_whenProductExists() {
+            // Arrange
+            Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
+            when(productDomainService.getProduct(1L)).thenReturn(product);
+
+            // Act
+            productApplicationService.deleteProduct(1L);
+
+            // Assert
+            assertThat(product.getDeletedAt()).isNotNull();
+            verify(stockRepository).softDeleteAllByProductIdIn(List.of(1L));
+            verify(likeRepository).deleteAllByProductId(1L);
+        }
+
+        @DisplayName("존재하지 않는 상품이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenProductDoesNotExist() {
+            // Arrange
+            when(productDomainService.getProduct(999L))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+
+            // Act
+            CoreException ex = assertThrows(CoreException.class, () ->
+                productApplicationService.deleteProduct(999L)
+            );
+
+            // Assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 

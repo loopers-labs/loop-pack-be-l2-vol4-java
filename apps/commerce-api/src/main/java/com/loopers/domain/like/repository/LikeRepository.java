@@ -9,4 +9,5 @@ public interface LikeRepository {
     List<Like> findAllByUserId(Long userId);
     Like save(Like like);
     void deleteByUserIdAndProductId(Long userId, Long productId);
+    void deleteAllByProductId(Long productId);
 }
