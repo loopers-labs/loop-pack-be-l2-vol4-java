@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
@@ -25,27 +26,35 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo createProduct(String name, String description, Long price, Integer stock, Long brandId) {
-        brandService.getActive(brandId);
+        BrandModel brand = brandService.getActive(brandId);
         ProductModel product = productService.createProduct(name, description, price, brandId);
         StockModel stockModel = stockService.create(product.getId(), stock);
-        return ProductInfo.from(product, stockModel);
+        return ProductInfo.from(product, stockModel.isAvailable(), brand);
     }
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
         ProductModel product = productService.getProduct(id);
         StockModel stockModel = stockService.getByProductId(id);
-        return ProductInfo.from(product, stockModel);
+        BrandModel brand = brandService.getBrand(product.getBrandId());
+        return ProductInfo.from(product, stockModel.isAvailable(), brand);
     }
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getAllProducts(ProductSortType sort, int page, int size) {
         List<ProductModel> products = productService.getAllProducts(sort, page, size);
         List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).toList();
         Map<Long, StockModel> stockByProductId = stockService.getAllByProductIdIn(productIds).stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
+        Map<Long, BrandModel> brandById = brandService.getAllByIdIn(brandIds).stream()
+            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
         return products.stream()
-            .map(product -> ProductInfo.from(product, stockByProductId.get(product.getId())))
+            .map(product -> ProductInfo.from(
+                product,
+                stockByProductId.get(product.getId()).isAvailable(),
+                brandById.get(product.getBrandId())
+            ))
             .toList();
     }
 
@@ -54,7 +63,8 @@ public class ProductFacade {
         ProductModel product = productService.updateProduct(id, name, description, price);
         StockModel stockModel = stockService.getByProductId(id);
         stockModel.changeTo(stock);
-        return ProductInfo.from(product, stockModel);
+        BrandModel brand = brandService.getBrand(product.getBrandId());
+        return ProductInfo.from(product, stockModel.isAvailable(), brand);
     }
 
     @Transactional

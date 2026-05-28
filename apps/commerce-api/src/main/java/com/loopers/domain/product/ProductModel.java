@@ -3,6 +3,7 @@ package com.loopers.domain.product;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
@@ -14,13 +15,11 @@ public class ProductModel extends BaseEntity {
     private String description;
     private Long price;
     private long likeCount;
+
+    @Column(name = "brand_id", nullable = false)
     private Long brandId;
 
     protected ProductModel() {}
-
-    public ProductModel(String name, String description, Long price) {
-        this(name, description, price, null);
-    }
 
     public ProductModel(String name, String description, Long price, Long brandId) {
         if (name == null || name.isBlank()) {
@@ -31,6 +30,9 @@ public class ProductModel extends BaseEntity {
         }
         if (price == null || price < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+        }
+        if (brandId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID 는 비어있을 수 없습니다.");
         }
 
         this.name = name;

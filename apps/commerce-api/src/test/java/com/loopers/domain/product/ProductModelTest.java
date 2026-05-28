@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ProductModelTest {
 
+    private static final Long DEFAULT_BRAND_ID = 1L;
+
     @DisplayName("ProductModel 을 생성할 때, ")
     @Nested
     class Create {
@@ -23,15 +25,17 @@ class ProductModelTest {
             String name = "에어맥스 270";
             String description = "가벼운 쿠셔닝의 데일리 러닝화";
             Long price = 159_000L;
+            Long brandId = 42L;
 
             // when
-            ProductModel product = new ProductModel(name, description, price);
+            ProductModel product = new ProductModel(name, description, price, brandId);
 
             // then
             assertAll(
                 () -> assertThat(product.getName()).isEqualTo(name),
                 () -> assertThat(product.getDescription()).isEqualTo(description),
-                () -> assertThat(product.getPrice()).isEqualTo(price)
+                () -> assertThat(product.getPrice()).isEqualTo(price),
+                () -> assertThat(product.getBrandId()).isEqualTo(brandId)
             );
         }
 
@@ -45,7 +49,7 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
@@ -64,7 +68,7 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
@@ -83,7 +87,7 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
@@ -102,7 +106,7 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
@@ -121,7 +125,7 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
@@ -140,12 +144,32 @@ class ProductModelTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> new ProductModel(name, description, price));
+                () -> new ProductModel(name, description, price, DEFAULT_BRAND_ID));
 
             // then
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
                 () -> assertThat(result.getCustomMessage()).isEqualTo("가격은 0 이상이어야 합니다.")
+            );
+        }
+
+        @DisplayName("brandId 가 null 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenBrandIdIsNull() {
+            // given
+            String name = "에어맥스 270";
+            String description = "가벼운 쿠셔닝의 데일리 러닝화";
+            Long price = 159_000L;
+            Long brandId = null;
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> new ProductModel(name, description, price, brandId));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("브랜드 ID 는 비어있을 수 없습니다.")
             );
         }
 
@@ -158,26 +182,10 @@ class ProductModelTest {
             Long price = 159_000L;
 
             // when
-            ProductModel product = new ProductModel(name, description, price);
+            ProductModel product = new ProductModel(name, description, price, DEFAULT_BRAND_ID);
 
             // then
             assertThat(product.getLikeCount()).isEqualTo(0L);
-        }
-
-        @DisplayName("brandId 를 함께 받아 생성하면, brandId 가 그대로 보관된다.")
-        @Test
-        void keepsBrandId_whenCreatedWithBrandId() {
-            // given
-            String name = "슈퍼스타";
-            String description = "쉘토 스니커즈의 상징";
-            Long price = 129_000L;
-            Long brandId = 42L;
-
-            // when
-            ProductModel product = new ProductModel(name, description, price, brandId);
-
-            // then
-            assertThat(product.getBrandId()).isEqualTo(brandId);
         }
     }
 
@@ -189,7 +197,7 @@ class ProductModelTest {
         @Test
         void updatesAllFields_whenAllFieldsAreValid() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
             String newName = "에어맥스 270 SE";
             String newDescription = "스페셜 에디션 컬러웨이";
             Long newPrice = 179_000L;
@@ -209,7 +217,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenNameIsNull() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -226,7 +234,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenNameIsBlank() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -243,7 +251,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenDescriptionIsNull() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -260,7 +268,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenDescriptionIsBlank() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -277,7 +285,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenPriceIsNull() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -294,7 +302,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequestException_whenPriceIsNegative() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -316,7 +324,7 @@ class ProductModelTest {
         @Test
         void increasesLikeCountByOne_whenIncrementLikeCountIsCalled() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             product.incrementLikeCount();
@@ -329,7 +337,7 @@ class ProductModelTest {
         @Test
         void decreasesLikeCountByOne_whenDecrementLikeCountIsCalled() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
             product.incrementLikeCount();
 
             // when
@@ -343,7 +351,7 @@ class ProductModelTest {
         @Test
         void throwsInvalidLikeCountException_whenDecrementingFromZero() {
             // given
-            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L);
+            ProductModel product = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, DEFAULT_BRAND_ID);
 
             // when
             CoreException result = assertThrows(CoreException.class, product::decrementLikeCount);

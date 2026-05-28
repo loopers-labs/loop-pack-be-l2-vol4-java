@@ -64,11 +64,20 @@ class ProductFacadeIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
+    /*
+    private void softDeleteBrand(Long id) {
+        BrandModel brand = brandJpaRepository.findById(id).orElseThrow();
+        brand.delete();
+        brandJpaRepository.save(brand);
+    }
+    */
+
     @DisplayName("상품을 등록할 때, ")
     @Nested
     class CreateProduct {
 
-        @DisplayName("Product 와 Stock 이 같은 트랜잭션에서 함께 저장되고, 응답에 stock 이 포함된다.")
+        @DisplayName("Product 와 Stock 이 같은 트랜잭션에서 함께 저장되고, 응답에 purchasable 이 포함된다.")
         @Test
         void persistsProductAndStockTogether() {
             // given
@@ -86,7 +95,7 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(result.name()).isEqualTo(name),
                 () -> assertThat(result.description()).isEqualTo(description),
                 () -> assertThat(result.price()).isEqualTo(price),
-                () -> assertThat(result.stock()).isEqualTo(stock),
+                () -> assertThat(result.purchasable()).isTrue(),
                 () -> assertThat(productJpaRepository.findById(result.id()))
                     .hasValueSatisfying(p -> assertThat(p.getBrandId()).isEqualTo(brandId)),
                 () -> assertThat(stockJpaRepository.findByProductId(result.id()))
@@ -112,6 +121,8 @@ class ProductFacadeIntegrationTest {
             );
         }
 
+        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
+        /*
         @DisplayName("soft-deleted 된 brandId 가 주어지면, BRAND_NOT_FOUND 예외가 발생하고 Product 와 Stock 은 저장되지 않는다.")
         @Test
         void throwsBrandNotFound_whenBrandIsSoftDeleted() {
@@ -131,6 +142,7 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(stockJpaRepository.count()).isZero()
             );
         }
+        */
     }
 
     @DisplayName("상품을 단건 조회할 때, ")
@@ -164,6 +176,52 @@ class ProductFacadeIntegrationTest {
             assertThat(result.likeCount()).isEqualTo(3L);
         }
 
+        @DisplayName("재고가 0 인 상품을 조회하면, 응답의 purchasable 은 false 다.")
+        @Test
+        void returnsPurchasableFalse_whenStockIsZero() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 0, brandId).id();
+
+            // when
+            ProductInfo result = productFacade.getProduct(productId);
+
+            // then
+            assertThat(result.purchasable()).isFalse();
+        }
+
+        @DisplayName("재고가 1 이상이면, 응답의 purchasable 은 true 다.")
+        @Test
+        void returnsPurchasableTrue_whenStockIsPositive() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 1, brandId).id();
+
+            // when
+            ProductInfo result = productFacade.getProduct(productId);
+
+            // then
+            assertThat(result.purchasable()).isTrue();
+        }
+
+        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
+        /*
+        @DisplayName("brand 가 soft-delete 되어도, 응답의 brand 정보는 그대로 노출된다.")
+        @Test
+        void exposesBrand_whenBrandIsSoftDeleted() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+            softDeleteBrand(brandId);
+
+            // when
+            ProductInfo result = productFacade.getProduct(productId);
+
+            // then
+            assertAll(
+                () -> assertThat(result.brand().id()).isEqualTo(brandId),
+                () -> assertThat(result.brand().name()).isEqualTo("나이키")
+            );
+        }
+        */
+
         private void increaseLikes(Long productId, int times) {
             ProductModel product = productJpaRepository.findById(productId).orElseThrow();
             for (int i = 0; i < times; i++) {
@@ -195,7 +253,7 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(result.name()).isEqualTo(newName),
                 () -> assertThat(result.description()).isEqualTo(newDescription),
                 () -> assertThat(result.price()).isEqualTo(newPrice),
-                () -> assertThat(result.stock()).isEqualTo(newStock),
+                () -> assertThat(result.purchasable()).isTrue(),
                 () -> assertThat(stockJpaRepository.findByProductId(productId))
                     .hasValueSatisfying(s -> assertThat(s.getQuantity()).isEqualTo(newStock))
             );
@@ -309,6 +367,26 @@ class ProductFacadeIntegrationTest {
             assertThat(result).extracting(ProductInfo::id)
                 .containsExactly(second.id(), first.id());
         }
+
+        // TODO(task 1): BrandModel.delete() 도입 후 복구 — .docs/plan/09-task1-brand-customer-read.md
+        /*
+        @DisplayName("brand 가 soft-delete 되어도, 목록 응답의 각 상품 brand 정보는 그대로 노출된다.")
+        @Test
+        void exposesBrandForEachProduct_whenBrandIsSoftDeleted() {
+            // given
+            productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            softDeleteBrand(brandId);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result)
+                .extracting(info -> info.brand().id(), info -> info.brand().name())
+                .containsOnly(tuple(brandId, "나이키"));
+        }
+        */
 
         private void increaseLikes(Long productId, int times) {
             ProductModel product = productJpaRepository.findById(productId).orElseThrow();

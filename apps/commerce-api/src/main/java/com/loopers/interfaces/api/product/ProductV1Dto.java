@@ -23,8 +23,9 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock,
-        long likeCount
+        boolean purchasable,
+        long likeCount,
+        BrandResponse brand
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
@@ -32,9 +33,16 @@ public class ProductV1Dto {
                 info.name(),
                 info.description(),
                 info.price(),
-                info.stock(),
-                info.likeCount()
+                info.purchasable(),
+                info.likeCount(),
+                BrandResponse.from(info.brand())
             );
+        }
+    }
+
+    public record BrandResponse(Long id, String name) {
+        public static BrandResponse from(ProductInfo.BrandSummary summary) {
+            return new BrandResponse(summary.id(), summary.name());
         }
     }
 }
