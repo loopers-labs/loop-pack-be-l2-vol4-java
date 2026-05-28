@@ -47,6 +47,7 @@ public class OrderFacade {
         return OrderInfo.from(saved);
     }
 
+    /** 같은 productId가 여러 line으로 와도 OrderItem은 line별로 1행씩 보존한다 (이력/표시 의도). 재고 차감만 {@link #aggregateQuantities}로 합산한다. */
     private List<OrderItem> buildItems(List<OrderLineCommand> lines, Map<Long, ProductModel> productMap) {
         return lines.stream()
             .map(line -> {

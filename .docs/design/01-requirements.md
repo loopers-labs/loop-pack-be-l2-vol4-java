@@ -201,8 +201,8 @@
 | D4 | `OrderStatus` enum 도입 — 본 라운드는 `CREATED`만. 결제 합류 시 `SUCCEEDED`/`FAILED` 등 상태 머신을 누적 확장 | 본 라운드는 도메인 모델링 중심이라 *상태 분기*는 다음 라운드(동시성/실패복구)에서 다룬다. enum 자체는 미리 도입해 다음 라운드 진입 시 확장이 *값 추가*로 끝나도록 한다 |
 | D5 | 어드민 API **포함 — 단 이번 라운드는 스코프(상품·브랜드 조회)에 해당하는 어드민 *조회*만**. 등록·수정·삭제와 어드민 주문 조회는 추후. 대고객/어드민을 prefix·헤더로 분리 (`/api/v1`+LoginId/Pw vs `/api-admin/v1`+Ldap) | 명세에 어드민 기능이 명시됨. 도메인 모델은 공유하고 오퍼레이션·노출 정보만 분리. CUD 제약(D14·D16)은 미리 정의 |
 | D6 | 좋아요 멱등 = `UNIQUE(user_id, product_id)` + 서비스 분기 | DB 예외 의존 안 함. 흐름 가독성 우선 |
-| D7 | **다도메인 협력은 Facade `@Transactional` 합성 (B안)** — 단 좋아요는 예외. 주문은 `OrderFacade`가 `ProductService` + `StockService` + `OrderService`를 *분기 없이* 합성. 좋아요는 `LikeFacade`가 `LikeService`에 **1:1 위임**하고, `LikeService`가 `ProductService`(상품 조회 + `like_count` 증감)와 협력 | 주문은 합성·분기가 Facade에 없어 규약대로. 좋아요는 *멱등 분기(등록·취소가 실제 반영될 때만 카운터 변경)*가 핵심 유스케이스 흐름이라 **Service 안에 두어야** 한다(Facade 분기 금지 규약) → `like_count` 갱신을 `ProductService` write로 호출. `like_count`는 약한 일관성(D3)이므로 Service↔Service 쓰기를 *이 카운터에 한해* 좁게 허용. 외부 I/O 없는 본 라운드 한정 |
-| D8 | `order_item.product_id` = 단순 BIGINT (논리적 FK도 약하게, JPA 연관 매핑 없음) | Product는 OrderItem과 *다른 애그리거트*이므로 ID 참조만(D18). 스냅샷 의미 강조 + 상품 hard delete와 무관하게 주문 이력 보존 |
+| D7 | **다도메인 협력은 Facade `@Transactional` 합성 (B안)** — 좋아요·주문 모두 Facade가 합성하고 Service↔Service 호출은 두지 않는다. 좋아요 카운터는 `ProductRepository.incrementLikeCount`/`decrementLikeCount` **원자 UPDATE**로 cross-user 동시 갱신 lost update를 차단(D3 보강) | `LikeFacade`가 `LikeService`의 멱등 결과(boolean)를 받아 *카운터 반영* 분기를 호출한다. 신규 등록·실제 삭제 분기는 atomic UPDATE를 호출, 멱등 분기는 `ProductService.requireExists`(SELECT 1)로 상품 부재 시 NOT_FOUND를 보장한다 — 사전 `getById`는 두지 않아 중복 조회 제거. 외부 I/O 없는 본 라운드 한정 |
+| D8 | `order_item.product_id` = 단순 BIGINT (논리적 FK도 약하게, JPA 연관 매핑 없음) | Product는 OrderItem과 *다른 애그리거트*이므로 ID 참조만(D18). 스냅샷 의미 강조 + 상품 변경(가격·이름)이나 soft delete와 무관하게 주문 이력 보존 |
 | D9 | `like` 테이블명 → `product_like` | SQL 예약어 회피 + 의미 명확성 |
 | D10 | `order` 테이블명 → `orders` | SQL 예약어 회피 |
 | D11 | 주문 도메인은 **결제 도메인 한 군데만 호출**(주문 → 결제 → PG). 주문이 PG Client를 직접 들지 않음 | Payment record가 *지불 사실의 단일 진실 원천*. 결제 수단·정책이 늘어나도 주문은 결제 인터페이스만 의존해 변경이 격리된다 |

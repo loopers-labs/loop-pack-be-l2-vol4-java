@@ -65,40 +65,53 @@ sequenceDiagram
     participant Ctl as LikeController
     participant F as LikeFacade
     participant S as LikeService
-    participant PS as ProductService
     participant LR as LikeRepository
+    participant PS as ProductService
+    participant PR as ProductRepository
     participant DB as DB
 
     C->>+Ctl: 좋아요 등록 요청 (POST /products/{productId}/likes)
-    Note over Ctl: 사전 조건 — 사용자 인증 완료, 상품 존재
+    Note over Ctl: 사전 조건 — 사용자 인증 완료
     Ctl->>+F: like(userId, productId)
-    F->>+S: like(userId, productId) — 1:1 위임
-    S->>+PS: getById(productId)
-    PS-->>-S: 상품 / 없음
-    opt 상품 미존재 / 삭제됨
-        S-->>C: throw CoreException(NOT_FOUND) → 전역 핸들러 404
-    end
-    Note over S,LR: 불변식 — 좋아요는 사용자·상품당 최대 1개 (UNIQUE 제약)
-    S->>+LR: 존재 확인 (existsByUserIdAndProductId)
+    Note over F,LR: 불변식 — 좋아요는 사용자·상품당 최대 1개 (UNIQUE 제약)
+    F->>+S: like(userId, productId)
+    S->>+LR: existsByUserIdAndProductId
     LR->>+DB: 조회
     DB-->>-LR: 존재 여부
     LR-->>-S: true / false
     alt 미존재 — 신규 등록
         S->>+LR: save(좋아요)
-        LR->>+DB: 저장
+        LR->>+DB: INSERT
         DB-->>-LR: ok
         LR-->>-S: 저장 완료
-        S->>PS: incrementLikeCount(productId)
+        S-->>F: created = true
+        F->>+PS: incrementLikeCount(productId)
+        PS->>+PR: 원자 +1
+        PR->>+DB: UPDATE product SET like_count = like_count + 1<br/>WHERE id AND deleted_at IS NULL
+        DB-->>-PR: 영향 행수
+        PR-->>-PS: int
+        opt 영향 행 0 — 상품 미존재/삭제 (트랜잭션 롤백)
+            PS-->>C: throw CoreException(NOT_FOUND) → 전역 핸들러 404
+        end
+        PS-->>-F: ok
     else 이미 존재 — 멱등
-        Note over S: 상태 변화 없음 (카운터 불변)
+        S-->>-F: created = false
+        F->>+PS: requireExists(productId)
+        PS->>+PR: existsById
+        PR->>+DB: SELECT 1 WHERE id AND deleted_at IS NULL
+        DB-->>-PR: 존재 여부
+        PR-->>-PS: bool
+        opt 미존재
+            PS-->>C: throw CoreException(NOT_FOUND) → 전역 핸들러 404
+        end
+        PS-->>-F: ok
     end
-    S-->>-F: liked = true
-    F-->>-Ctl: liked = true
+    F-->>-Ctl: ok
     Note over Ctl: 사후 조건 — 사용자-상품 좋아요 관계 존재
     Ctl-->>-C: 200 OK
 ```
 
-> 카운터 증감을 **LikeService 안**에 둔 이유(D7) — 등록·취소가 *실제 반영될 때만* 카운터를 바꾸는 **멱등 분기**가 핵심 유스케이스 흐름이라, Facade 분기 금지 규약상 Service에 둔다. `like_count`는 약한 일관성(D3)이라 Service↔Service 쓰기를 *이 카운터에 한해* 좁게 허용한다.
+> 카운터 증감은 **Facade가 LikeService의 멱등 결과(boolean)를 받아 ProductService의 원자 UPDATE를 분기 호출**한다(D7). cross-user 동시 등록의 lost update를 차단하기 위해 atomic UPDATE로 처리한다(D3 보강). 사전 `getById`는 두지 않는다 — 신규 등록 분기는 `incrementLikeCount`의 0건 결과로, 이미 좋아요 분기는 `requireExists`로 각각 NOT_FOUND 의미를 담당해 중복 조회를 제거한다.
 > 동시 등록 레이스(두 요청이 동시에 `existsBy`를 통과)는 `UNIQUE(user_id, product_id)` 위반으로 한쪽이 실패한다 — 위반 예외 처리는 동시성 라운드에서 합류(D6).
 
 ---
@@ -112,28 +125,44 @@ sequenceDiagram
     participant Ctl as LikeController
     participant F as LikeFacade
     participant S as LikeService
-    participant PS as ProductService
     participant LR as LikeRepository
+    participant PS as ProductService
+    participant PR as ProductRepository
     participant DB as DB
 
     C->>+Ctl: 좋아요 취소 요청 (DELETE /products/{productId}/likes)
     Note over Ctl: 사전 조건 — 사용자 인증 완료
     Ctl->>+F: unlike(userId, productId)
-    F->>+S: unlike(userId, productId) — 1:1 위임
-    S->>+LR: 좋아요 삭제 (deleteByUserIdAndProductId)
-    LR->>+DB: 삭제
-    DB-->>-LR: 삭제 건수 (1 = 삭제 / 0 = 없음)
+    F->>+S: unlike(userId, productId)
+    S->>+LR: deleteByUserIdAndProductId
+    LR->>+DB: DELETE FROM product_like<br/>WHERE user_id AND product_id
+    DB-->>-LR: 삭제 건수
     LR-->>-S: 삭제 건수
-    alt 실제 삭제됨 (1)
-        S->>PS: decrementLikeCount(productId)
-    else 없음 (0 — 멱등)
-        Note over S: 상태 변화 없음
+    S-->>-F: deleted (true / false)
+    alt 실제 삭제됨 (true)
+        F->>+PS: decrementLikeCount(productId)
+        PS->>+PR: 원자 -1 (likeCount>0 가드)
+        PR->>+DB: UPDATE product SET like_count = like_count - 1<br/>WHERE id AND deleted_at IS NULL AND like_count > 0
+        DB-->>-PR: 영향 행수 (0건이어도 멱등 통과)
+        PR-->>-PS: int
+        PS-->>-F: ok
+    else 없음 (false — 멱등)
+        F->>+PS: requireExists(productId)
+        PS->>+PR: existsById
+        PR->>+DB: SELECT 1 WHERE id AND deleted_at IS NULL
+        DB-->>-PR: 존재 여부
+        PR-->>-PS: bool
+        opt 미존재
+            PS-->>C: throw CoreException(NOT_FOUND) → 전역 핸들러 404
+        end
+        PS-->>-F: ok
     end
-    S-->>-F: liked = false
-    F-->>-Ctl: liked = false
+    F-->>-Ctl: ok
     Note over Ctl: 사후 조건 — 좋아요 관계 없음
     Ctl-->>-C: 200 OK
 ```
+
+> 등록과 대칭이다 — 실제 삭제 분기는 `decrementLikeCount`(원자 UPDATE), 멱등 분기는 `requireExists`로 상품 부재 시 NOT_FOUND를 보장(D7). decrementLikeCount는 like row 삭제 직후 호출되므로 상품 존재가 사실상 보장되며, 0건이어도(race로 likeCount=0) 멱등 통과한다.
 
 ---
 
@@ -159,14 +188,14 @@ sequenceDiagram
     O->>+S: 재고 차감
     S-->>-O: 차감 결과
     opt 재고 부족
-        O-->>C: 409 CONFLICT
+        O-->>C: 409 CONFLICT (트랜잭션 전체 롤백 — Order row 미생성)
     end
-    Note over O: 주문 저장 (스냅샷, status=CREATED) → 재고 차감 결과를 status에 반영
+    Note over O: 주문 저장 (스냅샷, status=CREATED)
     O-->>-C: 201 CREATED
-    Note over O: 사후 조건 — 주문 status에 재고 차감 결과 반영(본 라운드). 결제 합류 후엔 결제 결과까지 누적
+    Note over O: 사후 조건 — 주문 status=CREATED, 재고 차감 반영. 실패 시 All-or-Nothing 롤백
 ```
 
-> 본 라운드는 재고 차감 결과를 status에 반영한다 — 성공 시 `SUCCEEDED`, 실패 시 `FAILED` (FAILED row는 보존되어 시도 이력 표시). 결제 합류(아래 *5. 주문 결제*) 후엔 *결제 결과까지 누적*되어 `SUCCEEDED`는 *재고 + 결제 모두 성공*을 의미하게 되고, 재고 실패는 본 라운드와 동일하게 즉시 `FAILED`로 종료된다.
+> 본 라운드는 `status=CREATED`만 사용한다 — 재고 부족·상품 부재 등 실패 시 throw + 트랜잭션 전체 롤백이라 Order row 자체가 생성되지 않는다(All-or-Nothing, D4). FAILED row를 남기는 *Order-first* 흐름과 결제 합류 시 `SUCCEEDED`/`FAILED` 누적은 다음 라운드(동시성/실패복구·결제) 주제 — 아래 *5. 주문 결제* 참조.
 
 ---
 

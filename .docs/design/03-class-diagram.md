@@ -14,8 +14,7 @@ classDiagram
 
     namespace Product {
         class ProductModel {
-            +increaseLike()
-            +decreaseLike()
+            -Long likeCount
         }
     }
 
