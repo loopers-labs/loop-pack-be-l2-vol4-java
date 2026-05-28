@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Loopers Spring Java 템플릿 — Spring Boot 3.4.4, Java 21 기반의 Gradle 멀티 모듈 프로젝트. 로컬 개발 환경은 Docker Compose로 인프라를 구성한다.
 모듈 구조 및 아키텍처 상세는 `PROJECT_STRUCTURE.md` 참고.
+DDD 설계/구현 의사결정 기준은 `.docs/ddd-guide.md` 참고 — 도메인 모델링, 애그리거트, 트랜잭션 경계, 서비스 계층, 이벤트, CQRS 등의 패턴 적용 시 이 문서를 기준으로 삼는다.
 
 ## 명령어
 
