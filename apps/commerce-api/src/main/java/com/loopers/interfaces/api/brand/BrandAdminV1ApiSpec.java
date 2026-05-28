@@ -32,4 +32,12 @@ public interface BrandAdminV1ApiSpec {
             "삭제된 브랜드는 404 BRAND_NOT_FOUND, 다른 브랜드와 이름이 중복되면 409 DUPLICATE_BRAND_NAME 을 반환합니다."
     )
     ApiResponse<BrandAdminV1Dto.Response> update(Long brandId, BrandAdminV1Dto.UpdateRequest request);
+
+    @Operation(
+        summary = "어드민 브랜드 삭제",
+        description = "브랜드와 소속 상품을 모두 soft-delete 합니다. " +
+            "이미 삭제된 브랜드를 다시 삭제하면 멱등하게 성공합니다. " +
+            "존재하지 않는 브랜드는 404 BRAND_NOT_FOUND 를 반환합니다."
+    )
+    ApiResponse<Void> delete(Long brandId);
 }

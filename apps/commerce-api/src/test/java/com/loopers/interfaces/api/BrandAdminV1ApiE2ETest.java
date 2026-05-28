@@ -3,8 +3,12 @@ package com.loopers.interfaces.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.loopers.application.brand.BrandAdminInfo;
 import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.brand.BrandAdminV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -31,19 +35,25 @@ class BrandAdminV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final BrandFacade brandFacade;
+    private final ProductFacade productFacade;
     private final BrandJpaRepository brandJpaRepository;
+    private final ProductJpaRepository productJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     public BrandAdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandFacade brandFacade,
+        ProductFacade productFacade,
         BrandJpaRepository brandJpaRepository,
+        ProductJpaRepository productJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandFacade = brandFacade;
+        this.productFacade = productFacade;
         this.brandJpaRepository = brandJpaRepository;
+        this.productJpaRepository = productJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -391,6 +401,74 @@ class BrandAdminV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
                 ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, missingId
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("BRAND_NOT_FOUND")
+            );
+        }
+    }
+
+    @DisplayName("DELETE /api/v1/admin/brands/{brandId}")
+    @Nested
+    class DeleteBrand {
+
+        @DisplayName("정상 삭제 시, 200 을 반환하고 브랜드와 소속 상품이 모두 soft-delete 된다.")
+        @Test
+        void returnsOkAndSoftDeletesBrandAndItsProducts() {
+            // given
+            BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
+            ProductInfo product = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, created.id());
+
+            // when
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, created.id()
+            );
+
+            // then
+            BrandModel brand = brandJpaRepository.findById(created.id()).orElseThrow();
+            ProductModel productAfter = productJpaRepository.findById(product.id()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(brand.getDeletedAt()).isNotNull(),
+                () -> assertThat(productAfter.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("이미 삭제된 브랜드를 다시 삭제하면, 200 을 반환한다 (멱등).")
+        @Test
+        void returnsOk_whenBrandIsAlreadySoftDeleted() {
+            // given
+            BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
+            brandFacade.delete(created.id());
+
+            // when
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, created.id()
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            );
+        }
+
+        @DisplayName("존재하지 않는 id 로 삭제하면, 404 와 BRAND_NOT_FOUND 코드를 반환한다.")
+        @Test
+        void returnsNotFound_whenBrandDoesNotExist() {
+            // given
+            Long missingId = 9_999L;
+
+            // when
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, missingId
             );
 
             // then

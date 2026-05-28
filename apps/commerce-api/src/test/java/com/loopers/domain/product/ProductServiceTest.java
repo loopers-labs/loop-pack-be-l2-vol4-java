@@ -10,9 +10,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.BDDMockito.given;
 
@@ -57,6 +59,42 @@ class ProductServiceTest {
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("브랜드 단위로 상품을 삭제할 때, ")
+    @Nested
+    class DeleteByBrandId {
+
+        @DisplayName("해당 브랜드의 활성 상품들이 모두 soft-delete 된다.")
+        @Test
+        void softDeletesAllActiveProductsOfBrand() {
+            // given
+            Long brandId = 1L;
+            ProductModel airmax = new ProductModel("에어맥스 270", "데일리 러닝화", 159_000L, brandId);
+            ProductModel chuck  = new ProductModel("척테일러", "캔버스 클래식", 79_000L, brandId);
+            given(productRepository.findAllActiveByBrandId(brandId))
+                .willReturn(List.of(airmax, chuck));
+
+            // when
+            productService.deleteByBrandId(brandId);
+
+            // then
+            assertAll(
+                () -> assertThat(airmax.getDeletedAt()).isNotNull(),
+                () -> assertThat(chuck.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("해당 브랜드의 활성 상품이 없으면, 아무 동작도 하지 않는다.")
+        @Test
+        void doesNothing_whenNoActiveProductsExist() {
+            // given
+            Long brandId = 1L;
+            given(productRepository.findAllActiveByBrandId(brandId)).willReturn(List.of());
+
+            // when & then — 예외가 발생하지 않는다
+            productService.deleteByBrandId(brandId);
         }
     }
 }

@@ -1,7 +1,11 @@
 package com.loopers.application.brand;
 
+import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -24,17 +28,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class BrandFacadeIntegrationTest {
 
     private final BrandFacade brandFacade;
+    private final ProductFacade productFacade;
     private final BrandJpaRepository brandJpaRepository;
+    private final ProductJpaRepository productJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     public BrandFacadeIntegrationTest(
         BrandFacade brandFacade,
+        ProductFacade productFacade,
         BrandJpaRepository brandJpaRepository,
+        ProductJpaRepository productJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.brandFacade = brandFacade;
+        this.productFacade = productFacade;
         this.brandJpaRepository = brandJpaRepository;
+        this.productJpaRepository = productJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -362,6 +372,81 @@ class BrandFacadeIntegrationTest {
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("어드민이 브랜드를 삭제할 때, ")
+    @Nested
+    class Delete {
+
+        @DisplayName("브랜드와 소속 상품이 모두 soft-delete 된다.")
+        @Test
+        void softDeletesBrandAndItsProducts() {
+            // given
+            Long brandId = brandFacade.create("나이키", "Just Do It").id();
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+
+            // when
+            brandFacade.delete(brandId);
+
+            // then
+            BrandModel brand = brandJpaRepository.findById(brandId).orElseThrow();
+            ProductModel airmaxAfter = productJpaRepository.findById(airmax.id()).orElseThrow();
+            ProductModel chuckAfter  = productJpaRepository.findById(chuck.id()).orElseThrow();
+            assertAll(
+                () -> assertThat(brand.getDeletedAt()).isNotNull(),
+                () -> assertThat(airmaxAfter.getDeletedAt()).isNotNull(),
+                () -> assertThat(chuckAfter.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("다른 브랜드의 상품은 영향을 받지 않는다.")
+        @Test
+        void doesNotAffectProductsOfOtherBrands() {
+            // given
+            Long nikeId = brandFacade.create("나이키", "Just Do It").id();
+            Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, nikeId);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
+
+            // when
+            brandFacade.delete(nikeId);
+
+            // then
+            ProductModel airmaxAfter = productJpaRepository.findById(airmax.id()).orElseThrow();
+            ProductModel starAfter   = productJpaRepository.findById(star.id()).orElseThrow();
+            assertAll(
+                () -> assertThat(brandJpaRepository.findById(adidasId).orElseThrow().getDeletedAt()).isNull(),
+                () -> assertThat(airmaxAfter.getDeletedAt()).isNotNull(),
+                () -> assertThat(starAfter.getDeletedAt()).isNull()
+            );
+        }
+
+        @DisplayName("이미 삭제된 브랜드를 다시 삭제해도, 예외 없이 성공한다 (멱등).")
+        @Test
+        void isIdempotent_whenBrandIsAlreadySoftDeleted() {
+            // given
+            Long brandId = brandFacade.create("나이키", "Just Do It").id();
+            brandFacade.delete(brandId);
+
+            // when & then — 예외가 발생하지 않는다
+            brandFacade.delete(brandId);
+            assertThat(brandJpaRepository.findById(brandId).orElseThrow().getDeletedAt()).isNotNull();
+        }
+
+        @DisplayName("존재하지 않는 브랜드를 삭제하려고 하면, BRAND_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsBrandNotFound_whenBrandDoesNotExist() {
+            // given
+            Long missingId = 9_999L;
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandFacade.delete(missingId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);
         }
     }
 }

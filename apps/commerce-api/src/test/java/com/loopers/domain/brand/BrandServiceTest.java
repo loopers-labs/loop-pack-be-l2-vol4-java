@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -186,6 +187,58 @@ class BrandServiceTest {
             // when
             CoreException exception = assertThrows(CoreException.class,
                 () -> brandService.update(brandId, "아디다스", null));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("브랜드 삭제 시, ")
+    @Nested
+    class Delete {
+
+        @DisplayName("활성 브랜드를 삭제하면, deletedAt 이 설정된다.")
+        @Test
+        void setsDeletedAt_whenBrandIsActive() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            given(brandRepository.find(brandId)).willReturn(Optional.of(brand));
+
+            // when
+            brandService.delete(brandId);
+
+            // then
+            assertThat(brand.getDeletedAt()).isNotNull();
+        }
+
+        @DisplayName("이미 삭제된 브랜드를 다시 삭제해도, 예외 없이 멱등하게 동작한다.")
+        @Test
+        void isIdempotent_whenBrandIsAlreadySoftDeleted() {
+            // given
+            Long brandId = 1L;
+            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            brand.delete();
+            ZonedDateTime firstDeletedAt = brand.getDeletedAt();
+            given(brandRepository.find(brandId)).willReturn(Optional.of(brand));
+
+            // when
+            brandService.delete(brandId);
+
+            // then
+            assertThat(brand.getDeletedAt()).isEqualTo(firstDeletedAt);
+        }
+
+        @DisplayName("존재하지 않는 브랜드이면, BRAND_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsBrandNotFound_whenBrandDoesNotExist() {
+            // given
+            Long brandId = 999L;
+            given(brandRepository.find(brandId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> brandService.delete(brandId));
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BRAND_NOT_FOUND);

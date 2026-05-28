@@ -2,6 +2,7 @@ package com.loopers.application.brand;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BrandFacade {
 
     private final BrandService brandService;
+    private final ProductService productService;
 
     @Transactional
     public BrandAdminInfo create(String name, String description) {
@@ -41,5 +43,11 @@ public class BrandFacade {
     @Transactional(readOnly = true)
     public Page<BrandAdminInfo> list(Pageable pageable) {
         return brandService.getAll(pageable).map(BrandAdminInfo::from);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        brandService.delete(id);
+        productService.deleteByBrandId(id);
     }
 }

@@ -68,4 +68,12 @@ public class BrandService {
     public List<BrandModel> getAllByIdIn(Collection<Long> ids) {
         return brandRepository.findAllByIdIn(ids);
     }
+
+    @Transactional
+    public void delete(Long id) {
+        BrandModel brand = brandRepository.find(id)
+            .orElseThrow(() -> new CoreException(ErrorType.BRAND_NOT_FOUND,
+                "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
+        brand.delete();
+    }
 }

@@ -51,4 +51,10 @@ public class ProductService {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);
     }
+
+    @Transactional
+    public void deleteByBrandId(Long brandId) {
+        productRepository.findAllActiveByBrandId(brandId)
+            .forEach(ProductModel::delete);
+    }
 }
