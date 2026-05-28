@@ -39,4 +39,17 @@ public interface StockJpaRepository extends JpaRepository<StockModel, UUID> {
           AND :newTotal >= s.reservedQuantity
         """)
     int updateTotal(@Param("productId") UUID productId, @Param("newTotal") int newTotal);
+
+    /**
+     * 스케줄러 배치용 원자적 재고 해제 — SELECT FOR UPDATE 없이 단일 UPDATE.
+     * reserved_quantity -= qty (단, 0 미만 방지)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE StockModel s
+        SET s.reservedQuantity = s.reservedQuantity - :qty
+        WHERE s.productId = :productId
+          AND s.reservedQuantity >= :qty
+        """)
+    int releaseByProductId(@Param("productId") UUID productId, @Param("qty") int qty);
 }

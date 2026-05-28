@@ -61,4 +61,14 @@ public class OrderService {
     public List<OrderModel> findExpiredPending(ZonedDateTime before) {
         return orderRepository.findPendingBefore(before);
     }
+
+    /** 스케줄러 배치용 — 아이템 fetch join 포함 (N+1 방지) */
+    public List<OrderModel> findExpiredPendingWithItems(ZonedDateTime before) {
+        return orderRepository.findPendingBeforeWithItems(before);
+    }
+
+    /** 스케줄러 배치 상태 변경 — 단일 UPDATE */
+    public int failAllByIds(List<UUID> orderIds, ZonedDateTime now) {
+        return orderRepository.failAllByIds(orderIds, now);
+    }
 }

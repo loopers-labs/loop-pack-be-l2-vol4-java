@@ -34,4 +34,13 @@ public interface StockRepository {
      * @return affected rows — 0이면 reserved 미만으로 거부
      */
     int updateTotal(UUID productId, int newTotal);
+
+    /**
+     * 스케줄러 배치용 원자적 재고 해제.
+     * UPDATE stocks SET reserved_quantity = reserved_quantity - qty
+     *   WHERE product_id = :productId AND reserved_quantity >= qty
+     *
+     * @return affected rows — 0이면 reserved 부족 (데이터 정합성 오류)
+     */
+    int releaseByProductId(UUID productId, int qty);
 }

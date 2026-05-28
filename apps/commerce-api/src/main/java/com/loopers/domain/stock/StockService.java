@@ -61,6 +61,14 @@ public class StockService {
     }
 
     /**
+     * 스케줄러 배치용 재고 해제 — productId별 합산 수량을 원자적 UPDATE.
+     * SELECT FOR UPDATE 없이 단일 UPDATE per unique product.
+     */
+    public void releaseAll(Map<UUID, Integer> productQtyMap) {
+        productQtyMap.forEach((productId, qty) -> stockRepository.releaseByProductId(productId, qty));
+    }
+
+    /**
      * 어드민 재고 총량 수정 — 원자적 조건부 UPDATE.
      * reserved 미만이면 affected rows = 0 → CONFLICT.
      */

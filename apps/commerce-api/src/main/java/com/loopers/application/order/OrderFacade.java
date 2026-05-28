@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -88,10 +90,27 @@ public class OrderFacade {
         return OrderInfo.from(order);
     }
 
-    /** 스케줄러용 — 만료된 PENDING 주문 일괄 실패 처리 + 재고 해제 */
+    /** 스케줄러용 — 만료된 PENDING 주문 일괄 실패 처리 + 재고 해제 (배치) */
     @Transactional
     public void expirePendingOrders(ZonedDateTime before) {
-        orderService.findExpiredPending(before).forEach(orderStockService::expireOrder);
+        List<OrderModel> expiredOrders = orderService.findExpiredPendingWithItems(before);
+        if (expiredOrders.isEmpty()) return;
+
+        // 1단계: productId별 해제 수량 집계
+        Map<UUID, Integer> releaseMap = expiredOrders.stream()
+            .flatMap(o -> o.getItems().stream())
+            .collect(Collectors.toMap(
+                item -> item.getProductId(),
+                item -> item.getQuantity(),
+                Integer::sum
+            ));
+
+        // 2단계: 재고 배치 해제 (원자적 relative UPDATE, SELECT FOR UPDATE 불필요)
+        stockService.releaseAll(releaseMap);
+
+        // 3단계: 주문 상태 일괄 FAILED 처리
+        List<UUID> orderIds = expiredOrders.stream().map(OrderModel::getId).toList();
+        orderService.failAllByIds(orderIds, before);
     }
 
     public record OrderItemRequest(UUID productId, int quantity) {}

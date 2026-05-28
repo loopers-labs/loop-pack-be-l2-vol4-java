@@ -44,4 +44,9 @@ public class StockRepositoryImpl implements StockRepository {
     public int updateTotal(UUID productId, int newTotal) {
         return stockJpaRepository.updateTotal(productId, newTotal);
     }
+
+    @Override
+    public int releaseByProductId(UUID productId, int qty) {
+        return stockJpaRepository.releaseByProductId(productId, qty);
+    }
 }

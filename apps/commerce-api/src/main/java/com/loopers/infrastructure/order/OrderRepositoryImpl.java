@@ -48,4 +48,14 @@ public class OrderRepositoryImpl implements OrderRepository {
     public List<OrderModel> findPendingBefore(ZonedDateTime before) {
         return orderJpaRepository.findAllByStatusAndCreatedAtBefore(OrderStatus.PENDING, before);
     }
+
+    @Override
+    public List<OrderModel> findPendingBeforeWithItems(ZonedDateTime before) {
+        return orderJpaRepository.findAllPendingWithItemsBefore(before);
+    }
+
+    @Override
+    public int failAllByIds(List<UUID> orderIds, ZonedDateTime now) {
+        return orderJpaRepository.failAllByIds(orderIds, now);
+    }
 }
