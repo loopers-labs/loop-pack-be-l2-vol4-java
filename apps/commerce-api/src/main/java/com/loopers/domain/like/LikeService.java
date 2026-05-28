@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -18,15 +19,16 @@ public class LikeService {
 
     @Transactional
     public LikeEntity like(Long userId, Long productId) {
-        return likeRepository.findAny(userId, productId)
-                .map(like -> {
-                    if (!like.isDeleted()) {
-                        throw new CoreException(ErrorType.CONFLICT, "이미 좋아요한 상품입니다.");
-                    }
-                    like.restore();
-                    return likeRepository.save(like);
-                })
-                .orElseGet(() -> likeRepository.save(new LikeEntity(userId, productId)));
+        Optional<LikeEntity> existing = likeRepository.findAny(userId, productId);
+        if (existing.isPresent()) {
+            LikeEntity like = existing.get();
+            if (!like.isDeleted()) {
+                throw new CoreException(ErrorType.CONFLICT, "이미 좋아요한 상품입니다.");
+            }
+            like.restore();
+            return likeRepository.save(like);
+        }
+        return likeRepository.save(new LikeEntity(userId, productId));
     }
 
     @Transactional
