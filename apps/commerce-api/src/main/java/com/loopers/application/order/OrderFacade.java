@@ -50,7 +50,7 @@ public class OrderFacade {
 
         OrderModel savedOrder = orderRepository.save(order, orderItems);
 
-        return OrderInfo.from(savedOrder, orderItems);
+        return OrderInfo.of(savedOrder, orderItems);
     }
 
     private void validateNoDuplicateProduct(List<OrderItemCommand> itemCommands) {
@@ -110,7 +110,7 @@ public class OrderFacade {
         OrderModel order = orderRepository.getActiveByIdAndUserId(orderId, authUserId);
         List<OrderItemModel> orderItems = orderRepository.findActiveItemsByOrderId(order.getId());
 
-        return OrderInfo.from(order, orderItems);
+        return OrderInfo.of(order, orderItems);
     }
 
     @Transactional(readOnly = true)
@@ -131,7 +131,7 @@ public class OrderFacade {
         ZonedDateTime endExclusive = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault());
 
         return orderRepository.findActiveByUserIdAndOrderedAtBetween(userId, startInclusive, endExclusive, page, size)
-            .map(order -> OrderInfo.from(order, orderRepository.findActiveItemsByOrderId(order.getId())));
+            .map(order -> OrderInfo.of(order, orderRepository.findActiveItemsByOrderId(order.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -145,6 +145,6 @@ public class OrderFacade {
         OrderModel order = orderRepository.getActiveById(orderId);
         List<OrderItemModel> orderItems = orderRepository.findActiveItemsByOrderId(order.getId());
 
-        return OrderAdminInfo.from(order, orderItems);
+        return OrderAdminInfo.of(order, orderItems);
     }
 }

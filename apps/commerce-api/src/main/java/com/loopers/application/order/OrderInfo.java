@@ -15,7 +15,7 @@ public record OrderInfo(
     List<OrderItemInfo> items
 ) {
 
-    public static OrderInfo from(OrderModel order, List<OrderItemModel> orderItems) {
+    public static OrderInfo of(OrderModel order, List<OrderItemModel> orderItems) {
         List<OrderItemInfo> orderItemsInfo = orderItems.stream()
             .map(OrderItemInfo::from)
             .toList();
