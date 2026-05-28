@@ -2,6 +2,8 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
 
+import java.time.ZonedDateTime;
+
 public class ProductV1Dto {
 
     public record RegisterRequest(
@@ -28,6 +30,35 @@ public class ProductV1Dto {
                 info.description(),
                 info.price(),
                 info.likeCount()
+            );
+        }
+    }
+
+    // 어드민용 응답 (재고 수량, 날짜 포함)
+    public record ProductAdminResponse(
+        Long id,
+        String name,
+        String description,
+        Long price,
+        Long brandId,
+        String brandName,
+        int likeCount,
+        int stock,
+        ZonedDateTime createdAt,
+        ZonedDateTime updatedAt
+    ) {
+        public static ProductAdminResponse from(ProductInfo info) {
+            return new ProductAdminResponse(
+                info.id(),
+                info.name(),
+                info.description(),
+                info.price(),
+                info.brandId(),
+                info.brandName(),
+                info.likeCount(),
+                info.stockQuantity(),
+                info.createdAt(),
+                info.updatedAt()
             );
         }
     }

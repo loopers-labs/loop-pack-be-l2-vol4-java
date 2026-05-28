@@ -1,0 +1,11 @@
+### 어드민 상품 목록 조회
+GET {{commerce-api}}/api-admin/v1/products?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 어드민 상품 목록 조회 (브랜드 필터)
+GET {{commerce-api}}/api-admin/v1/products?brandId=1&page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 어드민 상품 단건 조회
+GET {{commerce-api}}/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin

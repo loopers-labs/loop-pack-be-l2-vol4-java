@@ -104,14 +104,16 @@
 - `brandId`: 선택, 특정 브랜드 상품만 필터링
 - `page`: 기본값 0
 - `size`: 기본값 20
+- 정렬: 지원하지 않음 (항상 최신순 `createdAt DESC`)
 
 ### 비즈니스 규칙
 - 없음
 
 ### 유스케이스 흐름
-1. `ProductRepository.findAllWithBrand(brandId, pageable)` — JOIN 쿼리로 브랜드명 포함 조회
-2. 각 상품의 재고 수량 조회
-3. 결과 반환
+1. `ProductRepository.findAll(brandId, pageable)` — 브랜드 필터 + 최신순 페이징
+2. 배치 조회: `BrandRepository.findAllByIdIn(brandIds)` → brandName Map
+3. 배치 조회: `StockRepository.findAllByProductIdIn(productIds)` → stock Map
+4. 결과 조립 후 반환
 
 ### 트랜잭션 경계
 - `@Transactional(readOnly = true)`
@@ -133,9 +135,10 @@
 - 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
 
 ### 유스케이스 흐름
-1. `ProductRepository.findByIdWithBrand(productId)` — JOIN 쿼리로 브랜드명 포함 조회
-2. 재고 수량 조회
-3. 결과 반환
+1. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 NOT_FOUND)
+2. `BrandDomainService.getBrand(brandId)` — 브랜드명 조회
+3. `StockDomainService.getStock(productId)` — 재고 수량 조회
+4. 결과 조립 후 반환
 
 ### 트랜잭션 경계
 - `@Transactional(readOnly = true)`
