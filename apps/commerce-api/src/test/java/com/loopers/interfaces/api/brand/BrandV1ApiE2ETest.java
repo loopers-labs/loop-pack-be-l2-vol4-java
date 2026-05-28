@@ -3,13 +3,13 @@ package com.loopers.interfaces.api.brand;
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.data.domain.Page;
 import org.springframework.http.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -186,9 +186,9 @@ class BrandV1ApiE2ETest {
             createBrand("아디다스", "독일 스포츠 브랜드");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Page<BrandV1Dto.BrandAdminResponse>>> type =
+            ParameterizedTypeReference<ApiResponse<PageResult<BrandV1Dto.BrandAdminResponse>>> type =
                     new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Page<BrandV1Dto.BrandAdminResponse>>> response =
+            ResponseEntity<ApiResponse<PageResult<BrandV1Dto.BrandAdminResponse>>> response =
                     testRestTemplate.exchange(
                             ENDPOINT_ADMIN + "?page=0&size=20",
                             HttpMethod.GET, new HttpEntity<>(adminHeaders()), type
@@ -196,7 +196,7 @@ class BrandV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().data().getTotalElements()).isEqualTo(2);
+            assertThat(response.getBody().data().totalElements()).isEqualTo(2);
         }
     }
 

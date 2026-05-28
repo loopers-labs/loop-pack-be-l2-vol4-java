@@ -2,8 +2,8 @@ package com.loopers.interfaces.api.brand;
 
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,8 +22,8 @@ public class BrandAdminV1Controller {
     private final BrandFacade brandFacade;
 
     @GetMapping
-    public ApiResponse<Page<BrandV1Dto.BrandAdminResponse>> getBrands(Pageable pageable) {
-        return ApiResponse.success(brandFacade.getBrands(pageable).map(BrandV1Dto.BrandAdminResponse::from));
+    public ApiResponse<PageResult<BrandV1Dto.BrandAdminResponse>> getBrands(Pageable pageable) {
+        return ApiResponse.success(PageResult.from(brandFacade.getBrands(pageable).map(BrandV1Dto.BrandAdminResponse::from)));
     }
 
     @GetMapping("/{brandId}")
