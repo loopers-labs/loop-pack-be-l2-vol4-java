@@ -24,7 +24,8 @@ public class ProductV1Controller {
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.stock(),
+            request.imageUrl()
         );
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
         return ApiResponse.success(response);
@@ -58,7 +59,8 @@ public class ProductV1Controller {
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.stock(),
+            request.imageUrl()
         );
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
         return ApiResponse.success(response);

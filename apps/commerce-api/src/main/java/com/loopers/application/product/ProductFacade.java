@@ -15,9 +15,9 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
 
-    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock, String imageUrl) {
         brandService.getBrand(brandId);
-        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
+        ProductModel product = productService.createProduct(brandId, name, description, price, stock, imageUrl);
         return ProductInfo.from(product);
     }
 
@@ -33,8 +33,8 @@ public class ProductFacade {
             .toList();
     }
 
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
+    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock, String imageUrl) {
+        ProductModel product = productService.updateProduct(id, name, description, price, stock, imageUrl);
         return ProductInfo.from(product);
     }
 

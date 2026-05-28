@@ -9,14 +9,16 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        String imageUrl
     ) {}
 
     public record UpdateProductRequest(
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        String imageUrl
     ) {}
 
     public record ProductResponse(
@@ -25,7 +27,8 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        String imageUrl
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
@@ -34,7 +37,8 @@ public class ProductV1Dto {
                 info.name(),
                 info.description(),
                 info.price(),
-                info.stock()
+                info.stock(),
+                info.imageUrl()
             );
         }
     }
