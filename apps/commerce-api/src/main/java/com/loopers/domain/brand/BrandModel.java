@@ -4,6 +4,8 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
+import java.time.ZonedDateTime;
+
 public class BrandModel extends BaseEntity {
 
     private String name;
@@ -19,7 +21,7 @@ public class BrandModel extends BaseEntity {
     }
 
     public static BrandModel of(Long id, String name, String description,
-            java.time.ZonedDateTime createdAt, java.time.ZonedDateTime updatedAt, java.time.ZonedDateTime deletedAt) {
+            ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         BrandModel model = new BrandModel();
         model.name = name;
         model.description = description;
