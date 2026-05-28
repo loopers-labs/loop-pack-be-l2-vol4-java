@@ -107,10 +107,10 @@ class OrderServiceTest {
     }
 
     // ─────────────────────────────────────────────
-    // getOrder
+    // getOrder (Admin — 소유권 검증 없음)
     // ─────────────────────────────────────────────
 
-    @DisplayName("주문 단건 조회")
+    @DisplayName("주문 단건 조회 (Admin)")
     @Nested
     class GetOrder {
 
@@ -141,6 +141,56 @@ class OrderServiceTest {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
                     () -> orderService.getOrder(ORDER_ID));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // getOrder(userId, orderId) (Customer — 소유권 검증 포함)
+    // ─────────────────────────────────────────────
+
+    @DisplayName("주문 단건 조회 (Customer)")
+    @Nested
+    class GetOrderForUser {
+
+        @DisplayName("[ECP] 본인 주문 조회 시 OrderEntity를 반환한다.")
+        @Test
+        void returnsOrder_whenOrderIsOwnedByUser() {
+            // arrange
+            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            OrderEntity order = savedOrder(ORDER_ID, USER_ID, items);
+            given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
+
+            // act
+            OrderEntity result = orderService.getOrder(USER_ID, ORDER_ID);
+
+            // assert
+            assertEquals(ORDER_ID, result.getId());
+        }
+
+        @DisplayName("[ECP] 존재하지 않는 orderId로 조회하면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderNotExists() {
+            // arrange
+            given(orderRepository.findById(ORDER_ID)).willReturn(Optional.empty());
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> orderService.getOrder(USER_ID, ORDER_ID));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
+        }
+
+        @DisplayName("[ADR-017] 타인의 주문 조회 시 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderIsOwnedByOtherUser() {
+            // arrange
+            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            OrderEntity order = savedOrder(ORDER_ID, 999L, items); // 타인 소유
+            given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> orderService.getOrder(USER_ID, ORDER_ID));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }

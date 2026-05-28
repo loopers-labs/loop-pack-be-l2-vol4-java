@@ -29,6 +29,15 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public OrderEntity getOrder(Long userId, Long orderId) {
+        OrderEntity order = getOrder(orderId);
+        if (!order.isOwnedBy(userId)) {
+            throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
+        }
+        return order;
+    }
+
+    @Transactional(readOnly = true)
     public Page<OrderEntity> getOrders(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderRepository.findAllByUserId(userId, startAt, endAt, pageable);
     }

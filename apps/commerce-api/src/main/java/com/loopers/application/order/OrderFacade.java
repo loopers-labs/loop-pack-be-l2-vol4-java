@@ -6,8 +6,6 @@ import com.loopers.domain.order.OrderItemEntity;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.ProductEntity;
 import com.loopers.domain.product.ProductService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,11 +42,7 @@ public class OrderFacade {
     }
 
     public OrderInfo getOrder(Long authUserId, Long orderId) {
-        OrderEntity order = orderService.getOrder(orderId);
-        if (!order.isOwnedBy(authUserId)) {
-            throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
-        }
-        return OrderInfo.from(order);
+        return OrderInfo.from(orderService.getOrder(authUserId, orderId));
     }
 
     public Page<OrderInfo> getOrders(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
