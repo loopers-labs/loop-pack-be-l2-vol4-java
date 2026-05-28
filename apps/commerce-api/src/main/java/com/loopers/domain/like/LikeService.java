@@ -48,4 +48,9 @@ public class LikeService {
     public Page<LikeModel> findAllByUserId(UUID userId, Pageable pageable) {
         return likeRepository.findAllByUserId(userId, pageable);
     }
+
+    /** Product+Brand fetch join 페이징 — N+1 방지 */
+    public Page<LikeModel> findAllByUserIdWithProduct(UUID userId, Pageable pageable) {
+        return likeRepository.findAllByUserIdWithProduct(userId, pageable);
+    }
 }

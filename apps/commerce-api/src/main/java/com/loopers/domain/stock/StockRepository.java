@@ -1,5 +1,6 @@
 package com.loopers.domain.stock;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -7,6 +8,8 @@ public interface StockRepository {
     StockModel save(StockModel stock);
 
     Optional<StockModel> findByProductId(UUID productId);
+
+    List<StockModel> findAllByProductIds(List<UUID> productIds);
 
     /**
      * 비관적 락(SELECT FOR UPDATE) 조회.

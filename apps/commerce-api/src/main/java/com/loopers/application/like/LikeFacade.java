@@ -1,10 +1,11 @@
 package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.like.ProductLikeService;
-import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
@@ -16,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -49,10 +52,15 @@ public class LikeFacade {
         if (!userId.equals(authenticatedUser.getId())) {
             throw new CoreException(ErrorType.NOT_FOUND, "접근할 수 없습니다.");
         }
-        return likeService.findAllByUserId(userId, pageable).map(like -> {
-            ProductModel product = productService.getActive(like.getProductId());
-            StockModel stock = stockService.getByProductId(like.getProductId());
-            return ProductInfo.from(product, stock);
-        });
+        // Product+Brand fetch join으로 N+1 방지 (다대일 fetch join → 페이징 안전)
+        Page<LikeModel> likes = likeService.findAllByUserIdWithProduct(userId, pageable);
+
+        // Stock 배치 조회 — productIds IN (:ids) 단일 쿼리
+        List<UUID> productIds = likes.getContent().stream()
+            .map(LikeModel::getProductId)
+            .toList();
+        Map<UUID, StockModel> stockMap = stockService.findAllByProductIds(productIds);
+
+        return likes.map(like -> ProductInfo.from(like.getProduct(), stockMap.get(like.getProductId())));
     }
 }

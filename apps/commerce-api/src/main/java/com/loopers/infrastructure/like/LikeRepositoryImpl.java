@@ -42,6 +42,11 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
+    public Page<LikeModel> findAllByUserIdWithProduct(UUID userId, Pageable pageable) {
+        return likeJpaRepository.findAllByUserIdWithProduct(userId, pageable);
+    }
+
+    @Override
     public void deleteByUserIdAndProductId(UUID userId, UUID productId) {
         likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
     }

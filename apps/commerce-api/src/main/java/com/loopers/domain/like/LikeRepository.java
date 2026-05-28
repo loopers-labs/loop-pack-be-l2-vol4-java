@@ -19,5 +19,8 @@ public interface LikeRepository {
     /** 유저의 좋아요 목록 — 페이징 */
     Page<LikeModel> findAllByUserId(UUID userId, Pageable pageable);
 
+    /** 유저의 좋아요 목록 — Product+Brand fetch join, N+1 방지 */
+    Page<LikeModel> findAllByUserIdWithProduct(UUID userId, Pageable pageable);
+
     void deleteByUserIdAndProductId(UUID userId, UUID productId);
 }

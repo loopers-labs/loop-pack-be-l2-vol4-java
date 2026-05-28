@@ -4,6 +4,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -14,6 +16,11 @@ public class StockService {
 
     public StockModel create(UUID productId, int initialQuantity) {
         return stockRepository.save(new StockModel(productId, initialQuantity));
+    }
+
+    public Map<UUID, StockModel> findAllByProductIds(List<UUID> productIds) {
+        return stockRepository.findAllByProductIds(productIds).stream()
+            .collect(java.util.stream.Collectors.toMap(StockModel::getProductId, s -> s));
     }
 
     public StockModel getByProductId(UUID productId) {

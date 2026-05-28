@@ -8,12 +8,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface StockJpaRepository extends JpaRepository<StockModel, UUID> {
 
     Optional<StockModel> findByProductId(UUID productId);
+
+    List<StockModel> findAllByProductIdIn(List<UUID> productIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM StockModel s WHERE s.productId = :productId")
