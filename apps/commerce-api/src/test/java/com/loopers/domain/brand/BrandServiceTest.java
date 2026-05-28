@@ -1,23 +1,34 @@
 package com.loopers.domain.brand;
 
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+@ExtendWith(MockitoExtension.class)
 class BrandServiceTest {
+
+    @Mock
+    private BrandRepository brandRepository;
+
+    @Mock
+    private ProductRepository productRepository;
 
     private BrandService brandService;
 
     @BeforeEach
     void setUp() {
-        brandService = new BrandService();
+        brandService = new BrandService(brandRepository, productRepository);
     }
 
     @DisplayName("브랜드를 삭제할 때, ")

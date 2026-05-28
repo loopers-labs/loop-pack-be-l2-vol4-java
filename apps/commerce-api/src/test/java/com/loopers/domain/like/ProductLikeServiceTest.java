@@ -1,11 +1,17 @@
 package com.loopers.domain.like;
 
 import com.loopers.domain.EntityTestSupport;
+import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductBrandProcessor;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,13 +19,28 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+@ExtendWith(MockitoExtension.class)
 class ProductLikeServiceTest {
+
+    @Mock
+    private ProductLikeRepository productLikeRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private BrandRepository brandRepository;
 
     private ProductLikeService productLikeService;
 
     @BeforeEach
     void setUp() {
-        productLikeService = new ProductLikeService();
+        productLikeService = new ProductLikeService(
+            productLikeRepository,
+            productRepository,
+            brandRepository,
+            new ProductBrandProcessor()
+        );
     }
 
     @DisplayName("상품에 좋아요를 누를 때, ")
@@ -32,7 +53,7 @@ class ProductLikeServiceTest {
             ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
-            ProductLikeResult result = productLikeService.likeProduct("user1234", 1L, product, Optional.empty());
+            ProductLikeResult result = productLikeService.createLike("user1234", 1L, product, Optional.empty());
 
             // assert
             assertAll(
@@ -51,7 +72,7 @@ class ProductLikeServiceTest {
             ProductLikeModel productLike = new ProductLikeModel("user1234", 1L);
 
             // act
-            ProductLikeResult result = productLikeService.likeProduct(
+            ProductLikeResult result = productLikeService.createLike(
                 "user1234",
                 1L,
                 product,
@@ -79,7 +100,7 @@ class ProductLikeServiceTest {
             ProductLikeModel productLike = new ProductLikeModel("user1234", 1L);
 
             // act
-            boolean result = productLikeService.unlikeProduct(product, Optional.of(productLike));
+            boolean result = productLikeService.deleteLike(product, Optional.of(productLike));
 
             // assert
             assertAll(
@@ -95,7 +116,7 @@ class ProductLikeServiceTest {
             ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
-            boolean result = productLikeService.unlikeProduct(product, Optional.empty());
+            boolean result = productLikeService.deleteLike(product, Optional.empty());
 
             // assert
             assertAll(

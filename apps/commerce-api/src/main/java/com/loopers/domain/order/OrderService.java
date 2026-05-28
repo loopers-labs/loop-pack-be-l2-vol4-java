@@ -1,63 +1,35 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.product.ProductModel;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
+@RequiredArgsConstructor
+@Component
 public class OrderService {
 
-    public OrderResult createOrder(
-        String userLoginId,
-        List<OrderProductCommand> commands,
-        Map<Long, ProductModel> productsById
-    ) {
-        validateCommands(commands);
+    private final OrderReader orderReader;
+    private final OrderWriter orderWriter;
 
-        List<OrderLineModel> orderLines = new ArrayList<>();
-        List<OrderFailure> failures = new ArrayList<>();
-
-        for (OrderProductCommand command : commands) {
-            tryOrderProduct(command, productsById, orderLines, failures);
-        }
-
-        if (orderLines.isEmpty()) {
-            throw new CoreException(ErrorType.CONFLICT, "주문 가능한 상품이 없습니다.");
-        }
-
-        OrderModel order = new OrderModel(userLoginId, orderLines);
-        return new OrderResult(order, List.copyOf(failures));
+    public OrderResult placeOrder(String userLoginId, List<OrderProductCommand> commands) {
+        return orderWriter.placeOrder(userLoginId, commands);
     }
 
-    private void validateCommands(List<OrderProductCommand> commands) {
-        if (commands == null || commands.isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청 상품은 1개 이상이어야 합니다.");
-        }
+    public List<OrderModel> getOrders(String userLoginId, LocalDate startAt, LocalDate endAt, Integer page, Integer size) {
+        return orderReader.getOrders(userLoginId, startAt, endAt, page, size);
     }
 
-    private void tryOrderProduct(
-        OrderProductCommand command,
-        Map<Long, ProductModel> productsById,
-        List<OrderLineModel> orderLines,
-        List<OrderFailure> failures
-    ) {
-        try {
-            ProductModel product = productsById.get(command.productId());
-            if (product == null) {
-                throw new CoreException(ErrorType.NOT_FOUND, "[id = " + command.productId() + "] 상품을 찾을 수 없습니다.");
-            }
-            product.deductStock(command.quantity());
-            orderLines.add(new OrderLineModel(
-                command.productId(),
-                product.getName(),
-                product.getPrice(),
-                command.quantity()
-            ));
-        } catch (CoreException e) {
-            failures.add(new OrderFailure(command.productId(), command.quantity(), e.getErrorType(), e.getMessage()));
-        }
+    public OrderModel getOrder(String userLoginId, Long orderId) {
+        return orderReader.getOrder(userLoginId, orderId);
+    }
+
+    public List<OrderModel> getAllOrders(Integer page, Integer size) {
+        return orderReader.getAllOrders(page, size);
+    }
+
+    public OrderModel getOrder(Long orderId) {
+        return orderReader.getOrder(orderId);
     }
 }

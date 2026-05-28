@@ -22,6 +22,9 @@ import static org.mockito.Mockito.verify;
 class UserServiceTest {
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private PasswordPolicy passwordPolicy;
 
     private final PasswordHasher passwordHasher = new FakePasswordHasher();
@@ -29,7 +32,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(passwordPolicy, passwordHasher);
+        userService = new UserService(userRepository, passwordPolicy, passwordHasher);
     }
 
     @DisplayName("회원가입할 때, ")

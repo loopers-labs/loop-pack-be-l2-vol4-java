@@ -15,13 +15,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class OrderServiceTest {
+class OrderProcessorTest {
 
-    private OrderService orderService;
+    private OrderProcessor orderProcessor;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService();
+        orderProcessor = new OrderProcessor();
     }
 
     @DisplayName("주문을 생성할 때, ")
@@ -34,7 +34,7 @@ class OrderServiceTest {
             ProductModel product = new ProductModel(10L, "니트", "부드러운 니트", 30_000L, 10);
 
             // act
-            OrderResult result = orderService.createOrder(
+            OrderResult result = orderProcessor.createOrder(
                 "user1234",
                 List.of(new OrderProductCommand(1L, 2)),
                 Map.of(1L, product)
@@ -58,7 +58,7 @@ class OrderServiceTest {
             ProductModel outOfStockProduct = new ProductModel(20L, "셔츠", "가벼운 셔츠", 20_000L, 1);
 
             // act
-            OrderResult result = orderService.createOrder(
+            OrderResult result = orderProcessor.createOrder(
                 "user1234",
                 List.of(
                     new OrderProductCommand(1L, 2),
@@ -83,7 +83,7 @@ class OrderServiceTest {
         void returnsFailure_whenProductDoesNotExist() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderService.createOrder(
+                orderProcessor.createOrder(
                     "user1234",
                     List.of(new OrderProductCommand(1L, 2)),
                     Map.of()
@@ -102,7 +102,7 @@ class OrderServiceTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderService.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)), Map.of(1L, product));
+                orderProcessor.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)), Map.of(1L, product));
             });
 
             // assert
@@ -117,7 +117,7 @@ class OrderServiceTest {
         void throwsBadRequestException_whenCommandIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderService.createOrder("user1234", List.of(), Map.of());
+                orderProcessor.createOrder("user1234", List.of(), Map.of());
             });
 
             // assert

@@ -15,13 +15,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class ProductCatalogServiceTest {
+class ProductBrandProcessorTest {
 
-    private ProductCatalogService productCatalogService;
+    private ProductBrandProcessor productBrandProcessor;
 
     @BeforeEach
     void setUp() {
-        productCatalogService = new ProductCatalogService();
+        productBrandProcessor = new ProductBrandProcessor();
     }
 
     @DisplayName("상품 상세를 구성할 때, ")
@@ -35,7 +35,7 @@ class ProductCatalogServiceTest {
             BrandModel brand = new BrandModel("Loopers", "감성 이커머스 브랜드");
 
             // act
-            ProductDetail result = productCatalogService.getProductDetail(product, brand);
+            ProductDetail result = productBrandProcessor.getProductDetail(product, brand);
 
             // assert
             assertAll(
@@ -57,7 +57,7 @@ class ProductCatalogServiceTest {
             ProductModel thirdProduct = new ProductModel(20L, "코트", "따뜻한 코트", 90_000L, 3);
 
             // act
-            List<Long> result = productCatalogService.getBrandIds(
+            List<Long> result = productBrandProcessor.getBrandIds(
                 List.of(firstProduct, secondProduct, thirdProduct)
             );
 
@@ -77,7 +77,7 @@ class ProductCatalogServiceTest {
             EntityTestSupport.setId(secondBrand, 20L);
 
             // act
-            List<ProductDetail> results = productCatalogService.getProductDetails(
+            List<ProductDetail> results = productBrandProcessor.getProductDetails(
                 List.of(firstProduct, secondProduct),
                 List.of(firstBrand, secondBrand)
             );
@@ -100,7 +100,7 @@ class ProductCatalogServiceTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                productCatalogService.getProductDetails(List.of(product), List.of());
+                productBrandProcessor.getProductDetails(List.of(product), List.of());
             });
 
             // assert

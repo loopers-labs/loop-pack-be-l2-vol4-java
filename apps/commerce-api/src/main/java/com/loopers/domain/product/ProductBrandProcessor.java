@@ -3,13 +3,15 @@ package com.loopers.domain.product;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class ProductCatalogService {
+@Component
+public class ProductBrandProcessor {
 
     public ProductDetail getProductDetail(ProductModel product, BrandModel brand) {
         return new ProductDetail(product, brand);
