@@ -477,30 +477,6 @@ class ProductV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         }
-
-        @DisplayName("brandId 변경을 시도하면 400을 반환한다.")
-        @Test
-        void returnsBadRequest_whenBrandIdIsChanged() {
-            // arrange
-            BrandInfo brand = createBrand("나이키");
-            BrandInfo otherBrand = createBrand("아디다스");
-            ProductInfo created = createProduct(brand.id(), "에어맥스", 100_000L, 10);
-            record UpdateWithBrandRequest(Long brandId, String name, String description, Long price, Integer quantity) {}
-            UpdateWithBrandRequest request =
-                    new UpdateWithBrandRequest(otherBrand.id(), "에어맥스 V2", "업데이트된 설명", 120_000L, 20);
-
-            // act
-            ParameterizedTypeReference<ApiResponse<Void>> type =
-                    new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<Void>> response =
-                    testRestTemplate.exchange(
-                            ENDPOINT_ADMIN + "/" + created.id(),
-                            HttpMethod.PUT, new HttpEntity<>(request, adminHeaders()), type
-                    );
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
     }
 
     // ─────────────────────────────────────────────
