@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProductServiceIntegrationTest {
 
     private static final Long BRAND_ID = 1L;
+    private static final Long OTHER_BRAND_ID = 2L;
     private static final String PRODUCT_NAME = "에어맥스";
     private static final String PRODUCT_DESCRIPTION = "나이키 런닝화";
     private static final Long PRODUCT_PRICE = 150000L;
@@ -90,18 +93,35 @@ class ProductServiceIntegrationTest {
     @Nested
     class GetAllProducts {
 
-        @DisplayName("[ECP] 생성된 상품 수만큼 목록이 반환된다.")
+        @DisplayName("[ECP] brandId 없이 조회하면 전체 상품 페이지가 반환된다.")
         @Test
-        void returnsAllProducts() {
+        void returnsAllProducts_whenNoBrandIdFilter() {
             // arrange
             productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
-            productService.createProduct(BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
+            productService.createProduct(OTHER_BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
 
             // act
-            List<ProductEntity> result = productService.getAllProducts();
+            Page<ProductEntity> result = productService.getAllProducts(null, PageRequest.of(0, 20));
 
             // assert
-            assertEquals(2, result.size());
+            assertEquals(2, result.getTotalElements());
+        }
+
+        @DisplayName("[ECP] brandId로 필터링하면 해당 브랜드의 상품만 반환된다.")
+        @Test
+        void returnsFilteredProducts_whenBrandIdProvided() {
+            // arrange
+            productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+            productService.createProduct(OTHER_BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
+
+            // act
+            Page<ProductEntity> result = productService.getAllProducts(BRAND_ID, PageRequest.of(0, 20));
+
+            // assert
+            assertAll(
+                    () -> assertEquals(1, result.getTotalElements()),
+                    () -> assertEquals(BRAND_ID, result.getContent().get(0).getBrandId())
+            );
         }
 
         @DisplayName("[Error Guessing] 삭제된 상품은 목록 조회에서 제외된다.")
@@ -112,10 +132,74 @@ class ProductServiceIntegrationTest {
             productService.deleteProduct(product.getId());
 
             // act
-            List<ProductEntity> result = productService.getAllProducts();
+            Page<ProductEntity> result = productService.getAllProducts(null, PageRequest.of(0, 20));
 
             // assert
-            assertEquals(0, result.size());
+            assertEquals(0, result.getTotalElements());
+        }
+    }
+
+    @DisplayName("브랜드별 상품 ID 목록 조회")
+    @Nested
+    class FindIdsByBrand {
+
+        @DisplayName("[ECP] brandId로 조회하면 해당 브랜드의 상품 id 목록이 반환된다.")
+        @Test
+        void returnsProductIds_whenBrandExists() {
+            // arrange
+            ProductEntity product1 = productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+            ProductEntity product2 = productService.createProduct(BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
+            productService.createProduct(OTHER_BRAND_ID, "아디다스 신발", "아디다스 런닝화", 120000L);
+
+            // act
+            List<Long> ids = productService.findIdsByBrand(BRAND_ID);
+
+            // assert
+            assertAll(
+                    () -> assertEquals(2, ids.size()),
+                    () -> assertTrue(ids.contains(product1.getId())),
+                    () -> assertTrue(ids.contains(product2.getId()))
+            );
+        }
+
+        @DisplayName("[Error Guessing] 삭제된 상품의 id는 반환되지 않는다.")
+        @Test
+        void excludesDeletedProductIds() {
+            // arrange
+            ProductEntity active = productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+            ProductEntity deleted = productService.createProduct(BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
+            productService.deleteProduct(deleted.getId());
+
+            // act
+            List<Long> ids = productService.findIdsByBrand(BRAND_ID);
+
+            // assert
+            assertAll(
+                    () -> assertEquals(1, ids.size()),
+                    () -> assertTrue(ids.contains(active.getId()))
+            );
+        }
+    }
+
+    @DisplayName("상품 일괄 삭제")
+    @Nested
+    class DeleteAll {
+
+        @DisplayName("[State Transition] 상품 id 목록으로 일괄 삭제하면 해당 상품들은 조회되지 않는다.")
+        @Test
+        void deletesAllProducts_thenNotFound() {
+            // arrange
+            ProductEntity product1 = productService.createProduct(BRAND_ID, PRODUCT_NAME, PRODUCT_DESCRIPTION, PRODUCT_PRICE);
+            ProductEntity product2 = productService.createProduct(BRAND_ID, "에어포스", "나이키 스니커즈", 130000L);
+
+            // act
+            productService.deleteAll(List.of(product1.getId(), product2.getId()));
+
+            // assert
+            assertAll(
+                    () -> assertThrows(CoreException.class, () -> productService.getProduct(product1.getId())),
+                    () -> assertThrows(CoreException.class, () -> productService.getProduct(product2.getId()))
+            );
         }
     }
 
