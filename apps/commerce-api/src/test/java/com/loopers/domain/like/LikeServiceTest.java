@@ -1,5 +1,6 @@
 package com.loopers.domain.like;
 
+import com.loopers.domain.product.ProductModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,6 +94,48 @@ class LikeServiceTest {
 
             // then
             assertThat(deleted).isFalse();
+        }
+    }
+
+    @DisplayName("내가 좋아요한 active 상품 목록을 조회할 때, ")
+    @Nested
+    class GetMyLikedActiveProducts {
+
+        @DisplayName("Repository 에서 받은 결과를 그대로 반환한다.")
+        @Test
+        void returnsRepositoryResult_asIs() {
+            // given
+            Long userId = 1L;
+            int page = 0;
+            int size = 20;
+            ProductModel p1 = new ProductModel("에어맥스 270", "데일리", 159_000L, 10L);
+            ProductModel p2 = new ProductModel("페가수스 40", "쿠셔닝", 139_000L, 10L);
+            given(likeRepository.findLikedActiveProductsByUserId(userId, page, size))
+                .willReturn(List.of(p1, p2));
+
+            // when
+            List<ProductModel> result = likeService.getMyLikedActiveProducts(userId, page, size);
+
+            // then
+            assertThat(result).containsExactly(p1, p2);
+            verify(likeRepository).findLikedActiveProductsByUserId(userId, page, size);
+        }
+
+        @DisplayName("좋아요한 active 상품이 없으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmptyList_whenNoLikedActiveProducts() {
+            // given
+            Long userId = 1L;
+            int page = 0;
+            int size = 20;
+            given(likeRepository.findLikedActiveProductsByUserId(userId, page, size))
+                .willReturn(List.of());
+
+            // when
+            List<ProductModel> result = likeService.getMyLikedActiveProducts(userId, page, size);
+
+            // then
+            assertThat(result).isEmpty();
         }
     }
 }
