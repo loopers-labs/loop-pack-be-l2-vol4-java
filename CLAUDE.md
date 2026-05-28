@@ -67,6 +67,7 @@ docker-compose -f ./docker/monitoring-compose.yml up
 
 - Controller는 Service가 아닌 Facade를 호출한다
 - Facade는 도메인 Model을 인터페이스 계층용 Info 객체로 변환한다
+- **Service 간 직접 참조 금지**: 여러 Service를 조합해야 하는 경우 반드시 Facade에서 각각 호출한다 (예: BrandFacade.delete() → brandService.delete() + productService.deleteByBrand())
 - Service는 비즈니스 오류 발생 시 `CoreException(ErrorType)`을 던진다
 - `ApiControllerAdvice`가 `CoreException`을 HTTP 응답으로 변환한다
 
