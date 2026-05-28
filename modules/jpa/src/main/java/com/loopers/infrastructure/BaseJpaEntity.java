@@ -31,6 +31,13 @@ public abstract class BaseJpaEntity {
     @Column(name = "deleted_at")
     protected ZonedDateTime deletedAt;
 
+    protected BaseJpaEntity() {}
+
+    protected BaseJpaEntity(Long id, ZonedDateTime deletedAt) {
+        if (id != null) this.id = id;
+        this.deletedAt = deletedAt;
+    }
+
     protected void setId(Long id) {
         this.id = id;
     }
