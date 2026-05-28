@@ -36,10 +36,11 @@
 - Java 파일은 Google Java Format 기준으로 포맷한다.
 - Lombok 사용을 전제로 한다 (`implementation` + `annotationProcessor`). getter/setter 보일러플레이트보다 `@Getter`, `@Builder`, `@RequiredArgsConstructor` 등을 우선 고려한다.
 - 패키지 컨벤션 (`apps/*` 기준):
-  - `interfaces.api.<domain>` — Controller / DTO / Swagger Spec / Advice
-  - `application.<domain>` — Facade / Info (UseCase, 트랜잭션 경계)
-  - `domain.<domain>` — Model / Service / Repository 인터페이스
-  - `infrastructure.<domain>` — Repository 구현체, Jpa/Querydsl repository
+  - `<domain>.interfaces.api` — Controller / DTO / Swagger Spec
+  - `<domain>.application` — Facade / Info (UseCase, 트랜잭션 경계)
+  - `<domain>.domain` — Model / Service / Repository 인터페이스
+  - `<domain>.infrastructure` — Repository 구현체, Jpa/Querydsl repository
+  - `common.interfaces.api` — 공통 API 응답 / 공통 API Advice
 - Controller 는 얇게, 비즈니스 규칙은 Service/Facade 에 둔다.
 - 상세 코드 작성 규칙은 [`.claude/rules/code-conventions.md`](.claude/rules/code-conventions.md)를 따른다.
 

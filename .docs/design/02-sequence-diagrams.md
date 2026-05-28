@@ -6,8 +6,8 @@
 
 ## 0. 공통 설계 관점
 
-- 사용자 API 는 `interfaces.api.<domain>`, 관리자 API 는 `interfaces.api.admin.<domain>` 책임으로 본다.
-- 여러 도메인이 결합되는 주문/결제 흐름은 `application.order` 또는 `application.payment` Facade 가 오케스트레이션한다.
+- 사용자 API 는 `<domain>.interfaces.api`, 관리자 API 는 `<domain>.interfaces.api.admin` 책임으로 본다.
+- 여러 도메인이 결합되는 주문/결제 흐름은 `order.application` 또는 `payment.application` Facade 가 오케스트레이션한다.
 - 도메인 규칙은 Aggregate 또는 Domain Service 가 판단하고, Repository 는 조회/저장 계약만 수행한다.
 - 행동 기록은 `UserActionLog` 또는 이후 이벤트 발행 대상으로 남긴다.
 - 로그인 실패, 존재하지 않는 리소스, 논리 삭제 상태, 상태 전이 불가, 금액/재고 불일치는 중요 예외로 명시한다.

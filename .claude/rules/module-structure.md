@@ -26,15 +26,17 @@ Root  (rootProject.name = "loopers-java-spring-template", group = "com.loopers")
 ```
 
 ## apps 패키지 레이아웃 (commerce-api 기준)
-`com.loopers` 하위에 layered 아키텍처를 사용합니다.
+`com.loopers` 하위에 도메인 > 계층형 기반 패키지 구성과 4 tier layered 아키텍처를 함께 사용합니다.
 
 ```
 com.loopers
 ├── CommerceApiApplication
-├── interfaces.api/          Controller, DTO, ApiSpec(Swagger), ApiControllerAdvice, ApiResponse
-├── application.<domain>/    Facade, Info (UseCase / 트랜잭션 경계)
-├── domain.<domain>/         Model, Service, Repository (도메인 계약)
-├── infrastructure.<domain>/ RepositoryImpl, JpaRepository (도메인 계약 구현)
+├── common.interfaces.api/   ApiControllerAdvice, ApiResponse 등 공통 API 계약
+├── <domain>/
+│   ├── interfaces.api/      Controller, DTO
+│   ├── application/         Facade, Info (UseCase / 트랜잭션 경계)
+│   ├── domain/              Model, Service, Repository (도메인 계약)
+│   └── infrastructure/      RepositoryImpl, JpaRepository (도메인 계약 구현)
 └── support.error/           CoreException, ErrorType
 ```
 샘플 도메인으로 `example`, `product` 가 포함되어 있습니다.
