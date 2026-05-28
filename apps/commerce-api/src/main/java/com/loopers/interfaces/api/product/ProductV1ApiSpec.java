@@ -14,6 +14,6 @@ public interface ProductV1ApiSpec {
     @Operation(summary = "상품 단건 조회", description = "고객용 — 활성 상품만, 재고 수량 비노출")
     ApiResponse<ProductV1Dto.ProductResponse> getActive(UUID id);
 
-    @Operation(summary = "상품 목록 조회", description = "고객용 — 활성 상품만, brandId 필터 지원")
-    ApiResponse<PageResponse<ProductV1Dto.ProductResponse>> getActiveList(UUID brandId, Pageable pageable);
+    @Operation(summary = "상품 목록 조회", description = "고객용 — 활성 상품만, brandId 필터 + sort(latest/price_asc/likes_desc) 지원")
+    ApiResponse<PageResponse<ProductV1Dto.ProductResponse>> getActiveList(UUID brandId, String sort, Pageable pageable);
 }

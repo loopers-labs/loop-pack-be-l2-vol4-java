@@ -6,6 +6,7 @@ import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.interfaces.api.common.response.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,9 +34,15 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     @Override
     public ApiResponse<PageResponse<ProductV1Dto.ProductResponse>> getActiveList(
         @RequestParam(required = false) UUID brandId,
+        @RequestParam(required = false) String sort,
         Pageable pageable
     ) {
-        Page<ProductInfo> page = productFacade.getActiveList(brandId, pageable);
+        Pageable resolvedPageable = PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            ProductSortType.resolve(sort)
+        );
+        Page<ProductInfo> page = productFacade.getActiveList(brandId, resolvedPageable);
         return ApiResponse.success(PageResponse.from(page.map(ProductV1Dto.ProductResponse::from)));
     }
 }
