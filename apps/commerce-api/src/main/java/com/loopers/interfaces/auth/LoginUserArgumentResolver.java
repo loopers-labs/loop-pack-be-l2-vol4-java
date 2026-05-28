@@ -9,6 +9,8 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver {
 
+    public static final String USER_ID_ATTRIBUTE = "userId";
+
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.hasParameterAnnotation(LoginUser.class);
@@ -18,6 +20,6 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
             NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
-        return request.getAttribute("userId");
+        return request.getAttribute(USER_ID_ATTRIBUTE);
     }
 }

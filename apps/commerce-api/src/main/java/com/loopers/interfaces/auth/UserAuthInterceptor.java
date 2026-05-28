@@ -29,7 +29,7 @@ public class UserAuthInterceptor implements HandlerInterceptor {
         }
 
         Long userId = userFacade.authenticate(loginId, loginPw);
-        request.setAttribute("userId", userId);
+        request.setAttribute(LoginUserArgumentResolver.USER_ID_ATTRIBUTE, userId);
         return true;
     }
 }
