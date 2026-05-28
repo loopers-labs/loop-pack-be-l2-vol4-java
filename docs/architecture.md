@@ -27,15 +27,18 @@ com.loopers
 - 허용: `@RestController`, `@RequestMapping`, Request/Response DTO
 - 금지: 비즈니스 로직, 도메인 객체 직접 조작, Repository 직접 주입
 
-### application (Facade)
-- 역할: 여러 도메인 서비스를 조합해 단일 유스케이스를 완성
-- 허용: 트랜잭션 경계 정의(`@Transactional`), 여러 도메인 서비스 조합
-- 금지: 비즈니스 규칙 직접 구현, Repository 직접 주입
+### application (ApplicationService / Facade)
+- 역할: 유스케이스 오케스트레이션. 트랜잭션 경계 정의. 도메인 서비스와 Repository를 조합해 흐름을 완성
+- 허용: `@Transactional`, DomainService 조합, Repository 직접 주입 (단순 저장/조회에 한함)
+- 금지: 비즈니스 규칙 직접 구현 (도메인 규칙은 반드시 DomainService 또는 Entity에 위임)
 
 ### domain
 - 역할: 순수 비즈니스 로직. 외부 프레임워크 의존 최소화
 - 허용: `@Service`, `@Entity`, `@Embeddable`, Repository 인터페이스
 - 금지: `@Controller`, `@RestController`, JPA 구현 세부사항 노출
+- **DomainService 기준**: 단일 Entity 혼자 판단할 수 없는 비즈니스 규칙만 위치
+  - ✅ 중복 검사 (DB 조회 필요), 접근 제어, 멱등 처리
+  - ❌ 단순 find+save 패턴 → ApplicationService에서 직접 처리
 
 ### infrastructure
 - 역할: domain의 Repository 인터페이스를 구현. 영속성 기술 캡슐화
