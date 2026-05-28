@@ -9,6 +9,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -168,6 +170,42 @@ class UserV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
+
+        @DisplayName("X-Loopers-LoginId 헤더가 공백 문자열이면, 400 Bad Request 응답을 반환한다.")
+        @ParameterizedTest
+        @ValueSource(strings = {" ", "   "})
+        void returnsBadRequest_whenLoginIdHeaderIsBlank(String blankLoginId) {
+            // act
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, blankLoginId);
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, "Password1!");
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ENDPOINT_GET_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("X-Loopers-LoginPw 헤더가 공백 문자열이면, 400 Bad Request 응답을 반환한다.")
+        @ParameterizedTest
+        @ValueSource(strings = {" ", "   "})
+        void returnsBadRequest_whenLoginPwHeaderIsBlank(String blankLoginPw) {
+            // act
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(AuthHeaders.HEADER_LOGIN_ID, "tester01");
+            headers.set(AuthHeaders.HEADER_LOGIN_PW, blankLoginPw);
+            ParameterizedTypeReference<ApiResponse<UserV1Dto.MyInfoResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserV1Dto.MyInfoResponse>> response = testRestTemplate.exchange(
+                ENDPOINT_GET_MY_INFO, HttpMethod.GET, new HttpEntity<>(headers), responseType
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @DisplayName("PATCH /api/v1/users/me/password")
@@ -197,7 +235,7 @@ class UserV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
-                () -> assertThat(userJpaRepository.findById(saved.getId()).orElseThrow().getPassword()).isEqualTo("NewPass2@")
+                () -> assertThat(userJpaRepository.findById(saved.getId()).orElseThrow().matchesPassword("NewPass2@")).isTrue()
             );
         }
 

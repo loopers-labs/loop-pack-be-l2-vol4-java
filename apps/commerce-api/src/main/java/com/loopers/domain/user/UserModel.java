@@ -9,6 +9,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +36,8 @@ public class UserModel extends BaseEntity {
     private static final Pattern PASSWORD_HAS_DIGIT = Pattern.compile(".*\\d.*");
     private static final Pattern PASSWORD_HAS_SPECIAL =
         Pattern.compile(".*[!@#$%^&*()_+\\-=\\[\\]{};:'\",.<>/?\\\\|`~].*");
+
+    private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
 
     @Column(name = "login_id", nullable = false, unique = true, length = 10)
     private String loginId;
@@ -65,7 +69,7 @@ public class UserModel extends BaseEntity {
         validatePassword(password, birthDate);
 
         this.loginId = loginId;
-        this.password = password;
+        this.password = PASSWORD_ENCODER.encode(password);
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
@@ -73,7 +77,7 @@ public class UserModel extends BaseEntity {
     }
 
     public boolean matchesPassword(String password) {
-        return this.password.equals(password);
+        return PASSWORD_ENCODER.matches(password, this.password);
     }
 
     public String getMaskedName() {
@@ -88,10 +92,10 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
         }
         validatePassword(newPassword, this.birthDate);
-        if (newPassword.equals(this.password)) {
+        if (matchesPassword(newPassword)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 다른 값이어야 합니다.");
         }
-        this.password = newPassword;
+        this.password = PASSWORD_ENCODER.encode(newPassword);
     }
 
     private static void validateLoginId(String loginId) {

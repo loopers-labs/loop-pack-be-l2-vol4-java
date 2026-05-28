@@ -24,11 +24,11 @@ public class AuthHeadersArgumentResolver implements HandlerMethodArgumentResolve
         WebDataBinderFactory binderFactory
     ) throws Exception {
         String loginId = webRequest.getHeader(AuthHeaders.HEADER_LOGIN_ID);
-        if (loginId == null) {
+        if (loginId == null || loginId.isBlank()) {
             throw new MissingRequestHeaderException(AuthHeaders.HEADER_LOGIN_ID, parameter);
         }
         String loginPw = webRequest.getHeader(AuthHeaders.HEADER_LOGIN_PW);
-        if (loginPw == null) {
+        if (loginPw == null || loginPw.isBlank()) {
             throw new MissingRequestHeaderException(AuthHeaders.HEADER_LOGIN_PW, parameter);
         }
         return new AuthHeaders(loginId, loginPw);
