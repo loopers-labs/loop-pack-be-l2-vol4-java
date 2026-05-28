@@ -20,7 +20,7 @@ public record ProductInfo(
             product.getDescription(),
             product.getPrice().value(),
             product.getBrandId(),
-            brand != null ? brand.getName() : null,
+            brand.getName(),
             product.getLikeCount(),
             available
         );

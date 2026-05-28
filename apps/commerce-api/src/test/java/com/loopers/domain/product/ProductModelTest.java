@@ -93,46 +93,4 @@ class ProductModelTest {
         }
     }
 
-    @DisplayName("좋아요 수 증가 시")
-    @Nested
-    class IncreaseLike {
-
-        @DisplayName("호출할 때마다 좋아요 수가 1씩 증가한다")
-        @Test
-        void incrementsLikeCount_byOne() {
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
-
-            product.increaseLike();
-            product.increaseLike();
-
-            assertThat(product.getLikeCount()).isEqualTo(2);
-        }
-    }
-
-    @DisplayName("좋아요 수 감소 시")
-    @Nested
-    class DecreaseLike {
-
-        @DisplayName("좋아요 수가 1 이상이면 1만큼 감소한다")
-        @Test
-        void decrementsLikeCount_byOne() {
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
-            product.increaseLike();
-            product.increaseLike();
-
-            product.decreaseLike();
-
-            assertThat(product.getLikeCount()).isEqualTo(1);
-        }
-
-        @DisplayName("좋아요 수가 0이면 감소해도 0으로 유지된다 (음수 방지)")
-        @Test
-        void staysZero_whenAlreadyZero() {
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE);
-
-            product.decreaseLike();
-
-            assertThat(product.getLikeCount()).isZero();
-        }
-    }
 }

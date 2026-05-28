@@ -2,7 +2,7 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.common.Money;
-import com.loopers.infrastructure.jpa.MoneyConverter;
+import com.loopers.domain.common.MoneyConverter;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
@@ -49,15 +49,5 @@ public class ProductModel extends BaseEntity {
         this.description = description;
         this.price = Money.of(price);
         this.likeCount = 0L;
-    }
-
-    public void increaseLike() {
-        this.likeCount++;
-    }
-
-    public void decreaseLike() {
-        if (this.likeCount > 0) {
-            this.likeCount--;
-        }
     }
 }

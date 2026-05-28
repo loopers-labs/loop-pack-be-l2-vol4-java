@@ -58,11 +58,9 @@ class ProductAdminFacadeIntegrationTest {
         ProductModel expensive = productRepository.save(new ProductModel(brand.getId(),"패딩", "겨울", 70_000L));
         cheapId = cheap.getId();
 
-        // 좋아요 수: 맨투맨 0, 후드 5, 패딩 2
-        for (int i = 0; i < 5; i++) mid.increaseLike();
-        for (int i = 0; i < 2; i++) expensive.increaseLike();
-        productRepository.save(mid);
-        productRepository.save(expensive);
+        // 좋아요 수: 맨투맨 0, 후드 5, 패딩 2 — 원자 UPDATE로 시드
+        for (int i = 0; i < 5; i++) productRepository.incrementLikeCount(mid.getId());
+        for (int i = 0; i < 2; i++) productRepository.incrementLikeCount(expensive.getId());
 
         // 재고: 맨투맨 10, 후드 0, 패딩 3
         stockRepository.save(new StockModel(cheap.getId(), 10));

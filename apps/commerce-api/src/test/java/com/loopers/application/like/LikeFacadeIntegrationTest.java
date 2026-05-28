@@ -125,15 +125,24 @@ class LikeFacadeIntegrationTest {
             );
         }
 
-        @DisplayName("좋아요하지 않은 상품을 취소해도 멱등으로 likeCount는 0으로 유지된다")
+        @DisplayName("좋아요하지 않은 상품을 취소해도 (상품은 존재) 멱등으로 likeCount는 0으로 유지된다")
         @Test
-        void isIdempotent_whenNothingToUnlike() {
+        void isIdempotent_whenNothingToUnlike_andProductExists() {
             // when
             likeFacade.unlike(userId, productId);
 
             // then
             ProductModel product = productRepository.findById(productId).orElseThrow();
             assertThat(product.getLikeCount()).isZero();
+        }
+
+        @DisplayName("존재하지 않는 상품을 unlike하면 NOT_FOUND가 발생한다 (like row 0건 + requireExists)")
+        @Test
+        void throwsNotFound_whenProductMissing() {
+            // when / then
+            assertThatThrownBy(() -> likeFacade.unlike(userId, 999_999L))
+                .isInstanceOfSatisfying(CoreException.class, ex ->
+                    assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND));
         }
     }
 }

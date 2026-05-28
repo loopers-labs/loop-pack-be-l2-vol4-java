@@ -24,7 +24,7 @@ public record ProductAdminInfo(
             product.getDescription(),
             product.getPrice().value(),
             product.getBrandId(),
-            brand != null ? brand.getName() : null,
+            brand.getName(),
             product.getLikeCount(),
             stockQuantity,
             product.getCreatedAt(),

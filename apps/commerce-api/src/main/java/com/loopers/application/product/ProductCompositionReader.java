@@ -9,6 +9,8 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,8 +49,14 @@ public class ProductCompositionReader {
         Map<Long, BrandModel> brands = brandService.findAllByIds(brandIds).stream()
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
-        return products.map(p -> new ProductWithDeps(
-            p, brands.get(p.getBrandId()), quantities.getOrDefault(p.getId(), 0)
-        ));
+        return products.map(p -> {
+            BrandModel brand = brands.get(p.getBrandId());
+            if (brand == null) {
+                // 상품은 살아있는데 참조 brand가 사라진 상태 (예: soft-delete 비대칭) — 데이터 무결성 위반이므로 fail-fast.
+                throw new CoreException(ErrorType.INTERNAL_ERROR,
+                    "[productId=" + p.getId() + ", brandId=" + p.getBrandId() + "] 참조 브랜드를 찾을 수 없습니다.");
+            }
+            return new ProductWithDeps(p, brand, quantities.getOrDefault(p.getId(), 0));
+        });
     }
 }

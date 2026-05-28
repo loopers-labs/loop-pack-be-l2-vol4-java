@@ -41,6 +41,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public boolean existsById(Long id) {
+        return productJpaRepository.existsByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
     public Page<ProductModel> search(Long brandId, SortOption sort, Pageable pageable) {
         Pageable sortedPageable = PageRequest.of(
             pageable.getPageNumber(), pageable.getPageSize(), toSort(sort)
@@ -64,6 +69,16 @@ public class ProductRepositoryImpl implements ProductRepository {
         }
         return productJpaRepository.countGroupByBrandIdAndDeletedAtIsNull(brandIds).stream()
             .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+    }
+
+    @Override
+    public int incrementLikeCount(Long productId) {
+        return productJpaRepository.incrementLikeCount(productId);
+    }
+
+    @Override
+    public int decrementLikeCount(Long productId) {
+        return productJpaRepository.decrementLikeCount(productId);
     }
 
     /**

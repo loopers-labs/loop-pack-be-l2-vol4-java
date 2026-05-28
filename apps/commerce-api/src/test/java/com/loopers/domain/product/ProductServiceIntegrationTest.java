@@ -39,14 +39,12 @@ class ProductServiceIntegrationTest {
         BrandModel brand = brandRepository.save(new BrandModel("Loopers", "감성"));
         brandId = brand.getId();
         // 가격 5만, 3만, 7만
-        ProductModel cheap = productRepository.save(new ProductModel(brand.getId(),"맨투맨", "심플", 30_000L));
+        productRepository.save(new ProductModel(brand.getId(),"맨투맨", "심플", 30_000L));
         ProductModel mid = productRepository.save(new ProductModel(brand.getId(),"후드", "포근함", 50_000L));
         ProductModel expensive = productRepository.save(new ProductModel(brand.getId(),"패딩", "겨울", 70_000L));
-        // 좋아요 수: cheap=0, mid=5, expensive=2
-        for (int i = 0; i < 5; i++) mid.increaseLike();
-        for (int i = 0; i < 2; i++) expensive.increaseLike();
-        productRepository.save(mid);
-        productRepository.save(expensive);
+        // 좋아요 수: cheap=0, mid=5, expensive=2 — 원자 UPDATE로 시드
+        for (int i = 0; i < 5; i++) productRepository.incrementLikeCount(mid.getId());
+        for (int i = 0; i < 2; i++) productRepository.incrementLikeCount(expensive.getId());
     }
 
     @AfterEach

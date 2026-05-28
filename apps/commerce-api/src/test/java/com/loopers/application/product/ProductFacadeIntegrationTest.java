@@ -63,8 +63,7 @@ class ProductFacadeIntegrationTest {
         stockRepository.save(new StockModel(inStockProductId, 10));
         stockRepository.save(new StockModel(outOfStockProductId, 0));
 
-        inStock.increaseLike();
-        productRepository.save(inStock);
+        productRepository.incrementLikeCount(inStockProductId);
     }
 
     @AfterEach
@@ -135,6 +134,20 @@ class ProductFacadeIntegrationTest {
                     .filteredOn(p -> p.id().equals(outOfStockProductId))
                     .singleElement().extracting(ProductInfo::available).isEqualTo(false)
             );
+        }
+
+        @DisplayName("상품은 살아있는데 참조 브랜드가 soft-delete된 비대칭 상태에선 INTERNAL_ERROR로 fail-fast한다")
+        @Test
+        void throwsInternalError_whenReferencedBrandIsSoftDeleted() {
+            // given - 브랜드를 soft-delete (상품은 brandId로만 참조)
+            BrandModel brand = brandRepository.findById(brandId).orElseThrow();
+            brand.delete();
+            brandRepository.save(brand);
+
+            // when / then
+            CoreException ex = assertThrows(CoreException.class,
+                () -> productFacade.search(brandId, SortOption.PRICE_ASC, PageRequest.of(0, 20)));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.INTERNAL_ERROR);
         }
     }
 }
