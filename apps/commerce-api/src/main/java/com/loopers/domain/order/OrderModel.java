@@ -31,7 +31,8 @@ public class OrderModel extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    /** REMOVE/orphanRemoval 제외 — hard delete 시 OrderItem이 외래키로 차단되어 주문 이력 보호. */
+    @OneToMany(mappedBy = "order", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<OrderItem> items = new ArrayList<>();
 
     protected OrderModel() {}

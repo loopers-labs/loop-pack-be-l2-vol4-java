@@ -16,11 +16,7 @@ import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
-/**
- * 주문 항목 — 주문 시점의 상품 스냅샷.
- * <p>Order의 구성요소(같은 애그리거트)이므로 {@link ManyToOne}으로 물리 매핑한다.
- * 반면 Product는 다른 애그리거트이므로 {@code productId}로 ID 참조만 한다 (스냅샷 의미).
- */
+/** 주문 시점 상품 스냅샷. Order의 불변 구성요소(같은 애그리거트)라 BaseEntity 미상속. Product는 다른 애그리거트라 ID 참조. */
 @Getter
 @Entity
 @Table(name = "order_item")
