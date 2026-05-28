@@ -55,4 +55,39 @@ class MoneyTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("금액에 배수를 곱할 때, ")
+    @Nested
+    class Multiply {
+        @DisplayName("주어진 배수만큼 곱한 새 Money를 반환한다.")
+        @Test
+        void returnsMultipliedMoney() {
+            // arrange
+            Money money = new Money(BigDecimal.valueOf(1000));
+
+            // act
+            Money result = money.multiply(3);
+
+            // assert
+            assertThat(result.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(3000));
+        }
+    }
+
+    @DisplayName("금액을 더할 때, ")
+    @Nested
+    class Plus {
+        @DisplayName("두 Money를 더한 새 Money를 반환한다.")
+        @Test
+        void returnsSumOfMoney() {
+            // arrange
+            Money a = new Money(BigDecimal.valueOf(1000));
+            Money b = new Money(BigDecimal.valueOf(500));
+
+            // act
+            Money result = a.plus(b);
+
+            // assert
+            assertThat(result.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(1500));
+        }
+    }
 }

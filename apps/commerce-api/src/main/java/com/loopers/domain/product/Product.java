@@ -2,6 +2,7 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.money.Money;
+import com.loopers.domain.quantity.Quantity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
@@ -59,5 +60,9 @@ public class Product extends BaseEntity {
         if (this.likeCount > 0) {
             this.likeCount--;
         }
+    }
+
+    public void decreaseStock(Quantity quantity) {
+        this.stock = this.stock.decrease(quantity);
     }
 }

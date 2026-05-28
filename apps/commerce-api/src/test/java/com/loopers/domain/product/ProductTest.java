@@ -1,6 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.money.Money;
+import com.loopers.domain.quantity.Quantity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -101,6 +102,25 @@ class ProductTest {
 
             // assert
             assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
+    }
+
+    @DisplayName("재고를 차감할 때, ")
+    @Nested
+    class DecreaseStock {
+        @DisplayName("주어진 수량만큼 재고가 차감된다.")
+        @Test
+        void decreasesStock_byGivenQuantity() {
+            // arrange
+            Product product = new Product("에어맥스", "편한 러닝화",
+                new Money(BigDecimal.valueOf(100000)), new Stock(10), 1L);
+            Quantity quantity = new Quantity(3);
+
+            // act
+            product.decreaseStock(quantity);
+
+            // assert
+            assertThat(product.getStock().getQuantity()).isEqualTo(7);
         }
     }
 }

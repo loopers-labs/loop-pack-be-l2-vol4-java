@@ -28,4 +28,12 @@ public class Money {
             throw new CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.");
         }
     }
+
+    public Money multiply(int multiplier) {
+        return new Money(this.amount.multiply(BigDecimal.valueOf(multiplier)));
+    }
+
+    public Money plus(Money other) {
+        return new Money(this.amount.add(other.amount));
+    }
 }
