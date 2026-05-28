@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -65,7 +66,9 @@ public class OrderFacade {
         List<Long> productIds = lines.stream().map(OrderLineCommand::productId).distinct().toList();
         List<ProductModel> products = productService.getAllByIds(productIds);
         if (products.size() != productIds.size()) {
-            throw new CoreException(ErrorType.NOT_FOUND, "주문하려는 상품이 존재하지 않습니다.");
+            Set<Long> found = products.stream().map(ProductModel::getId).collect(Collectors.toSet());
+            List<Long> missing = productIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품: " + missing);
         }
         return products.stream().collect(Collectors.toMap(ProductModel::getId, Function.identity()));
     }
