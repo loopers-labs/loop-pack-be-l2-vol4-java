@@ -46,13 +46,6 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
-    public List<Brand> findAll() {
-        return brandJpaRepository.findAllByDeletedAtIsNull().stream()
-            .map(BrandJpaEntity::toDomain)
-            .toList();
-    }
-
-    @Override
     public List<Brand> findAll(int page, int size) {
         return brandJpaRepository.findAllByDeletedAtIsNull(PageRequest.of(page, size)).stream()
             .map(BrandJpaEntity::toDomain)

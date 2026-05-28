@@ -42,13 +42,6 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public List<Order> findAll() {
-        return orderJpaRepository.findAllByOrderByCreatedAtDesc().stream()
-            .map(OrderJpaEntity::toDomain)
-            .toList();
-    }
-
-    @Override
     public List<Order> findAll(int page, int size) {
         return orderJpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size)).stream()
             .map(OrderJpaEntity::toDomain)

@@ -1,7 +1,6 @@
 package com.loopers.infrastructure.product;
 
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -12,13 +11,9 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Lo
 
     List<ProductJpaEntity> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
-    List<ProductJpaEntity> findAllByDeletedAtIsNull(Sort sort);
-
     List<ProductJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
 
     List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId);
-
-    List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Sort sort);
 
     List<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 }

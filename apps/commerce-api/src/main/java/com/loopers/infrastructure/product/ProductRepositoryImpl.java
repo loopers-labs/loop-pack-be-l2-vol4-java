@@ -47,18 +47,6 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Product> findAll() {
-        return findAll(ProductSort.LATEST);
-    }
-
-    @Override
-    public List<Product> findAll(ProductSort sort) {
-        return productJpaRepository.findAllByDeletedAtIsNull(toJpaSort(sort)).stream()
-            .map(ProductJpaEntity::toDomain)
-            .toList();
-    }
-
-    @Override
     public List<Product> findAll(ProductSort sort, int page, int size) {
         return productJpaRepository.findAllByDeletedAtIsNull(PageRequest.of(page, size, toJpaSort(sort))).stream()
             .map(ProductJpaEntity::toDomain)
@@ -68,13 +56,6 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public List<Product> findAllByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId).stream()
-            .map(ProductJpaEntity::toDomain)
-            .toList();
-    }
-
-    @Override
-    public List<Product> findAllByBrandId(Long brandId, ProductSort sort) {
-        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, toJpaSort(sort)).stream()
             .map(ProductJpaEntity::toDomain)
             .toList();
     }

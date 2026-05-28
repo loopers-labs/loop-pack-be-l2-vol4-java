@@ -11,7 +11,5 @@ public interface BrandJpaRepository extends JpaRepository<BrandJpaEntity, Long> 
 
     List<BrandJpaEntity> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
-    List<BrandJpaEntity> findAllByDeletedAtIsNull();
-
     List<BrandJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
 }
