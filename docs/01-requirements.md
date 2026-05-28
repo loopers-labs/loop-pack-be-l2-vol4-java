@@ -326,8 +326,8 @@ ProductFacade.deleteProduct(productId)
 
 | 필드 | 규칙 |
 |---|---|
-| `name` | 필수, 빈 문자열 불가, 최대 100자, **중복 불가 (409 Conflict)** |
-| `description` | 선택(nullable), 최대 500자 |
+| `name` | 필수, 빈 문자열 불가, 앞뒤 공백 불가, 최대 100자, **중복 불가 (409 Conflict)** |
+| `description` | 필수, 빈 문자열 불가, 최대 500자 |
 
 ### 상품 등록 / 수정
 
