@@ -2,77 +2,126 @@ package com.loopers.domain.brand;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class BrandServiceTest {
 
-    @Mock
-    private BrandRepository brandRepository;
-
-    @InjectMocks
+    private FakeBrandRepository brandRepository;
     private BrandService brandService;
 
-    private static final Long BRAND_ID = 1L;
     private static final String BRAND_NAME = "나이키";
     private static final String BRAND_DESCRIPTION = "스포츠 브랜드";
 
-    private BrandEntity brandEntity() {
-        return BrandEntity.of(BRAND_ID, BRAND_NAME, BRAND_DESCRIPTION, null, null, null);
+    @BeforeEach
+    void setUp() {
+        brandRepository = new FakeBrandRepository();
+        brandService = new BrandService(brandRepository);
+    }
+
+    static class FakeBrandRepository implements BrandRepository {
+        private final Map<Long, BrandEntity> store = new HashMap<>();
+        private long nextId = 1L;
+
+        @Override
+        public BrandEntity save(BrandEntity brand) {
+            if (brand.getId() == null) {
+                long id = nextId++;
+                BrandEntity saved = BrandEntity.of(id, brand.getName(), brand.getDescription(),
+                        ZonedDateTime.now(), ZonedDateTime.now(), null);
+                store.put(id, saved);
+                return saved;
+            }
+            store.put(brand.getId(), brand);
+            return brand;
+        }
+
+        @Override
+        public Optional<BrandEntity> findById(Long id) {
+            BrandEntity entity = store.get(id);
+            if (entity == null || entity.getDeletedAt() != null) return Optional.empty();
+            return Optional.of(BrandEntity.of(entity.getId(), entity.getName(), entity.getDescription(),
+                    entity.getCreatedAt(), entity.getUpdatedAt(), entity.getDeletedAt()));
+        }
+
+        @Override
+        public Page<BrandEntity> findAll(Pageable pageable) {
+            List<BrandEntity> active = store.values().stream()
+                    .filter(b -> b.getDeletedAt() == null)
+                    .toList();
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), active.size());
+            List<BrandEntity> content = start >= active.size() ? List.of() : active.subList(start, end);
+            return new PageImpl<>(content, pageable, active.size());
+        }
+
+        @Override
+        public Optional<BrandEntity> findByName(String name) {
+            return store.values().stream()
+                    .filter(b -> b.getName().equals(name) && b.getDeletedAt() == null)
+                    .findFirst();
+        }
     }
 
     @DisplayName("브랜드 생성")
     @Nested
     class Create {
 
-        @DisplayName("유효한 name과 description이 주어지면 올바른 값으로 저장된다.")
+        @DisplayName("[ECP] 유효한 name과 description이 주어지면 id가 할당된 브랜드가 생성된다.")
         @Test
         void createsBrand_whenRequestIsValid() {
-            // arrange
-            when(brandRepository.findByName(BRAND_NAME)).thenReturn(Optional.empty());
-
             // act
-            brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
+            BrandEntity result = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
             // assert
-            ArgumentCaptor<BrandEntity> captor = ArgumentCaptor.forClass(BrandEntity.class);
-            verify(brandRepository).save(captor.capture());
             assertAll(
-                    () -> assertEquals(BRAND_NAME, captor.getValue().getName()),
-                    () -> assertEquals(BRAND_DESCRIPTION, captor.getValue().getDescription())
+                    () -> assertNotNull(result.getId()),
+                    () -> assertEquals(BRAND_NAME, result.getName()),
+                    () -> assertEquals(BRAND_DESCRIPTION, result.getDescription())
             );
         }
 
-        @DisplayName("이미 존재하는 name이면 CONFLICT 예외가 발생하고 save는 호출되지 않는다.")
+        @DisplayName("[ECP] 이미 존재하는 name이면 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenNameAlreadyExists() {
             // arrange
-            when(brandRepository.findByName(BRAND_NAME)).thenReturn(Optional.of(brandEntity()));
+            brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
-            // act
+            // act & assert
             CoreException exception = assertThrows(CoreException.class,
                     () -> brandService.create(BRAND_NAME, BRAND_DESCRIPTION));
+            assertEquals(ErrorType.CONFLICT, exception.getErrorType());
+        }
+
+        @DisplayName("[Error Guessing] 삭제된 브랜드와 같은 name으로 생성하면 성공한다.")
+        @Test
+        void createsBrand_whenNameBelongsToDeletedBrand() {
+            // arrange
+            BrandEntity deleted = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
+            brandService.delete(deleted.getId());
+
+            // act
+            BrandEntity result = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
             // assert
-            assertEquals(ErrorType.CONFLICT, exception.getErrorType());
-            verify(brandRepository, never()).save(any());
+            assertAll(
+                    () -> assertNotNull(result.getId()),
+                    () -> assertEquals(BRAND_NAME, result.getName())
+            );
         }
     }
 
@@ -80,28 +129,28 @@ class BrandServiceTest {
     @Nested
     class GetBrand {
 
-        @DisplayName("존재하는 id로 조회하면 BrandEntity를 반환한다.")
+        @DisplayName("[ECP] 존재하는 id로 조회하면 BrandEntity를 반환한다.")
         @Test
         void returnsBrand_whenBrandExists() {
             // arrange
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(brandEntity()));
+            BrandEntity created = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
             // act
-            BrandEntity result = brandService.getBrand(BRAND_ID);
+            BrandEntity result = brandService.getBrand(created.getId());
 
             // assert
-            assertEquals(BRAND_ID, result.getId());
+            assertAll(
+                    () -> assertEquals(created.getId(), result.getId()),
+                    () -> assertEquals(BRAND_NAME, result.getName())
+            );
         }
 
-        @DisplayName("존재하지 않는 id로 조회하면 NOT_FOUND 예외가 발생한다.")
+        @DisplayName("[ECP] 존재하지 않는 id로 조회하면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenBrandNotExists() {
-            // arrange
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.empty());
-
             // act
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.getBrand(BRAND_ID));
+                    () -> brandService.getBrand(999L));
 
             // assert
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
@@ -112,137 +161,111 @@ class BrandServiceTest {
     @Nested
     class GetBrands {
 
-        @DisplayName("브랜드 목록을 페이지로 반환한다.")
+        @DisplayName("[ECP] 생성된 브랜드 수만큼 목록이 반환된다.")
         @Test
         void returnsBrandPage() {
             // arrange
-            PageRequest pageable = PageRequest.of(0, 20);
-            Page<BrandEntity> page = new PageImpl<>(List.of(brandEntity()), pageable, 1);
-            when(brandRepository.findAll(pageable)).thenReturn(page);
+            brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
+            brandService.create("아디다스", "독일 스포츠 브랜드");
 
             // act
-            Page<BrandEntity> result = brandService.getBrands(pageable);
+            Page<BrandEntity> result = brandService.getBrands(PageRequest.of(0, 20));
 
             // assert
-            assertAll(
-                    () -> assertEquals(1, result.getTotalElements()),
-                    () -> assertEquals(BRAND_NAME, result.getContent().get(0).getName())
-            );
+            assertEquals(2, result.getTotalElements());
         }
     }
 
-    @DisplayName("브랜드 수정")
+    @DisplayName("브랜드 수정 — Decision Table: (브랜드 존재) × (name 중복 여부) × (동일 브랜드)")
     @Nested
     class Update {
 
-        @DisplayName("유효한 id와 name, description이 주어지면 올바른 값으로 저장된다.")
-        @Test
-        void updatesBrand_whenRequestIsValid() {
-            // arrange
-            String newName = "아디다스";
-            String newDescription = "독일 스포츠 브랜드";
-            BrandEntity existing = brandEntity();
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(existing));
-            when(brandRepository.findByName(newName)).thenReturn(Optional.empty());
-
-            // act
-            brandService.update(BRAND_ID, newName, newDescription);
-
-            // assert
-            ArgumentCaptor<BrandEntity> captor = ArgumentCaptor.forClass(BrandEntity.class);
-            verify(brandRepository).save(captor.capture());
-            assertAll(
-                    () -> assertEquals(newName, captor.getValue().getName()),
-                    () -> assertEquals(newDescription, captor.getValue().getDescription())
-            );
-        }
-
-        @DisplayName("존재하지 않는 id이면 NOT_FOUND 예외가 발생하고 save는 호출되지 않는다.")
+        @DisplayName("[Decision Table] 브랜드가 존재하지 않으면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenBrandNotExists() {
-            // arrange
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.empty());
-
             // act
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.update(BRAND_ID, "아디다스", "독일 스포츠 브랜드"));
+                    () -> brandService.update(999L, "아디다스", "독일 스포츠 브랜드"));
 
             // assert
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
-            verify(brandRepository, never()).save(any());
         }
 
-        @DisplayName("다른 브랜드와 name이 중복되면 CONFLICT 예외가 발생하고 save는 호출되지 않는다.")
+        @DisplayName("[Decision Table] 브랜드가 존재하고 name 중복이 없으면 수정된다.")
+        @Test
+        void updatesBrand_whenNameIsUnique() {
+            // arrange
+            BrandEntity brand = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
+
+            // act
+            brandService.update(brand.getId(), "아디다스", "독일 스포츠 브랜드");
+
+            // assert
+            BrandEntity updated = brandService.getBrand(brand.getId());
+            assertAll(
+                    () -> assertEquals("아디다스", updated.getName()),
+                    () -> assertEquals("독일 스포츠 브랜드", updated.getDescription())
+            );
+        }
+
+        @DisplayName("[Decision Table] 다른 브랜드와 name이 중복되면 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenNameBelongsToAnotherBrand() {
             // arrange
-            Long anotherBrandId = 2L;
-            BrandEntity another = BrandEntity.of(anotherBrandId, BRAND_NAME, BRAND_DESCRIPTION, null, null, null);
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(brandEntity()));
-            when(brandRepository.findByName(BRAND_NAME)).thenReturn(Optional.of(another));
+            brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
+            BrandEntity another = brandService.create("아디다스", "독일 스포츠 브랜드");
 
             // act
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.update(BRAND_ID, BRAND_NAME, BRAND_DESCRIPTION));
+                    () -> brandService.update(another.getId(), BRAND_NAME, "변경된 설명"));
 
             // assert
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
-            verify(brandRepository, never()).save(any());
         }
 
-        @DisplayName("현재 브랜드와 동일한 name으로 수정하면 올바른 값으로 저장된다. (자기 자신과 중복 허용)")
+        @DisplayName("[Decision Table] 현재 브랜드와 동일한 name으로 수정하면 성공한다.")
         @Test
         void updatesBrand_whenNameIsSameAsCurrentBrand() {
             // arrange
-            BrandEntity existing = brandEntity();
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(existing));
-            when(brandRepository.findByName(BRAND_NAME)).thenReturn(Optional.of(existing));
+            BrandEntity brand = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
             // act
-            brandService.update(BRAND_ID, BRAND_NAME, "새로운 설명");
+            brandService.update(brand.getId(), BRAND_NAME, "새로운 설명");
 
             // assert
-            ArgumentCaptor<BrandEntity> captor = ArgumentCaptor.forClass(BrandEntity.class);
-            verify(brandRepository).save(captor.capture());
-            assertAll(
-                    () -> assertEquals(BRAND_NAME, captor.getValue().getName()),
-                    () -> assertEquals("새로운 설명", captor.getValue().getDescription())
-            );
+            BrandEntity updated = brandService.getBrand(brand.getId());
+            assertEquals("새로운 설명", updated.getDescription());
         }
     }
 
-    @DisplayName("브랜드 삭제")
+    @DisplayName("브랜드 삭제 — State Transition: Active → Deleted")
     @Nested
     class Delete {
 
-        @DisplayName("존재하는 id이면 soft delete 후 저장된다.")
+        @DisplayName("[State Transition] 삭제된 브랜드는 이후 조회 시 NOT_FOUND가 발생한다.")
         @Test
-        void deletesBrand_whenBrandExists() {
+        void deletesBrand_thenNotFoundOnGet() {
             // arrange
-            BrandEntity existing = brandEntity();
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.of(existing));
+            BrandEntity brand = brandService.create(BRAND_NAME, BRAND_DESCRIPTION);
 
             // act
-            brandService.delete(BRAND_ID);
+            brandService.delete(brand.getId());
 
             // assert
-            assertNotNull(existing.getDeletedAt());
-            verify(brandRepository, times(1)).save(existing);
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> brandService.getBrand(brand.getId()));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
-        @DisplayName("존재하지 않는 id이면 NOT_FOUND 예외가 발생하고 save는 호출되지 않는다.")
+        @DisplayName("[State Transition] 존재하지 않는 id이면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenBrandNotExists() {
-            // arrange
-            when(brandRepository.findById(BRAND_ID)).thenReturn(Optional.empty());
-
             // act
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.delete(BRAND_ID));
+                    () -> brandService.delete(999L));
 
             // assert
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
-            verify(brandRepository, never()).save(any());
         }
     }
 }
