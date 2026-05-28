@@ -73,11 +73,10 @@ interfaces/api/
     └── OrderV1Dto
 
 application/
-├── brand/     BrandFacade, BrandInfo
-├── product/   ProductFacade, ProductInfo
-├── inventory/ InventoryFacade, InventoryInfo
-├── like/      LikeFacade, LikeInfo
-└── order/     OrderFacade, OrderInfo
+├── brand/   BrandFacade, BrandInfo
+├── product/ ProductFacade, ProductInfo
+├── like/    LikeFacade, LikeInfo
+└── order/   OrderFacade, OrderInfo
 
 domain/
 ├── brand/     BrandEntity, BrandRepository, BrandService
