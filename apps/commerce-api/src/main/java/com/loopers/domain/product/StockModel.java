@@ -1,6 +1,6 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.BaseUpdatedTimeEntity;
+import com.loopers.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "stock")
-public class StockModel extends BaseUpdatedTimeEntity {
+public class StockModel extends BaseTimeEntity {
 
     @Id
     @Column(name = "product_id")

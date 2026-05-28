@@ -1,6 +1,6 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.BaseTimeEntity;
+import com.loopers.domain.BaseSoftDeleteEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 @SQLDelete(sql = "UPDATE product SET is_deleted = true WHERE id = ?")
 @SQLRestriction("is_deleted = false")
 @Table(name = "product")
-public class ProductModel extends BaseTimeEntity {
+public class ProductModel extends BaseSoftDeleteEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,9 +37,6 @@ public class ProductModel extends BaseTimeEntity {
     @Column(nullable = false)
     private int likeCount = 0;
 
-    @Column(nullable = false)
-    private boolean isDeleted = false;
-
     @Builder
     public ProductModel(Long brandId, String name, BigDecimal price) {
         validateBrandId(brandId);
@@ -50,7 +47,6 @@ public class ProductModel extends BaseTimeEntity {
         this.name = name;
         this.price = price;
         this.likeCount = 0;
-        this.isDeleted = false;
     }
 
     public void update(String name, BigDecimal price) {
@@ -69,10 +65,6 @@ public class ProductModel extends BaseTimeEntity {
         if (this.likeCount > 0) {
             this.likeCount--;
         }
-    }
-
-    public void delete() {
-        this.isDeleted = true;
     }
 
     private void validateBrandId(Long brandId) {
