@@ -11,7 +11,7 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @Configuration
-public class WebMvcConfig implements WebMvcConfigurer {
+public class AuthInterceptorConfig implements WebMvcConfigurer {
 
     private final UserFacade userFacade;
 
