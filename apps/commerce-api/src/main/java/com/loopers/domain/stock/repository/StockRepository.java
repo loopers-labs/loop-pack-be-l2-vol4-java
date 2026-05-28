@@ -9,5 +9,6 @@ public interface StockRepository {
     Optional<Stock> findByProductId(Long productId);
     List<Stock> findAllByProductIdIn(List<Long> productIds);
     int softDeleteAllByProductIdIn(List<Long> productIds);
+    int deductStock(Long productId, int quantity);
     Stock save(Stock stock);
 }

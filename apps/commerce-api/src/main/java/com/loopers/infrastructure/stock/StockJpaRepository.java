@@ -17,4 +17,8 @@ public interface StockJpaRepository extends JpaRepository<Stock, Long> {
     @Modifying
     @Query("UPDATE Stock s SET s.deletedAt = :now WHERE s.productId IN :productIds AND s.deletedAt IS NULL")
     int softDeleteAllByProductIdIn(@Param("productIds") List<Long> productIds, @Param("now") ZonedDateTime now);
+
+    @Modifying
+    @Query("UPDATE Stock s SET s.quantity = s.quantity - :quantity WHERE s.productId = :productId AND s.quantity >= :quantity AND s.deletedAt IS NULL")
+    int deductStock(@Param("productId") Long productId, @Param("quantity") int quantity);
 }

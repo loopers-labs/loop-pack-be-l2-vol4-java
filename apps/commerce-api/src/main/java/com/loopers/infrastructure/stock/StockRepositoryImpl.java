@@ -34,6 +34,11 @@ public class StockRepositoryImpl implements StockRepository {
     }
 
     @Override
+    public int deductStock(Long productId, int quantity) {
+        return stockJpaRepository.deductStock(productId, quantity);
+    }
+
+    @Override
     public Stock save(Stock stock) {
         return stockJpaRepository.save(stock);
     }

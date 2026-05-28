@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface ProductRepository {
     Optional<Product> findById(Long id);
+    List<Product> findAllByIdIn(List<Long> ids);
     Page<Product> findAll(Long brandId, Pageable pageable);
     List<Long> findIdsByBrandId(Long brandId);
     int softDeleteAllByBrandId(Long brandId);
