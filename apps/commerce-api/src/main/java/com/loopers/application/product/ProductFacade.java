@@ -10,11 +10,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 @RequiredArgsConstructor
 @Component
+@Transactional(readOnly = true)
 public class ProductFacade {
 
     private final BrandService brandService;
@@ -22,6 +24,7 @@ public class ProductFacade {
     private final StockService stockService;
 
     /** 상품 등록 — 브랜드 검증 + 상품 저장 + 재고 초기화 */
+    @Transactional
     public ProductInfo create(UUID brandId, String name, String description, Long price, int initialQuantity) {
         BrandModel brand = brandService.getActive(brandId);
         ProductModel product = productService.create(brand, name, description, price);
@@ -59,12 +62,14 @@ public class ProductFacade {
         });
     }
 
+    @Transactional
     public ProductInfo update(UUID id, String name, String description, Long price) {
         ProductModel product = productService.update(id, name, description, price);
         StockModel stock = stockService.getByProductId(id);
         return ProductInfo.from(product, stock);
     }
 
+    @Transactional
     public void delete(UUID id) {
         productService.delete(id);
     }
