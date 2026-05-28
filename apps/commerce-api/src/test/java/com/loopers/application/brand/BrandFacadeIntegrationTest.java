@@ -1,11 +1,8 @@
 package com.loopers.application.brand;
 
-import com.loopers.domain.inventory.InventoryEntity;
 import com.loopers.domain.inventory.InventoryService;
-import com.loopers.domain.like.LikeEntity;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductService;
-import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -38,9 +35,6 @@ class BrandFacadeIntegrationTest {
 
     @Autowired
     private LikeService likeService;
-
-    @Autowired
-    private BrandJpaRepository brandJpaRepository;
 
     @Autowired
     private ProductJpaRepository productJpaRepository;
