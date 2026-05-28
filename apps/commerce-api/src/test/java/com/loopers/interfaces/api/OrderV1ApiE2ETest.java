@@ -1,5 +1,7 @@
 package com.loopers.interfaces.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.fixture.BrandFixture;
 import com.loopers.fixture.ProductFixture;
 import com.loopers.fixture.UserFixture;
@@ -10,6 +12,7 @@ import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.payment.PaymentV1Dto;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.pg.PgHmacVerifier;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
@@ -24,6 +28,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import java.time.ZoneOffset;
@@ -42,11 +47,17 @@ class OrderV1ApiE2ETest {
     private static final String BRANDS_URL   = "/api-admin/v1/brands";
     private static final String PRODUCTS_URL = "/api-admin/v1/products";
     private static final String ORDERS_URL   = "/api/v1/orders";
-    private static final String PAYMENTS_CONFIRM_URL = "/api/v1/payments/confirm";
-    private static final String PAYMENTS_FAIL_URL    = "/api/v1/payments/fail";
+    private static final String PAYMENTS_CONFIRM_URL = "/api-admin/v1/payments/confirm";
+    private static final String PAYMENTS_FAIL_URL    = "/api-admin/v1/payments/fail";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Value("${pg.hmac-secret}")
+    private String pgHmacSecret;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -91,6 +102,23 @@ class OrderV1ApiE2ETest {
         headers.set("X-Loopers-LoginId", UserFixture.LOGIN_ID);
         headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
         return headers;
+    }
+
+    /** PG 콜백용 — HMAC 서명 + JSON Content-Type 헤더 */
+    private HttpHeaders pgHeaders(String rawBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-PG-Signature", PgHmacVerifier.computeHmac(rawBody, pgHmacSecret));
+        return headers;
+    }
+
+    /** 요청 객체를 JSON 직렬화 — HMAC 계산용 */
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private OrderV1Dto.CreateRequest validCreateRequest() {
@@ -269,9 +297,10 @@ class OrderV1ApiE2ETest {
             UUID orderId = created.getBody().data().id();
             Long amount  = created.getBody().data().pgAmount();
 
+            String confirmBody = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", amount));
             testRestTemplate.exchange(
                 PAYMENTS_CONFIRM_URL, HttpMethod.POST,
-                new HttpEntity<>(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", amount)),
+                new HttpEntity<>(confirmBody, pgHeaders(confirmBody)),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -310,11 +339,11 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    @DisplayName("POST /api/v1/payments/confirm — 결제 확정")
+    @DisplayName("POST /api-admin/v1/payments/confirm — 결제 확정")
     @Nested
     class ConfirmPayment {
 
-        @DisplayName("올바른 금액이면, 200 + SUCCESS 결제를 반환한다.")
+        @DisplayName("올바른 HMAC + 금액이면, 200 + SUCCESS 결제를 반환한다.")
         @Test
         void confirmsPayment_whenAmountMatches() {
             // arrange
@@ -325,11 +354,12 @@ class OrderV1ApiE2ETest {
             );
             UUID orderId = created.getBody().data().id();
             Long amount  = created.getBody().data().pgAmount();
+            String rawBody = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", amount));
 
             // act
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
                 PAYMENTS_CONFIRM_URL, HttpMethod.POST,
-                new HttpEntity<>(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", amount)),
+                new HttpEntity<>(rawBody, pgHeaders(rawBody)),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -338,6 +368,32 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().status().name()).isEqualTo("SUCCESS"),
                 () -> assertThat(response.getBody().data().orderId()).isEqualTo(orderId)
             );
+        }
+
+        @DisplayName("서명 없이 요청하면, 401을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenSignatureMissing() {
+            // arrange
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID orderId = created.getBody().data().id();
+            Long amount  = created.getBody().data().pgAmount();
+            String rawBody = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", amount));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // act — 서명 헤더 없음
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                PAYMENTS_CONFIRM_URL, HttpMethod.POST,
+                new HttpEntity<>(rawBody, headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
         @DisplayName("금액 불일치이면, 400을 반환한다.")
@@ -350,11 +406,12 @@ class OrderV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
+            String rawBody = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", 1L));
 
             // act
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 PAYMENTS_CONFIRM_URL, HttpMethod.POST,
-                new HttpEntity<>(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-001", 1L)),
+                new HttpEntity<>(rawBody, pgHeaders(rawBody)),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -362,7 +419,7 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    @DisplayName("POST /api/v1/payments/fail — 결제 실패")
+    @DisplayName("POST /api-admin/v1/payments/fail — 결제 실패")
     @Nested
     class FailPayment {
 
@@ -377,11 +434,12 @@ class OrderV1ApiE2ETest {
             );
             UUID orderId = created.getBody().data().id();
             Long amount  = created.getBody().data().pgAmount();
+            String rawBody = toJson(new PaymentV1Dto.FailRequest(orderId, "pg-tx-fail-001", amount));
 
             // act
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
                 PAYMENTS_FAIL_URL, HttpMethod.POST,
-                new HttpEntity<>(new PaymentV1Dto.FailRequest(orderId, "pg-tx-fail-001", amount)),
+                new HttpEntity<>(rawBody, pgHeaders(rawBody)),
                 new ParameterizedTypeReference<>() {}
             );
 
