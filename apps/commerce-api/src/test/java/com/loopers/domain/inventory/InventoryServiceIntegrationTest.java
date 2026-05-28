@@ -171,6 +171,18 @@ class InventoryServiceIntegrationTest {
                     () -> inventoryService.deductAll(Map.of(PRODUCT_ID, 5)));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
+
+        @DisplayName("[Error Guessing] 존재하지 않는 productId가 포함되면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenInventoryNotExists() {
+            // arrange
+            inventoryService.create(PRODUCT_ID, INITIAL_QUANTITY);
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> inventoryService.deductAll(Map.of(PRODUCT_ID, 1, 999L, 1)));
+            assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
+        }
     }
 
     @DisplayName("재고 단건 연쇄 삭제")
