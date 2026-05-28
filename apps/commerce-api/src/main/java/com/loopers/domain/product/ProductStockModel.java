@@ -38,6 +38,14 @@ public class ProductStockModel extends BaseEntity {
         this.stock = stock;
     }
 
+    public void decreaseStock(int quantity) {
+        this.stock = this.stock.decrease(quantity);
+    }
+
+    public void increaseStock(int quantity) {
+        this.stock = this.stock.increase(quantity);
+    }
+
     @Override
     public boolean equals(Object object) {
         if (this == object) {

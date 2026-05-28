@@ -22,4 +22,9 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
     public Optional<ProductStockModel> findByProductId(Long productId) {
         return productStockJpaRepository.findByProductIdAndDeletedAtIsNull(productId);
     }
+
+    @Override
+    public Optional<ProductStockModel> findByProductIdForUpdate(Long productId) {
+        return productStockJpaRepository.findByProductIdForUpdate(productId);
+    }
 }

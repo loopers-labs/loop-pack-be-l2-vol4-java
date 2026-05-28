@@ -38,4 +38,22 @@ public class ProductStockService {
         model.delete();
         productStockRepository.save(model);
     }
+
+    @Transactional
+    public void decreaseStock(Long productId, int quantity) {
+        ProductStockModel stock = productStockRepository.findByProductIdForUpdate(productId)
+                .orElseThrow(
+                    () -> new CoreException(ErrorType.NOT_FOUND, "상품 재고를 찾을 수 없습니다.")
+                );
+        stock.decreaseStock(quantity);
+    }
+
+    @Transactional
+    public void increaseStock(Long productId, int quantity) {
+        ProductStockModel stock = productStockRepository.findByProductIdForUpdate(productId)
+                .orElseThrow(
+                    () -> new CoreException(ErrorType.NOT_FOUND, "상품 재고를 찾을 수 없습니다.")
+                );
+        stock.increaseStock(quantity);
+    }
 }
