@@ -18,16 +18,16 @@ public class ProductReader {
         return getProductById(id);
     }
 
+    public List<Product> findProductsByIds(List<Long> ids) {
+        return productRepository.findAllByIds(ids);
+    }
+
     public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         ProductSort productSort = ProductSort.from(sort);
         PageCriteria pageCriteria = PageCriteria.of(page, size);
         return brandId == null
             ? productRepository.findAll(productSort, pageCriteria.page(), pageCriteria.size())
             : productRepository.findAllByBrandId(brandId, productSort, pageCriteria.page(), pageCriteria.size());
-    }
-
-    public List<Product> getProductsByIds(List<Long> ids) {
-        return productRepository.findAllByIds(ids);
     }
 
     Product getProductById(Long id) {

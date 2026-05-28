@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.like.ProductLikeFacade;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.like.ProductLikeService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
@@ -17,7 +17,7 @@ import java.util.List;
 public class ProductV1Controller {
 
     private final ProductFacade productFacade;
-    private final ProductLikeFacade productLikeFacade;
+    private final ProductLikeService productLikeService;
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductDto.Get.V1.Response> getProduct(
@@ -47,7 +47,7 @@ public class ProductV1Controller {
         @LoginUser AuthenticatedUser user,
         @PathVariable(value = "productId") Long productId
     ) {
-        productLikeFacade.likeProduct(user.loginId(), productId);
+        productLikeService.likeProduct(user.loginId(), productId);
         return ApiResponse.success(null);
     }
 
@@ -56,7 +56,7 @@ public class ProductV1Controller {
         @LoginUser AuthenticatedUser user,
         @PathVariable(value = "productId") Long productId
     ) {
-        productLikeFacade.unlikeProduct(user.loginId(), productId);
+        productLikeService.unlikeProduct(user.loginId(), productId);
         return ApiResponse.success(null);
     }
 }

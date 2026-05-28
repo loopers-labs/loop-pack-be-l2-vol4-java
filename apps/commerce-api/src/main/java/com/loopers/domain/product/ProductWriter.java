@@ -3,6 +3,8 @@ package com.loopers.domain.product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class ProductWriter {
@@ -18,6 +20,10 @@ public class ProductWriter {
         Product product = productReader.getProductById(id);
         product.update(name, description, price, stock);
         return productRepository.save(product);
+    }
+
+    public void saveProducts(List<Product> products) {
+        products.forEach(productRepository::save);
     }
 
     public void deleteProduct(Long id) {

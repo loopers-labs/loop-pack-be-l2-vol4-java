@@ -8,16 +8,19 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
-public class OrderProcessor {
+public class OrderProductProcessService {
 
     public OrderResult createOrder(
         String userLoginId,
         List<OrderProductCommand> commands,
-        Map<Long, Product> productsById
+        List<Product> products
     ) {
         validateCommands(commands);
+        Map<Long, Product> productsById = productsById(products);
 
         List<OrderLine> orderLines = new ArrayList<>();
         List<OrderFailure> failures = new ArrayList<>();
@@ -61,5 +64,10 @@ public class OrderProcessor {
         } catch (CoreException e) {
             failures.add(new OrderFailure(command.productId(), command.quantity(), e.getErrorType(), e.getMessage()));
         }
+    }
+
+    private Map<Long, Product> productsById(List<Product> products) {
+        return products.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 }

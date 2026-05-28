@@ -4,6 +4,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -25,6 +26,7 @@ public class UserService {
         return getUser(loginId);
     }
 
+    @Transactional
     public void changePassword(String loginId, String oldPassword, String newPassword) {
         User user = getUser(loginId);
         changePassword(user, oldPassword, newPassword);

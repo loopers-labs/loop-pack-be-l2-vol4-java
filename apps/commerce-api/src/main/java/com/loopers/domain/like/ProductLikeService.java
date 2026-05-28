@@ -6,6 +6,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ public class ProductLikeService {
     private final ProductLikeRepository productLikeRepository;
     private final ProductRepository productRepository;
 
+    @Transactional
     public void likeProduct(String userLoginId, Long productId) {
         Product product = getProduct(productId);
         Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, productId);
@@ -32,6 +34,7 @@ public class ProductLikeService {
         }
     }
 
+    @Transactional
     public void unlikeProduct(String userLoginId, Long productId) {
         Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, productId);
         if (existingLike.isEmpty()) {

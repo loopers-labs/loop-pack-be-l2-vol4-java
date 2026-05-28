@@ -20,16 +20,6 @@ public class ProductLikeFacade {
     private final BrandService brandService;
     private final ProductBrandProcessService productBrandProcessService;
 
-    @Transactional
-    public void likeProduct(String userLoginId, Long productId) {
-        productLikeService.likeProduct(userLoginId, productId);
-    }
-
-    @Transactional
-    public void unlikeProduct(String userLoginId, Long productId) {
-        productLikeService.unlikeProduct(userLoginId, productId);
-    }
-
     @Transactional(readOnly = true)
     public List<ProductInfo> getLikedProducts(String userLoginId) {
         List<Product> products = productLikeService.getLikedProducts(userLoginId);

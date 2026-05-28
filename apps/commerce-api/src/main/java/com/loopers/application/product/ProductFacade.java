@@ -33,19 +33,9 @@ public class ProductFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductInfo> getAllProducts() {
-        return getAllProducts(null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ProductInfo> getAllProducts(String sort) {
-        return getAllProducts(null, sort, null, null);
-    }
-
-    @Transactional(readOnly = true)
     public List<ProductInfo> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         if (brandId != null) {
-            brandService.getBrand(brandId);
+            brandService.validateBrandExists(brandId);
         }
 
         List<Product> products = productService.getAllProducts(brandId, sort, page, size);
@@ -61,10 +51,5 @@ public class ProductFacade {
         Product product = productService.updateProduct(id, name, description, price, stock);
         Brand brand = brandService.getBrand(product.getBrandId());
         return ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
-    }
-
-    @Transactional
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
     }
 }

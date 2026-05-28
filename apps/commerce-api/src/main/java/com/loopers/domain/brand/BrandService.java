@@ -1,8 +1,6 @@
 package com.loopers.domain.brand;
 
 import com.loopers.domain.common.PageCriteria;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +13,6 @@ import java.util.List;
 public class BrandService {
 
     private final BrandRepository brandRepository;
-    private final ProductRepository productRepository;
 
     public Brand createBrand(String name, String description) {
         return brandRepository.save(new Brand(name, description));
@@ -34,23 +31,14 @@ public class BrandService {
         return brandRepository.findAllByIds(ids);
     }
 
+    public void validateBrandExists(Long id) {
+        getBrandById(id);
+    }
+
     public Brand updateBrand(Long id, String name, String description) {
         Brand brand = getBrandById(id);
         brand.update(name, description);
         return brandRepository.save(brand);
-    }
-
-    public void deleteBrand(Long id) {
-        Brand brand = getBrandById(id);
-        List<Product> products = productRepository.findAllByBrandId(id);
-        deleteBrandWithProducts(brand, products);
-        brandRepository.save(brand);
-        products.forEach(productRepository::save);
-    }
-
-    public void deleteBrandWithProducts(Brand brand, List<Product> products) {
-        brand.delete();
-        products.forEach(Product::delete);
     }
 
     private Brand getBrandById(Long id) {

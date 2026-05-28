@@ -9,19 +9,18 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class OrderProcessorTest {
+class OrderProductProcessServiceTest {
 
-    private OrderProcessor orderProcessor;
+    private OrderProductProcessService orderProductProcessService;
 
     @BeforeEach
     void setUp() {
-        orderProcessor = new OrderProcessor();
+        orderProductProcessService = new OrderProductProcessService();
     }
 
     @DisplayName("주문을 생성할 때, ")
@@ -31,13 +30,13 @@ class OrderProcessorTest {
         @Test
         void createsOrderAndDeductsStock_whenAllProductsAreAvailable() {
             // arrange
-            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product product = Product.reconstruct(1L, 10L, "니트", "부드러운 니트", 30_000L, 10, 0, false);
 
             // act
-            OrderResult result = orderProcessor.createOrder(
+            OrderResult result = orderProductProcessService.createOrder(
                 "user1234",
                 List.of(new OrderProductCommand(1L, 2)),
-                Map.of(1L, product)
+                List.of(product)
             );
 
             // assert
@@ -54,17 +53,17 @@ class OrderProcessorTest {
         @Test
         void createsAvailableOrderLinesAndReturnsFailures_whenSomeProductsAreOutOfStock() {
             // arrange
-            Product availableProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
-            Product outOfStockProduct = new Product(20L, "셔츠", "가벼운 셔츠", 20_000L, 1);
+            Product availableProduct = Product.reconstruct(1L, 10L, "니트", "부드러운 니트", 30_000L, 10, 0, false);
+            Product outOfStockProduct = Product.reconstruct(2L, 20L, "셔츠", "가벼운 셔츠", 20_000L, 1, 0, false);
 
             // act
-            OrderResult result = orderProcessor.createOrder(
+            OrderResult result = orderProductProcessService.createOrder(
                 "user1234",
                 List.of(
                     new OrderProductCommand(1L, 2),
                     new OrderProductCommand(2L, 3)
                 ),
-                Map.of(1L, availableProduct, 2L, outOfStockProduct)
+                List.of(availableProduct, outOfStockProduct)
             );
 
             // assert
@@ -83,10 +82,10 @@ class OrderProcessorTest {
         void returnsFailure_whenProductDoesNotExist() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderProcessor.createOrder(
+                orderProductProcessService.createOrder(
                     "user1234",
                     List.of(new OrderProductCommand(1L, 2)),
-                    Map.of()
+                    List.of()
                 );
             });
 
@@ -98,11 +97,11 @@ class OrderProcessorTest {
         @Test
         void throwsConflictException_whenNoProductCanBeOrdered() {
             // arrange
-            Product product = new Product(10L, "니트", "부드러운 니트", 30_000L, 1);
+            Product product = Product.reconstruct(1L, 10L, "니트", "부드러운 니트", 30_000L, 1, 0, false);
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderProcessor.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)), Map.of(1L, product));
+                orderProductProcessService.createOrder("user1234", List.of(new OrderProductCommand(1L, 2)), List.of(product));
             });
 
             // assert
@@ -117,7 +116,7 @@ class OrderProcessorTest {
         void throwsBadRequestException_whenCommandIsEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                orderProcessor.createOrder("user1234", List.of(), Map.of());
+                orderProductProcessService.createOrder("user1234", List.of(), List.of());
             });
 
             // assert

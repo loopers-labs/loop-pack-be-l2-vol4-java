@@ -37,8 +37,4 @@ public class BrandFacade {
         return BrandInfo.from(brand);
     }
 
-    @Transactional
-    public void deleteBrand(Long id) {
-        brandService.deleteBrand(id);
-    }
 }

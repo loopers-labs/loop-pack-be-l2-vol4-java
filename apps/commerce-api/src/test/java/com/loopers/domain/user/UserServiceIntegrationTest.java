@@ -27,6 +27,7 @@ class UserServiceIntegrationTest {
     private static final LocalDate BIRTH = LocalDate.of(1990, 1, 15);
 
     private final UserFacade userFacade;
+    private final UserService userService;
     private final UserJpaRepository userJpaRepository;
     private final PasswordHasher passwordHasher;
     private final DatabaseCleanUp databaseCleanUp;
@@ -34,11 +35,13 @@ class UserServiceIntegrationTest {
     @Autowired
     UserServiceIntegrationTest(
         UserFacade userFacade,
+        UserService userService,
         UserJpaRepository userJpaRepository,
         PasswordHasher passwordHasher,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.userFacade = userFacade;
+        this.userService = userService;
         this.userJpaRepository = userJpaRepository;
         this.passwordHasher = passwordHasher;
         this.databaseCleanUp = databaseCleanUp;
@@ -100,7 +103,7 @@ class UserServiceIntegrationTest {
             userFacade.signup(LOGIN_ID, PASSWORD, "홍길동", BIRTH, "user@example.com");
 
             // act
-            userFacade.changePassword(LOGIN_ID, PASSWORD, "new123!?");
+            userService.changePassword(LOGIN_ID, PASSWORD, "new123!?");
 
             // assert
             UserJpaEntity savedUser = userJpaRepository.findByLoginId(LOGIN_ID).orElseThrow();
@@ -118,7 +121,7 @@ class UserServiceIntegrationTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                userFacade.changePassword(LOGIN_ID, "wrong123!", "new123!?");
+                userService.changePassword(LOGIN_ID, "wrong123!", "new123!?");
             });
 
             // assert

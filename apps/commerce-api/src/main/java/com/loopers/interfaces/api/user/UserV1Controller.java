@@ -4,6 +4,7 @@ import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.application.like.ProductLikeFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
 import com.loopers.interfaces.api.ApiResponse;
@@ -30,6 +31,7 @@ import java.util.List;
 public class UserV1Controller {
 
     private final UserFacade userFacade;
+    private final UserService userService;
     private final ProductLikeFacade productLikeFacade;
 
     @ResponseStatus(HttpStatus.CREATED)
@@ -62,7 +64,7 @@ public class UserV1Controller {
         @LoginUser AuthenticatedUser user,
         @Valid @RequestBody UserDto.ChangePassword.V1.Request request
     ) {
-        userFacade.changePassword(user.loginId(), request.oldPassword(), request.newPassword());
+        userService.changePassword(user.loginId(), request.oldPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 

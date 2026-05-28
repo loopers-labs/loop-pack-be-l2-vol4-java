@@ -22,9 +22,4 @@ public class UserFacade {
     public UserInfo getMyInfo(String loginId) {
         return UserInfo.fromMasked(userService.getMyInfo(loginId));
     }
-
-    @Transactional
-    public void changePassword(String loginId, String oldPassword, String newPassword) {
-        userService.changePassword(loginId, oldPassword, newPassword);
-    }
 }

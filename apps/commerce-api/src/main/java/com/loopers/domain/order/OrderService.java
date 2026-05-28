@@ -13,8 +13,8 @@ public class OrderService {
     private final OrderReader orderReader;
     private final OrderWriter orderWriter;
 
-    public OrderResult placeOrder(String userLoginId, List<OrderProductCommand> commands) {
-        return orderWriter.placeOrder(userLoginId, commands);
+    public OrderResult saveOrder(OrderResult result) {
+        return orderWriter.saveOrder(result);
     }
 
     public List<Order> getOrders(String userLoginId, LocalDate startAt, LocalDate endAt, Integer page, Integer size) {

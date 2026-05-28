@@ -2,6 +2,7 @@ package com.loopers.domain.product;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,18 +21,23 @@ public class ProductService {
         return productReader.getProduct(id);
     }
 
-    public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
-        return productReader.getAllProducts(brandId, sort, page, size);
+    public List<Product> findProductsByIds(List<Long> ids) {
+        return productReader.findProductsByIds(ids);
     }
 
-    public List<Product> getProductsByIds(List<Long> ids) {
-        return productReader.getProductsByIds(ids);
+    public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
+        return productReader.getAllProducts(brandId, sort, page, size);
     }
 
     public Product updateProduct(Long id, String name, String description, Long price, Integer stock) {
         return productWriter.updateProduct(id, name, description, price, stock);
     }
 
+    public void saveProducts(List<Product> products) {
+        productWriter.saveProducts(products);
+    }
+
+    @Transactional
     public void deleteProduct(Long id) {
         productWriter.deleteProduct(id);
     }

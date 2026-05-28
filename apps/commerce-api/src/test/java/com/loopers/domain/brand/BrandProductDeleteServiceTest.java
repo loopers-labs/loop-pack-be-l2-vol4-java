@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @ExtendWith(MockitoExtension.class)
-class BrandServiceTest {
+class BrandProductDeleteServiceTest {
 
     @Mock
     private BrandRepository brandRepository;
@@ -24,11 +24,11 @@ class BrandServiceTest {
     @Mock
     private ProductRepository productRepository;
 
-    private BrandService brandService;
+    private BrandProductDeleteService brandProductDeleteService;
 
     @BeforeEach
     void setUp() {
-        brandService = new BrandService(brandRepository, productRepository);
+        brandProductDeleteService = new BrandProductDeleteService(brandRepository, productRepository);
     }
 
     @DisplayName("브랜드를 삭제할 때, ")
@@ -44,7 +44,7 @@ class BrandServiceTest {
             Product secondProduct = new Product(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
 
             // act
-            brandService.deleteBrandWithProducts(brand, List.of(firstProduct, secondProduct));
+            brandProductDeleteService.deleteBrandWithProducts(brand, List.of(firstProduct, secondProduct));
 
             // assert
             assertAll(
