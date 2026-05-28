@@ -2,6 +2,7 @@ package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.like.LikeService;
+import com.loopers.domain.like.ProductLikeService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockModel;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class LikeFacade {
 
     private final LikeService likeService;
+    private final ProductLikeService productLikeService;
     private final ProductService productService;
     private final StockService stockService;
 
@@ -30,11 +32,7 @@ public class LikeFacade {
     @Transactional
     public LikeInfo like(UUID productId, UserModel user) {
         ProductModel product = productService.getActive(productId);
-        boolean isNew = likeService.find(user.getId(), productId).isEmpty();
-        if (isNew) {
-            likeService.like(user.getId(), productId);
-            product.incrementLikeCount();
-        }
+        productLikeService.like(user.getId(), productId, product);
         return LikeInfo.of(productId, product.getLikeCount());
     }
 
@@ -42,10 +40,7 @@ public class LikeFacade {
     @Transactional
     public LikeInfo unlike(UUID productId, UserModel user) {
         ProductModel product = productService.getActive(productId);
-        boolean deleted = likeService.unlike(user.getId(), productId);
-        if (deleted) {
-            product.decrementLikeCount();
-        }
+        productLikeService.unlike(user.getId(), productId, product);
         return LikeInfo.of(productId, product.getLikeCount());
     }
 

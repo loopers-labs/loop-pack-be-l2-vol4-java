@@ -60,9 +60,12 @@ public class OrderModel extends BaseEntity {
         return this.status == OrderStatus.PENDING;
     }
 
-    public void confirm() {
+    public void confirm(Long paymentAmount) {
         if (!isPending()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "PENDING 상태 주문만 확정할 수 있습니다.");
+        }
+        if (!this.pgAmount.equals(paymentAmount)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 금액이 주문 금액과 일치하지 않습니다.");
         }
         this.status = OrderStatus.CONFIRMED;
     }

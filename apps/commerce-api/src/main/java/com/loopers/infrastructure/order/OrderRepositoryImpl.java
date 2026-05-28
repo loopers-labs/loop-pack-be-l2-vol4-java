@@ -30,6 +30,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdAndUserId(UUID id, UUID userId) {
+        return orderJpaRepository.findByIdAndUserId(id, userId);
+    }
+
+    @Override
     public Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt, pageable);
     }

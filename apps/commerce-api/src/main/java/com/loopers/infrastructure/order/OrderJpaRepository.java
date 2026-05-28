@@ -10,9 +10,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderJpaRepository extends JpaRepository<OrderModel, UUID> {
+
+    Optional<OrderModel> findByIdAndUserId(UUID id, UUID userId);
 
     @Query("SELECT o FROM OrderModel o WHERE o.userId = :userId AND o.createdAt BETWEEN :startAt AND :endAt")
     Page<OrderModel> findAllByUserIdAndCreatedAtBetween(

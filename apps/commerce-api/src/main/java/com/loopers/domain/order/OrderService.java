@@ -31,6 +31,12 @@ public class OrderService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
     }
 
+    /** 소유자 일치 단건 조회 — 본인 주문 아니면 NOT_FOUND */
+    public OrderModel getByIdAndUser(UUID id, UUID userId) {
+        return orderRepository.findByIdAndUserId(id, userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
     public Page<OrderModel> getListByUser(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderRepository.findAllByUserId(userId, startAt, endAt, pageable);
     }
@@ -39,8 +45,8 @@ public class OrderService {
         return orderRepository.findAll(pageable);
     }
 
-    public void confirm(OrderModel order) {
-        order.confirm();
+    public void confirm(OrderModel order, Long paymentAmount) {
+        order.confirm(paymentAmount);
     }
 
     public void fail(OrderModel order) {

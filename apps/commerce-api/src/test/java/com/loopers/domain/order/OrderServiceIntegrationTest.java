@@ -135,14 +135,14 @@ class OrderServiceIntegrationTest {
     @Nested
     class Confirm {
 
-        @DisplayName("PENDING 상태면, CONFIRMED 로 변경된다.")
+        @DisplayName("PENDING 상태이고 금액이 일치하면, CONFIRMED 로 변경된다.")
         @Test
-        void confirmsOrder_whenPending() {
+        void confirmsOrder_whenPendingAndAmountMatches() {
             // arrange
             OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
 
             // act
-            orderService.confirm(order);
+            orderService.confirm(order, 0L); // 아이템 없으므로 pgAmount = 0
 
             // assert
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
@@ -176,7 +176,7 @@ class OrderServiceIntegrationTest {
         void cancelsOrder_whenConfirmed() {
             // arrange
             OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
-            orderService.confirm(order);
+            orderService.confirm(order, 0L);
 
             // act
             orderService.cancel(order);

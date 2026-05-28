@@ -2896,3 +2896,157 @@ application/
 ---
 
 학습하느라 고생 많으셨습니다. 이 두 문서를 프로젝트 설계 시 참고 자료로 활용하시면 좋습니다. 🎉
+
+---
+---
+
+# PART 3. 실전 안티패턴 — 반복된 실수 기록
+
+> 실제 개발 과정에서 발견된 DDD 위반 사례를 기록합니다.
+> 같은 실수가 반복되지 않도록 코드 리뷰 체크리스트로 활용하세요.
+
+---
+
+## 1. Facade에 도메인 규칙이 새어 나온 경우
+
+### 안티패턴 A — 도메인 검증 중복
+
+Facade가 도메인의 상태 검증을 미리 if문으로 복사하는 경우.
+
+```java
+// ❌ Facade에서 중복 검증 — OrderModel.confirm()이 이미 같은 검증을 한다
+public PaymentInfo confirm(...) {
+    if (!order.isPending()) {
+        throw new CoreException(ErrorType.BAD_REQUEST, "...");
+    }
+    orderService.confirm(order); // 내부에서 order.confirm() 호출 → 같은 검증 또 함
+}
+```
+
+```java
+// ✅ 도메인에 위임, Facade는 흐름만
+public PaymentInfo confirm(...) {
+    orderService.confirm(order, amount); // 상태 + 금액 검증 모두 OrderModel.confirm(amount) 에서
+}
+```
+
+**규칙**: 도메인 메서드가 이미 방어하는 규칙을 Facade에서 사전 체크하지 말 것. 신호: 같은 조건이 Facade와 도메인 양쪽에 존재.
+
+---
+
+### 안티패턴 B — 비즈니스 규칙이 Facade에 존재
+
+"결제 금액이 주문 금액과 일치해야 한다"처럼 엔티티의 자기 상태에 관한 규칙이 Facade에 있는 경우.
+
+```java
+// ❌ 주문 엔티티가 알아야 할 규칙이 Facade에
+if (!amount.equals(order.getPgAmount())) {
+    throw new CoreException(ErrorType.BAD_REQUEST, "결제 금액이 주문 금액과 일치하지 않습니다.");
+}
+```
+
+```java
+// ✅ OrderModel이 자기 pgAmount와 비교
+public void confirm(Long paymentAmount) {
+    if (!isPending()) throw ...;
+    if (!this.pgAmount.equals(paymentAmount)) throw ...;
+    this.status = OrderStatus.CONFIRMED;
+}
+```
+
+**판단 기준**: 엔티티 자신의 필드를 참조하는 검증은 엔티티 안에. 여러 애그리거트를 비교하는 규칙은 Domain Service.
+
+---
+
+### 안티패턴 C — 소유권 체크가 Facade에 중복
+
+엔티티 조회 후 Facade에서 if로 소유자를 비교하는 패턴이 여러 메서드에 반복되는 경우.
+
+```java
+// ❌ 3개 메서드에 동일 패턴 반복
+OrderModel order = orderService.get(orderId);
+if (!order.getUserId().equals(user.getId())) {
+    throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
+}
+```
+
+```java
+// ✅ 쿼리 레벨 처리 — WHERE id = ? AND user_id = ?
+public OrderModel getByIdAndUser(UUID id, UUID userId) {
+    return orderRepository.findByIdAndUserId(id, userId)
+        .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+}
+
+// Facade — if 없음
+OrderModel order = orderService.getByIdAndUser(orderId, user.getId());
+```
+
+**장점**: 중복 제거, 존재하지 않는 경우와 권한 없는 경우 모두 NOT_FOUND로 통일(보안상 존재 여부 노출 방지).
+
+---
+
+## 2. 체크리스트
+
+코드 작성 후 아래 질문으로 검토:
+
+| 질문 | 위반 시 이동할 곳 |
+|---|---|
+| Facade의 if문이 도메인 메서드 내부 검증과 동일한가? | 도메인 메서드에 위임, Facade if 삭제 |
+| 엔티티 자신의 필드를 참조하는 검증이 Facade에 있는가? | 엔티티 메서드로 이동 |
+| 소유권 체크 if문이 여러 메서드에 반복되는가? | Repository 쿼리 레벨로 통합 |
+| Facade 메서드에 비즈니스 if가 3개 이상 있는가? | 도메인 서비스 또는 엔티티로 이동 신호 |
+
+**Facade의 역할은 흐름 조율(What to call, in what order)이다. Why와 How는 도메인이 안다.**
+
+---
+
+## 3. Domain Service 판단 기준 (자주 혼동)
+
+### 올바른 기준 — 어느 엔티티에도 속하지 못하는 크로스 애그리거트 규칙
+
+```java
+// ✅ Domain Service가 맞는 경우
+// "주문 취소 = 재고 복구 + 주문 상태 변경"
+// - OrderModel에 넣으면 StockService를 알아야 함 (불가)
+// - StockService에 넣으면 OrderModel을 알아야 함 (불가)
+// → OrderStockService (Domain Service)
+
+public class OrderStockService {
+    public void cancelOrder(OrderModel order) {
+        order.getItems().forEach(item -> stockService.restore(...));
+        orderService.cancel(order);
+    }
+}
+```
+
+### 잘못된 기준 — "여러 곳에서 재사용하려고"
+
+```java
+// ❌ 재사용 목적으로 Domain Service 만드는 것은 틀림
+// 이 이유라면 Order 자신에게 validate()로 넣는 게 맞음
+public class OrderValidationService {
+    public void validate(Order order) { ... } // ← 단순 재사용
+}
+```
+
+### 판단 플로우
+
+```
+"이 로직을 어디에 넣어야 하지?"
+        ↓
+하나의 엔티티/VO 안에 넣을 수 있는가?
+  → YES: 엔티티 메서드로
+        ↓
+  → NO: 여러 애그리거트가 협력해야 하는가?
+      → YES: Domain Service (예: OrderStockService, ProductLikeService)
+      → NO: Facade 흐름 조율
+
+"같은 로직이 여러 곳에서 필요해서" → Domain Service 이유 아님
+```
+
+### 프로젝트 실제 적용 사례
+
+| Domain Service | 크로스 애그리거트 | 규칙 |
+|---|---|---|
+| `OrderStockService` | Order + Stock | 주문 상태 전이 시 재고 연동 |
+| `ProductLikeService` | Like + Product | 좋아요/취소 시 likeCount 연동 |

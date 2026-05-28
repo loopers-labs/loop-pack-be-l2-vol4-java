@@ -75,12 +75,12 @@ class OrderModelTest {
     @Nested
     class Confirm {
 
-        @DisplayName("PENDING 상태면, CONFIRMED 로 변경된다.")
+        @DisplayName("PENDING 상태이고 금액이 일치하면, CONFIRMED 로 변경된다.")
         @Test
-        void confirmsOrder_whenPending() {
+        void confirmsOrder_whenPendingAndAmountMatches() {
             OrderModel order = OrderFixture.createModel(USER_ID);
 
-            order.confirm();
+            order.confirm(0L); // pgAmount 초기값 0
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         }
@@ -89,9 +89,19 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenNotPending() {
             OrderModel order = OrderFixture.createModel(USER_ID);
-            order.confirm(); // CONFIRMED
+            order.confirm(0L); // CONFIRMED
 
-            CoreException ex = assertThrows(CoreException.class, order::confirm);
+            CoreException ex = assertThrows(CoreException.class, () -> order.confirm(0L));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("금액이 불일치하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenAmountMismatch() {
+            OrderModel order = OrderFixture.createModel(USER_ID);
+
+            CoreException ex = assertThrows(CoreException.class, () -> order.confirm(9999L));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
@@ -115,7 +125,7 @@ class OrderModelTest {
         @Test
         void isIdempotent_whenNotPending() {
             OrderModel order = OrderFixture.createModel(USER_ID);
-            order.confirm(); // CONFIRMED
+            order.confirm(0L); // CONFIRMED
 
             order.fail(); // 멱등
 
@@ -131,7 +141,7 @@ class OrderModelTest {
         @Test
         void cancelsOrder_whenConfirmed() {
             OrderModel order = OrderFixture.createModel(USER_ID);
-            order.confirm();
+            order.confirm(0L);
 
             order.cancel();
 

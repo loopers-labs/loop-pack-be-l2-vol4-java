@@ -14,6 +14,9 @@ public interface OrderRepository {
 
     Optional<OrderModel> findById(UUID id);
 
+    /** 소유자 일치 조회 — 주문자가 아니면 empty */
+    Optional<OrderModel> findByIdAndUserId(UUID id, UUID userId);
+
     /** 유저 주문 목록 — 기간 필터, 페이징 */
     Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable);
 
