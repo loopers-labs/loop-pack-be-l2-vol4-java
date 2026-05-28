@@ -1,0 +1,62 @@
+package com.loopers.interfaces.api.order;
+
+import com.loopers.application.order.OrderCommand;
+import com.loopers.application.order.OrderInfo;
+import com.loopers.domain.order.OrderStatus;
+
+import java.time.ZonedDateTime;
+import java.util.List;
+
+public class OrderV1Dto {
+
+    public record PlaceOrderRequest(List<Item> items) {
+        public record Item(Long productId, Integer quantity) {
+        }
+
+        public OrderCommand.Place toCommand() {
+            List<OrderCommand.Line> lines = items == null ? List.of()
+                : items.stream()
+                    .map(item -> new OrderCommand.Line(item.productId(), item.quantity()))
+                    .toList();
+            return new OrderCommand.Place(lines);
+        }
+    }
+
+    public record OrderResponse(
+        Long id,
+        Long userId,
+        Long totalAmount,
+        OrderStatus status,
+        List<Item> items,
+        ZonedDateTime createdAt
+    ) {
+        public record Item(
+            Long productId,
+            Integer quantity,
+            String productName,
+            Long productPrice,
+            String brandName
+        ) {
+            public static Item from(OrderInfo.Item info) {
+                return new Item(
+                    info.productId(),
+                    info.quantity(),
+                    info.productName(),
+                    info.productPrice(),
+                    info.brandName()
+                );
+            }
+        }
+
+        public static OrderResponse from(OrderInfo info) {
+            return new OrderResponse(
+                info.id(),
+                info.userId(),
+                info.totalAmount(),
+                info.status(),
+                info.items().stream().map(Item::from).toList(),
+                info.createdAt()
+            );
+        }
+    }
+}
