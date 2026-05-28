@@ -5,15 +5,15 @@
 
 ```mermaid
 erDiagram
-    %% ID 기반 논리 참조 (매핑 없음 — 다른 애그리거트/외부/스냅샷, D18)
+    %% ID 기반 논리 참조 (매핑 없음 — 크로스 애그리거트/외부/스냅샷)
     USERS ||..o{ ORDERS : places
     USERS ||..o{ PRODUCT_LIKE : likes
     PRODUCT ||..o{ PRODUCT_LIKE : likedBy
     PRODUCT ||..o{ ORDER_ITEM : snapshotRef
     PRODUCT ||..|| STOCK : has
-    BRAND ||..o{ PRODUCT : owns
 
-    %% JPA 연관 매핑 (같은 애그리거트 — D18). 물리 FK 제약은 D12에 따라 미설정.
+    %% JPA 연관 매핑 유지 (논리 FK, 물리 제약 미설정 — D12)
+    BRAND ||--o{ PRODUCT : owns
     ORDERS ||--|{ ORDER_ITEM : contains
 
     %% USERS: 외부 컨텍스트(Round 1 구현 완료) — 본 라운드 설계 범위 밖이나 관계 파악을 위해 실제 스키마를 표기
@@ -68,7 +68,7 @@ erDiagram
     ORDERS {
         BIGINT id PK
         BIGINT user_id
-        VARCHAR status "본 라운드는 CREATED만 (D4)"
+        VARCHAR status
         BIGINT total_amount
         DATETIME created_at
         DATETIME updated_at
