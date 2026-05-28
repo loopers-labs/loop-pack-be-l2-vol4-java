@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.brand;
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.interfaces.api.common.response.ApiResponse;
+import com.loopers.interfaces.api.common.response.PageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,9 +42,9 @@ public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
 
     @GetMapping
     @Override
-    public ApiResponse<Page<BrandV1Dto.BrandResponse>> getList(Pageable pageable) {
+    public ApiResponse<PageResponse<BrandV1Dto.BrandResponse>> getList(Pageable pageable) {
         Page<BrandInfo> page = brandFacade.getList(pageable);
-        return ApiResponse.success(page.map(BrandV1Dto.BrandResponse::from));
+        return ApiResponse.success(PageResponse.from(page.map(BrandV1Dto.BrandResponse::from)));
     }
 
     @PutMapping("/{id}")

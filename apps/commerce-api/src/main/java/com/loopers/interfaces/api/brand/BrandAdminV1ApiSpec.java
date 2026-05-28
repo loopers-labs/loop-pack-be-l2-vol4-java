@@ -1,10 +1,10 @@
 package com.loopers.interfaces.api.brand;
 
 import com.loopers.interfaces.api.common.response.ApiResponse;
+import com.loopers.interfaces.api.common.response.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.UUID;
@@ -19,7 +19,7 @@ public interface BrandAdminV1ApiSpec {
     ApiResponse<BrandV1Dto.BrandResponse> get(UUID id);
 
     @Operation(summary = "브랜드 목록 조회", description = "어드민용 — 소프트 딜리트된 브랜드도 포함합니다.")
-    ApiResponse<Page<BrandV1Dto.BrandResponse>> getList(Pageable pageable);
+    ApiResponse<PageResponse<BrandV1Dto.BrandResponse>> getList(Pageable pageable);
 
     @Operation(summary = "브랜드 수정")
     ApiResponse<BrandV1Dto.BrandResponse> update(UUID id, @Valid BrandV1Dto.UpdateRequest request);

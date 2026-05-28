@@ -1,10 +1,9 @@
 package com.loopers.interfaces.api;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.loopers.fixture.BrandFixture;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.interfaces.api.common.response.ApiResponse;
+import com.loopers.interfaces.api.common.response.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +18,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,27 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BrandAdminV1ApiE2ETest {
-
-    /** Jackson이 PageImpl/Pageable을 역직렬화할 수 없어 테스트 전용 POJO 사용 */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class RestPage<T> {
-        @JsonProperty("content")
-        private List<T> content;
-        @JsonProperty("totalElements")
-        private long totalElements;
-        @JsonProperty("totalPages")
-        private int totalPages;
-        @JsonProperty("size")
-        private int size;
-        @JsonProperty("number")
-        private int number;
-
-        public List<T> getContent() { return content; }
-        public long getTotalElements() { return totalElements; }
-        public int getTotalPages() { return totalPages; }
-        public int getSize() { return size; }
-        public int getNumber() { return number; }
-    }
 
     private static final String BASE_URL = "/api/v1/admin/brands";
 
@@ -199,7 +176,7 @@ class BrandAdminV1ApiE2ETest {
             createBrand("뉴발란스", BrandFixture.DESCRIPTION);
 
             // act
-            ResponseEntity<ApiResponse<RestPage<BrandV1Dto.BrandResponse>>> response = testRestTemplate.exchange(
+            ResponseEntity<ApiResponse<PageResponse<BrandV1Dto.BrandResponse>>> response = testRestTemplate.exchange(
                 BASE_URL + "?page=0&size=2", HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<>() {}
