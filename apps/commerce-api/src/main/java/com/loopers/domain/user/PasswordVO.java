@@ -12,18 +12,6 @@ public class PasswordVO {
     private static final int MIN_LENGTH = 8;
     private static final int MAX_LENGTH = 16;
 
-    /**
-     * 허용 문자:
-     * - 영문 대소문자
-     * - 숫자
-     * - 특수문자
-     *
-     * 비허용:
-     * - 한글
-     * - 공백
-     * - 이모지
-     * - 기타 유니코드 문자
-     */
     private static final Pattern PASSWORD_PATTERN =
             Pattern.compile(
                     "^[a-zA-Z0-9!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/\\\\|`~]+$"
@@ -45,9 +33,7 @@ public class PasswordVO {
     }
 
     public static PasswordVO fromEncoded(String encodedValue) {
-
-        validateEncodedValue(encodedValue);
-
+        validateNotBlank(encodedValue);
         return new PasswordVO(encodedValue);
     }
 
@@ -61,20 +47,7 @@ public class PasswordVO {
         validateBirthDate(rawPassword, birthDate);
     }
 
-    private static void validateEncodedValue(
-            String encodedValue
-    ) {
-        if (encodedValue == null || encodedValue.isBlank()) {
-            throw new CoreException(
-                    ErrorType.BAD_REQUEST,
-                    "비밀번호는 비어있을 수 없습니다."
-            );
-        }
-    }
-
-    private static void validateNotBlank(
-            String password
-    ) {
+    private static void validateNotBlank(String password) {
         if (password == null || password.isBlank()) {
             throw new CoreException(
                     ErrorType.BAD_REQUEST,
