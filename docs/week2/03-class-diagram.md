@@ -228,7 +228,7 @@ classDiagram
 - 상품 재고 차감은 주문과 함께 일어나므로 동시 주문 상황에서 재고 일관성을 보장해야 한다. 1차로는 `ProductStock`에 대한 Pessimistic Lock(`SELECT ... FOR UPDATE`)을 적용한다. 트래픽이 늘어나면 분산락이나 비동기 처리 방식을 다시 검토한다.
 - 결제 실패 등 보상이 필요한 경우 `ProductStock.increase()`로 차감분을 되돌린다. 이 복구는 DB 자동 롤백이 아니라 별도 트랜잭션의 명시적 보상이다.
 - 브랜드 삭제 시 상품이 함께 삭제되므로, 상품 삭제가 주문 이력을 훼손하지 않도록 주문은 상품 정보를 스냅샷으로 저장해야 한다.
-- 좋아요 수 정렬(`likes_desc`)은 `Product.likeCount` 집계 컬럼으로 처리한다(갱신·동시성은 Likes 설계 메모/리스크 참고).
+- 좋아요 수 정렬(`likes_desc`)은 현재 `Like` 테이블을 매번 집계해 처리한다. 집계 컬럼이나 캐시 도입은 성능 측정 후 별도로 검토한다.
 
 ## Likes
 
@@ -284,13 +284,11 @@ classDiagram
 
 이 구조에서 봐야 할 포인트는 `Like`가 `userId`, `productId`를 통해 `User`, `Product`를 참조한다는 점이다. `Product`가 좋아요 목록을 직접 소유하지 않으므로 상품 Aggregate가 과도하게 커지지 않는다.
 
-좋아요 수는 `Product.likeCount`에 비정규화하되, `LikeService`가 `Product`를 직접 수정하지 않고 projection 핸들러가 이벤트로 recount해 갱신한다(애그리거트 디커플링, 최종 일관성). 갱신 규칙 상세는 requirements Likes 설계 메모 참고.
-
 ### 설계 리스크
 
 - 같은 사용자와 상품 조합은 한 row로 관리한다. 취소는 `deleted_at`을 채워 비활성화하고, 재등록은 `deleted_at`을 비워 복구한다. `UNIQUE(user_id, product_id)` 제약을 통해 중복 row가 생기지 않도록 한다.
 - 좋아요 취소 상태가 조회 결과에 섞이지 않도록 활성 좋아요 조회 조건이 일관되게 적용되어야 한다.
-- 좋아요 수 정렬(`likes_desc`)은 `Product.likeCount` 집계 컬럼으로 처리하며, 비동기 recount + 배치 안전망의 최종 일관성이다(상세는 Likes 설계 메모).
+- 좋아요 수 정렬은 현재 범위에서 `likes`를 매번 집계해 처리한다. 정렬 성능이 문제가 되면 집계 컬럼이나 캐시 도입을 별도로 설계한다.
 - 상품 외 다른 대상에 좋아요가 생기면 `Like`라는 이름이 너무 넓어질 수 있으므로 모델 범위를 다시 검토해야 한다.
 
 ## Orders

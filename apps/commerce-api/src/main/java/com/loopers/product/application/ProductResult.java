@@ -11,8 +11,7 @@ public class ProductResult {
         String description,
         long price,
         ProductDisplayStatus displayStatus,
-        String thumbnailUrl,
-        long likeCount
+        String thumbnailUrl
     ) {
         public static Detail from(Product product, int stockQuantity) {
             return new Detail(
@@ -22,8 +21,7 @@ public class ProductResult {
                 product.getDescription(),
                 product.getPrice(),
                 ProductDisplayStatus.of(product.getStatus(), stockQuantity),
-                product.getThumbnailUrl(),
-                product.getLikeCount()
+                product.getThumbnailUrl()
             );
         }
     }
@@ -36,7 +34,6 @@ public class ProductResult {
         long price,
         com.loopers.product.domain.ProductStatus status,
         String thumbnailUrl,
-        long likeCount,
         int stockQuantity
     ) {
         public static AdminDetail from(Product product, int stockQuantity) {
@@ -48,7 +45,6 @@ public class ProductResult {
                 product.getPrice(),
                 product.getStatus(),
                 product.getThumbnailUrl(),
-                product.getLikeCount(),
                 stockQuantity
             );
         }

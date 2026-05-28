@@ -162,9 +162,9 @@
   | --- | --- |
   | `latest` | `Product.createdAt DESC` |
   | `price_asc` | `Product.price ASC` |
-  | `likes_desc` | `Product.likeCount DESC` (집계 컬럼) |
+  | `likes_desc` | `Like` 집계 결과(활성 좋아요 수) 기준 DESC |
 
-- 좋아요 수 정렬은 `Product.likeCount` 집계 컬럼으로 처리해 매 조회마다 전체 집계하지 않는다. `likeCount` 갱신 방식은 Likes 설계 메모 참고.
+- 좋아요 수 정렬은 현재 범위에서 `likes`를 매번 집계(GROUP BY)해 처리한다. 트래픽이 늘어 정렬 성능이 문제가 되면 집계 컬럼이나 캐시 도입을 측정 후 별도로 검토한다.
 
 ## Likes
 
@@ -208,10 +208,7 @@
 - `Like`는 `userId`, `productId`로 `User`, `Product`를 참조한다.
 - 취소된 좋아요를 다시 등록하면 기존 좋아요를 복구한다.
 - 좋아요 등록과 취소는 별도 엔드포인트로 분리해 동작 자체가 멱등하게 보장된다. 응답은 두 경우 모두 `200 OK`로 통일하고 현재 좋아요 상태를 본문에 담는다.
-- 상품별 좋아요 수는 `Product.likeCount` 집계 컬럼에 비정규화한다(`likes`가 SSOT). 갱신 규칙:
-  - 좋아요 등록/취소 커밋 후 `@TransactionalEventListener(AFTER_COMMIT)` 이벤트로 해당 상품을 recount해 `likeCount`를 갱신한다. `LikeService`가 아닌 projection 핸들러가 처리해 애그리거트 경계를 유지한다.
-  - recount는 멱등이라 이벤트 중복/유실에 강건하고, 배치(`commerce-batch`) 전체 재계산을 안전망으로 둔다.
-  - 최종 일관성이라 정렬·표시가 순간적으로 lag날 수 있다.
+- 상품별 좋아요 수 정렬(`likes_desc`)은 현재 `likes` 테이블을 매번 집계해 처리한다. 비정규화 집계 컬럼이나 캐시 도입은 측정 후 성능이 문제가 될 때 별도로 검토한다(섣부른 최적화를 피한다).
 - 좋아요 변경 이력 전체가 필요해지면 별도 history 모델을 검토한다.
 - 상품 외 다른 대상에 좋아요가 생기면 `Like` 이름과 모델 범위를 다시 검토한다.
 

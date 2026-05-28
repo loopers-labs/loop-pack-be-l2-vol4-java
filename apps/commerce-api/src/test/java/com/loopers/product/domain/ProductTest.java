@@ -20,7 +20,7 @@ class ProductTest {
     private static final String THUMBNAIL = "https://cdn.loopers.com/products/shirt.png";
 
     @Test
-    @DisplayName("create 로 생성하면 모든 필드와 함께 status=ON_SALE, likeCount=0 으로 초기화된다")
+    @DisplayName("create 로 생성하면 모든 필드와 함께 status=ON_SALE 으로 초기화된다")
     void givenValidFields_whenCreate_thenStoresAllFieldsWithDefaults() {
         Product product = Product.create(BRAND_ID, NAME, DESCRIPTION, PRICE, THUMBNAIL);
 
@@ -30,8 +30,7 @@ class ProductTest {
                 () -> assertThat(product.getDescription()).isEqualTo(DESCRIPTION),
                 () -> assertThat(product.getPrice()).isEqualTo(PRICE),
                 () -> assertThat(product.getThumbnailUrl()).isEqualTo(THUMBNAIL),
-                () -> assertThat(product.getStatus()).isEqualTo(ProductStatus.ON_SALE),
-                () -> assertThat(product.getLikeCount()).isZero()
+                () -> assertThat(product.getStatus()).isEqualTo(ProductStatus.ON_SALE)
         );
     }
 

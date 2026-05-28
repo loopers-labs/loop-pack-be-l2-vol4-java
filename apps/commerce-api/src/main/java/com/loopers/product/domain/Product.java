@@ -37,9 +37,6 @@ public class Product extends BaseEntity {
     @Column
     private String thumbnailUrl;
 
-    @Column(nullable = false)
-    private long likeCount;
-
     private Product(Long brandId, String name, String description, long price, String thumbnailUrl) {
         this.brandId = brandId;
         this.name = name;
@@ -47,7 +44,6 @@ public class Product extends BaseEntity {
         this.price = price;
         this.thumbnailUrl = thumbnailUrl;
         this.status = ProductStatus.ON_SALE;
-        this.likeCount = 0L;
         validate();
     }
 

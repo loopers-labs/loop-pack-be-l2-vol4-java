@@ -12,8 +12,7 @@ public class ProductV1Response {
         String description,
         long price,
         ProductDisplayStatus displayStatus,
-        String thumbnailUrl,
-        long likeCount
+        String thumbnailUrl
     ) {
         public static Detail from(ProductResult.Detail result) {
             return new Detail(
@@ -23,8 +22,7 @@ public class ProductV1Response {
                 result.description(),
                 result.price(),
                 result.displayStatus(),
-                result.thumbnailUrl(),
-                result.likeCount()
+                result.thumbnailUrl()
             );
         }
     }

@@ -1,5 +1,7 @@
 package com.loopers.product.infrastructure;
 
+import com.loopers.like.domain.Like;
+import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -20,11 +22,17 @@ class ProductRepositoryIntegrationTest {
     private static final Long BRAND_ID = 1L;
 
     private final ProductRepository productRepository;
+    private final LikeRepository likeRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    public ProductRepositoryIntegrationTest(ProductRepository productRepository, DatabaseCleanUp databaseCleanUp) {
+    public ProductRepositoryIntegrationTest(
+            ProductRepository productRepository,
+            LikeRepository likeRepository,
+            DatabaseCleanUp databaseCleanUp
+    ) {
         this.productRepository = productRepository;
+        this.likeRepository = likeRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -119,5 +127,30 @@ class ProductRepositoryIntegrationTest {
         assertThat(result)
                 .extracting(Product::getName)
                 .containsExactlyInAnyOrder("판매중", "판매중지");
+    }
+
+    @Test
+    @DisplayName("findAllOnSaleOrderByLikeCountDesc 는 활성 좋아요 수 내림차순 정렬하며, 취소 좋아요·판매중지는 제외한다")
+    void givenProductsWithLikes_whenFindAllOnSaleOrderByLikeCountDesc_thenOrdersByActiveLikeCount() {
+        Product many = save("많이", 1000L);
+        Product few = save("적게", 2000L);
+        save("없음", 3000L);
+        Product suspended = saveSuspended("판매중지", 4000L);
+
+        likeRepository.save(Like.create(1L, many.getId()));
+        likeRepository.save(Like.create(2L, many.getId()));
+        likeRepository.save(Like.create(1L, few.getId()));
+        Like cancelled = Like.create(2L, few.getId());
+        cancelled.delete();
+        likeRepository.save(cancelled);
+        likeRepository.save(Like.create(1L, suspended.getId()));
+        likeRepository.save(Like.create(2L, suspended.getId()));
+        likeRepository.save(Like.create(3L, suspended.getId()));
+
+        List<Product> result = productRepository.findAllOnSaleOrderByLikeCountDesc();
+
+        assertThat(result)
+                .extracting(Product::getName)
+                .containsExactly("많이", "적게", "없음");
     }
 }

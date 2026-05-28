@@ -291,7 +291,6 @@ sequenceDiagram
     Service->>LikeRepository: 좋아요 조회
     LikeRepository-->>Service: 좋아요 상태
     Service->>LikeRepository: 좋아요 생성 또는 복구
-    Note over Service,LikeRepository: 커밋 후(AFTER_COMMIT) 이벤트 발행 →<br/>projection 핸들러가 해당 상품 recount해 Product.likeCount 갱신 (비동기)
     Service-->>Controller: 처리 결과
     Controller-->>Client: 응답
 ```
@@ -317,7 +316,6 @@ sequenceDiagram
     Service->>LikeRepository: 좋아요 조회
     LikeRepository-->>Service: 좋아요 상태
     Service->>LikeRepository: 좋아요 취소
-    Note over Service,LikeRepository: 커밋 후(AFTER_COMMIT) 이벤트 발행 →<br/>projection 핸들러가 해당 상품 recount해 Product.likeCount 갱신 (비동기)
     Service-->>Controller: 처리 결과
     Controller-->>Client: 응답
 ```

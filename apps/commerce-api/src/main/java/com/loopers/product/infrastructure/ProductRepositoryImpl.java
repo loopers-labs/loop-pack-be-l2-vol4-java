@@ -42,7 +42,7 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public List<Product> findAllOnSaleOrderByLikeCountDesc() {
-        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByLikeCountDesc(ProductStatus.ON_SALE);
+        return productJpaRepository.findOnSaleOrderByLikeCountDesc();
     }
 
     @Override

@@ -77,7 +77,7 @@ class ProductV1ApiE2ETest {
     class GetOne {
 
         @Test
-        @DisplayName("판매중 상품을 조회하면 200 과 displayStatus=ON_SALE 및 likeCount 를 반환한다")
+        @DisplayName("판매중 상품을 조회하면 200 과 displayStatus=ON_SALE 을 반환한다")
         void givenOnSaleProduct_whenGet_thenReturnsDetail() {
             Product product = saveOnSale("셔츠", 29_000L, 10);
 
@@ -86,8 +86,7 @@ class ProductV1ApiE2ETest {
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                     () -> assertThat(response.getBody().data().name()).isEqualTo("셔츠"),
-                    () -> assertThat(response.getBody().data().displayStatus()).isEqualTo(ProductDisplayStatus.ON_SALE),
-                    () -> assertThat(response.getBody().data().likeCount()).isZero()
+                    () -> assertThat(response.getBody().data().displayStatus()).isEqualTo(ProductDisplayStatus.ON_SALE)
             );
         }
 

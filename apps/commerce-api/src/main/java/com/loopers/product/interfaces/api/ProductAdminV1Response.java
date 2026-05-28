@@ -13,7 +13,6 @@ public class ProductAdminV1Response {
         long price,
         ProductStatus status,
         String thumbnailUrl,
-        long likeCount,
         int stockQuantity
     ) {
         public static AdminDetail from(ProductResult.AdminDetail result) {
@@ -25,7 +24,6 @@ public class ProductAdminV1Response {
                 result.price(),
                 result.status(),
                 result.thumbnailUrl(),
-                result.likeCount(),
                 result.stockQuantity()
             );
         }
