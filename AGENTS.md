@@ -18,7 +18,7 @@
 새 기능 구현 시 핵심 구현 1개는 사용자가 직접 작성할 수 있도록 비워두는 것을 기본으로 한다.
 
 - 구현 전 핸드코딩 후보를 먼저 제안하고 사용자와 합의한다.
-- 보통 도메인 `Service`의 핵심 비즈니스 메서드, 도메인 `Model`의 상태 전이/불변식 처리, 알고리즘성 코드가 후보가 된다.
+- 보통 도메인 `Service`의 핵심 비즈니스 메서드, 도메인 `Entity`의 상태 전이/불변식 처리, 알고리즘성 코드가 후보가 된다.
 - 합의된 영역에는 아래 표식을 남긴다.
 
 ```java
@@ -115,7 +115,7 @@ support/error
 - DTO의 응답 변환은 `from(...)` 팩토리로 처리한다.
 - Facade는 얇은 유스케이스 조율자이며 비즈니스 규칙을 직접 갖지 않는다.
 - Domain Service는 도메인의 외부 진입점으로 사용한다.
-- Domain Model은 상태 변경과 도메인 규칙을 담당한다.
+- Domain Entity는 상태 변경과 도메인 규칙을 담당하며 JPA annotation을 갖지 않는다.
 - Domain layer는 Spring Data나 infrastructure 구현체에 의존하지 않는다.
 - 비즈니스 예외는 `CoreException(ErrorType.X, "한국어 메시지")`로 표현한다.
 
@@ -135,6 +135,7 @@ support/error
 - `application` 레이어에서 외부 레이어로 전달하는 유스케이스 정보 객체는 `*Info`를 사용한다.
   - 예: `ProductInfo`, `OrderInfo`, `AuthenticatedUserInfo`
 - `domain` 레이어에서는 무제한 자유 네이밍을 피하고, 역할이 드러나는 제한된 suffix를 사용한다.
+  - suffix 없음: JPA annotation을 갖지 않는 순수 도메인 엔티티. 예: `Product`, `Brand`, `User`, `Order`
   - `*Command`: 도메인 동작 입력
   - `*Criteria`: 조회/필터/페이징 조건
   - `*Result`: 도메인 동작 결과
@@ -145,6 +146,8 @@ support/error
   - `*Service`: 도메인 진입점
   - `*Reader`: 조회 전용 Repository 접근
   - `*Writer`: 생성/수정/삭제 Repository 접근
+- JPA 영속화 객체는 infrastructure layer에서 `*JpaEntity`로 둔다.
+  - 예: `ProductJpaEntity`, `BrandJpaEntity`, `UserJpaEntity`, `OrderJpaEntity`
 - 도메인 조회 조합 객체는 `*Dto` 대신 `*View`를 우선 고려한다.
   - 예: `ProductDetail`보다 `ProductDetailView`
 
@@ -155,9 +158,9 @@ support/error
 - Repository 접근 책임은 아래 객체로 분리한다.
   - `*Reader`: 조회 전용 Repository 접근
   - `*Writer`: 생성/수정/삭제 Repository 접근
-  - `*Policy` 또는 `*Processor`: Repository 없이 순수 규칙 처리
+  - `*Policy`, `*Processor`, `*ProcessService`: Repository 없이 순수 규칙 처리
 - 2개 이상의 도메인 객체를 조합하는 순수 객체는 `*CatalogService`처럼 범용적인 이름보다, 조합되는 도메인과 책임이 드러나는 이름을 사용한다.
-  - 예: `ProductBrandProcessor`
+  - 예: `ProductBrandProcessService`
 - Facade에서 Repository를 직접 호출하지 않는다. Facade는 Transaction 경계와 유스케이스 호출에 집중한다.
 
 ### get/find 네이밍 규칙

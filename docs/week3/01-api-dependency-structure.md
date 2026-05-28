@@ -14,10 +14,10 @@
 - `interfaces -> domain` 직접 참조는 허용한다. 예: Controller가 Domain Command를 만들거나 Domain Service 진입점을 직접 호출하는 경우.
 - API의 진입점은 `*Controller`, Domain의 진입점은 단일 도메인 `*Service`이다.
 - `*Service`는 Domain 진입점이고, Repository 접근은 조회 전용 `*Reader`와 생성/수정/삭제 전용 `*Writer`로 분리한다.
-- `*Policy` 또는 `*Processor`는 Repository 없이 순수 규칙 처리를 담당한다.
-- `ProductBrandProcessor`처럼 2개 이상의 도메인 객체를 조합하는 서비스는 책임이 섞인 도메인명을 함께 드러내고, Repository 없이 순수 조합 로직만 담당한다.
+- `*Policy`, `*Processor`, `*ProcessService`는 Repository 없이 순수 규칙 처리를 담당한다.
+- `ProductBrandProcessService`처럼 2개 이상의 도메인 객체를 조합하는 서비스는 책임이 섞인 도메인명을 함께 드러내고, Repository 없이 순수 조합 로직만 담당한다.
 
-> 주의: 이 문서는 “의도한 레이어 의존 방향”을 표현한다. 현재 구현의 infrastructure adapter는 domain의 Repository interface와 Model을 구현/사용하기 때문에, strict import 기준으로 보면 `infrastructure -> domain` 참조가 남아 있다. 이를 완전히 제거하려면 persistence entity/mapper 분리가 별도 리팩터링으로 필요하다.
+> 주의: 이 문서는 “의도한 레이어 의존 방향”을 표현한다. 현재 구현은 domain 객체와 JPA 영속화 객체를 분리하고, infrastructure adapter에서 domain Repository port와 `*JpaEntity` 간 매핑을 담당한다.
 
 ---
 
@@ -39,7 +39,7 @@ flowchart LR
     subgraph domain
         UserService
         UserRepository
-        UserModel
+        User
         PasswordPolicy
         PasswordHasher
     end
@@ -47,6 +47,7 @@ flowchart LR
     subgraph infrastructure
         UserRepositoryImpl
         UserJpaRepository
+        UserJpaEntity
         BCryptPasswordHasher
     end
 
@@ -55,9 +56,11 @@ flowchart LR
     UserService -->|"findByLoginId"| UserRepository
     UserService -->|"validate/authenticate"| PasswordPolicy
     UserService -->|"matches/encode"| PasswordHasher
-    UserService -->|"credential target"| UserModel
+    UserService -->|"credential target"| User
     UserRepository -->|"persistence port"| UserRepositoryImpl
+    UserRepositoryImpl -->|"map domain/persistence"| UserJpaEntity
     UserRepositoryImpl -->|"Spring Data"| UserJpaRepository
+    UserJpaRepository -->|"persist"| UserJpaEntity
     PasswordHasher -->|"hash implementation"| BCryptPasswordHasher
     LoginUserArgumentResolver -->|"request attribute"| AuthenticatedUser
 ```
@@ -84,20 +87,23 @@ flowchart LR
         ProductReader
         ProductWriter
         ProductRepository
+        BrandService
         BrandRepository
-        ProductBrandProcessor
+        ProductBrandProcessService
         ProductSort
         PageCriteria
-        ProductModel
-        BrandModel
+        Product
+        Brand
         ProductDetailView
     end
 
     subgraph infrastructure
         ProductRepositoryImpl
         ProductJpaRepository
+        ProductJpaEntity
         BrandRepositoryImpl
         BrandJpaRepository
+        BrandJpaEntity
     end
 
     ProductV1Controller -->|"조회/목록 params"| ProductFacade
@@ -107,37 +113,42 @@ flowchart LR
     ProductDto -->|"from(ProductInfo)"| ProductInfo
 
     ProductFacade -->|"use case call"| ProductService
+    ProductFacade -->|"brand lookup"| BrandService
+    ProductFacade -->|"compose product + brand"| ProductBrandProcessService
     ProductFacade -->|"from(ProductDetailView)"| ProductInfo
 
     ProductService -->|"read entry"| ProductReader
     ProductService -->|"write entry"| ProductWriter
     ProductReader -->|"find/list"| ProductRepository
-    ProductReader -->|"find brand"| BrandRepository
-    ProductReader -->|"combine product + brand"| ProductBrandProcessor
     ProductReader -->|"sort parse"| ProductSort
     ProductReader -->|"page, size"| PageCriteria
     ProductWriter -->|"save/delete"| ProductRepository
     ProductWriter -->|"find existing"| ProductReader
-    ProductWriter -->|"state change"| ProductModel
-    ProductWriter -->|"combine product + brand"| ProductBrandProcessor
-    ProductBrandProcessor -->|"read brand data"| BrandModel
-    ProductBrandProcessor -->|"compose"| ProductDetailView
+    ProductWriter -->|"state change"| Product
+    ProductBrandProcessService -->|"read product data"| Product
+    ProductBrandProcessService -->|"read brand data"| Brand
+    ProductBrandProcessService -->|"compose"| ProductDetailView
+    BrandService -->|"find/list brands"| BrandRepository
 
     ProductRepository -->|"adapter"| ProductRepositoryImpl
+    ProductRepositoryImpl -->|"map domain/persistence"| ProductJpaEntity
     ProductRepositoryImpl -->|"Spring Data"| ProductJpaRepository
+    ProductJpaRepository -->|"persist"| ProductJpaEntity
     BrandRepository -->|"adapter"| BrandRepositoryImpl
+    BrandRepositoryImpl -->|"map domain/persistence"| BrandJpaEntity
     BrandRepositoryImpl -->|"Spring Data"| BrandJpaRepository
+    BrandJpaRepository -->|"persist"| BrandJpaEntity
 ```
 
 ### API별 의존 흐름
 
 | API | 의존 흐름 |
 | --- | --- |
-| `GET /api/v1/products/{productId}` | `ProductV1Controller -> ProductFacade -> ProductService -> ProductReader -> ProductRepository/BrandRepository/ProductBrandProcessor` |
-| `GET /api/v1/products` | `ProductV1Controller -> ProductFacade -> ProductService -> ProductReader -> ProductRepository/BrandRepository/ProductBrandProcessor` |
-| `POST /api-admin/v1/products` | `AdminProductV1Controller -> ProductFacade -> ProductService -> ProductWriter -> ProductRepository/ProductReader/ProductBrandProcessor` |
-| `PUT /api-admin/v1/products/{productId}` | `AdminProductV1Controller -> ProductFacade -> ProductService -> ProductWriter -> ProductReader/ProductRepository/ProductModel` |
-| `DELETE /api-admin/v1/products/{productId}` | `AdminProductV1Controller -> ProductFacade -> ProductService -> ProductWriter -> ProductReader/ProductRepository/ProductModel` |
+| `GET /api/v1/products/{productId}` | `ProductV1Controller -> ProductFacade -> ProductService/BrandService/ProductBrandProcessService` |
+| `GET /api/v1/products` | `ProductV1Controller -> ProductFacade -> ProductService/BrandService/ProductBrandProcessService` |
+| `POST /api-admin/v1/products` | `AdminProductV1Controller -> ProductFacade -> BrandService/ProductService/ProductBrandProcessService` |
+| `PUT /api-admin/v1/products/{productId}` | `AdminProductV1Controller -> ProductFacade -> ProductService -> ProductWriter -> ProductReader/ProductRepository/Product` |
+| `DELETE /api-admin/v1/products/{productId}` | `AdminProductV1Controller -> ProductFacade -> ProductService -> ProductWriter -> ProductReader/ProductRepository/Product` |
 
 ---
 
@@ -161,15 +172,17 @@ flowchart LR
         BrandRepository
         ProductRepository
         PageCriteria
-        BrandModel
-        ProductModel
+        Brand
+        Product
     end
 
     subgraph infrastructure
         BrandRepositoryImpl
         BrandJpaRepository
+        BrandJpaEntity
         ProductRepositoryImpl
         ProductJpaRepository
+        ProductJpaEntity
     end
 
     BrandV1Controller -->|"brandId"| BrandFacade
@@ -179,18 +192,22 @@ flowchart LR
     BrandDto -->|"from(BrandInfo)"| BrandInfo
 
     BrandFacade -->|"use case call"| BrandService
-    BrandFacade -->|"from(BrandModel)"| BrandInfo
+    BrandFacade -->|"from(Brand)"| BrandInfo
 
     BrandService -->|"save/find/list"| BrandRepository
     BrandService -->|"find/save related products"| ProductRepository
     BrandService -->|"page, size"| PageCriteria
-    BrandService -->|"state change"| BrandModel
-    BrandService -->|"soft delete related products"| ProductModel
+    BrandService -->|"state change"| Brand
+    BrandService -->|"soft delete related products"| Product
 
     BrandRepository -->|"adapter"| BrandRepositoryImpl
+    BrandRepositoryImpl -->|"map domain/persistence"| BrandJpaEntity
     BrandRepositoryImpl -->|"Spring Data"| BrandJpaRepository
+    BrandJpaRepository -->|"persist"| BrandJpaEntity
     ProductRepository -->|"adapter"| ProductRepositoryImpl
+    ProductRepositoryImpl -->|"map domain/persistence"| ProductJpaEntity
     ProductRepositoryImpl -->|"Spring Data"| ProductJpaRepository
+    ProductJpaRepository -->|"persist"| ProductJpaEntity
 ```
 
 ### API별 의존 흐름
@@ -200,8 +217,8 @@ flowchart LR
 | `GET /api/v1/brands/{brandId}` | `BrandV1Controller -> BrandFacade -> BrandService -> BrandRepository` |
 | `GET /api-admin/v1/brands` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository` |
 | `POST /api-admin/v1/brands` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository` |
-| `PUT /api-admin/v1/brands/{brandId}` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository/BrandModel` |
-| `DELETE /api-admin/v1/brands/{brandId}` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository/ProductRepository/BrandModel/ProductModel` |
+| `PUT /api-admin/v1/brands/{brandId}` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository/Brand` |
+| `DELETE /api-admin/v1/brands/{brandId}` | `AdminBrandV1Controller -> BrandFacade -> BrandService -> BrandRepository/ProductRepository/Brand/Product` |
 
 ---
 
@@ -225,10 +242,12 @@ flowchart LR
         ProductLikeService
         ProductLikeRepository
         ProductRepository
+        BrandService
         BrandRepository
-        ProductBrandProcessor
-        ProductLikeModel
-        ProductModel
+        ProductBrandProcessService
+        ProductLike
+        Product
+        Brand
         ProductLikeResult
         ProductDetailView
     end
@@ -236,10 +255,13 @@ flowchart LR
     subgraph infrastructure
         ProductLikeRepositoryImpl
         ProductLikeJpaRepository
+        ProductLikeJpaEntity
         ProductRepositoryImpl
         ProductJpaRepository
+        ProductJpaEntity
         BrandRepositoryImpl
         BrandJpaRepository
+        BrandJpaEntity
     end
 
     ProductV1Controller -->|"loginId, productId"| ProductLikeFacade
@@ -250,32 +272,41 @@ flowchart LR
     ProductDto -->|"from(ProductInfo)"| ProductInfo
 
     ProductLikeFacade -->|"use case call"| ProductLikeService
+    ProductLikeFacade -->|"brand lookup"| BrandService
+    ProductLikeFacade -->|"compose product + brand"| ProductBrandProcessService
     ProductLikeFacade -->|"from(ProductDetailView)"| ProductInfo
 
     ProductLikeService -->|"save/find/delete"| ProductLikeRepository
     ProductLikeService -->|"find/save product"| ProductRepository
-    ProductLikeService -->|"find brands"| BrandRepository
-    ProductLikeService -->|"combine liked products"| ProductBrandProcessor
-    ProductLikeService -->|"create/delete relation"| ProductLikeModel
-    ProductLikeService -->|"increase/decrease count"| ProductModel
+    ProductLikeService -->|"create/delete relation"| ProductLike
+    ProductLikeService -->|"increase/decrease count"| Product
     ProductLikeService -->|"decision result"| ProductLikeResult
-    ProductBrandProcessor -->|"compose"| ProductDetailView
+    ProductBrandProcessService -->|"read product data"| Product
+    ProductBrandProcessService -->|"read brand data"| Brand
+    ProductBrandProcessService -->|"compose"| ProductDetailView
+    BrandService -->|"find/list brands"| BrandRepository
 
     ProductLikeRepository -->|"adapter"| ProductLikeRepositoryImpl
+    ProductLikeRepositoryImpl -->|"map domain/persistence"| ProductLikeJpaEntity
     ProductLikeRepositoryImpl -->|"Spring Data"| ProductLikeJpaRepository
+    ProductLikeJpaRepository -->|"persist"| ProductLikeJpaEntity
     ProductRepository -->|"adapter"| ProductRepositoryImpl
+    ProductRepositoryImpl -->|"map domain/persistence"| ProductJpaEntity
     ProductRepositoryImpl -->|"Spring Data"| ProductJpaRepository
+    ProductJpaRepository -->|"persist"| ProductJpaEntity
     BrandRepository -->|"adapter"| BrandRepositoryImpl
+    BrandRepositoryImpl -->|"map domain/persistence"| BrandJpaEntity
     BrandRepositoryImpl -->|"Spring Data"| BrandJpaRepository
+    BrandJpaRepository -->|"persist"| BrandJpaEntity
 ```
 
 ### API별 의존 흐름
 
 | API | 의존 흐름 |
 | --- | --- |
-| `POST /api/v1/products/{productId}/likes` | `ProductV1Controller -> ProductLikeFacade -> ProductLikeService -> ProductRepository/ProductLikeRepository/ProductModel/ProductLikeModel` |
-| `DELETE /api/v1/products/{productId}/likes` | `ProductV1Controller -> ProductLikeFacade -> ProductLikeService -> ProductLikeRepository/ProductRepository/ProductModel` |
-| `GET /api/v1/users/{userId}/likes` | `UserV1Controller -> ProductLikeFacade -> ProductLikeService -> ProductLikeRepository/ProductRepository/BrandRepository/ProductBrandProcessor` |
+| `POST /api/v1/products/{productId}/likes` | `ProductV1Controller -> ProductLikeFacade -> ProductLikeService -> ProductRepository/ProductLikeRepository/Product/ProductLike` |
+| `DELETE /api/v1/products/{productId}/likes` | `ProductV1Controller -> ProductLikeFacade -> ProductLikeService -> ProductLikeRepository/ProductRepository/Product` |
+| `GET /api/v1/users/{userId}/likes` | `UserV1Controller -> ProductLikeFacade -> ProductLikeService/BrandService/ProductBrandProcessService` |
 
 ---
 
@@ -303,9 +334,9 @@ flowchart LR
         OrderRepository
         ProductRepository
         OrderProductCommand
-        ProductModel
-        OrderModel
-        OrderLineModel
+        Product
+        Order
+        OrderLine
         OrderFailure
         OrderResult
         PageCriteria
@@ -314,8 +345,11 @@ flowchart LR
     subgraph infrastructure
         OrderRepositoryImpl
         OrderJpaRepository
+        OrderJpaEntity
+        OrderLineJpaEntity
         ProductRepositoryImpl
         ProductJpaRepository
+        ProductJpaEntity
     end
 
     OrderV1Controller -->|"request/auth/query params"| OrderFacade
@@ -327,7 +361,7 @@ flowchart LR
     OrderDto -->|"from(OrderInfo)"| OrderInfo
 
     OrderFacade -->|"use case call"| OrderService
-    OrderFacade -->|"from(OrderResult/OrderModel)"| OrderInfo
+    OrderFacade -->|"from(OrderResult/Order)"| OrderInfo
 
     OrderService -->|"read entry"| OrderReader
     OrderService -->|"write entry"| OrderWriter
@@ -336,24 +370,29 @@ flowchart LR
     OrderWriter -->|"save order"| OrderRepository
     OrderWriter -->|"find/save products"| ProductRepository
     OrderWriter -->|"create order result"| OrderProcessor
-    OrderWriter -->|"deduct stock"| ProductModel
+    OrderWriter -->|"deduct stock"| Product
     OrderProcessor -->|"validate command"| OrderProductCommand
-    OrderProcessor -->|"create order"| OrderModel
-    OrderProcessor -->|"create line"| OrderLineModel
+    OrderProcessor -->|"create order"| Order
+    OrderProcessor -->|"create line"| OrderLine
     OrderProcessor -->|"record failure"| OrderFailure
     OrderProcessor -->|"result wrapper"| OrderResult
 
     OrderRepository -->|"adapter"| OrderRepositoryImpl
+    OrderRepositoryImpl -->|"map domain/persistence"| OrderJpaEntity
     OrderRepositoryImpl -->|"Spring Data"| OrderJpaRepository
+    OrderJpaRepository -->|"persist"| OrderJpaEntity
+    OrderJpaEntity -->|"contains"| OrderLineJpaEntity
     ProductRepository -->|"adapter"| ProductRepositoryImpl
+    ProductRepositoryImpl -->|"map domain/persistence"| ProductJpaEntity
     ProductRepositoryImpl -->|"Spring Data"| ProductJpaRepository
+    ProductJpaRepository -->|"persist"| ProductJpaEntity
 ```
 
 ### API별 의존 흐름
 
 | API | 의존 흐름 |
 | --- | --- |
-| `POST /api/v1/orders` | `OrderV1Controller -> OrderFacade -> OrderService -> OrderWriter -> ProductRepository/OrderRepository/OrderProcessor/ProductModel/OrderModel` |
+| `POST /api/v1/orders` | `OrderV1Controller -> OrderFacade -> OrderService -> OrderWriter -> ProductRepository/OrderRepository/OrderProcessor/Product/Order` |
 | `GET /api/v1/orders` | `OrderV1Controller -> OrderFacade -> OrderService -> OrderReader -> OrderRepository/PageCriteria` |
 | `GET /api/v1/orders/{orderId}` | `OrderV1Controller -> OrderFacade -> OrderService -> OrderReader -> OrderRepository` |
 | `GET /api-admin/v1/orders` | `AdminOrderV1Controller -> OrderFacade -> OrderService -> OrderReader -> OrderRepository/PageCriteria` |
@@ -379,7 +418,7 @@ flowchart LR
     subgraph domain
         UserService
         UserRepository
-        UserModel
+        User
         PasswordPolicy
         PasswordHasher
     end
@@ -387,6 +426,7 @@ flowchart LR
     subgraph infrastructure
         UserRepositoryImpl
         UserJpaRepository
+        UserJpaEntity
         BCryptPasswordHasher
     end
 
@@ -396,15 +436,17 @@ flowchart LR
     UserDto -->|"from(UserInfo)"| UserInfo
 
     UserFacade -->|"use case call"| UserService
-    UserFacade -->|"from(UserModel)"| UserInfo
+    UserFacade -->|"from(User)"| UserInfo
 
     UserService -->|"save/find/exists"| UserRepository
-    UserService -->|"create/change/authenticate"| UserModel
+    UserService -->|"create/change/authenticate"| User
     UserService -->|"validate password"| PasswordPolicy
     UserService -->|"encode/matches"| PasswordHasher
 
     UserRepository -->|"adapter"| UserRepositoryImpl
+    UserRepositoryImpl -->|"map domain/persistence"| UserJpaEntity
     UserRepositoryImpl -->|"Spring Data"| UserJpaRepository
+    UserJpaRepository -->|"persist"| UserJpaEntity
     PasswordHasher -->|"hash implementation"| BCryptPasswordHasher
 ```
 
@@ -412,9 +454,9 @@ flowchart LR
 
 | API | 의존 흐름 |
 | --- | --- |
-| `POST /api/v1/users` | `UserV1Controller -> UserFacade -> UserService -> UserRepository/PasswordPolicy/PasswordHasher/UserModel` |
+| `POST /api/v1/users` | `UserV1Controller -> UserFacade -> UserService -> UserRepository/PasswordPolicy/PasswordHasher/User` |
 | `GET /api/v1/users/me` | `UserV1Controller -> UserFacade -> UserService -> UserRepository` |
-| `PUT/PATCH /api/v1/users/password` | `UserV1Controller -> UserFacade -> UserService -> UserRepository/PasswordPolicy/PasswordHasher/UserModel` |
+| `PUT/PATCH /api/v1/users/password` | `UserV1Controller -> UserFacade -> UserService -> UserRepository/PasswordPolicy/PasswordHasher/User` |
 
 ---
 
@@ -422,5 +464,5 @@ flowchart LR
 
 - 다이어그램 화살표는 모두 단방향 의존만 표현한다.
 - `Facade`는 Repository를 직접 들지 않는다. Transaction은 `application` 레이어에서 열고, Repository 조회/저장은 `domain` 레이어의 단일 도메인 `*Service`가 담당한다.
-- `ProductBrandProcessor`는 Product와 Brand 도메인 객체를 조합하는 순수 Processor로 유지하며 Repository를 의존하지 않는다.
+- `ProductBrandProcessService`는 Product와 Brand 도메인 객체를 조합하는 순수 Domain Service로 유지하며 Repository를 의존하지 않는다.
 - 응답 변환은 DTO의 `from(...)` 팩토리와 `Info` 객체 사이의 같은 방향 의존으로만 표현한다.
