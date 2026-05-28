@@ -34,6 +34,7 @@ classDiagram
         +String name
         +BigDecimal price
         +int likeCount
+        +Stock stock
         +increaseLikeCount()
         +decreaseLikeCount()
     }
@@ -41,10 +42,10 @@ classDiagram
     
     class Stock {
         +Long productId
+        +Product product
         +int quantity
         +decrease(int amount)
     }
-    Stock --|> BaseTimeEntity
     
     class ProductLike {
         +Long id
@@ -57,19 +58,24 @@ classDiagram
         +Long id
         +Long userId
         +OrderStatus status
+        +List~OrderItem~ items
     }
     Order --|> BaseTimeEntity
     
     class OrderItem {
         +Long id
-        +Long orderId
+        +Order order
         +Long productId
-        +String snapshotName
-        +BigDecimal snapshotPrice
-        +String snapshotBrandName
+        +ProductSnapshot snapshot
         +int quantity
     }
-    OrderItem --|> BaseTimeEntity
+    
+    class ProductSnapshot {
+        <<VO>>
+        +String name
+        +BigDecimal price
+        +String brandName
+    }
 
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains

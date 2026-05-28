@@ -11,8 +11,8 @@
 - [x] 기존 `ProductModel`을 Week 2 설계(ERD)에 맞게 구조 조정 (Tidy First)
 
 ## 1. 브랜드 (Brands)
-- [x] [Red] 브랜드 등록 (Admin) 테스트 작성
-- [x] [Green] 브랜드 등록 기능 구현
+- [ ] [Red] 브랜드 등록 (Admin) 테스트 작성
+- [ ] [Green] 브랜드 등록 기능 구현
 - [ ] [Red] 브랜드 목록 조회 (Admin) 테스트 작성
 - [ ] [Green] 브랜드 목록 조회 기능 구현
 - [ ] [Red] 브랜드 정보 수정 (Admin) 테스트 작성
