@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -51,9 +52,13 @@ class OrderAdminV1ApiE2ETest {
     }
 
     private OrderModel saveOrder(Long userId) {
+        return saveOrderAt(userId, ZonedDateTime.now());
+    }
+
+    private OrderModel saveOrderAt(Long userId, ZonedDateTime orderedAt) {
         OrderModel savedOrder = orderJpaRepository.save(OrderModel.builder()
             .userId(userId)
-            .orderedAt(ZonedDateTime.now())
+            .orderedAt(orderedAt)
             .totalPrice(78_000)
             .build());
 
@@ -90,12 +95,14 @@ class OrderAdminV1ApiE2ETest {
     @Nested
     class ReadOrders {
 
-        @DisplayName("정상 요청이면, 200 OK와 함께 전체 주문 목록과 페이지 메타가 반환된다.")
+        @DisplayName("정상 요청이면, 200 OK와 함께 전체 주문 목록과 페이지 메타가 반환되고 주문 시각 내림차순으로 정렬된다.")
         @Test
         void returnsOk_withOrdersAndMeta() {
             // arrange
-            saveOrder(1L);
-            saveOrder(2L);
+            ZonedDateTime earlier = ZonedDateTime.now().minusHours(1);
+            ZonedDateTime later = ZonedDateTime.now();
+            saveOrderAt(1L, earlier);
+            OrderModel secondOrder = saveOrderAt(2L, later);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -106,13 +113,20 @@ class OrderAdminV1ApiE2ETest {
             );
 
             // assert
-            Map<String, Object> item = contentOf(response).get(0);
+            Map<String, Object> firstItem = contentOf(response).get(0);
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(2),
-                () -> assertThat(item).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "totalPrice")
+                () -> assertThat(firstItem).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "totalPrice"),
+                () -> assertThat(((Number) firstItem.get("userId")).longValue()).isEqualTo(secondOrder.getUserId()),
+                () -> assertThat(firstItem.get("status")).isEqualTo("CREATED"),
+                () -> assertThat(((Number) firstItem.get("totalPrice")).intValue()).isEqualTo(78_000),
+                () -> assertThat(contentOf(response))
+                    .extracting(o -> ZonedDateTime.parse((String) o.get("orderedAt")))
+                    .isSortedAccordingTo(Comparator.reverseOrder())
             );
         }
 
@@ -130,6 +144,7 @@ class OrderAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -148,6 +163,7 @@ class OrderAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -175,6 +191,7 @@ class OrderAdminV1ApiE2ETest {
             Map<String, Object> data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(data).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "totalPrice", "items"),
                 () -> assertThat(((Number) data.get("userId")).longValue()).isEqualTo(7L)
             );
@@ -197,6 +214,7 @@ class OrderAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
             );
         }
@@ -215,6 +233,7 @@ class OrderAdminV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }

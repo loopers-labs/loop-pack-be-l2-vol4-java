@@ -145,6 +145,7 @@ class UserLikeV1ApiE2ETest {
             Map<?, ?> itemBrand = (Map<?, ?>) item.get("brand");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(1),
@@ -179,9 +180,13 @@ class UserLikeV1ApiE2ETest {
             );
 
             // assert
-            assertThat(contentOf(response))
-                .extracting(item -> ((Number) item.get("productId")).longValue())
-                .containsExactly(lastLiked.getId(), firstLiked.getId());
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(contentOf(response))
+                    .extracting(item -> ((Number) item.get("productId")).longValue())
+                    .containsExactly(lastLiked.getId(), firstLiked.getId())
+            );
         }
 
         @DisplayName("좋아요한 뒤 삭제된 상품은 목록에서 제외된다.")
@@ -207,6 +212,8 @@ class UserLikeV1ApiE2ETest {
 
             // assert
             assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).hasSize(1),
                 () -> assertThat(((Number) contentOf(response).get(0).get("productId")).longValue())
                     .isEqualTo(activeProduct.getId())
@@ -230,6 +237,7 @@ class UserLikeV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -255,6 +263,7 @@ class UserLikeV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -276,6 +285,7 @@ class UserLikeV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -294,6 +304,7 @@ class UserLikeV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.UNAUTHENTICATED.getCode())
             );
         }

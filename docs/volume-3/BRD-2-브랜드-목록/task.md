@@ -12,9 +12,9 @@
 
 ## Phase 1: 목록 유스케이스 (`GET /api-admin/v1/brands?page&size`)
 
-- [X] T010 `BrandFacade.readBrands(int page, int size)` — page/size 가드(page<0·size 1~100 밖 → CoreException BAD_REQUEST; `@Validated`는 ApiSpec 인터페이스+JDK프록시로 바인딩 깨져 미사용) → `findActiveByPage` → `Page<BrandInfo>` + 단위 테스트 — `application/brand/BrandFacade.java`, `test/.../application/brand/BrandFacadeTest.java`(ReadBrands)
+- [X] T010 `BrandFacade.readBrands(int page, int size)` → `findActiveByPage` → `Page<BrandInfo>` + 단위 테스트 — `application/brand/BrandFacade.java`, `test/.../application/brand/BrandFacadeTest.java`(ReadBrands)
 - [X] T011 `BrandAdminV1Dto.PageResponse`(content=`List<DetailResponse>` 재사용, page·size·totalElements·totalPages, from `Page<BrandInfo>`) + `BrandAdminV1ApiSpec.readBrands` + `BrandAdminV1Controller` GET(`@RequestParam(defaultValue)`) — `interfaces/api/brand/`
-- [X] T012 E2E — `test/.../interfaces/api/BrandAdminV1ApiE2ETest.java`(ReadBrands: 200 메타·항목 / 빈결과 200 / 403 / 400 page·size)
+- [X] T012 E2E — `test/.../interfaces/api/BrandAdminV1ApiE2ETest.java`(ReadBrands: 200 메타·항목 / 빈결과 200 / 403)
 
 ## Phase 2: 마무리
 - [X] T050 spec 테스트 계획 대비 누락 점검

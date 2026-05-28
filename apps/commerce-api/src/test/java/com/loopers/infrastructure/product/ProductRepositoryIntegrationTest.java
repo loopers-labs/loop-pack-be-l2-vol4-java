@@ -256,14 +256,14 @@ class ProductRepositoryIntegrationTest {
             assertThat(summaries.getTotalElements()).isEqualTo(0);
         }
 
-        @DisplayName("최신 등록 순으로 조회하면 등록 시각 내림차순으로 정렬된다.")
+        @DisplayName("최신 등록 순으로 조회하면 등록 시각 내림차순(가장 최근 등록이 먼저)으로 정렬된다.")
         @Test
         void sortsByLatest() {
             // arrange
             BrandModel brand = saveBrand("브랜드");
-            saveProduct(brand.getId(), "상품1", 10_000, 5);
-            saveProduct(brand.getId(), "상품2", 10_000, 5);
-            saveProduct(brand.getId(), "상품3", 10_000, 5);
+            ProductModel first = saveProduct(brand.getId(), "상품1", 10_000, 5);
+            ProductModel second = saveProduct(brand.getId(), "상품2", 10_000, 5);
+            ProductModel third = saveProduct(brand.getId(), "상품3", 10_000, 5);
 
             // act
             Page<ProductSummary> summaries = productRepository.findActiveSummaries(null, ProductSortType.LATEST, 0, 10);
@@ -271,7 +271,7 @@ class ProductRepositoryIntegrationTest {
             // assert
             assertThat(summaries.getContent())
                 .extracting(ProductSummary::productId)
-                .isSortedAccordingTo(Comparator.reverseOrder());
+                .containsExactly(third.getId(), second.getId(), first.getId());
         }
 
         @DisplayName("가격 오름차순으로 조회하면 가격이 낮은 순으로 정렬된다.")
@@ -489,6 +489,20 @@ class ProductRepositoryIntegrationTest {
                     .extracting(ProductAdminView::productId)
                     .containsExactly(productA.getId())
             );
+        }
+
+        @DisplayName("존재하지 않는 brandId로 필터하면 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmpty_whenBrandIdIsAbsent() {
+            // arrange
+            BrandModel brand = saveBrand("브랜드");
+            saveProduct(brand.getId(), "상품", 10_000, 5);
+
+            // act
+            Page<ProductAdminView> views = productRepository.findActiveAdminViews(99999L, 0, 10);
+
+            // assert
+            assertThat(views.getTotalElements()).isEqualTo(0);
         }
 
         @DisplayName("정확한 재고 수량을 노출한다.")

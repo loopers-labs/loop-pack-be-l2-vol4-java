@@ -5,7 +5,7 @@
 
 ## 요약
 
-`GET /api-admin/v1/products?brandId&page&size`로 관리자가 상품을 페이징 조회한다. 좋아요 집계가 없어 GROUP BY·서브쿼리가 불필요하고, 브랜드명 ad-hoc JOIN + 재고 **정확 수량** + 등록/갱신 시각을 담은 read-model `ProductAdminView`를 반환한다. 정렬은 등록 시각 내림차순 고정(쿼리 ORDER BY). 인증은 기존 `/api-admin/**` 인터셉터(403), 페이지네이션·page/size 가드는 BRD-2 패턴. 기존 `ProductAdminV1Controller`(등록/수정/삭제)에 GET 추가.
+`GET /api-admin/v1/products?brandId&page&size`로 관리자가 상품을 페이징 조회한다. 좋아요 집계가 없어 GROUP BY·서브쿼리가 불필요하고, 브랜드명 ad-hoc JOIN + 재고 **정확 수량** + 등록/갱신 시각을 담은 read-model `ProductAdminView`를 반환한다. 정렬은 등록 시각 내림차순 고정(쿼리 ORDER BY). 인증은 기존 `/api-admin/**` 인터셉터(403), 페이지네이션은 BRD-2 패턴. 기존 `ProductAdminV1Controller`(등록/수정/삭제)에 GET 추가.
 
 ## 기술 컨텍스트
 - 고정: Java 21 / Spring Boot 3.4.4 / JPA / MySQL / commerce-api
@@ -14,7 +14,7 @@
 ## 컨벤션·결정 점검
 - [x] 호출 방향 준수
 - [x] admin 인증: `/api-admin/**` 인터셉터(`AdminAuthInterceptor`) 403 — 컨트롤러 추가 코드 없음
-- [x] page/size 검증: Facade 가드(BrandFacade 선례)
+- [x] page/size: 검증 없이 클라이언트 신뢰
 - [x] 결정 7: `p.deletedAt IS NULL` + 브랜드 `b.deletedAt IS NULL` JOIN 필터
 - [x] 재고 정확 수량 노출(대고객 가용 여부와 대비) — `ProductAdminView`는 `stock` 정수 그대로
 - [x] 응답: `Page` 직렬화 금지 → `ProductAdminV1Dto.PageResponse`
@@ -28,7 +28,7 @@
 
 ### application (신규/편집)
 - `application/product/ProductAdminInfo.java`(신규) — record(productId·name·description·brandId·brandName·price·stock·createdAt·updatedAt). `from(ProductAdminView)`.
-- `application/product/ProductFacade.java`(편집) — `readProductsForAdmin(Long brandId, int page, int size)` `@Transactional(readOnly=true)`: page/size 가드 → `productRepository.findActiveAdminViews(brandId, page, size)` → `.map(ProductAdminInfo::from)`.
+- `application/product/ProductFacade.java`(편집) — `readProductsForAdmin(Long brandId, int page, int size)` `@Transactional(readOnly=true)`: `productRepository.findActiveAdminViews(brandId, page, size)` → `.map(ProductAdminInfo::from)`.
 
 ### domain (신규/편집)
 - `domain/product/ProductAdminView.java`(신규) — read-model record(productId·name·description·brandId·brandName·price·stock·createdAt·updatedAt).

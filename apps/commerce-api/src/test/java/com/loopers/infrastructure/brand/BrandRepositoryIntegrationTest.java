@@ -253,5 +253,26 @@ class BrandRepositoryIntegrationTest {
                     .isSortedAccordingTo(Comparator.reverseOrder())
             );
         }
+
+        @DisplayName("2페이지를 요청하면, 오프셋이 적용되어 해당 페이지 항목만 반환된다.")
+        @Test
+        void returnsSecondPage_withOffset() {
+            // arrange
+            brandRepository.save(createBrand("브랜드1"));
+            brandRepository.save(createBrand("브랜드2"));
+            brandRepository.save(createBrand("브랜드3"));
+
+            // act
+            Page<BrandModel> firstPage = brandRepository.findActiveByPage(0, 2);
+            Page<BrandModel> secondPage = brandRepository.findActiveByPage(1, 2);
+
+            // assert
+            assertAll(
+                () -> assertThat(firstPage.getTotalElements()).isEqualTo(3),
+                () -> assertThat(firstPage.getContent()).hasSize(2),
+                () -> assertThat(secondPage.getContent()).hasSize(1),
+                () -> assertThat(secondPage.getTotalElements()).isEqualTo(3)
+            );
+        }
     }
 }

@@ -80,6 +80,23 @@ class BrandFacadeTest {
                 () -> then(brandRepository).should(never()).save(any(BrandModel.class))
             );
         }
+
+        @DisplayName("삭제된 동일 이름 브랜드가 존재해도 중복 검사를 통과하고 신규 등록된다.")
+        @Test
+        void returnsCreateInfo_whenSameNameBrandIsDeleted() {
+            // arrange
+            given(brandRepository.existsActiveByName(name)).willReturn(false);
+            given(brandRepository.save(any(BrandModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // act
+            BrandCreateInfo createInfo = brandFacade.createBrand(name, description);
+
+            // assert
+            assertAll(
+                () -> assertThat(createInfo).isNotNull(),
+                () -> then(brandRepository).should().save(any(BrandModel.class))
+            );
+        }
     }
 
     @DisplayName("브랜드를 수정할 때,")
@@ -144,6 +161,27 @@ class BrandFacadeTest {
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
                 () -> assertThat(brand.getName().value()).isEqualTo("기존 브랜드")
+            );
+        }
+
+        @DisplayName("자기 이름 그대로 수정하면 중복 검사를 통과하고 갱신된다.")
+        @Test
+        void updatesBrand_whenUpdatedWithSameName() {
+            // arrange
+            BrandModel brand = BrandModel.builder()
+                .rawName("감성 브랜드")
+                .rawDescription("기존 설명")
+                .build();
+            given(brandRepository.getActiveById(brandId)).willReturn(brand);
+            given(brandRepository.existsActiveByNameAndIdNot("감성 브랜드", brandId)).willReturn(false);
+
+            // act
+            BrandUpdateInfo updateInfo = brandFacade.updateBrand(brandId, "감성 브랜드", "새 설명");
+
+            // assert
+            assertAll(
+                () -> assertThat(updateInfo).isNotNull(),
+                () -> assertThat(brand.getDescription()).isEqualTo("새 설명")
             );
         }
     }
@@ -226,7 +264,9 @@ class BrandFacadeTest {
             // assert
             assertAll(
                 () -> assertThat(brandInfo.name()).isEqualTo("감성 브랜드"),
-                () -> assertThat(brandInfo.description()).isEqualTo("감성 설명")
+                () -> assertThat(brandInfo.description()).isEqualTo("감성 설명"),
+                () -> assertThat(brandInfo.createdAt()).isEqualTo(brand.getCreatedAt()),
+                () -> assertThat(brandInfo.updatedAt()).isEqualTo(brand.getUpdatedAt())
             );
         }
 

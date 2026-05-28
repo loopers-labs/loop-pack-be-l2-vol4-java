@@ -219,6 +219,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.UNAUTHENTICATED.getCode())
             );
         }
@@ -242,6 +243,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode()),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
             );
@@ -268,6 +270,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode()),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
             );
@@ -295,6 +298,7 @@ class OrderV1ApiE2ETest {
             ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
                 () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(3),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
@@ -326,6 +330,7 @@ class OrderV1ApiE2ETest {
             ProductModel reloadedSecond = productJpaRepository.findById(secondProduct.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(itemsOf(response)).hasSize(2),
                 () -> assertThat(((Number) response.getBody().data().get("totalPrice")).intValue()).isEqualTo(20_000),
                 () -> assertThat(reloadedFirst.getStock().value()).isEqualTo(49),
@@ -351,6 +356,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode()),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
             );
@@ -378,6 +384,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode()),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
             );
@@ -406,6 +413,7 @@ class OrderV1ApiE2ETest {
             ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode()),
                 () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(50),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
@@ -436,6 +444,7 @@ class OrderV1ApiE2ETest {
             ProductModel reloadedSufficient = productJpaRepository.findById(sufficientProduct.getId()).orElseThrow();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
                 () -> assertThat(reloadedSufficient.getStock().value()).isEqualTo(10),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
@@ -467,6 +476,7 @@ class OrderV1ApiE2ETest {
             Map<String, Object> item = itemsOf(response).get(0);
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(data).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items"),
                 () -> assertThat(((Number) data.get("orderId")).longValue()).isEqualTo(order.getId()),
                 () -> assertThat(itemsOf(response)).hasSize(1),
@@ -492,6 +502,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.UNAUTHENTICATED.getCode())
             );
         }
@@ -513,6 +524,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -536,6 +548,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
@@ -562,12 +575,20 @@ class OrderV1ApiE2ETest {
 
             // assert
             Map<String, Object> order = contentOf(response).get(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> firstItem = ((List<Map<String, Object>>) order.get("items")).get(0);
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(1),
-                () -> assertThat(order).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items")
+                () -> assertThat(order).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items"),
+                () -> assertThat(firstItem).containsOnlyKeys("productId", "productName", "brandName", "unitPrice", "quantity"),
+                () -> assertThat(firstItem.get("productName")).isEqualTo("감성 가디건"),
+                () -> assertThat(firstItem.get("brandName")).isEqualTo("감성 브랜드"),
+                () -> assertThat(((Number) firstItem.get("unitPrice")).intValue()).isEqualTo(39_000),
+                () -> assertThat(((Number) firstItem.get("quantity")).intValue()).isEqualTo(2)
             );
         }
 
@@ -589,6 +610,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(contentOf(response)).isEmpty()
             );
         }
@@ -607,6 +629,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.UNAUTHENTICATED.getCode())
             );
         }
@@ -628,6 +651,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }
@@ -649,6 +673,7 @@ class OrderV1ApiE2ETest {
             // assert
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
             );
         }

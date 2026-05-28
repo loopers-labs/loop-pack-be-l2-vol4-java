@@ -5,7 +5,7 @@
 
 ## 요약
 
-`GET /api/v1/products?brandId&sort&page&size`로 누구나 상품을 페이징 조회한다. 상품에 **브랜드명을 ad-hoc 엔티티 JOIN**으로 붙이고(Product는 `brandId`를 스칼라로 보유 — 매핑 연관 없음), **좋아요 수는 스칼라 상관 서브쿼리**로 매 조회 집계한다(결정 1). GROUP BY 없이 서브쿼리로 집계해 정렬·페이징·count 쿼리를 단순하게 유지한다. 읽기 결과는 도메인 read-model record(`ProductSummary`)로 받고, 페이지네이션은 BRD-2 패턴(Spring Data `Pageable`/`Page` + 자체 `PageResponse` DTO, page/size는 Facade 가드)을 따른다. **이 시나리오가 Product read 토대(`ProductSummary` projection·`ProductSortType`·public 컨트롤러)를 처음 세운다 — PRD-2·LIK-3가 재사용**.
+`GET /api/v1/products?brandId&sort&page&size`로 누구나 상품을 페이징 조회한다. 상품에 **브랜드명을 ad-hoc 엔티티 JOIN**으로 붙이고(Product는 `brandId`를 스칼라로 보유 — 매핑 연관 없음), **좋아요 수는 스칼라 상관 서브쿼리**로 매 조회 집계한다(결정 1). GROUP BY 없이 서브쿼리로 집계해 정렬·페이징·count 쿼리를 단순하게 유지한다. 읽기 결과는 도메인 read-model record(`ProductSummary`)로 받고, 페이지네이션은 BRD-2 패턴(Spring Data `Pageable`/`Page` + 자체 `PageResponse` DTO)을 따른다. **이 시나리오가 Product read 토대(`ProductSummary` projection·`ProductSortType`·public 컨트롤러)를 처음 세운다 — PRD-2·LIK-3가 재사용**.
 
 ## 기술 컨텍스트
 - 고정: Java 21 / Spring Boot 3.4.4 / JPA(Hibernate 6) / MySQL / commerce-api
@@ -14,7 +14,7 @@
 ## 컨벤션·결정 점검
 - [x] 호출 방향 interfaces → application → domain → infrastructure 준수
 - [x] 인증 불필요(public) — `@LoginUser` 미사용
-- [x] 검증 단일화: sort 문자열 → `ProductSortType.from(String)` VO식 검증(허용 외 → `CoreException(BAD_REQUEST)`). page/size는 `BrandFacade` 선례대로 **Facade 가드**(`@Validated` 미사용 — ApiSpec 인터페이스+JDK프록시 바인딩 깨짐)
+- [x] 검증 단일화: sort 문자열 → `ProductSortType.from(String)` VO식 검증(허용 외 → `CoreException(BAD_REQUEST)`). page/size는 검증 없이 클라이언트 신뢰(`@Validated` 미사용 — ApiSpec 인터페이스+JDK프록시 바인딩 깨짐)
 - [x] 결정 1(좋아요 매 조회 집계): 스칼라 상관 서브쿼리 `(SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id)`
 - [x] 결정 7(soft delete): `p.deletedAt IS NULL`. 브랜드 삭제 상품 제외는 cascade(상품 deletedAt)로 1차 보장 + **JOIN에 `b.deletedAt IS NULL` 방어 필터** 동시 적용
 - [x] 재고 가용 여부: projection은 `stock`(int) 보유, `available = stock > 0`은 Info 매핑에서 파생(스냅샷 컬럼 추가 안 함)
@@ -29,7 +29,7 @@
 
 ### application (신규)
 - `application/product/ProductSummaryInfo.java` — record(`Long productId, String name, Long brandId, String brandName, int price, boolean available, long likeCount`). `from(ProductSummary)`: `available = summary.stock() > 0`.
-- `application/product/ProductFacade.java`(편집) — `readProducts(Long brandId, String sort, int page, int size)` 신규 `@Transactional(readOnly = true)`: page/size 가드(page<0·size 1~100 밖 → `CoreException(BAD_REQUEST)`, 상수 `MIN_PAGE_SIZE`/`MAX_PAGE_SIZE`) → `ProductSortType.from(sort)` → `productRepository.findActiveSummaries(brandId, sortType, page, size)` → `.map(ProductSummaryInfo::from)`.
+- `application/product/ProductFacade.java`(편집) — `readProducts(Long brandId, String sort, int page, int size)` 신규 `@Transactional(readOnly = true)`: `ProductSortType.from(sort)` → `productRepository.findActiveSummaries(brandId, sortType, page, size)` → `.map(ProductSummaryInfo::from)`.
 
 ### domain (신규/편집)
 - `domain/product/ProductSummary.java`(신규) — read-model record(`Long productId, String name, Long brandId, String brandName, Integer price, Integer stock, Long likeCount`). JPA 무관 순수 데이터.

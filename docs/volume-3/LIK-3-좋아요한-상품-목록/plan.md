@@ -15,7 +15,7 @@
 - [x] 호출 방향 준수
 - [x] 인증: `@LoginUser AuthenticatedUser` — 인증 실패는 ArgumentResolver가 401(UNAUTHENTICATED)
 - [x] 본인 일치: `loginUser.userId() != pathUserId` → 빈 페이지(200, 401·403 아님). 인증 자체는 통과한 상태
-- [x] page/size 검증: Facade 가드(BrandFacade 선례)
+- [x] page/size: Facade 가드 없음(클라 신뢰 방침). 기본값만 Controller에서 적용(page=0, size=20)
 - [x] 결정 1: 좋아요 수 스칼라 서브쿼리 집계
 - [x] 결정 7 / LIK-2 대칭: 삭제 상품·브랜드 cascade 삭제 상품은 JOIN(`p.deletedAt IS NULL`·`b.deletedAt IS NULL`)으로 제외
 - [x] 정렬: 최신 좋아요 순(`myLike.createdAt DESC`) 고정
@@ -27,7 +27,7 @@
 - `interfaces/api/like/UserLikeV1ApiSpec.java`(신규) — `@Tag` + `readLikedProducts` 선언(`@Parameter(hidden=true)` loginUser).
 
 ### application (편집)
-- `application/like/LikeFacade.java`(편집) — `readLikedProducts(Long authUserId, Long pathUserId, int page, int size)` `@Transactional(readOnly=true)`: page/size 가드 → `authUserId`와 `pathUserId` 불일치면 `Page.empty(PageRequest.of(page, size))` 반환 → 일치하면 `likeRepository.findLikedProductSummaries(authUserId, page, size).map(ProductSummaryInfo::from)`. 반환 `Page<ProductSummaryInfo>`.
+- `application/like/LikeFacade.java`(편집) — `readLikedProducts(Long authUserId, Long pathUserId, int page, int size)` `@Transactional(readOnly=true)`: `authUserId`와 `pathUserId` 불일치면 `Page.empty(PageRequest.of(page, size))` 반환 → 일치하면 `likeRepository.findLikedProductSummaries(authUserId, page, size).map(ProductSummaryInfo::from)`. 반환 `Page<ProductSummaryInfo>`. (page/size 가드 없음 — 클라 신뢰 방침)
 
 ### domain (편집)
 - `domain/like/LikeRepository.java`(편집) — `Page<ProductSummary> findLikedProductSummaries(Long userId, int page, int size)` 추가(`ProductSummary`는 `domain.product` 재사용).
