@@ -1,5 +1,7 @@
 package com.loopers.domain.product;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -31,5 +33,12 @@ public class StockModel {
 
     public void updateQuantity(Integer quantity) {
         this.quantity = quantity;
+    }
+
+    public void decrease(int amount) {
+        if (this.quantity < amount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+        }
+        this.quantity -= amount;
     }
 }

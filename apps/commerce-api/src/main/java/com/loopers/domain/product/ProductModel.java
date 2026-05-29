@@ -70,6 +70,10 @@ public class ProductModel extends BaseSoftDeleteEntity {
         }
     }
 
+    public void assignStock(int quantity) {
+        this.stock = new StockModel(this, quantity);
+    }
+
     private void validateBrandId(Long brandId) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
