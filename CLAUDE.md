@@ -28,6 +28,22 @@
 - 응답 래핑 `ApiResponse<T>`, 예외 변환 `ApiControllerAdvice`.
 - 컨트롤러는 `*V1ApiSpec` implements (Swagger 어노테이션 분리).
 
+## 도메인 & 객체 설계 전략
+- 도메인 객체는 데이터가 아닌 **행위와 책임**을 가진다. 비즈니스 규칙은 도메인 안에 캡슐화한다.
+- **Entity**: 고유 ID 로 동일성 판단, 상태 변화·연속성을 가짐 (`User`, `Product`, `Order`).
+- **Value Object**: 값이 같으면 동일한 불변 객체. 값/계산 중심 개념은 VO 로 표현하고 규칙(음수 방지 등)을 내부에 캡슐화 (`Money`, `Quantity`). JPA 는 `@Embeddable` class 로 매핑 (record 불가).
+- **Domain Service**: 상태 없이 여러 도메인 객체의 협력이 필요한 로직만 담당. 단순 위임·연산(doer)은 도메인이 아니다.
+- 같은 규칙이 여러 서비스에 중복되면 도메인 객체로 옮길 후보다.
+- Aggregate 내부 엔티티는 root 를 통해서만 접근한다 (예: `OrderItem` 은 `Order` 경유).
+- 책임·결합도 판단이 모호하면 임의로 정하지 말고 개발자 의도를 먼저 확인한다.
+
+## 아키텍처 & DIP 전략
+- 레이어드 아키텍처 + DIP. 의존 방향은 **Application → Domain ← Infrastructure**, 모든 화살표는 Domain 을 향한다.
+- Domain 은 다른 계층에 의존하지 않는다. Repository **인터페이스는 domain**, **구현체는 infrastructure** 에 둔다.
+- Application(Facade)은 도메인 객체를 조합해 흐름만 orchestration 하고, 비즈니스 로직은 도메인에 위임한다.
+- API request/response DTO 와 application 의 Info/Command 는 분리한다.
+- 테스트는 외부 의존성을 Fake/Stub 으로 분리해 단위 테스트 가능하게 구성한다.
+
 ## 개발 Workflow
 **증강 코딩**: AI 는 방향성·결정에 *제안만* 한다. 임의 판단/테스트 삭제 금지.
 
