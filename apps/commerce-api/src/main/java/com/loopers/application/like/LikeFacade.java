@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
@@ -19,11 +20,13 @@ public class LikeFacade {
     private final ProductService productService;
     private final BrandService brandService;
 
+    @Transactional
     public void addLike(Long userId, Long productId) {
         likeService.like(userId, productId);
         productService.incrementLikeCount(productId);
     }
 
+    @Transactional
     public void removeLike(Long userId, Long productId) {
         likeService.unlike(userId, productId);
         productService.decrementLikeCount(productId);
