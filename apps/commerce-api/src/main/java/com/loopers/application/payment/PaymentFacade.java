@@ -21,11 +21,14 @@ public class PaymentFacade {
     private final OrderStockService orderStockService;
     private final PaymentService paymentService;
 
-    /** 결제 확정 — 재고+주문 확정(금액/상태 검증 포함) + 결제 저장 */
+    /** 결제 확정 — 재고+주문 확정(금액/상태 검증 포함) + 결제 저장 (멱등) */
     public PaymentInfo confirm(UUID orderId, String pgTransactionId, Long amount) {
         OrderModel order = orderService.get(orderId);
         orderStockService.confirmOrder(order, amount);
-        PaymentModel payment = paymentService.save(new PaymentModel(orderId, pgTransactionId, PaymentStatus.SUCCESS, amount));
+        PaymentModel payment = paymentService.saveIfAbsent(
+            orderId,
+            new PaymentModel(orderId, pgTransactionId, PaymentStatus.SUCCESS, amount)
+        );
         return PaymentInfo.from(payment);
     }
 
