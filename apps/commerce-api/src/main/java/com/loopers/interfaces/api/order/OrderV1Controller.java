@@ -6,6 +6,7 @@ import com.loopers.application.order.OrderItemCommand;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.LoginUser;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class OrderV1Controller {
     @PostMapping
     public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
         @LoginUser UserInfo loginUser,
-        @RequestBody OrderV1Dto.CreateOrderRequest request
+        @Valid @RequestBody OrderV1Dto.CreateOrderRequest request
     ) {
         List<OrderItemCommand> items = request.items().stream()
             .map(item -> new OrderItemCommand(item.productId(), item.quantity()))
@@ -51,7 +52,10 @@ public class OrderV1Controller {
     }
 
     @GetMapping("/{orderId}")
-    public ApiResponse<OrderV1Dto.OrderResponse> getOrder(@PathVariable(value = "orderId") Long orderId) {
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.getOrder(orderId)));
+    public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
+        @LoginUser UserInfo loginUser,
+        @PathVariable(value = "orderId") Long orderId
+    ) {
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.getOrder(loginUser.id(), orderId)));
     }
 }

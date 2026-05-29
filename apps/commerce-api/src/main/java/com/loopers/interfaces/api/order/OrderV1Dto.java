@@ -1,13 +1,26 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderInfo;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 public class OrderV1Dto {
 
-    public record CreateOrderRequest(List<Item> items) {
-        public record Item(Long productId, int quantity) {}
+    public record CreateOrderRequest(
+        @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.")
+        @Valid
+        List<Item> items
+    ) {
+        public record Item(
+            @NotNull(message = "productId 는 필수입니다.")
+            Long productId,
+            @Min(value = 1, message = "quantity 는 1 이상이어야 합니다.")
+            int quantity
+        ) {}
     }
 
     public record OrderResponse(

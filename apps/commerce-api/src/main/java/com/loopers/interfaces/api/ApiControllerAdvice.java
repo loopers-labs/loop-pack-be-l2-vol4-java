@@ -8,6 +8,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -100,6 +101,14 @@ public class ApiControllerAdvice {
         } else {
             return failureResponse(ErrorType.BAD_REQUEST, null);
         }
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleBadRequest(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+            .map(err -> err.getField() + ": " + err.getDefaultMessage())
+            .collect(Collectors.joining(", "));
+        return failureResponse(ErrorType.BAD_REQUEST, message.isBlank() ? "요청 검증에 실패했습니다." : message);
     }
 
     @ExceptionHandler

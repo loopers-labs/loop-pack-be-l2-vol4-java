@@ -48,9 +48,13 @@ public class OrderFacade {
         return OrderInfo.from(orderRepository.save(order));
     }
 
+    /**
+     * 주문 단건 조회. 본인 주문만 볼 수 있고, 남의 주문은 존재 자체를 노출하지 않기 위해 NOT_FOUND 로 응답한다.
+     */
     @Transactional(readOnly = true)
-    public OrderInfo getOrder(Long orderId) {
+    public OrderInfo getOrder(Long userId, Long orderId) {
         Order order = orderRepository.find(orderId)
+            .filter(o -> o.getUserId().equals(userId))
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
         return OrderInfo.from(order);
     }
