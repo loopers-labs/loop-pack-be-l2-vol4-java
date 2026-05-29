@@ -32,4 +32,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
 
     @Query("SELECT p FROM ProductModel p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
     List<ProductModel> findAllByBrandId(@Param("brandId") Long brandId);
+
+    @Query("SELECT p FROM ProductModel p WHERE p.id IN :ids AND p.deletedAt IS NULL")
+    List<ProductModel> findAllByIdInAndDeletedAtIsNull(@Param("ids") List<Long> ids);
 }

@@ -1,104 +1,47 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.payment.PaymentResult;
-import com.loopers.domain.payment.PaymentService;
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.stock.StockService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.ZonedDateTime;
 import java.util.List;
 
-@RequiredArgsConstructor
+/**
+ * 주문 도메인 협력 Service (스타일 2 - Percival 정통).
+ *
+ * <p>Repository / 외부 시스템 의존 없이 호출자가 조회해서 넘긴 도메인 객체만으로 협력한다.
+ * 모든 영속성 호출과 트랜잭션 경계는 {@link com.loopers.application.order.OrderFacade}가 책임진다.
+ *
+ * <p>한 줄 단위 문맥은 {@link OrderLine} 으로 묶어서 받는다. 여러 리스트(products/stocks/items)를
+ * 인덱스로 매칭하던 약한 결합을 제거한다.
+ */
 @Service
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
-    private final StockService stockService;
-    private final PaymentService paymentService;
-
     /**
-     * 주문 생성 + 결제 흐름 (요구사항 F-10, F-11, P-5).
+     * 주문 생성 + 항목별 재고 차감 도메인 협력.
      *
-     * 단일 트랜잭션 내에서 다음을 처리한다.
-     * 1. 각 상품 검증 + 재고 차감 (실패 시 예외 throw → 트랜잭션 롤백)
-     * 2. 주문 PENDING 저장
-     * 3. 결제 요청 (외부 PG 동기 호출)
-     * 4. 성공: 주문 COMPLETED 로 전이
-     *    실패: 주문 CANCELLED + 재고 복구 (예외 X, 보상 처리. 결제 실패 기록 보존을 위해 커밋한다)
+     * <p>각 {@link OrderLine} 의 Stock 에 대해 {@link com.loopers.domain.stock.StockModel#deduct(int)}
+     * 도메인 메서드를 호출하여 재고 음수 방지 규칙을 위임한다.
      */
-    @Transactional
-    public OrderModel createOrder(Long userId, List<OrderItemCommand> items) {
-        if (items == null || items.isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
-        }
-
+    public OrderModel createWithStockDeduction(Long userId, List<OrderLine> orderLines) {
         OrderModel order = new OrderModel(userId);
-
-        for (OrderItemCommand itemCommand : items) {
-            ProductModel product = productRepository.findById(itemCommand.productId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + itemCommand.productId() + "] 상품을 찾을 수 없습니다."));
-
-            stockService.deduct(product.getId(), itemCommand.quantity());
-
-            OrderItemModel orderItem = new OrderItemModel(
+        for (OrderLine line : orderLines) {
+            line.stock().deduct(line.quantity());
+            order.addItem(new OrderItemModel(
                 order,
-                product.getId(),
-                product.getName(),
-                product.getPrice(),
-                itemCommand.quantity()
-            );
-            order.addItem(orderItem);
+                line.product().getId(),
+                line.product().getName(),
+                line.product().getPrice(),
+                line.quantity()
+            ));
         }
-
         order.confirmTotalPrice();
-        OrderModel saved = orderRepository.save(order);
-
-        PaymentResult result = paymentService.process(saved.getId(), saved.getTotalPrice());
-
-        if (result.isSuccess()) {
-            saved.complete();
-        } else {
-            saved.cancel();
-            for (OrderItemCommand itemCommand : items) {
-                stockService.restore(itemCommand.productId(), itemCommand.quantity());
-            }
-        }
-
-        return saved;
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderModel> getOrders(Long userId, ZonedDateTime startAt, ZonedDateTime endAt) {
-        return orderRepository.findByUserIdAndOrderedAtBetween(userId, startAt, endAt);
-    }
-
-    @Transactional(readOnly = true)
-    public OrderModel getOrder(Long userId, Long orderId) {
-        OrderModel order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
-
-        if (!order.getUserId().equals(userId)) {
-            // 본인 외 주문 접근은 존재 자체를 노출하지 않기 위해 404로 응답 (P-11)
-            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다.");
-        }
         return order;
     }
 
-    @Transactional(readOnly = true)
-    public OrderModel findById(Long orderId) {
-        return orderRepository.findById(orderId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderModel> getAllOrders(int page, int size) {
-        return orderRepository.findAll(page, size);
+    /** 결제 실패 시 주문 항목별 재고 복구 도메인 협력. */
+    public void restoreStocks(List<OrderLine> orderLines) {
+        for (OrderLine line : orderLines) {
+            line.stock().restore(line.quantity());
+        }
     }
 }

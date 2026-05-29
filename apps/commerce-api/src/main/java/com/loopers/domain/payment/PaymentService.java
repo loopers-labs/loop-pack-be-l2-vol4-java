@@ -4,6 +4,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 결제 트랜잭션 책임 Service.
+ *
+ * <p><strong>스타일 선택 - Vernon 절충 (스타일 2 예외)</strong>:
+ * {@link com.loopers.domain.order.OrderService} 와 동일한 사유로 Service 계층을 유지한다.
+ *
+ * <ul>
+ *   <li>외부 PG ({@link PaymentGateway}) 동기 호출이 트랜잭션 내부에서 일어남</li>
+ *   <li>REQUESTED → SUCCESS/FAILED 상태 전이가 같은 트랜잭션에서 기록되어야</li>
+ *   <li>실패 시에도 결과를 예외가 아닌 {@link PaymentResult} 로 반환 (호출자가 보상 처리)</li>
+ * </ul>
+ *
+ * <p>이 패턴은 Vernon 의 "복잡한 트랜잭션엔 Domain Service 허용" 견해를 따른다.
+ */
 @RequiredArgsConstructor
 @Service
 public class PaymentService {

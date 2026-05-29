@@ -27,6 +27,12 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAllByIds(List<Long> ids) {
+        if (ids.isEmpty()) return List.of();
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids);
+    }
+
+    @Override
     public List<ProductModel> findAll(Long brandId, String sort, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         String sortKey = sort == null ? "latest" : sort;

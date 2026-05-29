@@ -26,4 +26,9 @@ public record PaymentResult(
     public boolean isSuccess() {
         return status == Status.SUCCESS;
     }
+
+    /** 실패 사유. null 이면 기본 메시지를 반환한다. 결제 실패 응답 메시지 구성에 사용. */
+    public String failureReasonOrDefault() {
+        return failureReason != null ? failureReason : "결제 실패로 주문이 취소되었습니다.";
+    }
 }
