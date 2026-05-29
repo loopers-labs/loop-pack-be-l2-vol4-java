@@ -5,18 +5,12 @@ import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
     private final ProductService productService;
-
-    public ProductInfo createProduct(Long brandId, String name, BigDecimal price) {
-        ProductModel product = productService.createProduct(brandId, name, price);
-        return ProductInfo.from(product);
-    }
 
     public ProductInfo getProduct(Long id) {
         ProductModel product = productService.getProduct(id);
@@ -28,14 +22,5 @@ public class ProductFacade {
         return products.stream()
             .map(ProductInfo::from)
             .toList();
-    }
-
-    public ProductInfo updateProduct(Long id, String name, BigDecimal price) {
-        ProductModel product = productService.updateProduct(id, name, price);
-        return ProductInfo.from(product);
-    }
-
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
     }
 }
