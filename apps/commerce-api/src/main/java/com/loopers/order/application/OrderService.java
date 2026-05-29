@@ -26,9 +26,9 @@ import java.util.List;
 public class OrderService {
 
     private final ProductReader productReader;
+    private final ProductStockRepository productStockRepository;
     private final BrandReader brandReader;
     private final OrderRepository orderRepository;
-    private final ProductStockRepository productStockRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderNumberGenerator orderNumberGenerator;
     private final PaymentService paymentService;
