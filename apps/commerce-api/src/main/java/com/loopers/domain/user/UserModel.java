@@ -54,7 +54,7 @@ public class UserModel extends BaseEntity {
         this.password = hasher.hash(this.password);
     }
 
-    void updatePassword(String encodedNewPassword) {
+    public void updatePassword(String encodedNewPassword) {
         this.password = new EncodedPassword(encodedNewPassword).value();
     }
 

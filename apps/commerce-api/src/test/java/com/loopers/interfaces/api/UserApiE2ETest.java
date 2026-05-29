@@ -2,7 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserService;
 import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
