@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -24,54 +27,52 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
+    private final OrderDomainService orderDomainService;
 
     @Transactional
     public OrderModel create(Long memberId, List<OrderItemCommand> commands) {
         // 1. 상품 존재 확인
-        List<ProductModel> products = commands.stream()
-            .map(cmd -> productRepository.findById(cmd.productId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 상품을 찾을 수 없습니다.")))
-            .toList();
+        Map<Long, ProductModel> productMap = commands.stream()
+            .collect(Collectors.toMap(
+                OrderItemCommand::productId,
+                cmd -> productRepository.findById(cmd.productId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 상품을 찾을 수 없습니다."))
+            ));
 
         // 2. productId 오름차순 정렬 (데드락 방지)
         List<OrderItemCommand> sorted = commands.stream()
             .sorted(Comparator.comparingLong(OrderItemCommand::productId))
             .toList();
 
-        // 3. 재고 확인 (비관적 락)
-        for (OrderItemCommand cmd : sorted) {
-            StockModel stock = stockRepository.findByProductIdForUpdate(cmd.productId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 재고를 찾을 수 없습니다."));
-            if (!stock.isAvailable(cmd.quantity())) {
-                throw new CoreException(ErrorType.BAD_REQUEST, "[productId = " + cmd.productId() + "] 재고가 부족합니다.");
-            }
-        }
+        // 3. 재고 비관적 락 취득
+        Map<Long, StockModel> stockMap = sorted.stream()
+            .collect(Collectors.toMap(
+                OrderItemCommand::productId,
+                cmd -> stockRepository.findByProductIdForUpdate(cmd.productId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 재고를 찾을 수 없습니다."))
+            ));
 
-        // 4. totalPrice 계산
-        long totalPrice = commands.stream()
-            .mapToLong(cmd -> {
-                ProductModel product = products.stream()
-                    .filter(p -> p.getId().equals(cmd.productId()))
-                    .findFirst().orElseThrow();
-                return product.getPrice() * cmd.quantity();
-            })
-            .sum();
+        Map<Long, Integer> quantityMap = commands.stream()
+            .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
-        // 5. 주문 저장
+        // 4. 재고 검증 (도메인 서비스)
+        orderDomainService.validateStockAvailability(List.copyOf(stockMap.values()), quantityMap);
+
+        // 5. 총 가격 계산 (도메인 서비스)
+        long totalPrice = orderDomainService.calculateTotalPrice(List.copyOf(productMap.values()), quantityMap);
+
+        // 6. 주문 저장
         OrderModel order = orderRepository.save(new OrderModel(memberId, totalPrice));
 
-        // 6. OrderItem 저장 (스냅샷)
+        // 7. OrderItem 저장 (스냅샷)
         for (OrderItemCommand cmd : commands) {
-            ProductModel product = products.stream()
-                .filter(p -> p.getId().equals(cmd.productId()))
-                .findFirst().orElseThrow();
+            ProductModel product = productMap.get(cmd.productId());
             orderRepository.saveItem(new OrderItemModel(order.getId(), product.getId(), product.getName(), product.getPrice(), cmd.quantity()));
         }
 
-        // 7. 재고 일괄 차감
+        // 8. 재고 차감 (이미 락된 StockModel 재사용)
         for (OrderItemCommand cmd : sorted) {
-            StockModel stock = stockRepository.findByProductIdForUpdate(cmd.productId()).orElseThrow();
-            stock.decrease(cmd.quantity());
+            stockMap.get(cmd.productId()).decrease(cmd.quantity());
         }
 
         return order;

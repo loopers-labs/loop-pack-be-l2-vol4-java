@@ -32,9 +32,9 @@ public class ProductDto {
         int quantity
     ) {}
 
-    public record ProductResponse(Long id, String name, Long price, Long brandId, int likeCount) {
+    public record ProductResponse(Long id, String name, Long price, Long brandId, String brandName, int likeCount) {
         public static ProductResponse from(ProductInfo info) {
-            return new ProductResponse(info.id(), info.name(), info.price(), info.brandId(), info.likeCount());
+            return new ProductResponse(info.id(), info.name(), info.price(), info.brandId(), info.brandName(), info.likeCount());
         }
     }
 

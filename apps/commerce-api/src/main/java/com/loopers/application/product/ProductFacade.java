@@ -2,6 +2,8 @@ package com.loopers.application.product;
 
 import com.loopers.application.brand.BrandService;
 import com.loopers.application.stock.StockService;
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.stock.StockModel;
@@ -18,6 +20,7 @@ public class ProductFacade {
     private final ProductService productService;
     private final StockService stockService;
     private final BrandService brandService;
+    private final ProductDomainService productDomainService;
 
     @Transactional
     public ProductInfo createProduct(String name, Long price, Long brandId, int stockQuantity) {
@@ -28,7 +31,9 @@ public class ProductFacade {
     }
 
     public ProductInfo getProduct(Long id) {
-        return ProductInfo.from(productService.getById(id));
+        ProductModel product = productService.getById(id);
+        BrandModel brand = brandService.getById(product.getBrandId());
+        return ProductInfo.from(productDomainService.combineWithBrand(product, brand));
     }
 
     public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, int page, int size) {

@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -41,7 +42,7 @@ class OrderServiceTest {
         fakeOrderRepository = new FakeOrderRepository();
         fakeProductRepository = new FakeProductRepository();
         fakeStockRepository = new FakeStockRepository();
-        orderService = new OrderService(fakeOrderRepository, fakeProductRepository, fakeStockRepository);
+        orderService = new OrderService(fakeOrderRepository, fakeProductRepository, fakeStockRepository, new OrderDomainService());
     }
 
     @DisplayName("주문을 생성할 때,")
@@ -65,6 +66,36 @@ class OrderServiceTest {
             assertThat(saved.getStatus()).isEqualTo(OrderStatus.PENDING);
             assertThat(saved.getTotalPrice()).isEqualTo(20000L);
             assertThat(fakeOrderRepository.findItemsByOrderId(saved.getId())).hasSize(1);
+        }
+
+        @DisplayName("존재하지 않는 상품으로 주문하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void create_throwsNotFound_whenProductDoesNotExist() {
+            // arrange
+            Long nonExistentProductId = 999L;
+            List<OrderItemCommand> items = List.of(new OrderItemCommand(nonExistentProductId, 1));
+
+            // act & assert
+            assertThatThrownBy(() -> orderService.create(1L, items))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("재고가 부족한 상품으로 주문하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void create_throwsBadRequest_whenStockIsInsufficient() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 1));
+
+            List<OrderItemCommand> items = List.of(new OrderItemCommand(product.getId(), 5));
+
+            // act & assert
+            assertThatThrownBy(() -> orderService.create(1L, items))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 
