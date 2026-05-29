@@ -26,6 +26,11 @@ public class BrandService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.Optional<BrandModel> findBrand(Long id) {
+        return brandRepository.find(id);
+    }
+
+    @Transactional(readOnly = true)
     public List<BrandModel> getAllBrands() {
         return brandRepository.findAll();
     }
