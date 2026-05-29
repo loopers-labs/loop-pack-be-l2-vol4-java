@@ -13,26 +13,7 @@
       "Bash(grep -A 15 \"failure\" \"C:\\\\loopers\\\\apps\\\\commerce-api\\\\build\\\\test-results\\\\test\\\\TEST-com.loopers.interfaces.api.UserV1ApiE2ETest\\\\$Register.xml\" | head -20)",
       "Bash(docker info *)",
       "Bash(./gradlew test *)",
-      "Bash(./gradlew :apps:commerce-batch:test --info)",
-      "Bash(mkdir -p C:/loopers/.claude/commands)",
-      "Bash(git -C \"C:/loopers\" add .claude/commands/ REVIEW_MY_INFO_AND_PASSWORD.md TDD_LEARNING_NOTES.md TDD_PROGRESS.md TESTCONTAINERS_TROUBLESHOOTING.md TEST_GUIDE.md)",
-      "Bash(git -C C:/loopers commit -m ' *)",
-      "WebFetch(domain:medium.com)",
-      "Bash(git -C \"C:/loopers\" add TEST_GUIDE.md .claude/commands/test-guide.md)",
-      "Bash(mkdir -p \"C:/loopers/.claude/skills/test-guide\")",
-      "Bash(rm \"C:/loopers/.claude/commands/test-guide.md\")",
-      "Bash(git -C \"C:/loopers\" add .claude/skills/ .claude/commands/)",
-      "Bash(git -C \"C:/loopers\" add .claude/skills/test-guide/SKILL.md)",
-      "Bash(mkdir -p \"C:/loopers/.claude/skills/requirements-analysis\")",
-      "Bash(git -C \"C:/loopers\" add .claude/skills/requirements-analysis/)",
-      "Bash(git -C \"C:/loopers\" add .docs/)",
-      "Bash(git -C \"C:/loopers\" add .docs/design/04-erd.md)",
-      "Bash(git -C \"C:/loopers\" add .docs/design/)",
-      "Bash(xargs grep -l \"class.*Model\\\\|class.*Repository\\\\|class.*Service\\\\|class.*Controller\")",
-      "Bash(xargs grep -l \"order\\\\|Order\")",
-      "Bash(gh api *)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "Bash(./gradlew :apps:commerce-batch:test --info)"
     ]
   }
 }

@@ -3,8 +3,6 @@ package com.loopers.interfaces.api.user;
 import com.loopers.application.user.UserInfo;
 import jakarta.validation.constraints.NotBlank;
 
-import java.util.UUID;
-
 public class UserV1Dto {
 
     public record RegisterRequest(
@@ -17,7 +15,7 @@ public class UserV1Dto {
 
     // password 필드 의도적으로 제외 — 사이클 9 검증 대상
     public record RegisterResponse(
-        UUID id,
+        Long id,
         String loginId,
         String name,
         String birth,
@@ -36,7 +34,7 @@ public class UserV1Dto {
 
     // 내정보 조회 응답 — name 은 마스킹된 값
     public record MyInfoResponse(
-        UUID id,
+        Long id,
         String loginId,
         String name,
         String birth,

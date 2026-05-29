@@ -5,8 +5,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import java.util.UUID;
-
 @Tag(name = "Example V1 API", description = "Loopers 예시 API 입니다.")
 public interface ExampleV1ApiSpec {
 
@@ -16,6 +14,6 @@ public interface ExampleV1ApiSpec {
     )
     ApiResponse<ExampleV1Dto.ExampleResponse> getExample(
         @Schema(name = "예시 ID", description = "조회할 예시의 ID")
-        UUID exampleId
+        Long exampleId
     );
 }

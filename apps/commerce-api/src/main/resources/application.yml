@@ -29,17 +29,11 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-pg:
-  hmac-secret: change-me
-
 ---
 spring:
   config:
     activate:
       on-profile: local, test
-
-pg:
-  hmac-secret: test-pg-secret
 
 ---
 spring:

@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/examples")
@@ -21,7 +19,7 @@ public class ExampleV1Controller implements ExampleV1ApiSpec {
     @GetMapping("/{exampleId}")
     @Override
     public ApiResponse<ExampleV1Dto.ExampleResponse> getExample(
-        @PathVariable(value = "exampleId") UUID exampleId
+        @PathVariable(value = "exampleId") Long exampleId
     ) {
         ExampleInfo info = exampleFacade.getExample(exampleId);
         ExampleV1Dto.ExampleResponse response = ExampleV1Dto.ExampleResponse.from(info);

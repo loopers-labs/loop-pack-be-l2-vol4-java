@@ -10,7 +10,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Loopers Spring Java 템플릿 — Spring Boot 3.4.4, Java 21 기반의 Gradle 멀티 모듈 프로젝트. 로컬 개발 환경은 Docker Compose로 인프라를 구성한다.
 모듈 구조 및 아키텍처 상세는 `PROJECT_STRUCTURE.md` 참고.
-DDD 설계/구현 의사결정 기준은 `.docs/ddd-guide.md` 참고 — 도메인 모델링, 애그리거트, 트랜잭션 경계, 서비스 계층, 이벤트, CQRS 등의 패턴 적용 시 이 문서를 기준으로 삼는다.
 
 ## 명령어
 
@@ -67,7 +66,6 @@ docker-compose -f ./docker/monitoring-compose.yml up
 
 - Controller는 Service가 아닌 Facade를 호출한다
 - Facade는 도메인 Model을 인터페이스 계층용 Info 객체로 변환한다
-- **Service 간 직접 참조 금지**: 여러 Service를 조합해야 하는 경우 반드시 Facade에서 각각 호출한다 (예: BrandFacade.delete() → brandService.delete() + productService.deleteByBrand())
 - Service는 비즈니스 오류 발생 시 `CoreException(ErrorType)`을 던진다
 - `ApiControllerAdvice`가 `CoreException`을 HTTP 응답으로 변환한다
 
@@ -95,7 +93,7 @@ docker-compose -f ./docker/monitoring-compose.yml up
 - **중간 결과 보고**: AI가 반복적인 동작을 하거나, 요청하지 않은 기능을 구현하거나, 테스트를 임의로 삭제할 경우 개발자가 개입한다.
 - **설계 주도권 유지**: AI가 임의 판단하지 않고, 방향성에 대한 제안은 할 수 있으나 개발자의 승인을 받은 후 수행한다.
 - **md 파일 중복 방지**: `.md` 파일에 내용을 추가하기 전에 동일하거나 유사한 내용이 이미 존재하는지 먼저 확인하고, 중복이 발견되면 개발자에게 알리고 승인을 받은 후 진행한다.
-- **개발 완료 후 자동 커밋**: 소스 개발이 완료되면 변경된 파일에 영향받는 모듈 테스트만 실행한다(`./gradlew :apps:<module>:test`). 전체 테스트(`./gradlew test`)는 사용자가 명시적으로 요청할 때만 실행한다. 해당 테스트가 통과하면 변경된 파일을 스테이징하고 작업 내용을 요약한 커밋 메시지로 자동으로 `git commit`을 수행한다.
+- **개발 완료 후 자동 커밋**: 소스 개발이 완료되어 모든 테스트가 통과하면, 변경된 파일을 스테이징하고 작업 내용을 요약한 커밋 메시지로 자동으로 `git commit`을 수행한다.
 
 ### 개발 Workflow — TDD (Red → Green → Refactor)
 
