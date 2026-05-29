@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재고 오버부킹 문제와 비관적 락으로 해결하기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.8;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 60px auto;
+            padding: 0 24px;
+        }
+
+        /* 헤더 */
+        .header {
+            margin-bottom: 48px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e8f4fd;
+            color: #1a73e8;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1a1a2e;
+            line-height: 1.3;
+            margin-bottom: 16px;
+        }
+
+        .meta {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #e8e8e8;
+            margin: 40px 0;
+        }
+
+        /* 섹션 */
+        h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 48px 0 20px;
+            padding-left: 14px;
+            border-left: 4px solid #1a73e8;
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin: 32px 0 14px;
+        }
+
+        p {
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: #444;
+        }
+
+        /* 코드 블록 */
+        pre {
+            background: #1e1e2e;
+            color: #cdd6f4;
+            border-radius: 10px;
+            padding: 24px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.7;
+            position: relative;
+        }
+
+        pre .comment { color: #6c7086; }
+        pre .keyword { color: #cba6f7; }
+        pre .string  { color: #a6e3a1; }
+        pre .annotation { color: #fab387; }
+        pre .type    { color: #89dceb; }
+        pre .number  { color: #fab387; }
+
+        code {
+            background: #eef2ff;
+            color: #4f46e5;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+
+        /* 테이블 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 15px;
+        }
+
+        th {
+            background: #1a73e8;
+            color: #fff;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:nth-child(even) td {
+            background: #f8f9ff;
+        }
+
+        tr:hover td {
+            background: #eef2ff;
+        }
+
+        /* 콜아웃 박스 */
+        .callout {
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin: 24px 0;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .callout.danger {
+            background: #fff1f0;
+            border: 1px solid #ffd6d6;
+        }
+
+        .callout.info {
+            background: #e8f4fd;
+            border: 1px solid #c2dff7;
+        }
+
+        .callout.warning {
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+        }
+
+        .callout .icon {
+            font-size: 22px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .callout .text {
+            font-size: 15px;
+            color: #444;
+            line-height: 1.7;
+        }
+
+        .callout strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 15px;
+        }
+
+        /* 흐름 다이어그램 */
+        .flow {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 24px;
+            margin: 20px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 2;
+            color: #444;
+        }
+
+        .flow .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 4px 0;
+        }
+
+        .flow .arrow {
+            color: #1a73e8;
+            font-weight: bold;
+        }
+
+        .flow .highlight {
+            background: #eef2ff;
+            color: #4f46e5;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .flow .success { color: #16a34a; font-weight: 600; }
+        .flow .danger  { color: #dc2626; font-weight: 600; }
+
+        /* 변경 전/후 비교 */
+        .diff-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .diff-box {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .diff-label {
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .diff-box.before .diff-label {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .diff-box.after .diff-label {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .diff-box pre {
+            border-radius: 0;
+            margin: 0;
+        }
+
+        /* 결론 카드 */
+        .result-card {
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            color: #fff;
+            border-radius: 14px;
+            padding: 32px;
+            margin: 40px 0;
+        }
+
+        .result-card h3 {
+            color: #fff;
+            font-size: 20px;
+            margin: 0 0 20px;
+        }
+
+        .result-card table th {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        .result-card table td {
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        .result-card table tr:nth-child(even) td {
+            background: rgba(255,255,255,0.07);
+        }
+
+        .result-card table tr:hover td {
+            background: rgba(255,255,255,0.12);
+        }
+
+        /* 푸터 */
+        .footer {
+            text-align: center;
+            color: #aaa;
+            font-size: 13px;
+            margin: 60px 0 40px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 헤더 -->
+    <div class="header">
+        <div class="badge">Spring Boot · TDD · Concurrency</div>
+        <h1>재고 오버부킹 문제와<br>비관적 락으로 해결하기</h1>
+        <p class="meta">2024 · Java 17 · Spring Boot 3 · JPA</p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- 1. 문제 발견 -->
+    <h2>문제 발견</h2>
+    <p>
+        주문 생성 로직을 리뷰하던 중 <strong>동시 요청 시 재고가 실제보다 더 많이 차감되는 오버부킹 위험</strong>을 발견했다.
+        재고 확인과 차감이 두 단계로 분리되어 있는 것이 원인이었다.
+    </p>
+
+    <pre><code><span class="comment">// OrderService.createOrder()</span>
+
+<span class="comment">// Step 1. 재고 확인</span>
+<span class="keyword">if</span> (!product.hasEnoughStock(item.quantity())) {
+    <span class="keyword">throw new</span> <span class="type">IllegalArgumentException</span>(<span class="string">"재고가 부족합니다."</span>);
+}
+
+<span class="comment">// Step 2. 재고 차감 (확인과 차감 사이에 간격 존재)</span>
+product.decreaseStock(item.quantity());
+productRepository.save(product);</code></pre>
+
+    <!-- 2. 원인 분석 -->
+    <h2>원인 분석 — Race Condition</h2>
+    <p>
+        두 요청이 동시에 들어오면 <strong>읽기 → 검증 → 쓰기</strong> 사이의 간격에서 Race Condition이 발생한다.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>시점</th>
+                <th>스레드 A</th>
+                <th>스레드 B</th>
+                <th>DB stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>T1</td><td>stock=1 조회</td><td>stock=1 조회</td><td>1</td></tr>
+            <tr><td>T2</td><td>1 >= 1 → 통과</td><td>1 >= 1 → 통과</td><td>1</td></tr>
+            <tr><td>T3</td><td>stock=0 저장</td><td>stock=0 저장 (A 덮어씀)</td><td>0</td></tr>
+            <tr><td>결과</td><td>주문 성공</td><td>주문 성공</td><td><strong>오버부킹 발생</strong></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout danger">
+        <div class="icon">🚨</div>
+        <div class="text">
+            <strong>핵심 문제</strong>
+            두 트랜잭션이 모두 <code>stock=1</code>을 읽고, 모두 검증을 통과한 후, 모두 <code>stock=0</code>을 저장한다.
+            재고는 1개인데 주문은 2개가 성공하는 오버부킹이 발생한다.
+        </div>
+    </div>
+
+    <!-- 3. 해결 방법 비교 -->
+    <h2>해결 방법 비교</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>방법</th>
+                <th>원리</th>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>비관적 락</strong></td>
+                <td>SELECT FOR UPDATE</td>
+                <td>정합성 확실</td>
+                <td>처리량 저하</td>
+            </tr>
+            <tr>
+                <td>낙관적 락</td>
+                <td>@Version 충돌 감지</td>
+                <td>처리량 높음</td>
+                <td>재시도 로직 필요</td>
+            </tr>
+            <tr>
+                <td>원자적 UPDATE</td>
+                <td>DB 단 처리</td>
+                <td>구현 단순</td>
+                <td>복잡한 로직 적용 어려움</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout info">
+        <div class="icon">💡</div>
+        <div class="text">
+            재고 시스템은 <strong>정합성이 최우선</strong>이므로 비관적 락을 선택했다.
+        </div>
+    </div>
+
+    <!-- 4. 비관적 락 구현 -->
+    <h2>비관적 락 구현</h2>
+
+    <p>
+        비관적 락은 <strong>조회 시점에 행을 선점</strong>한다.
+        트랜잭션 A가 락을 잡고 있는 동안 트랜잭션 B는 커밋될 때까지 대기한다.
+    </p>
+
+    <div class="flow">
+        <div class="step"><span class="arrow">→</span> 스레드 A: <code>SELECT ... FOR UPDATE</code> <span class="highlight">락 획득</span></div>
+        <div class="step"><span class="arrow">→</span> 스레드 B: <code>SELECT ... FOR UPDATE</code> <span class="danger">대기 중...</span></div>
+        <div class="step"><span class="arrow">→</span> 스레드 A: stock 차감 → <code>COMMIT</code> → 락 해제</div>
+        <div class="step"><span class="arrow">→</span> 스레드 B: 이제 읽음 → stock=0 → <span class="danger">재고 부족 예외</span></div>
+    </div>
+
+    <h3>1. 도메인 인터페이스 — ProductRepository</h3>
+    <p>도메인이 인터페이스를 소유하고 인프라가 구현하는 <strong>DIP 원칙</strong>을 유지한다.</p>
+
+    <div class="diff-container">
+        <div class="diff-box before">
+            <div class="diff-label">변경 전</div>
+            <pre><code>Optional&lt;Product&gt; findById(Long id);</code></pre>
+        </div>
+        <div class="diff-box after">
+            <div class="diff-label">변경 후</div>
+            <pre><code>Optional&lt;Product&gt; findById(Long id);
+
+Optional&lt;Product&gt; findByIdWithLock(Long id);</code></pre>
+        </div>
+    </div>
+
+    <h3>2. JPA 구현 — ProductJpaRepository</h3>
+    <p><code>@Lock(PESSIMISTIC_WRITE)</code> 하나로 Spring Data JPA가 자동으로 <code>SELECT ... FOR UPDATE</code>를 실행해준다.</p>
+
+    <div class="diff-container">
+        <div class="diff-box before">
+            <div class="diff-label">변경 전</div>
+            <pre><code><span class="keyword">public interface</span> <span class="type">ProductJpaRepository</span>
+    <span class="keyword">extends</span> <span class="type">JpaRepository</span>&lt;<span class="type">Product</span>, <span class="type">Long</span>&gt; {
+
+    List&lt;Product&gt; findAllByBrandId(Long brandId);
+}</code></pre>
+        </div>
+        <div class="diff-box after">
+            <div class="diff-label">변경 후</div>
+            <pre><code><span class="keyword">public interface</span> <span class="type">ProductJpaRepository</span>
+    <span class="keyword">extends</span> <span class="type">JpaRepository</span>&lt;<span class="type">Product</span>, <span class="type">Long</span>&gt; {
+
+    List&lt;Product&gt; findAllByBrandId(Long brandId);
+
+    <span class="annotation">@Lock</span>(LockModeType.PESSIMISTIC_WRITE)
+    Optional&lt;Product&gt; findWithLockById(Long id);
+}</code></pre>
+        </div>
+    </div>
+
+    <h3>3. 구현체 — ProductRepositoryImpl</h3>
+
+    <div class="diff-container">
+        <div class="diff-box before">
+            <div class="diff-label">변경 전</div>
+            <pre><code><span class="annotation">@Override</span>
+<span class="keyword">public</span> Optional&lt;Product&gt; findById(Long id) {
+    <span class="keyword">return</span> jpaRepository.findById(id);
+}</code></pre>
+        </div>
+        <div class="diff-box after">
+            <div class="diff-label">변경 후</div>
+            <pre><code><span class="annotation">@Override</span>
+<span class="keyword">public</span> Optional&lt;Product&gt; findById(Long id) {
+    <span class="keyword">return</span> jpaRepository.findById(id);
+}
+
+<span class="annotation">@Override</span>
+<span class="keyword">public</span> Optional&lt;Product&gt; findByIdWithLock(Long id) {
+    <span class="keyword">return</span> jpaRepository.findWithLockById(id);
+}</code></pre>
+        </div>
+    </div>
+
+    <h3>4. 서비스 — OrderService</h3>
+
+    <div class="diff-container">
+        <div class="diff-box before">
+            <div class="diff-label">변경 전</div>
+            <pre><code>Product product =
+    productRepository
+        .findById(item.productId())
+        .orElseThrow(...);</code></pre>
+        </div>
+        <div class="diff-box after">
+            <div class="diff-label">변경 후</div>
+            <pre><code>Product product =
+    productRepository
+        .findByIdWithLock(item.productId())
+        .orElseThrow(...);</code></pre>
+        </div>
+    </div>
+
+    <h3>5. 단위 테스트 — FakeProductRepository</h3>
+    <p>
+        단위 테스트에서는 실제 DB 락이 없으므로 <code>findById</code>로 위임한다.
+        동시성 검증은 통합 테스트에서 수행한다.
+    </p>
+
+    <pre><code><span class="annotation">@Override</span>
+<span class="keyword">public</span> Optional&lt;Product&gt; findByIdWithLock(Long id) {
+    <span class="keyword">return</span> findById(id); <span class="comment">// 단위 테스트는 동시성 검증 대상 아님</span>
+}</code></pre>
+
+    <!-- 5. 주의사항 -->
+    <h2>주의사항</h2>
+
+    <div class="callout warning">
+        <div class="icon">⚠️</div>
+        <div class="text">
+            <strong>@Transactional 필수</strong>
+            비관적 락은 트랜잭션 범위 안에서만 동작한다.
+            <code>@Transactional</code>이 없으면 조회 즉시 락이 해제되어 의미가 없어진다.
+        </div>
+    </div>
+
+    <pre><code><span class="annotation">@Service</span>
+<span class="annotation">@Transactional</span>  <span class="comment">// 필수 — 트랜잭션이 커밋될 때까지 락 유지</span>
+<span class="keyword">public class</span> <span class="type">OrderService</span> {
+    ...
+}</code></pre>
+
+    <!-- 결론 -->
+    <div class="result-card">
+        <h3>결론</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>변경 전</th>
+                    <th>변경 후</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>동시 요청</td>
+                    <td>오버부킹 발생</td>
+                    <td>두 번째 요청은 대기 후 재고 부족 처리</td>
+                </tr>
+                <tr>
+                    <td>재고 정합성</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>구현 복잡도</td>
+                    <td>낮음</td>
+                    <td>낮음 (어노테이션 1개)</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="color: rgba(255,255,255,0.85); font-size: 15px; margin-top: 20px; margin-bottom: 0;">
+            <code style="background: rgba(255,255,255,0.15); color: #fff;">@Lock(PESSIMISTIC_WRITE)</code> 어노테이션 하나로
+            DB 수준의 락을 적용해 재고 정합성을 보장할 수 있었다.<br>
+            단, 처리량이 중요한 대용량 트래픽 환경에서는 낙관적 락이나 Redis 분산 락을 고려해볼 필요가 있다.
+        </p>
+    </div>
+
+    <div class="footer">
+        TDD Study Project · Spring Boot 3.4.5 · Java 17
+    </div>
+
+</div>
+</body>
+</html>

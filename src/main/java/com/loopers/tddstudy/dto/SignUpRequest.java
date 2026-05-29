@@ -5,7 +5,8 @@ package com.loopers.tddstudy.dto;
             String loginPw,
             String name,
             String birthDate,
-            String email
+            String email,
+            String role
     ) {}
 
 
