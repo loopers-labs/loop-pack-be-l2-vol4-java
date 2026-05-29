@@ -23,6 +23,11 @@ public class FilterConfig {
         registration.setFilter(new AuthFilter(userRepository, passwordEncoder, objectMapper));
         registration.addUrlPatterns("/api/v1/users/me");
         registration.addUrlPatterns("/api/v1/users/password");
+        registration.addUrlPatterns("/api/v1/products/*");
+        registration.addUrlPatterns("/api/v1/users/*");
+        registration.addUrlPatterns("/api/v1/orders");
+        registration.addUrlPatterns("/api/v1/orders/*");
+        registration.addUrlPatterns("/api-admin/v1/*");
         return registration;
     }
 }
