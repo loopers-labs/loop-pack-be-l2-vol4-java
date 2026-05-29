@@ -178,7 +178,7 @@ class LikeFacadeIntegrationTest {
             likeFacade.addLike(user.getId(), product.id());
 
             // act
-            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), PageRequest.of(0, 20));
 
             // assert
             assertAll(
@@ -189,19 +189,6 @@ class LikeFacadeIntegrationTest {
             );
         }
 
-        @DisplayName("[ECP] 타인의 좋아요 목록을 조회하면 FORBIDDEN 예외가 발생한다.")
-        @Test
-        void throwsForbidden_whenOtherUserRequests() {
-            // arrange
-            UserEntity owner = createUser("testuser1");
-            UserEntity other = createUser("testuser2");
-
-            // act & assert
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> likeFacade.getLikedProducts(other.getId(), owner.getId(), PageRequest.of(0, 20)));
-            assertEquals(ErrorType.FORBIDDEN, exception.getErrorType());
-        }
-
         @DisplayName("[ECP] 좋아요한 상품이 없으면 빈 페이지가 반환된다.")
         @Test
         void returnsEmptyPage_whenNoLikesExist() {
@@ -209,7 +196,7 @@ class LikeFacadeIntegrationTest {
             UserEntity user = createUser("testuser1");
 
             // act
-            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent()).isEmpty();

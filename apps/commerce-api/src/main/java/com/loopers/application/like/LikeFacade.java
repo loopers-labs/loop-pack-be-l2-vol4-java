@@ -4,8 +4,6 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductEntity;
 import com.loopers.domain.product.ProductService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,11 +30,8 @@ public class LikeFacade {
         productService.decrementLikeCount(productId);
     }
 
-    public Page<LikeInfo> getLikedProducts(Long authUserId, Long pathUserId, Pageable pageable) {
-        if (!authUserId.equals(pathUserId)) {
-            throw new CoreException(ErrorType.FORBIDDEN, "본인의 좋아요 목록만 조회할 수 있습니다.");
-        }
-        return likeService.getLikedProducts(pathUserId, pageable)
+    public Page<LikeInfo> getLikedProducts(Long userId, Pageable pageable) {
+        return likeService.getLikedProducts(userId, pageable)
                 .map(like -> {
                     ProductEntity product = productService.getProduct(like.getProductId());
                     return LikeInfo.from(product, brandService.getBrand(product.getBrandId()));

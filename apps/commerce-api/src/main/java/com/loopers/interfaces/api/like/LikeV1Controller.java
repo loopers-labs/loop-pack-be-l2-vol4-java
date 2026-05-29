@@ -4,6 +4,8 @@ import com.loopers.application.like.LikeFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.interfaces.auth.LoginUser;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -41,9 +43,12 @@ public class LikeV1Controller implements LikeV1ApiSpec {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
+        if (!authUserId.equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인의 좋아요 목록만 조회할 수 있습니다.");
+        }
         return ApiResponse.success(
                 PageResult.from(
-                        likeFacade.getLikedProducts(authUserId, userId, PageRequest.of(page, size))
+                        likeFacade.getLikedProducts(userId, PageRequest.of(page, size))
                                 .map(LikeV1Dto.LikeResponse::from)
                 )
         );
