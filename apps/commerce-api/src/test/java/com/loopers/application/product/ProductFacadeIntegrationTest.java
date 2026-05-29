@@ -81,7 +81,7 @@ class ProductFacadeIntegrationTest {
     @Nested
     class CreateProduct {
 
-        @DisplayName("Product 와 Stock 이 같은 트랜잭션에서 함께 저장되고, 응답에 purchasable 이 포함된다.")
+        @DisplayName("Product 와 Stock 이 같은 트랜잭션에서 함께 저장되고, 응답에 stockQuantity 가 포함된다.")
         @Test
         void persistsProductAndStockTogether() {
             // given
@@ -91,7 +91,7 @@ class ProductFacadeIntegrationTest {
             Integer stock = 50;
 
             // when
-            ProductInfo result = productFacade.createProduct(name, description, price, stock, brandId);
+            ProductAdminInfo result = productFacade.createProduct(name, description, price, stock, brandId);
 
             // then
             assertAll(
@@ -99,7 +99,7 @@ class ProductFacadeIntegrationTest {
                 () -> assertThat(result.name()).isEqualTo(name),
                 () -> assertThat(result.description()).isEqualTo(description),
                 () -> assertThat(result.price()).isEqualTo(price),
-                () -> assertThat(result.purchasable()).isTrue(),
+                () -> assertThat(result.stockQuantity()).isEqualTo(stock),
                 () -> assertThat(productJpaRepository.findById(result.id()))
                     .hasValueSatisfying(p -> assertThat(p.getBrandId()).isEqualTo(brandId)),
                 () -> assertThat(stockJpaRepository.findByProductId(result.id()))
@@ -269,14 +269,14 @@ class ProductFacadeIntegrationTest {
             Integer newStock = 80;
 
             // when
-            ProductInfo result = productFacade.updateProduct(productId, newName, newDescription, newPrice, newStock);
+            ProductAdminInfo result = productFacade.updateProduct(productId, newName, newDescription, newPrice, newStock);
 
             // then
             assertAll(
                 () -> assertThat(result.name()).isEqualTo(newName),
                 () -> assertThat(result.description()).isEqualTo(newDescription),
                 () -> assertThat(result.price()).isEqualTo(newPrice),
-                () -> assertThat(result.purchasable()).isTrue(),
+                () -> assertThat(result.stockQuantity()).isEqualTo(newStock),
                 () -> assertThat(stockJpaRepository.findByProductId(productId))
                     .hasValueSatisfying(s -> assertThat(s.getQuantity()).isEqualTo(newStock))
             );
@@ -320,9 +320,9 @@ class ProductFacadeIntegrationTest {
         @Test
         void returnsLatestFirst_whenSortIsLatest() {
             // given
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
 
             // when
             List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
@@ -336,9 +336,9 @@ class ProductFacadeIntegrationTest {
         @Test
         void returnsLowestPriceFirst_whenSortIsPriceAsc() {
             // given
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
 
             // when
             List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.PRICE_ASC, 0, 10);
@@ -352,9 +352,9 @@ class ProductFacadeIntegrationTest {
         @Test
         void returnsMostLikedFirst_whenSortIsLikesDesc() {
             // given
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
             increaseLikes(airmax.id(), 5);
             increaseLikes(chuck.id(), 2);
 
@@ -370,9 +370,9 @@ class ProductFacadeIntegrationTest {
         @Test
         void includesLikeCountForEachProduct() {
             // given
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
             increaseLikes(airmax.id(), 5);
             increaseLikes(chuck.id(), 2);
 
@@ -393,10 +393,10 @@ class ProductFacadeIntegrationTest {
         @Test
         void returnsSlicedPage_whenPageAndSizeGiven() {
             // given
-            ProductInfo first  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
-            ProductInfo second = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
-            ProductInfo third  = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo fourth = productFacade.createProduct("스탠스미스", "올타임 화이트 스니커즈", 119_000L, 25, brandId);
+            ProductAdminInfo first  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo second = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
+            ProductAdminInfo third  = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo fourth = productFacade.createProduct("스탠스미스", "올타임 화이트 스니커즈", 119_000L, 25, brandId);
 
             // when
             List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 1, 2);
@@ -427,8 +427,8 @@ class ProductFacadeIntegrationTest {
         @Test
         void excludesSoftDeletedProducts() {
             // given
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
             productFacade.deleteProduct(chuck.id());
 
             // when
@@ -444,7 +444,7 @@ class ProductFacadeIntegrationTest {
         void returnsOnlyProductsOfGivenBrand_whenBrandIdIsProvided() {
             // given
             Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
             productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
 
             // when
@@ -460,8 +460,8 @@ class ProductFacadeIntegrationTest {
         void returnsAllProducts_whenBrandIdIsNotProvided() {
             // given
             Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
 
             // when
             List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);

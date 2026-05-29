@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class OrderReadV1ApiE2ETest {
 
     private static final String MEMBER_ENDPOINT = "/api/v1/orders";
-    private static final String ADMIN_ENDPOINT = "/api/v1/admin/orders";
+    private static final String ADMIN_ENDPOINT = "/api-admin/v1/orders";
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Abcd1234!";
     private static final String OTHER_LOGIN_ID = "user02";
@@ -91,6 +91,12 @@ class OrderReadV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set(AuthHeaders.LOGIN_ID, loginId);
         headers.set(AuthHeaders.LOGIN_PW, loginPw);
+        return headers;
+    }
+
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(AuthHeaders.ADMIN_LDAP, AuthHeaders.ADMIN_LDAP_VALUE);
         return headers;
     }
 
@@ -271,7 +277,7 @@ class OrderReadV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/orders (어드민 전체 목록)")
+    @DisplayName("GET /api-admin/v1/orders (어드민 전체 목록)")
     @Nested
     class GetAllOrders {
 
@@ -284,7 +290,7 @@ class OrderReadV1ApiE2ETest {
 
             // when
             ResponseEntity<ApiResponse<AdminOrderV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                ADMIN_ENDPOINT + "?page=0&size=20", HttpMethod.GET, HttpEntity.EMPTY,
+                ADMIN_ENDPOINT + "?page=0&size=20", HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {});
 
             // then
@@ -305,7 +311,7 @@ class OrderReadV1ApiE2ETest {
 
             // when
             ResponseEntity<ApiResponse<AdminOrderV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                ADMIN_ENDPOINT, HttpMethod.GET, HttpEntity.EMPTY,
+                ADMIN_ENDPOINT, HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {});
 
             // then
@@ -321,7 +327,7 @@ class OrderReadV1ApiE2ETest {
         void returnsEmptyContent_whenNoOrders() {
             // when
             ResponseEntity<ApiResponse<AdminOrderV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                ADMIN_ENDPOINT, HttpMethod.GET, HttpEntity.EMPTY,
+                ADMIN_ENDPOINT, HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {});
 
             // then
@@ -333,7 +339,7 @@ class OrderReadV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/orders/{orderId} (어드민 주문 상세)")
+    @DisplayName("GET /api-admin/v1/orders/{orderId} (어드민 주문 상세)")
     @Nested
     class GetOrder {
 
@@ -345,7 +351,7 @@ class OrderReadV1ApiE2ETest {
 
             // when
             ResponseEntity<ApiResponse<AdminOrderV1Dto.AdminOrderDetail>> response = testRestTemplate.exchange(
-                ADMIN_ENDPOINT + "/" + orderId, HttpMethod.GET, HttpEntity.EMPTY,
+                ADMIN_ENDPOINT + "/" + orderId, HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {});
 
             // then
@@ -365,7 +371,7 @@ class OrderReadV1ApiE2ETest {
         void returnsOrderNotFound_whenOrderDoesNotExist() {
             // when
             ResponseEntity<ApiResponse<AdminOrderV1Dto.AdminOrderDetail>> response = testRestTemplate.exchange(
-                ADMIN_ENDPOINT + "/999", HttpMethod.GET, HttpEntity.EMPTY,
+                ADMIN_ENDPOINT + "/999", HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<>() {});
 
             // then

@@ -219,7 +219,7 @@ class StockModelTest {
 
     @DisplayName("재고 가용 여부를 확인할 때, ")
     @Nested
-    class IsAvailable {
+    class IsPurchasable {
 
         @DisplayName("quantity 가 0 보다 크면, true 를 반환한다.")
         @Test
@@ -228,7 +228,7 @@ class StockModelTest {
             StockModel stock = new StockModel(1L, 1);
 
             // when
-            boolean result = stock.isAvailable();
+            boolean result = stock.isPurchasable();
 
             // then
             assertThat(result).isTrue();
@@ -241,7 +241,7 @@ class StockModelTest {
             StockModel stock = new StockModel(1L, 0);
 
             // when
-            boolean result = stock.isAvailable();
+            boolean result = stock.isPurchasable();
 
             // then
             assertThat(result).isFalse();

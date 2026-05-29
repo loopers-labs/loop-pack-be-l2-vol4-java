@@ -1,9 +1,10 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.product.ProductAdminInfo;
 import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.product.admin.ProductAdminV1Dto;
+import com.loopers.interfaces.auth.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +60,12 @@ class ProductAdminV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(AuthHeaders.ADMIN_LDAP, AuthHeaders.ADMIN_LDAP_VALUE);
+        return headers;
+    }
+
     @DisplayName("GET /api-admin/v1/products")
     @Nested
     class ListProducts {
@@ -66,15 +74,15 @@ class ProductAdminV1ApiE2ETest {
         @Test
         void includesSoftDeletedProducts_withStockAndDeletedAt() {
             // given
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
             productFacade.deleteProduct(chuck.id());
 
             // when
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -102,14 +110,14 @@ class ProductAdminV1ApiE2ETest {
         void appliesBrandFilter() {
             // given
             Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
             productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
 
             // when
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION + "?brandId=" + brandId, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION + "?brandId=" + brandId, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -131,7 +139,7 @@ class ProductAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -150,7 +158,7 @@ class ProductAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -171,14 +179,14 @@ class ProductAdminV1ApiE2ETest {
         @Test
         void returnsSoftDeletedProduct_withStockAndOperationalInfo() {
             // given
-            ProductInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
             productFacade.deleteProduct(created.id());
 
             // when
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, responseType, created.id()
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -204,7 +212,7 @@ class ProductAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, responseType, missingProductId
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType, missingProductId
             );
 
             // then
@@ -212,6 +220,158 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("PRODUCT_NOT_FOUND")
+            );
+        }
+    }
+
+    @DisplayName("POST /api-admin/v1/products")
+    @Nested
+    class CreateProduct {
+
+        @DisplayName("유효한 요청이면, 200 과 재고 수량을 포함한 신규 상품 정보를 반환한다.")
+        @Test
+        void returnsCreatedProduct_withStockQuantity() {
+            // given
+            ProductAdminV1Dto.CreateRequest request =
+                new ProductAdminV1Dto.CreateRequest("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
+                COLLECTION, HttpMethod.POST, new HttpEntity<>(request, adminHeaders()), responseType
+            );
+
+            // then
+            ProductAdminV1Dto.AdminProductDetail body = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(body.id()).isNotNull(),
+                () -> assertThat(body.name()).isEqualTo("에어맥스 270"),
+                () -> assertThat(body.price()).isEqualTo(159_000L),
+                () -> assertThat(body.stockQuantity()).isEqualTo(50),
+                () -> assertThat(body.deletedAt()).isNull(),
+                () -> assertThat(body.brand().id()).isEqualTo(brandId)
+            );
+        }
+
+        @DisplayName("존재하지 않는 brandId 면, 404 와 BRAND_NOT_FOUND 코드를 반환한다.")
+        @Test
+        void returnsBrandNotFound_whenBrandDoesNotExist() {
+            // given
+            Long missingBrandId = brandId + 9_999L;
+            ProductAdminV1Dto.CreateRequest request =
+                new ProductAdminV1Dto.CreateRequest("에어맥스 270", "데일리 러닝화", 159_000L, 50, missingBrandId);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
+                COLLECTION, HttpMethod.POST, new HttpEntity<>(request, adminHeaders()), responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("BRAND_NOT_FOUND")
+            );
+        }
+    }
+
+    @DisplayName("PUT /api-admin/v1/products/{productId}")
+    @Nested
+    class UpdateProduct {
+
+        @DisplayName("유효한 요청이면, 200 과 변경된 정보·재고 수량을 반환한다.")
+        @Test
+        void returnsUpdatedProduct_withNewStockQuantity() {
+            // given
+            ProductAdminInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminV1Dto.UpdateRequest request =
+                new ProductAdminV1Dto.UpdateRequest("에어맥스 270 SE", "스페셜 에디션", 179_000L, 80);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.PUT, new HttpEntity<>(request, adminHeaders()), responseType, created.id()
+            );
+
+            // then
+            ProductAdminV1Dto.AdminProductDetail body = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(body.name()).isEqualTo("에어맥스 270 SE"),
+                () -> assertThat(body.price()).isEqualTo(179_000L),
+                () -> assertThat(body.stockQuantity()).isEqualTo(80)
+            );
+        }
+
+        @DisplayName("삭제된 상품을 수정하면, 404 와 PRODUCT_NOT_FOUND 코드를 반환한다.")
+        @Test
+        void returnsProductNotFound_whenProductIsSoftDeleted() {
+            // given
+            ProductAdminInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            productFacade.deleteProduct(created.id());
+            ProductAdminV1Dto.UpdateRequest request =
+                new ProductAdminV1Dto.UpdateRequest("변경", "변경 설명", 99_000L, 10);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductAdminV1Dto.AdminProductDetail>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.PUT, new HttpEntity<>(request, adminHeaders()), responseType, created.id()
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("PRODUCT_NOT_FOUND")
+            );
+        }
+    }
+
+    @DisplayName("DELETE /api-admin/v1/products/{productId}")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("정상 삭제 시, 200 을 반환하고 어드민 조회에서 deletedAt 이 노출된다.")
+        @Test
+        void returnsOkAndSoftDeletesProduct() {
+            // given
+            ProductAdminInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), responseType, created.id()
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(productFacade.getProductForAdmin(created.id()).deletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("이미 삭제된 상품을 다시 삭제해도, 200 을 반환한다 (멱등).")
+        @Test
+        void returnsOk_whenProductIsAlreadySoftDeleted() {
+            // given
+            ProductAdminInfo created = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            productFacade.deleteProduct(created.id());
+
+            // when
+            ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ITEM, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), responseType, created.id()
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
             );
         }
     }

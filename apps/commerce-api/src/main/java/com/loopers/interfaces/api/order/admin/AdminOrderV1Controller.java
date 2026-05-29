@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/v1/admin/orders")
+@RequestMapping("/api-admin/v1/orders")
 public class AdminOrderV1Controller implements AdminOrderV1ApiSpec {
 
     private final OrderFacade orderFacade;

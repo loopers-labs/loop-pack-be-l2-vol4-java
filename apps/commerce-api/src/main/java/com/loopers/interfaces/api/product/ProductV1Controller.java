@@ -16,21 +16,6 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductFacade productFacade;
 
-    @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
-    ) {
-        ProductInfo info = productFacade.createProduct(
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock(),
-            request.brandId()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
@@ -54,29 +39,5 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
         return ApiResponse.success(responses);
-    }
-
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
-    ) {
-        ProductInfo info = productFacade.updateProduct(
-            productId,
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
-    @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
-    ) {
-        productFacade.deleteProduct(productId);
-        return ApiResponse.success(null);
     }
 }

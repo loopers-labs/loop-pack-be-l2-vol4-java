@@ -9,6 +9,21 @@ import java.util.List;
 
 public class ProductAdminV1Dto {
 
+    public record CreateRequest(
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Long brandId
+    ) {}
+
+    public record UpdateRequest(
+        String name,
+        String description,
+        Long price,
+        Integer stock
+    ) {}
+
     public record BrandResponse(Long id, String name) {
         public static BrandResponse from(ProductInfo.BrandSummary summary) {
             return new BrandResponse(summary.id(), summary.name());

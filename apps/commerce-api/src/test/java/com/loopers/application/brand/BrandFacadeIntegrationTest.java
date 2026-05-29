@@ -1,7 +1,7 @@
 package com.loopers.application.brand;
 
 import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductAdminInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
@@ -384,8 +384,8 @@ class BrandFacadeIntegrationTest {
         void softDeletesBrandAndItsProducts() {
             // given
             Long brandId = brandFacade.create("나이키", "Just Do It").id();
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
-            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductAdminInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
 
             // when
             brandFacade.delete(brandId);
@@ -407,8 +407,8 @@ class BrandFacadeIntegrationTest {
             // given
             Long nikeId = brandFacade.create("나이키", "Just Do It").id();
             Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
-            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, nikeId);
-            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
+            ProductAdminInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, nikeId);
+            ProductAdminInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
 
             // when
             brandFacade.delete(nikeId);

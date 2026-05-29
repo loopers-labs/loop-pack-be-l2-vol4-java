@@ -27,11 +27,11 @@ public class ProductFacade {
     private final BrandService brandService;
 
     @Transactional
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock, Long brandId) {
+    public ProductAdminInfo createProduct(String name, String description, Long price, Integer stock, Long brandId) {
         BrandModel brand = brandService.getActive(brandId);
         ProductModel product = productService.createProduct(name, description, price, brandId);
         StockModel stockModel = stockService.create(product.getId(), stock);
-        return ProductInfo.from(product, stockModel.isAvailable(), brand);
+        return ProductAdminInfo.from(product, stockModel, brand);
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +39,7 @@ public class ProductFacade {
         ProductModel product = productService.getActive(id);
         StockModel stockModel = stockService.getByProductId(id);
         BrandModel brand = brandService.getBrand(product.getBrandId());
-        return ProductInfo.from(product, stockModel.isAvailable(), brand);
+        return ProductInfo.from(product, stockModel.isPurchasable(), brand);
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +50,7 @@ public class ProductFacade {
         return products.stream()
             .map(product -> ProductInfo.from(
                 product,
-                stockByProductId.get(product.getId()).isAvailable(),
+                stockByProductId.get(product.getId()).isPurchasable(),
                 brandById.get(product.getBrandId())
             ))
             .toList();
@@ -77,12 +77,12 @@ public class ProductFacade {
     }
 
     @Transactional
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductAdminInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
         ProductModel product = productService.updateProduct(id, name, description, price);
         StockModel stockModel = stockService.getByProductId(id);
         stockModel.changeTo(stock);
         BrandModel brand = brandService.getBrand(product.getBrandId());
-        return ProductInfo.from(product, stockModel.isAvailable(), brand);
+        return ProductAdminInfo.from(product, stockModel, brand);
     }
 
     @Transactional

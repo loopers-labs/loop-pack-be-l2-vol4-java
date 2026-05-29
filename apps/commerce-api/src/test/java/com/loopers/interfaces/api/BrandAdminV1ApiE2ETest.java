@@ -3,13 +3,14 @@ package com.loopers.interfaces.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.loopers.application.brand.BrandAdminInfo;
 import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.product.ProductAdminInfo;
 import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.brand.BrandAdminV1Dto;
+import com.loopers.interfaces.auth.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BrandAdminV1ApiE2ETest {
 
-    private static final String COLLECTION = "/api/v1/admin/brands";
-    private static final String ITEM = "/api/v1/admin/brands/{brandId}";
+    private static final String COLLECTION = "/api-admin/v1/brands";
+    private static final String ITEM = "/api-admin/v1/brands/{brandId}";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandFacade brandFacade;
@@ -62,7 +64,13 @@ class BrandAdminV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("POST /api/v1/admin/brands")
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(AuthHeaders.ADMIN_LDAP, AuthHeaders.ADMIN_LDAP_VALUE);
+        return headers;
+    }
+
+    @DisplayName("POST /api-admin/v1/brands")
     @Nested
     class Create {
 
@@ -76,7 +84,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.POST, new HttpEntity<>(request), responseType
+                COLLECTION, HttpMethod.POST, new HttpEntity<>(request, adminHeaders()), responseType
             );
 
             // then
@@ -101,7 +109,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.POST, new HttpEntity<>(duplicate), responseType
+                COLLECTION, HttpMethod.POST, new HttpEntity<>(duplicate, adminHeaders()), responseType
             );
 
             // then
@@ -113,7 +121,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/brands")
+    @DisplayName("GET /api-admin/v1/brands")
     @Nested
     class ListBrands {
 
@@ -128,7 +136,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -157,7 +165,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION, HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -184,7 +192,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.PageResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.PageResponse>> response = testRestTemplate.exchange(
-                COLLECTION + "?page=0&size=2", HttpMethod.GET, HttpEntity.EMPTY, responseType
+                COLLECTION + "?page=0&size=2", HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType
             );
 
             // then
@@ -198,7 +206,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/admin/brands/{brandId}")
+    @DisplayName("GET /api-admin/v1/brands/{brandId}")
     @Nested
     class GetBrand {
 
@@ -212,7 +220,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, responseType, created.id()
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -238,7 +246,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, responseType, created.id()
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -260,7 +268,7 @@ class BrandAdminV1ApiE2ETest {
 
             // when
             ResponseEntity<JsonNode> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, JsonNode.class, created.id()
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), JsonNode.class, created.id()
             );
 
             // then
@@ -284,7 +292,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.GET, HttpEntity.EMPTY, responseType, missingId
+                ITEM, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType, missingId
             );
 
             // then
@@ -295,7 +303,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /api/v1/admin/brands/{brandId}")
+    @DisplayName("PATCH /api-admin/v1/brands/{brandId}")
     @Nested
     class UpdateBrand {
 
@@ -310,7 +318,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, created.id()
+                ITEM, HttpMethod.PATCH, new HttpEntity<>(request, adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -332,7 +340,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, created.id()
+                ITEM, HttpMethod.PATCH, new HttpEntity<>(request, adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -355,7 +363,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, target.id()
+                ITEM, HttpMethod.PATCH, new HttpEntity<>(request, adminHeaders()), responseType, target.id()
             );
 
             // then
@@ -379,7 +387,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, created.id()
+                ITEM, HttpMethod.PATCH, new HttpEntity<>(request, adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -400,7 +408,7 @@ class BrandAdminV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<BrandAdminV1Dto.Response>> responseType =
                 new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<BrandAdminV1Dto.Response>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.PATCH, new HttpEntity<>(request), responseType, missingId
+                ITEM, HttpMethod.PATCH, new HttpEntity<>(request, adminHeaders()), responseType, missingId
             );
 
             // then
@@ -411,7 +419,7 @@ class BrandAdminV1ApiE2ETest {
         }
     }
 
-    @DisplayName("DELETE /api/v1/admin/brands/{brandId}")
+    @DisplayName("DELETE /api-admin/v1/brands/{brandId}")
     @Nested
     class DeleteBrand {
 
@@ -420,12 +428,12 @@ class BrandAdminV1ApiE2ETest {
         void returnsOkAndSoftDeletesBrandAndItsProducts() {
             // given
             BrandAdminInfo created = brandFacade.create("나이키", "Just Do It");
-            ProductInfo product = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, created.id());
+            ProductAdminInfo product = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, created.id());
 
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, created.id()
+                ITEM, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -449,7 +457,7 @@ class BrandAdminV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, created.id()
+                ITEM, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), responseType, created.id()
             );
 
             // then
@@ -468,7 +476,7 @@ class BrandAdminV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                ITEM, HttpMethod.DELETE, HttpEntity.EMPTY, responseType, missingId
+                ITEM, HttpMethod.DELETE, new HttpEntity<>(adminHeaders()), responseType, missingId
             );
 
             // then

@@ -59,7 +59,7 @@ public class StockModel extends BaseEntity {
         }
     }
 
-    public boolean isAvailable() {
+    public boolean isPurchasable() {
         return this.quantity > 0;
     }
 
