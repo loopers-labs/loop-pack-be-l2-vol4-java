@@ -3,6 +3,8 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,21 +37,26 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts(ProductSortType sort, int page, int size) {
-        return productRepository.findAll(sort, page, size);
+    public List<ProductModel> getAllActiveProducts(Long brandId, ProductSortType sort, int page, int size) {
+        return productRepository.findAllActive(brandId, sort, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductModel> getAllProducts(Long brandId, Pageable pageable) {
+        return productRepository.findAll(brandId, pageable);
     }
 
     @Transactional
     public ProductModel updateProduct(Long id, String name, String description, Long price) {
-        ProductModel product = getProduct(id);
+        ProductModel product = getActive(id);
         product.update(name, description, price);
         return productRepository.save(product);
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductModel product = getProduct(id);
+        product.delete();
     }
 
     @Transactional

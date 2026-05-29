@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -217,6 +218,35 @@ class ProductFacadeIntegrationTest {
             );
         }
 
+        @DisplayName("존재하지 않는 상품을 조회하면, PRODUCT_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsProductNotFound_whenProductDoesNotExist() {
+            // given
+            Long missingProductId = 9_999L;
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productFacade.getProduct(missingProductId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
+        }
+
+        @DisplayName("삭제된 상품을 조회하면, PRODUCT_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsProductNotFound_whenProductIsSoftDeleted() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+            productFacade.deleteProduct(productId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productFacade.getProduct(productId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
+        }
+
         private void increaseLikes(Long productId, int times) {
             for (int i = 0; i < times; i++) {
                 likeFacade.like(likeUserIdSeq.getAndIncrement(), productId);
@@ -265,6 +295,21 @@ class ProductFacadeIntegrationTest {
             assertThat(stockJpaRepository.findByProductId(productId))
                 .hasValueSatisfying(s -> assertThat(s.getQuantity()).isEqualTo(12));
         }
+
+        @DisplayName("삭제된 상품을 수정하면, PRODUCT_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsProductNotFound_whenUpdatingSoftDeletedProduct() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+            productFacade.deleteProduct(productId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productFacade.updateProduct(productId, "변경", "변경 설명", 99_000L, 10));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
+        }
     }
 
     @DisplayName("상품 목록을 조회할 때, ")
@@ -280,7 +325,7 @@ class ProductFacadeIntegrationTest {
             ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
 
             // then
             assertThat(result).extracting(ProductInfo::id)
@@ -296,7 +341,7 @@ class ProductFacadeIntegrationTest {
             ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, brandId);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.PRICE_ASC, 0, 10);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.PRICE_ASC, 0, 10);
 
             // then
             assertThat(result).extracting(ProductInfo::id)
@@ -314,7 +359,7 @@ class ProductFacadeIntegrationTest {
             increaseLikes(chuck.id(), 2);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LIKES_DESC, 0, 10);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LIKES_DESC, 0, 10);
 
             // then
             assertThat(result).extracting(ProductInfo::id)
@@ -332,7 +377,7 @@ class ProductFacadeIntegrationTest {
             increaseLikes(chuck.id(), 2);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
 
             // then
             assertThat(result)
@@ -354,7 +399,7 @@ class ProductFacadeIntegrationTest {
             ProductInfo fourth = productFacade.createProduct("스탠스미스", "올타임 화이트 스니커즈", 119_000L, 25, brandId);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 1, 2);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 1, 2);
 
             // then
             assertThat(result).extracting(ProductInfo::id)
@@ -370,12 +415,84 @@ class ProductFacadeIntegrationTest {
             softDeleteBrand(brandId);
 
             // when
-            List<ProductInfo> result = productFacade.getAllProducts(ProductSortType.LATEST, 0, 10);
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
 
             // then
             assertThat(result)
                 .extracting(info -> info.brand().id(), info -> info.brand().name())
                 .containsOnly(tuple(brandId, "나이키"));
+        }
+
+        @DisplayName("삭제된 상품은 목록에 포함되지 않는다.")
+        @Test
+        void excludesSoftDeletedProducts() {
+            // given
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductInfo chuck  = productFacade.createProduct("척테일러", "캔버스 클래식", 79_000L, 30, brandId);
+            productFacade.deleteProduct(chuck.id());
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(airmax.id());
+        }
+
+        @DisplayName("brandId 로 필터하면, 해당 브랜드의 상품만 반환한다.")
+        @Test
+        void returnsOnlyProductsOfGivenBrand_whenBrandIdIsProvided() {
+            // given
+            Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(brandId, ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactly(airmax.id());
+        }
+
+        @DisplayName("brandId 를 지정하지 않으면, 전체 브랜드의 상품을 반환한다.")
+        @Test
+        void returnsAllProducts_whenBrandIdIsNotProvided() {
+            // given
+            Long adidasId = brandFacade.create("아디다스", "Impossible is Nothing").id();
+            ProductInfo airmax = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            ProductInfo star   = productFacade.createProduct("슈퍼스타", "쉘토 스니커즈의 상징", 129_000L, 40, adidasId);
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).extracting(ProductInfo::id)
+                .containsExactlyInAnyOrder(airmax.id(), star.id());
+        }
+
+        @DisplayName("존재하지 않는 brandId 로 필터하면, 빈 목록을 반환한다.")
+        @Test
+        void returnsEmptyList_whenBrandIdDoesNotExist() {
+            // given
+            productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId);
+            Long missingBrandId = brandId + 9_999L;
+
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(missingBrandId, ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @DisplayName("조건에 맞는 상품이 없으면, 빈 목록을 반환한다.")
+        @Test
+        void returnsEmptyList_whenNoProductMatches() {
+            // when
+            List<ProductInfo> result = productFacade.getAllProducts(null, ProductSortType.LATEST, 0, 10);
+
+            // then
+            assertThat(result).isEmpty();
         }
 
         private void increaseLikes(Long productId, int times) {
@@ -389,9 +506,9 @@ class ProductFacadeIntegrationTest {
     @Nested
     class DeleteProduct {
 
-        @DisplayName("Product 와 Stock 이 함께 사라진다.")
+        @DisplayName("Product 는 soft-delete 되고(deletedAt 기록), Stock 은 그대로 보존된다.")
         @Test
-        void deletesProductAndStockTogether() {
+        void softDeletesProductAndRetainsStock() {
             // given
             Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
 
@@ -400,9 +517,42 @@ class ProductFacadeIntegrationTest {
 
             // then
             assertAll(
-                () -> assertThat(productJpaRepository.findById(productId)).isEmpty(),
-                () -> assertThat(stockJpaRepository.findByProductId(productId)).isEmpty()
+                () -> assertThat(productJpaRepository.findById(productId))
+                    .hasValueSatisfying(p -> assertThat(p.getDeletedAt()).isNotNull()),
+                () -> assertThat(productJpaRepository.findByIdAndDeletedAtIsNull(productId)).isEmpty(),
+                () -> assertThat(stockJpaRepository.findByProductId(productId))
+                    .hasValueSatisfying(s -> assertThat(s.getQuantity()).isEqualTo(50))
             );
+        }
+
+        @DisplayName("이미 삭제된 상품을 다시 삭제해도 멱등하게 성공한다.")
+        @Test
+        void isIdempotent_whenDeletingAlreadyDeletedProduct() {
+            // given
+            Long productId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 159_000L, 50, brandId).id();
+            productFacade.deleteProduct(productId);
+            ZonedDateTime firstDeletedAt = productJpaRepository.findById(productId).orElseThrow().getDeletedAt();
+
+            // when
+            productFacade.deleteProduct(productId);
+
+            // then
+            assertThat(productJpaRepository.findById(productId))
+                .hasValueSatisfying(p -> assertThat(p.getDeletedAt()).isEqualTo(firstDeletedAt));
+        }
+
+        @DisplayName("존재하지 않는 상품을 삭제하면 PRODUCT_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsProductNotFound_whenProductDoesNotExist() {
+            // given
+            Long missingProductId = 9_999L;
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productFacade.deleteProduct(missingProductId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
         }
     }
 }

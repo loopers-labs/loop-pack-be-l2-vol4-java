@@ -4,7 +4,9 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
@@ -32,18 +34,19 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductModel> findAll(ProductSortType sort, int page, int size) {
-        return productJpaRepository.findAll(PageRequest.of(page, size, toSort(sort))).getContent();
+    public List<ProductModel> findAllActive(Long brandId, ProductSortType sort, int page, int size) {
+        return productJpaRepository.findActivePage(brandId, PageRequest.of(page, size, toSort(sort)));
+    }
+
+    @Override
+    public Page<ProductModel> findAll(Long brandId, Pageable pageable) {
+        Pageable latest = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), toSort(ProductSortType.LATEST));
+        return productJpaRepository.findAllPage(brandId, latest);
     }
 
     @Override
     public List<ProductModel> findAllActiveByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
-    }
-
-    @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
     }
 
     @Override

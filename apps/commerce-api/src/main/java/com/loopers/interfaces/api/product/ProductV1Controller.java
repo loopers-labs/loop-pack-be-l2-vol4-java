@@ -12,7 +12,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductV1Controller {
+public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductFacade productFacade;
 
@@ -32,6 +32,7 @@ public class ProductV1Controller {
     }
 
     @GetMapping("/{productId}")
+    @Override
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
@@ -41,12 +42,14 @@ public class ProductV1Controller {
     }
 
     @GetMapping
+    @Override
     public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts(
+        @RequestParam(required = false) Long brandId,
         @RequestParam(defaultValue = "LATEST") ProductSortType sort,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        List<ProductInfo> infos = productFacade.getAllProducts(sort, page, size);
+        List<ProductInfo> infos = productFacade.getAllProducts(brandId, sort, page, size);
         List<ProductV1Dto.ProductResponse> responses = infos.stream()
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
