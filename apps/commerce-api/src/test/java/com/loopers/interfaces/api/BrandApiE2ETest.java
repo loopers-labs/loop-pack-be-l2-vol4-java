@@ -1,7 +1,6 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandService;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.interfaces.api.brand.BrandDto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -27,9 +26,6 @@ class BrandApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
-
-    @Autowired
-    private BrandService brandService;
 
     @Autowired
     private BrandJpaRepository brandJpaRepository;
