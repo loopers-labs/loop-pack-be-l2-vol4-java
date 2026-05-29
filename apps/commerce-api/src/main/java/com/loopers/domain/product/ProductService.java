@@ -1,12 +1,12 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -14,21 +14,12 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
-
-    @Transactional
-    public ProductModel createProduct(Long brandId, String name, BigDecimal price) {
-        ProductModel product = ProductModel.builder()
-                .brandId(brandId)
-                .name(name)
-                .price(price)
-                .build();
-        return productRepository.save(product);
-    }
+    private final BrandRepository brandRepository;
 
     @Transactional(readOnly = true)
     public ProductModel getProduct(Long id) {
-        return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+        return productRepository.findById(id)
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
@@ -36,17 +27,49 @@ public class ProductService {
         return productRepository.findAll();
     }
 
-    @Transactional
-    public ProductModel updateProduct(Long id, String name, BigDecimal price) {
-        ProductModel product = getProduct(id);
-        product.update(name, price);
-        return productRepository.save(product);
+    @Transactional(readOnly = true)
+    public List<ProductModel> getProductsByIds(List<Long> ids) {
+        return productRepository.findByIds(ids);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<ProductModel> getProducts(Long brandId, String sort, org.springframework.data.domain.Pageable pageable) {
+        return productRepository.findAll(brandId, sort, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public ProductDetail getProductDetail(Long productId) {
+        ProductModel product = productRepository.findById(productId)
+                .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));
+        
+        com.loopers.domain.brand.BrandModel brand = brandRepository.findById(product.getBrandId())
+                .orElseThrow(() -> new CoreException(ErrorType.BRAND_NOT_FOUND));
+
+        return new ProductDetail(
+                product.getId(),
+                product.getName(),
+                product.getPrice(),
+                brand.getId(),
+                brand.getName(),
+                product.getLikeCount(),
+                product.getStock() != null ? product.getStock().getQuantity() : 0
+        );
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
-        ProductModel product = getProduct(id);
-        product.delete();
-        productRepository.save(product);
+    public void deleteProductsByBrand(Long brandId) {
+        productRepository.deleteByBrandId(brandId);
+    }
+
+    @Transactional
+    public void increaseLikeCount(Long productId) {
+        ProductModel product = getProduct(productId);
+        product.increaseLikeCount();
+    }
+
+    @Transactional
+    public void decreaseLikeCount(Long productId) {
+        ProductModel product = getProduct(productId);
+        product.decreaseLikeCount();
     }
 }
