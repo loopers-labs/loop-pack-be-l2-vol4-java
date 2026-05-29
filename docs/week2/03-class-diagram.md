@@ -323,7 +323,6 @@ classDiagram
         status
         totalAmount
         shippingDestination
-        paymentMethod
         orderedAt
         create()
         markPaid()
@@ -366,11 +365,6 @@ classDiagram
         Product 조회 및 재고 차감
     }
 
-    class PaymentService {
-        <<External Stub>>
-        pay()
-    }
-
     class OrderService {
         <<Application Service>>
         주문 생성
@@ -387,21 +381,107 @@ classDiagram
     Order --> OrderStatus
     OrderService --> OrderRepository
     OrderService --> ProductRepository
-    OrderService --> PaymentService
     OrderService --> Order
     OrderAdminService --> OrderRepository
 ```
 
 이 구조에서 봐야 할 포인트는 `OrderItem`이 `Product`가 아니라 주문 당시 상품 스냅샷이라는 점이다. 상품명, 브랜드명, 가격이 이후 변경되어도 기존 주문 정보는 바뀌지 않는다.
 
-`OrderStatus`는 결제 도메인 추가를 고려해 `PENDING`, `PAID`, `FAILED`를 함께 정의해 두지만, `PAID`와 `FAILED`는 현재 범위에서는 사용하지 않는다. 현재 범위에서 주문은 생성 직후 `PENDING` 상태로 종료된다.
+`OrderStatus`는 `PENDING`(생성·결제대기) → `PAID`(결제 완료) / `FAILED`(결제 실패, 재고 복구·종료)로 전이한다. 상태 전이 권한은 `Order`에 두고(`markPaid()`/`markFailed()`), 결제 결과는 별도 Payment 도메인이 알려준다(아래 Payments 참고). 주문 생성은 `PENDING`까지만 책임지고 결제를 직접 호출하지 않는다.
 
-배송지·수령인은 `ShippingDestination` 값 객체로 묶어 `Order`가 보유하며, 주문 시점 스냅샷이다(영속성은 ORDERS 테이블에 `@Embedded` 평면 컬럼). `PaymentService`는 결제 통합 지점으로 현재 범위에서는 stub(껍데기)이며, `OrderService`가 의존하지만 실제 상태 전이는 결제 도메인 추가 시 연결한다. 사용자 주문 생성·본인 주문 조회는 `OrderService`, 관리자 전체 주문 조회는 `OrderAdminService`로 분리한다.
+배송지·수령인은 `ShippingDestination` 값 객체로 묶어 `Order`가 보유하며, 주문 시점 스냅샷이다(영속성은 ORDERS 테이블에 `@Embedded` 평면 컬럼). 결제수단은 Order가 아니라 Payment가 소유한다. 사용자 주문 생성·본인 주문 조회는 `OrderService`, 관리자 전체 주문 조회는 `OrderAdminService`로 분리한다.
 
 ### 설계 리스크
 
 - 주문 생성과 재고 차감을 하나의 트랜잭션으로 처리하므로, 주문 상품 수가 많아지면 트랜잭션이 커질 수 있다.
 - 재고 차감은 동시 주문 상황에서 충돌 가능성이 있으므로 ProductStock에 대한 동시성 제어가 필요하다.
 - 한 주문에 여러 상품이 포함될 때, 락 획득 순서가 엇갈리면 deadlock이 발생할 수 있다. 이를 막기 위해 재고 락은 `productId` 오름차순으로 획득한다.
-- 상태 전이(`PENDING → PAID/FAILED`)는 `Order` 내부 메서드(`markPaid()`, `markFailed()`)에서 처리하고, 허용되지 않은 전이는 예외로 막는다. 결제 결과는 `Order` 외부에서 받지만 상태 변경 권한은 `Order` aggregate에 둔다.
-- 결제 도메인이 추가되면 실패/취소 시 재고 복구 정책과 주문 상태 전이를 함께 다시 설계해야 한다.
+- 상태 전이(`PENDING → PAID/FAILED`)는 `Order` 내부 메서드(`markPaid()`, `markFailed()`)에서 처리하고, 허용되지 않은 전이는 예외로 막는다. 결제 결과는 Payment 도메인이 전달하지만 상태 변경·재고 복구 권한은 `Order`에 둔다.
+- 결제는 별도 Payment 도메인이 별도 API + webhook로 처리한다(아래 Payments). 주문 생성 트랜잭션은 결제 호출을 포함하지 않아 재고 락이 외부 결제 동안 잡히지 않는다.
+
+## Payments
+
+### 개념 모델
+
+액터:
+- 일반 사용자: 생성한 주문에 대해 결제를 요청한다.
+
+핵심 도메인:
+- `Payment`: 한 번의 결제 시도를 표현하는 aggregate root.
+
+관련 도메인:
+- `Order`: 결제 대상 주문. `orderNumber`로 참조하고, 결제 결과를 `Order`에 반영한다(`Order`는 `Payment`를 모름).
+
+보조/외부 시스템:
+- `PaymentGateway`: 외부 PG 연동 추상화. 현재 범위에서는 즉시 승인하는 stub.
+
+### 클래스 다이어그램
+
+이 다이어그램은 `Payment`가 `Order`와 별도 Aggregate이며, PG 연동·결과 확정을 책임지고 결과만 `Order`에 반영한다는 점을 확인하기 위한 것이다.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Payment {
+        <<Aggregate Root>>
+        orderNumber
+        method
+        amount
+        status
+        request()
+        approve()
+        fail()
+    }
+
+    class PaymentStatus {
+        <<Enumeration>>
+        REQUESTED
+        PAID
+        FAILED
+    }
+
+    class PaymentMethod {
+        <<Enumeration>>
+        CARD
+        CASH
+    }
+
+    class PaymentRepository {
+        <<Repository Port>>
+        Payment 저장/조회
+    }
+
+    class PaymentGateway {
+        <<External Stub>>
+        결제 요청(승인/실패)
+    }
+
+    class Order {
+        <<Related Aggregate>>
+        orderNumber로 조회(금액)
+        markPaid() / markFailed() 반영
+    }
+
+    class PaymentService {
+        <<Application Service>>
+        결제 요청
+        결제 결과 콜백 처리
+    }
+
+    Payment --> PaymentStatus
+    Payment --> PaymentMethod
+    PaymentService --> PaymentRepository
+    PaymentService --> PaymentGateway
+    PaymentService --> Payment
+    PaymentService --> Order
+```
+
+이 구조에서 봐야 할 포인트는 `Payment`가 `orderNumber`로만 `Order`를 참조하고 `Order`는 `Payment`를 모른다는 점이다(의존 단방향). 결제 요청 시 `Payment`를 `REQUESTED`로 만들고 `PaymentGateway`(stub)를 호출하며, PG webhook 콜백으로 `PAID`/`FAILED`를 확정한다. 결제 금액은 클라이언트 값을 믿지 않고 `orderNumber`로 조회한 주문의 `totalAmount`를 쓴다. 결과 확정 시 `Order`의 `markPaid()`/`markFailed()`(+재고 복구)를 호출해 반영하며, 상태 전이·재고 권한은 `Order`에 둔다.
+
+### 설계 리스크
+
+- 결제 콜백은 중복 수신될 수 있으므로 멱등 처리한다(이미 확정된 결제·주문은 재반영하지 않음).
+- PG 호출은 외부·비동기이므로 재고 락이 걸린 주문 생성 트랜잭션 안에서 호출하지 않는다(주문 생성과 결제는 분리된 단계).
+- `CASH`(입금 대기)와 `CARD`(PG 승인)는 흐름이 다르지만 현재 stub에선 즉시 승인으로 단순화한다. 실제 PG 연동 시 구체화한다.
+- 미결제 `PENDING` 주문이 재고를 점유하므로, 만료 배치로 정리한다(재고 복구 + 주문 종료).

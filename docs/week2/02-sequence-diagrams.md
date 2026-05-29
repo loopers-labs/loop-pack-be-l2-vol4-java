@@ -381,89 +381,19 @@ sequenceDiagram
         ProductStock-->>Service: 차감 완료 (재고 부족 시 예외)
     end
 
-    Service->>Order: create(userId, 상품 스냅샷 정보, ShippingDestination, paymentMethod)
-    Note over Order: orderNumber 생성(yyyyMMdd+일별 시퀀스)<br/>OrderItem 스냅샷(productId, productName, brandId, brandName, price, quantity)<br/>ShippingDestination·paymentMethod 저장, totalAmount 계산, status=PENDING
+    Service->>Order: create(userId, 상품 스냅샷 정보, ShippingDestination)
+    Note over Order: orderNumber 생성(yyyyMMdd+일별 시퀀스)<br/>OrderItem 스냅샷(productId, productName, brandId, brandName, price, quantity)<br/>ShippingDestination 저장, totalAmount 계산, status=PENDING
     Order-->>Service: 주문 Aggregate
 
     Service->>OrderRepository: 주문 저장
     OrderRepository-->>Service: 주문
-    Note over Service: (결제 도메인 추가 시) PaymentService.pay() 호출 지점<br/>현재 범위에서는 stub — 상태 전이 없이 PENDING 종료
-    Service-->>Controller: 주문 생성 결과
+    Service-->>Controller: 주문 생성 결과 (PENDING)
     Controller-->>Client: 응답
 ```
 
 이 흐름에서 주문 생성이 성공했다는 것은 재고가 확보되었다는 의미다. 여러 상품 중 하나라도 주문할 수 없으면 전체 주문을 생성하지 않는다.
 
-재고 락은 deadlock을 피하기 위해 `productId` 오름차순으로 잡고, `SELECT ... FOR UPDATE`로 차감 직전까지 보유한다. 재고 차감과 주문 스냅샷 저장은 하나의 트랜잭션 안에서 함께 처리한다.
-
-### 주문 생성과 결제 흐름 (결제 도메인 추가 시)
-
-이 다이어그램은 결제 도메인이 추가되었을 때 주문 생성에서 결제 완료/실패까지의 전체 흐름을 확인하기 위한 것이다. Requirements 도메인 규칙에 따라 현재 범위에서는 주문이 `PENDING` 상태로 종료되므로, 이 흐름은 결제 도메인 도입 시점의 목표 설계로 본다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as 사용자
-    participant Auth as HeaderAuthenticationFilter
-    participant Controller as OrderController
-    participant OrderService as OrderService
-    participant ProductRepository as ProductRepository
-    participant ProductStock as ProductStock
-    participant Order as Order
-    participant OrderRepository as OrderRepository
-    participant PaymentService as PaymentService
-    participant PG as 외부 결제 시스템
-
-    Client->>Auth: 주문 요청 (인증 헤더 전달)
-    Auth->>Controller: 요청 전달 (인증된 userId)
-    Controller->>OrderService: 주문 생성 및 결제
-
-    Note over OrderService,OrderRepository: 트랜잭션 1 — 재고 차감 + 주문 PENDING 저장
-    OrderService->>ProductRepository: 주문 상품과 재고 조회 (productId 오름차순, SELECT ... FOR UPDATE)
-    ProductRepository-->>OrderService: Product / ProductStock 목록
-    loop 주문 상품마다
-        OrderService->>ProductStock: decrease(quantity)
-        ProductStock-->>OrderService: 차감 완료 (재고 부족 시 예외)
-    end
-    OrderService->>Order: create(userId, 상품 스냅샷 정보)
-    Note over Order: OrderItem 스냅샷 구성<br/>totalAmount 계산, status=PENDING
-    Order-->>OrderService: 주문 Aggregate
-    OrderService->>OrderRepository: 주문 저장 (PENDING)
-    OrderRepository-->>OrderService: 주문
-
-    OrderService->>PaymentService: 결제 요청
-    PaymentService->>PG: 결제 호출
-
-    alt 결제 성공
-        PG-->>PaymentService: 결제 승인
-        PaymentService-->>OrderService: 결제 성공
-        Note over OrderService,OrderRepository: 트랜잭션 2 — 주문 상태 PAID 전이
-        OrderService->>Order: markPaid()
-        OrderService->>OrderRepository: 주문 저장
-        OrderService-->>Controller: 주문 결제 완료
-        Controller-->>Client: 응답 (PAID)
-    else 결제 실패 (잔액 부족 / 외부 결제 시스템 네트워크 오류)
-        PG-->>PaymentService: 결제 거절 또는 호출 실패
-        PaymentService-->>OrderService: 결제 실패
-        Note over OrderService,OrderRepository: 트랜잭션 3 — 보상 처리 (재고 복구 + 주문 상태 FAILED 전이)
-        loop 주문 상품마다
-            OrderService->>ProductStock: increase(quantity)
-            ProductStock-->>OrderService: 복구 완료
-        end
-        OrderService->>Order: markFailed()
-        OrderService->>OrderRepository: 주문 저장
-        OrderService-->>Controller: 주문 결제 실패
-        Controller-->>Client: 응답 (FAILED)
-    end
-```
-
-이 흐름에서 봐야 할 포인트는 세 가지다.
-
-첫째, 외부 결제 시스템 호출은 DB 트랜잭션 바깥에서 이루어진다. 결제 호출이 길어지거나 네트워크 오류로 지연되더라도 재고 락이 길게 유지되지 않도록 트랜잭션을 분리한다.
-
-둘째, 재고 차감과 주문 `PENDING` 저장은 한 트랜잭션으로 묶이고, 결제 결과에 따른 상태 전이는 별도 트랜잭션으로 처리한다. 결제 응답을 받기 전까지 주문은 `PENDING` 상태로 영속화되어 있어야 중간 장애 상황에서도 추적할 수 있다.
-
-셋째, 결제 실패 시 재고 복구는 DB 자동 롤백이 아니라 명시적 보상 트랜잭션이다. 트랜잭션 1이 이미 커밋된 뒤이므로 재고를 다시 늘리고 주문 상태를 `FAILED`로 전이하는 후속 작업이 필요하다. 잔액 부족과 외부 시스템 네트워크 오류는 모두 결제 실패로 일괄 처리하며, 사유 구분이 필요해지면 별도 실패 사유 정보를 도입한다.
+재고 락은 deadlock을 피하기 위해 `productId` 오름차순으로 잡고, `SELECT ... FOR UPDATE`로 차감 직전까지 보유한다. 재고 차감과 주문 스냅샷 저장은 하나의 트랜잭션 안에서 함께 처리한다. 결제는 이 트랜잭션과 분리된 별도 단계(Payment 도메인)이므로 주문 생성 API는 `PENDING`으로 끝난다(아래 Payments 참고).
 
 ### 주문 목록 조회
 
@@ -512,3 +442,69 @@ sequenceDiagram
 ```
 
 이 흐름에서 관리자는 전체 주문을 조회한다. 주문 자체의 소유자는 여전히 일반 사용자이며, 관리자 조회는 주문 Aggregate의 소유 관계를 바꾸지 않는다.
+
+## Payments
+
+### 결제 요청
+
+이 다이어그램은 사용자가 생성된 주문에 대해 결제를 요청하는 흐름을 확인하기 위한 것이다. 주문 생성과 결제는 분리된 단계이며, 결제 금액은 클라이언트가 아니라 주문에서 가져온다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as 사용자
+    participant Auth as HeaderAuthenticationFilter
+    participant Controller as PaymentController
+    participant Service as PaymentService
+    participant OrderReader as OrderReader
+    participant PaymentRepository as PaymentRepository
+    participant Gateway as PaymentGateway
+
+    Client->>Auth: 결제 요청 (인증 헤더, orderNumber)
+    Auth->>Controller: 요청 전달 (인증된 userId)
+    Controller->>Service: 결제 요청
+    Service->>OrderReader: orderNumber 로 주문 조회
+    OrderReader-->>Service: 주문 (PENDING·본인 검증, totalAmount)
+    Note over Service: 결제 금액 = 주문 totalAmount
+    Service->>PaymentRepository: Payment 저장 (status=REQUESTED)
+    Service->>Gateway: 결제 요청 (외부 PG stub, DB 트랜잭션 밖)
+    Gateway-->>Service: 접수 (결과는 별도 webhook)
+    Service-->>Controller: 결제 요청 결과 (REQUESTED)
+    Controller-->>Client: 응답
+```
+
+이 흐름에서 핵심은 결제 요청 시 `Payment`가 `REQUESTED`로 생성되고, 실제 승인/실패는 PG webhook 콜백으로 확정된다는 점이다. 주문이 `PENDING`이 아니거나 본인 주문이 아니면 결제를 요청할 수 없다.
+
+### 결제 결과 콜백 (webhook)
+
+이 다이어그램은 외부 PG가 결제 결과를 webhook으로 통지했을 때 결제·주문 상태를 확정하는 흐름을 확인하기 위한 것이다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PG as 외부 결제 시스템
+    participant Controller as PaymentController
+    participant Service as PaymentService
+    participant PaymentRepository as PaymentRepository
+    participant OrderService as OrderService
+
+    PG->>Controller: 결제 결과 콜백 (서명 검증)
+    Controller->>Service: 결제 결과 반영
+    Service->>PaymentRepository: Payment 조회
+    PaymentRepository-->>Service: Payment
+    Note over Service: 멱등 — 이미 PAID/FAILED 로 확정된 결제·주문이면 무시
+
+    alt 승인
+        Service->>Service: Payment.approve() (PAID)
+        Service->>OrderService: markPaid(orderNumber)
+        OrderService-->>Service: 주문 PAID 전이
+    else 실패
+        Service->>Service: Payment.fail() (FAILED)
+        Service->>OrderService: markFailed(orderNumber)
+        Note over OrderService: 재고 복구 + 주문 FAILED 전이 (종료)
+        OrderService-->>Service: 보상 완료
+    end
+    Controller-->>PG: 200 OK
+```
+
+이 흐름에서 봐야 할 포인트는 결제 결과 확정과 주문 상태 전이가 분리되어 있다는 점이다. Payment는 결과를 받아 자신의 상태를 확정하고, 주문 상태 전이·재고 복구는 `Order`(OrderService)가 소유한다. 콜백은 중복 수신될 수 있으므로 멱등하게 처리하고, 결제 실패는 종료로 보아 재구매는 새 주문으로 한다.
