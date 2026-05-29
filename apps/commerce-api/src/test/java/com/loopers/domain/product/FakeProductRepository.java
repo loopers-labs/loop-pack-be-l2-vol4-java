@@ -45,7 +45,7 @@ public class FakeProductRepository implements ProductRepository {
         }
         switch (sort) {
             case PRICE_ASC -> result.sort(Comparator.comparing(p -> p.getPrice().amount()));
-            // LATEST / LIKES_DESC: 최신순(id 역순)으로 정렬. LIKES_DESC 재정렬은 조합 단계의 책임.
+            // LIKES_DESC 는 실제 구현체에서 JPQL JOIN 으로 처리. Fake 는 좋아요 정보 없어 LATEST 와 동일하게 fallback.
             default -> result.sort(Comparator.comparing(Product::getId).reversed());
         }
         int from = Math.min(page * size, result.size());

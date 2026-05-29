@@ -12,7 +12,6 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -37,16 +36,9 @@ public class ProductFacade {
 
     public List<ProductDetailInfo> getProducts(Long brandId, String sort, int page, int size) {
         ProductSortType sortType = ProductSortType.from(sort);
+        // 정렬(LIKES_DESC 포함)은 모두 Repository 가 책임진다.
         List<Product> products = productService.getProducts(brandId, sortType, page, size);
-        List<ProductDetail> details = productDisplayService.getProductDetails(products);
-
-        if (sortType == ProductSortType.LIKES_DESC) {
-            details = details.stream()
-                .sorted(Comparator.comparingLong(ProductDetail::likeCount).reversed())
-                .toList();
-        }
-
-        return details.stream()
+        return productDisplayService.getProductDetails(products).stream()
             .map(ProductDetailInfo::from)
             .toList();
     }

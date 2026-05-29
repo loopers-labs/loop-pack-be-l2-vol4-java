@@ -34,6 +34,10 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public List<Product> findAll(Long brandId, ProductSortType sort, int page, int size) {
+        if (sort == ProductSortType.LIKES_DESC) {
+            // 좋아요 수는 집계라 derived query 로 표현 못 함 → JPQL 로 한 방 정렬.
+            return productJpaRepository.findAllOrderByLikeCountDesc(brandId, PageRequest.of(page, size));
+        }
         Pageable pageable = PageRequest.of(page, size, toSort(sort));
         if (brandId != null) {
             return productJpaRepository.findAllByBrandId(brandId, pageable).getContent();
@@ -60,12 +64,12 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     /**
-     * LATEST / PRICE_ASC 는 저장소에서 정렬한다.
-     * LIKES_DESC 는 좋아요 집계가 필요하므로 여기서는 최신순으로 가져오고, 조합 단계에서 재정렬한다.
+     * LATEST 와 PRICE_ASC 는 단일 컬럼이라 Spring Data Sort 로 처리한다.
+     * LIKES_DESC 는 위에서 별도 JPQL 로 처리하므로 여기 도달하지 않는다.
      */
     private Sort toSort(ProductSortType sort) {
         return switch (sort) {
-            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount");
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
             case LIKES_DESC, LATEST -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
     }
