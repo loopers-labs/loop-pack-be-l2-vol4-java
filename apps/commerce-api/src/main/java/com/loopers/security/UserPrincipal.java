@@ -4,7 +4,6 @@ import lombok.Value;
 
 @Value
 public class UserPrincipal {
-    int id;
+    Long id;
     String loginId;
-    String role;
 }
