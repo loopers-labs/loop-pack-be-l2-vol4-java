@@ -624,3 +624,4 @@ LikeFacade.removeLike(userId, productId)
 | ADR-023 | OrderStatus — PENDING 상태 확정 및 요구사항 문서 정정 | `adr/023-order-status-pending-confirmed.md` |
 | ADR-024 | 주문 생성 흐름 — fast-fail 사전 재고 검증 미적용 | `adr/024-order-creation-no-fast-fail.md` |
 | ADR-025 | 상품+브랜드 조합 위치 — Facade 유지 (중복 3회↑ 시 Application Service 분리 검토) | `adr/025-product-brand-combination-location.md` |
+| ADR-026 | 좋아요 목록 조회 N+1 문제 — 현행 유지 (Known Issue) | `adr/026-like-list-n-plus-one.md` |
