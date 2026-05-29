@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
@@ -21,6 +22,7 @@ public class ProductFacade {
     private final InventoryService inventoryService;
     private final LikeService likeService;
 
+    @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer quantity) {
         BrandEntity brand = brandService.getBrand(brandId);
         ProductEntity product = productService.createProduct(brandId, name, description, price);
@@ -36,11 +38,13 @@ public class ProductFacade {
         return productService.getAllProducts(brandId, pageable).map(this::assembleProductInfo);
     }
 
+    @Transactional
     public void updateProduct(Long id, String name, String description, Long price, Integer quantity) {
         productService.updateProduct(id, name, description, price);
         inventoryService.updateQuantity(id, quantity);
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
         productService.deleteProduct(id);
         inventoryService.deleteByProduct(id);
