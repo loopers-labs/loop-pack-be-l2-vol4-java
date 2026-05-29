@@ -1,73 +1,37 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Validated
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
 public class ProductV1Controller {
 
-    private final ProductFacade productFacade;
-
-    @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
-    ) {
-        ProductInfo info = productFacade.createProduct(
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
-    @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-        @PathVariable(value = "productId") Long productId
-    ) {
-        ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
+    private final ProductApplicationService productApplicationService;
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
+    public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
+        @RequestParam(required = false) Long brandId,
+        @RequestParam(required = false) String sort,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) int size
+    ) {
+        List<ProductV1Dto.ProductResponse> responses = productApplicationService.getProducts(brandId, page, size, sort).stream()
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
         return ApiResponse.success(responses);
     }
 
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
-    ) {
-        ProductInfo info = productFacade.updateProduct(
-            productId,
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
-    @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
-    ) {
-        productFacade.deleteProduct(productId);
-        return ApiResponse.success(null);
+    @GetMapping("/{id}")
+    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(@PathVariable @Min(1) Long id) {
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(productApplicationService.getProduct(id)));
     }
 }
