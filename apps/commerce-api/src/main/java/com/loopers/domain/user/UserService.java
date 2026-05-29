@@ -1,5 +1,12 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.enums.UserRole;
+import com.loopers.domain.user.vo.BirthDay;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.Name;
+import com.loopers.domain.user.vo.Password;
+import com.loopers.domain.user.vo.RawPassword;
+import com.loopers.domain.user.vo.UserId;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -15,30 +22,38 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public UserModel register(String userid, String password, String name, String birthDay, String email) {
-        if (userRepository.existsByUserid(userid)) {
+    public UserModel register(UserId userid, RawPassword rawPassword, Name name, BirthDay birthDay, Email email) {
+        if (userRepository.existsByUserId(userid)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 아이디입니다.");
         }
-        UserModel.validatePassword(password, birthDay);
-        UserModel user = new UserModel(userid, passwordEncoder.encode(password), name, birthDay, email, UserRole.USER);
+
+        PasswordPolicy.validatePasswordNotContainBirthDay(rawPassword, birthDay);
+
+        UserModel user = new UserModel(
+                userid,
+                new Password(passwordEncoder.encode(rawPassword.getValue())),
+                name,
+                birthDay,
+                email,
+                UserRole.USER
+        );
         return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
-    public UserModel getUser(String userid) {
-        return userRepository.findByUserid(userid)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userid = " + userid + "] 회원을 찾을 수 없습니다."));
+    public UserModel getUser(UserId userid) {
+        return userRepository.findByUserId(userid)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userid = " + userid.getValue() + "] 회원을 찾을 수 없습니다."));
     }
 
     @Transactional
-    public UserModel changePassword(String userid, String newPassword) {
-        UserModel user = userRepository.findByUserid(userid)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userid = " + userid + "] 회원을 찾을 수 없습니다."));
-        UserModel.validatePassword(newPassword, user.getBirthDay());
-        if (passwordEncoder.matches(newPassword, user.getPassword())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호는 사용할 수 없습니다.");
-        }
-        user.changePassword(passwordEncoder.encode(newPassword));
+    public UserModel changePassword(UserId userid, RawPassword newRawPassword) {
+        UserModel user = getUser(userid);
+
+        PasswordPolicy.validatePasswordNotContainBirthDay(newRawPassword, user.getBirthDay());
+        PasswordPolicy.validateNotSamePassword(passwordEncoder.matches(newRawPassword.getValue(), user.getPassword().getValue()));
+
+        user.changePassword(new Password(passwordEncoder.encode(newRawPassword.getValue())));
         return user;
     }
 }

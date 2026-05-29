@@ -24,7 +24,7 @@ public class UserV1Controller implements UserV1ApiSpec {
     @Override
     public ApiResponse<UserV1Dto.UserResponse> register(@Valid @RequestBody UserV1Dto.RegisterRequest request) {
         UserInfo info = userFacade.registerUser(
-            request.userid(),
+            request.userId(),
             request.password(),
             request.name(),
             request.birthDay(),

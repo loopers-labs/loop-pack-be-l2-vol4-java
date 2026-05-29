@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 public class UserV1Dto {
 
     public record RegisterRequest(
-        @NotBlank(message = "아이디는 빈값이 들어올 수 없습니다.") String userid,
+        @NotBlank(message = "아이디는 빈값이 들어올 수 없습니다.") String userId,
         @NotBlank(message = "비밀번호는 빈값이 들어올 수 없습니다.") String password,
         @NotBlank(message = "이름은 빈값이 들어올 수 없습니다.") String name,
         @NotBlank(message = "생년월일은 빈값이 들어올 수 없습니다.") String birthDay,
@@ -19,7 +19,7 @@ public class UserV1Dto {
 
     public record UserResponse(
         Long id,
-        String userid,
+        String userId,
         String name,
         String email,
         String birthDay
@@ -27,7 +27,7 @@ public class UserV1Dto {
         public static UserResponse from(UserInfo info) {
             return new UserResponse(
                 info.id(),
-                info.userid(),
+                info.userId(),
                 info.maskedName(),
                 info.email(),
                 info.birthDay()

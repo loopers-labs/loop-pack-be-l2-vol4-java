@@ -4,7 +4,7 @@ import com.loopers.domain.user.UserModel;
 
 public record UserInfo(
         Long id,
-        String userid,
+        String userId,
         String maskedName,
         String email,
         String birthDay
@@ -12,10 +12,10 @@ public record UserInfo(
     public static UserInfo from(UserModel user) {
         return new UserInfo(
                 user.getId(),
-                user.getUserid(),
-                maskName(user.getName()),
-                user.getEmail(),
-                user.getBirthDay()
+                user.getUserId().getValue(),
+                maskName(user.getName().getValue()),
+                user.getEmail().getValue(),
+                user.getBirthDay().getValue()
         );
     }
 
