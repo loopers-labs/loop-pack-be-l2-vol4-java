@@ -2,11 +2,14 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -20,16 +23,16 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Optional<ProductModel> find(Long id) {
-        return productJpaRepository.findById(id);
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id);
     }
 
     @Override
-    public List<ProductModel> findAll() {
-        return productJpaRepository.findAll();
-    }
-
-    @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public List<ProductModel> findAll(Long brandId, ProductSortType sort, int page, int size) {
+        ProductSortType sortType = (sort != null) ? sort : ProductSortType.LATEST;
+        Pageable pageable = PageRequest.of(page, size, sortType.toSort());
+        if (brandId != null) {
+            return productJpaRepository.findByBrandIdAndDeletedAtIsNull(brandId, pageable).getContent();
+        }
+        return productJpaRepository.findByDeletedAtIsNull(pageable).getContent();
     }
 }

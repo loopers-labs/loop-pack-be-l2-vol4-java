@@ -15,8 +15,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = new ProductModel(brandId, name, description, price, stock);
         return productRepository.save(product);
     }
 
@@ -27,8 +27,11 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public List<ProductModel> getProducts(Long brandId, ProductSortType sort, int page, int size) {
+        if (page < 0 || size <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "페이지 정보가 올바르지 않습니다.");
+        }
+        return productRepository.findAll(brandId, sort, page, size);
     }
 
     @Transactional
@@ -40,7 +43,8 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductModel product = getProduct(id);
+        product.delete(); // soft delete (BaseEntity.deletedAt 설정)
+        productRepository.save(product);
     }
 }

@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -12,8 +13,8 @@ import java.util.List;
 public class ProductFacade {
     private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
         return ProductInfo.from(product);
     }
 
@@ -22,8 +23,8 @@ public class ProductFacade {
         return ProductInfo.from(product);
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
+    public List<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
+        List<ProductModel> products = productService.getProducts(brandId, ProductSortType.from(sort), page, size);
         return products.stream()
             .map(ProductInfo::from)
             .toList();

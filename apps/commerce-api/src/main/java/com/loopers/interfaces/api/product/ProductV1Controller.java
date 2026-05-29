@@ -20,6 +20,7 @@ public class ProductV1Controller {
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
@@ -39,8 +40,13 @@ public class ProductV1Controller {
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
+    public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
+        @RequestParam(value = "brandId", required = false) Long brandId,
+        @RequestParam(value = "sort", required = false, defaultValue = "latest") String sort,
+        @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+        @RequestParam(value = "size", required = false, defaultValue = "20") int size
+    ) {
+        List<ProductInfo> infos = productFacade.getProducts(brandId, sort, page, size);
         List<ProductV1Dto.ProductResponse> responses = infos.stream()
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
