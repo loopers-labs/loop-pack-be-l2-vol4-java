@@ -1,7 +1,6 @@
 package com.loopers.config;
 
 import com.loopers.security.HeaderAuthFilter;
-import com.loopers.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,11 +24,9 @@ public class SecurityConfig {
     @Value("${cors.allowed-origin:http://localhost:5173}")
     private String allowedOrigin;
 
-    private final JwtAuthFilter jwtAuthFilter;
     private final HeaderAuthFilter headerAuthFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, HeaderAuthFilter headerAuthFilter) {
-        this.jwtAuthFilter = jwtAuthFilter;
+    public SecurityConfig(HeaderAuthFilter headerAuthFilter) {
         this.headerAuthFilter = headerAuthFilter;
     }
 
@@ -41,18 +38,15 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/health").permitAll()
-                .requestMatchers("/api/auth/register").permitAll()
-                .requestMatchers("/api/auth/login").permitAll()
-                .requestMatchers("/api/auth/validate-password").permitAll()
-                .requestMatchers("/api/v1/**").permitAll()
+                .requestMatchers("/api/**").permitAll()
+                .requestMatchers("/api-admin/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(headerAuthFilter, JwtAuthFilter.class);
+            .addFilterBefore(headerAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
