@@ -19,8 +19,9 @@ public class OrderStockService {
     private final OrderService orderService;
     private final StockService stockService;
 
-    /** 결제 확정 — 아이템별 재고 확정 + 주문 확정 (상태/금액 검증은 OrderModel.confirm() 에서) */
+    /** 결제 확정 — 아이템별 재고 확정 + 주문 확정 (멱등: 이미 CONFIRMED면 스킵) */
     public void confirmOrder(OrderModel order, Long paymentAmount) {
+        if (!order.isPending()) return;
         order.getItems().forEach(item -> stockService.confirm(item.getProductId(), item.getQuantity()));
         orderService.confirm(order, paymentAmount);
     }
