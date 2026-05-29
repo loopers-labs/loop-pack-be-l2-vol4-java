@@ -13,13 +13,17 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 class BrandFacadeIntegrationTest {
@@ -27,13 +31,13 @@ class BrandFacadeIntegrationTest {
     @Autowired
     private BrandFacade brandFacade;
 
-    @Autowired
+    @SpyBean
     private ProductService productService;
 
-    @Autowired
+    @SpyBean
     private InventoryService inventoryService;
 
-    @Autowired
+    @SpyBean
     private LikeService likeService;
 
     @Autowired
@@ -50,6 +54,7 @@ class BrandFacadeIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        Mockito.reset(productService, inventoryService, likeService);
         databaseCleanUp.truncateAllTables();
     }
 
@@ -272,6 +277,72 @@ class BrandFacadeIntegrationTest {
 
             assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(1L, productId))
                     .isEmpty();
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // 트랜잭션 원자성
+    // ─────────────────────────────────────────────
+
+    @DisplayName("트랜잭션 원자성")
+    @Nested
+    class TransactionalAtomicity {
+
+        @DisplayName("[Transactional] deleteBrand 중 product deleteAll 실패 시 brand 삭제가 롤백된다.")
+        @Test
+        void rollbacksBrandDelete_whenProductDeleteAllFails() {
+            // arrange
+            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L);
+            doThrow(new RuntimeException("강제 실패")).when(productService).deleteAll(anyList());
+
+            // act
+            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+
+            // assert: brand가 롤백되어 여전히 조회 가능
+            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
+        }
+
+        @DisplayName("[Transactional] deleteBrand 중 inventory deleteAllByProducts 실패 시 brand와 product 삭제가 롤백된다.")
+        @Test
+        void rollbacksBrandAndProductDelete_whenInventoryDeleteAllFails() {
+            // arrange
+            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            Long productId = productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L).getId();
+            inventoryService.create(productId, 10);
+            doThrow(new RuntimeException("강제 실패")).when(inventoryService).deleteAllByProducts(anyList());
+
+            // act
+            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+
+            // assert: brand와 product 모두 롤백
+            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
+            assertThat(productJpaRepository.findById(productId))
+                    .isPresent()
+                    .get()
+                    .satisfies(p -> assertNull(p.getDeletedAt()));
+        }
+
+        @DisplayName("[Transactional] deleteBrand 중 like deleteAllByProducts 실패 시 brand, product, inventory 삭제가 롤백된다.")
+        @Test
+        void rollbacksBrandProductAndInventoryDelete_whenLikeDeleteAllFails() {
+            // arrange
+            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            Long productId = productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L).getId();
+            inventoryService.create(productId, 10);
+            doThrow(new RuntimeException("강제 실패")).when(likeService).deleteAllByProducts(anyList());
+
+            // act
+            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+
+            // assert: brand, product, inventory 모두 롤백
+            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
+            assertThat(productJpaRepository.findById(productId))
+                    .isPresent()
+                    .get()
+                    .satisfies(p -> assertNull(p.getDeletedAt()));
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId))
+                    .isPresent();
         }
     }
 }
