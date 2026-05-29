@@ -27,6 +27,12 @@ public class UserService {
         return userRepository.findByLoginId(loginId);
     }
 
+    @Transactional(readOnly = true)
+    public UserModel getUser(String loginId) {
+        return userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+    }
+
     @Transactional
     public void changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel user = userRepository.findByLoginId(loginId)

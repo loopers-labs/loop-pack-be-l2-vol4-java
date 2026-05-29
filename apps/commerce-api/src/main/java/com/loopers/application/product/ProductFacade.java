@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductDetailService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
@@ -12,6 +13,7 @@ import java.util.List;
 @Component
 public class ProductFacade {
     private final ProductService productService;
+    private final ProductDetailService productDetailService;
 
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
         ProductModel product = productService.createProduct(brandId, name, description, price, stock);
@@ -21,6 +23,10 @@ public class ProductFacade {
     public ProductInfo getProduct(Long id) {
         ProductModel product = productService.getProduct(id);
         return ProductInfo.from(product);
+    }
+
+    public ProductDetailInfo getProductDetail(Long id) {
+        return ProductDetailInfo.from(productDetailService.getProductDetail(id));
     }
 
     public List<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
