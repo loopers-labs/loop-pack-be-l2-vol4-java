@@ -23,4 +23,10 @@ public interface OrderJpaRepository extends JpaRepository<OrderModel, Long> {
         @Param("startAt") ZonedDateTime startAt,
         @Param("endAt") ZonedDateTime endAt
     );
+
+    @Query("SELECT o FROM OrderModel o WHERE o.createdAt >= :startAt AND o.createdAt <= :endAt")
+    List<OrderModel> findAllByCreatedAtBetween(
+        @Param("startAt") ZonedDateTime startAt,
+        @Param("endAt") ZonedDateTime endAt
+    );
 }

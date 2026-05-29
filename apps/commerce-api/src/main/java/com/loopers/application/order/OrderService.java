@@ -125,6 +125,11 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrderModel> getAllOrders(LocalDate startAt, LocalDate endAt) {
+        return orderRepository.findAllByDateRange(startAt, endAt);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderItemModel> getItemsByOrderId(Long orderId) {
         return orderRepository.findItemsByOrderId(orderId);
     }

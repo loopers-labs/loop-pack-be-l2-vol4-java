@@ -211,6 +211,11 @@ class LikeServiceTest {
         }
 
         @Override
+        public List<ProductModel> findAllByBrandId(Long brandId) {
+            return store.values().stream().filter(p -> p.getBrandId().equals(brandId)).toList();
+        }
+
+        @Override
         public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
             List<ProductModel> list = new ArrayList<>(store.values());
             return new org.springframework.data.domain.PageImpl<>(list, pageRequest, list.size());

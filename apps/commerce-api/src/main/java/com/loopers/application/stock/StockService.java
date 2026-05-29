@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Component
 public class StockService {
@@ -35,5 +37,16 @@ public class StockService {
     public void increase(Long productId, int qty) {
         StockModel stock = getByProductId(productId);
         stock.increase(qty);
+    }
+
+    @Transactional
+    public void update(Long productId, int quantity) {
+        StockModel stock = getByProductId(productId);
+        stock.update(quantity);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<StockModel> findByProductId(Long productId) {
+        return stockRepository.findByProductId(productId);
     }
 }

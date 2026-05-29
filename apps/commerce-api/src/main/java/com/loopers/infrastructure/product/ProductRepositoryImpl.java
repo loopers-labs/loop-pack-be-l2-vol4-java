@@ -9,6 +9,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -39,6 +40,11 @@ public class ProductRepositoryImpl implements ProductRepository {
             return productJpaRepository.findAllByBrandId(brandId, sortedPage);
         }
         return productJpaRepository.findAll(sortedPage);
+    }
+
+    @Override
+    public List<ProductModel> findAllByBrandId(Long brandId) {
+        return productJpaRepository.findAllByBrandId(brandId);
     }
 
     private Sort toSort(ProductSort sort) {

@@ -39,6 +39,11 @@ public class StockModel extends BaseEntity {
         this.quantity += qty;
     }
 
+    public void update(int quantity) {
+        validateQuantity(quantity);
+        this.quantity = quantity;
+    }
+
     public boolean isAvailable(int qty) {
         return this.quantity >= qty;
     }

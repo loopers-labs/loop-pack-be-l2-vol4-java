@@ -47,6 +47,13 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public List<OrderModel> findAllByDateRange(LocalDate startAt, LocalDate endAt) {
+        ZonedDateTime start = startAt != null ? startAt.atStartOfDay(ZoneOffset.UTC) : LocalDate.of(2000, 1, 1).atStartOfDay(ZoneOffset.UTC);
+        ZonedDateTime end = endAt != null ? endAt.plusDays(1).atStartOfDay(ZoneOffset.UTC) : LocalDate.of(2100, 1, 1).atStartOfDay(ZoneOffset.UTC);
+        return orderJpaRepository.findAllByCreatedAtBetween(start, end);
+    }
+
+    @Override
     public List<OrderItemModel> findItemsByOrderId(Long orderId) {
         return orderItemJpaRepository.findAllByOrderId(orderId);
     }

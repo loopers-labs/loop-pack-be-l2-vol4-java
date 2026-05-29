@@ -10,5 +10,6 @@ public interface OrderRepository {
     Optional<OrderModel> findById(Long id);
     Optional<OrderModel> findByIdForUpdate(Long id);
     List<OrderModel> findAllByMemberIdAndDateRange(Long memberId, LocalDate startAt, LocalDate endAt);
+    List<OrderModel> findAllByDateRange(LocalDate startAt, LocalDate endAt);
     List<OrderItemModel> findItemsByOrderId(Long orderId);
 }

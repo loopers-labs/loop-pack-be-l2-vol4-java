@@ -182,6 +182,11 @@ class OrderServiceTest {
         }
 
         @Override
+        public List<OrderModel> findAllByDateRange(LocalDate startAt, LocalDate endAt) {
+            return orderStore.values().stream().filter(o -> o.getDeletedAt() == null).toList();
+        }
+
+        @Override
         public List<OrderModel> findAllByMemberIdAndDateRange(Long memberId, LocalDate startAt, LocalDate endAt) {
             return orderStore.values().stream()
                 .filter(o -> o.getMemberId().equals(memberId))
@@ -221,6 +226,11 @@ class OrderServiceTest {
         public Optional<ProductModel> findById(Long id) {
             return Optional.ofNullable(store.get(id))
                 .filter(p -> p.getDeletedAt() == null);
+        }
+
+        @Override
+        public List<ProductModel> findAllByBrandId(Long brandId) {
+            return store.values().stream().filter(p -> p.getBrandId().equals(brandId)).toList();
         }
 
         @Override

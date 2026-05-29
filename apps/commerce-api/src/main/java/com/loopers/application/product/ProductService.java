@@ -3,6 +3,8 @@ package com.loopers.application.product;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
+
+import java.util.List;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -44,5 +46,10 @@ public class ProductService {
     public void delete(Long id) {
         ProductModel product = getById(id);
         product.delete();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductModel> findAllByBrandId(Long brandId) {
+        return productRepository.findAllByBrandId(brandId);
     }
 }

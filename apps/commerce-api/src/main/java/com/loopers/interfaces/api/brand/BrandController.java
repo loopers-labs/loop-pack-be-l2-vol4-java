@@ -24,6 +24,12 @@ public class BrandController {
         return ApiResponse.success(BrandDto.BrandResponse.from(info));
     }
 
+    @GetMapping("/api-admin/v1/brands/{brandId}")
+    public ApiResponse<BrandDto.BrandResponse> getBrandAdmin(@PathVariable Long brandId) {
+        BrandInfo info = brandFacade.getById(brandId);
+        return ApiResponse.success(BrandDto.BrandResponse.from(info));
+    }
+
     @GetMapping("/api-admin/v1/brands")
     public ApiResponse<BrandDto.BrandPageResponse> getBrands(
         @RequestParam(defaultValue = "0") int page,
