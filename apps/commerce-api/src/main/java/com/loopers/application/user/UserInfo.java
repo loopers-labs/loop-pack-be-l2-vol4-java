@@ -2,9 +2,7 @@ package com.loopers.application.user;
 
 import com.loopers.domain.user.UserModel;
 
-import java.util.UUID;
-
-public record UserInfo(UUID id, String loginId, String name, String maskedName, String birth, String email) {
+public record UserInfo(Long id, String loginId, String name, String maskedName, String birth, String email) {
     public static UserInfo from(UserModel model) {
         return new UserInfo(
             model.getId(),

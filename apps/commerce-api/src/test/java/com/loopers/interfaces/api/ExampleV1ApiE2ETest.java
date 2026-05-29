@@ -18,7 +18,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.UUID;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ExampleV1ApiE2ETest {
 
-    private static final Function<UUID, String> ENDPOINT_GET = id -> "/api/v1/examples/" + id;
+    private static final Function<Long, String> ENDPOINT_GET = id -> "/api/v1/examples/" + id;
 
     private final TestRestTemplate testRestTemplate;
     private final ExampleJpaRepository exampleJpaRepository;
@@ -76,7 +75,7 @@ class ExampleV1ApiE2ETest {
             );
         }
 
-        @DisplayName("UUID 형식이 아닌 ID로 요청하면, 400 BAD_REQUEST 응답을 받는다.")
+        @DisplayName("숫자가 아닌 ID 로 요청하면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         void throwsBadRequest_whenIdIsNotProvided() {
             // arrange
@@ -98,7 +97,7 @@ class ExampleV1ApiE2ETest {
         @Test
         void throwsException_whenInvalidIdIsProvided() {
             // arrange
-            UUID invalidId = UUID.randomUUID();
+            Long invalidId = -1L;
             String requestUrl = ENDPOINT_GET.apply(invalidId);
 
             // act

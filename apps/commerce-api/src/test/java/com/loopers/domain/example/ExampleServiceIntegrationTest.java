@@ -11,8 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -60,7 +58,7 @@ class ExampleServiceIntegrationTest {
         @Test
         void throwsException_whenInvalidIdIsProvided() {
             // arrange
-            UUID invalidId = UUID.randomUUID();
+            Long invalidId = 999L; // Assuming this ID does not exist
 
             // act
             CoreException exception = assertThrows(CoreException.class, () -> {

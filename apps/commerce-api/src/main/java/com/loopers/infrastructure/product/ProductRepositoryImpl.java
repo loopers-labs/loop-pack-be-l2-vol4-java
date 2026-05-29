@@ -3,18 +3,14 @@ package com.loopers.infrastructure.product;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
-
     private final ProductJpaRepository productJpaRepository;
 
     @Override
@@ -23,37 +19,17 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Optional<ProductModel> find(UUID id) {
+    public Optional<ProductModel> find(Long id) {
         return productJpaRepository.findById(id);
     }
 
     @Override
-    public Optional<ProductModel> findActive(UUID id) {
-        return productJpaRepository.findByIdAndDeletedAtIsNull(id);
+    public List<ProductModel> findAll() {
+        return productJpaRepository.findAll();
     }
 
     @Override
-    public Page<ProductModel> findAll(Pageable pageable) {
-        return productJpaRepository.findAll(pageable);
-    }
-
-    @Override
-    public Page<ProductModel> findAllActive(Pageable pageable) {
-        return productJpaRepository.findAllByDeletedAtIsNull(pageable);
-    }
-
-    @Override
-    public List<ProductModel> findAllByBrandId(UUID brandId) {
-        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
-    }
-
-    @Override
-    public Page<ProductModel> findAllActiveByBrandId(UUID brandId, Pageable pageable) {
-        return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, pageable);
-    }
-
-    @Override
-    public Page<ProductModel> findAllByBrandIdPaged(UUID brandId, Pageable pageable) {
-        return productJpaRepository.findAllByBrandIdPaged(brandId, pageable);
+    public void delete(Long id) {
+        productJpaRepository.deleteById(id);
     }
 }

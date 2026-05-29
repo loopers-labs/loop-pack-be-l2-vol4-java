@@ -2,9 +2,7 @@ package com.loopers.application.example;
 
 import com.loopers.domain.example.ExampleModel;
 
-import java.util.UUID;
-
-public record ExampleInfo(UUID id, String name, String description) {
+public record ExampleInfo(Long id, String name, String description) {
     public static ExampleInfo from(ExampleModel model) {
         return new ExampleInfo(
             model.getId(),
