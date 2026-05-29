@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api-admin/v1/payments")
+@RequestMapping("/api-webhook/v1/payments")
 public class PaymentAdminV1Controller implements PaymentAdminV1ApiSpec {
 
     private final PaymentFacade paymentFacade;

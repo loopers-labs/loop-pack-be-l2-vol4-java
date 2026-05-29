@@ -47,8 +47,8 @@ class OrderV1ApiE2ETest {
     private static final String BRANDS_URL   = "/api-admin/v1/brands";
     private static final String PRODUCTS_URL = "/api-admin/v1/products";
     private static final String ORDERS_URL   = "/api/v1/orders";
-    private static final String PAYMENTS_CONFIRM_URL = "/api-admin/v1/payments/confirm";
-    private static final String PAYMENTS_FAIL_URL    = "/api-admin/v1/payments/fail";
+    private static final String PAYMENTS_CONFIRM_URL = "/api-webhook/v1/payments/confirm";
+    private static final String PAYMENTS_FAIL_URL    = "/api-webhook/v1/payments/fail";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -345,7 +345,7 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    @DisplayName("POST /api-admin/v1/payments/confirm — 결제 확정")
+    @DisplayName("POST /api-webhook/v1/payments/confirm — 결제 확정")
     @Nested
     class ConfirmPayment {
 
@@ -425,7 +425,7 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    @DisplayName("POST /api-admin/v1/payments/fail — 결제 실패")
+    @DisplayName("POST /api-webhook/v1/payments/fail — 결제 실패")
     @Nested
     class FailPayment {
 
