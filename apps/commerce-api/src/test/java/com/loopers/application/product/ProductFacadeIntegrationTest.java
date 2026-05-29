@@ -1,8 +1,8 @@
 package com.loopers.application.product;
 
 import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.like.LikeFacade;
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -30,10 +31,13 @@ class ProductFacadeIntegrationTest {
 
     private final ProductFacade productFacade;
     private final BrandFacade brandFacade;
+    private final LikeFacade likeFacade;
     private final ProductJpaRepository productJpaRepository;
     private final StockJpaRepository stockJpaRepository;
     private final BrandJpaRepository brandJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+
+    private final AtomicLong likeUserIdSeq = new AtomicLong(1L);
 
     private Long brandId;
 
@@ -41,6 +45,7 @@ class ProductFacadeIntegrationTest {
     public ProductFacadeIntegrationTest(
         ProductFacade productFacade,
         BrandFacade brandFacade,
+        LikeFacade likeFacade,
         ProductJpaRepository productJpaRepository,
         StockJpaRepository stockJpaRepository,
         BrandJpaRepository brandJpaRepository,
@@ -48,6 +53,7 @@ class ProductFacadeIntegrationTest {
     ) {
         this.productFacade = productFacade;
         this.brandFacade = brandFacade;
+        this.likeFacade = likeFacade;
         this.productJpaRepository = productJpaRepository;
         this.stockJpaRepository = stockJpaRepository;
         this.brandJpaRepository = brandJpaRepository;
@@ -212,11 +218,9 @@ class ProductFacadeIntegrationTest {
         }
 
         private void increaseLikes(Long productId, int times) {
-            ProductModel product = productJpaRepository.findById(productId).orElseThrow();
             for (int i = 0; i < times; i++) {
-                product.incrementLikeCount();
+                likeFacade.like(likeUserIdSeq.getAndIncrement(), productId);
             }
-            productJpaRepository.save(product);
         }
     }
 
@@ -375,11 +379,9 @@ class ProductFacadeIntegrationTest {
         }
 
         private void increaseLikes(Long productId, int times) {
-            ProductModel product = productJpaRepository.findById(productId).orElseThrow();
             for (int i = 0; i < times; i++) {
-                product.incrementLikeCount();
+                likeFacade.like(likeUserIdSeq.getAndIncrement(), productId);
             }
-            productJpaRepository.save(product);
         }
     }
 

@@ -21,6 +21,9 @@ import static org.mockito.BDDMockito.given;
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
 
+    private static final Long PRODUCT_ID = 1L;
+    private static final Long ABSENT_PRODUCT_ID = 999L;
+
     @Mock
     private ProductRepository productRepository;
 
@@ -95,6 +98,64 @@ class ProductServiceTest {
 
             // when & then — 예외가 발생하지 않는다
             productService.deleteByBrandId(brandId);
+        }
+    }
+
+    @DisplayName("좋아요 수 증가 시, ")
+    @Nested
+    class IncrementLikeCount {
+
+        @DisplayName("active 상품이 존재하면 정상적으로 종료된다.")
+        @Test
+        void doesNotThrow_whenActiveProductExists() {
+            // given
+            given(productRepository.incrementLikeCount(PRODUCT_ID)).willReturn(1);
+
+            // when & then — 예외가 발생하지 않는다
+            productService.incrementLikeCount(PRODUCT_ID);
+        }
+
+        @DisplayName("active 상품이 없으면 PRODUCT_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsProductNotFound_whenAffectedRowsIsZero() {
+            // given
+            given(productRepository.incrementLikeCount(ABSENT_PRODUCT_ID)).willReturn(0);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productService.incrementLikeCount(ABSENT_PRODUCT_ID));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("좋아요 수 감소 시, ")
+    @Nested
+    class DecrementLikeCount {
+
+        @DisplayName("active 상품이 존재하면 정상적으로 종료된다.")
+        @Test
+        void doesNotThrow_whenActiveProductExists() {
+            // given
+            given(productRepository.decrementLikeCount(PRODUCT_ID)).willReturn(1);
+
+            // when & then — 예외가 발생하지 않는다
+            productService.decrementLikeCount(PRODUCT_ID);
+        }
+
+        @DisplayName("active 상품이 없으면 PRODUCT_NOT_FOUND 예외를 던진다.")
+        @Test
+        void throwsProductNotFound_whenAffectedRowsIsZero() {
+            // given
+            given(productRepository.decrementLikeCount(ABSENT_PRODUCT_ID)).willReturn(0);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> productService.decrementLikeCount(ABSENT_PRODUCT_ID));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND);
         }
     }
 }

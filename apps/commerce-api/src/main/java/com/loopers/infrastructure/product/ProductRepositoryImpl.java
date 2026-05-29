@@ -46,6 +46,16 @@ public class ProductRepositoryImpl implements ProductRepository {
         productJpaRepository.deleteById(id);
     }
 
+    @Override
+    public int incrementLikeCount(Long id) {
+        return productJpaRepository.incrementLikeCount(id);
+    }
+
+    @Override
+    public int decrementLikeCount(Long id) {
+        return productJpaRepository.decrementLikeCount(id);
+    }
+
     private Sort toSort(ProductSortType sort) {
         return switch (sort) {
             case LATEST     -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));

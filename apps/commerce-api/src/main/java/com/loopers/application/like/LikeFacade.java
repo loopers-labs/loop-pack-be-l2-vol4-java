@@ -24,19 +24,19 @@ public class LikeFacade {
 
     @Transactional
     public void like(Long userId, Long productId) {
-        ProductModel product = productService.getActive(productId);
+        productService.getActive(productId);
 
         if (likeService.like(userId, productId)) {
-            product.incrementLikeCount();
+            productService.incrementLikeCount(productId);
         }
     }
 
     @Transactional
     public void unlike(Long userId, Long productId) {
-        ProductModel product = productService.getActive(productId);
+        productService.getActive(productId);
 
         if (likeService.unlike(userId, productId)) {
-            product.decrementLikeCount();
+            productService.decrementLikeCount(productId);
         }
     }
 

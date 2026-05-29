@@ -61,17 +61,6 @@ public class ProductModel extends BaseEntity {
         return brandId;
     }
 
-    public void incrementLikeCount() {
-        this.likeCount++;
-    }
-
-    public void decrementLikeCount() {
-        if (this.likeCount <= 0) {
-            throw new CoreException(ErrorType.INVALID_LIKE_COUNT, "좋아요 수는 0 미만이 될 수 없습니다.");
-        }
-        this.likeCount--;
-    }
-
     public void update(String newName, String newDescription, Long newPrice) {
         if (newName == null || newName.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");

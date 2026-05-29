@@ -57,4 +57,22 @@ public class ProductService {
         productRepository.findAllActiveByBrandId(brandId)
             .forEach(ProductModel::delete);
     }
+
+    @Transactional
+    public void incrementLikeCount(Long productId) {
+        int affected = productRepository.incrementLikeCount(productId);
+        if (affected == 0) {
+            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND,
+                "[id = " + productId + "] 상품을 찾을 수 없습니다.");
+        }
+    }
+
+    @Transactional
+    public void decrementLikeCount(Long productId) {
+        int affected = productRepository.decrementLikeCount(productId);
+        if (affected == 0) {
+            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND,
+                "[id = " + productId + "] 상품을 찾을 수 없습니다.");
+        }
+    }
 }
