@@ -1,5 +1,12 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.enums.UserRole;
+import com.loopers.domain.user.vo.BirthDay;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.Name;
+import com.loopers.domain.user.vo.Password;
+import com.loopers.domain.user.vo.RawPassword;
+import com.loopers.domain.user.vo.UserId;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -15,165 +22,96 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    private final String DEFAULT_USERID    = "user1";
-    private final String DEFAULT_PASSWORD  = "Dlaxodid1!";
-    private final String DEFAULT_NAME      = "홍길동";
-    private final String DEFAULT_BIRTHDAY  = "1990-01-01";
-    private final String DEFAULT_EMAIL     = "test@test.com";
-    private final UserRole DEFAULT_ROLE    = UserRole.USER;
-
-    private final String NEW_PASSWORD      = "Dlaxodid2!";
-
-    private static final String BLANK      = "";
-    private static final String SPACE      = " ";
+    private static final String DEFAULT_USERID   = "user1";
+    private static final String DEFAULT_PASSWORD = "Dlaxodid1!";
+    private static final String DEFAULT_NAME     = "홍길동";
+    private static final String DEFAULT_BIRTHDAY = "1990-01-01";
+    private static final String DEFAULT_EMAIL    = "test@test.com";
+    private static final String NEW_PASSWORD     = "Dlaxodid2!";
+    private static final String BLANK            = "";
+    private static final String SPACE            = " ";
 
     private UserModel createDefaultUser() {
-        return new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE);
+        return new UserModel(
+                new UserId(DEFAULT_USERID),
+                new Password(passwordEncoder.encode(DEFAULT_PASSWORD)),
+                new Name(DEFAULT_NAME),
+                new BirthDay(DEFAULT_BIRTHDAY),
+                new Email(DEFAULT_EMAIL),
+                UserRole.USER
+        );
     }
 
     @DisplayName("회원 모델을 생성 할 때,")
     @Nested
     class Create {
-        @DisplayName("아이디가 영문/숫자 외 문자를 포함하거나 16자를 초과하면,")
-        @Nested
-        class UserIdFormatValidation {
-            @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {
-                    BLANK,
-                    SPACE,
-                    "유저1",               // 한글 포함
-                    "user_1",             // 언더스코어 포함
-                    "user-1",             // 하이픈 포함
-                    "user!1",             // 특수문자 포함
-                    "abcdefghijklmnopq",  // 17자 초과
-            })
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenUseridIsBlank(String invalidUserId) {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(invalidUserId, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE)
-                );
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+        @ParameterizedTest(name = "[{index}] {0}")
+        @ValueSource(strings = {BLANK, SPACE, "유저1", "user_1", "user-1", "user!1", "abcdefghijklmnopq"})
+        @DisplayName("아이디가 영문/숫자 외 문자를 포함하거나 16자를 초과하면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenUseridIsInvalid(String invalidUserId) {
+            CoreException result = assertThrows(CoreException.class, () -> new UserId(invalidUserId));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("이름이 공백이거나 2자 미만이거나 50자를 초과하면,")
-        @Nested
-        class NameFormatValidation {
-            @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {BLANK, SPACE, "양", "가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다"})
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenNameIsInvalid(String invalidName) {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), invalidName, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, DEFAULT_ROLE)
-                );
+        @ParameterizedTest(name = "[{index}] {0}")
+        @ValueSource(strings = {BLANK, SPACE, "양", "가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다"})
+        @DisplayName("이름이 공백이거나 2자 미만이거나 50자를 초과하면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenNameIsInvalid(String invalidName) {
+            CoreException result = assertThrows(CoreException.class, () -> new Name(invalidName));
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("비밀번호 사용에서 ")
-        @Nested
-        class PasswordFormatValidation {
-            @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {
-                    BLANK,
-                    SPACE,
-                    "abc1",                    // 8자 미만
-                    "toolongpassword12345!",   // 16자 초과
-                    "한글포함패스워드",           // 허용 문자 외
-                    "dlaxodidAA!",             // 숫자 없음
-                    "Dlaxodid11",              // 특수문자 없음
-                    "12345678!!",              // 영문 없음
-            })
-            @DisplayName("8~16자의 영문 대소문자, 숫자, 특수문자를 포함하지 않으면 BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenPasswordFormatIsInvalid(String invalidPassword) {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        UserModel.validatePassword(invalidPassword, DEFAULT_BIRTHDAY)
-                );
+        @ParameterizedTest(name = "[{index}] {0}")
+        @ValueSource(strings = {BLANK, SPACE, "abc1", "toolongpassword12345!", "한글포함패스워드", "dlaxodidAA!", "Dlaxodid11", "12345678!!"})
+        @DisplayName("비밀번호가 형식에 맞지 않으면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenPasswordFormatIsInvalid(String invalidPassword) {
+            CoreException result = assertThrows(CoreException.class, () -> new RawPassword(invalidPassword));
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
-
-            @Test
-            @DisplayName("생년월일이 포함되면, BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenPasswordContainsBirthday() {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        UserModel.validatePassword("19900101Abc!", DEFAULT_BIRTHDAY)
-                );
-
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("생년월일 형식이 yyyy-mm-dd가 아니면,")
-        @Nested
-        class BirthDayFormatValidation {
-            @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {
-                    BLANK,
-                    SPACE,
-                    "1998-04",                   // 형식 안맞음
-                    "19980410",               // 형식 안맞음
-            })
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenBirthDayFormatIsInvalid(String invalidBirthDay) {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, invalidBirthDay, DEFAULT_EMAIL, DEFAULT_ROLE)
-                );
+        @Test
+        @DisplayName("생년월일이 포함된 비밀번호면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenPasswordContainsBirthday() {
+            CoreException result = assertThrows(CoreException.class, () ->
+                    PasswordPolicy.validatePasswordNotContainBirthDay(new RawPassword("19900101Abc!"), new BirthDay(DEFAULT_BIRTHDAY))
+            );
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("이메일 형식이 올바르지 않으면,")
-        @Nested
-        class EmailFormatValidation {
-            @ParameterizedTest(name = "[{index}] {0}")
-            @ValueSource(strings = {
-                    BLANK,
-                    SPACE,
-                    "test",                   // 형식 안맞음
-                    "test1234@",               // 형식 안맞음
-            })
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenEmailFormatIsInvalid(String invalidEmail) {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, invalidEmail, DEFAULT_ROLE)
-                );
+        @ParameterizedTest(name = "[{index}] {0}")
+        @ValueSource(strings = {BLANK, SPACE, "1998-04", "19980410"})
+        @DisplayName("생년월일 형식이 yyyy-MM-dd가 아니면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenBirthDayFormatIsInvalid(String invalidBirthDay) {
+            CoreException result = assertThrows(CoreException.class, () -> new BirthDay(invalidBirthDay));
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("역할이 null이면,")
-        @Nested
-        class RoleValidation {
-            @Test
-            @DisplayName("BAD_REQUEST 예외가 발생한다.")
-            void throwsBadRequest_whenRoleIsNull() {
-                // act
-                CoreException result = assertThrows(CoreException.class, () ->
-                        new UserModel(DEFAULT_USERID, passwordEncoder.encode(DEFAULT_PASSWORD), DEFAULT_NAME, DEFAULT_BIRTHDAY, DEFAULT_EMAIL, null)
-                );
+        @ParameterizedTest(name = "[{index}] {0}")
+        @ValueSource(strings = {BLANK, SPACE, "test", "test1234@"})
+        @DisplayName("이메일 형식이 올바르지 않으면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenEmailFormatIsInvalid(String invalidEmail) {
+            CoreException result = assertThrows(CoreException.class, () -> new Email(invalidEmail));
 
-                // assert
-                assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            }
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @Test
+        @DisplayName("역할이 null이면, BAD_REQUEST 예외가 발생한다.")
+        void throwsBadRequest_whenRoleIsNull() {
+            CoreException result = assertThrows(CoreException.class, () ->
+                    new UserModel(new UserId(DEFAULT_USERID), new Password(passwordEncoder.encode(DEFAULT_PASSWORD)), new Name(DEFAULT_NAME), new BirthDay(DEFAULT_BIRTHDAY), new Email(DEFAULT_EMAIL), null)
+            );
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @Test
@@ -182,12 +120,12 @@ class UserModelTest {
             UserModel user = createDefaultUser();
 
             assertAll(
-                    () -> assertThat(user.getUserid()).isEqualTo(DEFAULT_USERID),
-                    () -> assertThat(user.getName()).isEqualTo(DEFAULT_NAME),
-                    () -> assertThat(user.getEmail()).isEqualTo(DEFAULT_EMAIL),
-                    () -> assertThat(user.getBirthDay()).isEqualTo(DEFAULT_BIRTHDAY),
-                    () -> assertThat(passwordEncoder.matches(DEFAULT_PASSWORD, user.getPassword())).isTrue(),
-                    () -> assertThat(user.getRole()).isEqualTo(DEFAULT_ROLE)
+                    () -> assertThat(user.getUserId().getValue()).isEqualTo(DEFAULT_USERID),
+                    () -> assertThat(user.getName().getValue()).isEqualTo(DEFAULT_NAME),
+                    () -> assertThat(user.getEmail().getValue()).isEqualTo(DEFAULT_EMAIL),
+                    () -> assertThat(user.getBirthDay().getValue()).isEqualTo(DEFAULT_BIRTHDAY),
+                    () -> assertThat(passwordEncoder.matches(DEFAULT_PASSWORD, user.getPassword().getValue())).isTrue(),
+                    () -> assertThat(user.getRole()).isEqualTo(UserRole.USER)
             );
         }
     }
@@ -199,15 +137,12 @@ class UserModelTest {
         @Test
         @DisplayName("새 인코딩된 비밀번호로 변경되면, 비밀번호가 업데이트된다.")
         void changesPassword_whenEncodedPasswordIsGiven() {
-            // arrange
             UserModel user = createDefaultUser();
             String newEncoded = passwordEncoder.encode(NEW_PASSWORD);
 
-            // act
-            user.changePassword(newEncoded);
+            user.changePassword(new Password(newEncoded));
 
-            // assert
-            assertThat(user.getPassword()).isEqualTo(newEncoded);
+            assertThat(passwordEncoder.matches(NEW_PASSWORD, user.getPassword().getValue())).isTrue();
         }
     }
 }

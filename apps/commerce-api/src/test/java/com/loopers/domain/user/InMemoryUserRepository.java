@@ -1,5 +1,7 @@
 package com.loopers.domain.user;
 
+import com.loopers.domain.user.vo.UserId;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -9,17 +11,17 @@ class InMemoryUserRepository implements UserRepository {
 
     @Override
     public UserModel save(UserModel user) {
-        store.put(user.getUserid(), user);
+        store.put(user.getUserId().getValue(), user);
         return user;
     }
 
     @Override
-    public Optional<UserModel> findByUserid(String userid) {
-        return Optional.ofNullable(store.get(userid));
+    public Optional<UserModel> findByUserId(UserId userid) {
+        return Optional.ofNullable(store.get(userid.getValue()));
     }
 
     @Override
-    public boolean existsByUserid(String userid) {
-        return store.containsKey(userid);
+    public boolean existsByUserId(UserId userid) {
+        return store.containsKey(userid.getValue());
     }
 }
