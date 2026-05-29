@@ -59,4 +59,33 @@ public class OrderV1Dto {
             );
         }
     }
+
+    public record MyOrderSummary(
+        Long id,
+        Long totalAmount,
+        OrderStatus status,
+        ZonedDateTime createdAt
+    ) {
+        public static MyOrderSummary from(OrderInfo info) {
+            return new MyOrderSummary(info.id(), info.totalAmount(), info.status(), info.createdAt());
+        }
+    }
+
+    public record MyOrderDetail(
+        Long id,
+        Long totalAmount,
+        OrderStatus status,
+        List<OrderResponse.Item> items,
+        ZonedDateTime createdAt
+    ) {
+        public static MyOrderDetail from(OrderInfo info) {
+            return new MyOrderDetail(
+                info.id(),
+                info.totalAmount(),
+                info.status(),
+                info.items().stream().map(OrderResponse.Item::from).toList(),
+                info.createdAt()
+            );
+        }
+    }
 }

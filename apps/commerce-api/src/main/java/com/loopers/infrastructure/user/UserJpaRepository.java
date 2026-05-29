@@ -4,6 +4,8 @@ import com.loopers.domain.user.LoginId;
 import com.loopers.domain.user.UserModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface UserJpaRepository extends JpaRepository<UserModel, Long> {
@@ -11,4 +13,6 @@ public interface UserJpaRepository extends JpaRepository<UserModel, Long> {
     boolean existsByLoginId(LoginId loginId);
 
     Optional<UserModel> findByLoginId(LoginId loginId);
+
+    List<UserModel> findByIdIn(Collection<Long> ids);
 }

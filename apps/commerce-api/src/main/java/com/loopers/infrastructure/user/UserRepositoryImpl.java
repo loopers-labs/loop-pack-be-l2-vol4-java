@@ -6,6 +6,8 @@ import com.loopers.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -27,6 +29,11 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public Optional<UserModel> findById(Long id) {
         return userJpaRepository.findById(id);
+    }
+
+    @Override
+    public List<UserModel> findAllByIdIn(Collection<Long> ids) {
+        return userJpaRepository.findByIdIn(ids);
     }
 
     @Override
