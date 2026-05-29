@@ -24,7 +24,15 @@ public enum ErrorType {
     INVALID_NAME(HttpStatus.BAD_REQUEST, "USER-008", "이름은 2~20자의 한글 또는 영문이어야 합니다."),
     INVALID_EMAIL(HttpStatus.BAD_REQUEST, "USER-009", "올바른 이메일 형식이 아닙니다."),
     INVALID_BIRTHDATE(HttpStatus.BAD_REQUEST, "USER-010", "생년월일이 유효하지 않습니다."),
-    REQUIRED_BIRTHDATE(HttpStatus.BAD_REQUEST, "USER-011", "생년월일을 입력해주세요.");
+    REQUIRED_BIRTHDATE(HttpStatus.BAD_REQUEST, "USER-011", "생년월일을 입력해주세요."),
+
+    /** 브랜드/상품 관련 에러 */
+    BRAND_NOT_FOUND(HttpStatus.NOT_FOUND, "BRAND-001", "브랜드를 찾을 수 없습니다."),
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT-001", "상품을 찾을 수 없습니다."),
+    STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "STOCK-001", "재고 정보를 찾을 수 없습니다."),
+
+    /** 주문 관련 에러 */
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER-001", "주문 내역을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
