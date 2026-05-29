@@ -12,11 +12,12 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductV1Controller {
+public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductFacade productFacade;
 
     @PostMapping
+    @Override
     public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
@@ -32,6 +33,7 @@ public class ProductV1Controller {
     }
 
     @GetMapping("/{productId}")
+    @Override
     public ApiResponse<ProductV1Dto.ProductDetailResponse> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
@@ -41,6 +43,7 @@ public class ProductV1Controller {
     }
 
     @GetMapping
+    @Override
     public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
         @RequestParam(value = "brandId", required = false) Long brandId,
         @RequestParam(value = "sort", required = false, defaultValue = "latest") String sort,
@@ -55,6 +58,7 @@ public class ProductV1Controller {
     }
 
     @PutMapping("/{productId}")
+    @Override
     public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
         @PathVariable(value = "productId") Long productId,
         @RequestBody ProductV1Dto.UpdateProductRequest request
@@ -71,6 +75,7 @@ public class ProductV1Controller {
     }
 
     @DeleteMapping("/{productId}")
+    @Override
     public ApiResponse<Void> deleteProduct(
         @PathVariable(value = "productId") Long productId
     ) {
