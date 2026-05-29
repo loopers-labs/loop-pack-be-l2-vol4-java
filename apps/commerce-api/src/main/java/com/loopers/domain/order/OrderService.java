@@ -45,4 +45,10 @@ public class OrderService {
         OrderModel order = new OrderModel(userId, items);
         return orderRepository.save(order);
     }
+
+    @Transactional(readOnly = true)
+    public OrderModel getOrder(Long id) {
+        return orderRepository.find(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
+    }
 }

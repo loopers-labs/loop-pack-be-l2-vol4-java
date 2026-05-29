@@ -11,6 +11,7 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -34,7 +35,7 @@ public class OrderModel extends BaseEntity {
     @AttributeOverride(name = "amount", column = @Column(name = "total_amount", nullable = false))
     private Money totalAmount;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderItemModel> items = new ArrayList<>();
 
