@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
@@ -20,6 +21,7 @@ public class ProductV1Controller {
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
@@ -35,6 +37,15 @@ public class ProductV1Controller {
     ) {
         ProductInfo info = productFacade.getProduct(productId);
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{productId}/detail")
+    public ApiResponse<ProductV1Dto.ProductDetailResponse> getProductDetail(
+        @PathVariable(value = "productId") Long productId
+    ) {
+        ProductDetailInfo info = productFacade.getProductDetail(productId);
+        ProductV1Dto.ProductDetailResponse response = ProductV1Dto.ProductDetailResponse.from(info);
         return ApiResponse.success(response);
     }
 
@@ -54,6 +65,7 @@ public class ProductV1Controller {
     ) {
         ProductInfo info = productFacade.updateProduct(
             productId,
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
