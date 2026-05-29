@@ -207,6 +207,30 @@ class LikeApiE2ETest {
             assertThat(response.getBody().data().get(0).productName()).isEqualTo("에어포스1");
         }
 
+        @DisplayName("다른 회원의 좋아요 목록을 조회하면, 403을 반환한다.")
+        @Test
+        void returns403_whenAccessingOtherUserLikes() {
+            // arrange
+            userService.signUp(new UserModel(
+                "user02", "Password2@", "김철수",
+                LocalDate.of(1995, 5, 5), "other@example.com"
+            ));
+            HttpHeaders otherHeaders = new HttpHeaders();
+            otherHeaders.set(LOGIN_ID_HEADER, "user02");
+            otherHeaders.set(LOGIN_PW_HEADER, "Password2@");
+
+            // act
+            ResponseEntity<ApiResponse<List<LikeDto.LikeResponse>>> response = testRestTemplate.exchange(
+                "/api/v1/users/" + savedUser.getId() + "/likes",
+                HttpMethod.GET,
+                new HttpEntity<>(otherHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+
         @DisplayName("비로그인 상태로 요청하면, 401을 반환한다.")
         @Test
         void returns401_whenNotLoggedIn() {
