@@ -54,7 +54,7 @@ class UserV1ControllerTest {
                 VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL
             );
             given(userFacade.signUp(anyString(), anyString(), anyString(), anyString(), anyString()))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
 
             // act & assert
             mockMvc.perform(post(SIGN_UP_ENDPOINT)
@@ -98,7 +98,7 @@ class UserV1ControllerTest {
         void returns200WithMaskedName_whenAuthHeadersAreValid() throws Exception {
             // arrange
             given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
 
             // act & assert
             mockMvc.perform(get(MY_INFO_ENDPOINT)
@@ -154,7 +154,7 @@ class UserV1ControllerTest {
         void returns200_whenRequestIsValid() throws Exception {
             // arrange
             given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
             UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, NEW_RAW_PASSWORD);
 
             // act & assert
@@ -173,7 +173,7 @@ class UserV1ControllerTest {
             // arrange
             String wrongOldPassword = "wrong1234!";
             given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
             UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(wrongOldPassword, NEW_RAW_PASSWORD);
             willThrow(new CoreException(ErrorType.UNAUTHORIZED, "기존 비밀번호가 일치하지 않습니다."))
                 .given(userFacade).changePassword(VALID_LOGIN_ID, wrongOldPassword, NEW_RAW_PASSWORD);
@@ -193,7 +193,7 @@ class UserV1ControllerTest {
         void returns400_whenNewPasswordEqualsCurrent() throws Exception {
             // arrange
             given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
             UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, VALID_RAW_PASSWORD);
             willThrow(new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 기존 비밀번호와 같을 수 없습니다."))
                 .given(userFacade).changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, VALID_RAW_PASSWORD);
@@ -214,7 +214,7 @@ class UserV1ControllerTest {
             // arrange
             String newPasswordWithBirthDate = "Pass19950510!";
             given(userFacade.authenticate(VALID_LOGIN_ID, VALID_RAW_PASSWORD))
-                .willReturn(new UserInfo(VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
+                .willReturn(new UserInfo(1L, VALID_LOGIN_ID, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL));
             UserV1Dto.UpdatePasswordRequest request = new UserV1Dto.UpdatePasswordRequest(VALID_RAW_PASSWORD, newPasswordWithBirthDate);
             willThrow(new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다."))
                 .given(userFacade).changePassword(VALID_LOGIN_ID, VALID_RAW_PASSWORD, newPasswordWithBirthDate);

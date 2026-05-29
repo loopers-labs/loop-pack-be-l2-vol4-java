@@ -2,6 +2,7 @@ package com.loopers.domain.order;
 
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +37,20 @@ public class FakeOrderRepository implements OrderRepository {
         List<Order> result = new ArrayList<>();
         for (Order order : store.values()) {
             if (order.getUserId().equals(userId)) {
+                result.add(order);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public List<Order> findByUserIdAndPeriod(Long userId, ZonedDateTime start, ZonedDateTime end) {
+        List<Order> result = new ArrayList<>();
+        for (Order order : store.values()) {
+            if (!order.getUserId().equals(userId)) continue;
+            ZonedDateTime createdAt = order.getCreatedAt();
+            if (createdAt == null) continue; // 단위테스트 환경에선 @PrePersist 미실행이라 null 일 수 있음
+            if (!createdAt.isBefore(start) && !createdAt.isAfter(end)) {
                 result.add(order);
             }
         }

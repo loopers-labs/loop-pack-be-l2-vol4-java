@@ -12,15 +12,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 /**
- * 주문 유스케이스 조립.
- * 상품 조회(존재 확인) → 도메인 서비스(재고 차감 + 주문 생성)에 위임 → 영속화.
+ * 주문 유스케이스 조립: 상품 조회 → 도메인 서비스 위임 → 영속화.
  */
 @RequiredArgsConstructor
 @Component
 public class OrderFacade {
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
     private final OrderService orderService;
     private final ProductService productService;
     private final OrderRepository orderRepository;
@@ -35,17 +40,12 @@ public class OrderFacade {
         }
 
         List<OrderLine> lines = items.stream()
-            .map(item -> {
-                Product product = productService.getProduct(item.productId()); // 없으면 NOT_FOUND
-                return new OrderLine(product, item.quantity());
-            })
+            .map(item -> new OrderLine(productService.getProduct(item.productId()), item.quantity()))
             .toList();
 
-        // 도메인 서비스가 재고를 차감하고 주문을 생성한다.
-        // 조회된 상품은 같은 트랜잭션의 영속 상태이므로 재고 변경은 커밋 시 반영된다.
+        // 같은 트랜잭션에서 조회한 상품의 재고 변경은 dirty checking 으로 반영된다.
         Order order = orderService.createOrder(userId, lines);
-        Order saved = orderRepository.save(order);
-        return OrderInfo.from(saved);
+        return OrderInfo.from(orderRepository.save(order));
     }
 
     @Transactional(readOnly = true)
@@ -55,10 +55,28 @@ public class OrderFacade {
         return OrderInfo.from(order);
     }
 
+    /**
+     * 유저의 주문 목록을 조회한다. startAt·endAt 이 모두 주어지면 그 기간(일 단위, inclusive)으로 필터링한다.
+     * 둘 중 하나만 오면 잘못된 요청으로 간주한다.
+     */
     @Transactional(readOnly = true)
-    public List<OrderInfo> getOrders(Long userId) {
-        return orderRepository.findByUserId(userId).stream()
-            .map(OrderInfo::from)
-            .toList();
+    public List<OrderInfo> getOrders(Long userId, LocalDate startAt, LocalDate endAt) {
+        boolean hasStart = startAt != null;
+        boolean hasEnd = endAt != null;
+        if (hasStart ^ hasEnd) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "startAt 와 endAt 은 함께 지정해야 합니다.");
+        }
+        List<Order> orders;
+        if (hasStart) {
+            if (startAt.isAfter(endAt)) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "startAt 은 endAt 이후일 수 없습니다.");
+            }
+            ZonedDateTime start = startAt.atStartOfDay(SEOUL);
+            ZonedDateTime end = endAt.atTime(LocalTime.MAX).atZone(SEOUL);
+            orders = orderRepository.findByUserIdAndPeriod(userId, start, end);
+        } else {
+            orders = orderRepository.findByUserId(userId);
+        }
+        return orders.stream().map(OrderInfo::from).toList();
     }
 }

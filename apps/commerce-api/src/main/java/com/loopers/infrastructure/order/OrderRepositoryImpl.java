@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,5 +27,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public List<Order> findByUserId(Long userId) {
         return orderJpaRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<Order> findByUserIdAndPeriod(Long userId, ZonedDateTime start, ZonedDateTime end) {
+        return orderJpaRepository.findByUserIdAndCreatedAtBetween(userId, start, end);
     }
 }
