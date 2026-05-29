@@ -3,7 +3,6 @@ package com.loopers.order.application;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderRepository;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.order.domain.ShippingDestination;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +21,6 @@ class OrderAdminServiceTest {
     private Order order(Long userId, String orderNumber) {
         return Order.create(userId, orderNumber,
                 ShippingDestination.create("김루퍼", "010-1234-5678", "12345", "서울", "101"),
-                PaymentMethod.CARD,
                 List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 1)));
     }
 

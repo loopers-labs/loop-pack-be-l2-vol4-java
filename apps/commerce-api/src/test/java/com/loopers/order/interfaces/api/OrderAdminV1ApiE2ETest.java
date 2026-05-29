@@ -3,7 +3,6 @@ package com.loopers.order.interfaces.api;
 import com.loopers.brand.application.BrandAdminService;
 import com.loopers.brand.application.BrandCommand;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
 import com.loopers.user.application.UserCommand;
@@ -94,8 +93,7 @@ class OrderAdminV1ApiE2ETest {
     private void placeOrder(String loginId) {
         OrderV1Request.Create body = new OrderV1Request.Create(
                 List.of(new OrderV1Request.Create.Line(productId, 1)),
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
-                PaymentMethod.CARD
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
         );
         testRestTemplate.exchange(
                 "/api/v1/orders", HttpMethod.POST, new HttpEntity<>(body, userHeaders(loginId)),

@@ -1,7 +1,6 @@
 package com.loopers.order.interfaces.api;
 
 import com.loopers.order.application.OrderCommand;
-import com.loopers.order.domain.PaymentMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -35,17 +34,13 @@ public class OrderV1Request {
         String address1,
 
         @Size(max = 255, message = "상세주소는 255자 이내여야 합니다.")
-        String address2,
-
-        @NotNull(message = "결제수단은 필수입니다.")
-        PaymentMethod paymentMethod
+        String address2
     ) {
         public OrderCommand.Create toCommand(Long userId) {
             return new OrderCommand.Create(
                 userId,
                 items.stream().map(Line::toCommandLine).toList(),
-                recipientName, recipientPhone, zipcode, address1, address2,
-                paymentMethod
+                recipientName, recipientPhone, zipcode, address1, address2
             );
         }
 

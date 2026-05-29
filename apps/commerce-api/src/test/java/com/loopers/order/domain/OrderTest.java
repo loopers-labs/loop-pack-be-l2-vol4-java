@@ -32,13 +32,12 @@ class OrderTest {
     @Test
     @DisplayName("create 로 생성하면 주문 정보가 저장되고 상태는 PENDING 이다")
     void givenValidInputs_whenCreate_thenStoresFieldsWithPendingStatus() {
-        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), PaymentMethod.CARD, items());
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
 
         assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(USER_ID),
                 () -> assertThat(order.getOrderNumber()).isEqualTo(ORDER_NUMBER),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(order.getPaymentMethod()).isEqualTo(PaymentMethod.CARD),
                 () -> assertThat(order.getShippingDestination().getRecipientName()).isEqualTo("김루퍼"),
                 () -> assertThat(order.getOrderedAt()).isNotNull()
         );
@@ -47,7 +46,7 @@ class OrderTest {
     @Test
     @DisplayName("총액은 주문 항목 소계의 합으로 산정된다")
     void givenItems_whenCreate_thenTotalAmountIsSumOfSubtotals() {
-        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), PaymentMethod.CARD, items());
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
 
         assertThat(order.getTotalAmount()).isEqualTo(29_000L * 2 + 15_000L);
     }
@@ -55,7 +54,7 @@ class OrderTest {
     @Test
     @DisplayName("userId 가 null 이면 CoreException 이 발생한다")
     void givenNullUserId_whenCreate_thenThrowsCoreException() {
-        assertThatThrownBy(() -> Order.create(null, ORDER_NUMBER, shipping(), PaymentMethod.CARD, items()))
+        assertThatThrownBy(() -> Order.create(null, ORDER_NUMBER, shipping(), items()))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("userId 는 비어있을 수 없습니다.");
     }
@@ -65,23 +64,15 @@ class OrderTest {
     @ValueSource(strings = {" "})
     @DisplayName("주문번호가 비어 있으면 CoreException 이 발생한다")
     void givenBlankOrderNumber_whenCreate_thenThrowsCoreException(String invalid) {
-        assertThatThrownBy(() -> Order.create(USER_ID, invalid, shipping(), PaymentMethod.CARD, items()))
+        assertThatThrownBy(() -> Order.create(USER_ID, invalid, shipping(), items()))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("주문번호는 비어있을 수 없습니다.");
     }
 
     @Test
-    @DisplayName("결제수단이 null 이면 CoreException 이 발생한다")
-    void givenNullPaymentMethod_whenCreate_thenThrowsCoreException() {
-        assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, shipping(), null, items()))
-                .isInstanceOf(CoreException.class)
-                .hasMessageContaining("결제수단은 비어있을 수 없습니다.");
-    }
-
-    @Test
     @DisplayName("배송지 정보가 null 이면 CoreException 이 발생한다")
     void givenNullShipping_whenCreate_thenThrowsCoreException() {
-        assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, null, PaymentMethod.CARD, items()))
+        assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, null, items()))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("배송지 정보는 비어있을 수 없습니다.");
     }
@@ -89,7 +80,7 @@ class OrderTest {
     @Test
     @DisplayName("주문 항목이 비어 있으면 CoreException 이 발생한다")
     void givenEmptyItems_whenCreate_thenThrowsCoreException() {
-        assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, shipping(), PaymentMethod.CARD, List.of()))
+        assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, shipping(), List.of()))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("주문 항목은 하나 이상이어야 합니다.");
     }

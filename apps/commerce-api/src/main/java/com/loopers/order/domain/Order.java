@@ -47,10 +47,6 @@ public class Order extends BaseEntity {
     @Embedded
     private ShippingDestination shippingDestination;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false)
-    private PaymentMethod paymentMethod;
-
     @Column(name = "ordered_at", nullable = false)
     private ZonedDateTime orderedAt;
 
@@ -58,13 +54,11 @@ public class Order extends BaseEntity {
             Long userId,
             String orderNumber,
             ShippingDestination shippingDestination,
-            PaymentMethod paymentMethod,
             List<OrderItem> items
     ) {
         this.userId = userId;
         this.orderNumber = orderNumber;
         this.shippingDestination = shippingDestination;
-        this.paymentMethod = paymentMethod;
         validate(items);
         this.totalAmount = items.stream().mapToLong(OrderItem::subtotal).sum();
         this.status = OrderStatus.PENDING;
@@ -75,10 +69,9 @@ public class Order extends BaseEntity {
             Long userId,
             String orderNumber,
             ShippingDestination shippingDestination,
-            PaymentMethod paymentMethod,
             List<OrderItem> items
     ) {
-        return new Order(userId, orderNumber, shippingDestination, paymentMethod, items);
+        return new Order(userId, orderNumber, shippingDestination, items);
     }
 
     private void validate(List<OrderItem> items) {
@@ -90,9 +83,6 @@ public class Order extends BaseEntity {
         }
         if (shippingDestination == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "배송지 정보는 비어있을 수 없습니다.");
-        }
-        if (paymentMethod == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "결제수단은 비어있을 수 없습니다.");
         }
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 하나 이상이어야 합니다.");

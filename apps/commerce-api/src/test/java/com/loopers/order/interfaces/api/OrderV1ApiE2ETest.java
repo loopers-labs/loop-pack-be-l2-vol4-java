@@ -3,7 +3,6 @@ package com.loopers.order.interfaces.api;
 import com.loopers.brand.application.BrandAdminService;
 import com.loopers.brand.application.BrandCommand;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
 import com.loopers.user.application.UserCommand;
@@ -101,8 +100,7 @@ class OrderV1ApiE2ETest {
     private OrderV1Request.Create orderOf(OrderV1Request.Create.Line... lines) {
         return new OrderV1Request.Create(
                 List.of(lines),
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
-                PaymentMethod.CARD
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
         );
     }
 

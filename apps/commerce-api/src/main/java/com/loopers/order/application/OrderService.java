@@ -65,7 +65,7 @@ public class OrderService {
                 command.recipientName(), command.recipientPhone(), command.zipcode(),
                 command.address1(), command.address2()
         );
-        Order order = Order.create(command.userId(), orderNumber, shipping, command.paymentMethod(), orderItems);
+        Order order = Order.create(command.userId(), orderNumber, shipping, orderItems);
         Order saved = orderRepository.save(order);
 
         orderItems.forEach(item -> {

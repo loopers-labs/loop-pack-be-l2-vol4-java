@@ -1,7 +1,5 @@
 package com.loopers.order.application;
 
-import com.loopers.order.domain.PaymentMethod;
-
 import java.util.List;
 
 public class OrderCommand {
@@ -13,8 +11,7 @@ public class OrderCommand {
         String recipientPhone,
         String zipcode,
         String address1,
-        String address2,
-        PaymentMethod paymentMethod
+        String address2
     ) {
     }
 

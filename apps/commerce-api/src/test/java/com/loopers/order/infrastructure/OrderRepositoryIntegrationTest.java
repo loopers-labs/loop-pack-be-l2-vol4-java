@@ -4,7 +4,6 @@ import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.order.domain.ShippingDestination;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -50,7 +49,7 @@ class OrderRepositoryIntegrationTest {
 
     private Order saveOrder(Long userId, String orderNumber, List<OrderItem> items) {
         Order order = orderRepository.save(
-                Order.create(userId, orderNumber, shipping(), PaymentMethod.CARD, items)
+                Order.create(userId, orderNumber, shipping(), items)
         );
         items.forEach(item -> {
             item.assignOrder(order.getId());

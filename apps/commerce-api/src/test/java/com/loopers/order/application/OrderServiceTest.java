@@ -7,7 +7,6 @@ import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.OrderStatus;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.product.application.ProductReader;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductStock;
@@ -54,8 +53,7 @@ class OrderServiceTest {
     private OrderCommand.Create command(List<OrderCommand.Line> lines) {
         return new OrderCommand.Create(
                 USER_ID, lines,
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
-                PaymentMethod.CARD
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
         );
     }
 
@@ -182,7 +180,6 @@ class OrderServiceTest {
     void givenUserOrders_whenGetMyOrders_thenReturnsOrderSummaries() {
         Order order = Order.create(USER_ID, "20260528-000001",
                 com.loopers.order.domain.ShippingDestination.create("김루퍼", "010-1234-5678", "12345", "서울", "101"),
-                PaymentMethod.CARD,
                 List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 1)));
         when(orderRepository.findByUserId(USER_ID)).thenReturn(List.of(order));
 

@@ -12,7 +12,6 @@ public class OrderV1Response {
         String orderNumber,
         String status,
         long totalAmount,
-        String paymentMethod,
         ZonedDateTime orderedAt,
         Recipient recipient,
         List<Item> items
@@ -23,7 +22,6 @@ public class OrderV1Response {
                 result.orderNumber(),
                 result.status().name(),
                 result.totalAmount(),
-                result.paymentMethod().name(),
                 result.orderedAt(),
                 Recipient.from(result.recipient()),
                 result.items().stream().map(Item::from).toList()
@@ -37,7 +35,6 @@ public class OrderV1Response {
         String orderNumber,
         String status,
         long totalAmount,
-        String paymentMethod,
         ZonedDateTime orderedAt
     ) {
         public static Summary from(OrderResult.Summary result) {
@@ -47,7 +44,6 @@ public class OrderV1Response {
                 result.orderNumber(),
                 result.status().name(),
                 result.totalAmount(),
-                result.paymentMethod().name(),
                 result.orderedAt()
             );
         }

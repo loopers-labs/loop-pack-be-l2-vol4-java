@@ -3,7 +3,6 @@ package com.loopers.order.application;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderStatus;
-import com.loopers.order.domain.PaymentMethod;
 import com.loopers.order.domain.ShippingDestination;
 
 import java.time.ZonedDateTime;
@@ -19,7 +18,6 @@ public class OrderResult {
         String orderNumber,
         OrderStatus status,
         long totalAmount,
-        PaymentMethod paymentMethod,
         ZonedDateTime orderedAt,
         Recipient recipient,
         List<Item> items
@@ -30,7 +28,6 @@ public class OrderResult {
                 order.getOrderNumber(),
                 order.getStatus(),
                 order.getTotalAmount(),
-                order.getPaymentMethod(),
                 order.getOrderedAt(),
                 Recipient.from(order.getShippingDestination()),
                 items.stream().map(Item::from).toList()
@@ -47,7 +44,6 @@ public class OrderResult {
         String orderNumber,
         OrderStatus status,
         long totalAmount,
-        PaymentMethod paymentMethod,
         ZonedDateTime orderedAt
     ) {
         public static Summary from(Order order) {
@@ -57,7 +53,6 @@ public class OrderResult {
                 order.getOrderNumber(),
                 order.getStatus(),
                 order.getTotalAmount(),
-                order.getPaymentMethod(),
                 order.getOrderedAt()
             );
         }
