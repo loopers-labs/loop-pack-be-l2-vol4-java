@@ -33,4 +33,9 @@ public class LikeRepositoryImpl implements LikeRepository {
     public void delete(LikeModel like) {
         likeJpaRepository.delete(like);
     }
+
+    @Override
+    public void deleteAllByProductId(Long productId) {
+        likeJpaRepository.deleteAllByProductId(productId);
+    }
 }

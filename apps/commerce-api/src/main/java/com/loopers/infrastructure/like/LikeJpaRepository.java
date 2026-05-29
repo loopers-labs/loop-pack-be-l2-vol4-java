@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface LikeJpaRepository extends JpaRepository<LikeModel, Long> {
     Optional<LikeModel> findByMemberIdAndProductId(Long memberId, Long productId);
     List<LikeModel> findAllByMemberId(Long memberId);
+    void deleteAllByProductId(Long productId);
 }

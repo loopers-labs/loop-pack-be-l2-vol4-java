@@ -22,4 +22,9 @@ public class StockRepositoryImpl implements StockRepository {
     public Optional<StockModel> findByProductId(Long productId) {
         return stockJpaRepository.findByProductId(productId);
     }
+
+    @Override
+    public Optional<StockModel> findByProductIdForUpdate(Long productId) {
+        return stockJpaRepository.findByProductIdForUpdate(productId);
+    }
 }

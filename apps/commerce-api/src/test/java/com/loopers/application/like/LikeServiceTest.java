@@ -165,6 +165,11 @@ class LikeServiceTest {
             store.remove(like.getId());
         }
 
+        @Override
+        public void deleteAllByProductId(Long productId) {
+            store.values().removeIf(l -> l.getProductId().equals(productId));
+        }
+
         public boolean existsByMemberIdAndProductId(Long memberId, Long productId) {
             return store.values().stream()
                 .anyMatch(l -> l.getMemberId().equals(memberId) && l.getProductId().equals(productId));

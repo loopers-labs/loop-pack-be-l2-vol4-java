@@ -162,6 +162,11 @@ class StockServiceTest {
                 .findFirst();
         }
 
+        @Override
+        public Optional<StockModel> findByProductIdForUpdate(Long productId) {
+            return findByProductId(productId);
+        }
+
         private void setId(StockModel stock, long id) {
             try {
                 var field = com.loopers.domain.BaseEntity.class.getDeclaredField("id");
