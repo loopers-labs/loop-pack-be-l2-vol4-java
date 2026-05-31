@@ -18,6 +18,7 @@
 | 기존 코드 정리 / 추출 / 중복 제거 | `/refactor` | 동작 보존, 변경 범위 제한, 추출 기준, 레거시 점진 개선, 테스트 안전망 |
 | 새 기능 구조 / 책임 분배 / 인터페이스·패턴 도입 | `/design` | 단순 설계 우선, SOLID 적용 기준, Strategy/Factory/Template Method 사용 시점, **Repository port-adapter 예외** |
 | 테스트 작성 / TDD 사이클 | `/tdd` | 실전형 Red-Green-Refactor 기준 + 일반 테스트 룰 (AAA, 명명, 한 상황만, mock 남용 금지, 단위/통합/E2E 구분) |
+| 트랜잭션 / JPA / QueryDSL 흐름 분석 | `/analyze-query` | 사용자 관점의 일관성, 트랜잭션 범위, readOnly, 영속성 컨텍스트, flush/지연 로딩, 조회/쓰기 혼합 리스크 |
 
 ## Stack & Tooling
 
