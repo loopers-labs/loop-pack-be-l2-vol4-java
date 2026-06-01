@@ -1,6 +1,6 @@
 package com.loopers.config;
 
-import com.loopers.interfaces.api.LoginUserResolver;
+import com.loopers.support.auth.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;

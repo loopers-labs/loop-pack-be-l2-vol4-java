@@ -31,12 +31,20 @@ erDiagram
         BIGINT brand_id
         VARCHAR name
         BIGINT price
-        INT stock
         VARCHAR description
         BIGINT like_count
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
+    }
+
+    stocks {
+        BIGINT id PK
+        BIGINT product_id FK
+        INT total_stock
+        INT reserved_stock
+        DATETIME created_at
+        DATETIME updated_at
     }
 
     likes {
@@ -69,7 +77,8 @@ erDiagram
     users }o--o| brands : "brand_id (nullable)"
     users ||--o{ likes : ""
     users ||--o{ orders : ""
-    brands ||--o{ products : ""
+    brands |o--o{ products : "brand_id (nullable)"
+    products ||--|| stocks : ""
     products ||--o{ likes : ""
     orders ||--|{ order_items : ""
 ```
@@ -88,7 +97,7 @@ erDiagram
 | 상속 | 테이블 |
 |------|--------|
 | SoftDeletableEntity | users, brands, products |
-| BaseEntity | likes, orders, order_items |
+| BaseEntity | stocks, likes, orders, order_items |
 
 `orders`와 `order_items`는 삭제 시나리오가 없고, 추후 주문 취소가 생기더라도 `deleted_at`이 아닌 `status` 필드로 상태를 표현하는 게 적합하다.
 
@@ -100,6 +109,12 @@ erDiagram
 
 ### order_items — product_id 논리 참조
 `product_id`는 스냅샷 참조용으로만 보관한다. 주문 이후 상품이 삭제되어도 주문 기록이 유지되어야 하므로 FK 제약을 걸지 않는다.
+
+### orders — status
+주문 상태는 `PENDING_PAYMENT` → `CONFIRMED` 두 단계로 관리한다. 주문 생성 시 `PENDING_PAYMENT`로 시작하며, 결제 완료(`pay/confirm`) 시 `CONFIRMED`로 전환된다.
+
+### stocks — 재고 선점 모델
+`total_stock`은 전체 재고, `reserved_stock`은 결제 진입 후 선점된 수량이다. 실제 주문 가능 수량은 `total_stock - reserved_stock`으로 계산한다. 결제 완료 시 두 값을 동시에 차감해 확정 처리한다.
 
 ### products — like_count
 초기값 0으로 생성되며 좋아요 등록·취소 시 `like_count = like_count ± 1` 형태의 DB 원자 UPDATE로 갱신된다.

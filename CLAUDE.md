@@ -1,71 +1,45 @@
 # CLAUDE.md
 
-## Commands
+## DDD 기반 구현
 
-### 인프라 실행 (테스트/로컬 실행 전 필수)
-```shell
-docker-compose -f ./docker/infra-compose.yml up
-```
+### 도메인 & 객체 설계 전략
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
+- Domain Service는 Repository 의존 없이 순수 도메인 로직만 담당합니다. 도메인 객체를 파라미터로 받아 비즈니스 규칙을 수행하고 도메인 객체를 반환합니다. 크로스 도메인 협력 로직도 DomainService가 담당하며, 이때 Facade가 로드한 타 도메인 객체를 파라미터로 받아 처리합니다.
+- Application Layer(Facade)는 Repository 로드·저장과 DomainService 호출 순서 조율을 담당합니다. 크로스 도메인 비즈니스 로직을 Facade에 인라인으로 직접 작성하지 않습니다.
 
-### 빌드 및 테스트
-```shell
-./gradlew build
-./gradlew test
-
-# 특정 모듈
-./gradlew :apps:commerce-api:test
-./gradlew :apps:commerce-batch:test
-
-# 단일 클래스 / 메서드
-./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest"
-./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest.Create.createsExampleModel_whenNameAndDescriptionAreProvided"
-```
-
-### 애플리케이션 실행
-```shell
-./gradlew :apps:commerce-api:bootRun
-```
-
----
-
-## 아키텍처
-
-### 멀티 모듈 구조
-- `apps/` — 실행 가능한 SpringBootApplication. `commerce-api`(REST API), `commerce-batch`(배치), `commerce-streamer`(Kafka 컨슈머)
-- `modules/` — 도메인에 독립적인 재사용 설정. `jpa`, `redis`, `kafka`
-- `supports/` — 부가 기능 애드온. `jackson`, `monitoring`, `logging`
-
-### `commerce-api` 레이어 구조
+### 아키텍처, 패키지 구성 전략
+- 본 프로젝트는 4티어 레이어드 아키텍처를 따릅니다: `interfaces → application → domain ← infrastructure`
+- DIP(의존성 역전 원칙)는 교체 가능성이 있는 곳에만 적용합니다.
+  - 적용: `Repository` 인터페이스, `PasswordEncryptor` 인터페이스
+  - 미적용: `Facade`, `DomainService` 등 구현체를 교체할 시나리오가 없는 곳
+- API request/response DTO와 응용 레이어의 DTO는 분리해 작성합니다.
+- 패키징 전략은 **도메인 중심(Domain-first, 약하게)** 으로 구성합니다.
+  - 최상위는 도메인 패키지, 그 안에 레이어 서브패키지를 둡니다.
+  - 레이어 서브패키지를 유지함으로써 레이어 경계를 코드 구조로 표현합니다.
 
 ```
-interfaces/api  →  Controller, Dto, ApiSpec (Swagger)
-application     →  Facade, Info (레이어 간 데이터 전달 record)
-domain          →  Service, Model (Entity), Repository (인터페이스)
-infrastructure  →  JpaRepository, RepositoryImpl
+com.loopers/
+├── support/                        ← 도메인 무관 공통 코드
+│   ├── error/                      (CoreException, ErrorType)
+│   ├── response/                   (ApiResponse, ApiControllerAdvice)
+│   └── auth/                       (CurrentUser, LoginUser, LoginUserResolver)
+│
+├── {domain}/                       ← user, brand, product, like, order
+│   ├── domain/                     (Model, Repository 인터페이스, Service)
+│   ├── application/                (Facade, Info DTO)
+│   ├── infrastructure/             (Repository 구현체, JpaRepository)
+│   └── interfaces/                 (Controller, DTO — 고객/어드민 파일명으로 구분)
 ```
 
-- **Controller**는 Facade만 호출한다. Service를 직접 호출하지 않는다.
-- **Facade**는 여러 Service를 조합하는 역할이다. 단일 Service 호출도 Facade를 거친다.
-- **Service**는 도메인 로직을 담당하며 `@Transactional`을 선언한다.
-- **Repository**는 도메인 레이어에 인터페이스로 정의되고, `infrastructure`에서 구현한다 (의존성 역전).
-- **Model**은 JPA Entity이자 도메인 객체다. 생성자에서 유효성 검증을 수행하며 유효하지 않으면 `CoreException`을 던진다.
-- **Controller**는 `implements XxxV1ApiSpec` 형태로 Swagger 어노테이션을 인터페이스에 분리한다. Controller 본문에는 `@Operation` 등을 작성하지 않는다.
+- 어드민/고객 API는 같은 `interfaces/` 안에서 파일명으로 구분합니다.
+  - 고객: `BrandV1Controller.java`
+  - 어드민: `AdminBrandV1Controller.java`
+- `OrderItemModel`은 `order/domain/` 안에 위치합니다. (Order 없이 독립 존재 불가)
 
-### API 응답 형식
-모든 응답은 `ApiResponse<T>` record를 사용한다:
-```json
-{ "meta": { "result": "SUCCESS", "errorCode": null, "message": null }, "data": { ... } }
-```
-에러 시 `ApiControllerAdvice`가 `CoreException`을 잡아 `ApiResponse.fail()`로 변환한다.
 
-### 예외 처리
-- 비즈니스 예외는 `CoreException(ErrorType, customMessage)` 사용
-- `ErrorType` enum: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR` (각각 HTTP 상태코드 매핑됨)
-
-### BaseEntity
-모든 Entity는 `modules/jpa`의 `BaseEntity`를 상속한다. `id`(AUTO_INCREMENT), `createdAt`, `updatedAt`, `deletedAt`을 자동 관리한다. 소프트 딜리트는 `delete()` / `restore()` 메서드로 처리하며 둘 다 멱등하게 동작한다.
-
----
 
 ## 테스트 관행
 
@@ -73,9 +47,10 @@ infrastructure  →  JpaRepository, RepositoryImpl
 
 | 종류 | 위치 | 어노테이션 | 특징 |
 |------|------|-----------|------|
-| 단위 테스트 | `domain/XxxModelTest` | 없음 (순수 Java) | Model 생성·유효성 검증 |
-| 통합 테스트 | `domain/XxxServiceIntegrationTest` | `@SpringBootTest` | 실제 DB(Testcontainers), `DatabaseCleanUp`으로 격리 |
-| E2E 테스트 | `interfaces/api/XxxApiE2ETest` | `@SpringBootTest(webEnvironment=RANDOM_PORT)` | `TestRestTemplate` 사용, 실제 HTTP 요청 |
+| 단위 테스트 | `{domain}/domain/XxxModelTest` | 없음 (순수 Java) | Model 생성·유효성 검증 |
+| 단위 테스트 | `{domain}/domain/XxxServiceTest` | 없음 (순수 Java) | DomainService 비즈니스 로직 검증 (Repository 불필요) |
+| 통합 테스트 | `{domain}/application/XxxFacadeIntegrationTest` | `@SpringBootTest` | 실제 DB(Testcontainers), `DatabaseCleanUp`으로 격리 |
+| E2E 테스트 | `{domain}/interfaces/XxxApiE2ETest` | `@SpringBootTest(webEnvironment=RANDOM_PORT)` | `TestRestTemplate` 사용, 실제 HTTP 요청 |
 
 - 테스트 메서드 이름은 `동사_when조건` 패턴을 따른다 (예: `returnsExampleInfo_whenValidIdIsProvided`)
 - 각 테스트는 `// arrange / act / assert` 주석으로 구분한다
@@ -104,9 +79,13 @@ infrastructure  →  JpaRepository, RepositoryImpl
 - [ ] 이름이 두 글자 이상이면 마지막 글자만 * 처리 → "홍길동" → "홍길*"
 - [ ] 이름이 한 글자이면 * 하나만 반환 → "*"
 
-[통합] UserService 내 정보 조회
-- [ ] 존재하는 loginId로 조회 → 회원 정보 반환
-- [ ] 존재하지 않는 loginId로 조회 → null 반환
+[단위] UserService 회원가입
+- [ ] 이미 존재하는 loginId → CONFLICT 예외
+- [ ] 존재하지 않는 loginId → 비밀번호 인코딩 후 UserModel 반환
+
+[통합] UserFacade 회원가입
+- [ ] 정상 요청 → DB에 저장되고 UserInfo 반환
+- [ ] 중복 loginId → CONFLICT 예외
 
 [E2E] GET /api/v1/users/me
 - [ ] 정상 조회 → 200, 유저 정보 반환
