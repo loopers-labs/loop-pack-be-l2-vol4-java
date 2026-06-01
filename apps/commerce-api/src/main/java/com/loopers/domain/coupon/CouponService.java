@@ -4,9 +4,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -15,23 +14,18 @@ public class CouponService {
     private final CouponTemplateRepository couponTemplateRepository;
     private final UserCouponRepository userCouponRepository;
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
-        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
-            .map(issuedCoupon -> CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon))
-            .orElseGet(() -> {
-                UserCoupon issuedCoupon = couponTemplate.issue(userId);
-                UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
-                return CouponIssueResult.issued(couponTemplate, savedCoupon);
-            });
-    }
+        UserCoupon couponToIssue = couponTemplate.issue(userId);
+        boolean newlyIssued = userCouponRepository.issueOnce(couponToIssue);
+        UserCoupon issuedCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+            .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "발급된 쿠폰을 확인할 수 없습니다."));
 
-    @Transactional(readOnly = true)
-    public Optional<CouponIssueResult> findAlreadyIssuedCoupon(Long userId, Long couponTemplateId) {
-        CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
-        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
-            .map(issuedCoupon -> CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon));
+        if (newlyIssued) {
+            return CouponIssueResult.issued(couponTemplate, issuedCoupon);
+        }
+        return CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon);
     }
 
     public CouponTemplate getCouponTemplateForIssue(Long couponTemplateId) {
