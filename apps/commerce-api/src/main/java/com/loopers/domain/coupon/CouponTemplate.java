@@ -81,10 +81,8 @@ public class CouponTemplate extends BaseEntity {
     }
 
     public CouponDiscount apply(CouponMoney orderAmount, ZonedDateTime now, CouponDiscountPolicy policy) {
-        validateOrderAmount(orderAmount);
         validatePolicy(type, policy);
-        validateNotExpired(now);
-        validateMinimumOrderAmount(orderAmount);
+        validateApplicableTo(orderAmount, now);
 
         CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
         return CouponDiscount.of(orderAmount, discountAmount);
@@ -96,6 +94,17 @@ public class CouponTemplate extends BaseEntity {
 
     public boolean isExpiredAt(ZonedDateTime now) {
         return expiration.isExpiredAt(now);
+    }
+
+    public boolean canApplyTo(CouponMoney orderAmount, ZonedDateTime now) {
+        validateOrderAmount(orderAmount);
+        return !isExpiredAt(now) && satisfiesMinimumOrderAmount(orderAmount);
+    }
+
+    public void validateApplicableTo(CouponMoney orderAmount, ZonedDateTime now) {
+        validateOrderAmount(orderAmount);
+        validateNotExpired(now);
+        validateMinimumOrderAmount(orderAmount);
     }
 
     private static void validateType(CouponType type) {
@@ -123,8 +132,12 @@ public class CouponTemplate extends BaseEntity {
     }
 
     private void validateMinimumOrderAmount(CouponMoney orderAmount) {
-        if (minimumOrderAmount != null && orderAmount.isLessThan(minimumOrderAmount)) {
+        if (!satisfiesMinimumOrderAmount(orderAmount)) {
             throw new CoreException(ErrorType.CONFLICT, "최소 주문 금액을 충족하지 못했습니다.");
         }
+    }
+
+    private boolean satisfiesMinimumOrderAmount(CouponMoney orderAmount) {
+        return minimumOrderAmount == null || !orderAmount.isLessThan(minimumOrderAmount);
     }
 }

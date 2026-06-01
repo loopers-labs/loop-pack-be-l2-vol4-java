@@ -66,6 +66,14 @@ public class UserCoupon extends BaseEntity {
         return couponTemplateId.value();
     }
 
+    public boolean isIssuedTo(Long userId) {
+        return owner.isSameUser(userId);
+    }
+
+    public boolean isAvailable() {
+        return status == UserCouponStatus.AVAILABLE;
+    }
+
     public void use(Long userId, ZonedDateTime usedAt) {
         validateOwner(userId);
         validateUsedAt(usedAt);
