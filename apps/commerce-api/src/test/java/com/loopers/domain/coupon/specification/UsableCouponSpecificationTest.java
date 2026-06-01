@@ -35,7 +35,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
+        boolean satisfied = specification.isSatisfiedBy(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isTrue();
@@ -51,7 +51,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, otherUserId, orderAmount));
+        boolean satisfied = specification.isSatisfiedBy(couponUseAttempt(userCoupon, couponTemplate, otherUserId, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
@@ -67,7 +67,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
+        boolean satisfied = specification.isSatisfiedBy(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
@@ -82,7 +82,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(9_999L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
+        boolean satisfied = specification.isSatisfiedBy(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
@@ -104,7 +104,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
+        boolean satisfied = specification.isSatisfiedBy(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
@@ -120,7 +120,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateUsable(context(userCoupon, couponTemplate, otherUserId, orderAmount)))
+        assertThatThrownBy(() -> specification.validateUsable(couponUseAttempt(userCoupon, couponTemplate, otherUserId, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.FORBIDDEN);
@@ -135,19 +135,19 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(9_999L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateUsable(context(userCoupon, couponTemplate, USER_ID, orderAmount)))
+        assertThatThrownBy(() -> specification.validateUsable(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.CONFLICT);
     }
 
-    private CouponUseContext context(
+    private CouponUseAttempt couponUseAttempt(
         UserCoupon userCoupon,
         CouponTemplate couponTemplate,
         Long userId,
         CouponMoney orderAmount
     ) {
-        return new CouponUseContext(userCoupon, couponTemplate, userId, orderAmount, NOW);
+        return new CouponUseAttempt(userCoupon, couponTemplate, userId, orderAmount, NOW);
     }
 
     private CouponTemplate createCouponTemplate(Long minimumOrderAmount) {

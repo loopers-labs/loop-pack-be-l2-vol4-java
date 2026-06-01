@@ -6,7 +6,7 @@ import com.loopers.domain.coupon.vo.CouponMoney;
 
 import java.time.ZonedDateTime;
 
-public record CouponUseContext(
+public record CouponUseAttempt(
     UserCoupon userCoupon,
     CouponTemplate couponTemplate,
     Long userId,
@@ -22,15 +22,15 @@ public record CouponUseContext(
         return couponTemplate != null;
     }
 
-    public boolean isCouponIssuedToUser() {
+    public boolean isIssuedToUser() {
         return userCoupon.isIssuedTo(userId);
     }
 
-    public boolean isCouponAvailable() {
+    public boolean isAvailable() {
         return userCoupon.isAvailable();
     }
 
-    public boolean isCouponApplicableToOrder() {
+    public boolean isApplicableToOrder() {
         return couponTemplate.canApplyTo(orderAmount, now);
     }
 }

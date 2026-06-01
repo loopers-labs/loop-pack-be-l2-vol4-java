@@ -7,29 +7,29 @@ import com.loopers.support.error.ErrorType;
 import org.springframework.stereotype.Component;
 
 @Component
-public class UsableCouponSpecification implements Specification<CouponUseContext> {
+public class UsableCouponSpecification implements Specification<CouponUseAttempt> {
 
     @Override
-    public boolean isSatisfiedBy(CouponUseContext context) {
-        return context != null
-            && context.hasIssuedCoupon()
-            && context.hasCouponTemplate()
-            && context.isCouponIssuedToUser()
-            && context.isCouponAvailable()
-            && context.isCouponApplicableToOrder();
+    public boolean isSatisfiedBy(CouponUseAttempt attempt) {
+        return attempt != null
+            && attempt.hasIssuedCoupon()
+            && attempt.hasCouponTemplate()
+            && attempt.isIssuedToUser()
+            && attempt.isAvailable()
+            && attempt.isApplicableToOrder();
     }
 
-    public void validateUsable(CouponUseContext context) {
-        validateContext(context);
-        validateUserCoupon(context.userCoupon());
-        validateCouponTemplate(context.couponTemplate());
-        validateOwner(context.userCoupon(), context.userId());
-        validateAvailable(context.userCoupon());
-        context.couponTemplate().validateApplicableTo(context.orderAmount(), context.now());
+    public void validateUsable(CouponUseAttempt attempt) {
+        validateAttempt(attempt);
+        validateUserCoupon(attempt.userCoupon());
+        validateCouponTemplate(attempt.couponTemplate());
+        validateOwner(attempt.userCoupon(), attempt.userId());
+        validateAvailable(attempt.userCoupon());
+        attempt.couponTemplate().validateApplicableTo(attempt.orderAmount(), attempt.now());
     }
 
-    private static void validateContext(CouponUseContext context) {
-        if (context == null) {
+    private static void validateAttempt(CouponUseAttempt attempt) {
+        if (attempt == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 사용 조건은 비어있을 수 없습니다.");
         }
     }
