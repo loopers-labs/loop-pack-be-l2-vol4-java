@@ -26,7 +26,10 @@ public class CouponV1Controller {
         @PathVariable Long couponId
     ) {
         CouponIssueInfo info = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponId));
-        HttpStatus status = info.newlyIssued() ? HttpStatus.CREATED : HttpStatus.OK;
+        HttpStatus status = switch (info.status()) {
+            case ISSUED -> HttpStatus.CREATED;
+            case ALREADY_ISSUED -> HttpStatus.OK;
+        };
         return ResponseEntity.status(status)
             .body(ApiResponse.success(CouponV1Dto.UserCouponResponse.from(info.coupon())));
     }

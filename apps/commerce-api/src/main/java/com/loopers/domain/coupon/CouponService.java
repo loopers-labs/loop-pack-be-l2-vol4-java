@@ -17,7 +17,7 @@ public class CouponService {
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
         return userCouponRepository.findByUserIdAndCouponTemplateId(userId, couponTemplate.getId())
-            .map(userCoupon -> new CouponIssueResult(couponTemplate, userCoupon, false))
+            .map(userCoupon -> new CouponIssueResult(couponTemplate, userCoupon, CouponIssueStatus.ALREADY_ISSUED))
             .orElseGet(() -> issueNewCoupon(userId, couponTemplate));
     }
 
@@ -30,6 +30,6 @@ public class CouponService {
     private CouponIssueResult issueNewCoupon(Long userId, CouponTemplate couponTemplate) {
         UserCoupon userCoupon = UserCoupon.issue(userId, couponTemplate.getId());
         UserCoupon saved = userCouponRepository.save(userCoupon);
-        return new CouponIssueResult(couponTemplate, saved, true);
+        return new CouponIssueResult(couponTemplate, saved, CouponIssueStatus.ISSUED);
     }
 }
