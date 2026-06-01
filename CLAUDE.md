@@ -1,45 +1,5 @@
 # CLAUDE.md
 
-## DDD 기반 구현
-
-### 도메인 & 객체 설계 전략
-- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
-- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
-- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
-- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
-- Domain Service는 Repository 의존 없이 순수 도메인 로직만 담당합니다. 도메인 객체를 파라미터로 받아 비즈니스 규칙을 수행하고 도메인 객체를 반환합니다. 크로스 도메인 협력 로직도 DomainService가 담당하며, 이때 Facade가 로드한 타 도메인 객체를 파라미터로 받아 처리합니다.
-- Application Layer(Facade)는 Repository 로드·저장과 DomainService 호출 순서 조율을 담당합니다. 크로스 도메인 비즈니스 로직을 Facade에 인라인으로 직접 작성하지 않습니다.
-
-### 아키텍처, 패키지 구성 전략
-- 본 프로젝트는 4티어 레이어드 아키텍처를 따릅니다: `interfaces → application → domain ← infrastructure`
-- DIP(의존성 역전 원칙)는 교체 가능성이 있는 곳에만 적용합니다.
-  - 적용: `Repository` 인터페이스, `PasswordEncryptor` 인터페이스
-  - 미적용: `Facade`, `DomainService` 등 구현체를 교체할 시나리오가 없는 곳
-- API request/response DTO와 응용 레이어의 DTO는 분리해 작성합니다.
-- 패키징 전략은 **도메인 중심(Domain-first, 약하게)** 으로 구성합니다.
-  - 최상위는 도메인 패키지, 그 안에 레이어 서브패키지를 둡니다.
-  - 레이어 서브패키지를 유지함으로써 레이어 경계를 코드 구조로 표현합니다.
-
-```
-com.loopers/
-├── support/                        ← 도메인 무관 공통 코드
-│   ├── error/                      (CoreException, ErrorType)
-│   ├── response/                   (ApiResponse, ApiControllerAdvice)
-│   └── auth/                       (CurrentUser, LoginUser, LoginUserResolver)
-│
-├── {domain}/                       ← user, brand, product, like, order
-│   ├── domain/                     (Model, Repository 인터페이스, Service)
-│   ├── application/                (Facade, Info DTO)
-│   ├── infrastructure/             (Repository 구현체, JpaRepository)
-│   └── interfaces/                 (Controller, DTO — 고객/어드민 파일명으로 구분)
-```
-
-- 어드민/고객 API는 같은 `interfaces/` 안에서 파일명으로 구분합니다.
-  - 고객: `BrandV1Controller.java`
-  - 어드민: `AdminBrandV1Controller.java`
-- `OrderItemModel`은 `order/domain/` 안에 위치합니다. (Order 없이 독립 존재 불가)
-
-
 
 ## 테스트 관행
 
