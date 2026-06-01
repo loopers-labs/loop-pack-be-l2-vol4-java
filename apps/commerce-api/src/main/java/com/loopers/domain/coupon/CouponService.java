@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Component
 public class CouponService {
@@ -23,6 +25,13 @@ public class CouponService {
                 UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
                 return CouponIssueResult.issued(couponTemplate, savedCoupon);
             });
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CouponIssueResult> findAlreadyIssuedCoupon(Long userId, Long couponTemplateId) {
+        CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
+        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+            .map(issuedCoupon -> CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon));
     }
 
     public CouponTemplate getCouponTemplateForIssue(Long couponTemplateId) {
