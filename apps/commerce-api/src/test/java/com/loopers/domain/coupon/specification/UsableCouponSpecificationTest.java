@@ -120,7 +120,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateUsable(couponUseAttempt(userCoupon, couponTemplate, otherUserId, orderAmount)))
+        assertThatThrownBy(() -> specification.confirmUsable(couponUseAttempt(userCoupon, couponTemplate, otherUserId, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.FORBIDDEN);
@@ -135,7 +135,7 @@ class UsableCouponSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(9_999L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateUsable(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount)))
+        assertThatThrownBy(() -> specification.confirmUsable(couponUseAttempt(userCoupon, couponTemplate, USER_ID, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.CONFLICT);

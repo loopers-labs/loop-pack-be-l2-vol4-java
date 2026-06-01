@@ -22,19 +22,19 @@ public class CouponV1Dto {
         ZonedDateTime usedAt
     ) {
 
-        public static UserCouponResponse from(UserCouponInfo info) {
+        public static UserCouponResponse from(UserCouponInfo userCoupon) {
             return new UserCouponResponse(
-                info.id(),
-                info.userId(),
-                info.couponTemplateId(),
-                info.name(),
-                info.type(),
-                info.discountValue(),
-                info.minimumOrderAmount(),
-                info.expiredAt(),
-                info.status(),
-                info.issuedAt(),
-                info.usedAt()
+                userCoupon.id(),
+                userCoupon.userId(),
+                userCoupon.couponTemplateId(),
+                userCoupon.name(),
+                userCoupon.type(),
+                userCoupon.discountValue(),
+                userCoupon.minimumOrderAmount(),
+                userCoupon.expiredAt(),
+                userCoupon.status(),
+                userCoupon.issuedAt(),
+                userCoupon.usedAt()
             );
         }
     }

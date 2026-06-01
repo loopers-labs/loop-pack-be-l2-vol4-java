@@ -11,8 +11,8 @@ public class CouponFacade {
 
     private final CouponService couponService;
 
-    public CouponIssueInfo issueCoupon(IssueCouponCommand command) {
-        CouponIssueResult result = couponService.issueCoupon(command.userId(), command.couponTemplateId());
-        return CouponIssueInfo.from(result);
+    public IssuedCouponInfo issueCoupon(IssueCouponCommand command) {
+        CouponIssueResult issueResult = couponService.issueCoupon(command.userId(), command.couponTemplateId());
+        return IssuedCouponInfo.from(issueResult);
     }
 }

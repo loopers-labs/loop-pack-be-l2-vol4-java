@@ -15,21 +15,19 @@ public class CouponService {
 
     @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
-        CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
-        return userCouponRepository.findByUserIdAndCouponTemplateId(userId, couponTemplate.getId())
-            .map(userCoupon -> new CouponIssueResult(couponTemplate, userCoupon, CouponIssueStatus.ALREADY_ISSUED))
-            .orElseGet(() -> issueNewCoupon(userId, couponTemplate));
+        CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
+        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+            .map(issuedCoupon -> CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon))
+            .orElseGet(() -> {
+                UserCoupon issuedCoupon = couponTemplate.issue(userId);
+                UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
+                return CouponIssueResult.issued(couponTemplate, savedCoupon);
+            });
     }
 
-    @Transactional(readOnly = true)
-    public CouponTemplate getCouponTemplate(Long couponTemplateId) {
-        return couponTemplateRepository.findActiveById(couponTemplateId)
+    public CouponTemplate getCouponTemplateForIssue(Long couponTemplateId) {
+        return couponTemplateRepository.findIssuingCoupon(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
     }
 
-    private CouponIssueResult issueNewCoupon(Long userId, CouponTemplate couponTemplate) {
-        UserCoupon userCoupon = UserCoupon.issue(userId, couponTemplate.getId());
-        UserCoupon saved = userCouponRepository.save(userCoupon);
-        return new CouponIssueResult(couponTemplate, saved, CouponIssueStatus.ISSUED);
-    }
 }

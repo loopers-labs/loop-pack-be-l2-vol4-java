@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api.coupon;
 
-import com.loopers.application.coupon.CouponIssueInfo;
 import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.IssuedCouponInfo;
 import com.loopers.application.coupon.IssueCouponCommand;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +23,14 @@ public class CouponV1Controller {
     @PostMapping("/{couponId}/issue")
     public ResponseEntity<ApiResponse<CouponV1Dto.UserCouponResponse>> issueCoupon(
         @AuthenticationPrincipal Long userId,
-        @PathVariable Long couponId
+        @PathVariable("couponId") Long couponTemplateId
     ) {
-        CouponIssueInfo info = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponId));
-        HttpStatus status = switch (info.status()) {
+        IssuedCouponInfo issuedCoupon = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplateId));
+        HttpStatus status = switch (issuedCoupon.status()) {
             case ISSUED -> HttpStatus.CREATED;
             case ALREADY_ISSUED -> HttpStatus.OK;
         };
         return ResponseEntity.status(status)
-            .body(ApiResponse.success(CouponV1Dto.UserCouponResponse.from(info.coupon())));
+            .body(ApiResponse.success(CouponV1Dto.UserCouponResponse.from(issuedCoupon.coupon())));
     }
 }

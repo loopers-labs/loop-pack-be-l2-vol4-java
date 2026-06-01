@@ -14,23 +14,13 @@ public record CouponUseAttempt(
     ZonedDateTime now
 ) {
 
-    public boolean hasIssuedCoupon() {
-        return userCoupon != null;
+    public boolean canUse() {
+        return userCoupon.canBeUsedBy(userId)
+            && couponTemplate.canApplyTo(orderAmount, now);
     }
 
-    public boolean hasCouponTemplate() {
-        return couponTemplate != null;
-    }
-
-    public boolean isIssuedToUser() {
-        return userCoupon.isIssuedTo(userId);
-    }
-
-    public boolean isAvailable() {
-        return userCoupon.isAvailable();
-    }
-
-    public boolean isApplicableToOrder() {
-        return couponTemplate.canApplyTo(orderAmount, now);
+    public void confirmUsable() {
+        userCoupon.confirmUsableBy(userId);
+        couponTemplate.confirmApplicableTo(orderAmount, now);
     }
 }

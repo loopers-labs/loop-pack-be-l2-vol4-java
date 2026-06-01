@@ -74,6 +74,15 @@ public class UserCoupon extends BaseEntity {
         return status == UserCouponStatus.AVAILABLE;
     }
 
+    public boolean canBeUsedBy(Long userId) {
+        return isIssuedTo(userId) && isAvailable();
+    }
+
+    public void confirmUsableBy(Long userId) {
+        validateOwner(userId);
+        validateAvailable();
+    }
+
     public void use(Long userId, ZonedDateTime usedAt) {
         validateOwner(userId);
         validateUsedAt(usedAt);

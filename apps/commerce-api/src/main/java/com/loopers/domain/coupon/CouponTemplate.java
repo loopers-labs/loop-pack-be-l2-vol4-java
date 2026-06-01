@@ -82,10 +82,14 @@ public class CouponTemplate extends BaseEntity {
 
     public CouponDiscount apply(CouponMoney orderAmount, ZonedDateTime now, CouponDiscountPolicy policy) {
         validatePolicy(type, policy);
-        validateApplicableTo(orderAmount, now);
+        confirmApplicableTo(orderAmount, now);
 
         CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
         return CouponDiscount.of(orderAmount, discountAmount);
+    }
+
+    public UserCoupon issue(Long userId) {
+        return UserCoupon.issue(userId, getId());
     }
 
     public String getName() {
@@ -101,7 +105,7 @@ public class CouponTemplate extends BaseEntity {
         return !isExpiredAt(now) && satisfiesMinimumOrderAmount(orderAmount);
     }
 
-    public void validateApplicableTo(CouponMoney orderAmount, ZonedDateTime now) {
+    public void confirmApplicableTo(CouponMoney orderAmount, ZonedDateTime now) {
         validateOrderAmount(orderAmount);
         validateNotExpired(now);
         validateMinimumOrderAmount(orderAmount);
