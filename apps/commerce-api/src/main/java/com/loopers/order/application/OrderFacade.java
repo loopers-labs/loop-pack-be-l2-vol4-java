@@ -67,6 +67,14 @@ public class OrderFacade {
             .toList();
 
         List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        Map<Long, StockModel> stockMap = stocks.stream()
+            .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
+
+        // [fix] 재고 레코드 없는 상품이 포함되어도 예외 없이 통과하던 버그 수정
+        if (!stockMap.keySet().containsAll(quantities.keySet())) {
+            throw new CoreException(ErrorType.NOT_FOUND, "재고 정보가 없는 상품이 포함되어 있습니다.");
+        }
+
         stocks.forEach(stock -> stock.reserve(quantities.get(stock.getProductId())));
         stocks.forEach(stockRepository::save);
 
@@ -86,6 +94,13 @@ public class OrderFacade {
             .toList();
 
         List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        Map<Long, StockModel> stockMap = stocks.stream()
+            .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
+
+        if (!stockMap.keySet().containsAll(quantities.keySet())) {
+            throw new CoreException(ErrorType.NOT_FOUND, "재고 정보가 없는 상품이 포함되어 있습니다.");
+        }
+
         stocks.forEach(stock -> stock.confirm(quantities.get(stock.getProductId())));
         stocks.forEach(stockRepository::save);
 

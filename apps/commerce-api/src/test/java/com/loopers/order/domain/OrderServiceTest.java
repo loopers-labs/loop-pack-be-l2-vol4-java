@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,8 @@ class OrderServiceTest {
         void returnsOrderModelWithPendingPaymentStatus_whenRequestIsValid() {
             // arrange
             ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, null);
+            // [fix] getId()가 null이 될 경우 Map.of에서 NPE 발생 가능 → 명시적 ID 설정으로 안전하게 수정
+            ReflectionTestUtils.setField(product, "id", 1L);
             Map<Long, Integer> quantities = Map.of(product.getId(), 2);
 
             // act
@@ -111,6 +114,23 @@ class OrderServiceTest {
                 () -> assertThat(result.getItems().get(0).getProductName()).isEqualTo("에어맥스"),
                 () -> assertThat(result.getItems().get(0).getQuantity()).isEqualTo(2)
             );
+        }
+
+        @DisplayName("quantities 맵에 해당 productId가 없으면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenProductIdNotInQuantities() {
+            // arrange
+            ProductModel product = new ProductModel("에어맥스", "나이키 운동화", 150000L, null);
+            ReflectionTestUtils.setField(product, "id", 1L);
+            Map<Long, Integer> quantities = Map.of(999L, 2);
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderService.createOrder(1L, List.of(product), quantities)
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }

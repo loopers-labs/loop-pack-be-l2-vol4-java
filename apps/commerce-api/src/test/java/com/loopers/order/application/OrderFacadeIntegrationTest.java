@@ -153,6 +153,22 @@ class OrderFacadeIntegrationTest {
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
+
+        @DisplayName("주문 품목 중 재고 레코드가 없는 상품이 있으면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenStockNotExists() {
+            // arrange
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.startPayment(1L, order.id())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
     }
 
     @DisplayName("결제를 확정(confirmPayment)할 때,")
