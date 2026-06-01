@@ -15,7 +15,7 @@ import java.time.ZonedDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CouponUseSpecificationTest {
+class UsableCouponSpecificationTest {
 
     private static final String COUPON_NAME = "1주년 쿠폰";
     private static final Long USER_ID = 1L;
@@ -24,9 +24,9 @@ class CouponUseSpecificationTest {
     private static final ZonedDateTime NOW = ZonedDateTime.parse("2026-06-01T12:00:00+09:00");
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
-    private final CouponUseSpecification specification = new CouponUseSpecification();
+    private final UsableCouponSpecification specification = new UsableCouponSpecification();
 
-    @DisplayName("사용 가능한 유저 쿠폰과 적용 가능한 쿠폰 템플릿이 주어지면, 쿠폰 사용 조건을 만족한다.")
+    @DisplayName("사용 가능한 유저 쿠폰과 적용 가능한 쿠폰 템플릿이면 쿠폰 사용 조건을 만족한다.")
     @Test
     void returnsTrue_whenCouponCanBeUsed() {
         // arrange
@@ -35,13 +35,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(userCoupon, couponTemplate, USER_ID, orderAmount, NOW);
+        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isTrue();
     }
 
-    @DisplayName("다른 사용자의 유저 쿠폰이면, 쿠폰 사용 조건을 만족하지 않는다.")
+    @DisplayName("다른 사용자의 유저 쿠폰이면 쿠폰 사용 조건을 만족하지 않는다.")
     @Test
     void returnsFalse_whenCouponBelongsToOtherUser() {
         // arrange
@@ -51,13 +51,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(userCoupon, couponTemplate, otherUserId, orderAmount, NOW);
+        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, otherUserId, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
     }
 
-    @DisplayName("이미 사용된 유저 쿠폰이면, 쿠폰 사용 조건을 만족하지 않는다.")
+    @DisplayName("이미 사용된 유저 쿠폰이면 쿠폰 사용 조건을 만족하지 않는다.")
     @Test
     void returnsFalse_whenCouponIsAlreadyUsed() {
         // arrange
@@ -67,13 +67,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(userCoupon, couponTemplate, USER_ID, orderAmount, NOW);
+        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
     }
 
-    @DisplayName("주문 금액이 최소 주문 금액보다 작으면, 쿠폰 사용 조건을 만족하지 않는다.")
+    @DisplayName("주문 금액이 최소 주문 금액보다 작으면 쿠폰 사용 조건을 만족하지 않는다.")
     @Test
     void returnsFalse_whenOrderAmountIsLessThanMinimum() {
         // arrange
@@ -82,13 +82,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(9_999L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(userCoupon, couponTemplate, USER_ID, orderAmount, NOW);
+        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
     }
 
-    @DisplayName("쿠폰 템플릿이 만료되었으면, 쿠폰 사용 조건을 만족하지 않는다.")
+    @DisplayName("쿠폰 템플릿이 만료되었으면 쿠폰 사용 조건을 만족하지 않는다.")
     @Test
     void returnsFalse_whenCouponTemplateIsExpired() {
         // arrange
@@ -104,13 +104,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        boolean satisfied = specification.isSatisfiedBy(userCoupon, couponTemplate, USER_ID, orderAmount, NOW);
+        boolean satisfied = specification.isSatisfiedBy(context(userCoupon, couponTemplate, USER_ID, orderAmount));
 
         // assert
         assertThat(satisfied).isFalse();
     }
 
-    @DisplayName("다른 사용자의 유저 쿠폰이면, FORBIDDEN 예외를 던진다.")
+    @DisplayName("다른 사용자의 유저 쿠폰이면 FORBIDDEN 예외를 던진다.")
     @Test
     void throwsForbidden_whenCouponBelongsToOtherUser() {
         // arrange
@@ -120,19 +120,13 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateSatisfiedBy(
-            userCoupon,
-            couponTemplate,
-            otherUserId,
-            orderAmount,
-            NOW
-        ))
+        assertThatThrownBy(() -> specification.validateUsable(context(userCoupon, couponTemplate, otherUserId, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.FORBIDDEN);
     }
 
-    @DisplayName("주문 금액이 최소 주문 금액보다 작으면, CONFLICT 예외를 던진다.")
+    @DisplayName("주문 금액이 최소 주문 금액보다 작으면 CONFLICT 예외를 던진다.")
     @Test
     void throwsConflict_whenOrderAmountIsLessThanMinimum() {
         // arrange
@@ -141,10 +135,19 @@ class CouponUseSpecificationTest {
         CouponMoney orderAmount = CouponMoney.of(9_999L);
 
         // act & assert
-        assertThatThrownBy(() -> specification.validateSatisfiedBy(userCoupon, couponTemplate, USER_ID, orderAmount, NOW))
+        assertThatThrownBy(() -> specification.validateUsable(context(userCoupon, couponTemplate, USER_ID, orderAmount)))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.CONFLICT);
+    }
+
+    private CouponUseContext context(
+        UserCoupon userCoupon,
+        CouponTemplate couponTemplate,
+        Long userId,
+        CouponMoney orderAmount
+    ) {
+        return new CouponUseContext(userCoupon, couponTemplate, userId, orderAmount, NOW);
     }
 
     private CouponTemplate createCouponTemplate(Long minimumOrderAmount) {

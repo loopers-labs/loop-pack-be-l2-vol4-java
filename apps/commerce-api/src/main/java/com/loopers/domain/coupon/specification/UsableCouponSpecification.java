@@ -2,42 +2,36 @@ package com.loopers.domain.coupon.specification;
 
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.UserCoupon;
-import com.loopers.domain.coupon.vo.CouponMoney;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.springframework.stereotype.Component;
 
-import java.time.ZonedDateTime;
-
 @Component
-public class CouponUseSpecification {
+public class UsableCouponSpecification implements Specification<CouponUseContext> {
 
-    public boolean isSatisfiedBy(
-        UserCoupon userCoupon,
-        CouponTemplate couponTemplate,
-        Long userId,
-        CouponMoney orderAmount,
-        ZonedDateTime now
-    ) {
-        return userCoupon != null
-            && couponTemplate != null
-            && userCoupon.isIssuedTo(userId)
-            && userCoupon.isAvailable()
-            && couponTemplate.canApplyTo(orderAmount, now);
+    @Override
+    public boolean isSatisfiedBy(CouponUseContext context) {
+        return context != null
+            && context.hasIssuedCoupon()
+            && context.hasCouponTemplate()
+            && context.isCouponIssuedToUser()
+            && context.isCouponAvailable()
+            && context.isCouponApplicableToOrder();
     }
 
-    public void validateSatisfiedBy(
-        UserCoupon userCoupon,
-        CouponTemplate couponTemplate,
-        Long userId,
-        CouponMoney orderAmount,
-        ZonedDateTime now
-    ) {
-        validateUserCoupon(userCoupon);
-        validateCouponTemplate(couponTemplate);
-        validateOwner(userCoupon, userId);
-        validateAvailable(userCoupon);
-        couponTemplate.validateApplicableTo(orderAmount, now);
+    public void validateUsable(CouponUseContext context) {
+        validateContext(context);
+        validateUserCoupon(context.userCoupon());
+        validateCouponTemplate(context.couponTemplate());
+        validateOwner(context.userCoupon(), context.userId());
+        validateAvailable(context.userCoupon());
+        context.couponTemplate().validateApplicableTo(context.orderAmount(), context.now());
+    }
+
+    private static void validateContext(CouponUseContext context) {
+        if (context == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 사용 조건은 비어있을 수 없습니다.");
+        }
     }
 
     private static void validateUserCoupon(UserCoupon userCoupon) {
