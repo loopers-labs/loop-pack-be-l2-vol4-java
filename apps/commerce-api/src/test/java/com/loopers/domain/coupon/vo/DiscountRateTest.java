@@ -14,10 +14,10 @@ class DiscountRateTest {
     @Test
     void createsDiscountRate_whenValueIsBetweenOneAndHundred() {
         // arrange
-        CouponValue value = CouponValue.of(10L);
+        DiscountValue discountValue = DiscountValue.of(10L);
 
         // act
-        DiscountRate discountRate = DiscountRate.of(value);
+        DiscountRate discountRate = DiscountRate.of(discountValue);
 
         // assert
         assertThat(discountRate.value()).isEqualTo(10L);
@@ -27,10 +27,10 @@ class DiscountRateTest {
     @Test
     void throwsBadRequest_whenValueIsOutOfRange() {
         // arrange
-        CouponValue value = CouponValue.of(101L);
+        DiscountValue discountValue = DiscountValue.of(101L);
 
         // act & assert
-        assertThatThrownBy(() -> DiscountRate.of(value))
+        assertThatThrownBy(() -> DiscountRate.of(discountValue))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
@@ -40,7 +40,7 @@ class DiscountRateTest {
     @Test
     void returnsDiscountMoney_whenAppliedToCouponMoney() {
         // arrange
-        DiscountRate discountRate = DiscountRate.of(CouponValue.of(10L));
+        DiscountRate discountRate = DiscountRate.of(DiscountValue.of(10L));
         CouponMoney orderAmount = CouponMoney.of(12_345L);
 
         // act

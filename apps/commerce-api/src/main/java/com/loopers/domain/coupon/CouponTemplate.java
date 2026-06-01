@@ -6,7 +6,7 @@ import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.domain.coupon.vo.CouponExpiration;
 import com.loopers.domain.coupon.vo.CouponMoney;
 import com.loopers.domain.coupon.vo.CouponName;
-import com.loopers.domain.coupon.vo.CouponValue;
+import com.loopers.domain.coupon.vo.DiscountValue;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
@@ -38,11 +38,11 @@ public class CouponTemplate extends BaseEntity {
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "value", nullable = false))
-    private CouponValue couponValue;
+    private DiscountValue discountValue;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "min_order_amount"))
-    private CouponMoney minOrderAmount;
+    private CouponMoney minimumOrderAmount;
 
     @Embedded
     @AttributeOverride(name = "expiredAt", column = @Column(name = "expired_at", nullable = false))
@@ -51,33 +51,33 @@ public class CouponTemplate extends BaseEntity {
     private CouponTemplate(
         CouponName name,
         CouponType type,
-        CouponValue couponValue,
-        CouponMoney minOrderAmount,
+        DiscountValue discountValue,
+        CouponMoney minimumOrderAmount,
         CouponExpiration expiration
     ) {
         this.name = name;
         this.type = type;
-        this.couponValue = couponValue;
-        this.minOrderAmount = minOrderAmount;
+        this.discountValue = discountValue;
+        this.minimumOrderAmount = minimumOrderAmount;
         this.expiration = expiration;
     }
 
     public static CouponTemplate create(
         String name,
         CouponType type,
-        long value,
-        Long minOrderAmount,
+        long discountValue,
+        Long minimumOrderAmount,
         ZonedDateTime expiredAt,
         CouponDiscountPolicy policy
     ) {
         validateType(type);
         validatePolicy(type, policy);
         CouponName couponName = CouponName.of(name);
-        CouponValue couponValue = CouponValue.of(value);
-        policy.validateValue(couponValue);
-        CouponMoney minimum = minOrderAmount == null ? null : CouponMoney.of(minOrderAmount);
+        DiscountValue discount = DiscountValue.of(discountValue);
+        policy.validateDiscountValue(discount);
+        CouponMoney minimum = minimumOrderAmount == null ? null : CouponMoney.of(minimumOrderAmount);
         CouponExpiration expiration = CouponExpiration.of(expiredAt);
-        return new CouponTemplate(couponName, type, couponValue, minimum, expiration);
+        return new CouponTemplate(couponName, type, discount, minimum, expiration);
     }
 
     public CouponDiscount apply(CouponMoney orderAmount, ZonedDateTime now, CouponDiscountPolicy policy) {
@@ -86,7 +86,7 @@ public class CouponTemplate extends BaseEntity {
         validateNotExpired(now);
         validateMinimumOrderAmount(orderAmount);
 
-        CouponMoney discountAmount = policy.calculateDiscount(orderAmount, couponValue);
+        CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
         return CouponDiscount.of(orderAmount, discountAmount);
     }
 
@@ -123,7 +123,7 @@ public class CouponTemplate extends BaseEntity {
     }
 
     private void validateMinimumOrderAmount(CouponMoney orderAmount) {
-        if (minOrderAmount != null && orderAmount.isLessThan(minOrderAmount)) {
+        if (minimumOrderAmount != null && orderAmount.isLessThan(minimumOrderAmount)) {
             throw new CoreException(ErrorType.CONFLICT, "최소 주문 금액을 충족하지 못했습니다.");
         }
     }

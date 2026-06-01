@@ -14,23 +14,23 @@ class CouponMoneyTest {
     @Test
     void createsCouponMoney_whenValueIsNotNegative() {
         // arrange
-        long value = 2_000L;
+        long amount = 2_000L;
 
         // act
-        CouponMoney money = CouponMoney.of(value);
+        CouponMoney couponMoney = CouponMoney.of(amount);
 
         // assert
-        assertThat(money.value()).isEqualTo(value);
+        assertThat(couponMoney.value()).isEqualTo(amount);
     }
 
     @DisplayName("금액이 음수이면, BAD_REQUEST 예외를 던진다.")
     @Test
     void throwsBadRequest_whenValueIsNegative() {
         // arrange
-        long value = -1L;
+        long amount = -1L;
 
         // act & assert
-        assertThatThrownBy(() -> CouponMoney.of(value))
+        assertThatThrownBy(() -> CouponMoney.of(amount))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
@@ -40,27 +40,27 @@ class CouponMoneyTest {
     @Test
     void returnsMinMoney_whenOtherMoneyIsProvided() {
         // arrange
-        CouponMoney money = CouponMoney.of(2_000L);
-        CouponMoney other = CouponMoney.of(12_000L);
+        CouponMoney fixedDiscountAmount = CouponMoney.of(2_000L);
+        CouponMoney orderAmount = CouponMoney.of(12_000L);
 
         // act
-        CouponMoney min = money.min(other);
+        CouponMoney minAmount = fixedDiscountAmount.min(orderAmount);
 
         // assert
-        assertThat(min).isEqualTo(money);
+        assertThat(minAmount).isEqualTo(fixedDiscountAmount);
     }
 
     @DisplayName("쿠폰 금액에서 다른 금액을 차감하면, 차감된 금액을 반환한다.")
     @Test
     void returnsSubtractedMoney_whenOtherMoneyIsProvided() {
         // arrange
-        CouponMoney money = CouponMoney.of(12_000L);
-        CouponMoney other = CouponMoney.of(2_000L);
+        CouponMoney orderAmount = CouponMoney.of(12_000L);
+        CouponMoney discountAmount = CouponMoney.of(2_000L);
 
         // act
-        CouponMoney subtracted = money.minus(other);
+        CouponMoney paymentAmount = orderAmount.minus(discountAmount);
 
         // assert
-        assertThat(subtracted.value()).isEqualTo(10_000L);
+        assertThat(paymentAmount.value()).isEqualTo(10_000L);
     }
 }

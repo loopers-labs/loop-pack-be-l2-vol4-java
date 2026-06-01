@@ -11,11 +11,11 @@ public record DiscountRate(long value) {
         }
     }
 
-    public static DiscountRate of(CouponValue value) {
-        if (value == null) {
+    public static DiscountRate of(DiscountValue discountValue) {
+        if (discountValue == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "정률 쿠폰 값은 비어있을 수 없습니다.");
         }
-        return new DiscountRate(value.value());
+        return new DiscountRate(discountValue.value());
     }
 
     public CouponMoney discount(CouponMoney orderAmount) {

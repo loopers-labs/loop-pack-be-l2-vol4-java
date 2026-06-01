@@ -43,9 +43,9 @@ class CouponTemplateTest {
 
         // assert
         assertAll(
-            () -> assertThat(discount.originalAmount()).isEqualTo(orderAmount),
+            () -> assertThat(discount.orderAmount()).isEqualTo(orderAmount),
             () -> assertThat(discount.discountAmount().value()).isEqualTo(2_000L),
-            () -> assertThat(discount.finalAmount().value()).isEqualTo(10_000L)
+            () -> assertThat(discount.paymentAmount().value()).isEqualTo(10_000L)
         );
     }
 
@@ -69,7 +69,7 @@ class CouponTemplateTest {
         // assert
         assertAll(
             () -> assertThat(discount.discountAmount()).isEqualTo(orderAmount),
-            () -> assertThat(discount.finalAmount().value()).isZero()
+            () -> assertThat(discount.paymentAmount().value()).isZero()
         );
     }
 
@@ -93,7 +93,7 @@ class CouponTemplateTest {
         // assert
         assertAll(
             () -> assertThat(discount.discountAmount().value()).isEqualTo(1_234L),
-            () -> assertThat(discount.finalAmount().value()).isEqualTo(11_111L)
+            () -> assertThat(discount.paymentAmount().value()).isEqualTo(11_111L)
         );
     }
 
@@ -142,15 +142,15 @@ class CouponTemplateTest {
 
     @DisplayName("정액 쿠폰 금액이 0 이하이면, BAD_REQUEST 예외를 던진다.")
     @Test
-    void throwsBadRequest_whenFixedCouponValueIsNotPositive() {
+    void throwsBadRequest_whenFixedDiscountValueIsNotPositive() {
         // arrange
-        long value = 0L;
+        long discountValue = 0L;
 
         // act & assert
         assertThatThrownBy(() -> CouponTemplate.create(
             COUPON_NAME,
             CouponType.FIXED,
-            value,
+            discountValue,
             10_000L,
             EXPIRED_AT,
             FIXED_POLICY
@@ -188,15 +188,15 @@ class CouponTemplateTest {
 
     @DisplayName("정률 쿠폰 비율이 1에서 100 사이가 아니면, BAD_REQUEST 예외를 던진다.")
     @Test
-    void throwsBadRequest_whenRateCouponValueIsOutOfRange() {
+    void throwsBadRequest_whenRateDiscountValueIsOutOfRange() {
         // arrange
-        long value = 101L;
+        long discountValue = 101L;
 
         // act & assert
         assertThatThrownBy(() -> CouponTemplate.create(
             COUPON_NAME,
             CouponType.RATE,
-            value,
+            discountValue,
             10_000L,
             EXPIRED_AT,
             RATE_POLICY
@@ -210,14 +210,14 @@ class CouponTemplateTest {
     @Test
     void throwsBadRequest_whenMinOrderAmountIsNegative() {
         // arrange
-        Long minOrderAmount = -1L;
+        Long minimumOrderAmount = -1L;
 
         // act & assert
         assertThatThrownBy(() -> CouponTemplate.create(
             COUPON_NAME,
             CouponType.FIXED,
             2_000L,
-            minOrderAmount,
+            minimumOrderAmount,
             EXPIRED_AT,
             FIXED_POLICY
         ))

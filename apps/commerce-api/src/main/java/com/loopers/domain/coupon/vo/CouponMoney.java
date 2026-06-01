@@ -17,26 +17,26 @@ public record CouponMoney(long value) {
         return new CouponMoney(value);
     }
 
-    public CouponMoney add(CouponMoney other) {
-        return CouponMoney.of(value + requireOther(other).value);
+    public CouponMoney add(CouponMoney amount) {
+        return CouponMoney.of(value + requireAmount(amount).value);
     }
 
-    public CouponMoney minus(CouponMoney other) {
-        return CouponMoney.of(value - requireOther(other).value);
+    public CouponMoney minus(CouponMoney amount) {
+        return CouponMoney.of(value - requireAmount(amount).value);
     }
 
-    public CouponMoney min(CouponMoney other) {
-        return value <= requireOther(other).value ? this : other;
+    public CouponMoney min(CouponMoney amount) {
+        return value <= requireAmount(amount).value ? this : amount;
     }
 
-    public boolean isLessThan(CouponMoney other) {
-        return value < requireOther(other).value;
+    public boolean isLessThan(CouponMoney amount) {
+        return value < requireAmount(amount).value;
     }
 
-    private static CouponMoney requireOther(CouponMoney other) {
-        if (other == null) {
+    private static CouponMoney requireAmount(CouponMoney amount) {
+        if (amount == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비교할 쿠폰 금액은 비어있을 수 없습니다.");
         }
-        return other;
+        return amount;
     }
 }

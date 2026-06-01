@@ -2,7 +2,7 @@ package com.loopers.domain.coupon.policy;
 
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.vo.CouponMoney;
-import com.loopers.domain.coupon.vo.CouponValue;
+import com.loopers.domain.coupon.vo.DiscountValue;
 import com.loopers.domain.coupon.vo.DiscountRate;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +15,12 @@ public class RateCouponDiscountPolicy implements CouponDiscountPolicy {
     }
 
     @Override
-    public void validateValue(CouponValue value) {
-        DiscountRate.of(value);
+    public void validateDiscountValue(DiscountValue discountValue) {
+        DiscountRate.of(discountValue);
     }
 
     @Override
-    public CouponMoney calculateDiscount(CouponMoney orderAmount, CouponValue value) {
-        return DiscountRate.of(value).discount(orderAmount);
+    public CouponMoney discount(CouponMoney orderAmount, DiscountValue discountValue) {
+        return DiscountRate.of(discountValue).discount(orderAmount);
     }
 }

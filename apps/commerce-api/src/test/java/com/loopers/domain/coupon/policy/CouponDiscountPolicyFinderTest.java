@@ -11,19 +11,19 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CouponDiscountPoliciesTest {
+class CouponDiscountPolicyFinderTest {
 
     @DisplayName("쿠폰 타입이 주어지면, 해당 타입의 할인 정책을 반환한다.")
     @Test
     void returnsPolicy_whenCouponTypeIsProvided() {
         // arrange
-        CouponDiscountPolicies policies = new CouponDiscountPolicies(List.of(
+        CouponDiscountPolicyFinder policyFinder = new CouponDiscountPolicyFinder(List.of(
             new FixedCouponDiscountPolicy(),
             new RateCouponDiscountPolicy()
         ));
 
         // act
-        CouponDiscountPolicy policy = policies.get(CouponType.FIXED);
+        CouponDiscountPolicy policy = policyFinder.find(CouponType.FIXED);
 
         // assert
         assertThat(policy).isInstanceOf(FixedCouponDiscountPolicy.class);
@@ -33,10 +33,10 @@ class CouponDiscountPoliciesTest {
     @Test
     void throwsInternalError_whenPolicyDoesNotExist() {
         // arrange
-        CouponDiscountPolicies policies = new CouponDiscountPolicies(List.of(new FixedCouponDiscountPolicy()));
+        CouponDiscountPolicyFinder policyFinder = new CouponDiscountPolicyFinder(List.of(new FixedCouponDiscountPolicy()));
 
         // act & assert
-        assertThatThrownBy(() -> policies.get(CouponType.RATE))
+        assertThatThrownBy(() -> policyFinder.find(CouponType.RATE))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.INTERNAL_ERROR);
@@ -52,7 +52,7 @@ class CouponDiscountPoliciesTest {
         );
 
         // act & assert
-        assertThatThrownBy(() -> new CouponDiscountPolicies(policies))
+        assertThatThrownBy(() -> new CouponDiscountPolicyFinder(policies))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.INTERNAL_ERROR);

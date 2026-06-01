@@ -2,13 +2,13 @@ package com.loopers.domain.coupon.policy;
 
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.vo.CouponMoney;
-import com.loopers.domain.coupon.vo.CouponValue;
+import com.loopers.domain.coupon.vo.DiscountValue;
 
 public interface CouponDiscountPolicy {
 
     CouponType type();
 
-    void validateValue(CouponValue value);
+    void validateDiscountValue(DiscountValue discountValue);
 
-    CouponMoney calculateDiscount(CouponMoney orderAmount, CouponValue value);
+    CouponMoney discount(CouponMoney orderAmount, DiscountValue discountValue);
 }
