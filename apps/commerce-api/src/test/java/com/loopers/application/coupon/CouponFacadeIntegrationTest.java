@@ -3,6 +3,7 @@ package com.loopers.application.coupon;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.support.error.CoreException;
@@ -34,6 +35,7 @@ class CouponFacadeIntegrationTest {
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     private final CouponFacade couponFacade;
+    private final UserCouponListQuery userCouponListQuery;
     private final CouponTemplateRepository couponTemplateRepository;
     private final UserCouponJpaRepository userCouponJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
@@ -41,11 +43,13 @@ class CouponFacadeIntegrationTest {
     @Autowired
     CouponFacadeIntegrationTest(
         CouponFacade couponFacade,
+        UserCouponListQuery userCouponListQuery,
         CouponTemplateRepository couponTemplateRepository,
         UserCouponJpaRepository userCouponJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.couponFacade = couponFacade;
+        this.userCouponListQuery = userCouponListQuery;
         this.couponTemplateRepository = couponTemplateRepository;
         this.userCouponJpaRepository = userCouponJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
@@ -92,6 +96,28 @@ class CouponFacadeIntegrationTest {
             } finally {
                 executor.shutdownNow();
             }
+        }
+    }
+
+    @DisplayName("내 쿠폰 목록을 조회할 때 ")
+    @Nested
+    class GetMyCoupons {
+
+        @DisplayName("쿠폰 만료 시각과 조회 시각이 같으면, 표시 상태를 EXPIRED로 반환한다.")
+        @Test
+        void returnsExpiredStatus_whenCouponExpiresAtCurrentTime() {
+            // arrange
+            Long userId = 1L;
+            CouponTemplate couponTemplate = createCouponTemplate();
+            couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplate.getId()));
+
+            // act
+            List<UserCouponInfo> coupons = userCouponListQuery.findMyCoupons(userId, EXPIRED_AT);
+
+            // assert
+            assertThat(coupons)
+                .extracting(UserCouponInfo::displayStatus)
+                .containsExactly(UserCouponStatus.EXPIRED);
         }
     }
 

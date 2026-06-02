@@ -10,31 +10,29 @@ public class CouponV1Dto {
 
     public record UserCouponResponse(
         Long id,
-        Long userId,
         Long couponTemplateId,
         String name,
         CouponType type,
         long discountValue,
         Long minimumOrderAmount,
         ZonedDateTime expiredAt,
-        UserCouponStatus status,
+        UserCouponStatus displayStatus,
         ZonedDateTime issuedAt,
         ZonedDateTime usedAt
     ) {
 
-        public static UserCouponResponse from(UserCouponInfo userCoupon) {
+        public static UserCouponResponse from(UserCouponInfo info) {
             return new UserCouponResponse(
-                userCoupon.id(),
-                userCoupon.userId(),
-                userCoupon.couponTemplateId(),
-                userCoupon.name(),
-                userCoupon.type(),
-                userCoupon.discountValue(),
-                userCoupon.minimumOrderAmount(),
-                userCoupon.expiredAt(),
-                userCoupon.status(),
-                userCoupon.issuedAt(),
-                userCoupon.usedAt()
+                info.id(),
+                info.couponTemplateId(),
+                info.name(),
+                info.type(),
+                info.discountValue(),
+                info.minimumOrderAmount(),
+                info.expiredAt(),
+                info.displayStatus(),
+                info.issuedAt(),
+                info.usedAt()
             );
         }
     }

@@ -10,22 +10,21 @@ import java.time.ZonedDateTime;
 
 public record UserCouponInfo(
     Long id,
-    Long userId,
     Long couponTemplateId,
     String name,
     CouponType type,
     long discountValue,
     Long minimumOrderAmount,
     ZonedDateTime expiredAt,
-    UserCouponStatus status,
+    UserCouponStatus displayStatus,
     ZonedDateTime issuedAt,
     ZonedDateTime usedAt
 ) {
 
+    // 방금 발급된 쿠폰은 만료될 수 없으므로 저장 상태가 곧 표시 상태다.
     public static UserCouponInfo from(UserCoupon userCoupon, CouponTemplate couponTemplate) {
         return new UserCouponInfo(
             userCoupon.getId(),
-            userCoupon.getUserId(),
             couponTemplate.getId(),
             couponTemplate.getName(),
             couponTemplate.getType(),

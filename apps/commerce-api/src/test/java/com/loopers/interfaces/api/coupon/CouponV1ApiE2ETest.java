@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.coupon;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.interfaces.api.ApiResponse;
@@ -24,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -33,26 +36,35 @@ class CouponV1ApiE2ETest {
 
     private static final String ENDPOINT_USERS = "/api/v1/users";
     private static final String ENDPOINT_COUPON_ISSUE = "/api/v1/coupons/{couponId}/issue";
+    private static final String ENDPOINT_MY_COUPONS = "/api/v1/users/me/coupons";
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
     private static final String LOGIN_ID = "loopers01";
     private static final String PASSWORD = "Loopers!2026";
     private static final String COUPON_NAME = "1주년 쿠폰";
+    private static final String AVAILABLE_COUPON_NAME = "1주년 사용 가능 쿠폰";
+    private static final String USED_COUPON_NAME = "1주년 사용 완료 쿠폰";
+    private static final String EXPIRED_COUPON_NAME = "1주년 만료 쿠폰";
     private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
+    private static final ZonedDateTime PAST_EXPIRED_AT = ZonedDateTime.parse("2026-01-01T00:00:00+09:00");
+    private static final ZonedDateTime USED_AT = ZonedDateTime.parse("2026-06-01T12:00:00+09:00");
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     private final TestRestTemplate testRestTemplate;
     private final CouponTemplateRepository couponTemplateRepository;
+    private final UserCouponRepository userCouponRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     CouponV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         CouponTemplateRepository couponTemplateRepository,
+        UserCouponRepository userCouponRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.couponTemplateRepository = couponTemplateRepository;
+        this.userCouponRepository = userCouponRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -86,7 +98,7 @@ class CouponV1ApiE2ETest {
                 () -> assertThat(data.discountValue()).isEqualTo(2_000L),
                 () -> assertThat(data.minimumOrderAmount()).isEqualTo(10_000L),
                 () -> assertThat(data.expiredAt()).isEqualTo(EXPIRED_AT),
-                () -> assertThat(data.status()).isEqualTo(UserCouponStatus.AVAILABLE),
+                () -> assertThat(data.displayStatus()).isEqualTo(UserCouponStatus.AVAILABLE),
                 () -> assertThat(data.issuedAt()).isNotNull()
             );
         }
@@ -134,18 +146,72 @@ class CouponV1ApiE2ETest {
         }
     }
 
+    @DisplayName("GET /api/v1/users/me/coupons")
+    @Nested
+    class GetMyCoupons {
+
+        @DisplayName("인증 사용자가 쿠폰 목록을 조회하면, 보유 쿠폰의 상태와 쿠폰 정보를 함께 반환한다.")
+        @Test
+        void returnsMyCouponsWithStatus_whenAuthenticatedUserRequestsCoupons() {
+            // arrange
+            Long userId = signUpUser();
+            CouponTemplate availableCoupon = createCouponTemplate(AVAILABLE_COUPON_NAME, EXPIRED_AT);
+            CouponTemplate usedCoupon = createCouponTemplate(USED_COUPON_NAME, EXPIRED_AT);
+            CouponTemplate expiredCoupon = createCouponTemplate(EXPIRED_COUPON_NAME, PAST_EXPIRED_AT);
+            issueCoupon(availableCoupon.getId(), authHeaders());
+            issueCoupon(usedCoupon.getId(), authHeaders());
+            issueCoupon(expiredCoupon.getId(), authHeaders());
+            useCoupon(userId, usedCoupon.getId());
+
+            // act
+            ResponseEntity<ApiResponse<List<CouponV1Dto.UserCouponResponse>>> response = getMyCoupons(authHeaders());
+
+            // assert
+            List<CouponV1Dto.UserCouponResponse> coupons = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(coupons)
+                    .extracting(CouponV1Dto.UserCouponResponse::name)
+                    .containsExactly(EXPIRED_COUPON_NAME, USED_COUPON_NAME, AVAILABLE_COUPON_NAME),
+                () -> assertThat(coupons)
+                    .extracting(CouponV1Dto.UserCouponResponse::displayStatus)
+                    .containsExactly(UserCouponStatus.EXPIRED, UserCouponStatus.USED, UserCouponStatus.AVAILABLE),
+                () -> assertThat(coupons)
+                    .extracting(CouponV1Dto.UserCouponResponse::discountValue)
+                    .containsExactly(2_000L, 2_000L, 2_000L),
+                () -> assertThat(coupons)
+                    .extracting(CouponV1Dto.UserCouponResponse::minimumOrderAmount)
+                    .containsExactly(10_000L, 10_000L, 10_000L)
+            );
+        }
+
+        @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED를 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAuthenticationHeadersAreMissing() {
+            // act
+            ResponseEntity<ApiResponse<Object>> response = getMyCouponsForError(new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
     private CouponTemplate createCouponTemplate() {
+        return createCouponTemplate(COUPON_NAME, EXPIRED_AT);
+    }
+
+    private CouponTemplate createCouponTemplate(String name, ZonedDateTime expiredAt) {
         return couponTemplateRepository.save(CouponTemplate.create(
-            COUPON_NAME,
+            name,
             CouponType.FIXED,
             2_000L,
             10_000L,
-            EXPIRED_AT,
+            expiredAt,
             FIXED_POLICY
         ));
     }
 
-    private void signUpUser() {
+    private Long signUpUser() {
         UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
             LOGIN_ID,
             PASSWORD,
@@ -153,7 +219,14 @@ class CouponV1ApiE2ETest {
             LocalDate.of(1993, 11, 3),
             "loopers@example.com"
         );
-        testRestTemplate.postForEntity(ENDPOINT_USERS, request, ApiResponse.class);
+        ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+        ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ENDPOINT_USERS,
+            HttpMethod.POST,
+            new HttpEntity<>(request),
+            responseType
+        );
+        return response.getBody().data().id();
     }
 
     private ResponseEntity<ApiResponse<CouponV1Dto.UserCouponResponse>> issueCoupon(Long couponId, HttpHeaders headers) {
@@ -176,6 +249,33 @@ class CouponV1ApiE2ETest {
             responseType,
             couponId
         );
+    }
+
+    private ResponseEntity<ApiResponse<List<CouponV1Dto.UserCouponResponse>>> getMyCoupons(HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<List<CouponV1Dto.UserCouponResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_MY_COUPONS,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> getMyCouponsForError(HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_MY_COUPONS,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private void useCoupon(Long userId, Long couponTemplateId) {
+        UserCoupon userCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplateId)
+            .orElseThrow();
+        userCoupon.use(userId, USED_AT);
+        userCouponRepository.save(userCoupon);
     }
 
     private HttpHeaders authHeaders() {
