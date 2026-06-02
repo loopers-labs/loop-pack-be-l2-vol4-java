@@ -1,8 +1,9 @@
 package com.loopers.infrastructure.coupon;
 
-import com.loopers.domain.coupon.DuplicateCouponIssueException;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -20,7 +21,7 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
         try {
             return userCouponJpaRepository.saveAndFlush(userCoupon);
         } catch (DataIntegrityViolationException e) {
-            throw new DuplicateCouponIssueException(e);
+            throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
         }
     }
 
