@@ -15,7 +15,7 @@ public class CouponService {
 
     @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
-        CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
+        CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
         if (userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId()).isPresent()) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
         }
@@ -25,7 +25,7 @@ public class CouponService {
         return CouponIssueResult.issued(couponTemplate, savedCoupon);
     }
 
-    public CouponTemplate getCouponTemplateForIssue(Long couponTemplateId) {
+    public CouponTemplate getCouponTemplate(Long couponTemplateId) {
         return couponTemplateRepository.findIssuingCoupon(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
     }
