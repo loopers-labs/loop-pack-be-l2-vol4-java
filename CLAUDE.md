@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 개요
 
-Loopers 커머스 백엔드 — 멀티 모듈 Spring Boot 프로젝트(Loopers Java/Spring 템플릿). 그룹은 `com.loopers`, 루트 프로젝트는 `loopers-java-spring-template`. `commerce-api`의 `example` 패키지는 계층 구조를 보여주는 레퍼런스 구현이며, `product`는 동일 패턴으로 만든 첫 실제 도메인이다.
+Loopers 커머스 백엔드 — 멀티 모듈 Spring Boot 프로젝트(Loopers Java/Spring 템플릿). 그룹은 `com.loopers`, 루트 프로젝트는 `loopers-java-spring-template`. `commerce-api`의 `user` 패키지가 도메인 > 계층 구조의 레퍼런스 구현이다.
 
 ## 기술 스택
 
@@ -43,8 +43,8 @@ supports/    부가 기능 add-on (logging, monitoring, jackson)
 
 ./gradlew test                        # 전체 테스트
 ./gradlew :apps:commerce-api:test     # 특정 모듈 테스트
-./gradlew :apps:commerce-api:test --tests "com.loopers.domain.example.ExampleModelTest"   # 단일 테스트 클래스
-./gradlew :apps:commerce-api:test --tests "*.ExampleModelTest.someMethod"                  # 단일 테스트 메서드
+./gradlew :apps:commerce-api:test --tests "com.loopers.user.domain.UserTest"               # 단일 테스트 클래스
+./gradlew :apps:commerce-api:test --tests "*.UserTest.someMethod"                           # 단일 테스트 메서드
 
 ./gradlew jacocoTestReport            # 커버리지 XML 리포트 (test 이후 실행)
 ```
@@ -70,24 +70,35 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Prometheus + Grafana (h
 
 `local`/`test` 프로파일은 이 인프라(localhost)를 바라본다. 그 외 프로파일(`dev`/`qa`/`prd`)은 환경변수가 필요하다: `MYSQL_HOST`/`MYSQL_PORT`/`MYSQL_USER`/`MYSQL_PWD`, `REDIS_MASTER_HOST`/`REDIS_MASTER_PORT`, `REDIS_REPLICA_1_HOST`/`REDIS_REPLICA_1_PORT`, `BOOTSTRAP_SERVERS`. 테스트는 Testcontainers를 쓰므로 Docker 데몬은 필요하지만 compose 스택은 필요 없다.
 
+## 도메인 & 객체 설계 전략
+
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
+- 서로 다른 Aggregate는 식별자로 참조하며, 객체를 직접 소유하지 않습니다.
+
+## 아키텍처, 패키지 구성 전략
+
+- 본 프로젝트는 레이어드 아키텍처를 따르며, DIP(의존성 역전 원칙)을 준수합니다.
+- API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
+
 ## 아키텍처 (commerce-api)
 
-도메인당 하나의 패키지(`com.loopers.<layer>.<domain>`)를 갖는 Clean Architecture 스타일 레이어링. 의존성은 안쪽을 향한다: `interfaces → application → domain ← infrastructure`.
+도메인당 하나의 최상위 패키지(`com.loopers.<domain>`)를 두고, 그 아래에 4계층을 둔다. 의존성은 안쪽을 향한다: `interfaces → application → domain ← infrastructure`.
 
 | 계층 | 패키지 | 역할 | I/O |
 |------|--------|------|-----|
-| Interface | `interfaces/api/<domain>` | `XxxV1Controller`(REST), `XxxV1Dto`(요청/응답 record), `XxxV1ApiSpec`(Swagger 인터페이스 — 컨트롤러가 `implements`) | — |
-| Application | `application/<domain>` | `XxxService`(유스케이스 오케스트레이션, `@Transactional`), `XxxValidator`(검증), `XxxReader`(조회), `XxxCommand`(유스케이스 입력 record), `XxxFacade`(다중 도메인 조합 시) | **Repository·외부 I/O는 모두 여기** |
-| Domain | `domain/<domain>` | `XxxModel`(`@Entity`), 정적 정책·규칙 클래스(예: `XxxPasswordPolicy`), `XxxRepository`(port 인터페이스) | **순수 인메모리만, I/O 없음** |
-| Infrastructure | `infrastructure/<domain>` | `XxxRepositoryImpl`(port 구현), `XxxJpaRepository`(Spring Data 인터페이스) | — |
+| Interface | `<domain>/interfaces/api` | `XxxV1Controller`(REST), `XxxV1Dto`(요청/응답 record), `XxxV1ApiSpec`(Swagger 인터페이스 — 컨트롤러가 `implements`) | — |
+| Application | `<domain>/application` | `XxxService`(유스케이스 오케스트레이션, `@Transactional`), `XxxValidator`(검증), `XxxReader`(조회), `XxxCommand`(유스케이스 입력 record), `XxxFacade`(다중 도메인 조합 시) | **Repository·외부 I/O는 모두 여기** |
+| Domain | `<domain>/domain` | `XxxModel`(`@Entity`), 정적 정책·규칙 클래스(예: `XxxPasswordPolicy`), `XxxRepository`(port 인터페이스) | **순수 인메모리만, I/O 없음** |
+| Infrastructure | `<domain>/infrastructure` | `XxxRepositoryImpl`(port 구현), `XxxJpaRepository`(Spring Data 인터페이스) | — |
 
 **도메인/애플리케이션 분기 기준**: Repository나 외부 시스템을 호출하면 application, 순수 인메모리 로직(엔티티 불변식·정적 규칙)만 있으면 domain.
 
 호출 흐름: Controller가 `V1Dto` → application `Command`로 변환 → application `Service`가 도메인 객체와 Repository를 조율 → 결과를 `V1Dto.Response`로 매핑해 `ApiResponse`로 반환. 다중 도메인을 엮어야 할 때만 Facade를 application에 추가한다(단일 도메인 유스케이스면 Facade 불필요).
 
-Repository **port**는 `domain`에 인터페이스로만 선언하고, JPA **어댑터**는 `infrastructure`에 둔다 — 도메인은 Spring Data를 import하지 않는다. JPA 리포지토리 스캔 범위는 `com.loopers.infrastructure`로 한정돼 있다(`JpaConfig`).
-
-> **예외**: `commerce-api`의 `example`, `product` 도메인은 프로젝트 템플릿이 제공한 레퍼런스 코드라서 Spring 레이어드 컨벤션(`XxxService`가 `domain/`에 위치)을 따른다. **신규 도메인(예: `user`)부터는 위 표의 Clean Architecture 기준**을 따른다. `XxxV1ApiSpec`(Swagger 인터페이스)은 신규 도메인에 적용을 권장한다.
+Repository **port**는 `domain`에 인터페이스로만 선언하고, JPA **어댑터**는 `infrastructure`에 둔다 — 도메인은 Spring Data를 import하지 않는다. JPA 리포지토리 스캔 범위는 `com.loopers`이며(`JpaConfig`), Spring Data가 `Repository` 인터페이스만 자동으로 골라 잡는다.
 
 ### 공통 규약
 
@@ -130,7 +141,7 @@ Repository **port**는 `domain`에 인터페이스로만 선언하고, JPA **어
 - 실제 API를 호출해 확인하는 E2E 테스트 작성
 - 재사용 가능한 객체 설계
 - 성능 최적화에 대한 대안 및 제안 제시
-- 개발 완료된 API는 `http/<app>/<name>.http` 에 분류해 작성 (예: `http/commerce-api/example-v1.http`)
+- 개발 완료된 API는 `http/<app>/<name>.http` 에 분류해 작성 (예: `http/commerce-api/user-v1.http`)
 
 ### 3. 우선순위 (Priority)
 
