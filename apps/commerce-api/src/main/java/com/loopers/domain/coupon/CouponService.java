@@ -16,14 +16,20 @@ public class CouponService {
     @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
-        UserCoupon couponToIssue = couponTemplate.issue(userId);
-        boolean newlyIssued = userCouponRepository.issueOnce(couponToIssue);
+        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+            .map(issuedCoupon -> CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon))
+            .orElseGet(() -> {
+                UserCoupon issuedCoupon = couponTemplate.issue(userId);
+                UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
+                return CouponIssueResult.issued(couponTemplate, savedCoupon);
+            });
+    }
+
+    @Transactional(readOnly = true)
+    public CouponIssueResult getAlreadyIssuedCoupon(Long userId, Long couponTemplateId) {
+        CouponTemplate couponTemplate = getCouponTemplateForIssue(couponTemplateId);
         UserCoupon issuedCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
             .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "발급된 쿠폰을 확인할 수 없습니다."));
-
-        if (newlyIssued) {
-            return CouponIssueResult.issued(couponTemplate, issuedCoupon);
-        }
         return CouponIssueResult.alreadyIssued(couponTemplate, issuedCoupon);
     }
 

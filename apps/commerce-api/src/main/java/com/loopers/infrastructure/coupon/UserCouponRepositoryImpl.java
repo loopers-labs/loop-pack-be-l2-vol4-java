@@ -14,13 +14,8 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     private final UserCouponJpaRepository userCouponJpaRepository;
 
     @Override
-    public boolean issueOnce(UserCoupon userCoupon) {
-        int issuedCount = userCouponJpaRepository.issueOnce(
-            userCoupon.getUserId(),
-            userCoupon.getCouponTemplateId(),
-            userCoupon.getStatus().name()
-        );
-        return issuedCount == 1;
+    public UserCoupon save(UserCoupon userCoupon) {
+        return userCouponJpaRepository.save(userCoupon);
     }
 
     @Override

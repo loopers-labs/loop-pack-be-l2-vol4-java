@@ -27,7 +27,6 @@ datasource:
       max-lifetime: 1800000 # 커넥션 최대 생존시간(ms) ( default: 1800000 = 30min )
       leak-detection-threshold: 0  # 커넥션 누수 감지 (주어진 ms 내에 반환 안 하면 로그 경고) ( default: 0 = 비활성화 )
       initialization-fail-timeout: 1  # DB 연결 실패 시 즉시 예외 발생 ( default: -1 = 무한대기 )
-      transaction-isolation: TRANSACTION_READ_COMMITTED
       data-source-properties:
         rewriteBatchedStatements: true
 

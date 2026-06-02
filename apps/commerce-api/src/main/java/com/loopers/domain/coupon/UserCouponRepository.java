@@ -4,7 +4,7 @@ import java.util.Optional;
 
 public interface UserCouponRepository {
 
-    boolean issueOnce(UserCoupon userCoupon);
+    UserCoupon save(UserCoupon userCoupon);
 
     Optional<UserCoupon> findIssuedCoupon(Long userId, Long couponTemplateId);
 }
