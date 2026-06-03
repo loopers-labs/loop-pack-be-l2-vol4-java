@@ -13,8 +13,8 @@ public class OrderEntityTest {
 
     private static final Long VALID_USER_ID = 1L;
 
-    private OrderItemEntity createItem(Long productId) {
-        return new OrderItemEntity(productId, "상품명", 10000L, 1);
+    private OrderItemVO createItem(Long productId) {
+        return new OrderItemVO(productId, "상품명", 10000L, 1);
     }
 
     @DisplayName("주문 생성")
@@ -25,7 +25,7 @@ public class OrderEntityTest {
         @Test
         void createsOrderEntity_whenRequestIsValid() {
             // arrange
-            List<OrderItemEntity> items = List.of(createItem(1L));
+            List<OrderItemVO> items = List.of(createItem(1L));
 
             // act
             OrderEntity order = new OrderEntity(VALID_USER_ID, items);
@@ -41,7 +41,7 @@ public class OrderEntityTest {
         @Test
         void createsOrderEntity_withPendingStatus() {
             // arrange
-            List<OrderItemEntity> items = List.of(createItem(1L));
+            List<OrderItemVO> items = List.of(createItem(1L));
 
             // act
             OrderEntity order = new OrderEntity(VALID_USER_ID, items);
@@ -54,7 +54,7 @@ public class OrderEntityTest {
         @Test
         void throwsException_whenUserIdIsNull() {
             // arrange
-            List<OrderItemEntity> items = List.of(createItem(1L));
+            List<OrderItemVO> items = List.of(createItem(1L));
 
             // act & assert
             assertThrows(CoreException.class, () -> new OrderEntity(null, items));
@@ -78,7 +78,7 @@ public class OrderEntityTest {
         @Test
         void throwsException_whenItemsHasDuplicateProductId() {
             // arrange
-            List<OrderItemEntity> items = List.of(createItem(1L), createItem(1L));
+            List<OrderItemVO> items = List.of(createItem(1L), createItem(1L));
 
             // act & assert
             assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, items));
@@ -93,7 +93,7 @@ public class OrderEntityTest {
         @Test
         void returnsSingleItemSubtotal_whenOneItem() {
             // arrange
-            OrderItemEntity item = new OrderItemEntity(1L, "상품A", 10000L, 2);
+            OrderItemVO item = new OrderItemVO(1L, "상품A", 10000L, 2);
             OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(item));
 
             // act & assert
@@ -104,8 +104,8 @@ public class OrderEntityTest {
         @Test
         void returnsSumOfSubtotals_whenMultipleItems() {
             // arrange
-            OrderItemEntity item1 = new OrderItemEntity(1L, "상품A", 10000L, 2);
-            OrderItemEntity item2 = new OrderItemEntity(2L, "상품B", 5000L, 3);
+            OrderItemVO item1 = new OrderItemVO(1L, "상품A", 10000L, 2);
+            OrderItemVO item2 = new OrderItemVO(2L, "상품B", 5000L, 3);
             OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(item1, item2));
 
             // act & assert

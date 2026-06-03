@@ -2,7 +2,7 @@ package com.loopers.application.order;
 
 import com.loopers.domain.inventory.InventoryService;
 import com.loopers.domain.order.OrderEntity;
-import com.loopers.domain.order.OrderItemEntity;
+import com.loopers.domain.order.OrderItemVO;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.ProductEntity;
 import com.loopers.domain.product.ProductService;
@@ -27,15 +27,15 @@ public class OrderFacade {
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
-        List<OrderItemEntity> items = commands.stream().map(command -> {
+        List<OrderItemVO> items = commands.stream().map(command -> {
             ProductEntity product = productService.getProduct(command.productId());
-            return new OrderItemEntity(product.getId(), product.getName(), product.getPrice(), command.quantity());
+            return new OrderItemVO(product.getId(), product.getName(), product.getPrice(), command.quantity());
         }).toList();
 
         OrderEntity order = orderService.createOrder(userId, items);
 
         Map<Long, Integer> productQuantities = items.stream()
-                .collect(Collectors.toMap(OrderItemEntity::getProductId, OrderItemEntity::getQuantity));
+                .collect(Collectors.toMap(OrderItemVO::getProductId, OrderItemVO::getQuantity));
         inventoryService.deductAll(productQuantities);
 
         return OrderInfo.from(order);

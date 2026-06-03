@@ -18,7 +18,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
 
     @Transactional
-    public OrderEntity createOrder(Long userId, List<OrderItemEntity> items) {
+    public OrderEntity createOrder(Long userId, List<OrderItemVO> items) {
         return orderRepository.save(new OrderEntity(userId, items));
     }
 

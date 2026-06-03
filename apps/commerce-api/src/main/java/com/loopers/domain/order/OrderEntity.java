@@ -13,11 +13,11 @@ public class OrderEntity extends BaseEntity {
 
     private Long userId;
     private OrderStatus status;
-    private List<OrderItemEntity> items;
+    private List<OrderItemVO> items;
 
     protected OrderEntity() {}
 
-    public OrderEntity(Long userId, List<OrderItemEntity> items) {
+    public OrderEntity(Long userId, List<OrderItemVO> items) {
         validateUserId(userId);
         validateItems(items);
         this.userId = userId;
@@ -25,7 +25,7 @@ public class OrderEntity extends BaseEntity {
         this.items = items;
     }
 
-    public static OrderEntity of(Long id, Long userId, OrderStatus status, List<OrderItemEntity> items,
+    public static OrderEntity of(Long id, Long userId, OrderStatus status, List<OrderItemVO> items,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         OrderEntity entity = new OrderEntity();
         entity.userId = userId;
@@ -43,13 +43,13 @@ public class OrderEntity extends BaseEntity {
         return status;
     }
 
-    public List<OrderItemEntity> getItems() {
+    public List<OrderItemVO> getItems() {
         return items;
     }
 
     public Long calculateTotalAmount() {
         return items.stream()
-                .mapToLong(OrderItemEntity::subtotal)
+                .mapToLong(OrderItemVO::subtotal)
                 .sum();
     }
 
@@ -63,12 +63,12 @@ public class OrderEntity extends BaseEntity {
         }
     }
 
-    private void validateItems(List<OrderItemEntity> items) {
+    private void validateItems(List<OrderItemVO> items) {
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
         Set<Long> productIds = new HashSet<>();
-        for (OrderItemEntity item : items) {
+        for (OrderItemVO item : items) {
             if (!productIds.add(item.getProductId())) {
                 throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목에 중복된 상품이 있습니다.");
             }

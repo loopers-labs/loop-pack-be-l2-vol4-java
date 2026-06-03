@@ -34,11 +34,11 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    private OrderItemEntity item(Long productId, String name, Long price, int qty) {
-        return new OrderItemEntity(productId, name, price, qty);
+    private OrderItemVO item(Long productId, String name, Long price, int qty) {
+        return new OrderItemVO(productId, name, price, qty);
     }
 
-    private OrderEntity savedOrder(Long id, Long userId, List<OrderItemEntity> items) {
+    private OrderEntity savedOrder(Long id, Long userId, List<OrderItemVO> items) {
         return OrderEntity.of(id, userId, OrderStatus.PENDING, items,
                 ZonedDateTime.now(), ZonedDateTime.now(), null);
     }
@@ -55,7 +55,7 @@ class OrderServiceTest {
         @Test
         void savesOrder_withPendingStatus_whenItemsAreValid() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 2));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 2));
             OrderEntity saved = savedOrder(ORDER_ID, USER_ID, items);
             given(orderRepository.save(any())).willReturn(saved);
 
@@ -94,7 +94,7 @@ class OrderServiceTest {
         @Test
         void throwsBadRequest_whenDuplicateProductIdExists() {
             // arrange
-            List<OrderItemEntity> items = List.of(
+            List<OrderItemVO> items = List.of(
                     item(1L, "에어맥스", 100_000L, 1),
                     item(1L, "에어맥스", 100_000L, 2)
             );
@@ -118,7 +118,7 @@ class OrderServiceTest {
         @Test
         void returnsOrder_whenOrderExists() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             OrderEntity order = savedOrder(ORDER_ID, USER_ID, items);
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
@@ -157,7 +157,7 @@ class OrderServiceTest {
         @Test
         void returnsOrder_whenOrderIsOwnedByUser() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             OrderEntity order = savedOrder(ORDER_ID, USER_ID, items);
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
@@ -184,7 +184,7 @@ class OrderServiceTest {
         @Test
         void throwsNotFound_whenOrderIsOwnedByOtherUser() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             OrderEntity order = savedOrder(ORDER_ID, 999L, items); // 타인 소유
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
@@ -208,7 +208,7 @@ class OrderServiceTest {
         void returnsOrderPage_whenNoDateFilter() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             List<OrderEntity> orders = List.of(
                     savedOrder(ORDER_ID, USER_ID, items),
                     savedOrder(ORDER_ID + 1, USER_ID, items)
@@ -235,7 +235,7 @@ class OrderServiceTest {
             PageRequest pageable = PageRequest.of(0, 20);
             ZonedDateTime startAt = ZonedDateTime.now().minusDays(7);
             ZonedDateTime endAt = ZonedDateTime.now();
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             given(orderRepository.findAllByUserId(USER_ID, startAt, endAt, pageable))
                     .willReturn(new PageImpl<>(List.of(savedOrder(ORDER_ID, USER_ID, items)), pageable, 1));
 
@@ -276,7 +276,7 @@ class OrderServiceTest {
         void returnsAllOrdersPage() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
+            List<OrderItemVO> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             List<OrderEntity> orders = List.of(
                     savedOrder(ORDER_ID, USER_ID, items),
                     savedOrder(ORDER_ID + 1, 2L, items)
