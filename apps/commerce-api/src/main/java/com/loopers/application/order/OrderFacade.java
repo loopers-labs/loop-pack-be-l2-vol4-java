@@ -19,14 +19,19 @@ public class OrderFacade {
     private final OrderService orderService;
     private final PaymentGateway paymentGateway;
 
-    /**
-     * 주문 실행. ① 주문 생성(PENDING)+재고차감 [tx] → ② PG 결제 [tx 밖] → ③ 결과 반영 [tx].
-     * SUCCESS→markPaid, FAILED→markFailed(+재고원복), TIMEOUT→PENDING 유지 (01 §7.6, UC-08).
-     */
+    /** 쿠폰 미적용 주문. */
     public OrderInfo placeOrder(Long userId, PaymentMethod method, List<OrderLine> lines) {
-        OrderModel order = orderService.placeOrderPending(userId, method, lines);
+        return placeOrder(userId, method, lines, null);
+    }
 
-        PaymentResult result = paymentGateway.pay(order.getId(), order.getTotalAmount().getAmount(), method);
+    /**
+     * 주문 실행. ① 주문 생성(PENDING)+재고차감+쿠폰사용 [tx] → ② PG 결제(최종 결제 금액) [tx 밖] → ③ 결과 반영 [tx].
+     * SUCCESS→markPaid, FAILED→markFailed(+재고·쿠폰 원복), TIMEOUT→PENDING 유지 (01 §7.6, UC-17~19).
+     */
+    public OrderInfo placeOrder(Long userId, PaymentMethod method, List<OrderLine> lines, Long couponId) {
+        OrderModel order = orderService.placeOrderPending(userId, method, lines, couponId);
+
+        PaymentResult result = paymentGateway.pay(order.getId(), order.getFinalAmount().getAmount(), method);
 
         OrderModel finalized;
         if (result.isSuccess()) {

@@ -86,7 +86,7 @@ class OrderV1ApiE2ETest {
 
     private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> placeOrder(String loginId, int quantity) {
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, quantity)));
+                PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, quantity)), null);
         return testRestTemplate.exchange(
                 ORDERS_PATH, HttpMethod.POST,
                 new HttpEntity<>(request, authHeaders(loginId, "testPw1234")), ORDER_TYPE);
@@ -113,7 +113,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returns409_whenStockInsufficient() {
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                    PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 999)));
+                    PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 999)), null);
 
             ResponseEntity<Object> response = testRestTemplate.exchange(
                     ORDERS_PATH, HttpMethod.POST,

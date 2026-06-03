@@ -2,6 +2,8 @@ package com.loopers.domain.order;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.coupon.AppliedCoupon;
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
@@ -20,14 +22,22 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductService productService;
     private final BrandService brandService;
+    private final UserCouponService userCouponService;
+
+    /** 쿠폰 미적용 주문 생성. */
+    @Transactional
+    public OrderModel placeOrderPending(Long userId, PaymentMethod method, List<OrderLine> lines) {
+        return placeOrderPending(userId, method, lines, null);
+    }
 
     /**
-     * 주문 생성(PENDING) — 각 상품의 활성 검증 + 스냅샷 + 재고 차감을 한 트랜잭션으로.
-     * 재고 부족 시 CONFLICT로 전체 롤백 (한 줄이라도 실패하면 차감 전부 원복).
+     * 주문 생성(PENDING) — 각 상품의 활성 검증 + 스냅샷 + 재고 차감 + (선택)쿠폰 사용을 한 트랜잭션으로.
+     * 재고 부족 시 CONFLICT, 쿠폰 검증/사용 실패 시 예외 → 전체 롤백 (차감/사용 전부 원복).
+     * 쿠폰은 템플릿 ID(couponId)로 받아 사용 가능 발급분을 골라 사용하고 할인을 반영한다(UC-17).
      * 결제(PG)는 이 트랜잭션 밖에서 별도 호출한다 (01 §7.6).
      */
     @Transactional
-    public OrderModel placeOrderPending(Long userId, PaymentMethod method, List<OrderLine> lines) {
+    public OrderModel placeOrderPending(Long userId, PaymentMethod method, List<OrderLine> lines, Long couponId) {
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목이 비어있습니다.");
         }
@@ -46,6 +56,10 @@ public class OrderService {
             ));
         }
         order.calculateTotals();
+        if (couponId != null) {
+            AppliedCoupon applied = userCouponService.useForOrder(userId, couponId, order.getTotalAmount().getAmount());
+            order.applyDiscount(applied.userCouponId(), new Money(applied.discountAmount()));
+        }
         return orderRepository.save(order);
     }
 
@@ -56,13 +70,16 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    /** 결제 실패 처리 — 상태 전이 + 항목별 재고 원복 (01 §7.6). */
+    /** 결제 실패 처리 — 상태 전이 + 항목별 재고 원복 + (적용됐다면) 쿠폰 원복 (01 §7.6, UC-19). */
     @Transactional
     public OrderModel markFailed(Long orderId, String reason) {
         OrderModel order = getOrder(orderId);
         order.markFailed(reason);
         for (OrderItem item : order.getItems()) {
             productService.restoreStock(item.getProductId(), item.getQuantity());
+        }
+        if (order.getUserCouponId() != null) {
+            userCouponService.restore(order.getUserCouponId());
         }
         return orderRepository.save(order);
     }

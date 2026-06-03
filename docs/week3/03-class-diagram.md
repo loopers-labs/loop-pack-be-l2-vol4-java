@@ -186,7 +186,6 @@ classDiagram
 
     UserCouponModel ..> CouponModel : couponId (템플릿)
     OrderModel ..> UserCouponModel : userCouponId (사용 발급분)
-    UserCouponModel ..> UserType : userId
 
     note for OrderModel "주문 생성 tx 안에서\nUserCouponService.useForOrder()로\n발급분 선택·할인계산·use() 수행"
 ```

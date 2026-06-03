@@ -29,6 +29,11 @@ public class Money {
         return new Money(this.amount + other.amount);
     }
 
+    /** 차감 (finalAmount = original − discount). 결과가 음수면 Money 생성자가 BAD_REQUEST를 던진다. */
+    public Money subtract(Money other) {
+        return new Money(this.amount - other.amount);
+    }
+
     /** 수량만큼 곱한다 (lineTotal = unitPrice × quantity). */
     public Money multiply(int quantity) {
         if (quantity < 0) {

@@ -39,6 +39,7 @@ class OrderServiceTest {
     private OrderRepository orderRepository;
     private ProductService productService;
     private BrandService brandService;
+    private com.loopers.domain.coupon.UserCouponService userCouponService;
     private OrderService orderService;
 
     @BeforeEach
@@ -46,7 +47,8 @@ class OrderServiceTest {
         orderRepository = mock(OrderRepository.class);
         productService = mock(ProductService.class);
         brandService = mock(BrandService.class);
-        orderService = new OrderService(orderRepository, productService, brandService);
+        userCouponService = mock(com.loopers.domain.coupon.UserCouponService.class);
+        orderService = new OrderService(orderRepository, productService, brandService, userCouponService);
     }
 
     private ProductModel product(Long id, long price, int stock) {

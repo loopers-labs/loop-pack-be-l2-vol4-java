@@ -34,7 +34,7 @@ public class OrderV1Controller {
         List<OrderLine> lines = request.items().stream()
             .map(item -> new OrderLine(item.productId(), item.quantity()))
             .toList();
-        OrderInfo info = orderFacade.placeOrder(userId, request.paymentMethod(), lines);
+        OrderInfo info = orderFacade.placeOrder(userId, request.paymentMethod(), lines, request.couponId());
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 

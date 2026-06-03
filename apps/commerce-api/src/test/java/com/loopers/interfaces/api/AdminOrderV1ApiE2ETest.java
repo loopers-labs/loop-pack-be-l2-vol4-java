@@ -89,7 +89,7 @@ class AdminOrderV1ApiE2ETest {
 
     private void placeOrder(String loginId) {
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 1)));
+                PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 1)), null);
         testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST,
                 new HttpEntity<>(request, authHeaders(loginId)),
                 new ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>>() {});
