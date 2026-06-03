@@ -1,5 +1,6 @@
 package com.loopers.application.user;
 
+import com.loopers.domain.user.PasswordEncoder;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class UserFacade {
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
 
     public UserInfo signUp(
             String loginId,
@@ -20,7 +22,7 @@ public class UserFacade {
             String email
     ) {
         UserModel saved = userService.signUp(
-                new UserModel(loginId, password, name, birthday, email)
+                new UserModel(loginId, password, name, birthday, email, passwordEncoder)
         );
         return toUserInfo(saved);
     }
@@ -31,8 +33,15 @@ public class UserFacade {
     }
 
     public void changePassword(String loginId, String currentPassword, String newPassword) {
-        UserModel user = userService.authenticate(loginId, currentPassword);
-        userService.changePassword(user.getId(), currentPassword, newPassword);
+        userService.changePassword(loginId, currentPassword, newPassword);
+    }
+
+    /**
+     * 인증 후 userId 반환 — Like/Order 등 사용자 식별이 필요한 진입점에서 사용.
+     * 자격 증명이 틀리면 UserService.authenticate가 UNAUTHORIZED를 던진다.
+     */
+    public Long authenticate(String loginId, String rawPassword) {
+        return userService.authenticate(loginId, rawPassword).getId();
     }
 
     private static UserInfo toUserInfo(UserModel user) {

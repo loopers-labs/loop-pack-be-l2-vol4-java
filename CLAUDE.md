@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-Loopers 백엔드 학습용 멀티 모듈 프로젝트. Spring Boot 3.4.4 + Java 21 (toolchain) + Gradle (Kotlin DSL).
+Loopers 백엔드 멀티 모듈 프로젝트. Spring Boot 3.4.4 + Java 21 (toolchain) + Gradle (Kotlin DSL).
 Group: `com.loopers`, 모든 코드는 이 패키지 밑으로 들어간다.
 
 ## 빌드 / 실행 / 테스트
@@ -97,6 +97,8 @@ support.error                # CoreException + ErrorType (HttpStatus / code / me
 - **Service 가 트랜잭션 경계** (`@Transactional` / `@Transactional(readOnly = true)`).
 - 도메인 검증 실패는 `throw new CoreException(ErrorType.BAD_REQUEST, "...")` — `ApiControllerAdvice` 가 받아서 표준 응답으로 직렬화한다 (`ProductModel` 생성자 참고).
 - **모든 응답은 `ApiResponse<T>` 로 감싼다.** `meta(result, errorCode, message)` + `data` 구조. 컨트롤러는 `ApiResponse.success(data)` 형태로 리턴.
+- **도메인 객체가 비즈니스 규칙을 캡슐화한다.** 같은 규칙이 여러 Service 에 중복되면 도메인 객체(Model/VO)로 끌어올린다.
+- **API DTO 와 응용 DTO 를 분리한다.** `interfaces` 의 `V1Dto`(요청/응답) 와 `application` 의 `Info`(유스케이스 결과)는 별도 타입으로 둔다.
 
 새 도메인 추가 시 `example` / `product` 패키지를 그대로 베껴서 5개 파일 (Model / Repository(interface) / Service / RepositoryImpl / JpaRepository) + Facade + Info + V1Controller + V1Dto 를 만든다.
 

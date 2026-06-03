@@ -1,6 +1,8 @@
 package com.loopers.fixture;
 
+import com.loopers.domain.user.PasswordEncoder;
 import com.loopers.domain.user.UserModel;
+import com.loopers.infrastructure.user.BCryptPasswordEncoderAdapter;
 
 import java.time.LocalDate;
 
@@ -11,6 +13,7 @@ public class UserModelFixture {
     private String name = "테스터";
     private LocalDate birthday = LocalDate.of(1992, 6, 24);
     private String email = "test@example.com";
+    private PasswordEncoder passwordEncoder = new BCryptPasswordEncoderAdapter();
 
     public static UserModelFixture aUser() {
         return new UserModelFixture();
@@ -21,8 +24,9 @@ public class UserModelFixture {
     public UserModelFixture withName(String name) { this.name = name; return this; }
     public UserModelFixture withBirthday(LocalDate birthday) { this.birthday = birthday; return this; }
     public UserModelFixture withEmail(String email) { this.email = email; return this; }
+    public UserModelFixture withPasswordEncoder(PasswordEncoder passwordEncoder) { this.passwordEncoder = passwordEncoder; return this; }
 
     public UserModel build() {
-        return new UserModel(loginId, password, name, birthday, email);
+        return new UserModel(loginId, password, name, birthday, email, passwordEncoder);
     }
 }

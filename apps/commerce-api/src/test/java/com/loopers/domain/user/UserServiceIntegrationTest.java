@@ -135,7 +135,7 @@ public class UserServiceIntegrationTest {
             String oldHash = savedUserModel.getPassword();
 
             // Act
-            userService.changePassword(savedUserModel.getId(), currentPassword, newPassword);
+            userService.changePassword(savedUserModel.getLoginId().getValue(), currentPassword, newPassword);
 
             // Assert
             UserModel updatedUserModel = userService.getMyInfo(savedUserModel.getId());
@@ -153,7 +153,7 @@ public class UserServiceIntegrationTest {
 
             // Act
             Throwable thrown = catchThrowable(() ->
-                    userService.changePassword(savedUserModel.getId(), "wrongPw9999", "newPw5678"));
+                    userService.changePassword(savedUserModel.getLoginId().getValue(), "wrongPw9999", "newPw5678"));
 
             // Assert
             assertThat(thrown).isInstanceOf(CoreException.class);
@@ -169,23 +169,23 @@ public class UserServiceIntegrationTest {
 
             // Act
             Throwable thrown = catchThrowable(() ->
-                    userService.changePassword(savedUserModel.getId(), currentPassword, currentPassword));
+                    userService.changePassword(savedUserModel.getLoginId().getValue(), currentPassword, currentPassword));
 
             // Assert
             assertThat(thrown).isInstanceOf(CoreException.class);
             assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("존재하지 않는 userId면, NotFound 예외가 발생한다.")
+        @DisplayName("존재하지 않는 loginId면, Unauthorized 예외가 발생한다(계정 존재 노출 방지).")
         @Test
-        void given_nonExistingUserId_when_changePassword_then_throwsNotFoundException() {
+        void given_nonExistingLoginId_when_changePassword_then_throwsUnauthorizedException() {
             // Act
             Throwable thrown = catchThrowable(() ->
-                    userService.changePassword(9999L, "anyPw1234", "newPw5678"));
+                    userService.changePassword("nosuchid", "anyPw1234", "newPw5678"));
 
             // Assert
             assertThat(thrown).isInstanceOf(CoreException.class);
-            assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
 
         @DisplayName("새 비밀번호가 RULE을 위반하면, BadRequest 예외가 발생한다.")
@@ -196,7 +196,7 @@ public class UserServiceIntegrationTest {
 
             // Act
             Throwable thrown = catchThrowable(() ->
-                    userService.changePassword(saved.getId(), "testPw1234", "short"));  // < 8자
+                    userService.changePassword(saved.getLoginId().getValue(), "testPw1234", "short"));  // < 8자
 
             // Assert
             assertThat(thrown).isInstanceOf(CoreException.class);
