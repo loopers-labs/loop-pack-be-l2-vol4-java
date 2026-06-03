@@ -1,0 +1,85 @@
+### [Customer] 상품 목록 조회 - 기본(최신순)
+GET {{commerce-api}}/api/v1/products?page=0&size=20
+
+###
+
+### [Customer] 상품 목록 조회 - 브랜드 필터
+GET {{commerce-api}}/api/v1/products?brandId=1&page=0&size=20
+
+###
+
+### [Customer] 상품 목록 조회 - 가격 오름차순
+GET {{commerce-api}}/api/v1/products?sort=price_asc&page=0&size=20
+
+###
+
+### [Customer] 상품 목록 조회 - 가격 내림차순
+GET {{commerce-api}}/api/v1/products?sort=price_desc&page=0&size=20
+
+###
+
+### [Customer] 상품 목록 조회 - 좋아요 많은순
+GET {{commerce-api}}/api/v1/products?sort=like_desc&page=0&size=20
+
+###
+
+### [Customer] 상품 목록 조회 - 좋아요 적은순
+GET {{commerce-api}}/api/v1/products?sort=like_asc&page=0&size=20
+
+###
+
+### [Customer] 상품 단건 조회
+GET {{commerce-api}}/api/v1/products/1
+
+###
+
+### [Admin] 상품 목록 조회
+GET {{commerce-api}}/api-admin/v1/products?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+###
+
+### [Admin] 상품 목록 조회 - 브랜드 필터
+GET {{commerce-api}}/api-admin/v1/products?brandId=1&page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+###
+
+### [Admin] 상품 단건 조회
+GET {{commerce-api}}/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+###
+
+### [Admin] 상품 등록
+POST {{commerce-api}}/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "에어맥스 90",
+  "description": "나이키의 대표 클래식 운동화",
+  "price": 159000,
+  "quantity": 100
+}
+
+###
+
+### [Admin] 상품 수정 (브랜드 변경 불가, 재고 수량 포함)
+PUT {{commerce-api}}/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "에어맥스 90 리미티드",
+  "description": "한정판 에어맥스 90",
+  "price": 199000,
+  "quantity": 30
+}
+
+###
+
+### [Admin] 상품 삭제 (연관 재고·좋아요 연쇄 Soft Delete)
+DELETE {{commerce-api}}/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin

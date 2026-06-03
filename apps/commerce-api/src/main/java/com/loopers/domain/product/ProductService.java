@@ -3,6 +3,8 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,32 +17,57 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
-        return productRepository.save(product);
+    public ProductEntity createProduct(Long brandId, String name, String description, Long price) {
+        return productRepository.save(new ProductEntity(brandId, name, description, price));
     }
 
     @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
+    public ProductEntity getProduct(Long id) {
         return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public Page<ProductEntity> getAllProducts(Long brandId, Pageable pageable) {
+        return productRepository.findAll(brandId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> findIdsByBrand(Long brandId) {
+        return productRepository.findIdsByBrandId(brandId);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
+    public ProductEntity updateProduct(Long id, String name, String description, Long price) {
+        ProductEntity product = getProduct(id);
+        product.update(name, description, price);
         return productRepository.save(product);
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductEntity product = getProduct(id);
+        product.delete();
+        productRepository.save(product);
+    }
+
+    @Transactional
+    public void incrementLikeCount(Long id) {
+        getProduct(id);
+        productRepository.incrementLikeCount(id);
+    }
+
+    @Transactional
+    public void decrementLikeCount(Long id) {
+        getProduct(id);
+        productRepository.decrementLikeCount(id);
+    }
+
+    @Transactional
+    public void deleteAll(List<Long> ids) {
+        productRepository.findAllByIds(ids).forEach(product -> {
+            product.delete();
+            productRepository.save(product);
+        });
     }
 }

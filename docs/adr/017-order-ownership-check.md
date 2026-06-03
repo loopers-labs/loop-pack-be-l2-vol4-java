@@ -5,11 +5,11 @@
 
 ## 결정
 
-`GET /api/v1/orders/{orderId}` 요청 시, 해당 주문이 인증된 사용자의 주문이 아닌 경우 `404 Not Found`를 반환한다. 검증은 `OrderService` 또는 `OrderFacade` 레이어에서 `OrderModel.isOwnedBy(userId)`로 수행한다.
+`GET /api/v1/orders/{orderId}` 요청 시, 해당 주문이 인증된 사용자의 주문이 아닌 경우 `404 Not Found`를 반환한다. 검증은 `OrderService` 또는 `OrderFacade` 레이어에서 `OrderEntity.isOwnedBy(userId)`로 수행한다.
 
 ```java
 // OrderFacade 또는 OrderService
-OrderModel order = orderService.getOrder(orderId); // 없으면 404
+OrderEntity order = orderService.getOrder(orderId); // 없으면 404
 if (!order.isOwnedBy(authUserId)) {
     throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
 }

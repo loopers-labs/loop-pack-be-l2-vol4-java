@@ -26,11 +26,11 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 
 | 관계 | 방식 | 근거 |
 |---|---|---|
-| Product → Brand | `@ManyToOne` (NO_CONSTRAINT) | 상품 조회 시 브랜드명 JOIN 필요 |
+| Product → Brand | `brandId Long` 참조 | JPA 관계 없음, 조회 시 Repository에서 JOIN |
 | Product.likeCount | DB 비정규화 컬럼 | SQL 원자적 증감으로 COUNT 쿼리 제거 ([ADR-003](./adr/003-like-count-query.md)) |
-| Product.quantity | PRODUCT_INVENTORY JOIN 필드 | 상품 조회 시 재고 포함 반환 — 별도 재고 조회 불필요, 품절 여부 노출 |
+| Product.quantity | INVENTORY JOIN 필드 | 상품 조회 시 재고 포함 반환 — 별도 재고 조회 불필요, 품절 여부 노출 |
 | Like → User / Product | `userId`, `productId` Long | 존재 여부 확인만 필요, JPA 관계 불필요 |
-| OrderItem → Order | `@ManyToOne` | 동일 Aggregate, 생명주기 공유 |
+| OrderItem → Order | `orderId Long` 참조 | JPA 관계 없음, 동일 Aggregate는 RepositoryImpl에서 조합 |
 | OrderItem → Product | `productId` + 스냅샷 컬럼 | 주문 시점 정보 보존 (요구사항 명시) |
 | Order → User | `userId` Long | 유저 변경과 주문 이력 분리 |
 
@@ -79,18 +79,19 @@ application/
 └── order/   OrderFacade, OrderInfo
 
 domain/
-├── brand/   BrandModel, BrandRepository, BrandService
-├── product/ ProductModel, ProductInventoryModel,
-│            ProductRepository, ProductInventoryRepository, ProductService
-├── like/    LikeModel, LikeRepository, LikeService
-└── order/   OrderModel, OrderItemModel, OrderRepository, OrderService
+├── brand/     BrandEntity, BrandRepository, BrandService
+├── product/   ProductEntity, ProductRepository, ProductService
+├── inventory/ InventoryEntity, InventoryRepository, InventoryService
+├── like/      LikeEntity, LikeRepository, LikeService
+└── order/     OrderEntity, OrderItemEntity, OrderRepository, OrderService
 
 infrastructure/
-├── brand/   BrandJpaRepository, BrandRepositoryImpl
-├── product/ ProductJpaRepository, ProductRepositoryImpl,
-│            ProductInventoryJpaRepository, ProductInventoryRepositoryImpl
-├── like/    LikeJpaRepository, LikeRepositoryImpl
-└── order/   OrderJpaRepository, OrderRepositoryImpl
+├── brand/     BrandJpaEntity, BrandJpaRepository, BrandRepositoryImpl
+├── product/   ProductJpaEntity, ProductJpaRepository, ProductRepositoryImpl
+├── inventory/ InventoryJpaEntity, InventoryJpaRepository, InventoryRepositoryImpl
+├── like/      LikeJpaEntity, LikeJpaRepository, LikeRepositoryImpl
+└── order/     OrderJpaEntity, OrderItemJpaEntity,
+               OrderJpaRepository, OrderRepositoryImpl
 ```
 
 ---
@@ -161,7 +162,7 @@ infrastructure/
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
 | POST | `/api/v1/orders` | 주문 생성 | User |
-| GET | `/api/v1/orders?startAt=&endAt=&page=0&size=20` | 내 주문 목록 | User |
+| GET | `/api/v1/orders?startAt=2026-05-01&endAt=2026-05-31&page=0&size=20` | 내 주문 목록 (`startAt`/`endAt`은 날짜만, YYYY-MM-DD) | User |
 | GET | `/api/v1/orders/{orderId}` | 주문 단건 조회 | User |
 | GET | `/api-admin/v1/orders?page=0&size=20` | 주문 목록 (Admin) | Admin |
 | GET | `/api-admin/v1/orders/{orderId}` | 주문 단건 조회 (Admin) | Admin |
@@ -305,7 +306,7 @@ BrandFacade.deleteBrand(brandId)
   ├── BrandService.delete(brandId) → brand 조회 후 brand.delete()
   ├── ProductService.findIdsByBrand(brandId) → List<productId>
   ├── ProductService.deleteAll(productIds)
-  ├── ProductInventoryService.deleteAllByProducts(productIds)
+  ├── InventoryService.deleteAllByProducts(productIds)
   └── LikeService.deleteAllByProducts(productIds)
 ```
 
@@ -316,7 +317,7 @@ BrandFacade.deleteBrand(brandId)
 ```
 ProductFacade.deleteProduct(productId)
   ├── ProductService.delete(productId)          → product.delete()
-  └── ProductInventoryService.deleteByProduct(productId) → inventory.delete()
+  └── InventoryService.deleteByProduct(productId) → inventory.delete()
 ```
 
 > 상품이 soft delete되면 ProductInventory도 동일하게 soft delete한다. 이후 재고 조회 시 `deleted_at IS NULL` 필터로 제외된다.
@@ -325,12 +326,12 @@ ProductFacade.deleteProduct(productId)
 
 | 필드 | 규칙 |
 |---|---|
-| `name` | 필수, 빈 문자열 불가, 최대 100자, **중복 불가 (409 Conflict)** |
-| `description` | 선택(nullable), 최대 500자 |
+| `name` | 필수, 빈 문자열 불가, 앞뒤 공백 불가, 최대 100자, **중복 불가 (409 Conflict)** |
+| `description` | 필수, 빈 문자열 불가, 최대 500자 |
 
 ### 상품 등록 / 수정
 
-- 등록: `brandId`로 Brand 존재 여부 검증 후 ProductModel 생성, ProductInventoryModel도 함께 생성
+- 등록: `brandId`로 Brand 존재 여부 검증 후 ProductEntity 생성, InventoryEntity도 함께 생성
 - 수정: 브랜드 변경 불가 — `brand` 필드는 update 메서드에서 제외
 - `quantity` 검증: 0 이상 정수만 허용. 0은 품절 상태로 허용, 음수는 `400 Bad Request`
 - 품절 상품(`quantity = 0`)은 Customer 목록/단건 조회에 정상 노출. 주문 시 재고 부족으로 `400 Bad Request` 처리
@@ -349,7 +350,7 @@ stateDiagram-v2
 - POST: `findByUserIdAndProductId` (deleted_at 포함 전체 조회)
   - active 존재 → 409 Conflict
   - soft-deleted 존재 → `restore()` [deleted_at = null]
-  - 없음 → `save(new LikeModel)`
+  - 없음 → `save(new LikeEntity)`
 - DELETE: `findByUserIdAndProductId` (deleted_at IS NULL, active만)
   - 없으면 404 Not Found
   - 존재 → `like.delete()` [deleted_at = now()]
@@ -364,7 +365,7 @@ stateDiagram-v2
 - `product` 테이블의 `like_count` 컬럼으로 관리 (DB 비정규화, [ADR-003](./adr/003-like-count-query.md))
 - **등록**: `UPDATE product SET like_count = like_count + 1 WHERE id = ?` (SQL 원자적 처리)
 - **취소**: `UPDATE product SET like_count = like_count - 1 WHERE id = ?` (SQL 원자적 처리)
-- **조회**: `ProductModel.likeCount` 필드를 그대로 반환 — 별도 COUNT 쿼리 없음
+- **조회**: `ProductEntity.likeCount` 필드를 그대로 반환 — 별도 COUNT 쿼리 없음
 
 ### 주문 생성
 
@@ -372,17 +373,15 @@ stateDiagram-v2
 flowchart TD
     A[주문 요청] --> B{"items 유효성 검증<br/>빈 배열 / quantity≤0 / 중복 productId"}
     B -- 실패 --> C[400 Bad Request]
-    B -- 통과 --> D{"상품 조회<br/>PRODUCT JOIN PRODUCT_INVENTORY"}
+    B -- 통과 --> D{"상품 조회<br/>PRODUCT JOIN INVENTORY"}
     D -- 없는 상품 포함 --> E[404 Not Found]
-    D -- 성공 --> F{"재고 확인<br/>fast fail, 락 없음"}
-    F -- quantity 부족 --> G[400 Bad Request]
-    F -- 통과 --> H["Transactional 시작<br/>주문 생성 INSERT<br/>OrderModel + OrderItemModel 스냅샷"]
+    D -- 성공 --> H["@Transactional 시작<br/>주문 생성 INSERT<br/>OrderEntity + OrderItemEntity 스냅샷"]
     H --> I{"재고 차감<br/>SELECT FOR UPDATE<br/>productInventory.deduct"}
     I -- 재고 부족 --> J[Rollback → 400]
     I -- 성공 --> K[Commit → 201 Created]
 ```
 
-> - 2번 fast fail은 명백한 재고 부족을 주문 INSERT 이전에 조기 차단하는 역할
+> - 재고 확인은 `SELECT FOR UPDATE` 단일 지점에서만 수행한다 — fast-fail 사전 검증 미적용 ([ADR-024](./adr/024-order-creation-no-fast-fail.md))
 > - 실제 동시성 보장은 FOR UPDATE 락이 담당
 > - product_inventory 테이블에만 락이 걸리므로 상품 조회 성능에 영향 없음 ([ADR-006](./adr/006-product-inventory-table.md))
 
@@ -398,8 +397,8 @@ flowchart TD
 > 여러 트랜잭션이 서로 다른 순서로 락을 획득하면 데드락이 발생할 수 있다.
 > `WHERE product_id IN (...) ORDER BY product_id FOR UPDATE`로 락 획득 순서를 일관되게 유지한다.
 
-> **주문 상태** ([ADR-015](./adr/015-order-status-single-value.md))
-> 현재는 결제 기능이 없으므로 주문 생성 즉시 `COMPLETED` 단일 상태로 처리한다. 결제 기능 추가 시 상태 확장 예정.
+> **주문 상태** ([ADR-023](./adr/023-order-status-pending-confirmed.md))
+> 주문 생성 즉시 `PENDING` 상태로 생성된다. 향후 결제 흐름(`PENDING → PAID → COMPLETED`) 확장 예정.
 
 ### 어드민 인증
 
@@ -471,7 +470,7 @@ Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `L
 
 ### 예외 — OrderFacade.createOrder()
 
-주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `ProductInventoryService`)가 담당하므로, Facade에서 트랜잭션 경계를 감싼다.
+주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `InventoryService`)가 담당하므로, Facade에서 트랜잭션 경계를 감싼다.
 
 > Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 최대한 지양한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
 
@@ -488,7 +487,7 @@ BrandFacade.deleteBrand(brandId)
   ├── BrandService.delete(brandId)
   ├── ProductService.findIdsByBrand(brandId) → List<productId>
   ├── ProductService.deleteAll(productIds)
-  ├── ProductInventoryService.deleteAllByProducts(productIds)
+  ├── InventoryService.deleteAllByProducts(productIds)
   └── LikeService.deleteAllByProducts(productIds)
 ```
 
@@ -497,7 +496,7 @@ BrandFacade.deleteBrand(brandId)
 ```
 ProductFacade.deleteProduct(productId)
   ├── ProductService.delete(productId)
-  ├── ProductInventoryService.deleteByProduct(productId)
+  ├── InventoryService.deleteByProduct(productId)
   └── LikeService.deleteAllByProduct(productId)
 ```
 
@@ -560,7 +559,7 @@ LikeFacade.removeLike(userId, productId)
 | `GET /api/v1/products` | `sort` 파라미터 추가 (섹션 7 참고) |
 | `GET /api-admin/v1/products` | |
 | `GET /api/v1/users/{userId}/likes` | |
-| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 ([ADR-010](./adr/010-order-list-query-spec.md)) |
+| `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 — **날짜만 (YYYY-MM-DD)** ([ADR-010](./adr/010-order-list-query-spec.md)) |
 | `GET /api-admin/v1/orders` | |
 
 ### 예외
@@ -620,3 +619,9 @@ LikeFacade.removeLike(userId, productId)
 | ADR-015 | orderStatus (보류) | `adr/015-order-status-single-value.md` |
 | ADR-016 | Admin 인증 — 테이블 미생성, 헤더 고정값 검증 | `adr/016-admin-auth-header.md` |
 | ADR-017 | 타인의 주문 접근 — 404 반환 정책 | `adr/017-order-ownership-check.md` |
+| ADR-018 | InventoryService 도입 — 재고 차감 책임 분리 | `adr/018-inventory-service-boundary.md` |
+| ADR-022 | LikeFacade 좋아요 등록·취소에 @Transactional 적용 | `adr/022-like-facade-transaction.md` |
+| ADR-023 | OrderStatus — PENDING 상태 확정 및 요구사항 문서 정정 | `adr/023-order-status-pending-confirmed.md` |
+| ADR-024 | 주문 생성 흐름 — fast-fail 사전 재고 검증 미적용 | `adr/024-order-creation-no-fast-fail.md` |
+| ADR-025 | 상품+브랜드 조합 위치 — Facade 유지 (중복 3회↑ 시 Application Service 분리 검토) | `adr/025-product-brand-combination-location.md` |
+| ADR-026 | 좋아요 목록 조회 N+1 문제 — 현행 유지 (Known Issue) | `adr/026-like-list-n-plus-one.md` |

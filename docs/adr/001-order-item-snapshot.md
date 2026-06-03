@@ -5,7 +5,7 @@
 
 ## 결정
 
-`OrderItemModel`에 주문 시점의 상품 정보(`productName`, `productPrice`)를 스냅샷 컬럼으로 저장한다. `Product`와의 JPA `@ManyToOne` 관계는 사용하지 않는다.
+`OrderItemEntity`에 주문 시점의 상품 정보(`productName`, `productPrice`)를 스냅샷 컬럼으로 저장한다. `Product`와의 JPA `@ManyToOne` 관계는 사용하지 않는다.
 
 ## 근거
 
@@ -15,12 +15,12 @@
 
 #### Option 1. @ManyToOne 관계로 Product 참조
 
-`OrderItemModel`이 `ProductModel`을 `@ManyToOne`으로 참조하여, 조회 시 JOIN으로 상품 정보를 가져오는 방식이다.
+`OrderItemEntity`이 `ProductEntity`을 `@ManyToOne`으로 참조하여, 조회 시 JOIN으로 상품 정보를 가져오는 방식이다.
 
 ```java
 @ManyToOne(fetch = FetchType.LAZY)
 @JoinColumn(name = "product_id")
-private ProductModel product;
+private ProductEntity product;
 ```
 
 - **장점**: 별도 스냅샷 컬럼 없이 상품 정보를 재사용할 수 있다. 스키마가 단순하다.
@@ -30,7 +30,7 @@ private ProductModel product;
 
 #### Option 2. 스냅샷 컬럼 저장 (채택)
 
-주문 시점의 상품 정보를 `OrderItemModel`의 컬럼에 직접 복사하여 저장하는 방식이다.
+주문 시점의 상품 정보를 `OrderItemEntity`의 컬럼에 직접 복사하여 저장하는 방식이다.
 
 ```java
 @Column(name = "product_name")
