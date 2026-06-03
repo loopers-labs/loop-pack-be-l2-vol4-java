@@ -20,7 +20,6 @@ spring:
   config:
     import:
       - jpa.yml
-      - redis.yml
       - logging.yml
       - monitoring.yml
 
@@ -28,6 +27,17 @@ springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+commerce:
+  workers:
+    payment:
+      enabled: false
+      initial-delay-ms: 5000
+      fixed-delay-ms: 5000
+    event-relay:
+      enabled: false
+      initial-delay-ms: 5000
+      fixed-delay-ms: 5000
 
 ---
 spring:

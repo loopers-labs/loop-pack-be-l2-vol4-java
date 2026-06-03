@@ -1,4 +1,4 @@
-# 2주차 ERD
+# ERD 이력 및 3주차 반영 기준
 
 ## 읽는 포인트
 
@@ -16,17 +16,16 @@
 erDiagram
     BRAND ||--o{ PRODUCT : has
     PRODUCT ||--o{ PRODUCT_LIKE : liked_by
-    USER ||--o{ PRODUCT_LIKE : likes
-    USER ||--o{ ORDERS : places
     ORDERS ||--|{ ORDER_LINE : contains
     PRODUCT ||--o{ ORDER_LINE : ordered_as
-    ORDERS ||--o| PAYMENT : paid_by
+    ORDERS ||--|| PAYMENT : paid_by
     ORDERS ||--o{ ORDER_EVENT_OUTBOX : emits
 
     BRAND {
         bigint id PK
         varchar name
         varchar description
+        datetime deleted_at
         datetime created_at
         datetime updated_at
     }
@@ -46,26 +45,15 @@ erDiagram
 
     PRODUCT_LIKE {
         bigint id PK
-        varchar user_id FK
+        varchar user_id
         bigint product_id FK
-        datetime created_at
-        datetime updated_at
-    }
-
-    USER {
-        bigint id PK
-        varchar user_id UK
-        varchar encoded_password
-        varchar name
-        date birth_date
-        varchar email
         datetime created_at
         datetime updated_at
     }
 
     ORDERS {
         bigint id PK
-        varchar user_id FK
+        varchar user_id
         bigint total_amount
         varchar status
         datetime created_at
@@ -107,23 +95,27 @@ erDiagram
     }
 ```
 
+`user_id`는 기존 `identity` 모듈의 사용자 식별자 참조다. 이번 volume-2 설계에서는 `User` 내부 테이블과 필드를 상세 설계하지 않는다.
+
 ## 테이블별 설명
 
 ### brand
 
-브랜드 기본 정보를 저장한다. 상품은 하나의 브랜드에 속한다.
+브랜드 기본 정보를 저장한다. 상품은 하나의 브랜드에 속한다. ADMIN API에서 브랜드를 삭제하면 브랜드 row를 물리 삭제하지 않고 `deleted_at`을 기록하며, 해당 브랜드의 상품 row도 물리 삭제하지 않고 `STOPPED` 상태로 전환한다.
+
+`deleted_at`이 null이면 활성 브랜드, 값이 있으면 삭제된 브랜드로 본다.
 
 ### product
 
-상품의 판매 정보와 재고, 좋아요 수를 저장한다. `like_count`는 조회 성능을 위한 카운터이며, 정합성 기준 데이터는 `product_like`다. 재고를 별도 테이블로 분리할 수도 있지만, 현재 설계 초안에서는 단일 상품 재고만 필요하다고 보고 상품 테이블에 둔다.
+상품의 판매 정보와 재고, 좋아요 수를 저장한다. `brand_id`는 필수이며 이미 등록된 브랜드를 참조해야 한다. `like_count`는 조회 성능을 위한 카운터이며, 정합성 기준 데이터는 `product_like`다. 재고를 별도 테이블로 분리할 수도 있지만, 현재 설계 초안에서는 단일 상품 재고만 필요하다고 보고 상품 테이블에 둔다. ADMIN 상품 삭제는 물리 삭제가 아니라 `status=STOPPED` 전환으로 처리한다.
 
 ### product_like
 
-사용자의 상품 좋아요 관계를 저장한다. 좋아요 수 정합성과 내 좋아요 목록 조회의 기준 데이터이며, `user_id + product_id`에 unique 제약을 둔다.
+사용자의 상품 좋아요 관계를 저장한다. `user_id`는 기존 `identity` 모듈의 식별자 참조이며, 좋아요 수 정합성과 내 좋아요 목록 조회의 기준 데이터다. `user_id + product_id`에 unique 제약을 둔다.
 
 ### orders
 
-주문의 대표 상태와 총액을 저장한다. `order`는 SQL 예약어와 충돌할 수 있어 테이블명은 `orders`를 사용한다.
+주문의 대표 상태와 총액을 저장한다. `user_id`는 기존 `identity` 모듈의 식별자 참조다. `order`는 SQL 예약어와 충돌할 수 있어 테이블명은 `orders`를 사용한다.
 
 ### order_line
 
@@ -131,22 +123,26 @@ erDiagram
 
 ### payment
 
-결제 요청과 결과를 저장한다. 외부 결제 시스템 거래 키와 실패 사유를 보관한다. 외부 결제 요청 전 `REQUESTED` 상태로 먼저 생성되어 worker 처리 권한을 선점한다. `failure_reason`은 범용 실패 사유이며, 타임아웃 전용 컬럼은 두지 않는다.
+결제 요청과 결과를 저장한다. 외부 결제 시스템 거래 키와 실패 사유를 보관한다. 주문 생성 트랜잭션에서 `REQUESTED` 상태로 먼저 생성되어 주문 조회 응답의 `paymentStatus` 기준이 된다. `failure_reason`은 범용 실패 사유이며, 타임아웃 전용 컬럼은 두지 않는다.
 
 ### order_event_outbox
 
-외부 데이터 플랫폼 전송 이벤트를 저장한다. 주문 상태 변경과 이벤트 저장을 같은 트랜잭션에 묶고, 실제 외부 전송은 `EventRelayWorker`가 재시도한다.
+외부 데이터 플랫폼 전송 이벤트를 저장한다. 주문 상태 변경과 이벤트 저장을 같은 트랜잭션에 묶고, 실제 외부 전송은 `EventRelayWorker`가 재시도한다. 전송 실패 시 `retry_count`를 증가시키고, 최대 재시도 초과 시 상태를 `FAILED`로 확정한다.
+
+최대 재시도 횟수는 코드 상수 또는 설정값으로 두고, ERD에서는 구체 숫자를 고정하지 않는다.
 
 ## 주요 제약
 
 - `product.stock_quantity >= 0`
 - `product.like_count >= 0`
 - `product.price > 0`
+- `product.brand_id` not null
 - `product_like(user_id, product_id)` unique
 - `order_line.quantity > 0`
 - `order_line.line_amount = unit_price * quantity`
 - `payment.order_id` unique
 - 같은 `order_id`에 대한 결제 row는 한 건만 생성한다.
+- 성공적으로 생성된 주문은 반드시 하나의 `payment` row를 가진다.
 
 ## 데이터 정합성 전략
 
@@ -171,13 +167,26 @@ erDiagram
 - 카운터 증감은 DB 원자적 업데이트로 처리하고, 감소 시 `like_count > 0` 조건으로 음수를 방지한다.
 - 운영 복구가 필요하면 `product_like` 기준으로 `product.like_count`를 재집계한다.
 
+ADMIN 상품/브랜드:
+
+- 상품 등록 시 `brand_id`는 이미 존재하는 브랜드여야 한다.
+- 삭제된 브랜드는 신규 상품 등록 대상에서 제외한다.
+- 상품 수정 시 `brand_id`는 변경할 수 없다.
+- 상품 삭제 시 상품 row를 물리 삭제하지 않고 `status=STOPPED`로 전환한다.
+- 브랜드 삭제 시 브랜드 row를 물리 삭제하지 않고 `deleted_at`을 기록하며, 해당 브랜드의 상품도 같은 트랜잭션에서 `STOPPED`로 전환한다.
+- `order_line.product_id`는 과거 주문에서 원본 상품을 추적하기 위한 참조로 유지한다.
+- 브랜드와 상품 row를 보존하므로 과거 주문 항목의 `product_id`, `brand_id` 참조와 상품 스냅샷이 깨지지 않는다.
+- public `/api/v1`에는 상품 등록/수정/삭제를 노출하지 않고 `/api-admin/v1`에 둔다.
+
 주문/결제:
 
 - 주문 생성 완료 시 `PAYMENT_PENDING` 상태로 저장한다.
 - 주문 생성 API는 `orderId`와 `PAYMENT_PENDING`을 먼저 응답한다.
+- 주문 생성 트랜잭션에서 `payment(order_id, status=REQUESTED)` row도 함께 생성한다.
+- 주문 목록/상세 조회의 `paymentStatus`는 주문 생성 직후에도 `REQUESTED`로 반환한다.
 - 결제 요청은 서버 내부 비동기 흐름에서 처리한다.
-- 결제 worker는 외부 결제 요청 전에 `payment(order_id, status=REQUESTED)` row를 먼저 생성한다.
-- `payment.order_id` unique 제약으로 `payment` row 생성에 성공한 worker만 외부 결제 요청을 수행한다.
+- 결제 worker는 `REQUESTED` 상태의 `payment` row를 외부 결제 요청 대상으로 처리한다.
+- `payment.order_id` unique 제약으로 같은 주문의 결제 row는 하나만 존재한다.
 - 외부 결제 요청에는 `orderId` 기반 idempotency key를 사용한다.
 - `PAYMENT_PENDING` 대기 시간은 주문 생성 시점 기준 최대 1분이다.
 - 1분 초과 여부는 주문 생성 시각과 주문/결제 상태를 기준으로 소스 레벨에서 판정한다.
@@ -196,7 +205,9 @@ erDiagram
 - 주문 `PAID` 상태 전이와 outbox 저장은 같은 DB 트랜잭션으로 처리한다.
 - `PaymentService`는 `DataPlatformClient`를 직접 호출하지 않는다.
 - 외부 데이터 플랫폼 전송은 `EventRelayWorker`가 수행하는 재시도 가능한 별도 흐름으로 둔다.
-- 전송 성공 시 outbox 상태를 갱신하고, 전송 실패 시 재시도 대상으로 남긴다.
+- 전송 성공 시 outbox 상태를 `SENT`로 갱신한다.
+- 전송 실패 시 `retry_count`를 증가시키고, 재시도 가능하면 `PENDING`으로 유지한다.
+- 최대 재시도 횟수를 초과하면 outbox 상태를 `FAILED`로 확정하고 수동 확인 대상으로 남긴다.
 
 ## 리스크와 보완책
 

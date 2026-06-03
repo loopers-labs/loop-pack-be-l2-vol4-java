@@ -2,7 +2,6 @@ package com.loopers.support.error;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 
 @Getter
 @RequiredArgsConstructor
@@ -27,7 +26,7 @@ public enum ErrorType {
     EMAIL_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "EMAIL_INVALID_FORMAT", "이메일 형식이 올바르지 않습니다."),
     BIRTH_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "BIRTH_DATE_REQUIRED", "생년월일은 필수입니다.");
 
-    private final HttpStatus status;
+    private final int status;
     private final String code;
     private final String message;
 }
