@@ -756,7 +756,8 @@ POST /orders/{id}/pay/confirm → 재고 confirm + OrderStatus.CONFIRMED
 ## 결정 14. 동시성 제어 — 비관적 락 선택
 
 **결정**
-- 재고(`StockJpaRepository.findAllByProductIds`)와 쿠폰 사용(`CouponIssueJpaRepository.findById`) 쿼리에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
+- 재고(`StockJpaRepository.findAllByProductIdsForUpdate`)와 쿠폰 사용(`CouponIssueJpaRepository.findByIdForUpdate`) 쿼리에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
+- 단, 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
 
 **배경**
 - 동일 상품에 대한 동시 주문, 동일 쿠폰의 동시 사용 요청에서 Lost Update가 발생할 수 있음
@@ -775,8 +776,28 @@ POST /orders/{id}/pay/confirm → 재고 confirm + OrderStatus.CONFIRMED
 **적용 위치**
 
 ```
-StockJpaRepository.findAllByProductIds   → PESSIMISTIC_WRITE  (startPayment·confirmPayment)
-CouponIssueJpaRepository.findById        → PESSIMISTIC_WRITE  (startPayment)
+StockJpaRepository.findAllByProductIdsForUpdate   → PESSIMISTIC_WRITE  (startPayment·confirmPayment)
+CouponIssueJpaRepository.findByIdForUpdate        → PESSIMISTIC_WRITE  (startPayment)
 ```
 
 > `findByUserIdAndCouponId`는 `createOrder`에서 유효성 검증 용도로만 쓰이고 해당 트랜잭션에서 write가 발생하지 않으므로 락 미적용
+
+**회귀 수정 — 락 메서드 분리 필요성**
+
+처음에 `findAllByProductIds`와 `findById`에 직접 `@Lock`을 달았다가 기존 테스트 9개가 실패했다.
+
+원인: 동일 메서드가 `@Transactional(readOnly = true)` 컨텍스트(`getLikedProducts`, 상품 목록 조회 등)에서도 호출되는데, `PESSIMISTIC_WRITE`는 readOnly 트랜잭션에서 `SELECT ... FOR UPDATE`를 발급할 수 없어 `GenericJDBCException`이 발생함.
+
+해결: 쓰기 락이 필요한 경우에만 사용하는 전용 메서드를 별도로 추출했다.
+
+```
+// 일반 조회 (기존 유지)
+findAllByProductIds(ids)          → SELECT (no lock)
+findById(id)                      → SELECT (no lock)
+
+// 쓰기 직전 전용 (신규 추가)
+findAllByProductIdsWithLock(ids)  → SELECT ... FOR UPDATE
+findByIdWithLock(id)              → SELECT ... FOR UPDATE
+```
+
+> 규칙: `@Lock(PESSIMISTIC_WRITE)`는 반드시 전용 메서드(`ForUpdate` / `WithLock` 접미사)로 격리하고, 기존 조회 메서드에 덮어쓰지 않는다.
