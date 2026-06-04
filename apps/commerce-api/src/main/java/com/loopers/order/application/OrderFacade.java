@@ -100,7 +100,7 @@ public class OrderFacade {
             .map(OrderItemModel::getProductId)
             .toList();
 
-        List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        List<StockModel> stocks = stockRepository.findAllByProductIdsWithLock(productIds);
         Map<Long, StockModel> stockMap = stocks.stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
 
@@ -134,7 +134,7 @@ public class OrderFacade {
             .map(OrderItemModel::getProductId)
             .toList();
 
-        List<StockModel> stocks = stockRepository.findAllByProductIds(productIds);
+        List<StockModel> stocks = stockRepository.findAllByProductIdsWithLock(productIds);
         Map<Long, StockModel> stockMap = stocks.stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
 

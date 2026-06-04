@@ -7,4 +7,5 @@ public interface StockRepository {
     StockModel save(StockModel stock);
     Optional<StockModel> findByProductId(Long productId);
     List<StockModel> findAllByProductIds(List<Long> productIds);
+    List<StockModel> findAllByProductIdsWithLock(List<Long> productIds);
 }

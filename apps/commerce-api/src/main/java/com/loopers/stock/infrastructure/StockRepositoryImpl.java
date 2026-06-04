@@ -29,4 +29,10 @@ public class StockRepositoryImpl implements StockRepository {
         if (productIds.isEmpty()) return List.of();
         return stockJpaRepository.findAllByProductIds(productIds);
     }
+
+    @Override
+    public List<StockModel> findAllByProductIdsWithLock(List<Long> productIds) {
+        if (productIds.isEmpty()) return List.of();
+        return stockJpaRepository.findAllByProductIdsForUpdate(productIds);
+    }
 }
