@@ -693,15 +693,28 @@ com.loopers/
 │   ├── infrastructure/  (LikeRepositoryImpl, LikeJpaRepository)
 │   └── interfaces/  (LikeV1Controller, LikeV1Dto)
 │
-└── order/
+├── order/
+│   ├── domain/
+│   │   ├── OrderModel.java
+│   │   ├── OrderItemModel.java
+│   │   ├── OrderStatus.java
+│   │   ├── OrderRepository.java
+│   │   ├── OrderService.java
+│   │   └── OrderOwnerSpecification.java         ← Specification
+│   ├── application/  (OrderFacade, OrderInfo, OrderItemCommand, OrderItemInfo)
+│   ├── infrastructure/  (OrderRepositoryImpl, OrderJpaRepository)
+│   └── interfaces/  (OrderV1Controller, OrderV1Dto)
+│
+└── coupon/
     ├── domain/
-    │   ├── OrderModel.java
-    │   ├── OrderItemModel.java
-    │   ├── OrderStatus.java
-    │   ├── OrderRepository.java
-    │   ├── OrderService.java
-    │   └── OrderOwnerSpecification.java         ← Specification
-    ├── application/  (OrderFacade, OrderInfo, OrderItemCommand, OrderItemInfo)
-    ├── infrastructure/  (OrderRepositoryImpl, OrderJpaRepository)
-    └── interfaces/  (OrderV1Controller, OrderV1Dto)
+    │   ├── CouponModel.java
+    │   ├── CouponIssueModel.java
+    │   ├── CouponRepository.java
+    │   ├── CouponIssueRepository.java
+    │   ├── CouponService.java
+    │   ├── CouponType.java
+    │   └── CouponStatus.java
+    ├── application/  (CouponFacade, CouponInfo, CouponIssueInfo)
+    ├── infrastructure/  (CouponRepositoryImpl, CouponIssueRepositoryImpl, CouponJpaRepository, CouponIssueJpaRepository)
+    └── interfaces/  (CouponV1Controller, CouponAdminV1Controller, CouponV1Dto, CouponAdminV1Dto)
 ```
