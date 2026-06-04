@@ -1,5 +1,11 @@
 package com.loopers.order.application;
 
+import com.loopers.coupon.domain.CouponIssueModel;
+import com.loopers.coupon.domain.CouponModel;
+import com.loopers.coupon.domain.CouponStatus;
+import com.loopers.coupon.domain.CouponType;
+import com.loopers.coupon.infrastructure.CouponIssueJpaRepository;
+import com.loopers.coupon.infrastructure.CouponJpaRepository;
 import com.loopers.order.domain.OrderStatus;
 import com.loopers.order.infrastructure.OrderJpaRepository;
 import com.loopers.product.domain.ProductModel;
@@ -16,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +45,12 @@ class OrderFacadeIntegrationTest {
     private StockJpaRepository stockJpaRepository;
 
     @Autowired
+    private CouponJpaRepository couponJpaRepository;
+
+    @Autowired
+    private CouponIssueJpaRepository couponIssueJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -49,6 +62,14 @@ class OrderFacadeIntegrationTest {
         ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
         stockJpaRepository.save(new StockModel(product.getId(), totalStock));
         return product;
+    }
+
+    private CouponModel savedCoupon(CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+        return couponJpaRepository.save(new CouponModel("테스트 쿠폰", type, value, minOrderAmount, expiredAt));
+    }
+
+    private CouponIssueModel savedCouponIssue(Long couponId, Long userId) {
+        return couponIssueJpaRepository.save(new CouponIssueModel(couponId, userId));
     }
 
     @DisplayName("주문을 생성할 때,")
@@ -85,6 +106,122 @@ class OrderFacadeIntegrationTest {
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("쿠폰을 적용하여 주문을 생성할 때,")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        @DisplayName("유효한 FIXED 쿠폰을 적용하면, 할인 금액이 정확히 계산된다.")
+        @Test
+        void calculatesAmountsCorrectly_whenFixedCouponIsApplied() {
+            // arrange
+            ProductModel product = savedProduct(100);  // 150,000원 × 2개 = 300,000원
+            CouponModel coupon = savedCoupon(CouponType.FIXED, 10000L, null, ZonedDateTime.now().plusDays(30));
+            savedCouponIssue(coupon.getId(), 1L);
+
+            // act
+            OrderInfo result = orderFacade.createOrder(
+                1L, List.of(new OrderItemCommand(product.getId(), 2)), coupon.getId()
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(result.originalAmount()).isEqualTo(300000L),
+                () -> assertThat(result.discountAmount()).isEqualTo(10000L),
+                () -> assertThat(result.finalAmount()).isEqualTo(290000L)
+            );
+        }
+
+        @DisplayName("유효한 RATE 쿠폰을 적용하면, 정률 할인 금액이 정확히 계산된다.")
+        @Test
+        void calculatesAmountsCorrectly_whenRateCouponIsApplied() {
+            // arrange
+            ProductModel product = savedProduct(100);  // 150,000원 × 1개 = 150,000원
+            CouponModel coupon = savedCoupon(CouponType.RATE, 10L, null, ZonedDateTime.now().plusDays(30));
+            savedCouponIssue(coupon.getId(), 1L);
+
+            // act
+            OrderInfo result = orderFacade.createOrder(
+                1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId()
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(result.originalAmount()).isEqualTo(150000L),
+                () -> assertThat(result.discountAmount()).isEqualTo(15000L),
+                () -> assertThat(result.finalAmount()).isEqualTo(135000L)
+            );
+        }
+
+        @DisplayName("만료된 쿠폰을 적용하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCouponIsExpired() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            CouponModel coupon = savedCoupon(CouponType.FIXED, 1000L, null, ZonedDateTime.now().minusDays(1));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("보유하지 않은 쿠폰을 적용하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenCouponIsNotOwned() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            CouponModel coupon = savedCoupon(CouponType.FIXED, 1000L, null, ZonedDateTime.now().plusDays(30));
+            // 유저 2에게만 발급, 유저 1은 미보유
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("이미 사용된 쿠폰을 적용하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCouponIsAlreadyUsed() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            CouponModel coupon = savedCoupon(CouponType.FIXED, 1000L, null, ZonedDateTime.now().plusDays(30));
+            CouponIssueModel issue = savedCouponIssue(coupon.getId(), 1L);
+            issue.use();
+            couponIssueJpaRepository.save(issue);
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("minOrderAmount 조건을 충족하지 못하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenOrderAmountIsBelowMinOrderAmount() {
+            // arrange
+            ProductModel product = savedProduct(100);  // 150,000원 × 1개 = 150,000원
+            CouponModel coupon = savedCoupon(CouponType.FIXED, 1000L, 200000L, ZonedDateTime.now().plusDays(30));
+            savedCouponIssue(coupon.getId(), 1L);
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 
@@ -152,6 +289,25 @@ class OrderFacadeIntegrationTest {
 
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+
+        @DisplayName("쿠폰이 적용된 주문이면, startPayment 성공 후 쿠폰 상태가 USED로 변경된다.")
+        @Test
+        void changesCouponStatusToUsed_whenStartPaymentSucceedsWithCoupon() {
+            // arrange
+            ProductModel product = savedProduct(100);
+            CouponModel coupon = savedCoupon(CouponType.RATE, 10L, null, ZonedDateTime.now().plusDays(30));
+            CouponIssueModel issue = savedCouponIssue(coupon.getId(), 1L);
+            OrderInfo order = orderFacade.createOrder(
+                1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId()
+            );
+
+            // act
+            orderFacade.startPayment(1L, order.id());
+
+            // assert
+            CouponIssueModel updatedIssue = couponIssueJpaRepository.findById(issue.getId()).orElseThrow();
+            assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
         }
 
         @DisplayName("주문 품목 중 재고 레코드가 없는 상품이 있으면, NOT_FOUND 예외가 발생한다.")

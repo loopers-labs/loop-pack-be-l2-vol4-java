@@ -191,5 +191,35 @@ class CouponModelTest {
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("minOrderAmount가 null이면, 금액 조건 없이 할인이 계산된다.")
+        @Test
+        void calculatesDiscount_whenMinOrderAmountIsNull() {
+            // arrange
+            CouponModel coupon = new CouponModel("할인쿠폰", CouponType.FIXED, 1000L, null, FUTURE);
+
+            // act & assert
+            assertThat(coupon.calculateDiscount(500L)).isEqualTo(500L);
+        }
+
+        @DisplayName("FIXED 타입에서 orderAmount가 value와 같으면, orderAmount를 반환한다.")
+        @Test
+        void returnsOrderAmount_whenFixedValueEqualsOrderAmount() {
+            // arrange
+            CouponModel coupon = new CouponModel("1000원 할인", CouponType.FIXED, 1000L, null, FUTURE);
+
+            // act & assert
+            assertThat(coupon.calculateDiscount(1000L)).isEqualTo(1000L);
+        }
+
+        @DisplayName("RATE 100% 쿠폰이면, 전액 할인되어 orderAmount를 반환한다.")
+        @Test
+        void returnsFullOrderAmount_whenRateIs100Percent() {
+            // arrange
+            CouponModel coupon = new CouponModel("전액 할인", CouponType.RATE, 100L, null, FUTURE);
+
+            // act & assert
+            assertThat(coupon.calculateDiscount(10000L)).isEqualTo(10000L);
+        }
     }
 }
