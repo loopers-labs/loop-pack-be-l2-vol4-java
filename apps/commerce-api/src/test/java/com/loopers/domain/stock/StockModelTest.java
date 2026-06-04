@@ -63,6 +63,38 @@ class StockModelTest {
         }
     }
 
+    @DisplayName("재고 여부를 확인할 때, ")
+    @Nested
+    class IsInStock {
+
+        @DisplayName("수량이 1 이상이면 true 를 반환한다.")
+        @ValueSource(longs = {1L, 10L})
+        @ParameterizedTest
+        void returnsTrue_whenQuantityIsPositive(long quantity) {
+            // given
+            StockModel stock = new StockModel(PRODUCT_ID, quantity);
+
+            // when
+            boolean result = stock.isInStock();
+
+            // then
+            assertThat(result).isTrue();
+        }
+
+        @DisplayName("수량이 0 이면 false 를 반환한다.")
+        @Test
+        void returnsFalse_whenQuantityIsZero() {
+            // given
+            StockModel stock = new StockModel(PRODUCT_ID, 0L);
+
+            // when
+            boolean result = stock.isInStock();
+
+            // then
+            assertThat(result).isFalse();
+        }
+    }
+
     @DisplayName("재고를 수정할 때, ")
     @Nested
     class Update {

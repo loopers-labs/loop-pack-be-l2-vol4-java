@@ -21,7 +21,7 @@ public record ProductInfo(
             product.getName(),
             product.getPrice(),
             product.getLikeCount(),
-            stock.getQuantity() > 0
+            stock.isInStock()
         );
     }
 }
