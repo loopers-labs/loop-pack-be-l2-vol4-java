@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.stock.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -27,6 +28,7 @@ public class OrderServiceIntegrationTest {
     @Autowired OrderService orderService;
     @Autowired ProductService productService;
     @Autowired BrandService brandService;
+    @Autowired StockService stockService;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     private static final Long USER_ID = 100L;
@@ -44,12 +46,13 @@ public class OrderServiceIntegrationTest {
     }
 
     private Long createProduct(long price, int stock) {
-        ProductModel p = productService.createProduct(brandId, "에어맥스", "러닝화", null, price, stock);
+        ProductModel p = productService.createProduct(brandId, "에어맥스", "러닝화", null, price);
+        stockService.initialize(p.getId(), stock);
         return p.getId();
     }
 
     private int stockOf(Long productId) {
-        return productService.getProduct(productId).getStock();
+        return stockService.getQuantity(productId);
     }
 
     @Nested

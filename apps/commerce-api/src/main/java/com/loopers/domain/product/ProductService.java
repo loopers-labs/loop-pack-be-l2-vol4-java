@@ -18,8 +18,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(Long brandId, String name, String description, String imageUrl, Long price, Integer stock) {
-        ProductModel product = new ProductModel(brandId, name, description, imageUrl, price, stock);
+    public ProductModel createProduct(Long brandId, String name, String description, String imageUrl, Long price) {
+        ProductModel product = new ProductModel(brandId, name, description, imageUrl, price);
         return productRepository.save(product);
     }
 
@@ -63,9 +63,9 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, String imageUrl, Long price, Integer stock) {
+    public ProductModel updateProduct(Long id, String name, String description, String imageUrl, Long price) {
         ProductModel product = getProduct(id);
-        product.update(name, description, imageUrl, price, stock);
+        product.update(name, description, imageUrl, price);
         return productRepository.save(product);
     }
 
@@ -74,22 +74,6 @@ public class ProductService {
     public void deleteProduct(Long id) {
         ProductModel product = getProduct(id);
         product.delete();
-        productRepository.save(product);
-    }
-
-    /** 재고 차감 — 활성 상품만. 부족 시 ProductModel/Stock이 CONFLICT (주문 트랜잭션 내 호출). */
-    @Transactional
-    public void deductStock(Long id, int quantity) {
-        ProductModel product = getActiveProduct(id);
-        product.deductStock(quantity);
-        productRepository.save(product);
-    }
-
-    /** 재고 복원 (결제 실패 원복 — 01 §7.6). */
-    @Transactional
-    public void restoreStock(Long id, int quantity) {
-        ProductModel product = getProduct(id);
-        product.restoreStock(quantity);
         productRepository.save(product);
     }
 

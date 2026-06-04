@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeService;
+import com.loopers.domain.stock.StockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +27,16 @@ public class ProductQueryService {
     private final ProductService productService;
     private final BrandService brandService;
     private final LikeService likeService;
+    private final StockService stockService;
 
-    /** 상품 상세 — 활성 Product + 활성 Brand 조합. 둘 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). */
+    /** 상품 상세 — 활성 Product + 활성 Brand + 재고 수량 조합. Product/Brand 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). */
     @Transactional(readOnly = true)
     public ProductDetail getProductDetail(Long productId, Long userId) {
         ProductModel product = productService.getActiveProduct(productId);
         BrandModel brand = brandService.getActiveBrand(product.getBrandId());
         boolean liked = userId != null && likeService.isLiked(userId, productId);
-        return new ProductDetail(product, brand, liked);
+        int stockQuantity = stockService.getQuantity(productId);
+        return new ProductDetail(product, brand, liked, stockQuantity);
     }
 
     /**
@@ -48,12 +51,20 @@ public class ProductQueryService {
         Map<Long, String> brandNames = brandService.findByIds(brandIds).stream()
                 .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
 
+        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+
         Set<Long> likedIds = (userId == null)
                 ? Set.of()
-                : likeService.findLikedProductIds(userId, products.stream().map(ProductModel::getId).toList());
+                : likeService.findLikedProductIds(userId, productIds);
+
+        Map<Long, Integer> stocks = stockService.findQuantities(productIds);
 
         return products.stream()
-                .map(p -> new ProductListEntry(p, brandNames.get(p.getBrandId()), likedIds.contains(p.getId())))
+                .map(p -> new ProductListEntry(
+                        p,
+                        brandNames.get(p.getBrandId()),
+                        likedIds.contains(p.getId()),
+                        stocks.getOrDefault(p.getId(), 0)))
                 .toList();
     }
 

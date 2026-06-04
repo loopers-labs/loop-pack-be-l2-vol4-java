@@ -12,6 +12,7 @@ import com.loopers.domain.order.PaymentMethod;
 import com.loopers.domain.payment.PgStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.stock.StockService;
 import com.loopers.infrastructure.payment.FakePaymentGateway;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -46,6 +47,7 @@ public class OrderCouponConcurrencyTest {
     @Autowired CouponService couponService;
     @Autowired UserCouponService userCouponService;
     @Autowired UserCouponRepository userCouponRepository;
+    @Autowired StockService stockService;
     @Autowired FakePaymentGateway fakePaymentGateway;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
@@ -63,7 +65,8 @@ public class OrderCouponConcurrencyTest {
         fakePaymentGateway.reset();
         fakePaymentGateway.setForcedStatus(PgStatus.SUCCESS);
         BrandModel brand = brandService.register("나이키", "스포츠");
-        ProductModel product = productService.createProduct(brand.getId(), "에어맥스", "러닝화", null, 10000L, 100);
+        ProductModel product = productService.createProduct(brand.getId(), "에어맥스", "러닝화", null, 10000L);
+        stockService.initialize(product.getId(), 100);
         CouponModel template = couponService.register("할인", CouponType.RATE, 10L, null, ZonedDateTime.now().plusDays(7));
         Long couponId = template.getId();
         userCouponService.issue(USER_ID, couponId);

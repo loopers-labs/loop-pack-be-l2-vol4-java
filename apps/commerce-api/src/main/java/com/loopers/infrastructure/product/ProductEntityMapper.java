@@ -4,7 +4,7 @@ import com.loopers.domain.product.ProductModel;
 
 /**
  * ProductModel(순수 도메인) ↔ ProductEntity(JPA) 변환기. 도메인과 영속 경계 사이의 번역만 담당한다.
- * Stock VO는 엔티티에서 Integer 컬럼으로 풀어 저장하고, soft delete 상태(deletedAt)는 양방향 동기화한다.
+ * 재고는 독립 Aggregate(stock 테이블)라 여기서 다루지 않으며, soft delete 상태(deletedAt)는 양방향 동기화한다.
  */
 public final class ProductEntityMapper {
 
@@ -17,7 +17,6 @@ public final class ProductEntityMapper {
                 product.getDescription(),
                 product.getImageUrl(),
                 product.getPrice(),
-                product.getStock(),
                 product.getLikesCount()
         );
     }
@@ -30,7 +29,6 @@ public final class ProductEntityMapper {
                 entity.getDescription(),
                 entity.getImageUrl(),
                 entity.getPrice(),
-                entity.getStock(),
                 entity.getLikesCount(),
                 entity.getDeletedAt()
         );

@@ -33,7 +33,7 @@ public class ProductServiceIntegrationTest {
         @DisplayName("유효한 정보로 생성하면, 좋아요 0·활성 상태로 저장된다.")
         @Test
         void given_validInput_when_createProduct_then_savedWithZeroLikes() {
-            ProductModel result = productService.createProduct(1L, "에어맥스", "러닝화", "http://img/a.png", 139000L, 10);
+            ProductModel result = productService.createProduct(1L, "에어맥스", "러닝화", "http://img/a.png", 139000L);
 
             assertAll(
                     () -> assertThat(result.getId()).isNotNull(),
@@ -51,7 +51,7 @@ public class ProductServiceIntegrationTest {
         @DisplayName("존재하는 활성 상품을 조회하면, 상품을 반환한다.")
         @Test
         void given_activeProduct_when_getActiveProduct_then_returns() {
-            ProductModel saved = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L, 10);
+            ProductModel saved = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L);
 
             ProductModel result = productService.getActiveProduct(saved.getId());
 
@@ -70,7 +70,7 @@ public class ProductServiceIntegrationTest {
         @DisplayName("삭제된(비활성) 상품을 조회하면, NotFound 예외가 발생한다.")
         @Test
         void given_deletedProduct_when_getActiveProduct_then_throwsNotFound() {
-            ProductModel saved = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L, 10);
+            ProductModel saved = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L);
             saved.delete();
             productRepository.save(saved);
 

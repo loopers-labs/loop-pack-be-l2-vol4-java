@@ -6,6 +6,7 @@ import com.loopers.domain.coupon.AppliedCoupon;
 import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.stock.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.page.PagePolicy;
@@ -22,6 +23,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductService productService;
     private final BrandService brandService;
+    private final StockService stockService;
     private final UserCouponService userCouponService;
 
     /** 쿠폰 미적용 주문 생성. */
@@ -45,7 +47,7 @@ public class OrderService {
         for (OrderLine line : lines) {
             ProductModel product = productService.getActiveProduct(line.productId());
             BrandModel brand = brandService.getActiveBrand(product.getBrandId());
-            productService.deductStock(product.getId(), line.quantity());
+            stockService.decrease(product.getId(), line.quantity());
             order.addItem(new OrderItem(
                     product.getId(),
                     product.getName(),
@@ -76,7 +78,7 @@ public class OrderService {
         OrderModel order = getOrder(orderId);
         order.markFailed(reason);
         for (OrderItem item : order.getItems()) {
-            productService.restoreStock(item.getProductId(), item.getQuantity());
+            stockService.increase(item.getProductId(), item.getQuantity());
         }
         if (order.getUserCouponId() != null) {
             userCouponService.restore(order.getUserCouponId());

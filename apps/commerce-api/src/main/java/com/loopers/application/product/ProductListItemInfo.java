@@ -18,7 +18,7 @@ public record ProductListItemInfo(
     Long likesCount,
     boolean liked
 ) {
-    public static ProductListItemInfo of(ProductModel product, String brandName, boolean liked) {
+    public static ProductListItemInfo of(ProductModel product, String brandName, boolean liked, Integer stock) {
         return new ProductListItemInfo(
             product.getId(),
             product.getBrandId(),
@@ -27,7 +27,7 @@ public record ProductListItemInfo(
             product.getDescription(),
             product.getImageUrl(),
             product.getPrice(),
-            product.getStock(),
+            stock,
             product.getLikesCount(),
             liked
         );

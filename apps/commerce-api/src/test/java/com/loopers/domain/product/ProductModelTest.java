@@ -24,13 +24,12 @@ public class ProductModelTest {
         @Test
         void given_validInput_when_create_then_createsActiveProductWithZeroLikes() {
             ProductModel product = new ProductModel(1L, "에어맥스 90", "클래식 러닝화",
-                    "http://img/airmax.png", 139000L, 10);
+                    "http://img/airmax.png", 139000L);
 
             assertAll(
                     () -> assertThat(product.getBrandId()).isEqualTo(1L),
                     () -> assertThat(product.getName()).isEqualTo("에어맥스 90"),
                     () -> assertThat(product.getPrice()).isEqualTo(139000L),
-                    () -> assertThat(product.getStock()).isEqualTo(10),
                     () -> assertThat(product.getLikesCount()).isEqualTo(0L),
                     () -> assertThat(product.isActive()).isTrue()
             );
@@ -79,87 +78,6 @@ public class ProductModelTest {
         void given_negativePrice_when_create_then_throwsBadRequest(Long invalidPrice) {
             CoreException result = assertThrows(CoreException.class,
                     () -> aProduct().withPrice(invalidPrice).build());
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("재고가 null이거나 음수면 BAD_REQUEST 예외가 발생한다")
-        @ParameterizedTest
-        @ValueSource(ints = {-1, -100})
-        void given_negativeStock_when_create_then_throwsBadRequest(Integer invalidStock) {
-            CoreException result = assertThrows(CoreException.class,
-                    () -> aProduct().withStock(invalidStock).build());
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @Nested
-    @DisplayName("재고 차감 (deductStock)")
-    class DeductStock {
-
-        @DisplayName("재고가 충분하면 차감된다")
-        @Test
-        void given_enoughStock_when_deduct_then_reduced() {
-            ProductModel product = aProduct().withStock(10).build();
-
-            product.deductStock(3);
-
-            assertThat(product.getStock()).isEqualTo(7);
-        }
-
-        @DisplayName("재고와 동일한 수량을 차감하면 0이 된다 (경계)")
-        @Test
-        void given_exactStock_when_deduct_then_zero() {
-            ProductModel product = aProduct().withStock(5).build();
-
-            product.deductStock(5);
-
-            assertThat(product.getStock()).isEqualTo(0);
-        }
-
-        @DisplayName("재고보다 많은 수량을 차감하면 CONFLICT 예외가 발생한다")
-        @Test
-        void given_insufficientStock_when_deduct_then_throwsConflict() {
-            ProductModel product = aProduct().withStock(2).build();
-
-            CoreException result = assertThrows(CoreException.class, () -> product.deductStock(3));
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-        }
-
-        @DisplayName("차감 수량이 0 이하면 BAD_REQUEST 예외가 발생한다")
-        @ParameterizedTest
-        @ValueSource(ints = {0, -1})
-        void given_nonPositiveQuantity_when_deduct_then_throwsBadRequest(Integer quantity) {
-            ProductModel product = aProduct().withStock(10).build();
-
-            CoreException result = assertThrows(CoreException.class, () -> product.deductStock(quantity));
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @Nested
-    @DisplayName("재고 복원 (restoreStock)")
-    class RestoreStock {
-
-        @DisplayName("복원하면 재고가 증가한다")
-        @Test
-        void given_quantity_when_restore_then_increased() {
-            ProductModel product = aProduct().withStock(5).build();
-
-            product.restoreStock(3);
-
-            assertThat(product.getStock()).isEqualTo(8);
-        }
-
-        @DisplayName("복원 수량이 0 이하면 BAD_REQUEST 예외가 발생한다")
-        @ParameterizedTest
-        @ValueSource(ints = {0, -1})
-        void given_nonPositiveQuantity_when_restore_then_throwsBadRequest(Integer quantity) {
-            ProductModel product = aProduct().withStock(5).build();
-
-            CoreException result = assertThrows(CoreException.class, () -> product.restoreStock(quantity));
-
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }

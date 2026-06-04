@@ -15,14 +15,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * ProductService 순수 단위 테스트 — Repository를 mock으로 격리해 DB 없이
- * 활성/비활성 분기, 재고 차감/복원, 좋아요 카운터 동기 +/-, soft delete 흐름을 검증한다.
- * (실제 영속·정렬·페이지는 ProductServiceIntegrationTest가 Testcontainers로 검증)
+ * 활성/비활성 분기, 좋아요 카운터 동기 +/-, soft delete 흐름을 검증한다.
+ * (재고는 독립 Aggregate로 분리되어 StockService/StockServiceTest가 담당)
  */
 class ProductServiceTest {
 
@@ -38,12 +37,12 @@ class ProductServiceTest {
         productService = new ProductService(productRepository);
     }
 
-    private static ProductModel active(Long id, int stock, long likes) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, stock, likes, null);
+    private static ProductModel active(Long id, long likes) {
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, likes, null);
     }
 
     private static ProductModel inactive(Long id) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, 5, 0L,
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, 0L,
                 ZonedDateTime.now());
     }
 
@@ -54,7 +53,7 @@ class ProductServiceTest {
         @DisplayName("활성 상품이면 그대로 반환한다.")
         @Test
         void given_active_when_getActiveProduct_then_returns() {
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(active(PRODUCT_ID, 10, 0L)));
+            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(active(PRODUCT_ID, 0L)));
 
             ProductModel result = productService.getActiveProduct(PRODUCT_ID);
 
@@ -94,72 +93,13 @@ class ProductServiceTest {
     }
 
     @Nested
-    @DisplayName("재고 차감")
-    class DeductStock {
-
-        @DisplayName("활성 상품이면 차감하고 저장한다.")
-        @Test
-        void given_active_when_deductStock_then_savesWithReducedStock() {
-            ProductModel product = active(PRODUCT_ID, 10, 0L);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
-
-            productService.deductStock(PRODUCT_ID, 3);
-
-            verify(productRepository).save(product);
-            assertThat(product.getStock()).isEqualTo(7);
-        }
-
-        @DisplayName("재고 부족이면 CONFLICT가 발생하고, 저장하지 않는다(주문 트랜잭션 롤백 위임).")
-        @Test
-        void given_insufficient_when_deductStock_then_conflict() {
-            ProductModel product = active(PRODUCT_ID, 1, 0L);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
-
-            Throwable thrown = catchThrowable(() -> productService.deductStock(PRODUCT_ID, 5));
-
-            assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.CONFLICT);
-            verify(productRepository, never()).save(any());
-        }
-
-        @DisplayName("비활성 상품이면 NOT_FOUND가 발생한다.")
-        @Test
-        void given_inactive_when_deductStock_then_notFound() {
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(inactive(PRODUCT_ID)));
-
-            Throwable thrown = catchThrowable(() -> productService.deductStock(PRODUCT_ID, 1));
-
-            assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            verify(productRepository, never()).save(any());
-        }
-    }
-
-    @Nested
-    @DisplayName("재고 복원")
-    class RestoreStock {
-
-        @DisplayName("결제 실패 원복 — 비활성 상품도 복원해 저장한다(상태 무관 정합성).")
-        @Test
-        void given_anyProduct_when_restoreStock_then_increasesAndSaves() {
-            ProductModel product = active(PRODUCT_ID, 2, 0L);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
-
-            productService.restoreStock(PRODUCT_ID, 3);
-
-            assertThat(product.getStock()).isEqualTo(5);
-            verify(productRepository).save(product);
-        }
-    }
-
-    @Nested
     @DisplayName("좋아요 수 동기 카운터")
     class LikesCounter {
 
         @DisplayName("증가 시 +1 하여 저장한다.")
         @Test
         void given_product_when_increaseLikesCount_then_plusOneAndSaves() {
-            ProductModel product = active(PRODUCT_ID, 5, 4L);
+            ProductModel product = active(PRODUCT_ID, 4L);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
             when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -172,7 +112,7 @@ class ProductServiceTest {
         @DisplayName("감소 시 0 미만으로 내려가지 않는다(음수 방지).")
         @Test
         void given_zeroLikes_when_decreaseLikesCount_then_remainsZero() {
-            ProductModel product = active(PRODUCT_ID, 5, 0L);
+            ProductModel product = active(PRODUCT_ID, 0L);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
             when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -189,7 +129,7 @@ class ProductServiceTest {
         @DisplayName("활성 상품을 soft delete 하면 deletedAt이 채워진 채로 저장한다.")
         @Test
         void given_active_when_deleteProduct_then_savesInactive() {
-            ProductModel product = active(PRODUCT_ID, 5, 0L);
+            ProductModel product = active(PRODUCT_ID, 0L);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
             when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -208,7 +148,7 @@ class ProductServiceTest {
         @Test
         void delegates_findActiveByIds() {
             List<Long> ids = List.of(1L, 2L, 3L);
-            List<ProductModel> expected = List.of(active(1L, 5, 0L), active(2L, 5, 0L));
+            List<ProductModel> expected = List.of(active(1L, 0L), active(2L, 0L));
             when(productRepository.findActiveByIds(ids)).thenReturn(expected);
 
             List<ProductModel> result = productService.findActiveByIds(ids);
