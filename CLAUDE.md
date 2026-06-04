@@ -72,18 +72,49 @@ Root
 
 ### commerce-api 패키지 레이아웃 (com.loopers)
 
-레이어드/헥사고날 컨벤션:
+레이어드 아키텍처 (4-tier) 컨벤션:
 
 ```
 com.loopers
 ├── interfaces       — Controller, DTO, API spec, ControllerAdvice
-├── application      — Facade (Use case 조합)
-├── domain           — Model, Service, Repository(인터페이스)
-├── infrastructure   — JpaRepository, RepositoryImpl (도메인 Repository 구현)
+├── application      — Facade (Use case 조합), Info(출력 DTO)
+├── domain           — 도메인 엔티티(POJO), Value Object, Service, Repository(interface)
+├── infrastructure   — JpaEntity, JpaRepository, RepositoryImpl, Mapper, 외부 시스템 어댑터
 └── support          — 공통(ErrorType, CoreException 등)
 ```
 
-현재 예시 도메인: `example`, `product`.
+도메인별 표준 파일 구성 예시 (`product` 기준):
+
+```
+domain/product/
+  Product.java              — 순수 도메인 엔티티 (POJO, JPA 의존 없음)
+  ProductService.java       — 도메인 서비스
+  ProductRepository.java    — Repository 인터페이스 (도메인 타입 in/out)
+  Money.java / Stock.java   — Value Object
+
+infrastructure/product/
+  ProductJpaEntity.java     — @Entity, BaseEntity 상속, JPA 매핑 전용
+  ProductJpaRepository.java — Spring Data JPA 인터페이스
+  ProductMapper.java        — Product ↔ ProductJpaEntity 양방향 변환
+  ProductRepositoryImpl.java — domain Repository 구현 (JpaRepository + Mapper 조합)
+
+```
+
+현재 예시 도메인: `user`, `product`, `brand`, `like`, `order`.
+
+### 도메인 설계 원칙
+
+- **DIP 준수**: `domain` 패키지는 `infrastructure` / `interfaces` / `application` / Spring / JPA 어느 것에도 의존하지 않는다. 도메인은 순수 Java 만으로 컴파일 가능해야 한다.
+- **의존 방향**: `interfaces → application → domain ← infrastructure`. `infrastructure` 는 `domain` 의 추상(Repository 인터페이스 등)을 구현해 런타임에 주입된다.
+- **JPA 엔티티 ↔ 도메인 엔티티 분리**:
+    - 도메인 엔티티(`Product`)는 POJO 로 작성하고 JPA / Jakarta Persistence 어노테이션을 절대 부착하지 않는다.
+    - JPA 엔티티(`ProductJpaEntity`)는 `infrastructure` 패키지에 두고 `modules:jpa` 의 `BaseEntity` 를 상속한다. 도메인 엔티티는 `BaseEntity` 를 상속하지 않으며 필요한 메타 필드(id, createdAt 등)는 자체적으로 보유한다.
+    - 변환은 도메인/JPA 엔티티에 직접 작성하지 않고 **별도 Mapper 클래스**(`ProductMapper`)에서 담당한다. Mapper 는 `infrastructure` 에 위치하며 `toJpaEntity(Product)` / `toDomain(ProductJpaEntity)` 양방향 메서드를 제공한다.
+    - `RepositoryImpl` 은 `JpaRepository` 호출 결과를 Mapper 로 변환해 도메인 타입만 노출한다. 컨트롤러/서비스/Facade 는 JPA 엔티티를 절대 참조하지 않는다.
+- **Aggregate 참조**: 다른 애그리거트는 객체 참조 대신 ID(`brandId` 등)로 참조한다. `@ManyToOne`/`@OneToMany` 객체 그래프 의존은 지양한다.
+- **불변/검증 위치**: 도메인 엔티티 생성자/팩토리에서 불변식과 필드 검증을 수행하고, 위반 시 `CoreException(ErrorType.BAD_REQUEST, ...)` 으로 통일한다. Value Object(`Price`, `Stock`, `Email` 등)도 같은 규칙을 따른다.
+- **레이어 간 타입 컨벤션**:
+    - 인터페이스 요청/응답: `XxxV{n}Dto.Request / Response`
 
 ## 실행 / 인프라
 
@@ -117,8 +148,10 @@ Spring 프로필: `local`, `test`, `dev`, `qa`, `prd`. `application.yml` 에서 
 
 ## 작업 시 유의 사항
 
-- 새로운 도메인을 추가할 때는 `commerce-api` 의 4-layer 컨벤션(`interfaces` / `application` / `domain` / `infrastructure`)을 따릅니다.
-- JPA 엔티티의 공통 베이스는 `modules:jpa` 의 `com.loopers.domain.BaseEntity` 입니다.
+- **설계 근거 문서**: 모든 설계는 `docs/week2/` (요구사항 명세, 시퀀스 다이어그램, 클래스 다이어그램, ERD) 를 기반으로 한다. 구현이 문서와 다르거나 문서가 애매한 부분이 발견되면 스스로 판단해서 보완/수정하지 말고 개발자에게 먼저 질문한다.
+- 새로운 도메인을 추가할 때는 `commerce-api` 의 4-layer 컨벤션(`interfaces` / `application` / `domain` / `infrastructure`)과 위 "도메인 설계 원칙" 을 따릅니다.
+- 도메인 패키지에는 JPA / Spring 의존을 도입하지 않습니다. JPA 매핑은 `infrastructure/<도메인>/XxxJpaEntity` 에 격리하고 `XxxMapper` 로 변환합니다.
+- JPA 엔티티의 공통 베이스는 `modules:jpa` 의 `com.loopers.domain.BaseEntity` 입니다. 도메인 엔티티는 이를 상속하지 않습니다.
 - 통합 테스트는 Testcontainers 기반 픽스처(`MySqlTestContainersConfig`, `RedisTestContainersConfig`) 를 활용합니다.
 - 컨트롤러 응답 포맷은 `interfaces.api.ApiResponse`, 예외는 `support.error.CoreException` + `ErrorType` 으로 통일되어 있습니다.
 - 빌드 결과의 `version` 은 git short hash 로 자동 셋업됩니다(`getGitHash()`), 별도 지정이 없으면 `init`.
@@ -131,25 +164,7 @@ Spring 프로필: `local`, `test`, `dev`, `qa`, `prd`. `application.yml` 에서 
 - **대원칙** : 방향성 및 주요 의사 결정은 개발자에게 제안만 할 수 있으며, 최종 승인된 사항을 기반으로 작업을 수행한다.
 - **중간 결과 보고** : AI가 반복적인 실패를 겪거나, 접근 방식 변경이 필요하거나, 요구사항 외 기능이 필요하다고 판단될 경우 현재 상황과 다음 행동을 보고하고 개발자의 승인을 요청한다.
 - **설계 주도권 유지** : AI는 임의판단으로 설계나 요구사항을 변경하지 않는다. 방향성에 대한 제안은 가능하지만 개발자의 승인을 받은 후 수행한다.
-- **To-Do 작성** : 제공받은 요구사항과 기능 구현 리스트를 기준으로 엣지 케이스를 포함한 기능별 테스트 케이스를 `check-list.md`에 작성한다.
 - **금지 사항** : 요청하지 않은 기능 구현, 테스트 삭제, 테스트 스킵, 테스트 기대값 완화는 개발자의 명시적 승인 없이는 수행하지 않는다.
-
-### 개발 Workflow - TDD (Red > Green > Refactor)
-
-- 기능을 작은 증가분으로 정의하는 실패하는 테스트부터 시작한다.
-- 테스트를 통과시키는 데 충분한 코드만 작성한다. 그 이상은 하지 않는다.
-- 모든 테스트가 통과하면, 리팩터링 필요성을 검토한다.
-- 리팩터링은 동작 변경 없이 수행한다.
-- 새로운 기능에 대해 이 사이클을 반복한다.
-
-### 예시 워크플로우
-
-1. 기능의 작은 부분을 위한 단순한 실패하는 테스트를 작성한다.
-2. 테스트를 통과시키는 데 필요한 최소한만 구현한다.
-3. 테스트를 실행해 통과를 확인한다.
-4. 필요한 구조적 정리를 수행하고, 변경 후 테스트를 다시 실행한다.
-5. 각 기능 단위가 완료되면 개발자의 검증을 받은 후 `check-list.md`에 완료 표시한다.
-6. `check-list.md`에 완료되지 않은 항목이 없을 때까지 위 과정을 반복한다.
 
 ## 주의사항
 

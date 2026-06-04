@@ -13,7 +13,7 @@
 | Aggregate | Root | 책임지는 핵심 불변식 |
 |-----------|------|----------------------|
 | 사용자 | `UserModel` | 로그인 ID는 유일하다. 식별·인증 정보는 모두 필수다. |
-| 브랜드 | `Brand` | 브랜드명은 비어 있을 수 없다. 삭제는 논리 삭제. |
+| 브랜드 | `Brand` | 브랜드명은 비어 있을 수 없다. 삭제는 논리 삭제(도메인 행위). |
 | 상품 | `Product` | 가격·재고는 음수가 될 수 없다. 소속 브랜드는 바뀌지 않는다. |
 | 좋아요 | `Like` | 한 사용자-상품 쌍에 좋아요는 최대 1개. |
 | 주문 | `Order` | 총액 = 항목 소계의 합. 주문 이력은 불변. |
@@ -42,7 +42,7 @@ classDiagram
         -Long id
         -string name
         -string description
-        -datetime deletedAt
+        -boolean deleted
         +modify(name, description)
         +delete()
         +isDeleted() bool
@@ -54,12 +54,10 @@ classDiagram
         -string name
         -Money price
         -Stock stock
-        -datetime deletedAt
         +modify(name, price)
         +hasEnoughStock(qty) bool
         +adjustStock(newQuantity)
         +decreaseStock(qty)
-        +delete()
     }
     class Stock {
         <<ValueObject>>
@@ -94,7 +92,6 @@ classDiagram
     }
     class OrderItem {
         <<Entity>>
-        -Long id
         -Long productId
         -string productName
         -Money unitPrice
@@ -103,7 +100,7 @@ classDiagram
     }
     class OrderStatus {
         <<enumeration>>
-        COMPLETED
+        CREATED
     }
 
     Product "0..*" ..> "1" Brand : 소속 브랜드
@@ -132,7 +129,7 @@ classDiagram
         -Long id
         -string name
         -string description
-        -datetime deletedAt
+        -boolean deleted
         +modify(name, description)
         +delete()
         +isDeleted() bool
@@ -144,12 +141,10 @@ classDiagram
         -string name
         -Money price
         -Stock stock
-        -datetime deletedAt
         +modify(name, price)
         +hasEnoughStock(qty) bool
         +adjustStock(newQuantity)
         +decreaseStock(qty)
-        +delete()
     }
     class Stock {
         <<ValueObject>>
@@ -172,11 +167,12 @@ classDiagram
     Product ..> Money : 가격
 ```
 
-- **`Brand`** (AggregateRoot) — 브랜드 정보 관리와 논리 삭제(`delete()`는 삭제 시각 기록). 브랜드 삭제 시 소속 상품도 함께 논리 삭제돼야 하는데, 이 연쇄는 `Brand` 한 Aggregate 경계를 넘으므로 응용 계층이 조율한다(이 다이어그램 범위 밖).
+- **`Brand`** (AggregateRoot) — 브랜드 정보 관리와 논리 삭제. `delete()` 는 도메인 행위로 `deleted` 플래그를 set 한다(멱등). 도메인 모델은 "삭제 여부"(boolean) 만 알고, "삭제 시각"(timestamp) 같은 감사 정보는 영속 계층(`BrandJpaEntity` / `BaseEntity`) 의 관심사로 격리한다. 브랜드 삭제 시 소속 상품도 함께 삭제돼야 하는데, 이 연쇄는 `Brand` 한 Aggregate 경계를 넘으므로 도메인 서비스 또는 응용 계층이 조율한다(이 다이어그램 범위 밖).
 - **`Product`** (AggregateRoot) — 재고를 보유. `hasEnoughStock()`으로 주문 시 재고를 확인하고 `decreaseStock()`으로 주문 시 차감한다. 어드민이 재고를 특정 값으로 조정하는 것은 `adjustStock(newQuantity)`이 맡는다(US-15). `modify()` 인자에 브랜드가 없는 것은 "브랜드 변경 불가" 규칙(AC-15-2)을 타입으로 막은 것이다. 좋아요 수는 `Product`가 들고 있지 않다 — `Like` 행을 집계해 구한다.
 - **`Stock`** (VO) — 재고 수량을 감싼 불변 값 객체. `decrease(qty)`는 `재고 ≥ qty`일 때만 새 `Stock`을 돌려주고, `adjust(newQuantity)`는 `newQuantity ≥ 0`일 때만 새 `Stock`을 돌려준다 — 어느 쪽도 음수를 허용하지 않아 `재고 ≥ 0` 불변식이 `Stock` 타입 안에서 지켜진다. `isSoldOut()`은 고객 응답의 '품절 여부'에 쓰인다.
 - **`Money`** (VO) — 금액과 그 계산 규칙(`add`·`multiply`·`isGreaterThanOrEqual`)을 캡슐화한 불변 값 객체. `Product.price`·`OrderItem.unitPrice`가 모두 이 타입이다. 단일 통화(원) 가정이라 통화 필드는 두지 않는다.
-- **불변식** — 브랜드명은 필수, 삭제는 논리 삭제(삭제된 브랜드는 조회·노출에서 제외). 상품의 가격 ≥ 0, 재고 ≥ 0. 상품의 소속 브랜드(`brandId`)는 생성 후 변경 불가.
+- **불변식** — 브랜드명은 필수. 상품의 가격 ≥ 0, 재고 ≥ 0. 상품의 소속 브랜드(`brandId`)는 생성 후 변경 불가.
+- **삭제 정책** — 브랜드/상품 모두 논리 삭제. 도메인은 "삭제됨"(`boolean deleted`) 상태를 인지하고 `delete()` 도메인 행위로 표현한다. 영속 계층은 `deleted_at` 타임스탬프로 저장한다(`BaseEntity`). Repository 의 일반 조회(`find`, `findAll`)는 쿼리에서 삭제 제외 필터(`deleted_at IS NULL`)를 유지해 의도하지 않은 노출을 막는다. 그 결과 **삭제된 객체는 도메인 영역으로 복원되지 않으므로**, Mapper 의 영속→도메인 방향은 deleted 정보를 매핑하지 않고 항상 살아있는 상태로 만든다 (`deleted=true` 는 오직 도메인 행위 `delete()` 호출 직후 transient 상태로만 존재). 도메인→영속 반영은 `RepositoryImpl.update` 가 `domain.isDeleted()` 를 보고 JPA entity 의 `delete()` 를 호출해 시각을 세팅하는 방향성 매핑이다.
 
 ### 좋아요 — `Like`
 
@@ -211,7 +207,6 @@ classDiagram
     }
     class OrderItem {
         <<Entity>>
-        -Long id
         -Long productId
         -string productName
         -Money unitPrice
@@ -220,15 +215,15 @@ classDiagram
     }
     class OrderStatus {
         <<enumeration>>
-        COMPLETED
+        CREATED
     }
 
     Order "1" *-- "1..*" OrderItem : 합성
     Order ..> OrderStatus : 상태
 ```
 
-- **`Order`** (AggregateRoot) — 주문 한 건의 일관성. 항목·총액을 묶어 관리한다. `create(items)`로 주문 항목을 받아 총액·주문 이력을 구성하며, 주문은 생성과 동시에 `COMPLETED`로 확정된다 — 결제 단계가 없어 상태 전이가 없다. 주문자는 `userId`로 `UserModel`을 참조한다.
-- **`OrderItem`** (Entity) — 주문에 담긴 상품 1종과 수량. `productName`·`unitPrice`는 주문 시점 스냅샷(주문 이력)이라 이후 상품이 바뀌어도 불변. `productId`는 참조용으로 따로 보관한다. `Order` 없이는 존재하지 않으므로 합성 관계.
+- **`Order`** (AggregateRoot) — 주문 한 건의 일관성. 항목·총액을 묶어 관리한다. `create(items)`로 주문 항목을 받아 총액·주문 이력을 구성하며, 주문은 생성과 동시에 `CREATED` 상태가 된다 — 결제 단계가 없어 상태 전이가 없다. 주문자는 `userId`로 `UserModel`을 참조한다.
+- **`OrderItem`** (Entity) — 주문에 담긴 상품 1종과 수량. `productName`·`unitPrice`는 주문 시점 스냅샷(주문 이력)이라 이후 상품이 바뀌어도 불변. `productId`는 참조용으로 따로 보관한다. `Order` 없이는 존재하지 않으므로 합성 관계. 도메인 레벨에서는 식별자(`id`)를 두지 않는다 — 부분 취소·항목 단위 수정 같은 "항목을 단독으로 가리키는 행위"가 명세에 없어 식별자가 dead field 가 되기 때문이다. JPA 매핑에는 PK 가 필요하므로 `OrderItemJpaEntity` 가 `BaseEntity` 를 통해 surrogate key 를 보유하지만, 이는 영속화의 관심사로 도메인에 노출하지 않는다. 부분 취소처럼 항목 단독 행위가 추가되는 시점에 도메인 id 를 도입한다.
 - **불변식** — 주문 항목은 1개 이상. 주문 총액 = 모든 항목 소계의 합. 주문 항목의 상품명·단가는 주문 시점 스냅샷이며 생성 후 불변(주문 이력).
 
-> **enum 한국어 대응** — `OrderStatus`: `COMPLETED`(주문 완료) — 결제를 설계 범위에서 제외해 주문은 생성 즉시 완료되며 단일 상태다.
+> **enum 한국어 대응** — `OrderStatus`: `CREATED`(주문 생성) — 결제·배송을 설계 범위에서 제외해 주문은 생성 후 상태 전이가 없는 단일 상태다.
