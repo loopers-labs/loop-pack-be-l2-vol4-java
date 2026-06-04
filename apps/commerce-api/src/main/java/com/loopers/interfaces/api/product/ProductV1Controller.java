@@ -7,8 +7,6 @@ import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/products")
@@ -32,11 +30,12 @@ public class ProductV1Controller {
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
+    public ApiResponse<ProductV1Dto.ProductDisplayResponse> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
-        ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
+        ProductV1Dto.ProductDisplayResponse response = ProductV1Dto.ProductDisplayResponse.from(
+            productFacade.getProductDisplay(productId)
+        );
         return ApiResponse.success(response);
     }
 
@@ -50,12 +49,17 @@ public class ProductV1Controller {
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
-            .toList();
-        return ApiResponse.success(responses);
+    public ApiResponse<ProductV1Dto.ProductPageResponse> getAllProducts(
+        @RequestParam(value = "brandId", required = false) Long brandId,
+        @RequestParam(value = "sort", required = false) String sort,
+        @RequestParam(value = "direction", required = false) String direction,
+        @RequestParam(value = "page", required = false) Integer page,
+        @RequestParam(value = "size", required = false) Integer size
+    ) {
+        ProductV1Dto.ProductPageResponse response = ProductV1Dto.ProductPageResponse.from(
+            productFacade.searchProducts(brandId, sort, direction, page, size)
+        );
+        return ApiResponse.success(response);
     }
 
     @PutMapping("/{productId}")

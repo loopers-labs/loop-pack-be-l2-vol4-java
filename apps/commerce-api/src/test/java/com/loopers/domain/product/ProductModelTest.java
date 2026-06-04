@@ -28,7 +28,8 @@ class ProductModelTest {
                 () -> assertThat(product.getName()).isEqualTo("신발"),
                 () -> assertThat(product.getDescription()).isEqualTo("편한 신발"),
                 () -> assertThat(product.getPrice()).isEqualTo(10000L),
-                () -> assertThat(product.getStock()).isEqualTo(5)
+                () -> assertThat(product.getStock()).isEqualTo(5),
+                () -> assertThat(product.getLikeCount()).isZero()
             );
         }
 

@@ -64,6 +64,10 @@ public class ProductModel extends BaseEntity {
         return stock;
     }
 
+    public Long getLikeCount() {
+        return 0L;
+    }
+
     public void update(Long newBrandId, String newName, String newDescription, Long newPrice, Integer newStock) {
         if (newBrandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");

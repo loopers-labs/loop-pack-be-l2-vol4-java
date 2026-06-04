@@ -31,6 +31,12 @@ public class ProductService {
         return productRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
+    public ProductPage searchProducts(Long brandId, String sort, String direction, Integer page, Integer size) {
+        ProductSearchCondition condition = ProductSearchCondition.of(brandId, sort, direction, page, size);
+        return productRepository.search(condition);
+    }
+
     @Transactional
     public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
         ProductModel product = getProduct(id);
