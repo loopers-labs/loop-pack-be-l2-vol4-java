@@ -113,7 +113,7 @@ public class OrderFacade {
         stocks.forEach(stockRepository::save);
 
         if (order.getCouponIssueId() != null) {
-            CouponIssueModel couponIssue = couponIssueRepository.findById(order.getCouponIssueId())
+            CouponIssueModel couponIssue = couponIssueRepository.findByIdWithLock(order.getCouponIssueId())
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 발급 정보가 존재하지 않습니다."));
             couponIssue.use();
             couponIssueRepository.save(couponIssue);
