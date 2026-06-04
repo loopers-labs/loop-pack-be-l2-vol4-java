@@ -750,3 +750,33 @@ POST /orders/{id}/pay/confirm → 재고 confirm + OrderStatus.CONFIRMED
 **도메인 간 의존 방향**
 - `order/application` → `coupon/domain` (`CouponRepository`, `CouponIssueRepository` 참조)
 - `coupon/domain`은 `order/domain`을 알지 못함
+
+---
+
+## 결정 14. 동시성 제어 — 비관적 락 선택
+
+**결정**
+- 재고(`StockJpaRepository.findAllByProductIds`)와 쿠폰 사용(`CouponIssueJpaRepository.findById`) 쿼리에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
+
+**배경**
+- 동일 상품에 대한 동시 주문, 동일 쿠폰의 동시 사용 요청에서 Lost Update가 발생할 수 있음
+- 두 경우 모두 조회 직후 상태를 변경하는 패턴 (`reserve()`, `use()`)
+
+**트레이드오프**
+
+| 항목 | 비관적 락 (선택) | 낙관적 락 (`@Version`) |
+|------|----------------|----------------------|
+| 충돌 처리 방식 | DB가 락을 잡고 대기 → 순서대로 처리 | 먼저 커밋된 쪽 성공, 나머지 `OptimisticLockException` |
+| 재시도 로직 | 불필요 | 필요 (없으면 충돌 시 500 반환) |
+| 처리량 | 락 대기로 저하 가능 | 충돌이 드물면 처리량 높음 |
+| 에러 메시지 | `reserve()`·`use()` 내부 검증으로 명확한 메시지 반환 | 예외 변환 누락 시 스택트레이스 노출 위험 |
+| 이 도메인에서의 판단 | 재고·쿠폰은 핫 데이터 (충돌 다발 가능) → 비관적 락이 더 안전 | 재시도 로직 없이 낙관적 락만 쓰면 불완전한 구현 |
+
+**적용 위치**
+
+```
+StockJpaRepository.findAllByProductIds   → PESSIMISTIC_WRITE  (startPayment·confirmPayment)
+CouponIssueJpaRepository.findById        → PESSIMISTIC_WRITE  (startPayment)
+```
+
+> `findByUserIdAndCouponId`는 `createOrder`에서 유효성 검증 용도로만 쓰이고 해당 트랜잭션에서 write가 발생하지 않으므로 락 미적용
