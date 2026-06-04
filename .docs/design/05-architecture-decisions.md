@@ -718,3 +718,35 @@ com.loopers/
     ├── infrastructure/  (CouponRepositoryImpl, CouponIssueRepositoryImpl, CouponJpaRepository, CouponIssueJpaRepository)
     └── interfaces/  (CouponV1Controller, CouponAdminV1Controller, CouponV1Dto, CouponAdminV1Dto)
 ```
+
+---
+
+## 결정 13. 주문+쿠폰 통합 — 트랜잭션 경계 및 쿠폰 처리 시점
+
+**결정**
+- 쿠폰 유효성 검증·할인 금액 계산은 `createOrder`에서 수행하고, 쿠폰 실제 소비(`use()`)는 `startPayment`에서 재고 `reserve()`와 **동일한 `@Transactional`** 안에서 수행한다.
+- `OrderModel`에 `couponIssueId`, `originalAmount`, `discountAmount`, `finalAmount` 필드를 추가해 주문 시점의 금액 스냅샷을 영구 보존한다.
+
+**배경**
+- 요구사항: "쿠폰, 재고 처리 등 하나라도 실패하면 모두 롤백"
+- 기존 3단계 결제 플로우(`createOrder` → `startPayment` → `confirmPayment`)를 유지하면서 원자성을 확보해야 함
+
+**트레이드오프**
+
+| 항목 | 결정한 이유 | 포기한 것 |
+|------|------------|-----------|
+| 쿠폰 소비를 `startPayment`에서 처리 | 재고 reserve와 같은 트랜잭션 → 재고·쿠폰 롤백이 함께 보장됨 | `createOrder`~`startPayment` 사이에 동일 쿠폰을 다른 요청이 선점할 수 있는 짧은 시간 창이 존재 |
+| `createOrder`에서 유효성 검증만 수행 | 쿠폰 소비 없이 주문 생성이 실패해도 쿠폰 상태에 영향 없음 | 만료·중복 체크가 두 단계에 분산됨 (`startPayment`에서 재검증 불필요하나 혼동 가능) |
+| `OrderModel`에 금액 스냅샷 저장 | 주문 이력 조회 시 금액 재계산 불필요, 상품 가격 변경과 무관 | `OrderModel`이 쿠폰 할인 개념을 직접 가짐 |
+
+**결제 플로우 변경**
+
+```
+POST /orders              → 쿠폰 유효성 검증 + 할인 금액 계산 + OrderModel 저장 (쿠폰 AVAILABLE 유지)
+POST /orders/{id}/pay/start → 재고 reserve + couponIssue.use() [동일 트랜잭션]
+POST /orders/{id}/pay/confirm → 재고 confirm + OrderStatus.CONFIRMED
+```
+
+**도메인 간 의존 방향**
+- `order/application` → `coupon/domain` (`CouponRepository`, `CouponIssueRepository` 참조)
+- `coupon/domain`은 `order/domain`을 알지 못함

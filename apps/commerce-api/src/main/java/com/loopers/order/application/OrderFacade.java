@@ -1,5 +1,10 @@
 package com.loopers.order.application;
 
+import com.loopers.coupon.domain.CouponIssueModel;
+import com.loopers.coupon.domain.CouponIssueRepository;
+import com.loopers.coupon.domain.CouponModel;
+import com.loopers.coupon.domain.CouponRepository;
+import com.loopers.coupon.domain.CouponStatus;
 import com.loopers.order.domain.OrderItemModel;
 import com.loopers.order.domain.OrderModel;
 import com.loopers.order.domain.OrderRepository;
@@ -32,9 +37,16 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final StockService stockService;
+    private final CouponRepository couponRepository;
+    private final CouponIssueRepository couponIssueRepository;
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
+        return createOrder(userId, commands, null);
+    }
+
+    @Transactional
+    public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands, Long couponId) {
         if (commands == null || commands.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
         }
@@ -50,7 +62,29 @@ public class OrderFacade {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
         }
 
-        OrderModel order = orderService.createOrder(userId, products, quantities);
+        Long couponIssueId = null;
+        long discountAmount = 0L;
+
+        if (couponId != null) {
+            CouponModel coupon = couponRepository.findById(couponId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰이 존재하지 않습니다."));
+            if (coupon.isExpired()) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
+            }
+            CouponIssueModel couponIssue = couponIssueRepository.findByUserIdAndCouponId(userId, couponId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "보유하지 않은 쿠폰입니다."));
+            if (couponIssue.getStatus() != CouponStatus.AVAILABLE) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "사용 불가능한 쿠폰입니다.");
+            }
+
+            long originalAmount = products.stream()
+                .mapToLong(p -> p.getPrice() * quantities.getOrDefault(p.getId(), 0))
+                .sum();
+            discountAmount = coupon.calculateDiscount(originalAmount);
+            couponIssueId = couponIssue.getId();
+        }
+
+        OrderModel order = orderService.createOrder(userId, products, quantities, couponIssueId, discountAmount);
         return OrderInfo.from(orderRepository.save(order));
     }
 
@@ -77,6 +111,13 @@ public class OrderFacade {
 
         stocks.forEach(stock -> stock.reserve(quantities.get(stock.getProductId())));
         stocks.forEach(stockRepository::save);
+
+        if (order.getCouponIssueId() != null) {
+            CouponIssueModel couponIssue = couponIssueRepository.findById(order.getCouponIssueId())
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 발급 정보가 존재하지 않습니다."));
+            couponIssue.use();
+            couponIssueRepository.save(couponIssue);
+        }
 
         return OrderInfo.from(order);
     }

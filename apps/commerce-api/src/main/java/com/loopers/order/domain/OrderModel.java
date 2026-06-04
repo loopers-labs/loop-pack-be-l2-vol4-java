@@ -18,6 +18,10 @@ import java.util.List;
 public class OrderModel extends BaseEntity {
 
     private Long userId;
+    private Long couponIssueId;
+    private Long originalAmount;
+    private Long discountAmount;
+    private Long finalAmount;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
@@ -30,16 +34,23 @@ public class OrderModel extends BaseEntity {
     protected OrderModel() {}
 
     public OrderModel(Long userId, List<OrderItemModel> items) {
+        this(userId, items, null, 0L);
+    }
+
+    public OrderModel(Long userId, List<OrderItemModel> items, Long couponIssueId, long discountAmount) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "userId는 비어있을 수 없습니다.");
         }
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
         }
-
         this.userId = userId;
         this.items = items;
         this.status = OrderStatus.PENDING_PAYMENT;
+        this.couponIssueId = couponIssueId;
+        this.originalAmount = items.stream().mapToLong(i -> i.getPrice() * i.getQuantity()).sum();
+        this.discountAmount = discountAmount;
+        this.finalAmount = this.originalAmount - discountAmount;
     }
 
     public void confirm() {
@@ -49,4 +60,8 @@ public class OrderModel extends BaseEntity {
     public Long getUserId() { return userId; }
     public OrderStatus getStatus() { return status; }
     public List<OrderItemModel> getItems() { return items; }
+    public Long getCouponIssueId() { return couponIssueId; }
+    public Long getOriginalAmount() { return originalAmount; }
+    public Long getDiscountAmount() { return discountAmount; }
+    public Long getFinalAmount() { return finalAmount; }
 }

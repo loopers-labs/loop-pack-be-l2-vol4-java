@@ -9,7 +9,11 @@ public class OrderV1Dto {
 
     public record OrderItemRequest(Long productId, Integer quantity) {}
 
-    public record CreateRequest(List<OrderItemRequest> items) {}
+    public record CreateRequest(List<OrderItemRequest> items, Long couponId) {
+        public CreateRequest(List<OrderItemRequest> items) {
+            this(items, null);
+        }
+    }
 
     public record OrderItemResponse(Long id, Long productId, String productName, Long price, Integer quantity) {
         public static OrderItemResponse from(OrderItemInfo info) {
@@ -23,12 +27,28 @@ public class OrderV1Dto {
         }
     }
 
-    public record OrderResponse(Long id, Long userId, String status, List<OrderItemResponse> items) {
+    public record OrderResponse(
+        Long id,
+        Long userId,
+        String status,
+        List<OrderItemResponse> items,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount
+    ) {
         public static OrderResponse from(OrderInfo info) {
             List<OrderItemResponse> items = info.items().stream()
                 .map(OrderItemResponse::from)
                 .toList();
-            return new OrderResponse(info.id(), info.userId(), info.status(), items);
+            return new OrderResponse(
+                info.id(),
+                info.userId(),
+                info.status(),
+                items,
+                info.originalAmount(),
+                info.discountAmount(),
+                info.finalAmount()
+            );
         }
     }
 }
