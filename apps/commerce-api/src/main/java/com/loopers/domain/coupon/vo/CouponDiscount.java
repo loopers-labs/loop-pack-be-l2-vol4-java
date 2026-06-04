@@ -23,4 +23,8 @@ public record CouponDiscount(CouponMoney orderAmount, CouponMoney discountAmount
     public static CouponDiscount of(CouponMoney orderAmount, CouponMoney discountAmount) {
         return new CouponDiscount(orderAmount, discountAmount, orderAmount.minus(discountAmount));
     }
+
+    public static CouponDiscount none(CouponMoney orderAmount) {
+        return of(orderAmount, CouponMoney.of(0L));
+    }
 }

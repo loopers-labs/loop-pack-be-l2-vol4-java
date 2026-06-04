@@ -10,18 +10,18 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class CouponDiscountPolicyFinder {
+public class CouponDiscountMethod {
 
     private final Map<CouponType, CouponDiscountPolicy> policies;
 
-    public CouponDiscountPolicyFinder(List<CouponDiscountPolicy> policies) {
+    public CouponDiscountMethod(List<CouponDiscountPolicy> policies) {
         this.policies = toPolicyMap(policies);
     }
 
-    public CouponDiscountPolicy find(CouponType type) {
+    public CouponDiscountPolicy match(CouponType type) {
         CouponDiscountPolicy policy = policies.get(type);
         if (policy == null) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "지원하지 않는 쿠폰 할인 정책입니다.");
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "지원하지 않는 쿠폰 할인 방식입니다.");
         }
         return policy;
     }
@@ -31,7 +31,7 @@ public class CouponDiscountPolicyFinder {
         for (CouponDiscountPolicy policy : policies) {
             CouponDiscountPolicy previous = policyMap.put(policy.type(), policy);
             if (previous != null) {
-                throw new CoreException(ErrorType.INTERNAL_ERROR, "중복된 쿠폰 할인 정책입니다.");
+                throw new CoreException(ErrorType.INTERNAL_ERROR, "중복된 쿠폰 할인 방식입니다.");
             }
         }
         return policyMap;

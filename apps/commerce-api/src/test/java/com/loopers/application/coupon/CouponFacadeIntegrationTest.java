@@ -3,8 +3,11 @@ package com.loopers.application.coupon;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponUseCommand;
 import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
+import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -32,9 +35,11 @@ class CouponFacadeIntegrationTest {
 
     private static final String COUPON_NAME = "1주년 쿠폰";
     private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
+    private static final ZonedDateTime USED_AT = ZonedDateTime.parse("2026-06-01T12:00:00+09:00");
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     private final CouponFacade couponFacade;
+    private final CouponService couponService;
     private final UserCouponListQuery userCouponListQuery;
     private final CouponTemplateRepository couponTemplateRepository;
     private final UserCouponJpaRepository userCouponJpaRepository;
@@ -43,12 +48,14 @@ class CouponFacadeIntegrationTest {
     @Autowired
     CouponFacadeIntegrationTest(
         CouponFacade couponFacade,
+        CouponService couponService,
         UserCouponListQuery userCouponListQuery,
         CouponTemplateRepository couponTemplateRepository,
         UserCouponJpaRepository userCouponJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.couponFacade = couponFacade;
+        this.couponService = couponService;
         this.userCouponListQuery = userCouponListQuery;
         this.couponTemplateRepository = couponTemplateRepository;
         this.userCouponJpaRepository = userCouponJpaRepository;
@@ -96,6 +103,38 @@ class CouponFacadeIntegrationTest {
             } finally {
                 executor.shutdownNow();
             }
+        }
+    }
+
+    @DisplayName("荑좏룿 ?ъ슜????")
+    @Nested
+    class UseCoupon {
+
+        @DisplayName("諛쒓툒 ?댄썑 荑좏룿 ?쒗뵆由우씠 ??젣?섎뜑?쇰룄, 諛쒓툒 ??議곌굔?쇰줈 ?좎씤 湲덉븸??怨꾩궛?쒕떎.")
+        @Test
+        void calculatesDiscountWithIssuedSnapshot_whenCouponTemplateIsDeletedAfterIssue() {
+            // arrange
+            Long userId = 1L;
+            CouponTemplate couponTemplate = createCouponTemplate();
+            IssuedCouponInfo issuedCoupon = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplate.getId()));
+            couponTemplate.delete();
+            couponTemplateRepository.save(couponTemplate);
+            CouponUseCommand command = CouponUseCommand.forOrder(
+                userId,
+                issuedCoupon.coupon().id(),
+                12_000L,
+                USED_AT
+            );
+
+            // act
+            CouponDiscount discount = couponService.applyToOrder(command);
+
+            // assert
+            assertAll(
+                () -> assertThat(discount.orderAmount().value()).isEqualTo(12_000L),
+                () -> assertThat(discount.discountAmount().value()).isEqualTo(2_000L),
+                () -> assertThat(discount.paymentAmount().value()).isEqualTo(10_000L)
+            );
         }
     }
 

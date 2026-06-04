@@ -10,7 +10,7 @@ public record IssuedCouponInfo(
 
     public static IssuedCouponInfo from(CouponIssueResult issueResult) {
         return new IssuedCouponInfo(
-            UserCouponInfo.from(issueResult.userCoupon(), issueResult.couponTemplate()),
+            UserCouponInfo.from(issueResult.userCoupon()),
             issueResult.status()
         );
     }

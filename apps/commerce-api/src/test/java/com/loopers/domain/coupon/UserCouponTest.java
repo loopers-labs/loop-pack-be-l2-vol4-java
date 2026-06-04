@@ -1,5 +1,6 @@
 package com.loopers.domain.coupon;
 
+import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -13,22 +14,31 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 class UserCouponTest {
 
+    private static final String COUPON_NAME = "1주년 쿠폰";
+    private static final Long COUPON_TEMPLATE_ID = 10L;
+    private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
     private static final ZonedDateTime USED_AT = ZonedDateTime.parse("2026-05-31T12:00:00+09:00");
+    private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
-    @DisplayName("사용자 ID와 쿠폰 템플릿 ID가 주어지면, 사용 가능한 유저 쿠폰을 발급한다.")
+    @DisplayName("사용자 ID와 쿠폰 템플릿이 주어지면, 발급 당시 쿠폰 조건을 스냅샷으로 가진 유저 쿠폰을 발급한다.")
     @Test
-    void issuesUserCoupon_whenUserIdAndCouponTemplateIdAreProvided() {
+    void issuesUserCouponWithSnapshot_whenUserIdAndCouponTemplateAreProvided() {
         // arrange
         Long userId = 1L;
-        Long couponTemplateId = 10L;
+        CouponTemplate couponTemplate = createCouponTemplate();
 
         // act
-        UserCoupon userCoupon = UserCoupon.issue(userId, couponTemplateId);
+        UserCoupon userCoupon = UserCoupon.issue(userId, COUPON_TEMPLATE_ID, couponTemplate);
 
         // assert
         assertAll(
             () -> assertThat(userCoupon.getUserId()).isEqualTo(userId),
-            () -> assertThat(userCoupon.getCouponTemplateId()).isEqualTo(couponTemplateId),
+            () -> assertThat(userCoupon.getCouponTemplateId()).isEqualTo(COUPON_TEMPLATE_ID),
+            () -> assertThat(userCoupon.getName()).isEqualTo(COUPON_NAME),
+            () -> assertThat(userCoupon.getType()).isEqualTo(CouponType.FIXED),
+            () -> assertThat(userCoupon.getDiscountValue().value()).isEqualTo(2_000L),
+            () -> assertThat(userCoupon.getMinimumOrderAmount().value()).isEqualTo(10_000L),
+            () -> assertThat(userCoupon.getExpiration().expiredAt()).isEqualTo(EXPIRED_AT),
             () -> assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE),
             () -> assertThat(userCoupon.getUsedAt()).isNull()
         );
@@ -39,7 +49,7 @@ class UserCouponTest {
     void marksUsed_whenAvailableCouponIsUsed() {
         // arrange
         Long userId = 1L;
-        UserCoupon userCoupon = UserCoupon.issue(userId, 10L);
+        UserCoupon userCoupon = issueCoupon(userId);
 
         // act
         userCoupon.use(userId, USED_AT);
@@ -56,7 +66,7 @@ class UserCouponTest {
     void throwsConflict_whenUsedCouponIsUsedAgain() {
         // arrange
         Long userId = 1L;
-        UserCoupon userCoupon = UserCoupon.issue(userId, 10L);
+        UserCoupon userCoupon = issueCoupon(userId);
         userCoupon.use(userId, USED_AT);
 
         // act & assert
@@ -74,7 +84,7 @@ class UserCouponTest {
     @Test
     void throwsForbidden_whenCouponBelongsToOtherUser() {
         // arrange
-        UserCoupon userCoupon = UserCoupon.issue(1L, 10L);
+        UserCoupon userCoupon = issueCoupon(1L);
         Long otherUserId = 2L;
 
         // act & assert
@@ -89,10 +99,10 @@ class UserCouponTest {
     void throwsBadRequest_whenUserIdIsNull() {
         // arrange
         Long userId = null;
-        Long couponTemplateId = 10L;
+        CouponTemplate couponTemplate = createCouponTemplate();
 
         // act & assert
-        assertThatThrownBy(() -> UserCoupon.issue(userId, couponTemplateId))
+        assertThatThrownBy(() -> UserCoupon.issue(userId, COUPON_TEMPLATE_ID, couponTemplate))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
@@ -104,9 +114,24 @@ class UserCouponTest {
         // arrange
         Long userId = 1L;
         Long couponTemplateId = null;
+        CouponTemplate couponTemplate = createCouponTemplate();
 
         // act & assert
-        assertThatThrownBy(() -> UserCoupon.issue(userId, couponTemplateId))
+        assertThatThrownBy(() -> UserCoupon.issue(userId, couponTemplateId, couponTemplate))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+    @DisplayName("쿠폰이 없으면, BAD_REQUEST 예외를 던진다.")
+    @Test
+    void throwsBadRequest_whenCouponTemplateIsNull() {
+        // arrange
+        Long userId = 1L;
+        CouponTemplate couponTemplate = null;
+
+        // act & assert
+        assertThatThrownBy(() -> UserCoupon.issue(userId, COUPON_TEMPLATE_ID, couponTemplate))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
@@ -117,7 +142,7 @@ class UserCouponTest {
     void throwsBadRequest_whenUsedAtIsNull() {
         // arrange
         Long userId = 1L;
-        UserCoupon userCoupon = UserCoupon.issue(userId, 10L);
+        UserCoupon userCoupon = issueCoupon(userId);
         ZonedDateTime usedAt = null;
 
         // act & assert
@@ -134,7 +159,7 @@ class UserCouponTest {
     @Test
     void expiresCoupon_whenCouponIsAvailable() {
         // arrange
-        UserCoupon userCoupon = UserCoupon.issue(1L, 10L);
+        UserCoupon userCoupon = issueCoupon(1L);
 
         // act
         userCoupon.expire();
@@ -148,7 +173,7 @@ class UserCouponTest {
     void throwsConflict_whenExpiredCouponIsUsed() {
         // arrange
         Long userId = 1L;
-        UserCoupon userCoupon = UserCoupon.issue(userId, 10L);
+        UserCoupon userCoupon = issueCoupon(userId);
         userCoupon.expire();
 
         // act & assert
@@ -156,5 +181,20 @@ class UserCouponTest {
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.CONFLICT);
+    }
+
+    private UserCoupon issueCoupon(Long userId) {
+        return UserCoupon.issue(userId, COUPON_TEMPLATE_ID, createCouponTemplate());
+    }
+
+    private CouponTemplate createCouponTemplate() {
+        return CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.FIXED,
+            2_000L,
+            10_000L,
+            EXPIRED_AT,
+            FIXED_POLICY
+        );
     }
 }

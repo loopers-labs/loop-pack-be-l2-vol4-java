@@ -4,7 +4,6 @@ import com.loopers.application.coupon.UserCouponDisplayStatus;
 import com.loopers.application.coupon.UserCouponInfo;
 import com.loopers.application.coupon.UserCouponListQuery;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.coupon.QCouponTemplate;
 import com.loopers.domain.coupon.QUserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
 import com.querydsl.core.types.Projections;
@@ -20,7 +19,6 @@ import java.util.List;
 public class UserCouponListQueryDsl implements UserCouponListQuery {
 
     private static final QUserCoupon userCoupon = QUserCoupon.userCoupon;
-    private static final QCouponTemplate couponTemplate = QCouponTemplate.couponTemplate;
 
     private final JPAQueryFactory queryFactory;
 
@@ -30,18 +28,17 @@ public class UserCouponListQueryDsl implements UserCouponListQuery {
             .select(Projections.constructor(
                 UserCouponRow.class,
                 userCoupon.id,
-                couponTemplate.id,
-                couponTemplate.name.value,
-                couponTemplate.type,
-                couponTemplate.discountValue.value,
-                couponTemplate.minimumOrderAmount.value,
-                couponTemplate.expiration.expiredAt,
+                userCoupon.couponTemplateId.value,
+                userCoupon.name.value,
+                userCoupon.type,
+                userCoupon.discountValue.value,
+                userCoupon.minimumOrderAmount.value,
+                userCoupon.expiration.expiredAt,
                 userCoupon.status,
                 userCoupon.createdAt,
                 userCoupon.usedAt
             ))
             .from(userCoupon)
-            .join(couponTemplate).on(couponTemplate.id.eq(userCoupon.couponTemplateId.value))
             .where(
                 userCoupon.deletedAt.isNull(),
                 userCoupon.owner.userId.eq(userId)

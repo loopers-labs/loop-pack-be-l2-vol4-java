@@ -11,38 +11,38 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CouponDiscountPolicyFinderTest {
+class CouponDiscountMethodTest {
 
-    @DisplayName("쿠폰 타입이 주어지면, 해당 타입의 할인 정책을 반환한다.")
+    @DisplayName("쿠폰 타입이 주어지면, 해당 타입의 할인 방식을 반환한다.")
     @Test
     void returnsPolicy_whenCouponTypeIsProvided() {
         // arrange
-        CouponDiscountPolicyFinder policyFinder = new CouponDiscountPolicyFinder(List.of(
+        CouponDiscountMethod discountMethod = new CouponDiscountMethod(List.of(
             new FixedCouponDiscountPolicy(),
             new RateCouponDiscountPolicy()
         ));
 
         // act
-        CouponDiscountPolicy policy = policyFinder.find(CouponType.FIXED);
+        CouponDiscountPolicy policy = discountMethod.match(CouponType.FIXED);
 
         // assert
         assertThat(policy).isInstanceOf(FixedCouponDiscountPolicy.class);
     }
 
-    @DisplayName("쿠폰 타입을 지원하는 할인 정책이 없으면, INTERNAL_ERROR 예외를 던진다.")
+    @DisplayName("쿠폰 타입을 지원하는 할인 방식이 없으면, INTERNAL_ERROR 예외를 던진다.")
     @Test
     void throwsInternalError_whenPolicyDoesNotExist() {
         // arrange
-        CouponDiscountPolicyFinder policyFinder = new CouponDiscountPolicyFinder(List.of(new FixedCouponDiscountPolicy()));
+        CouponDiscountMethod discountMethod = new CouponDiscountMethod(List.of(new FixedCouponDiscountPolicy()));
 
         // act & assert
-        assertThatThrownBy(() -> policyFinder.find(CouponType.RATE))
+        assertThatThrownBy(() -> discountMethod.match(CouponType.RATE))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.INTERNAL_ERROR);
     }
 
-    @DisplayName("같은 타입의 할인 정책이 중복되면, INTERNAL_ERROR 예외를 던진다.")
+    @DisplayName("같은 타입의 할인 방식이 중복되면, INTERNAL_ERROR 예외를 던진다.")
     @Test
     void throwsInternalError_whenPolicyIsDuplicated() {
         // arrange
@@ -52,7 +52,7 @@ class CouponDiscountPolicyFinderTest {
         );
 
         // act & assert
-        assertThatThrownBy(() -> new CouponDiscountPolicyFinder(policies))
+        assertThatThrownBy(() -> new CouponDiscountMethod(policies))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.INTERNAL_ERROR);

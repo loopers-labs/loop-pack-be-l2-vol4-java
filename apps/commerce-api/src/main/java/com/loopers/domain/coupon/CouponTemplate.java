@@ -89,7 +89,7 @@ public class CouponTemplate extends BaseEntity {
     }
 
     public UserCoupon issue(Long userId) {
-        return UserCoupon.issue(userId, getId());
+        return UserCoupon.issue(userId, getId(), this);
     }
 
     public String getName() {

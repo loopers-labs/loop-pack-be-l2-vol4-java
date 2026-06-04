@@ -1,6 +1,5 @@
 package com.loopers.application.coupon;
 
-import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
@@ -21,24 +20,23 @@ public record UserCouponInfo(
     ZonedDateTime usedAt
 ) {
 
-    // 방금 발급된 쿠폰은 만료될 수 없으므로 저장 상태가 곧 표시 상태다.
-    public static UserCouponInfo from(UserCoupon userCoupon, CouponTemplate couponTemplate) {
+    public static UserCouponInfo from(UserCoupon userCoupon) {
         return new UserCouponInfo(
             userCoupon.getId(),
-            couponTemplate.getId(),
-            couponTemplate.getName(),
-            couponTemplate.getType(),
-            couponTemplate.getDiscountValue().value(),
-            minimumOrderAmount(couponTemplate),
-            couponTemplate.getExpiration().expiredAt(),
+            userCoupon.getCouponTemplateId(),
+            userCoupon.getName(),
+            userCoupon.getType(),
+            userCoupon.getDiscountValue().value(),
+            minimumOrderAmount(userCoupon),
+            userCoupon.getExpiration().expiredAt(),
             userCoupon.getStatus(),
             userCoupon.getCreatedAt(),
             userCoupon.getUsedAt()
         );
     }
 
-    private static Long minimumOrderAmount(CouponTemplate couponTemplate) {
-        CouponMoney minimumOrderAmount = couponTemplate.getMinimumOrderAmount();
+    private static Long minimumOrderAmount(UserCoupon userCoupon) {
+        CouponMoney minimumOrderAmount = userCoupon.getMinimumOrderAmount();
         return minimumOrderAmount == null ? null : minimumOrderAmount.value();
     }
 }
