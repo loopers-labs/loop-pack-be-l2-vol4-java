@@ -9,7 +9,10 @@ import java.util.List;
 public record OrderInfo(
     Long id,
     Long userId,
+    Long appliedUserCouponId,
     long orderTotalPrice,
+    long discountAmount,
+    long paymentAmount,
     List<Item> items,
     ZonedDateTime createdAt,
     ZonedDateTime updatedAt
@@ -19,7 +22,10 @@ public record OrderInfo(
         return new OrderInfo(
             order.getId(),
             order.getUserId(),
+            order.getAppliedUserCouponId(),
             order.getOrderTotalPrice(),
+            order.getDiscountAmount(),
+            order.getPaymentAmount(),
             order.getItems().stream()
                 .map(Item::from)
                 .toList(),

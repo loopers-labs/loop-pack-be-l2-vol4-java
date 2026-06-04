@@ -2,6 +2,13 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.UserCouponStatus;
+import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.ProductStockService;
@@ -24,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -44,11 +52,16 @@ class OrderV1ApiE2ETest {
     private static final String OTHER_NAME = "정원이";
     private static final LocalDate OTHER_BIRTH_DATE = LocalDate.of(2004, 5, 25);
     private static final String OTHER_EMAIL = "jungwon@example.com";
+    private static final String COUPON_NAME = "1주년 정액 할인 쿠폰";
+    private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
+    private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
     private final ProductService productService;
     private final ProductStockService productStockService;
+    private final CouponTemplateRepository couponTemplateRepository;
+    private final UserCouponRepository userCouponRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -57,12 +70,16 @@ class OrderV1ApiE2ETest {
         BrandService brandService,
         ProductService productService,
         ProductStockService productStockService,
+        CouponTemplateRepository couponTemplateRepository,
+        UserCouponRepository userCouponRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
         this.productService = productService;
         this.productStockService = productStockService;
+        this.couponTemplateRepository = couponTemplateRepository;
+        this.userCouponRepository = userCouponRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -108,6 +125,38 @@ class OrderV1ApiE2ETest {
                     .containsExactly(3_100_000L, 1_900_000L),
                 () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(8),
                 () -> assertThat(productStockService.getProductStock(iphoneMax.getId()).getQuantity()).isEqualTo(4)
+            );
+        }
+
+        @DisplayName("인증 사용자와 사용 가능한 쿠폰이 주어지면 201 CREATED와 할인 금액이 반영된 주문 스냅샷을 반환한다.")
+        @Test
+        void returnsCreatedOrderWithDiscount_whenAuthenticatedUserAndCouponAreProvided() {
+            // arrange
+            Long userId = signUpUser();
+            Brand brand = createBrand();
+            Product iphone = createProduct(brand, "아이폰 16 Pro", "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰", 1_550_000L, 10);
+            CouponTemplate couponTemplate = createFixedCouponTemplate();
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
+                new OrderV1Dto.CreateOrderRequest.Item(iphone.getId(), 1)
+            ), userCoupon.getId());
+
+            // act
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = createOrder(request, authHeaders());
+
+            // assert
+            OrderV1Dto.OrderResponse data = response.getBody().data();
+            UserCoupon usedCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+                .orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(data.id()).isNotNull(),
+                () -> assertThat(data.appliedUserCouponId()).isEqualTo(userCoupon.getId()),
+                () -> assertThat(data.orderTotalPrice()).isEqualTo(1_550_000L),
+                () -> assertThat(data.discountAmount()).isEqualTo(2_000L),
+                () -> assertThat(data.paymentAmount()).isEqualTo(1_548_000L),
+                () -> assertThat(usedCoupon.getStatus()).isEqualTo(UserCouponStatus.USED),
+                () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(9)
             );
         }
 
@@ -314,8 +363,19 @@ class OrderV1ApiE2ETest {
         return product;
     }
 
-    private void signUpUser() {
-        signUpUser(
+    private CouponTemplate createFixedCouponTemplate() {
+        return couponTemplateRepository.save(CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.FIXED,
+            2_000L,
+            10_000L,
+            EXPIRED_AT,
+            FIXED_POLICY
+        ));
+    }
+
+    private Long signUpUser() {
+        return signUpUser(
             LOGIN_ID,
             PASSWORD,
             "김성호",
@@ -324,7 +384,7 @@ class OrderV1ApiE2ETest {
         );
     }
 
-    private void signUpUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+    private Long signUpUser(String loginId, String password, String name, LocalDate birthDate, String email) {
         UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
             loginId,
             password,
@@ -332,7 +392,14 @@ class OrderV1ApiE2ETest {
             birthDate,
             email
         );
-        testRestTemplate.postForEntity(ENDPOINT_USERS, request, ApiResponse.class);
+        ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
+        ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response = testRestTemplate.exchange(
+            ENDPOINT_USERS,
+            HttpMethod.POST,
+            new HttpEntity<>(request),
+            responseType
+        );
+        return response.getBody().data().id();
     }
 
     private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createOrder(

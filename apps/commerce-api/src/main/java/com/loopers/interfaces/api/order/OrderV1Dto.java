@@ -13,14 +13,20 @@ public class OrderV1Dto {
 
     public record CreateOrderRequest(
         @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.")
-        List<@NotNull(message = "주문 항목은 비어있을 수 없습니다.") @Valid Item> items
+        List<@NotNull(message = "주문 항목은 비어있을 수 없습니다.") @Valid Item> items,
+
+        Long couponId
     ) {
+
+        public CreateOrderRequest(List<Item> items) {
+            this(items, null);
+        }
 
         public CreateOrderCommand toCommand(Long userId) {
             List<CreateOrderCommand.Item> commandItems = items.stream()
                 .map(item -> new CreateOrderCommand.Item(item.productId(), item.quantity()))
                 .toList();
-            return new CreateOrderCommand(userId, commandItems);
+            return new CreateOrderCommand(userId, commandItems, couponId);
         }
 
         public record Item(
@@ -37,7 +43,10 @@ public class OrderV1Dto {
     public record OrderResponse(
         Long id,
         Long userId,
+        Long appliedUserCouponId,
         long orderTotalPrice,
+        long discountAmount,
+        long paymentAmount,
         List<Item> items
     ) {
 
@@ -45,7 +54,10 @@ public class OrderV1Dto {
             return new OrderResponse(
                 info.id(),
                 info.userId(),
+                info.appliedUserCouponId(),
                 info.orderTotalPrice(),
+                info.discountAmount(),
+                info.paymentAmount(),
                 info.items().stream()
                     .map(Item::from)
                     .toList()

@@ -44,7 +44,7 @@ class OrderServiceIntegrationTest {
             Long userId = 1L;
             OrderItem iphone = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 2);
             OrderItem iphoneMax = OrderItem.create(1L, "애플", 2L, "아이폰 16 Pro Max", 1_900_000L, 1);
-            Order order = Order.create(userId, List.of(iphone, iphoneMax));
+            Order order = Order.create(userId, OrderItems.of(List.of(iphone, iphoneMax)));
 
             // act
             Order saved = orderService.saveOrder(order);

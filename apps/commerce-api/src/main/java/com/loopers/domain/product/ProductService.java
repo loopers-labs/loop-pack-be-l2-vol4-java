@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -41,6 +42,15 @@ public class ProductService {
             return List.of();
         }
         return productRepository.findActiveAllByIds(productIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> getAllByIds(Collection<Long> productIds) {
+        List<Product> products = getProducts(productIds);
+        if (products.size() != Set.copyOf(productIds).size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다.");
+        }
+        return products;
     }
 
     @Transactional(readOnly = true)

@@ -2,6 +2,13 @@ package com.loopers.application.order;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.UserCouponStatus;
+import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.ProductStockService;
@@ -16,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -30,10 +38,16 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBootTest
 class OrderFacadeIntegrationTest {
 
+    private static final String COUPON_NAME = "1주년 정액 할인 쿠폰";
+    private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
+    private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
+
     private final OrderFacade orderFacade;
     private final BrandService brandService;
     private final ProductService productService;
     private final ProductStockService productStockService;
+    private final CouponTemplateRepository couponTemplateRepository;
+    private final UserCouponRepository userCouponRepository;
     private final OrderJpaRepository orderJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
@@ -43,6 +57,8 @@ class OrderFacadeIntegrationTest {
         BrandService brandService,
         ProductService productService,
         ProductStockService productStockService,
+        CouponTemplateRepository couponTemplateRepository,
+        UserCouponRepository userCouponRepository,
         OrderJpaRepository orderJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
@@ -50,6 +66,8 @@ class OrderFacadeIntegrationTest {
         this.brandService = brandService;
         this.productService = productService;
         this.productStockService = productStockService;
+        this.couponTemplateRepository = couponTemplateRepository;
+        this.userCouponRepository = userCouponRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
@@ -151,6 +169,128 @@ class OrderFacadeIntegrationTest {
                 () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(8),
                 () -> assertThat(productStockService.getProductStock(iphoneMax.getId()).getQuantity()).isEqualTo(4)
             );
+        }
+
+        @DisplayName("사용 가능한 쿠폰이 주어지면, 주문 금액을 할인하고 쿠폰을 사용 완료로 변경한다.")
+        @Test
+        void createsOrderWithDiscountAndUsesCoupon_whenAvailableCouponIsProvided() {
+            // arrange
+            Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
+            CouponTemplate couponTemplate = createFixedCouponTemplate();
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ), userCoupon.getId());
+
+            // act
+            OrderInfo result = orderFacade.createOrder(command);
+
+            // assert
+            UserCoupon usedCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+                .orElseThrow();
+            assertAll(
+                () -> assertThat(result.id()).isNotNull(),
+                () -> assertThat(result.appliedUserCouponId()).isEqualTo(userCoupon.getId()),
+                () -> assertThat(result.orderTotalPrice()).isEqualTo(1_550_000L),
+                () -> assertThat(result.discountAmount()).isEqualTo(2_000L),
+                () -> assertThat(result.paymentAmount()).isEqualTo(1_548_000L),
+                () -> assertThat(usedCoupon.getStatus()).isEqualTo(UserCouponStatus.USED),
+                () -> assertThat(usedCoupon.getUsedAt()).isNotNull(),
+                () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(9)
+            );
+        }
+
+        @DisplayName("이미 사용된 쿠폰이 주어지면, 주문 생성을 실패하고 재고를 차감하지 않는다.")
+        @Test
+        void throwsConflictAndKeepsStock_whenCouponIsAlreadyUsed() {
+            // arrange
+            Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 10);
+            CouponTemplate couponTemplate = createFixedCouponTemplate();
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            userCoupon.use(userId, ZonedDateTime.parse("2026-06-01T12:00:00+09:00"));
+            userCouponRepository.save(userCoupon);
+            CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ), userCoupon.getId());
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(command))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("동일한 쿠폰으로 동시에 주문하면, 하나의 주문만 성공하고 쿠폰은 한 번만 사용된다.")
+        @Test
+        void createsOnlyOneOrder_whenSameCouponIsUsedConcurrently() throws Exception {
+            // arrange
+            Long userId = 1L;
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product iphone = productService.createProduct(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L
+            );
+            productStockService.createProductStock(iphone.getId(), 2);
+            CouponTemplate couponTemplate = createFixedCouponTemplate();
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            CreateOrderCommand firstCommand = new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ), userCoupon.getId());
+            CreateOrderCommand secondCommand = new CreateOrderCommand(userId, List.of(
+                new CreateOrderCommand.Item(iphone.getId(), 1)
+            ), userCoupon.getId());
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+
+            try {
+                Future<OrderAttempt> first = executor.submit(() -> createOrderAfter(start, firstCommand));
+                Future<OrderAttempt> second = executor.submit(() -> createOrderAfter(start, secondCommand));
+
+                // act
+                start.countDown();
+                List<OrderAttempt> attempts = List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)
+                );
+
+                // assert
+                UserCoupon usedCoupon = userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+                    .orElseThrow();
+                assertAll(
+                    () -> assertThat(attempts).filteredOn(OrderAttempt::succeeded).hasSize(1),
+                    () -> assertThat(attempts)
+                        .filteredOn(attempt -> !attempt.succeeded())
+                        .extracting(OrderAttempt::errorType)
+                        .containsExactly(ErrorType.CONFLICT),
+                    () -> assertThat(orderJpaRepository.count()).isEqualTo(1),
+                    () -> assertThat(productStockService.getProductStock(iphone.getId()).getQuantity()).isEqualTo(1),
+                    () -> assertThat(usedCoupon.getStatus()).isEqualTo(UserCouponStatus.USED)
+                );
+            } finally {
+                executor.shutdownNow();
+            }
         }
 
         @DisplayName("하나의 상품이라도 재고가 부족하면, 주문 생성을 실패하고 차감된 재고도 롤백한다.")
@@ -456,6 +596,17 @@ class OrderFacadeIntegrationTest {
         } catch (CoreException e) {
             return OrderAttempt.failureAttempt(e.getErrorType());
         }
+    }
+
+    private CouponTemplate createFixedCouponTemplate() {
+        return couponTemplateRepository.save(CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.FIXED,
+            2_000L,
+            10_000L,
+            EXPIRED_AT,
+            FIXED_POLICY
+        ));
     }
 
     private record OrderAttempt(boolean succeeded, ErrorType errorType) {

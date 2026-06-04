@@ -2,13 +2,17 @@ package com.loopers.application.order;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponUseCommand;
+import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderItems;
 import com.loopers.domain.order.OrderSearchPeriod;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.vo.OrderPayment;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
-import com.loopers.domain.stock.ProductStock;
 import com.loopers.domain.stock.ProductStockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -18,8 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collection;
-import java.util.HashSet;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -32,23 +35,25 @@ public class OrderFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final ProductStockService productStockService;
+    private final CouponService couponService;
     private final OrderService orderService;
 
     @Transactional
     public OrderInfo createOrder(CreateOrderCommand command) {
-        Map<Long, Product> products = getProducts(command.productIds());
-        Map<Long, Brand> brands = getBrands(products.values());
+        ZonedDateTime orderedAt = ZonedDateTime.now();
 
-        List<OrderItem> orderItems = command.items().stream()
-            .map(item -> createOrderItem(item, products, brands))
-            .toList();
+        OrderItems orderItems = createOrderItems(command);
+        CouponUseCommand couponUseCommand = command.couponUseCommand(orderItems.calculateTotalPrice(), orderedAt);
+        CouponDiscount discount = couponService.applyToOrder(couponUseCommand);
+        OrderPayment payment = OrderPayment.withDiscount(
+            discount.orderAmount().value(),
+            discount.discountAmount().value()
+        );
 
-        Order order = Order.create(command.userId(), orderItems);
-        Map<Long, ProductStock> productStocks = getProductStocksForUpdate(command.productIds());
-        deductStocks(command.items(), productStocks);
+        productStockService.deduct(command.stockDeductions());
 
-        Order savedOrder = orderService.saveOrder(order);
-        return OrderInfo.from(savedOrder);
+        Order order = Order.create(command.userId(), orderItems, command.userCouponId(), payment);
+        return OrderInfo.from(orderService.saveOrder(order));
     }
 
     @Transactional(readOnly = true)
@@ -70,59 +75,54 @@ public class OrderFacade {
         return OrderInfo.from(order);
     }
 
-    private Map<Long, Product> getProducts(List<Long> productIds) {
-        List<Product> products = productService.getProducts(productIds);
-        if (products.size() != new HashSet<>(productIds).size()) {
-            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다.");
-        }
+    private OrderItems createOrderItems(CreateOrderCommand command) {
+        List<Long> productIds = command.requestedProductIds();
+
+        List<Product> orderProducts = productService.getAllByIds(productIds);
+        Map<Long, Product> productsById = productsById(orderProducts);
+
+        List<Long> brandIds = brandIds(orderProducts);
+        List<Brand> orderBrands = brandService.getAllByIds(brandIds);
+        Map<Long, Brand> brandsById = brandsById(orderBrands);
+
+        List<OrderItem> orderItems = command.items().stream()
+            .map(item -> createOrderItem(item, productsById, brandsById))
+            .toList();
+
+        return OrderItems.of(orderItems);
+    }
+
+    private Map<Long, Product> productsById(List<Product> products) {
         return products.stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
-    private Map<Long, Brand> getBrands(Collection<Product> products) {
-        List<Long> brandIds = products.stream()
+    private List<Long> brandIds(List<Product> products) {
+        return products.stream()
             .map(Product::getBrandId)
             .distinct()
             .toList();
-        List<Brand> brands = brandService.getBrands(brandIds);
-        if (brands.size() != brandIds.size()) {
-            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드의 상품은 주문할 수 없습니다.");
-        }
+    }
+
+    private Map<Long, Brand> brandsById(List<Brand> brands) {
         return brands.stream()
             .collect(Collectors.toMap(Brand::getId, Function.identity()));
     }
 
-    private Map<Long, ProductStock> getProductStocksForUpdate(List<Long> productIds) {
-        List<ProductStock> productStocks = productStockService.getProductStocksForUpdate(productIds);
-        if (productStocks.size() != new HashSet<>(productIds).size()) {
-            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품 재고입니다.");
-        }
-        return productStocks.stream()
-            .collect(Collectors.toMap(ProductStock::getProductId, Function.identity()));
-    }
-
     private OrderItem createOrderItem(
-        CreateOrderCommand.Item item,
-        Map<Long, Product> products,
-        Map<Long, Brand> brands
+        CreateOrderCommand.Item requestedItem,
+        Map<Long, Product> productsById,
+        Map<Long, Brand> brandsById
     ) {
-        Product product = products.get(item.productId());
-        Brand brand = brands.get(product.getBrandId());
-
+        Product product = productsById.get(requestedItem.productId());
+        Brand brand = brandsById.get(product.getBrandId());
         return OrderItem.create(
             brand.getId(),
             brand.getName().value(),
             product.getId(),
             product.getName(),
             product.getPrice(),
-            item.quantity()
+            requestedItem.quantity()
         );
-    }
-
-    private void deductStocks(List<CreateOrderCommand.Item> items, Map<Long, ProductStock> productStocks) {
-        items.forEach(item -> {
-            ProductStock productStock = productStocks.get(item.productId());
-            productStock.deduct(item.quantity());
-        });
     }
 }

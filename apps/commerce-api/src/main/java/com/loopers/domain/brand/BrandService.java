@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -32,6 +33,15 @@ public class BrandService {
     @Transactional(readOnly = true)
     public List<Brand> getBrands(Collection<Long> brandIds) {
         return brandRepository.findActiveAllByIds(brandIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Brand> getAllByIds(Collection<Long> brandIds) {
+        List<Brand> brands = getBrands(brandIds);
+        if (brands.size() != Set.copyOf(brandIds).size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드입니다.");
+        }
+        return brands;
     }
 
     @Transactional(readOnly = true)
