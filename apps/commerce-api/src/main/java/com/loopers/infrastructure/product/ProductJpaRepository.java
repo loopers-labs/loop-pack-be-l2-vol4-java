@@ -12,11 +12,11 @@ import java.util.List;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
     void increaseLikeCount(@Param("id") Long id);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
     void decreaseLikeCount(@Param("id") Long id);
 
