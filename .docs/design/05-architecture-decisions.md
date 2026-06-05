@@ -851,3 +851,31 @@ CouponIssueJpaRepository.findByIdForUpdate  ← startPayment에서 사용하던 
 // 추가
 CouponIssueJpaRepository.findByUserIdAndCouponIdForUpdate  ← createOrder에서 사용할 락
 ```
+
+---
+
+## 결정 16. 3단계 결제 플로우 원자성 — 트레이드오프로 수용
+
+**결정**
+- `createOrder → startPayment → confirmPayment` 3단계 플로우 전체에 걸친 원자성은 보장하지 않는다.
+- 각 단계 내부의 원자성만 `@Transactional`로 보장한다.
+
+**배경**
+
+각 단계는 별개 트랜잭션이므로 단계 사이 서버 장애 시 부분 반영 상태가 남을 수 있다.
+
+```
+createOrder()    → 주문 생성, 쿠폰 USED  [트랜잭션 1]
+startPayment()   → 재고 reserve          [트랜잭션 2]
+confirmPayment() → 재고 confirm          [트랜잭션 3]
+```
+
+예: `startPayment()` 도중 서버가 죽으면 일부 재고는 reserve됐지만 나머지는 아닌 불일치 상태가 발생할 수 있다.
+
+**수용한 이유**
+
+이 플로우는 실제 PG사 연동을 고려한 설계다 (결정 12). 결제 요청 → PG 응답 대기 → 결제 완료 확인의 흐름에서 전 구간을 단일 트랜잭션으로 묶는 것은 현실적으로 불가능하다. 각 단계 내 원자성을 보장하는 것이 이 구조에서 달성 가능한 최선이다.
+
+**완전한 원자성이 필요하다면**
+
+PG 연동 없는 단순 구조라면 `createOrder()` 하나에 쿠폰 + 재고 + 주문 저장을 모두 묶을 수 있다. 현재 프로젝트에서는 3단계 플로우의 설계 의도를 유지하는 것을 우선으로 한다.
