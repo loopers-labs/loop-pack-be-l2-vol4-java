@@ -11,4 +11,5 @@ import java.util.List;
 public interface IssuedCouponJpaRepository extends JpaRepository<IssuedCoupon, Long> {
     List<IssuedCoupon> findAllByUserId(Long userId);
     Page<IssuedCoupon> findByCouponTemplateId(Long couponTemplateId, Pageable pageable);
+    boolean existsByCouponTemplateId(Long couponTemplateId);
 }

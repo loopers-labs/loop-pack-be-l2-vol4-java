@@ -29,6 +29,9 @@ import java.time.ZoneId;
 @RequiredArgsConstructor
 public class CouponAdminV1Controller implements CouponAdminV1ApiSpec {
 
+    /** 어드민이 입력한 만료일시(LocalDateTime)를 해석할 기준 타임존. 호스트 환경에 의존하지 않도록 명시한다. */
+    private static final ZoneId ADMIN_ZONE = ZoneId.of("Asia/Seoul");
+
     private final CouponAdminFacade couponAdminFacade;
 
     @GetMapping
@@ -48,7 +51,7 @@ public class CouponAdminV1Controller implements CouponAdminV1ApiSpec {
     public ApiResponse<CouponTemplateV1Response> create(@LdapAdmin AdminUser admin, @Valid @RequestBody CreateCouponTemplateV1Request request) {
         CouponTemplateInfo info = couponAdminFacade.create(
             request.name(), request.type(), request.value(), request.minOrderAmount(),
-            request.expiredAt().atZone(ZoneId.systemDefault())
+            request.expiredAt().atZone(ADMIN_ZONE)
         );
         return ApiResponse.success(CouponTemplateV1Response.from(info));
     }
@@ -58,7 +61,7 @@ public class CouponAdminV1Controller implements CouponAdminV1ApiSpec {
     public ApiResponse<CouponTemplateV1Response> update(@LdapAdmin AdminUser admin, @PathVariable Long couponId, @Valid @RequestBody UpdateCouponTemplateV1Request request) {
         CouponTemplateInfo info = couponAdminFacade.update(
             couponId, request.name(), request.type(), request.value(), request.minOrderAmount(),
-            request.expiredAt().atZone(ZoneId.systemDefault())
+            request.expiredAt().atZone(ADMIN_ZONE)
         );
         return ApiResponse.success(CouponTemplateV1Response.from(info));
     }

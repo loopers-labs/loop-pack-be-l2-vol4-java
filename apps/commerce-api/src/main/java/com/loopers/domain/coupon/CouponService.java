@@ -21,11 +21,14 @@ public class CouponService {
     private final CouponTemplateRepository couponTemplateRepository;
     private final IssuedCouponRepository issuedCouponRepository;
 
-    /** 쿠폰 발급. 한 유저가 같은 템플릿을 여러 장 발급받을 수 있다. */
+    /** 쿠폰 발급. 한 유저가 같은 템플릿을 여러 장 발급받을 수 있다. 이미 만료된 템플릿은 발급할 수 없다. */
     @Transactional
     public IssuedCoupon issue(Long userId, Long couponTemplateId) {
-        couponTemplateRepository.findById(couponTemplateId)
+        CouponTemplate template = couponTemplateRepository.findById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponTemplateId + "] 쿠폰을 찾을 수 없습니다."));
+        if (template.isExpired(ZonedDateTime.now())) {
+            throw new CoreException(ErrorType.CONFLICT, "만료된 쿠폰은 발급할 수 없습니다.");
+        }
         return issuedCouponRepository.save(new IssuedCoupon(userId, couponTemplateId));
     }
 

@@ -26,6 +26,7 @@ public class CouponFacade {
         Map<Long, CouponTemplate> templates = couponService.getTemplatesByIds(templateIds);
         ZonedDateTime now = ZonedDateTime.now();
         return issued.stream()
+            .filter(coupon -> templates.containsKey(coupon.getCouponTemplateId()))
             .map(coupon -> MyCouponInfo.from(coupon, templates.get(coupon.getCouponTemplateId()), now))
             .toList();
     }

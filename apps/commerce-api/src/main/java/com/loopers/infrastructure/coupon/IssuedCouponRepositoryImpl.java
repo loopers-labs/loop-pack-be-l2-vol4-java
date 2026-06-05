@@ -35,4 +35,9 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
     public Page<IssuedCoupon> findByCouponTemplateId(Long couponTemplateId, Pageable pageable) {
         return issuedCouponJpaRepository.findByCouponTemplateId(couponTemplateId, pageable);
     }
+
+    @Override
+    public boolean existsByCouponTemplateId(Long couponTemplateId) {
+        return issuedCouponJpaRepository.existsByCouponTemplateId(couponTemplateId);
+    }
 }

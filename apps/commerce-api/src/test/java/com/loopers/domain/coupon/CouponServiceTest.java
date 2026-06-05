@@ -73,6 +73,21 @@ class CouponServiceTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(issuedCouponRepository, never()).save(any(IssuedCoupon.class));
         }
+
+        @DisplayName("이미 만료된 템플릿으로 발급하면 CONFLICT 예외가 발생하고 저장하지 않는다")
+        @Test
+        void throwsConflict_whenTemplateExpired() {
+            // given
+            CouponTemplate expired = new CouponTemplate("만료쿠폰", CouponType.FIXED, 3_000L, null, ZonedDateTime.now().minusDays(1));
+            when(couponTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(expired));
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> couponService.issue(USER_ID, TEMPLATE_ID));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+            verify(issuedCouponRepository, never()).save(any(IssuedCoupon.class));
+        }
     }
 
     @DisplayName("쿠폰 사용 시")

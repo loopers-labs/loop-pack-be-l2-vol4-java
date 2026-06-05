@@ -46,6 +46,9 @@ public class CouponAdminService {
     @Transactional
     public void delete(Long id) {
         CouponTemplate template = getTemplate(id);
+        if (issuedCouponRepository.existsByCouponTemplateId(template.getId())) {
+            throw new CoreException(ErrorType.CONFLICT, "[id = " + id + "] 발급된 쿠폰이 있어 템플릿을 삭제할 수 없습니다.");
+        }
         couponTemplateRepository.deleteById(template.getId());
     }
 

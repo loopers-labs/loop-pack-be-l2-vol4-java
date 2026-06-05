@@ -11,4 +11,5 @@ public interface IssuedCouponRepository {
     Optional<IssuedCoupon> findById(Long id);
     List<IssuedCoupon> findAllByUserId(Long userId);
     Page<IssuedCoupon> findByCouponTemplateId(Long couponTemplateId, Pageable pageable);
+    boolean existsByCouponTemplateId(Long couponTemplateId);
 }

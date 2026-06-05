@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * CouponService 통합 — H2에서 발급 영속 상태와 1유저 1템플릿 제약을 검증한다.
+ * CouponService 통합 — H2에서 발급 영속 상태와 동일 템플릿 다중 발급 허용을 검증한다.
  * 단위(CouponServiceTest)는 분기, 통합은 실제 저장/조회를 본다.
  */
 @SpringBootTest
