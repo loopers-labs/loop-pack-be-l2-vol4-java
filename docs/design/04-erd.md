@@ -25,6 +25,7 @@ erDiagram
     bigint brand_id FK
     varchar name
     decimal price
+    int like_count
     timestamp created_at
     timestamp updated_at
     timestamp deleted_at
@@ -58,7 +59,6 @@ erDiagram
     varchar product_name
     int product_price
     int quantity
-    decimal subtotal_price
   }
 
   OUTBOX_EVENT {
