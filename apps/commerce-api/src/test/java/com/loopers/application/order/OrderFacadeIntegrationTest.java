@@ -240,5 +240,30 @@ class OrderFacadeIntegrationTest {
                 () -> assertThat(orderJpaRepository.count()).isEqualTo(1)
             );
         }
+
+        @DisplayName("한 주문에 쿠폰을 2장 이상 적용하면 BAD_REQUEST이고 아무것도 반영되지 않는다")
+        @Test
+        void throwsBadRequest_whenMoreThanOneCoupon() {
+            // given - 쿠폰 2장 발급
+            CouponTemplate template = couponTemplateRepository.save(
+                new CouponTemplate("3천원 할인", CouponType.FIXED, 3_000L, null, ZonedDateTime.now().plusDays(7)));
+            Long coupon1 = issuedCouponRepository.save(new IssuedCoupon(userId, template.getId())).getId();
+            Long coupon2 = issuedCouponRepository.save(new IssuedCoupon(userId, template.getId())).getId();
+
+            // when - 두 항목에 각각 쿠폰 적용
+            CoreException ex = assertThrows(CoreException.class, () ->
+                orderFacade.placeOrder(userId, List.of(
+                    new OrderLineCommand(product1Id, 1, coupon1),
+                    new OrderLineCommand(product2Id, 1, coupon2)
+                ))
+            );
+
+            // then - 검증에서 막혀 재고·주문 변경 없음
+            assertAll(
+                () -> assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(stockRepository.findByProductId(product1Id).orElseThrow().getQuantity()).isEqualTo(10)
+            );
+        }
     }
 }
