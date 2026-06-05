@@ -71,6 +71,10 @@ public class OrderFacade {
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
+        long couponCount = lines.stream().filter(line -> line.couponId() != null).count();
+        if (couponCount > 1) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰은 주문 1건당 1장만 적용할 수 있습니다.");
+        }
     }
 
     private Map<Long, ProductModel> loadProducts(List<OrderLineCommand> lines) {
