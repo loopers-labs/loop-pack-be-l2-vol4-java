@@ -107,6 +107,38 @@ class OrderFacadeIntegrationTest {
             // assert
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
+
+        // [fix] 재고 검증이 createOrder로 이동됨에 따라 테스트 위치 변경
+        @DisplayName("재고가 부족하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenStockIsInsufficient() {
+            // arrange
+            ProductModel product = savedProduct(1);
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)))
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        // [fix] 재고 검증이 createOrder로 이동됨에 따라 테스트 위치 변경
+        @DisplayName("재고 레코드가 없는 상품이 포함되면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenStockNotExists() {
+            // arrange
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+
+            // act
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)))
+            );
+
+            // assert
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
     }
 
     @DisplayName("쿠폰을 적용하여 주문을 생성할 때,")
@@ -247,22 +279,6 @@ class OrderFacadeIntegrationTest {
             );
         }
 
-        @DisplayName("재고가 부족하면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenStockIsInsufficient() {
-            // arrange
-            ProductModel product = savedProduct(1);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)));
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.startPayment(1L, order.id())
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
         @DisplayName("존재하지 않는 orderId이면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenOrderNotExists() {
@@ -310,21 +326,6 @@ class OrderFacadeIntegrationTest {
             assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
         }
 
-        @DisplayName("주문 품목 중 재고 레코드가 없는 상품이 있으면, NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenStockNotExists() {
-            // arrange
-            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
-
-            // act
-            CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.startPayment(1L, order.id())
-            );
-
-            // assert
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
     }
 
     @DisplayName("결제를 확정(confirmPayment)할 때,")

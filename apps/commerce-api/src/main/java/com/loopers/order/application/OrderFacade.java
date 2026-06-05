@@ -59,6 +59,17 @@ public class OrderFacade {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
         }
 
+        Map<Long, StockModel> stockMap = stockRepository.findAllByProductIds(productIds).stream()
+            .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
+        if (!stockMap.keySet().containsAll(quantities.keySet())) {
+            throw new CoreException(ErrorType.NOT_FOUND, "재고 정보가 없는 상품이 포함되어 있습니다.");
+        }
+        quantities.forEach((productId, qty) -> {
+            if (stockMap.get(productId).availableStock() < qty) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+            }
+        });
+
         Long couponIssueId = null;
         long discountAmount = 0L;
 

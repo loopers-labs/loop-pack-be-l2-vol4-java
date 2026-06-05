@@ -169,6 +169,7 @@ class OrderV1ApiE2ETest {
             assertThat(stock.getReservedStock()).isEqualTo(5);
         }
 
+        // [fix] 재고 검증이 createOrder로 이동됨에 따라 POST /orders 단계에서 400 검증으로 변경
         @DisplayName("재고가 부족하면, 400 Bad Request를 반환한다.")
         @Test
         void returnsBadRequest_whenStockIsInsufficient() {
@@ -178,13 +179,10 @@ class OrderV1ApiE2ETest {
                 List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 5))
             );
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
-            Long orderId = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(createRequest, authHeaders()), responseType
-            ).getBody().data().id();
 
             // act
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
-                testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/pay/start", HttpMethod.POST, new HttpEntity<>(authHeaders()), responseType);
+                testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(createRequest, authHeaders()), responseType);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
