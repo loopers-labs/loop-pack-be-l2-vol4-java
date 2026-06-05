@@ -11,6 +11,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.Getter;
 
+import java.time.ZonedDateTime;
+
 /** 유저에게 발급된 쿠폰. 한 유저가 같은 템플릿을 여러 장 발급받을 수 있다. CouponTemplate은 다른 애그리거트라 ID 참조한다. */
 @Getter
 @Entity
@@ -56,5 +58,13 @@ public class IssuedCoupon extends BaseEntity {
 
     public boolean isOwnedBy(Long userId) {
         return this.userId.equals(userId);
+    }
+
+    /** 목록 조회용 표시 상태. USED면 그대로, AVAILABLE이어도 템플릿이 만료됐으면 EXPIRED로 본다. */
+    public CouponStatus displayStatus(CouponTemplate template, ZonedDateTime at) {
+        if (this.status == CouponStatus.USED) {
+            return CouponStatus.USED;
+        }
+        return template.isExpired(at) ? CouponStatus.EXPIRED : CouponStatus.AVAILABLE;
     }
 }

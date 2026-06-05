@@ -42,6 +42,15 @@ public class CouponTemplate extends BaseEntity {
     protected CouponTemplate() {}
 
     public CouponTemplate(String name, CouponType type, long discountValue, Long minOrderAmount, ZonedDateTime expiredAt) {
+        apply(name, type, discountValue, minOrderAmount, expiredAt);
+    }
+
+    /** 템플릿 내용을 갱신한다(어드민 수정). 생성과 동일한 불변식을 적용한다. */
+    public void update(String name, CouponType type, long discountValue, Long minOrderAmount, ZonedDateTime expiredAt) {
+        apply(name, type, discountValue, minOrderAmount, expiredAt);
+    }
+
+    private void apply(String name, CouponType type, long discountValue, Long minOrderAmount, ZonedDateTime expiredAt) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰명은 비어있을 수 없습니다.");
         }

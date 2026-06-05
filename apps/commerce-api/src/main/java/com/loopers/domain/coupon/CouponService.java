@@ -8,6 +8,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -22,6 +27,18 @@ public class CouponService {
         couponTemplateRepository.findById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponTemplateId + "] 쿠폰을 찾을 수 없습니다."));
         return issuedCouponRepository.save(new IssuedCoupon(userId, couponTemplateId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<IssuedCoupon> getMyCoupons(Long userId) {
+        return issuedCouponRepository.findAllByUserId(userId);
+    }
+
+    /** 발급 쿠폰 목록의 표시 상태(만료 판정)를 위해 템플릿을 id로 묶어 조회한다. */
+    @Transactional(readOnly = true)
+    public Map<Long, CouponTemplate> getTemplatesByIds(Collection<Long> ids) {
+        return couponTemplateRepository.findAllByIds(ids).stream()
+            .collect(Collectors.toMap(CouponTemplate::getId, Function.identity()));
     }
 
     /**
