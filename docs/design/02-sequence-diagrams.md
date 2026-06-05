@@ -20,12 +20,12 @@ sequenceDiagram
   participant OC as OrderController
   participant OF as OrderFacade
   participant PS as ProductService
-  participant PAY as PaymentService
+  participant CS as CouponService
   participant OS as OrderService
   participant DB as DB
   participant Streamer as Streamer
 
-  User->>OC: 주문 요청
+  User->>OC: 주문 요청 (items, couponId?)
   OC->>OC: 유저 인증
 
   alt 인증 실패
@@ -41,30 +41,49 @@ sequenceDiagram
       OF-->>OC: 예외 발생
       OC-->>User: 404 Not Found
     else 상품 유효
-      Note over PS,DB: 트랜잭션 시작
+      Note over CS,DB: 트랜잭션 시작
+
+      opt couponId 제공됨
+        OF->>CS: 쿠폰 유효성 검증 및 사용 처리
+        CS->>DB: 쿠폰 조회 (소유자·상태·만료일 확인)
+
+        alt 쿠폰 없음
+          Note over CS,DB: 트랜잭션 롤백
+          OF-->>OC: 예외 발생
+          OC-->>User: 404 Not Found
+        else 소유자 불일치
+          Note over CS,DB: 트랜잭션 롤백
+          OF-->>OC: 예외 발생
+          OC-->>User: 403 Forbidden
+        else 사용 불가 (USED / EXPIRED / 최소금액 미충족)
+          Note over CS,DB: 트랜잭션 롤백
+          OF-->>OC: 예외 발생
+          OC-->>User: 409 Conflict
+        else 쿠폰 유효
+          CS->>DB: 쿠폰 상태 USED 로 변경
+          CS-->>OF: 할인 금액 반환
+        end
+      end
+
       OF->>PS: 재고 확인 및 차감 요청
-      PS->>DB: 재고 확인 (동시 접근 차단)
+      PS->>DB: 재고 확인 (SELECT FOR UPDATE — 동시 접근 차단)
       Note over DB: 동시 요청은 재고 확인 완료까지 대기
 
       alt 재고 부족
-        Note over PS,DB: 트랜잭션 롤백
+        Note over CS,DB: 트랜잭션 롤백
         OF-->>OC: 예외 발생
         OC-->>User: 409 Conflict (재고 부족)
       else 재고 충분
         PS->>DB: 재고 차감
         PS-->>OF: 차감 완료
 
-        OF->>PAY: 결제 요청 (포인트 차감)
-        PAY->>DB: 포인트 차감
-        PAY-->>OF: 결제 완료
-
-        OF->>OS: 주문 생성 요청
-        OS->>OS: 총 주문 금액 계산 (상품 가격 × 수량 합산)
-        OS->>DB: 주문 생성 (결제 대기 상태)
+        OF->>OS: 주문 생성 요청 (originalPrice, discountAmount, totalPrice)
+        OS->>OS: 금액 계산 (원래 금액 · 할인 금액 · 최종 금액)
+        OS->>DB: 주문 생성 (결제 대기 상태, 금액 스냅샷 포함)
         OS->>DB: 주문 상품 저장 (주문 시점 상품명·가격 스냅샷)
         OS->>DB: 외부 연동 이벤트 등록
         OS-->>OF: 생성된 주문 반환
-        Note over PS,DB: 트랜잭션 커밋
+        Note over CS,DB: 트랜잭션 커밋
 
         OF-->>OC: 주문 결과 반환
         OC-->>User: 201 Created (orderId)
@@ -80,7 +99,69 @@ sequenceDiagram
 
 ---
 
-## 2. 상품 좋아요 등록 / 취소 (LIKE-001, LIKE-002) — 멱등성 보장
+## 2. 쿠폰 발급 (COUPON-001)
+
+```mermaid
+sequenceDiagram
+  actor User as User
+  participant CC as CouponController
+  participant CS as CouponService
+  participant DB as DB
+
+  User->>CC: 쿠폰 발급 요청 (couponId)
+  CC->>CC: 유저 인증
+
+  alt 인증 실패
+    CC-->>User: 401 Unauthorized
+  else 인증 성공
+    CC->>CS: 쿠폰 발급 요청
+    CS->>DB: 쿠폰 존재 여부 확인
+
+    alt 쿠폰 없음 또는 삭제됨
+      CS-->>CC: 예외 발생
+      CC-->>User: 404 Not Found
+    else 쿠폰 유효
+      CS->>DB: 이미 발급 이력 확인 (user_id + coupon_id)
+
+      alt 이미 발급됨
+        CS-->>CC: 예외 발생
+        CC-->>User: 409 Conflict
+      else 발급 이력 없음
+        CS->>DB: IssuedCoupon 생성 (AVAILABLE)
+        CC-->>User: 201 Created
+      end
+    end
+  end
+```
+
+---
+
+## 3. 내 쿠폰 목록 조회 (COUPON-002)
+
+```mermaid
+sequenceDiagram
+  actor User as User
+  participant CC as CouponController
+  participant CS as CouponService
+  participant DB as DB
+
+  User->>CC: 내 쿠폰 목록 조회 요청
+  CC->>CC: 유저 인증
+
+  alt 인증 실패
+    CC-->>User: 401 Unauthorized
+  else 인증 성공
+    CC->>CS: 쿠폰 목록 조회 요청
+    CS->>DB: 유저의 IssuedCoupon 목록 조회
+    CS->>CS: expiredAt 기준으로 EXPIRED 상태 판별
+    CS-->>CC: 쿠폰 목록 반환 (AVAILABLE / USED / EXPIRED)
+    CC-->>User: 200 OK (쿠폰 목록)
+  end
+```
+
+---
+
+## 4. 상품 좋아요 등록 / 취소 (LIKE-001, LIKE-002) — 멱등성 보장
 
 ```mermaid
 sequenceDiagram
@@ -144,7 +225,7 @@ sequenceDiagram
 
 ---
 
-## 3. 상품 목록 조회 (PRODUCT-001) — 필터 / 정렬 / 페이지네이션
+## 5. 상품 목록 조회 (PRODUCT-001) — 필터 / 정렬 / 페이지네이션
 
 ```mermaid
 sequenceDiagram
@@ -178,7 +259,7 @@ sequenceDiagram
 
 ---
 
-## 4. 브랜드 삭제 (BRAND-ADMIN-005) — Soft Delete Cascade
+## 6. 브랜드 삭제 (BRAND-ADMIN-005) — Soft Delete Cascade
 
 ```mermaid
 sequenceDiagram
