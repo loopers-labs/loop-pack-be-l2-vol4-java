@@ -2,14 +2,21 @@ package com.loopers.domain.product;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @EqualsAndHashCode
-public final class Money {
+@Embeddable
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Money {
 
-    private final long amount;
+    @Column(name = "amount", nullable = false)
+    private long amount;
 
     private Money(long amount) {
         if (amount < 0) {

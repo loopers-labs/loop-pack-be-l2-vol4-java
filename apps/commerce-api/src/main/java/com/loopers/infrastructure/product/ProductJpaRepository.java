@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.product;
 
+import com.loopers.domain.product.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,19 +11,19 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Long> {
+public interface ProductJpaRepository extends JpaRepository<Product, Long> {
 
-    Optional<ProductJpaEntity> findByIdAndDeletedAtIsNull(Long id);
+    Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
-    List<ProductJpaEntity> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
+    List<Product> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
 
-    Page<ProductJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
+    Page<Product> findAllByDeletedAtIsNull(Pageable pageable);
 
-    Page<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
+    Page<Product> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-        UPDATE ProductJpaEntity p
+        UPDATE Product p
         SET p.deletedAt = CURRENT_TIMESTAMP,
             p.updatedAt = CURRENT_TIMESTAMP
         WHERE p.brandId = :brandId AND p.deletedAt IS NULL
@@ -31,21 +32,21 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Lo
 
     @Query("""
         SELECT p
-        FROM ProductJpaEntity p
-        LEFT JOIN LikeJpaEntity l ON l.productId = p.id
+        FROM Product p
+        LEFT JOIN ProductLike l ON l.productId = p.id
         WHERE p.deletedAt IS NULL
         GROUP BY p
         ORDER BY COUNT(l) DESC, p.id DESC
     """)
-    Page<ProductJpaEntity> findAllOrderByLikesDesc(Pageable pageable);
+    Page<Product> findAllOrderByLikesDesc(Pageable pageable);
 
     @Query("""
         SELECT p
-        FROM ProductJpaEntity p
-        LEFT JOIN LikeJpaEntity l ON l.productId = p.id
+        FROM Product p
+        LEFT JOIN ProductLike l ON l.productId = p.id
         WHERE p.deletedAt IS NULL AND p.brandId = :brandId
         GROUP BY p
         ORDER BY COUNT(l) DESC, p.id DESC
     """)
-    Page<ProductJpaEntity> findAllByBrandIdOrderByLikesDesc(Long brandId, Pageable pageable);
+    Page<Product> findAllByBrandIdOrderByLikesDesc(Long brandId, Pageable pageable);
 }

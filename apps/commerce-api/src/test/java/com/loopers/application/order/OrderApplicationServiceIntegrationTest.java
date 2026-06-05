@@ -1,10 +1,12 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.common.PageResult;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.infrastructure.brand.BrandJpaEntity;
+import com.loopers.domain.product.Money;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
-import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -45,7 +47,7 @@ class OrderApplicationServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        brandId = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개")).getId();
+        brandId = brandJpaRepository.save(Brand.create("브랜드A", "소개")).getId();
     }
 
     @AfterEach
@@ -54,7 +56,7 @@ class OrderApplicationServiceIntegrationTest {
     }
 
     private Long saveProduct(String name, long price, int stock) {
-        return productJpaRepository.save(ProductJpaEntity.of(brandId, name, price, stock)).getId();
+        return productJpaRepository.save(Product.create(brandId, name, Money.of(price), Stock.of(stock))).getId();
     }
 
     @DisplayName("place 는 ")
@@ -79,8 +81,8 @@ class OrderApplicationServiceIntegrationTest {
             assertThat(result.status()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.items()).hasSize(2);
 
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(8);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock()).isEqualTo(4);
+            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(8);
+            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock().getQuantity()).isEqualTo(4);
         }
 
         @DisplayName("존재하지 않는 상품이 포함되면 NOT_FOUND 를 던지고 재고는 변하지 않는다. (AC-07-1)")
@@ -95,7 +97,7 @@ class OrderApplicationServiceIntegrationTest {
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(10);
+            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
         }
 
         @DisplayName("재고가 하나라도 부족하면 BAD_REQUEST 를 던지고 모든 재고가 보존된다. (AC-07-3, AC-07-4)")
@@ -111,8 +113,8 @@ class OrderApplicationServiceIntegrationTest {
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(10);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock()).isEqualTo(1);
+            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock().getQuantity()).isEqualTo(1);
         }
 
         @DisplayName("주문 항목에는 주문 시점의 상품명·단가가 스냅샷으로 저장된다. (AC-07-5)")

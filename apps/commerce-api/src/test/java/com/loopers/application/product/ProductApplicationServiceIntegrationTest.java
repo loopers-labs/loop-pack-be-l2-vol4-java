@@ -1,11 +1,13 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.common.PageResult;
-import com.loopers.infrastructure.brand.BrandJpaEntity;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.like.Like;
+import com.loopers.domain.product.Money;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
-import com.loopers.infrastructure.like.LikeJpaEntity;
 import com.loopers.infrastructure.like.LikeJpaRepository;
-import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -44,8 +46,8 @@ class ProductApplicationServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        brandAId = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개A")).getId();
-        brandBId = brandJpaRepository.save(BrandJpaEntity.of("브랜드B", "소개B")).getId();
+        brandAId = brandJpaRepository.save(Brand.create("브랜드A", "소개A")).getId();
+        brandBId = brandJpaRepository.save(Brand.create("브랜드B", "소개B")).getId();
     }
 
     @AfterEach
@@ -88,10 +90,10 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("상품·브랜드·좋아요 수를 합성해 Detail 을 돌려준다. (AC-03-1)")
         @Test
         void returnsDetail_withBrandAndLikeCount() {
-            ProductJpaEntity p = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "상품1", 1_000L, 10));
-            likeJpaRepository.save(LikeJpaEntity.of(100L, p.getId()));
-            likeJpaRepository.save(LikeJpaEntity.of(101L, p.getId()));
+            Product p = productJpaRepository.save(
+                    Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(10)));
+            likeJpaRepository.save(Like.create(100L, p.getId()));
+            likeJpaRepository.save(Like.create(101L, p.getId()));
 
             ProductInfo.Detail result = productApplicationService.getProduct(p.getId());
 
@@ -105,8 +107,8 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("논리 삭제된 상품을 조회하면 NOT_FOUND. (AC-03-2)")
         @Test
         void throwsNotFound_whenDeleted() {
-            ProductJpaEntity p = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "상품1", 1_000L, 10));
+            Product p = productJpaRepository.save(
+                    Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(10)));
             productApplicationService.delete(p.getId());
 
             CoreException result = assertThrows(CoreException.class,
@@ -117,8 +119,8 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("재고 0 이면 soldOut=true.")
         @Test
         void returnsSoldOut_whenStockZero() {
-            ProductJpaEntity p = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "상품1", 1_000L, 0));
+            Product p = productJpaRepository.save(
+                    Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(0)));
 
             ProductInfo.Detail result = productApplicationService.getProduct(p.getId());
 
@@ -133,9 +135,9 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("LATEST 정렬은 최신 등록 순 (createdAt DESC, id DESC).")
         @Test
         void sortsByLatest() {
-            ProductJpaEntity p1 = productJpaRepository.save(ProductJpaEntity.of(brandAId, "상품1", 1_000L, 10));
-            ProductJpaEntity p2 = productJpaRepository.save(ProductJpaEntity.of(brandAId, "상품2", 2_000L, 10));
-            ProductJpaEntity p3 = productJpaRepository.save(ProductJpaEntity.of(brandAId, "상품3", 3_000L, 10));
+            Product p1 = productJpaRepository.save(Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(10)));
+            Product p2 = productJpaRepository.save(Product.create(brandAId, "상품2", Money.of(2_000L), Stock.of(10)));
+            Product p3 = productJpaRepository.save(Product.create(brandAId, "상품3", Money.of(3_000L), Stock.of(10)));
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
                     new ProductCriteria.GetAll(0, 20, null, "LATEST"));
@@ -147,9 +149,9 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("PRICE_ASC 정렬은 가격 오름차순.")
         @Test
         void sortsByPriceAsc() {
-            productJpaRepository.save(ProductJpaEntity.of(brandAId, "비싼것", 3_000L, 10));
-            productJpaRepository.save(ProductJpaEntity.of(brandAId, "싼것", 1_000L, 10));
-            productJpaRepository.save(ProductJpaEntity.of(brandAId, "중간", 2_000L, 10));
+            productJpaRepository.save(Product.create(brandAId, "비싼것", Money.of(3_000L), Stock.of(10)));
+            productJpaRepository.save(Product.create(brandAId, "싼것", Money.of(1_000L), Stock.of(10)));
+            productJpaRepository.save(Product.create(brandAId, "중간", Money.of(2_000L), Stock.of(10)));
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
                     new ProductCriteria.GetAll(0, 20, null, "PRICE_ASC"));
@@ -161,12 +163,12 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("LIKES_DESC 정렬은 좋아요 많은순.")
         @Test
         void sortsByLikesDesc() {
-            ProductJpaEntity less = productJpaRepository.save(ProductJpaEntity.of(brandAId, "덜인기", 1_000L, 10));
-            ProductJpaEntity more = productJpaRepository.save(ProductJpaEntity.of(brandAId, "인기", 1_000L, 10));
-            likeJpaRepository.save(LikeJpaEntity.of(100L, less.getId()));
-            likeJpaRepository.save(LikeJpaEntity.of(100L, more.getId()));
-            likeJpaRepository.save(LikeJpaEntity.of(101L, more.getId()));
-            likeJpaRepository.save(LikeJpaEntity.of(102L, more.getId()));
+            Product less = productJpaRepository.save(Product.create(brandAId, "덜인기", Money.of(1_000L), Stock.of(10)));
+            Product more = productJpaRepository.save(Product.create(brandAId, "인기", Money.of(1_000L), Stock.of(10)));
+            likeJpaRepository.save(Like.create(100L, less.getId()));
+            likeJpaRepository.save(Like.create(100L, more.getId()));
+            likeJpaRepository.save(Like.create(101L, more.getId()));
+            likeJpaRepository.save(Like.create(102L, more.getId()));
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
                     new ProductCriteria.GetAll(0, 20, null, "LIKES_DESC"));
@@ -178,9 +180,9 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("brandId 가 지정되면 해당 브랜드 상품만 반환한다. (AC-02-2)")
         @Test
         void filtersByBrand() {
-            productJpaRepository.save(ProductJpaEntity.of(brandAId, "A상품1", 1_000L, 10));
-            productJpaRepository.save(ProductJpaEntity.of(brandAId, "A상품2", 2_000L, 10));
-            productJpaRepository.save(ProductJpaEntity.of(brandBId, "B상품1", 1_000L, 10));
+            productJpaRepository.save(Product.create(brandAId, "A상품1", Money.of(1_000L), Stock.of(10)));
+            productJpaRepository.save(Product.create(brandAId, "A상품2", Money.of(2_000L), Stock.of(10)));
+            productJpaRepository.save(Product.create(brandBId, "B상품1", Money.of(1_000L), Stock.of(10)));
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
                     new ProductCriteria.GetAll(0, 20, brandAId, "LATEST"));
@@ -193,7 +195,7 @@ class ProductApplicationServiceIntegrationTest {
         @Test
         void paginates() {
             for (int i = 0; i < 5; i++) {
-                productJpaRepository.save(ProductJpaEntity.of(brandAId, "상품" + i, 1_000L + i, 10));
+                productJpaRepository.save(Product.create(brandAId, "상품" + i, Money.of(1_000L + i), Stock.of(10)));
             }
 
             PageResult<ProductInfo.ListItem> page0 = productApplicationService.getAllProducts(
@@ -207,8 +209,8 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("논리 삭제된 상품은 목록에서 제외된다. (AC-16-1)")
         @Test
         void excludesDeletedProducts() {
-            ProductJpaEntity p1 = productJpaRepository.save(ProductJpaEntity.of(brandAId, "활성", 1_000L, 10));
-            ProductJpaEntity p2 = productJpaRepository.save(ProductJpaEntity.of(brandAId, "삭제예정", 2_000L, 10));
+            Product p1 = productJpaRepository.save(Product.create(brandAId, "활성", Money.of(1_000L), Stock.of(10)));
+            Product p2 = productJpaRepository.save(Product.create(brandAId, "삭제예정", Money.of(2_000L), Stock.of(10)));
             productApplicationService.delete(p2.getId());
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
@@ -236,14 +238,14 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("이름과 가격을 갱신하지만 brandId 는 그대로 유지한다. (AC-15-2)")
         @Test
         void updatesNameAndPrice_keepsBrand() {
-            ProductJpaEntity saved = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "원본", 1_000L, 10));
+            Product saved = productJpaRepository.save(
+                    Product.create(brandAId, "원본", Money.of(1_000L), Stock.of(10)));
 
             productApplicationService.modify(new ProductCriteria.Modify(saved.getId(), "변경", 5_000L));
 
-            ProductJpaEntity reloaded = productJpaRepository.findById(saved.getId()).orElseThrow();
+            Product reloaded = productJpaRepository.findById(saved.getId()).orElseThrow();
             assertThat(reloaded.getName()).isEqualTo("변경");
-            assertThat(reloaded.getPrice()).isEqualTo(5_000L);
+            assertThat(reloaded.getPrice().getAmount()).isEqualTo(5_000L);
             assertThat(reloaded.getBrandId()).isEqualTo(brandAId);
         }
     }
@@ -255,12 +257,12 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("재고 수량을 지정 값으로 설정한다. (AC-15-4)")
         @Test
         void setsAbsoluteQuantity() {
-            ProductJpaEntity saved = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "상품1", 1_000L, 10));
+            Product saved = productJpaRepository.save(
+                    Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(10)));
 
             productApplicationService.adjustStock(new ProductCriteria.AdjustStock(saved.getId(), 3));
 
-            assertThat(productJpaRepository.findById(saved.getId()).orElseThrow().getStock()).isEqualTo(3);
+            assertThat(productJpaRepository.findById(saved.getId()).orElseThrow().getStock().getQuantity()).isEqualTo(3);
         }
     }
 
@@ -271,8 +273,8 @@ class ProductApplicationServiceIntegrationTest {
         @DisplayName("논리 삭제되어 deletedAt 이 채워진다.")
         @Test
         void softDeletes() {
-            ProductJpaEntity saved = productJpaRepository.save(
-                    ProductJpaEntity.of(brandAId, "상품1", 1_000L, 10));
+            Product saved = productJpaRepository.save(
+                    Product.create(brandAId, "상품1", Money.of(1_000L), Stock.of(10)));
 
             productApplicationService.delete(saved.getId());
 

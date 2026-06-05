@@ -1,39 +1,36 @@
 package com.loopers.domain.brand;
 
 
+import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
-public class Brand {
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "brands")
+public class Brand extends BaseEntity {
 
-    private final Long id;
-
+    @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "description")
     private String description;
 
-    private boolean deleted;
-
-
-    private Brand(Long id, String name, String description, boolean deleted) {
+    private Brand(String name, String description) {
         validateName(name);
-        this.id = id;
         this.name = name;
         this.description = description;
-        this.deleted = deleted;
     }
 
     public static Brand create(String name, String description) {
-        return new Brand(null, name, description, false);
-    }
-
-    public static Brand restore(Long id, String name, String description) {
-        if (id == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID가 비어있을 수 없습니다.");
-        }
-        return new Brand(id, name, description, false);
+        return new Brand(name, description);
     }
 
     public void modify(String name, String description) {
@@ -42,8 +39,8 @@ public class Brand {
         this.description = description;
     }
 
-    public void delete() {
-        this.deleted = true;
+    public boolean isDeleted() {
+        return getDeletedAt() != null;
     }
 
     private void validateName(String name) {

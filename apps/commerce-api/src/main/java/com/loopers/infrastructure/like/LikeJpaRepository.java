@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.like;
 
+import com.loopers.domain.like.Like;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 import java.util.List;
 
-public interface LikeJpaRepository extends JpaRepository<LikeJpaEntity, LikeJpaEntity.LikeId> {
+public interface LikeJpaRepository extends JpaRepository<Like, Like.LikeId> {
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
@@ -18,7 +19,7 @@ public interface LikeJpaRepository extends JpaRepository<LikeJpaEntity, LikeJpaE
 
     long countByProductId(Long productId);
 
-    Page<LikeJpaEntity> findAllByUserId(Long userId, Pageable pageable);
+    Page<Like> findAllByUserId(Long userId, Pageable pageable);
 
     @Modifying
     @Query(value = """
@@ -29,7 +30,7 @@ public interface LikeJpaRepository extends JpaRepository<LikeJpaEntity, LikeJpaE
 
     @Query("""
         SELECT l.productId AS productId, COUNT(l) AS count
-        FROM LikeJpaEntity l
+        FROM ProductLike l
         WHERE l.productId IN :productIds
         GROUP BY l.productId
     """)

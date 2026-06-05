@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +24,7 @@ class OrderTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 값이면 id 는 null, status 는 CREATED, totalAmount 는 항목 소계 합이다.")
+        @DisplayName("정상 값이면 id 는 미할당(0), status 는 CREATED, totalAmount 는 항목 소계 합이다.")
         @Test
         void createsCreatedOrder_whenValid() {
             // arrange
@@ -38,26 +37,13 @@ class OrderTest {
             Order order = Order.create(USER_ID, items);
 
             // assert
-            assertThat(order.getId()).isNull();
+            assertThat(order.getId()).isEqualTo(0L);
             assertThat(order.getUserId()).isEqualTo(USER_ID);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CREATED);
             assertThat(order.getTotalAmount().getAmount()).isEqualTo(3_500L);
             assertThat(order.getItems()).hasSize(2);
-            assertThat(order.getOrderedAt()).isNotNull();
-        }
-
-        @DisplayName("주문 시각 orderedAt 은 생성 시점으로 부여된다.")
-        @Test
-        void setsOrderedAt_atCreation() {
-            // arrange
-            LocalDateTime before = LocalDateTime.now().minusSeconds(1);
-            List<OrderItem> items = List.of(item(1L, 100L, 1));
-
-            // act
-            Order order = Order.create(USER_ID, items);
-
-            // assert
-            assertThat(order.getOrderedAt()).isAfter(before);
+            // orderedAt(=createdAt) 은 영속 시점에 부여되므로 영속 전(transient)에는 null 이다.
+            assertThat(order.getOrderedAt()).isNull();
         }
 
         @DisplayName("userId 가 null 이면 BAD_REQUEST 예외가 발생한다.")
@@ -82,42 +68,6 @@ class OrderTest {
         void throwsBadRequest_whenItemsIsEmpty() {
             CoreException result = assertThrows(CoreException.class,
                     () -> Order.create(USER_ID, List.of()));
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("Order 를 restore 로 복원할 때, ")
-    @Nested
-    class Restore {
-
-        @DisplayName("정상 값이면 모든 필드가 그대로 복원된다.")
-        @Test
-        void restoresOrder_whenValid() {
-            // arrange
-            List<OrderItem> items = List.of(item(1L, 1_000L, 2));
-            LocalDateTime orderedAt = LocalDateTime.of(2026, 5, 28, 12, 0);
-
-            // act
-            Order order = Order.restore(
-                    99L, USER_ID, items, Money.of(2_000L), OrderStatus.CREATED, orderedAt
-            );
-
-            // assert
-            assertThat(order.getId()).isEqualTo(99L);
-            assertThat(order.getUserId()).isEqualTo(USER_ID);
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.CREATED);
-            assertThat(order.getTotalAmount().getAmount()).isEqualTo(2_000L);
-            assertThat(order.getItems()).hasSize(1);
-            assertThat(order.getOrderedAt()).isEqualTo(orderedAt);
-        }
-
-        @DisplayName("id 가 null 이면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenIdIsNull() {
-            List<OrderItem> items = List.of(item(1L, 100L, 1));
-            CoreException result = assertThrows(CoreException.class,
-                    () -> Order.restore(null, USER_ID, items, Money.of(100L),
-                            OrderStatus.CREATED, LocalDateTime.now()));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }

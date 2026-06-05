@@ -3,15 +3,31 @@ package com.loopers.domain.order;
 import com.loopers.domain.product.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.Embedded;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
-public final class OrderItem {
+@Embeddable
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class OrderItem {
 
-    private final Long productId;
-    private final String productName;
-    private final Money unitPrice;
-    private final int quantity;
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "product_name", nullable = false, length = 200)
+    private String productName;
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "unit_price", nullable = false))
+    private Money unitPrice;
+
+    @Column(name = "quantity", nullable = false)
+    private int quantity;
 
     private OrderItem(Long productId, String productName, Money unitPrice, int quantity) {
         validateProductId(productId);

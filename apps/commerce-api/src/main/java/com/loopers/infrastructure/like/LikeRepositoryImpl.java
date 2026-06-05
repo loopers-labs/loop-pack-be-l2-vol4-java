@@ -10,7 +10,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -19,7 +18,6 @@ import java.util.stream.Collectors;
 public class LikeRepositoryImpl implements LikeRepository {
 
     private final LikeJpaRepository likeJpaRepository;
-    private final LikeMapper likeMapper;
 
     @Override
     public void save(Like like) {
@@ -57,13 +55,10 @@ public class LikeRepositoryImpl implements LikeRepository {
 
     @Override
     public PageResult<Like> findAllByUserId(Long userId, int page, int size) {
-        Page<LikeJpaEntity> result = likeJpaRepository.findAllByUserId(
+        Page<Like> result = likeJpaRepository.findAllByUserId(
                 userId,
                 PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt")))
         );
-        List<Like> content = result.getContent().stream()
-                .map(likeMapper::toDomain)
-                .toList();
-        return new PageResult<>(content, page, size, result.hasNext(), result.getTotalElements());
+        return new PageResult<>(result.getContent(), page, size, result.hasNext(), result.getTotalElements());
     }
 }

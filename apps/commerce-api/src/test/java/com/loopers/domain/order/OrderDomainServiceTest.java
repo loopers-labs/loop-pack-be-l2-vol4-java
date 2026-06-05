@@ -9,6 +9,7 @@ import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -19,8 +20,12 @@ class OrderDomainServiceTest {
 
     private final OrderDomainService orderDomainService = new OrderDomainService();
 
+    // 도메인 서비스는 Product.getId() 로 라인을 매칭하므로, 영속 없이도 식별자가 필요하다.
+    // 통합/영속 컨텍스트가 아닌 순수 단위 테스트라 id 를 reflection 으로 주입한다.
     private static Product product(long id, long price, int stock) {
-        return Product.restore(id, 1L, "상품" + id, Money.of(price), Stock.of(stock));
+        Product product = Product.create(1L, "상품" + id, Money.of(price), Stock.of(stock));
+        ReflectionTestUtils.setField(product, "id", id);
+        return product;
     }
 
     @DisplayName("OrderDomainService.create 가 ")

@@ -1,46 +1,50 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
-public class Product {
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "products")
+public class Product extends BaseEntity {
 
-    private final Long id;
+    @Column(name = "brand_id", nullable = false)
+    private Long brandId;
 
-    private final Long brandId;
-
+    @Column(name = "name", nullable = false)
     private String name;
 
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "price", nullable = false))
     private Money price;
 
+    @Embedded
+    @AttributeOverride(name = "quantity", column = @Column(name = "stock_quantity", nullable = false))
     private Stock stock;
 
-    private boolean deleted;
-
-    private Product(Long id, Long brandId, String name, Money price, Stock stock, boolean deleted) {
+    private Product(Long brandId, String name, Money price, Stock stock) {
         validateBrandId(brandId);
         validateName(name);
         validatePrice(price);
         validateStock(stock);
-        this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.price = price;
         this.stock = stock;
-        this.deleted = deleted;
     }
 
     public static Product create(Long brandId, String name, Money price, Stock stock) {
-        return new Product(null, brandId, name, price, stock, false);
-    }
-
-    public static Product restore(Long id, Long brandId, String name, Money price, Stock stock) {
-        if (id == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 비어있을 수 없습니다.");
-        }
-        return new Product(id, brandId, name, price, stock, false);
+        return new Product(brandId, name, price, stock);
     }
 
     public void modify(String name, Money price) {
@@ -66,8 +70,8 @@ public class Product {
         this.stock = this.stock.decrease(qty);
     }
 
-    public void delete() {
-        this.deleted = true;
+    public boolean isDeleted() {
+        return getDeletedAt() != null;
     }
 
     private void validateBrandId(Long brandId) {

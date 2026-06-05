@@ -23,14 +23,14 @@ class ProductTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 값이면 id 는 null, deleted 는 false 인 신규 Product 가 생성된다.")
+        @DisplayName("정상 값이면 id 는 미할당(0), deleted 는 false 인 신규 Product 가 생성된다.")
         @Test
         void createsNewProduct_whenValid() {
             // act
             Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
 
             // assert
-            assertThat(product.getId()).isNull();
+            assertThat(product.getId()).isEqualTo(0L);
             assertThat(product.getBrandId()).isEqualTo(BRAND_ID);
             assertThat(product.getName()).isEqualTo(NAME);
             assertThat(product.getPrice()).isEqualTo(PRICE);
@@ -85,33 +85,6 @@ class ProductTest {
         }
     }
 
-    @DisplayName("Product 를 restore 로 복원할 때, ")
-    @Nested
-    class Restore {
-
-        @DisplayName("정상 값이면 살아있는 상태(deleted=false)로 복원된다.")
-        @Test
-        void restoresProduct_whenValid() {
-            // act
-            Product product = Product.restore(7L, BRAND_ID, NAME, PRICE, STOCK);
-
-            // assert
-            assertThat(product.getId()).isEqualTo(7L);
-            assertThat(product.isDeleted()).isFalse();
-        }
-
-        @DisplayName("id 가 null 이면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenIdIsNull() {
-            // act
-            CoreException result = assertThrows(CoreException.class,
-                    () -> Product.restore(null, BRAND_ID, NAME, PRICE, STOCK));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
     @DisplayName("Product 를 modify 로 수정할 때, ")
     @Nested
     class Modify {
@@ -120,7 +93,7 @@ class ProductTest {
         @Test
         void modifiesNameAndPrice() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
             Money newPrice = Money.of(150_000L);
 
             // act
@@ -138,7 +111,7 @@ class ProductTest {
         @ValueSource(strings = {"", " "})
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -154,7 +127,7 @@ class ProductTest {
         @Test
         void throwsBadRequest_whenPriceIsNull() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -173,7 +146,7 @@ class ProductTest {
         @Test
         void hasEnoughStockDelegatesToStock() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, Stock.of(5));
+            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(5));
 
             // assert
             assertThat(product.hasEnoughStock(3)).isTrue();
@@ -185,7 +158,7 @@ class ProductTest {
         @Test
         void adjustStockSetsAbsoluteQuantity() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, Stock.of(5));
+            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(5));
 
             // act
             product.adjustStock(100);
@@ -198,7 +171,7 @@ class ProductTest {
         @Test
         void decreaseStockReducesQuantity() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, Stock.of(10));
+            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(10));
 
             // act
             product.decreaseStock(3);
@@ -211,7 +184,7 @@ class ProductTest {
         @Test
         void throwsBadRequest_whenDecreaseExceedsStock() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, Stock.of(2));
+            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(2));
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> product.decreaseStock(5));
@@ -229,7 +202,7 @@ class ProductTest {
         @Test
         void marksAsDeleted() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
 
             // act
             product.delete();
@@ -242,7 +215,7 @@ class ProductTest {
         @Test
         void isIdempotent_whenCalledTwice() {
             // arrange
-            Product product = Product.restore(1L, BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
             product.delete();
 
             // act
