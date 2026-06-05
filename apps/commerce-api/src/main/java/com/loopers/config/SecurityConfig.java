@@ -1,6 +1,7 @@
 package com.loopers.config;
 
-import com.loopers.application.user.UserService;
+import com.loopers.user.application.UserService;
+import com.loopers.support.auth.AdminAuthenticationFilter;
 import com.loopers.support.auth.HeaderAuthenticationFilter;
 import com.loopers.support.auth.UnauthorizedEntryPoint;
 import org.springframework.context.annotation.Bean;
@@ -40,10 +41,14 @@ public class SecurityConfig {
             .formLogin(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/password").authenticated()
+                .requestMatchers("/api/v1/likes/**").authenticated()
+                .requestMatchers("/api/v1/orders/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint))
+            .addFilterBefore(new AdminAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new HeaderAuthenticationFilter(userService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

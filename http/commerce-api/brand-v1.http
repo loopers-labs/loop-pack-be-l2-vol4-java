@@ -1,0 +1,67 @@
+### 브랜드 등록 - 정상
+POST {{commerce-api}}/api/v1/brands
+Content-Type: application/json
+
+{
+  "name": "루퍼스",
+  "description": "트렌디한 라이프스타일 브랜드"
+}
+
+### 브랜드 등록 - description 없이
+POST {{commerce-api}}/api/v1/brands
+Content-Type: application/json
+
+{
+  "name": "노디스크"
+}
+
+### 브랜드 등록 - 검증 실패 (이름 누락)
+POST {{commerce-api}}/api/v1/brands
+Content-Type: application/json
+
+{
+  "name": "  ",
+  "description": "잘못된 요청"
+}
+
+### 브랜드 단건 조회
+GET {{commerce-api}}/api/v1/brands/1
+
+### 브랜드 단건 조회 - 존재하지 않는 id (404)
+GET {{commerce-api}}/api/v1/brands/9999
+
+### 브랜드 목록 조회
+GET {{commerce-api}}/api/v1/brands
+
+### 브랜드 수정 - 정상
+PUT {{commerce-api}}/api/v1/brands/1
+Content-Type: application/json
+
+{
+  "name": "뉴루퍼스",
+  "description": "새 슬로건"
+}
+
+### 브랜드 수정 - 검증 실패 (이름 누락)
+PUT {{commerce-api}}/api/v1/brands/1
+Content-Type: application/json
+
+{
+  "name": "  ",
+  "description": "잘못된 요청"
+}
+
+### 브랜드 수정 - 존재하지 않는 id (404)
+PUT {{commerce-api}}/api/v1/brands/9999
+Content-Type: application/json
+
+{
+  "name": "뉴루퍼스",
+  "description": "새 슬로건"
+}
+
+### 브랜드 삭제
+DELETE {{commerce-api}}/api/v1/brands/1
+
+### 브랜드 삭제 - 존재하지 않는 id (404)
+DELETE {{commerce-api}}/api/v1/brands/9999

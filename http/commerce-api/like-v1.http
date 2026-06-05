@@ -1,0 +1,35 @@
+### 좋아요 등록 - 정상 (USER 인증 필요)
+POST {{commerce-api}}/api/v1/likes/products/1
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 좋아요 등록 - 멱등 (다시 호출해도 200)
+POST {{commerce-api}}/api/v1/likes/products/1
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 좋아요 등록 - 존재하지 않는 상품 (404)
+POST {{commerce-api}}/api/v1/likes/products/9999
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 좋아요 등록 - 인증 없음 (401)
+POST {{commerce-api}}/api/v1/likes/products/1
+
+### 좋아요 취소 - 정상
+DELETE {{commerce-api}}/api/v1/likes/products/1
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 좋아요 취소 - 이미 취소된 상태에서 호출 (멱등, 200)
+DELETE {{commerce-api}}/api/v1/likes/products/1
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 좋아요 목록 조회
+GET {{commerce-api}}/api/v1/likes/products
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 좋아요 목록 조회 - 인증 없음 (401)
+GET {{commerce-api}}/api/v1/likes/products
