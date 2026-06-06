@@ -59,6 +59,11 @@ public class ProductService {
     }
 
     @Transactional
+    public void suspendAllByBrandId(Long brandId) {
+        productRepository.suspendAllByBrandId(brandId);
+    }
+
+    @Transactional
     public ProductStockModel addStock(Long productId, Price price, Integer quantity) {
         ProductModel product = get(productId);
         return productStockRepository.save(new ProductStockModel(product, price, quantity));
