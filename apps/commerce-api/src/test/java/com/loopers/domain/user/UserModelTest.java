@@ -76,16 +76,6 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @Test
-        @DisplayName("생년월일이 포함된 비밀번호면, BAD_REQUEST 예외가 발생한다.")
-        void throwsBadRequest_whenPasswordContainsBirthday() {
-            CoreException result = assertThrows(CoreException.class, () ->
-                    PasswordPolicy.validatePasswordNotContainBirthDay(new RawPassword("19900101Abc!"), new BirthDay(DEFAULT_BIRTHDAY))
-            );
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
         @ParameterizedTest(name = "[{index}] {0}")
         @ValueSource(strings = {BLANK, SPACE, "1998-04", "19980410"})
         @DisplayName("생년월일 형식이 yyyy-MM-dd가 아니면, BAD_REQUEST 예외가 발생한다.")

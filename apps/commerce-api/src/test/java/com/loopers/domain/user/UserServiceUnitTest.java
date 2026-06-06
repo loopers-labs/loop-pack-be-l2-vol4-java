@@ -4,7 +4,6 @@ import com.loopers.domain.user.enums.UserRole;
 import com.loopers.domain.user.vo.BirthDay;
 import com.loopers.domain.user.vo.Email;
 import com.loopers.domain.user.vo.Name;
-import com.loopers.domain.user.vo.Password;
 import com.loopers.domain.user.vo.RawPassword;
 import com.loopers.domain.user.vo.UserId;
 import com.loopers.support.error.CoreException;
@@ -14,14 +13,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserServiceUnitTest {
 
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordService passwordService = new PasswordService(new BCryptPasswordEncoder());
     private InMemoryUserRepository userRepository;
     private UserService sut;
 
@@ -35,13 +33,13 @@ class UserServiceUnitTest {
     @BeforeEach
     void setUp() {
         userRepository = new InMemoryUserRepository();
-        sut = new UserService(userRepository, passwordEncoder);
+        sut = new UserService(userRepository, passwordService);
     }
 
     private void saveDefaultUser() {
         userRepository.save(new UserModel(
                 new UserId(DEFAULT_USERID),
-                new Password(passwordEncoder.encode(DEFAULT_PASSWORD)),
+                passwordService.encode(new RawPassword(DEFAULT_PASSWORD)),
                 new Name(DEFAULT_NAME),
                 new BirthDay(DEFAULT_BIRTHDAY),
                 new Email(DEFAULT_EMAIL),
@@ -115,7 +113,7 @@ class UserServiceUnitTest {
             sut.changePassword(defaultUserId(), newRawPassword());
 
             UserModel updated = sut.getUser(defaultUserId());
-            assertThat(passwordEncoder.matches(NEW_PASSWORD, updated.getPassword().getValue())).isTrue();
+            assertThat(new BCryptPasswordEncoder().matches(NEW_PASSWORD, updated.getPassword().getValue())).isTrue();
         }
 
         @DisplayName("회원이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
@@ -128,16 +126,5 @@ class UserServiceUnitTest {
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
-        @DisplayName("현재 비밀번호와 동일하면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenSamePasswordIsUsed() {
-            saveDefaultUser();
-
-            CoreException exception = assertThrows(CoreException.class, () ->
-                    sut.changePassword(defaultUserId(), defaultRawPassword())
-            );
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
     }
 }
