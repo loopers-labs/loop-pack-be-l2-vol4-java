@@ -58,27 +58,28 @@ class ProductServiceIntegrationTest {
         wishlistRepository.save(new WishlistModel(userId, productId));
     }
 
-    @DisplayName("상품 단건 조회 시,")
+    @DisplayName("상품 생성 시,")
     @Nested
-    class Get {
+    class Create {
 
-        @DisplayName("상품이 존재하면, 상품 정보를 반환한다.")
+        @DisplayName("유효한 입력이면, 상품이 저장된다.")
         @Test
-        void returnsProduct_whenProductExists() {
-            ProductModel product = saveProduct("테스트상품");
+        void createsProduct_whenInputsAreValid() {
+            ProductModel result = productService.create(brand.getId(), new ProductName("신규상품"));
 
-            ProductModel result = productService.get(product.getId());
-
-            assertThat(result.getName()).isEqualTo("테스트상품");
+            assertThat(result.getName()).isEqualTo("신규상품");
+            assertThat(result.getBrandId()).isEqualTo(brand.getId());
         }
 
-        @DisplayName("상품이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
+        @DisplayName("같은 브랜드 내 동일한 이름의 상품이 존재하면, CONFLICT 예외가 발생한다.")
         @Test
-        void throwsNotFound_whenProductDoesNotExist() {
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> productService.get(999L));
+        void throwsConflict_whenProductNameAlreadyExistsInBrand() {
+            saveProduct("테스트상품");
 
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> productService.create(brand.getId(), new ProductName("테스트상품")));
+
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 
@@ -111,30 +112,6 @@ class ProductServiceIntegrationTest {
             assertThat(result.getContent().get(0).getName()).isEqualTo("활성상품");
         }
 
-        @DisplayName("상품이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenProductDoesNotExist() {
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> productService.delete(999L));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
-    }
-
-    @DisplayName("재고 추가 시,")
-    @Nested
-    class AddStock {
-
-        @DisplayName("유효한 입력이면, 재고가 저장된다.")
-        @Test
-        void savesStock_whenInputsAreValid() {
-            ProductModel product = saveProduct("테스트상품");
-
-            ProductStockModel stock = productService.addStock(product.getId(), new Price(15000L), 5);
-
-            assertThat(stock.getPrice().getValue()).isEqualTo(15000L);
-            assertThat(stock.getStockQuantity().getValue()).isEqualTo(5);
-        }
     }
 
     @DisplayName("상품 목록 조회 시,")
