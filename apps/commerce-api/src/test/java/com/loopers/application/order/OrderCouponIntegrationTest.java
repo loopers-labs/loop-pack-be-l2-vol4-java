@@ -63,9 +63,13 @@ public class OrderCouponIntegrationTest {
     }
 
     private Long issueRateCoupon(int percent, Long minOrderAmount) {
+        return issueRateCouponTo(USER_ID, percent, minOrderAmount);
+    }
+
+    private Long issueRateCouponTo(Long userId, int percent, Long minOrderAmount) {
         CouponModel template = couponService.register("할인", CouponType.RATE, percent, minOrderAmount,
                 ZonedDateTime.now().plusDays(7));
-        userCouponService.issue(USER_ID, template.getId());
+        userCouponService.issue(userId, template.getId());
         return template.getId();
     }
 
@@ -109,6 +113,54 @@ public class OrderCouponIntegrationTest {
 
             Throwable thrown = catchThrowable(() -> orderFacade.placeOrder(USER_ID, PaymentMethod.CARD,
                     List.of(new OrderLine(productId, 2)), template.getId()));
+
+            assertAll(
+                    () -> assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND),
+                    () -> assertThat(stock()).isEqualTo(10)   // 차감 롤백
+            );
+        }
+
+        @DisplayName("이미 사용된 쿠폰으로 다시 주문하면 NOT_FOUND이고 재고가 원복된다")
+        @Test
+        void given_alreadyUsedCoupon_when_placeOrder_then_notFoundAndRolledBack() {
+            Long couponId = issueRateCoupon(10, null);
+            fakePaymentGateway.setForcedStatus(PgStatus.SUCCESS);
+            orderFacade.placeOrder(USER_ID, PaymentMethod.CARD, List.of(new OrderLine(productId, 2)), couponId);  // 1회 소진
+
+            Throwable thrown = catchThrowable(() -> orderFacade.placeOrder(USER_ID, PaymentMethod.CARD,
+                    List.of(new OrderLine(productId, 2)), couponId));
+
+            assertAll(
+                    () -> assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND),
+                    () -> assertThat(stock()).isEqualTo(8)   // 첫 주문 차감만 반영(10→8), 둘째 주문 차감은 롤백
+            );
+        }
+
+        @DisplayName("만료된 쿠폰으로 주문하면 BAD_REQUEST이고 재고가 원복된다")
+        @Test
+        void given_expiredCoupon_when_placeOrder_then_badRequestAndRolledBack() {
+            CouponModel template = couponService.register("할인", CouponType.RATE, 10L, null,
+                    ZonedDateTime.now().plusDays(7));
+            userCouponService.issue(USER_ID, template.getId());                       // 유효할 때 발급
+            couponService.update(template.getId(), "할인", 10L, null,
+                    ZonedDateTime.now().minusDays(1));                                // 이후 만료시킴
+
+            Throwable thrown = catchThrowable(() -> orderFacade.placeOrder(USER_ID, PaymentMethod.CARD,
+                    List.of(new OrderLine(productId, 2)), template.getId()));
+
+            assertAll(
+                    () -> assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                    () -> assertThat(stock()).isEqualTo(10)   // 차감 롤백
+            );
+        }
+
+        @DisplayName("타 유저 소유 쿠폰으로 주문하면 NOT_FOUND이고 재고가 원복된다")
+        @Test
+        void given_otherUsersCoupon_when_placeOrder_then_notFoundAndRolledBack() {
+            Long couponId = issueRateCouponTo(200L, 10, null);   // 다른 유저에게만 발급
+
+            Throwable thrown = catchThrowable(() -> orderFacade.placeOrder(USER_ID, PaymentMethod.CARD,
+                    List.of(new OrderLine(productId, 2)), couponId));
 
             assertAll(
                     () -> assertThat(((CoreException) thrown).getErrorType()).isEqualTo(ErrorType.NOT_FOUND),
