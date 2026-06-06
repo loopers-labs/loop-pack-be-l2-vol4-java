@@ -5,8 +5,6 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.enums.ProductStatus;
 import com.loopers.domain.product.vo.ProductName;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +18,6 @@ import org.springframework.data.domain.PageRequest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 class BrandServiceIntegrationTest {
@@ -54,17 +51,6 @@ class BrandServiceIntegrationTest {
             assertThat(result.getName()).isEqualTo(DEFAULT_NAME);
             assertThat(result.getStatus()).isEqualTo(BrandStatus.ACTIVE);
         }
-
-        @DisplayName("이미 존재하는 브랜드명이면, CONFLICT 예외가 발생한다.")
-        @Test
-        void throwsConflict_whenNameAlreadyExists() {
-            saveDefaultBrand();
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.create(DEFAULT_NAME));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-        }
     }
 
     @DisplayName("브랜드 조회 시,")
@@ -81,14 +67,6 @@ class BrandServiceIntegrationTest {
             assertThat(result.getName()).isEqualTo(DEFAULT_NAME);
         }
 
-        @DisplayName("브랜드가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenBrandDoesNotExist() {
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.get(999L));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
     }
 
     @DisplayName("브랜드 수정 시,")
@@ -103,17 +81,6 @@ class BrandServiceIntegrationTest {
             BrandModel result = brandService.update(saved.getId(), OTHER_NAME);
 
             assertThat(result.getName()).isEqualTo(OTHER_NAME);
-        }
-
-        @DisplayName("이미 존재하는 브랜드명이면, CONFLICT 예외가 발생한다.")
-        @Test
-        void throwsConflict_whenNameAlreadyExists() {
-            BrandModel saved = saveDefaultBrand();
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.update(saved.getId(), DEFAULT_NAME));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 
@@ -149,14 +116,6 @@ class BrandServiceIntegrationTest {
             assertThat(products).allMatch(p -> p.getStatus() == ProductStatus.INACTIVE);
         }
 
-        @DisplayName("브랜드가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenBrandDoesNotExist() {
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> brandService.delete(999L));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
     }
 
     @DisplayName("브랜드 목록 조회 시,")

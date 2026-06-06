@@ -1,28 +1,26 @@
 package com.loopers.domain.brand;
 
 import com.loopers.domain.brand.enums.BrandStatus;
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.product.enums.ProductSortType;
+import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
-import java.util.List;
-import java.util.Optional;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 
+@ExtendWith(MockitoExtension.class)
 class BrandServiceUnitTest {
 
     private InMemoryBrandRepository brandRepository;
-    private StubProductRepository productRepository;
+    @Mock private ProductService productService;
     private BrandService sut;
 
     private static final Long BRAND_ID = 0L; // BaseEntity.id 기본값
@@ -33,8 +31,7 @@ class BrandServiceUnitTest {
     @BeforeEach
     void setUp() {
         brandRepository = new InMemoryBrandRepository();
-        productRepository = new StubProductRepository();
-        sut = new BrandService(brandRepository, productRepository);
+        sut = new BrandService(brandRepository, productService);
     }
 
     private void saveDefaultBrand() {
@@ -144,10 +141,8 @@ class BrandServiceUnitTest {
         @Test
         void suspendsProducts_whenBrandIsDeleted() {
             saveDefaultBrand();
-
             sut.delete(BRAND_ID);
-
-            assertThat(productRepository.getLastSuspendedBrandId()).isEqualTo(BRAND_ID);
+            verify(productService).suspendAllByBrandId(BRAND_ID);
         }
 
         @DisplayName("브랜드가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
@@ -160,47 +155,4 @@ class BrandServiceUnitTest {
         }
     }
 
-    private static class StubProductRepository implements ProductRepository {
-
-        private Long lastSuspendedBrandId;
-
-        public Long getLastSuspendedBrandId() {
-            return lastSuspendedBrandId;
-        }
-
-        @Override
-        public void suspendAllByBrandId(Long brandId) {
-            this.lastSuspendedBrandId = brandId;
-        }
-
-        @Override
-        public ProductModel save(ProductModel product) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Optional<ProductModel> find(Long id) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<ProductModel> findAllByBrandId(Long brandId) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Page<ProductModel> findAll(Long brandId, ProductSortType sort, Pageable pageable) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Page<ProductModel> findAllForAdmin(Long brandId, Pageable pageable) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<ProductModel> findAllByIds(List<Long> ids) {
-            throw new UnsupportedOperationException();
-        }
-    }
 }
