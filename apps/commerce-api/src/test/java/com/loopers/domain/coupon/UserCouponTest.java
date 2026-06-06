@@ -119,7 +119,7 @@ class UserCouponTest {
             long orderAmount = 10_000L;
 
             // when
-            long discount = userCoupon.use(OWNER_ID, policy, orderAmount, NOW);
+            long discount = userCoupon.use(OWNER_ID, orderAmount, NOW);
 
             // then
             assertAll(
@@ -140,7 +140,7 @@ class UserCouponTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> userCoupon.use(otherUserId, policy, orderAmount, NOW));
+                () -> userCoupon.use(otherUserId, orderAmount, NOW));
 
             // then
             assertAll(
@@ -155,12 +155,12 @@ class UserCouponTest {
             // given
             CouponPolicy policy = availablePolicy();
             UserCoupon userCoupon = UserCoupon.issue(OWNER_ID, policy, NOW);
-            userCoupon.use(OWNER_ID, policy, 10_000L, NOW);
+            userCoupon.use(OWNER_ID, 10_000L, NOW);
             long orderAmount = 10_000L;
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> userCoupon.use(OWNER_ID, policy, orderAmount, NOW));
+                () -> userCoupon.use(OWNER_ID, orderAmount, NOW));
 
             // then
             assertAll(
@@ -180,7 +180,7 @@ class UserCouponTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> userCoupon.use(OWNER_ID, policy, orderAmount, afterExpiry));
+                () -> userCoupon.use(OWNER_ID, orderAmount, afterExpiry));
 
             // then
             assertAll(
@@ -199,7 +199,7 @@ class UserCouponTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                () -> userCoupon.use(OWNER_ID, policy, orderAmount, NOW));
+                () -> userCoupon.use(OWNER_ID, orderAmount, NOW));
 
             // then
             assertAll(

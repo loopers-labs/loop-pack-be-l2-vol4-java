@@ -58,14 +58,6 @@ public class CouponPolicy extends BaseEntity {
         return now.isAfter(expiredAt);
     }
 
-    public long discount(long orderAmount) {
-        return type.discount(orderAmount, value);
-    }
-
-    public boolean meetsMinOrderAmount(long orderAmount) {
-        return minOrderAmount == null || orderAmount >= minOrderAmount;
-    }
-
     public String getName() {
         return name;
     }

@@ -22,6 +22,19 @@ public class UserCoupon extends BaseEntity {
     private Long couponPolicyId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private CouponType type;
+
+    @Column(name = "discount_value", nullable = false)
+    private long discountValue;
+
+    @Column(name = "min_order_amount")
+    private Long minOrderAmount;
+
+    @Column(name = "expired_at", nullable = false)
+    private ZonedDateTime expiredAt;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private UserCouponStatus status;
 
@@ -30,9 +43,13 @@ public class UserCoupon extends BaseEntity {
 
     protected UserCoupon() {}
 
-    private UserCoupon(Long userId, Long couponPolicyId) {
+    private UserCoupon(Long userId, CouponPolicy policy) {
         this.userId = userId;
-        this.couponPolicyId = couponPolicyId;
+        this.couponPolicyId = policy.getId();
+        this.type = policy.getType();
+        this.discountValue = policy.getValue();
+        this.minOrderAmount = policy.getMinOrderAmount();
+        this.expiredAt = policy.getExpiredAt();
         this.status = UserCouponStatus.AVAILABLE;
     }
 
@@ -46,25 +63,33 @@ public class UserCoupon extends BaseEntity {
         if (policy.isExpired(now)) {
             throw new CoreException(ErrorType.COUPON_EXPIRED, "만료된 쿠폰은 발급할 수 없습니다.");
         }
-        return new UserCoupon(userId, policy.getId());
+        return new UserCoupon(userId, policy);
     }
 
-    public long use(Long requesterId, CouponPolicy policy, long orderAmount, ZonedDateTime now) {
+    public long use(Long requesterId, long orderAmount, ZonedDateTime now) {
         if (!this.userId.equals(requesterId)) {
             throw new CoreException(ErrorType.COUPON_NOT_OWNED, "쿠폰을 찾을 수 없습니다.");
         }
         if (this.status == UserCouponStatus.USED) {
             throw new CoreException(ErrorType.COUPON_ALREADY_USED, "이미 사용된 쿠폰입니다.");
         }
-        if (policy.isExpired(now)) {
+        if (isExpired(now)) {
             throw new CoreException(ErrorType.COUPON_EXPIRED, "만료된 쿠폰입니다.");
         }
-        if (!policy.meetsMinOrderAmount(orderAmount)) {
+        if (!meetsMinOrderAmount(orderAmount)) {
             throw new CoreException(ErrorType.COUPON_MIN_ORDER_AMOUNT_NOT_MET, "쿠폰 최소 주문 금액을 충족하지 못했습니다.");
         }
         this.status = UserCouponStatus.USED;
         this.usedAt = now;
-        return policy.discount(orderAmount);
+        return type.discount(orderAmount, discountValue);
+    }
+
+    private boolean isExpired(ZonedDateTime now) {
+        return now.isAfter(expiredAt);
+    }
+
+    private boolean meetsMinOrderAmount(long orderAmount) {
+        return minOrderAmount == null || orderAmount >= minOrderAmount;
     }
 
     public Long getUserId() {
