@@ -39,6 +39,17 @@ loopers-java-spring-template/
     └── monitoring              # Actuator + Prometheus 메트릭
 ```
 
+## 아키텍처, 패키지 구성 전략
+
+본 프로젝트는 **레이어드 아키텍처 + DIP(의존성 역전 원칙)** 를 채택한다.
+
+- **레이어드 아키텍처 + DIP**: 의존 방향은 `interfaces → application → domain` 뿐이며, `infrastructure` 는 `domain` 의 인터페이스를 구현해 역전시킨다. 도메인은 프레임워크의 존재를 모른다.
+- **4-layer × 도메인 패키징**: 최상위는 레이어 패키지, 그 하위에 도메인(`product/`, `user/` …) 을 둔다. 도메인이 늘면 같은 패턴을 반복한다.
+- **DTO 다층 분리**: API 의 요청·응답 DTO 와 응용 레이어의 DTO 는 분리해 작성한다.
+- **Application 경량 유지**: Facade 는 도메인 객체 조합과 변환에 집중한다. 비즈니스 규칙(불변식, 정책 분기, 상태 계산)은 도메인(`*Model` / `*Service`)에 둔다. Facade 가 두꺼워지면 도메인이 빈약(anemic)해지는 신호.
+- **애그리거트 간 협력은 Facade 가 조율**: 서로 다른 애그리거트를 엮는 유스케이스 시퀀스(사전조건 검증 → 주체 변경 → 결과적 협력 변경)는 Facade 가 조립하고 트랜잭션 외곽도 Facade 에 둔다. 도메인 Service 는 다른 도메인의 Service·Repository·Model 을 알지 않으며 자기 애그리거트 책임에만 집중한다.
+- **DIP 적용 범위는 Repository 만이 아니다**: 도메인이 의존하는 외부 효과는 모두 도메인 인터페이스로 정의하고 `infrastructure/` 에서 어댑터를 구현한다. 예: `PasswordEncoder` ↔ `BCryptPasswordEncoderAdapter`. 시계·외부 API·메시지 발행도 같은 패턴.
+
 ## commerce-api 아키텍처
 
 **Clean Architecture** 4-레이어 구조. 도메인 단위 패키지를 각 레이어 하위에 둠 (`product/`).
@@ -136,6 +147,25 @@ Response (ApiResponse<T>)
 
 - `.editorconfig` 기준: Java/Kotlin 파일 `max_line_length=130`, `*Test.java` 는 제한 없음, EOF 줄바꿈 강제.
 - Lombok 사용 허용.
+
+## 도메인 & 객체 설계 전략
+
+### 핵심 원칙
+
+1. **도메인 객체에 비즈니스 규칙을 캡슐화한다.**
+   불변식(invariant) 검증은 생성자·정적 팩토리·도메인 메서드 안에서 강제한다. setter 는 기본적으로 두지 않으며, 상태 변경은 의도가 드러나는 도메인 메서드(`user.changePassword(...)`) 로만 한다 — Tell, Don't Ask.
+
+2. **도메인 Service 는 "한 객체에 자연스럽게 속하지 않는 도메인 로직" 에만 쓴다.**
+   여러 애그리거트 협력, 외부 정책(`PasswordEncoder` 같은) 을 도메인 규칙과 엮는 흐름 등. 한 객체로 표현 가능한 규칙을 Service 메서드로 빼면 빈약 모델로 가는 첫 걸음이다. (Facade 의 역할은 `### 레이어별 책임` 표를 따른다.)
+
+3. **값에는 Value Object 를 부여한다.**
+   식별성이 아닌 값의 동등성으로 비교되는 개념(이메일, 금액, 식별번호 등) 은 원시 타입 대신 VO 로 모델링한다. **불변 + 자가 검증 + `equals`/`hashCode`**, 정적 팩토리(`of`, `encoded`) 로 생성하고 생성자는 비공개.
+
+4. **같은 규칙이 두 곳 이상에서 보이면 그 규칙의 집은 도메인이다.**
+   여러 Facade/Service 에 반복되는 검증·계산은 즉시 모델 또는 VO 메서드로 끌어올린다.
+
+5. **책임 위치가 모호하면 추측 금지, 합의 후 진행한다.**
+   "모델 / 도메인 서비스 / Facade 중 어디에 둘지" 가 모호하면 후보안과 근거를 짧게 제시하고 개발자 승인 후 진행한다. 새 도메인 개념은 이름(보편 언어, Ubiquitous Language) 부터 합의한다.
 
 ## 개발 규칙
 
