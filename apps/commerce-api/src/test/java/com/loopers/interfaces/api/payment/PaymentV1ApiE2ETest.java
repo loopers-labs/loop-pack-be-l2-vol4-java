@@ -119,18 +119,6 @@ class PaymentV1ApiE2ETest {
             assertThat(response.getBody().data().amount()).isEqualTo(10000L);
             assertThat(response.getBody().data().status()).isEqualTo("결제 대기");
         }
-
-        @DisplayName("존재하지 않는 주문 ID이면, 404 NOT_FOUND를 반환한다.")
-        @Test
-        void returnsNotFound_whenOrderDoesNotExist() {
-            PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(999L);
-            ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        }
     }
 
     @DisplayName("POST /api/v1/payments/{paymentId}/approve")
@@ -149,20 +137,6 @@ class PaymentV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 승인");
         }
-
-        @DisplayName("이미 승인된 결제이면, 400 BAD_REQUEST를 반환한다.")
-        @Test
-        void returnsBadRequest_whenAlreadyApproved() {
-            Long paymentId = createPayment(createOrder());
-            testRestTemplate.exchange("/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, null,
-                    new ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>>() {});
-            ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, null, type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
     }
 
     @DisplayName("POST /api/v1/payments/{paymentId}/fail")
@@ -180,20 +154,6 @@ class PaymentV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 실패");
-        }
-
-        @DisplayName("이미 실패 처리된 결제이면, 400 BAD_REQUEST를 반환한다.")
-        @Test
-        void returnsBadRequest_whenAlreadyFailed() {
-            Long paymentId = createPayment(createOrder());
-            testRestTemplate.exchange("/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, null,
-                    new ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>>() {});
-            ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, null, type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 }

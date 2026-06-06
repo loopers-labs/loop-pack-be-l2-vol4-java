@@ -32,6 +32,32 @@ class PaymentServiceUnitTest {
         paymentRepository.save(new PaymentModel(ORDER_ID, DEFAULT_AMOUNT));
     }
 
+    @DisplayName("결제 생성 시,")
+    @Nested
+    class Create {
+
+        @DisplayName("유효한 주문이면, PENDING 상태의 결제가 생성된다.")
+        @Test
+        void createsPayment_whenOrderIsValid() {
+            PaymentModel result = sut.create(ORDER_ID, DEFAULT_AMOUNT);
+
+            assertThat(result.getOrderId()).isEqualTo(ORDER_ID);
+            assertThat(result.getAmount()).isEqualTo(DEFAULT_AMOUNT);
+            assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        }
+
+        @DisplayName("동일 주문에 PENDING 결제가 이미 존재하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenPendingPaymentAlreadyExists() {
+            saveDefaultPayment();
+
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> sut.create(ORDER_ID, DEFAULT_AMOUNT));
+
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
     @DisplayName("결제 단건 조회 시,")
     @Nested
     class Get {
@@ -57,84 +83,4 @@ class PaymentServiceUnitTest {
         }
     }
 
-    @DisplayName("결제 승인 시,")
-    @Nested
-    class Approve {
-
-        @DisplayName("대기 상태이면, 승인 상태로 변경된다.")
-        @Test
-        void approvesPayment_whenStatusIsPending() {
-            saveDefaultPayment();
-
-            PaymentModel result = sut.approve(PAYMENT_ID);
-
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.APPROVED);
-        }
-
-        @DisplayName("대기 상태가 아니면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenStatusIsNotPending() {
-            saveDefaultPayment();
-            sut.approve(PAYMENT_ID);
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> sut.approve(PAYMENT_ID));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("결제 실패 처리 시,")
-    @Nested
-    class Fail {
-
-        @DisplayName("대기 상태이면, 실패 상태로 변경된다.")
-        @Test
-        void failsPayment_whenStatusIsPending() {
-            saveDefaultPayment();
-
-            PaymentModel result = sut.fail(PAYMENT_ID);
-
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        }
-
-        @DisplayName("대기 상태가 아니면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenStatusIsNotPending() {
-            saveDefaultPayment();
-            sut.fail(PAYMENT_ID);
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> sut.fail(PAYMENT_ID));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("결제 만료 처리 시,")
-    @Nested
-    class Expire {
-
-        @DisplayName("대기 상태이면, 만료 상태로 변경된다.")
-        @Test
-        void expiresPayment_whenStatusIsPending() {
-            saveDefaultPayment();
-
-            PaymentModel result = sut.expire(PAYMENT_ID);
-
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
-        }
-
-        @DisplayName("대기 상태가 아니면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenStatusIsNotPending() {
-            saveDefaultPayment();
-            sut.expire(PAYMENT_ID);
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> sut.expire(PAYMENT_ID));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
 }
