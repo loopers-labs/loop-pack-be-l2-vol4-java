@@ -37,12 +37,15 @@ public class ProductStockModel extends BaseEntity {
         this.stockQuantity = new StockQuantity(stockQuantity);
     }
 
-    public void increasePrice(long amount) {
-        this.price = this.price.increase(amount);
+    public void applyPriceTo(long targetPrice) {
+        long diff = targetPrice - this.price.getValue();
+        if (diff > 0) this.price = this.price.increase(diff);
+        else if (diff < 0) this.price = this.price.decrease(-diff);
     }
 
-    public void decreasePrice(long amount) {
-        this.price = this.price.decrease(amount);
+    public void applyQuantityDelta(int delta) {
+        if (delta > 0) this.stockQuantity = this.stockQuantity.increase(delta);
+        else if (delta < 0) this.stockQuantity = this.stockQuantity.decrease(-delta);
     }
 
     public void increase(int amount) {
@@ -52,6 +55,7 @@ public class ProductStockModel extends BaseEntity {
     public void decrease(int amount) {
         this.stockQuantity = this.stockQuantity.decrease(amount);
     }
+
 
     public ProductModel getProduct() { return product; }
 
