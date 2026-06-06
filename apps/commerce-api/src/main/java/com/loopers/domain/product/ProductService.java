@@ -1,7 +1,6 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.product.enums.ProductSortType;
-import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -18,10 +17,12 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final ProductStockRepository productStockRepository;
 
     @Transactional
     public ProductModel create(Long brandId, ProductName name) {
+        if (productRepository.existsByBrandIdAndName(brandId, name.getValue())) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 상품명입니다.");
+        }
         return productRepository.save(new ProductModel(brandId, name));
     }
 
@@ -63,9 +64,4 @@ public class ProductService {
         productRepository.suspendAllByBrandId(brandId);
     }
 
-    @Transactional
-    public ProductStockModel addStock(Long productId, Price price, Integer quantity) {
-        ProductModel product = get(productId);
-        return productStockRepository.save(new ProductStockModel(product, price, quantity));
-    }
 }

@@ -11,11 +11,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_product_brand_name", columnNames = {"brand_id", "name"})
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductModel extends BaseEntity {
 
@@ -41,10 +44,6 @@ public class ProductModel extends BaseEntity {
     public void update(ProductName name) {
         Guard.notNull(name, "상품명은 필수입니다.");
         this.name = name;
-    }
-
-    public void suspend() {
-        this.status = ProductStatus.INACTIVE;
     }
 
     @Override

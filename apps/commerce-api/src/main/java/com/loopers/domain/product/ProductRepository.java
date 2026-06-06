@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> find(Long id);
+    boolean existsByBrandIdAndName(Long brandId, String name);
     List<ProductModel> findAllByBrandId(Long brandId);
     void suspendAllByBrandId(Long brandId);
     Page<ProductModel> findAll(Long brandId, ProductSortType sort, Pageable pageable);

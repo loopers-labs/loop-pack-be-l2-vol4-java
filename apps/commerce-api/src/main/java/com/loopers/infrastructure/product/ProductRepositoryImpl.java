@@ -40,13 +40,18 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public boolean existsByBrandIdAndName(Long brandId, String name) {
+        return productJpaRepository.existsByBrandIdAndName(brandId, name);
+    }
+
+    @Override
     public List<ProductModel> findAllByBrandId(Long brandId) {
         return productJpaRepository.findAllByBrandId(brandId);
     }
 
     @Override
     public void suspendAllByBrandId(Long brandId) {
-        productJpaRepository.updateStatusByBrandId(brandId, ProductStatus.INACTIVE);
+        productJpaRepository.suspendAllByBrandId(brandId);
     }
 
     @Override

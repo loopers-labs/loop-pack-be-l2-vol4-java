@@ -20,6 +20,7 @@ public class ProductName {
     public ProductName(String value) {
         Guard.notBlank(value, "상품명은 비어있을 수 없습니다.");
         Guard.minLength(value, 2, "상품명은 2글자 이상이어야 합니다.");
+        Guard.maxLength(value, 200, "상품명은 200글자 이하이어야 합니다.");
         this.value = value;
     }
 }
