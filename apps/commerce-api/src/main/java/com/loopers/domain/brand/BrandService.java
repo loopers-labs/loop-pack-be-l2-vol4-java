@@ -9,12 +9,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class BrandService {
 
     private final BrandRepository brandRepository;
-    private final ProductService productService;
 
     @Transactional(readOnly = true)
     public Page<BrandModel> getList(Pageable pageable) {
@@ -25,6 +26,11 @@ public class BrandService {
     public BrandModel create(String name) {
         validateDuplicateName(name);
         return brandRepository.save(new BrandModel(name));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BrandModel> getByIds(List<Long> ids) {
+        return brandRepository.findAllByIds(ids);
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +56,6 @@ public class BrandService {
     @Transactional
     public void delete(Long id) {
         BrandModel brand = get(id);
-        productService.suspendAllByBrandId(id);
         brand.delete();
     }
 }
