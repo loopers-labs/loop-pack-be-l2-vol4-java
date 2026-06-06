@@ -5,6 +5,8 @@ import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.vo.ProductName;
+import com.loopers.domain.wishlist.WishlistModel;
+import com.loopers.domain.wishlist.WishlistRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -29,6 +31,7 @@ class ProductV1ApiE2ETest {
     @Autowired private TestRestTemplate testRestTemplate;
     @Autowired private BrandRepository brandRepository;
     @Autowired private ProductRepository productRepository;
+    @Autowired private WishlistRepository wishlistRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private BrandModel brand;
@@ -94,17 +97,21 @@ class ProductV1ApiE2ETest {
             assertThat(response.getBody().data().id()).isEqualTo(product.getId());
             assertThat(response.getBody().data().name()).isEqualTo("테스트상품");
             assertThat(response.getBody().data().brandName()).isEqualTo("테스트브랜드");
+            assertThat(response.getBody().data().likeCount()).isEqualTo(0L);
         }
 
-        @DisplayName("상품이 존재하지 않으면, 404 NOT_FOUND를 반환한다.")
+        @DisplayName("찜이 존재하면, likeCount가 정확히 반환된다.")
         @Test
-        void returnsNotFound_whenProductDoesNotExist() {
+        void returnsCorrectLikeCount_whenWishlistExists() {
+            wishlistRepository.save(new WishlistModel(1L, product.getId()));
+            wishlistRepository.save(new WishlistModel(2L, product.getId()));
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response =
-                    testRestTemplate.exchange("/api/v1/products/999", HttpMethod.GET, null, type);
+                    testRestTemplate.exchange("/api/v1/products/" + product.getId(), HttpMethod.GET, null, type);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().data().likeCount()).isEqualTo(2L);
         }
     }
 }
