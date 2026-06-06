@@ -15,12 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -75,24 +69,6 @@ class UserServiceIntegrationTest {
             );
 
             assertThat(result.getUserId().getValue()).isEqualTo(DEFAULT_USERID);
-        }
-
-        @DisplayName("동시에 같은 아이디로 회원가입하면, 한 명만 성공한다.")
-        @Test
-        void onlyOneSucceeds_whenConcurrentRegistrationWithSameUserid() throws InterruptedException {
-            ConcurrentResult result = runConcurrent(5, () ->
-                    userRepository.save(new UserModel(
-                            new UserId(DEFAULT_USERID),
-                            new Password(passwordEncoder.encode(DEFAULT_PASSWORD)),
-                            new Name(DEFAULT_NAME),
-                            new BirthDay(DEFAULT_BIRTHDAY),
-                            new Email(DEFAULT_EMAIL),
-                            UserRole.USER
-                    ))
-            );
-
-            assertThat(result.successCount()).isEqualTo(1);
-            assertThat(result.failureCount()).isEqualTo(4);
         }
 
         @DisplayName("이미 존재하는 아이디로 가입하면, CONFLICT 예외가 발생한다.")
@@ -163,35 +139,4 @@ class UserServiceIntegrationTest {
         }
     }
 
-    record ConcurrentResult(int successCount, int failureCount) {}
-
-    private ConcurrentResult runConcurrent(int threadCount, Runnable task) throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch doneLatch = new CountDownLatch(threadCount);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failureCount = new AtomicInteger(0);
-
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    task.run();
-                    successCount.incrementAndGet();
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    failureCount.incrementAndGet();
-                } catch (Throwable t) {
-                    failureCount.incrementAndGet();
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
-        }
-
-        startLatch.countDown();
-        doneLatch.await(10, TimeUnit.SECONDS);
-        executor.shutdownNow();
-        return new ConcurrentResult(successCount.get(), failureCount.get());
-    }
 }

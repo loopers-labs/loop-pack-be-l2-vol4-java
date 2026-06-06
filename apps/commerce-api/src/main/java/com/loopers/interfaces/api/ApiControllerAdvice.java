@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,8 +15,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import org.hibernate.exception.ConstraintViolationException;
 
 import java.util.Arrays;
 import java.util.regex.Matcher;
@@ -117,22 +114,6 @@ public class ApiControllerAdvice {
         } else {
             return failureResponse(ErrorType.BAD_REQUEST, null);
         }
-    }
-
-    @ExceptionHandler
-    public ResponseEntity<ApiResponse<?>> handleConflict(DataIntegrityViolationException e) {
-        Throwable cause = e.getCause();
-        while (cause != null && !(cause instanceof ConstraintViolationException)) {
-            cause = cause.getCause();
-        }
-
-        if (cause instanceof ConstraintViolationException constraintEx) {
-            String constraintName = constraintEx.getConstraintName();
-            if (constraintName != null && constraintName.toLowerCase().contains("uq_")) {
-                return failureResponse(ErrorType.CONFLICT, null);
-            }
-        }
-        return failureResponse(ErrorType.INTERNAL_ERROR, null);
     }
 
     @ExceptionHandler
