@@ -1,10 +1,6 @@
 package com.loopers.domain.brand;
 
 import com.loopers.domain.brand.enums.BrandStatus;
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.product.enums.ProductStatus;
-import com.loopers.domain.product.vo.ProductName;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,8 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -24,7 +18,6 @@ class BrandServiceIntegrationTest {
 
     @Autowired private BrandService brandService;
     @Autowired private BrandRepository brandRepository;
-    @Autowired private ProductRepository productRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private static final String DEFAULT_NAME = "나이키";
@@ -101,19 +94,6 @@ class BrandServiceIntegrationTest {
 
             Page<BrandModel> list = brandService.getList(PageRequest.of(0, 10));
             assertThat(list.getContent()).isEmpty();
-        }
-
-        @DisplayName("브랜드 삭제 시, 해당 브랜드의 상품이 판매 중단 처리된다.")
-        @Test
-        void suspendsProducts_whenBrandIsDeleted() {
-            BrandModel brand = saveDefaultBrand();
-            productRepository.save(new ProductModel(brand.getId(), new ProductName("상품A")));
-            productRepository.save(new ProductModel(brand.getId(), new ProductName("상품B")));
-
-            brandService.delete(brand.getId());
-
-            List<ProductModel> products = productRepository.findAllByBrandId(brand.getId());
-            assertThat(products).allMatch(p -> p.getStatus() == ProductStatus.INACTIVE);
         }
 
     }

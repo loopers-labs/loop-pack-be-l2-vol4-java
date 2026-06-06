@@ -1,26 +1,19 @@
 package com.loopers.domain.brand;
 
 import com.loopers.domain.brand.enums.BrandStatus;
-import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
 class BrandServiceUnitTest {
 
     private InMemoryBrandRepository brandRepository;
-    @Mock private ProductService productService;
     private BrandService sut;
 
     private static final Long BRAND_ID = 0L; // BaseEntity.id 기본값
@@ -31,7 +24,7 @@ class BrandServiceUnitTest {
     @BeforeEach
     void setUp() {
         brandRepository = new InMemoryBrandRepository();
-        sut = new BrandService(brandRepository, productService);
+        sut = new BrandService(brandRepository);
     }
 
     private void saveDefaultBrand() {
@@ -137,14 +130,6 @@ class BrandServiceUnitTest {
             assertThat(brand.getStatus()).isEqualTo(BrandStatus.INACTIVE);
         }
 
-        @DisplayName("브랜드 삭제 시, 해당 브랜드의 상품이 판매 중단 처리된다.")
-        @Test
-        void suspendsProducts_whenBrandIsDeleted() {
-            saveDefaultBrand();
-            sut.delete(BRAND_ID);
-            verify(productService).suspendAllByBrandId(BRAND_ID);
-        }
-
         @DisplayName("브랜드가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenBrandDoesNotExist() {
@@ -154,5 +139,4 @@ class BrandServiceUnitTest {
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
-
 }
