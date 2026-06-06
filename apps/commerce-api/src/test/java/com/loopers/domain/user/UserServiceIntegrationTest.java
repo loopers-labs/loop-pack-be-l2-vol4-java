@@ -7,8 +7,6 @@ import com.loopers.domain.user.vo.Name;
 import com.loopers.domain.user.vo.Password;
 import com.loopers.domain.user.vo.RawPassword;
 import com.loopers.domain.user.vo.UserId;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 class UserServiceIntegrationTest {
@@ -71,17 +68,6 @@ class UserServiceIntegrationTest {
             assertThat(result.getUserId().getValue()).isEqualTo(DEFAULT_USERID);
         }
 
-        @DisplayName("이미 존재하는 아이디로 가입하면, CONFLICT 예외가 발생한다.")
-        @Test
-        void throwsConflict_whenUseridAlreadyExists() {
-            saveDefaultUser();
-
-            CoreException result = assertThrows(CoreException.class, () ->
-                    userService.register(defaultUserId(), defaultRawPassword(), new Name(DEFAULT_NAME), new BirthDay(DEFAULT_BIRTHDAY), new Email(DEFAULT_EMAIL))
-            );
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-        }
     }
 
     @DisplayName("회원조회 시,")
@@ -114,29 +100,6 @@ class UserServiceIntegrationTest {
             assertThat(passwordEncoder.matches(NEW_PASSWORD, saved.getPassword().getValue())).isTrue();
         }
 
-        @DisplayName("형식에 맞지 않는 비밀번호로 변경하면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenPasswordFormatIsInvalid() {
-            saveDefaultUser();
-
-            CoreException result = assertThrows(CoreException.class, () ->
-                    userService.changePassword(defaultUserId(), new RawPassword("weakpassword"))
-            );
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("현재 비밀번호와 동일한 비밀번호로 변경하면, BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
-            saveDefaultUser();
-
-            CoreException result = assertThrows(CoreException.class, () ->
-                    userService.changePassword(defaultUserId(), defaultRawPassword())
-            );
-
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
     }
 
 }

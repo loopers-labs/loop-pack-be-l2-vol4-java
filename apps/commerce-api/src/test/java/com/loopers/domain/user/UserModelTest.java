@@ -13,9 +13,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -50,7 +53,7 @@ class UserModelTest {
     class Create {
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @ValueSource(strings = {BLANK, SPACE, "유저1", "user_1", "user-1", "user!1", "abcdefghijklmnopq"})
+        @MethodSource("invalidUserIds")
         @DisplayName("아이디가 영문/숫자 외 문자를 포함하거나 16자를 초과하면, BAD_REQUEST 예외가 발생한다.")
         void throwsBadRequest_whenUseridIsInvalid(String invalidUserId) {
             CoreException result = assertThrows(CoreException.class, () -> new UserId(invalidUserId));
@@ -58,13 +61,39 @@ class UserModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+        static Stream<String> invalidUserIds() {
+            return Stream.of("", " ", "유저1", "user_1", "user-1", "user!1", "a".repeat(17));
+        }
+
         @ParameterizedTest(name = "[{index}] {0}")
-        @ValueSource(strings = {BLANK, SPACE, "양", "가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다"})
+        @ValueSource(strings = {"a", "abc123", "abcdefghijklmnop"})
+        @DisplayName("아이디가 영문/숫자로만 구성되고 16자 이하이면, 유효하다.")
+        void createsUserId_whenUseridIsValid(String validUserId) {
+            assertThat(new UserId(validUserId).getValue()).isEqualTo(validUserId);
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("invalidNames")
         @DisplayName("이름이 공백이거나 2자 미만이거나 50자를 초과하면, BAD_REQUEST 예외가 발생한다.")
         void throwsBadRequest_whenNameIsInvalid(String invalidName) {
             CoreException result = assertThrows(CoreException.class, () -> new Name(invalidName));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        static Stream<String> invalidNames() {
+            return Stream.of("", " ", "양", "가".repeat(51));
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("validNames")
+        @DisplayName("이름이 2자 이상 50자 이하이면, 유효하다.")
+        void createsName_whenNameIsValid(String validName) {
+            assertThat(new Name(validName).getValue()).isEqualTo(validName);
+        }
+
+        static Stream<String> validNames() {
+            return Stream.of("홍길", DEFAULT_NAME, "가".repeat(50));
         }
 
         @ParameterizedTest(name = "[{index}] {0}")
