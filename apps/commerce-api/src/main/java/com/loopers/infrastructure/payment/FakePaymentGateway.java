@@ -14,19 +14,35 @@ import org.springframework.stereotype.Component;
 public class FakePaymentGateway implements PaymentGateway {
 
     private PgStatus forcedStatus = PgStatus.SUCCESS;
+    private PgStatus forcedInquiryStatus = PgStatus.SUCCESS;
 
     /** 테스트 시드 — 다음 결제 결과를 강제한다. */
     public void setForcedStatus(PgStatus forcedStatus) {
         this.forcedStatus = forcedStatus;
     }
 
+    /** 테스트 시드 — reconcile 시 inquire()가 반환할 사후 결과를 강제한다. */
+    public void setForcedInquiryStatus(PgStatus forcedInquiryStatus) {
+        this.forcedInquiryStatus = forcedInquiryStatus;
+    }
+
     public void reset() {
         this.forcedStatus = PgStatus.SUCCESS;
+        this.forcedInquiryStatus = PgStatus.SUCCESS;
     }
 
     @Override
     public PaymentResult pay(Long orderId, Long amount, PaymentMethod method) {
         return switch (forcedStatus) {
+            case SUCCESS -> PaymentResult.success("FAKE-TX-" + orderId);
+            case FAILED -> PaymentResult.failed("결제가 거절되었습니다.(Fake)");
+            case TIMEOUT -> PaymentResult.timeout();
+        };
+    }
+
+    @Override
+    public PaymentResult inquire(Long orderId) {
+        return switch (forcedInquiryStatus) {
             case SUCCESS -> PaymentResult.success("FAKE-TX-" + orderId);
             case FAILED -> PaymentResult.failed("결제가 거절되었습니다.(Fake)");
             case TIMEOUT -> PaymentResult.timeout();
