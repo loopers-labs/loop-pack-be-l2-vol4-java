@@ -96,29 +96,20 @@ class ProductServiceTest {
     @DisplayName("좋아요 수 동기 카운터")
     class LikesCounter {
 
-        @DisplayName("증가 시 +1 하여 저장한다.")
+        @DisplayName("증가 시 원자적 +1 UPDATE에 위임한다(동시 좋아요 lost update 차단).")
         @Test
-        void given_product_when_increaseLikesCount_then_plusOneAndSaves() {
-            ProductModel product = active(PRODUCT_ID, 4L);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
-
+        void given_product_when_increaseLikesCount_then_delegatesAtomicIncrement() {
             productService.increaseLikesCount(PRODUCT_ID);
 
-            assertThat(product.getLikesCount()).isEqualTo(5L);
-            verify(productRepository).save(product);
+            verify(productRepository).incrementLikesCount(PRODUCT_ID);
         }
 
-        @DisplayName("감소 시 0 미만으로 내려가지 않는다(음수 방지).")
+        @DisplayName("감소 시 원자적 -1 UPDATE에 위임한다(음수 방지는 영속 계층 가드).")
         @Test
-        void given_zeroLikes_when_decreaseLikesCount_then_remainsZero() {
-            ProductModel product = active(PRODUCT_ID, 0L);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
-
+        void given_product_when_decreaseLikesCount_then_delegatesAtomicDecrement() {
             productService.decreaseLikesCount(PRODUCT_ID);
 
-            assertThat(product.getLikesCount()).isEqualTo(0L);
+            verify(productRepository).decrementLikesCount(PRODUCT_ID);
         }
     }
 

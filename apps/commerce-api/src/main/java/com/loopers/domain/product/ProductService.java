@@ -77,19 +77,18 @@ public class ProductService {
         productRepository.save(product);
     }
 
-    /** 좋아요 수 동기 +1 (01 §7.3, 04 §4.2 — 좋아요 등록과 동일 트랜잭션). */
+    /**
+     * 좋아요 수 동기 +1 (01 §7.3, 04 §4.2 — 좋아요 등록과 동일 트랜잭션).
+     * 원자적 UPDATE(likes_count = likes_count + 1)로 처리해 동시 좋아요의 lost update를 차단한다.
+     */
     @Transactional
     public void increaseLikesCount(Long id) {
-        ProductModel product = getProduct(id);
-        product.incrementLikesCount();
-        productRepository.save(product);
+        productRepository.incrementLikesCount(id);
     }
 
-    /** 좋아요 수 동기 -1 (음수 방지는 ProductModel 책임). */
+    /** 좋아요 수 동기 -1. 원자적 UPDATE + likes_count > 0 가드로 음수를 방지한다. */
     @Transactional
     public void decreaseLikesCount(Long id) {
-        ProductModel product = getProduct(id);
-        product.decrementLikesCount();
-        productRepository.save(product);
+        productRepository.decrementLikesCount(id);
     }
 }

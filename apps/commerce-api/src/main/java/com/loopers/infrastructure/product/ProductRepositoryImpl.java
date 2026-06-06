@@ -66,6 +66,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public void incrementLikesCount(Long id) {
+        productJpaRepository.incrementLikesCount(id);
+    }
+
+    @Override
+    public void decrementLikesCount(Long id) {
+        productJpaRepository.decrementLikesCount(id);
+    }
+
+    @Override
     public List<ProductModel> findActivePage(Long brandId, ProductSortType sort, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, toSort(sort));
         List<ProductEntity> entities = (brandId == null)
