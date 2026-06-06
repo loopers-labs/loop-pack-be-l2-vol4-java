@@ -51,7 +51,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
             @Valid @RequestBody ProductAdminV1Dto.RegisterRequest request
     ) {
         return ApiResponse.success(ProductAdminV1Dto.ProductResponse.from(
-                productFacade.registerProduct(request.brandId(), request.name())
+                productFacade.registerProduct(request.brandId(), request.name(), request.price(), request.quantity())
         ));
     }
 
@@ -62,7 +62,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
             @Valid @RequestBody ProductAdminV1Dto.UpdateRequest request
     ) {
         return ApiResponse.success(ProductAdminV1Dto.ProductResponse.from(
-                productFacade.updateProduct(productId, request.name())
+                productFacade.updateProduct(productId, request.name(), request.stockId(), request.price(), request.stockQuantity())
         ));
     }
 
@@ -70,6 +70,6 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     @Override
     public ApiResponse<Void> delete(@PathVariable Long productId) {
         productFacade.deleteProduct(productId);
-        return ApiResponse.success((Void) null);
+        return ApiResponse.success(null);
     }
 }
