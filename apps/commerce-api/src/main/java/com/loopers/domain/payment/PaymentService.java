@@ -1,6 +1,7 @@
 package com.loopers.domain.payment;
 
 import com.loopers.domain.order.vo.Money;
+import com.loopers.domain.payment.enums.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,9 @@ public class PaymentService {
 
     @Transactional
     public PaymentModel create(Long orderId, Money amount) {
+        if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.PENDING)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 진행 중인 결제가 존재합니다.");
+        }
         return paymentRepository.save(new PaymentModel(orderId, amount));
     }
 
