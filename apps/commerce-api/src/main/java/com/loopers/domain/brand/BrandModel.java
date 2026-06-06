@@ -46,6 +46,7 @@ public class BrandModel extends BaseEntity {
     private void validateName(String name) {
         Guard.notBlank(name, "브랜드 이름은 비어있을 수 없습니다.");
         Guard.minLength(name, 2, "브랜드 이름은 2글자 이상이어야 합니다.");
+        Guard.maxLength(name, 100, "브랜드 이름은 100글자 이하이어야 합니다.");
     }
 
     public String getName() { return name; }
