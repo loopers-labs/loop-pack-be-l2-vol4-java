@@ -2,6 +2,7 @@ package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,5 +28,10 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     @Override
     public List<PaymentModel> findAllByOrderId(Long orderId) {
         return paymentJpaRepository.findAllByOrderId(orderId);
+    }
+
+    @Override
+    public boolean existsByOrderIdAndStatus(Long orderId, PaymentStatus status) {
+        return paymentJpaRepository.existsByOrderIdAndStatus(orderId, status);
     }
 }
