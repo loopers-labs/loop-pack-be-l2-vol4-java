@@ -44,6 +44,14 @@ public class Order extends BaseEntity {
     private List<OrderItem> items = new ArrayList<>();
 
     @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "original_amount", nullable = false))
+    private Money originalAmount;
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
     @AttributeOverride(name = "amount", column = @Column(name = "total_amount", nullable = false))
     private Money totalAmount;
 
@@ -51,23 +59,37 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status;
 
-    private Order(Long userId, List<OrderItem> items, Money totalAmount, OrderStatus status) {
+    private Order(Long userId, List<OrderItem> items,
+                  Money originalAmount, Money discountAmount, Money totalAmount, OrderStatus status) {
         validateUserId(userId);
         validateItems(items);
-        validateTotalAmount(totalAmount);
+        validateAmount(originalAmount, "주문 총액");
+        validateAmount(discountAmount, "할인액");
+        validateAmount(totalAmount, "최종 금액");
         validateStatus(status);
         this.userId = userId;
         this.items = new ArrayList<>(items);
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
         this.totalAmount = totalAmount;
         this.status = status;
     }
 
-    public static Order create(Long userId, List<OrderItem> items) {
+    /**
+     * 적용 전 금액은 항목 소계 합으로 산출하고, 할인액을 받아 최종 금액(= 적용 전 − 할인)을 확정한다.
+     * 할인액은 적용 전 금액을 초과할 수 없으며(AC-07-9), 쿠폰 미사용 시 호출자가 0원을 넘긴다.
+     */
+    public static Order create(Long userId, List<OrderItem> items, Money discountAmount) {
         validateItems(items);
-        Money total = items.stream()
+        validateAmount(discountAmount, "할인액");
+        Money original = items.stream()
                 .map(OrderItem::subtotal)
                 .reduce(Money.of(0), Money::add);
-        return new Order(userId, items, total, OrderStatus.CREATED);
+        if (!original.isGreaterThanOrEqual(discountAmount)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인액은 주문 금액을 초과할 수 없습니다.");
+        }
+        Money total = original.subtract(discountAmount);
+        return new Order(userId, items, original, discountAmount, total, OrderStatus.CREATED);
     }
 
     /**
@@ -107,9 +129,9 @@ public class Order extends BaseEntity {
         }
     }
 
-    private static void validateTotalAmount(Money totalAmount) {
-        if (totalAmount == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 총액은 비어있을 수 없습니다.");
+    private static void validateAmount(Money amount, String label) {
+        if (amount == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, label + "은 비어있을 수 없습니다.");
         }
     }
 

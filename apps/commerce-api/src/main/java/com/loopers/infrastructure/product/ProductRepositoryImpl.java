@@ -32,14 +32,6 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public void updateAll(List<Product> products) {
-        if (products == null || products.isEmpty()) {
-            return;
-        }
-        productJpaRepository.saveAll(products);
-    }
-
-    @Override
     public Optional<Product> find(Long id) {
         return productJpaRepository.findByIdAndDeletedAtIsNull(id);
     }

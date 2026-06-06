@@ -12,8 +12,6 @@ public interface ProductRepository {
 
     void update(Product product);
 
-    void updateAll(List<Product> products);
-
     Optional<Product> find(Long id);
 
     List<Product> findAllByIds(Collection<Long> ids);

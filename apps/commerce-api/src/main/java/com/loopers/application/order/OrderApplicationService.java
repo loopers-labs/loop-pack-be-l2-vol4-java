@@ -1,6 +1,8 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.common.PageResult;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderCommand;
 import com.loopers.domain.order.OrderDomainService;
@@ -13,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,6 +27,7 @@ public class OrderApplicationService {
     private final OrderDomainService orderDomainService;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
     public OrderInfo.Created place(OrderCriteria.Place command) {
@@ -36,10 +40,18 @@ public class OrderApplicationService {
                 .collect(Collectors.toSet());
         List<Product> products = productRepository.findAllByIds(productIds);
 
-        Order order = orderDomainService.create(command.userId(), products, lines);
+        ZonedDateTime now = ZonedDateTime.now();
+        UserCoupon userCoupon = command.couponId() == null ? null
+                : userCouponRepository.find(command.couponId())
+                        .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
 
-        productRepository.updateAll(products);
+        Order order = orderDomainService.create(command.userId(), products, lines, userCoupon, now);
+
         Order saved = orderRepository.save(order);
+
+        if (userCoupon != null) {
+            userCoupon.use(saved.getId(), now);
+        }
         return OrderInfo.Created.from(saved);
     }
 

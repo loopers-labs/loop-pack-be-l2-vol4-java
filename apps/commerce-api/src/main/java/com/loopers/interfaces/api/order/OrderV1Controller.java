@@ -32,7 +32,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @RequestBody OrderV1Dto.PlaceRequest request
     ) {
         OrderInfo.Created info = orderApplicationService.place(
-                new OrderCriteria.Place(userId, request.toCriteriaLines())
+                new OrderCriteria.Place(userId, request.couponId(), request.toCriteriaLines())
         );
         return ApiResponse.success(OrderV1Dto.CreatedResponse.from(info));
     }

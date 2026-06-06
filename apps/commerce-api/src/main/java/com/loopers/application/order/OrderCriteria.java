@@ -10,7 +10,7 @@ public final class OrderCriteria {
     private OrderCriteria() {
     }
 
-    public record Place(Long userId, List<Line> lines) {
+    public record Place(Long userId, Long couponId, List<Line> lines) {
     }
 
     public record Line(Long productId, Integer quantity) {

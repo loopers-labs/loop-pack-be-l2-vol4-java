@@ -28,6 +28,8 @@ public final class OrderInfo {
     public record Created(
             Long id,
             Long userId,
+            long originalAmount,
+            long discountAmount,
             long totalAmount,
             OrderStatus status,
             List<Item> items,
@@ -38,6 +40,8 @@ public final class OrderInfo {
             return new Created(
                     order.getId(),
                     order.getUserId(),
+                    order.getOriginalAmount().getAmount(),
+                    order.getDiscountAmount().getAmount(),
                     order.getTotalAmount().getAmount(),
                     order.getStatus(),
                     order.getItems().stream().map(Item::from).toList(),
@@ -49,6 +53,8 @@ public final class OrderInfo {
     public record Detail(
             Long id,
             Long userId,
+            long originalAmount,
+            long discountAmount,
             long totalAmount,
             OrderStatus status,
             List<Item> items,
@@ -59,6 +65,8 @@ public final class OrderInfo {
             return new Detail(
                     order.getId(),
                     order.getUserId(),
+                    order.getOriginalAmount().getAmount(),
+                    order.getDiscountAmount().getAmount(),
                     order.getTotalAmount().getAmount(),
                     order.getStatus(),
                     order.getItems().stream().map(Item::from).toList(),

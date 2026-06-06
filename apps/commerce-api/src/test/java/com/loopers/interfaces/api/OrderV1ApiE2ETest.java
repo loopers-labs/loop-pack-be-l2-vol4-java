@@ -1,6 +1,11 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.DiscountPolicy;
+import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
@@ -12,6 +17,8 @@ import com.loopers.domain.user.Name;
 import com.loopers.domain.user.PasswordEncoder;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
@@ -32,6 +39,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +54,8 @@ class OrderV1ApiE2ETest {
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final UserJpaRepository userJpaRepository;
+    private final CouponTemplateJpaRepository couponTemplateJpaRepository;
+    private final UserCouponJpaRepository userCouponJpaRepository;
     private final PasswordEncoder passwordEncoder;
     private final DatabaseCleanUp databaseCleanUp;
 
@@ -59,6 +69,8 @@ class OrderV1ApiE2ETest {
             BrandJpaRepository brandJpaRepository,
             ProductJpaRepository productJpaRepository,
             UserJpaRepository userJpaRepository,
+            CouponTemplateJpaRepository couponTemplateJpaRepository,
+            UserCouponJpaRepository userCouponJpaRepository,
             PasswordEncoder passwordEncoder,
             DatabaseCleanUp databaseCleanUp
     ) {
@@ -66,8 +78,16 @@ class OrderV1ApiE2ETest {
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.userJpaRepository = userJpaRepository;
+        this.couponTemplateJpaRepository = couponTemplateJpaRepository;
+        this.userCouponJpaRepository = userCouponJpaRepository;
         this.passwordEncoder = passwordEncoder;
         this.databaseCleanUp = databaseCleanUp;
+    }
+
+    private Long issueCoupon(Long userId, DiscountType type, long value) {
+        CouponTemplate template = couponTemplateJpaRepository.save(
+                CouponTemplate.create("쿠폰", DiscountPolicy.of(type, value), 30));
+        return userCouponJpaRepository.save(UserCoupon.issue(userId, template, ZonedDateTime.now())).getId();
     }
 
     @BeforeEach
@@ -127,7 +147,7 @@ class OrderV1ApiE2ETest {
     }
 
     private static OrderV1Dto.PlaceRequest oneLine(Long productId, int quantity) {
-        return new OrderV1Dto.PlaceRequest(List.of(new OrderV1Dto.LineRequest(productId, quantity)));
+        return new OrderV1Dto.PlaceRequest(null, List.of(new OrderV1Dto.LineRequest(productId, quantity)));
     }
 
     @DisplayName("POST /api/v1/orders")
@@ -137,7 +157,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("정상 주문이면 200 과 생성된 주문을 반환하고 재고가 차감된다.")
         @Test
         void returnsOkAndDecreasesStock_whenValid() {
-            OrderV1Dto.PlaceRequest request = new OrderV1Dto.PlaceRequest(List.of(
+            OrderV1Dto.PlaceRequest request = new OrderV1Dto.PlaceRequest(null, List.of(
                     new OrderV1Dto.LineRequest(productAId, 2),
                     new OrderV1Dto.LineRequest(productBId, 1)
             ));
@@ -153,6 +173,39 @@ class OrderV1ApiE2ETest {
 
             assertThat(productJpaRepository.findById(productAId).orElseThrow().getStock().getQuantity()).isEqualTo(8);
             assertThat(productJpaRepository.findById(productBId).orElseThrow().getStock().getQuantity()).isEqualTo(4);
+        }
+
+        @DisplayName("쿠폰을 지정하면 200 과 함께 할인 적용된 금액 3종을 반환하고 쿠폰이 사용 완료된다.")
+        @Test
+        void returnsOkWithDiscount_whenCouponApplied() {
+            Long couponId = issueCoupon(user1Id, DiscountType.FIXED, 500L);
+            OrderV1Dto.PlaceRequest request = new OrderV1Dto.PlaceRequest(
+                    couponId, List.of(new OrderV1Dto.LineRequest(productAId, 2))); // 2_000
+
+            ResponseEntity<ApiResponse<OrderV1Dto.CreatedResponse>> response = place("user1", request);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            OrderV1Dto.CreatedResponse body = response.getBody().data();
+            assertThat(body.originalAmount()).isEqualTo(2_000L);
+            assertThat(body.discountAmount()).isEqualTo(500L);
+            assertThat(body.totalAmount()).isEqualTo(1_500L);
+
+            assertThat(userCouponJpaRepository.findById(couponId).orElseThrow().getStatus())
+                    .isEqualTo(CouponStatus.USED);
+        }
+
+        @DisplayName("본인 소유가 아닌 쿠폰을 지정하면 403 을 반환하고 재고는 유지된다.")
+        @Test
+        void returnsForbidden_whenCouponNotOwned() {
+            Long otherUserId = createUser("user2");
+            Long couponId = issueCoupon(otherUserId, DiscountType.FIXED, 500L);
+            OrderV1Dto.PlaceRequest request = new OrderV1Dto.PlaceRequest(
+                    couponId, List.of(new OrderV1Dto.LineRequest(productAId, 2)));
+
+            ResponseEntity<ApiResponse<OrderV1Dto.CreatedResponse>> response = place("user1", request);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(productJpaRepository.findById(productAId).orElseThrow().getStock().getQuantity()).isEqualTo(10);
         }
 
         @DisplayName("재고가 부족하면 400 을 반환하고 재고는 그대로 유지된다.")

@@ -15,7 +15,7 @@ public final class OrderV1Dto {
     private OrderV1Dto() {
     }
 
-    public record PlaceRequest(List<LineRequest> lines) {
+    public record PlaceRequest(Long couponId, List<LineRequest> lines) {
 
         public List<OrderCriteria.Line> toCriteriaLines() {
             return lines == null ? List.of()
@@ -48,6 +48,8 @@ public final class OrderV1Dto {
     public record CreatedResponse(
             Long id,
             Long userId,
+            long originalAmount,
+            long discountAmount,
             long totalAmount,
             OrderStatus status,
             List<ItemResponse> items,
@@ -59,6 +61,8 @@ public final class OrderV1Dto {
             return new CreatedResponse(
                     info.id(),
                     info.userId(),
+                    info.originalAmount(),
+                    info.discountAmount(),
                     info.totalAmount(),
                     info.status(),
                     info.items().stream().map(ItemResponse::from).toList(),
@@ -70,6 +74,8 @@ public final class OrderV1Dto {
     public record DetailResponse(
             Long id,
             Long userId,
+            long originalAmount,
+            long discountAmount,
             long totalAmount,
             OrderStatus status,
             List<ItemResponse> items,
@@ -81,6 +87,8 @@ public final class OrderV1Dto {
             return new DetailResponse(
                     info.id(),
                     info.userId(),
+                    info.originalAmount(),
+                    info.discountAmount(),
                     info.totalAmount(),
                     info.status(),
                     info.items().stream().map(ItemResponse::from).toList(),
