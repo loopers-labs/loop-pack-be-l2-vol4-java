@@ -7,6 +7,7 @@ import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.domain.catalog.product.ProductSearchCondition;
 import com.loopers.domain.catalog.product.StockService;
+import com.loopers.application.coupon.CouponUseService;
 import com.loopers.application.event.order.OrderEventPublisher;
 import com.loopers.domain.event.outbox.OrderEventOutbox;
 import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
@@ -171,7 +172,8 @@ class PaymentServiceTest {
         private final FakePaymentGateway gateway = new FakePaymentGateway();
         private final OrderCommandService orderCommandService = new OrderCommandService(
             orderRepository,
-            new StockService(productRepository)
+            new StockService(productRepository),
+            new CouponUseService(null)
         );
         private final OrderEventPublisher orderEventPublisher = new OrderEventPublisher(orderEventOutboxRepository, objectMapper());
         private final PaymentResultService paymentResultService = new PaymentResultService(
@@ -200,7 +202,7 @@ class PaymentServiceTest {
         }
 
         private Payment createPayment(Order order) {
-            Payment payment = new Payment(order.getId(), order.getTotalAmount());
+            Payment payment = new Payment(order.getId(), order.getFinalAmount());
             paymentRepository.save(payment);
             return payment;
         }

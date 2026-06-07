@@ -111,6 +111,8 @@ class EventRelayWorkerTest {
                     orderId,
                     "user1",
                     2_000L,
+                    0L,
+                    2_000L,
                     ZonedDateTime.now(),
                     List.of(new OrderPaidEvent.Item(1L, "상품", 2, 1_000L, 2_000L))
                 ))

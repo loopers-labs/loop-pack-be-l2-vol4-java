@@ -4,6 +4,9 @@ import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
+import com.loopers.application.coupon.CouponCommand;
+import com.loopers.application.coupon.CouponCommandService;
+import com.loopers.domain.coupon.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
@@ -25,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +41,7 @@ class OrderApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final CouponCommandService couponCommandService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -44,11 +49,13 @@ class OrderApiE2ETest {
         TestRestTemplate testRestTemplate,
         BrandRepository brandRepository,
         ProductRepository productRepository,
+        CouponCommandService couponCommandService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
+        this.couponCommandService = couponCommandService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -89,12 +96,45 @@ class OrderApiE2ETest {
             assertAll(
                 () -> assertTrue(createResponse.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(createResponse.getBody().data().orderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING),
-                () -> assertThat(createResponse.getBody().data().totalAmount()).isEqualTo(2_000L),
+                () -> assertThat(createResponse.getBody().data().originalAmount()).isEqualTo(2_000L),
+                () -> assertThat(createResponse.getBody().data().discountAmount()).isZero(),
+                () -> assertThat(createResponse.getBody().data().finalAmount()).isEqualTo(2_000L),
                 () -> assertTrue(detailResponse.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(detailResponse.getBody().data().paymentStatus()).isEqualTo(PaymentStatus.REQUESTED),
                 () -> assertThat(detailResponse.getBody().data().items()).hasSize(1),
                 () -> assertThat(detailResponse.getBody().data().items().get(0).productName()).isEqualTo("상품"),
                 () -> assertThat(changedProduct.getStockQuantity()).isEqualTo(8)
+            );
+        }
+
+        @DisplayName("발급 쿠폰 ID를 보내면 할인 금액과 최종 결제 금액을 반환한다.")
+        @Test
+        void appliesIssuedCoupon() {
+            Product product = saveProduct("상품", 2_000L, 10);
+            Long couponTemplateId = couponCommandService.createTemplate(new CouponCommand.CreateTemplate(
+                "500원 할인",
+                CouponType.FIXED,
+                500L,
+                null,
+                1,
+                ZonedDateTime.now().plusDays(1)
+            )).couponId();
+            Long issuedCouponId = couponCommandService.issue(couponTemplateId, "user1").couponId();
+
+            ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> response = placeOrder(
+                "user1",
+                new OrderDto.OrderCreateRequest(
+                    List.of(new OrderDto.OrderCreateItemRequest(product.getId(), 1)),
+                    issuedCouponId
+                )
+            );
+
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().originalAmount()).isEqualTo(2_000L),
+                () -> assertThat(response.getBody().data().discountAmount()).isEqualTo(500L),
+                () -> assertThat(response.getBody().data().finalAmount()).isEqualTo(1_500L),
+                () -> assertThat(response.getBody().data().couponId()).isEqualTo(issuedCouponId)
             );
         }
     }

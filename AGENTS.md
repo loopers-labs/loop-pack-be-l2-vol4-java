@@ -5,7 +5,7 @@
   - `.docs/design/03-class-diagram.md`
   - `.docs/design/04-erd.md`
 - `AGENTS.md`, `.codeguide/**`, 도메인 용어집, 구현 계획 문서는 제출 커밋에 포함하지 않는다.
-- 현재 브랜치는 3주차 구현 흐름이므로, 구현 검증과 문서 기준은 `.codeguide/loopers-3-week.md`, `.docs/domain.md`, `.docs/architecture.md`, `.docs/worklog.md`를 우선한다.
+- 현재 브랜치는 4주차 구현 흐름이므로, 구현 검증과 문서 기준은 `.codeguide/loopers-4-week.md`, `.docs/domain.md`, `.docs/architecture.md`, `.docs/worklog.md`를 우선한다.
 
 ## 2. 설계 진행 규칙
 - 설계 문서를 수정하기 전 핵심 질문을 한 줄씩 묻고, 답변을 받은 뒤 반영한다.
@@ -15,7 +15,7 @@
 ## 3. 아키텍처 결정
 - 장기적으로 큰 서비스를 만든다는 전제로 도메인 우선 모듈러 모놀리스로 설계한다.
 - 최상위 패키지는 기존 5계층인 `interfaces`, `application`, `domain`, `infrastructure`, `support`를 유지한다.
-- 도메인 경계는 각 계층 하위 패키지의 `catalog`, `ordering`, `payment`, `event`로 나눈다.
+- 도메인 경계는 각 계층 하위 패키지의 `catalog`, `coupon`, `ordering`, `payment`, `event`로 나눈다.
 - 예: `com.loopers.domain.catalog.product`, `com.loopers.application.ordering.order`, `com.loopers.interfaces.api.catalog.product`.
 - 현재 구현 구조가 목표 구조와 다르면, 구현을 바로 바꾸지 말고 설계 문서에 목표 구조와 차이를 먼저 기록한다.
 
@@ -27,14 +27,15 @@
   3. `.docs/worklog.md`
   4. `.docs/domain.md`
   5. `.docs/architecture.md`
-  6. `.codeguide/loopers-3-week.md`
-  7. `.codeguide/service.md`
-  8. `.codeguide/loopers-2-week.md`
-  9. `.codeguide/loopers-1-week.md`
-  10. `.docs/design/01-requirements.md`
-  11. `.docs/design/02-sequence-diagrams.md`
-  12. `.docs/design/03-class-diagram.md`
-  13. `.docs/design/04-erd.md`
+  6. `.codeguide/loopers-4-week.md`
+  7. `.codeguide/loopers-3-week.md`
+  8. `.codeguide/service.md`
+  9. `.codeguide/loopers-2-week.md`
+  10. `.codeguide/loopers-1-week.md`
+  11. `.docs/design/01-requirements.md`
+  12. `.docs/design/02-sequence-diagrams.md`
+  13. `.docs/design/03-class-diagram.md`
+  14. `.docs/design/04-erd.md`
 
 ## 5. 문서 역할
 - `.docs/README.md`: 문서 지도와 탐색 목적을 정의한다.
@@ -42,7 +43,8 @@
 - `.docs/worklog.md`: 언제 중단되어도 이어가기 위한 현재 작업 상태를 관리한다.
 - `.docs/domain.md`: 도메인명, 상태명, 모듈 소속, 구현 이름의 기준이다.
 - `.docs/architecture.md`: 장기 아키텍처 결정, 모듈 경계, Onion/Hexagonal/CQRS, JPA 분리 기준을 정의한다.
-- `.codeguide/loopers-3-week.md`: 현재 3주차 구현 과제 조건과 완료 기준이다.
+- `.codeguide/loopers-4-week.md`: 현재 4주차 구현 과제 조건과 완료 기준이다.
+- `.codeguide/loopers-3-week.md`: 3주차 구현 과제 legacy reference다.
 - `.codeguide/service.md`: 전체 서비스 API 요구사항 기준이다.
 - `.codeguide/loopers-2-week.md`: 2주차 설계 제출 legacy reference다.
 - `.codeguide/loopers-1-week.md`: 기존 회원/인증 legacy reference다.
@@ -83,7 +85,7 @@
       /infrastructure/catalog/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
 
 ## 10. 저장 처리 고도화 협의 규칙
-- 현재 3주차 `apps/commerce-api` 저장 처리는 RDB-only로 진행한다.
+- 현재 4주차 `apps/commerce-api` 저장 처리는 RDB-only로 진행한다.
 - Redis, Kafka, cache, message broker는 사용자의 명시 승인 없이 도입하지 않는다.
 - 저장 처리 방식 고도화는 한 번에 한 가지 주제만 질문하고, 답변을 받은 뒤 다음 질문이나 구현으로 진행한다.
 - 저장 처리 관련 코드를 수정하기 전 의도, 선택지, 영향 범위, 검증 방법을 먼저 설명한다.

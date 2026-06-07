@@ -13,7 +13,10 @@ public class OrderAdminDto {
         String userId,
         OrderStatus orderStatus,
         PaymentStatus paymentStatus,
-        Long totalAmount,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
         ZonedDateTime createdAt
     ) {
         public static OrderListItemResponse from(OrderResult.Summary result) {
@@ -22,7 +25,10 @@ public class OrderAdminDto {
                 result.userId(),
                 result.orderStatus(),
                 result.paymentStatus(),
-                result.totalAmount(),
+                result.originalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.couponId(),
                 result.createdAt()
             );
         }
@@ -34,7 +40,10 @@ public class OrderAdminDto {
         OrderStatus orderStatus,
         PaymentStatus paymentStatus,
         String failureReason,
-        Long totalAmount,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
         List<OrderDetailItemResponse> items
     ) {
         public static OrderDetailResponse from(OrderResult.Detail result) {
@@ -44,7 +53,10 @@ public class OrderAdminDto {
                 result.orderStatus(),
                 result.paymentStatus(),
                 result.failureReason(),
-                result.totalAmount(),
+                result.originalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.couponId(),
                 result.items().stream()
                     .map(OrderDetailItemResponse::from)
                     .toList()

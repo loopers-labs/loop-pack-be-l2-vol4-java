@@ -22,8 +22,17 @@ public class OrderJpaEntity extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    @Column(name = "total_amount", nullable = false)
-    private Long totalAmount;
+    @Column(name = "original_amount", nullable = false)
+    private Long originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
+    @Column(name = "final_amount", nullable = false)
+    private Long finalAmount;
+
+    @Column(name = "coupon_id")
+    private Long couponId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -35,9 +44,20 @@ public class OrderJpaEntity extends BaseEntity {
 
     protected OrderJpaEntity() {}
 
-    private OrderJpaEntity(String userId, Long totalAmount, OrderStatus status, List<OrderLineJpaEntity> lines) {
+    private OrderJpaEntity(
+        String userId,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
+        OrderStatus status,
+        List<OrderLineJpaEntity> lines
+    ) {
         this.userId = userId;
-        this.totalAmount = totalAmount;
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.finalAmount = finalAmount;
+        this.couponId = couponId;
         this.status = status;
         this.lines = new ArrayList<>(lines);
     }
@@ -45,7 +65,10 @@ public class OrderJpaEntity extends BaseEntity {
     public static OrderJpaEntity from(Order order) {
         return new OrderJpaEntity(
             order.getUserId(),
-            order.getTotalAmount(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
+            order.getCouponId(),
             order.getStatus(),
             order.getLines().stream().map(OrderLineJpaEntity::from).toList()
         );
@@ -55,7 +78,10 @@ public class OrderJpaEntity extends BaseEntity {
         return Order.reconstruct(
             getId(),
             userId,
-            totalAmount,
+            originalAmount,
+            discountAmount,
+            finalAmount,
+            couponId,
             status,
             lines.stream().map(OrderLineJpaEntity::toDomain).toList(),
             getCreatedAt(),
@@ -66,7 +92,10 @@ public class OrderJpaEntity extends BaseEntity {
 
     public void apply(Order order) {
         this.userId = order.getUserId();
-        this.totalAmount = order.getTotalAmount();
+        this.originalAmount = order.getOriginalAmount();
+        this.discountAmount = order.getDiscountAmount();
+        this.finalAmount = order.getFinalAmount();
+        this.couponId = order.getCouponId();
         this.status = order.getStatus();
     }
 }

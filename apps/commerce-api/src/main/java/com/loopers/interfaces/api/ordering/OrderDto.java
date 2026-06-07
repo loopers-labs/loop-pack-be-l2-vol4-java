@@ -9,7 +9,11 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 public class OrderDto {
-    public record OrderCreateRequest(List<OrderCreateItemRequest> items) {
+    public record OrderCreateRequest(List<OrderCreateItemRequest> items, Long couponId) {
+        public OrderCreateRequest(List<OrderCreateItemRequest> items) {
+            this(items, null);
+        }
+
         public OrderCommand.Create toCommand(String userId) {
             return new OrderCommand.Create(
                 userId,
@@ -17,7 +21,8 @@ public class OrderDto {
                     ? List.of()
                     : items.stream()
                         .map(item -> new OrderCommand.Item(item.productId(), item.quantity()))
-                        .toList()
+                        .toList(),
+                couponId
             );
         }
     }
@@ -27,13 +32,19 @@ public class OrderDto {
     public record OrderCreateResponse(
         Long orderId,
         OrderStatus orderStatus,
-        Long totalAmount
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId
     ) {
         public static OrderCreateResponse from(OrderResult.Detail result) {
             return new OrderCreateResponse(
                 result.orderId(),
                 result.orderStatus(),
-                result.totalAmount()
+                result.originalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.couponId()
             );
         }
     }
@@ -42,7 +53,10 @@ public class OrderDto {
         Long orderId,
         OrderStatus orderStatus,
         PaymentStatus paymentStatus,
-        Long totalAmount,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
         ZonedDateTime createdAt
     ) {
         public static OrderListItemResponse from(OrderResult.Summary result) {
@@ -50,7 +64,10 @@ public class OrderDto {
                 result.orderId(),
                 result.orderStatus(),
                 result.paymentStatus(),
-                result.totalAmount(),
+                result.originalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.couponId(),
                 result.createdAt()
             );
         }
@@ -61,7 +78,10 @@ public class OrderDto {
         OrderStatus orderStatus,
         PaymentStatus paymentStatus,
         String failureReason,
-        Long totalAmount,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
         List<OrderDetailItemResponse> items
     ) {
         public static OrderDetailResponse from(OrderResult.Detail result) {
@@ -70,7 +90,10 @@ public class OrderDto {
                 result.orderStatus(),
                 result.paymentStatus(),
                 result.failureReason(),
-                result.totalAmount(),
+                result.originalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.couponId(),
                 result.items().stream()
                     .map(OrderDetailItemResponse::from)
                     .toList()

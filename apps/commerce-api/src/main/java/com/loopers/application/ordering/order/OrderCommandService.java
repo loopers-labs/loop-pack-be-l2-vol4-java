@@ -2,6 +2,7 @@ package com.loopers.application.ordering.order;
 
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.StockService;
+import com.loopers.application.coupon.CouponUseService;
 import com.loopers.domain.ordering.order.Order;
 import com.loopers.domain.ordering.order.OrderLine;
 import com.loopers.domain.ordering.order.OrderRepository;
@@ -23,6 +24,7 @@ public class OrderCommandService {
 
     private final OrderRepository orderRepository;
     private final StockService stockService;
+    private final CouponUseService couponUseService;
 
     @Transactional
     public Order createPendingOrder(OrderCommand.Create command) {
@@ -44,7 +46,14 @@ public class OrderCommandService {
             ));
         }
 
-        return orderRepository.save(new Order(command.userId(), orderLines));
+        Long originalAmount = orderLines.stream().mapToLong(OrderLine::getLineAmount).sum();
+        CouponUseService.Discount discount = couponUseService.useCoupon(
+            command.couponId(),
+            command.userId(),
+            originalAmount
+        );
+
+        return orderRepository.save(new Order(command.userId(), orderLines, discount.couponId(), discount.discountAmount()));
     }
 
     @Transactional
@@ -68,7 +77,7 @@ public class OrderCommandService {
             return order;
         }
 
-        restoreStock(order);
+        restoreResources(order);
         order.markPaymentFailed();
         return orderRepository.save(order);
     }
@@ -80,7 +89,7 @@ public class OrderCommandService {
             return order;
         }
 
-        restoreStock(order);
+        restoreResources(order);
         order.markCanceled();
         return orderRepository.save(order);
     }
@@ -98,11 +107,12 @@ public class OrderCommandService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
     }
 
-    private void restoreStock(Order order) {
+    private void restoreResources(Order order) {
         stockService.restore(order.getLines()
             .stream()
             .map(line -> new StockService.StockRequest(line.getProductId(), line.getQuantity()))
             .toList());
+        couponUseService.restoreCoupon(order.getCouponId());
     }
 
     private void validateCommand(OrderCommand.Create command) {

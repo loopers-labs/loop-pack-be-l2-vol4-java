@@ -32,7 +32,9 @@ class OrderTest {
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo("user1"),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING),
-                () -> assertThat(order.getTotalAmount()).isEqualTo(4_000L),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(4_000L),
+                () -> assertThat(order.getDiscountAmount()).isZero(),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(4_000L),
                 () -> assertThat(order.getLines()).hasSize(2),
                 () -> assertThat(order.getLines().get(0).getProductName()).isEqualTo("상품1"),
                 () -> assertThat(order.getLines().get(0).getLineAmount()).isEqualTo(2_000L)
@@ -50,5 +52,23 @@ class OrderTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+    }
+
+    @DisplayName("쿠폰 할인 금액을 적용하면 할인 전 금액, 할인 금액, 최종 금액을 스냅샷으로 보관한다.")
+    @Test
+    void snapshotsDiscountAmounts() {
+        Order order = new Order(
+            "user1",
+            List.of(new OrderLine(1L, "상품", 1_000L, 2)),
+            10L,
+            500L
+        );
+
+        assertAll(
+            () -> assertThat(order.getOriginalAmount()).isEqualTo(2_000L),
+            () -> assertThat(order.getDiscountAmount()).isEqualTo(500L),
+            () -> assertThat(order.getFinalAmount()).isEqualTo(1_500L),
+            () -> assertThat(order.getCouponId()).isEqualTo(10L)
+        );
     }
 }
