@@ -54,20 +54,12 @@ public class Product extends BaseEntity {
         this.price = price;
     }
 
-    public boolean hasEnoughStock(int qty) {
-        return this.stock.hasAtLeast(qty);
-    }
-
     public boolean isSoldOut() {
         return this.stock.isSoldOut();
     }
 
     public void adjustStock(int newQuantity) {
         this.stock = this.stock.adjust(newQuantity);
-    }
-
-    public void decreaseStock(int qty) {
-        this.stock = this.stock.decrease(qty);
     }
 
     public boolean isDeleted() {

@@ -39,34 +39,6 @@ class StockTest {
         }
     }
 
-    @DisplayName("hasAtLeast 를 호출할 때, ")
-    @Nested
-    class HasAtLeast {
-
-        @DisplayName("재고가 기준 이상이면 true 를 반환한다.")
-        @Test
-        void returnsTrue_whenStockGteQty() {
-            assertThat(Stock.of(10).hasAtLeast(5)).isTrue();
-            assertThat(Stock.of(10).hasAtLeast(10)).isTrue();
-        }
-
-        @DisplayName("재고가 기준 미만이면 false 를 반환한다.")
-        @Test
-        void returnsFalse_whenStockLtQty() {
-            assertThat(Stock.of(3).hasAtLeast(5)).isFalse();
-        }
-
-        @DisplayName("기준 수량이 음수이면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenQtyIsNegative() {
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> Stock.of(10).hasAtLeast(-1));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
     @DisplayName("adjust 로 재고를 조정할 때, ")
     @Nested
     class Adjust {
@@ -93,51 +65,6 @@ class StockTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> stock.adjust(-1));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("decrease 로 재고를 차감할 때, ")
-    @Nested
-    class Decrease {
-
-        @DisplayName("재고가 충분하면 차감된 새 Stock 이 반환된다.")
-        @Test
-        void decreasesStock() {
-            // arrange
-            Stock stock = Stock.of(10);
-
-            // act
-            Stock result = stock.decrease(3);
-
-            // assert
-            assertThat(result.getQuantity()).isEqualTo(7);
-        }
-
-        @DisplayName("재고가 부족하면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenInsufficient() {
-            // arrange
-            Stock stock = Stock.of(2);
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> stock.decrease(5));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("차감 수량이 0 이하이면 BAD_REQUEST 예외가 발생한다.")
-        @ParameterizedTest
-        @ValueSource(ints = {0, -1})
-        void throwsBadRequest_whenQtyIsNotPositive(int qty) {
-            // arrange
-            Stock stock = Stock.of(10);
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> stock.decrease(qty));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

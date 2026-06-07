@@ -142,18 +142,6 @@ class ProductTest {
     @Nested
     class StockBehaviors {
 
-        @DisplayName("hasEnoughStock 은 Stock.hasAtLeast 를 위임한다.")
-        @Test
-        void hasEnoughStockDelegatesToStock() {
-            // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(5));
-
-            // assert
-            assertThat(product.hasEnoughStock(3)).isTrue();
-            assertThat(product.hasEnoughStock(5)).isTrue();
-            assertThat(product.hasEnoughStock(6)).isFalse();
-        }
-
         @DisplayName("adjustStock 으로 재고가 절대값으로 설정된다.")
         @Test
         void adjustStockSetsAbsoluteQuantity() {
@@ -165,32 +153,6 @@ class ProductTest {
 
             // assert
             assertThat(product.getStock().getQuantity()).isEqualTo(100);
-        }
-
-        @DisplayName("decreaseStock 으로 재고가 차감된다.")
-        @Test
-        void decreaseStockReducesQuantity() {
-            // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(10));
-
-            // act
-            product.decreaseStock(3);
-
-            // assert
-            assertThat(product.getStock().getQuantity()).isEqualTo(7);
-        }
-
-        @DisplayName("재고가 부족하면 decreaseStock 호출 시 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenDecreaseExceedsStock() {
-            // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(2));
-
-            // act
-            CoreException result = assertThrows(CoreException.class, () -> product.decreaseStock(5));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 

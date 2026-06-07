@@ -45,6 +45,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int decreaseStock(Long productId, int amount) {
+        return productJpaRepository.decreaseStock(productId, amount);
+    }
+
+    @Override
     public PageResult<Product> findAll(ProductCommand.Search search) {
         Page<Product> page = switch (search.sort()) {
             case LATEST -> findOrderByLatest(search);

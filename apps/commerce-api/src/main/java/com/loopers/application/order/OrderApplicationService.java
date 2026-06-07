@@ -6,6 +6,7 @@ import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderCommand;
 import com.loopers.domain.order.OrderDomainService;
+import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -47,12 +49,25 @@ public class OrderApplicationService {
 
         Order order = orderDomainService.create(command.userId(), products, lines, userCoupon, now);
 
+        decreaseStock(order);
+
         Order saved = orderRepository.save(order);
 
         if (userCoupon != null) {
             userCoupon.use(saved.getId(), now);
         }
         return OrderInfo.Created.from(saved);
+    }
+
+    private void decreaseStock(Order order) {
+        order.getItems().stream()
+                .sorted(Comparator.comparingLong(OrderItem::getProductId))
+                .forEach(item -> {
+                    int affected = productRepository.decreaseStock(item.getProductId(), item.getQuantity());
+                    if (affected == 0) {
+                        throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족한 상품: " + item.getProductId());
+                    }
+                });
     }
 
     @Transactional(readOnly = true)

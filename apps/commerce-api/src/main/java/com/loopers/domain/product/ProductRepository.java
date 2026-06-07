@@ -16,6 +16,9 @@ public interface ProductRepository {
 
     List<Product> findAllByIds(Collection<Long> ids);
 
+    /** 재고를 원자적으로 차감한다. 반환값은 영향받은 행 수 — 0 이면 재고 부족(또는 상품 없음). */
+    int decreaseStock(Long productId, int amount);
+
     PageResult<Product> findAll(ProductCommand.Search search);
 
     int bulkSoftDeleteByBrandId(Long brandId);

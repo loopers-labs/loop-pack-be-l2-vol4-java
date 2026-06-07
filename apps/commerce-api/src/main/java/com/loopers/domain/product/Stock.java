@@ -29,25 +29,8 @@ public class Stock {
         return new Stock(quantity);
     }
 
-    public boolean hasAtLeast(int qty) {
-        if (qty < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비교 수량은 0 이상이어야 합니다.");
-        }
-        return this.quantity >= qty;
-    }
-
     public Stock adjust(int newQuantity) {
         return new Stock(newQuantity);
-    }
-
-    public Stock decrease(int qty) {
-        if (qty <= 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 0보다 커야 합니다.");
-        }
-        if (this.quantity < qty) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
-        }
-        return new Stock(this.quantity - qty);
     }
 
     public boolean isSoldOut() {
