@@ -56,6 +56,7 @@ classDiagram
         -string name
         -Money price
         -Stock stock
+        -long likeCount
         +modify(name, price)
         +adjustStock(newQuantity)
         +isSoldOut() bool
@@ -198,6 +199,7 @@ classDiagram
         -string name
         -Money price
         -Stock stock
+        -long likeCount
         +modify(name, price)
         +adjustStock(newQuantity)
         +isSoldOut() bool
@@ -222,7 +224,7 @@ classDiagram
 ```
 
 - **`Brand`** (AggregateRoot) — 브랜드 정보 관리와 논리 삭제. `Brand` 는 곧 JPA 엔티티(`@Entity`, `BaseEntity` 상속)이며 `delete()`(BaseEntity) 가 `deletedAt` 을 set 한다(멱등). 도메인은 `isDeleted()`(= `deletedAt != null`) 로 삭제 여부를 노출하고, 삭제 시각은 `BaseEntity.deletedAt` 가 보관한다. 브랜드 삭제 시 소속 상품도 함께 삭제돼야 하는데, 이 연쇄는 `Brand` 한 Aggregate 경계를 넘으므로 도메인 서비스 또는 응용 계층이 조율한다(이 다이어그램 범위 밖).
-- **`Product`** (AggregateRoot) — 재고를 보유. 주문 시 **재고 차감은 도메인 메서드가 아니라** 응용 서비스가 `ProductRepository`의 **원자적 조건부 UPDATE**(`stock = stock - n WHERE stock >= n`)로 수행한다 — 차감 결과 행 수가 0이면 재고 부족으로 거부한다(동시성 oversell 방지, 4단계 ERD `products` 참조). 따라서 `Product`에는 `hasEnoughStock()`/`decreaseStock()` 같은 in-memory 차감 메서드를 두지 않는다(과거 read-modify-write 방식은 lost update 위험이라 폐기). 어드민이 재고를 특정 값으로 조정하는 것은 `adjustStock(newQuantity)`이 맡는다(US-15). `isSoldOut()`은 고객 응답의 '품절 여부'에 쓰인다. `modify()` 인자에 브랜드가 없는 것은 "브랜드 변경 불가" 규칙(AC-15-2)을 타입으로 막은 것이다. 좋아요 수는 `Product`가 들고 있지 않다 — `Like` 행을 집계해 구한다.
+- **`Product`** (AggregateRoot) — 재고를 보유. 주문 시 **재고 차감은 도메인 메서드가 아니라** 응용 서비스가 `ProductRepository`의 **원자적 조건부 UPDATE**(`stock = stock - n WHERE stock >= n`)로 수행한다 — 차감 결과 행 수가 0이면 재고 부족으로 거부한다(동시성 oversell 방지, 4단계 ERD `products` 참조). 따라서 `Product`에는 `hasEnoughStock()`/`decreaseStock()` 같은 in-memory 차감 메서드를 두지 않는다(과거 read-modify-write 방식은 lost update 위험이라 폐기). 어드민이 재고를 특정 값으로 조정하는 것은 `adjustStock(newQuantity)`이 맡는다(US-15). `isSoldOut()`은 고객 응답의 '품절 여부'에 쓰인다. `modify()` 인자에 브랜드가 없는 것은 "브랜드 변경 불가" 규칙(AC-15-2)을 타입으로 막은 것이다. 좋아요 수는 `like_count`로 **비정규화**해 보유한다 — 진실은 `Like` 행이지만 좋아요순 정렬을 매번 `COUNT` 조인하면 데이터가 쌓일수록 느려져, 카운터를 두고 인덱스 정렬한다. 재고와 마찬가지로 in-memory 증감 메서드를 두지 않고(lost update 위험) 응용 서비스가 `ProductRepository`의 **원자적 UPDATE**(`like_count ± 1`)로 증감하며, 행이 실제로 INSERT/DELETE 됐을 때만(영향 행 수 == 1) 호출한다(4단계 ERD `products` 참조).
 - **`Stock`** (VO) — 재고 수량을 감싼 불변 값 객체. `adjust(newQuantity)`는 `newQuantity ≥ 0`일 때만 새 `Stock`을 돌려줘 `재고 ≥ 0` 불변식을 타입 안에서 지킨다. 주문 차감 시의 `재고 ≥ 수량` 보장은 (in-memory `decrease`가 아니라) 위 조건부 UPDATE의 `WHERE stock >= n`이 DB에서 원자적으로 책임진다. `isSoldOut()`은 고객 응답의 '품절 여부'에 쓰인다.
 - **`Money`** (VO) — 금액과 그 계산 규칙(`add`·`multiply`·`isGreaterThanOrEqual`)을 캡슐화한 불변 값 객체. `Product.price`·`OrderItem.unitPrice`가 모두 이 타입이다. 단일 통화(원) 가정이라 통화 필드는 두지 않는다.
 - **불변식** — 브랜드명은 필수. 상품의 가격 ≥ 0, 재고 ≥ 0. 상품의 소속 브랜드(`brandId`)는 생성 후 변경 불가.

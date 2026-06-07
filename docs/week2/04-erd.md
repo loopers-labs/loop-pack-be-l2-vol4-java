@@ -41,6 +41,7 @@ erDiagram
         varchar(200) name "NOT NULL"
         bigint price "NOT NULL / CHECK >= 0 / 원"
         int stock_quantity "NOT NULL / CHECK >= 0"
+        bigint like_count "NOT NULL / DEFAULT 0 / 좋아요 수 비정규화 카운터"
         timestamp deleted_at "NULL / soft delete"
         timestamp created_at "NOT NULL"
         timestamp updated_at "NOT NULL"
@@ -140,11 +141,16 @@ erDiagram
 | name | VARCHAR(200) | NOT NULL | 상품명 |
 | price | BIGINT | NOT NULL, CHECK (price >= 0) | 판매가(원) |
 | stock_quantity | INTEGER | NOT NULL, CHECK (stock_quantity >= 0) | 재고 수량 |
+| like_count | BIGINT | NOT NULL, DEFAULT 0 | 좋아요 수 비정규화 카운터 (인덱스 `(like_count DESC, id DESC)`) |
 | deleted_at | TIMESTAMP | NULL | 삭제 시각 |
 | created_at | TIMESTAMP | NOT NULL | 생성 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
 **제약** — `stock_quantity`는 `CHECK (stock_quantity >= 0)`로 음수를 막는다. 동시 주문에서의 **초과 판매(oversell) 방지**는 재고 차감을 **조건부 원자 UPDATE**(`SET stock_quantity = stock_quantity - n WHERE stock_quantity >= n`)로 수행해 보장한다 — 영향 행 수가 0이면 재고 부족으로 거부한다. 검증(`>= n`)과 차감이 한 문장에 묶여 read-modify-write 간극이 없으므로, **낙관적 락의 `version` 컬럼이 필요 없다**(쿠폰의 동시성 예고와 대비 — 재고는 단순 카운터 차감이라 조건부 UPDATE로 충분하다). 여러 상품을 차감할 때는 `id` 오름차순으로 UPDATE해 행 락 획득 순서를 통일, 데드락을 피한다.
+
+**좋아요 수(`like_count`) — 비정규화 카운터** — 좋아요 수의 진실은 `product_likes` 행이지만, 좋아요순 정렬을 위해 매번 `COUNT` 조인/`GROUP BY`하면 비용이 **O(전체 좋아요 행)** 이라 데이터가 쌓일수록 선형으로 느려진다(측정: 좋아요 100만 행에서 첫 페이지 정렬 ~312ms vs 카운터 ~2ms). 그래서 `like_count`로 **비정규화**해 `(like_count DESC, id DESC)` 인덱스로 O(페이지) 정렬한다. 대가는 **쓰기 동시성 + 행/카운터 정합성** 책임이다:
+- **정합성(멱등)**: 카운터는 행을 따라가는 종속물이므로 행이 **실제로 INSERT/DELETE 됐을 때만**(영향 행 수 == 1) 증감한다 — 등록은 `INSERT IGNORE` affected==1, 취소는 `DELETE` affected==1일 때만. 중복 좋아요로 부풀거나 없는 좋아요 취소로 음수가 되는 것을 막는다.
+- **동시성**: 인기 상품에 다수가 몰리는 **고경합** 카운터라, 증감을 **원자적 UPDATE**(`SET like_count = like_count + 1`, 감소는 `- 1 WHERE like_count > 0`)로 수행해 lost update를 원천 차단한다. 재고와 같은 결(고경합 단순 카운터) — 낙관적 락은 재시도 폭증으로 부적합(쿠폰의 저경합 상태 전이와 대비).
 
 ### 좋아요 — `product_likes`
 
@@ -154,7 +160,7 @@ erDiagram
 | product_id | BIGINT | PK, FK→products.id | 좋아요 대상 상품 |
 | created_at | TIMESTAMP | NOT NULL | 좋아요한 시각 |
 
-**제약** — 복합 기본키 `(user_id, product_id)`: 한 사용자가 한 상품에 좋아요는 최대 1개 — 이 PK가 **멱등성의 최종 방어선**이다(애플리케이션의 존재 확인이 동시성으로 뚫려도 DB가 막는다 — 2단계 시퀀스 다이어그램). 좋아요 취소는 행을 **물리 삭제**한다. `id`·`updated_at`을 두지 않는다 — `(user_id, product_id)`가 곧 식별자이고, 한 번 누른 좋아요는 수정되지 않는 불변 행이다(3단계 클래스 다이어그램 `Like`와 일치).
+**제약** — 복합 기본키 `(user_id, product_id)`: 한 사용자가 한 상품에 좋아요는 최대 1개 — 이 PK가 **멱등성의 최종 방어선**이다(애플리케이션의 존재 확인이 동시성으로 뚫려도 DB가 막는다 — 2단계 시퀀스 다이어그램). 좋아요 취소는 행을 **물리 삭제**한다. `id`·`updated_at`을 두지 않는다 — `(user_id, product_id)`가 곧 식별자이고, 한 번 누른 좋아요는 수정되지 않는 불변 행이다(3단계 클래스 다이어그램 `Like`와 일치). 좋아요 **수**는 이 행들이 진실이며, `products.like_count`는 정렬 성능을 위해 이를 비정규화한 종속 카운터다(행이 실제로 생기거나 사라질 때만 원자적으로 증감 — `products` 제약 참조).
 
 ### 주문 — `orders`
 
