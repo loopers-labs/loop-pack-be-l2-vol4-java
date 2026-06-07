@@ -33,7 +33,7 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"a", "abc"})
         void throwsBadRequest_whenValueIsShorterThanMinLength(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -44,7 +44,7 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"abcdefghijklmnopqrstu", "abcdefghijklmnopqrstuvwxyz1234"})
         void throwsBadRequest_whenValueIsLongerThanMaxLength(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -55,7 +55,7 @@ class LoginIdTest {
         @ParameterizedTest
         @ValueSource(strings = {"가나다라", "abc!def", "abc def"})
         void throwsBadRequest_whenValueContainsNonAlphanumericCharacters(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -67,7 +67,7 @@ class LoginIdTest {
         @NullAndEmptySource
         @ValueSource(strings = {" ", "      ", "\t", "\n", "\r"})
         void throwsBadRequest_whenValueIsNullOrBlank(String value) {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> LoginId.from(value))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")

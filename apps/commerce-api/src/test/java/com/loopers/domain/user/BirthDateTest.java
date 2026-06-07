@@ -60,7 +60,7 @@ class BirthDateTest {
         @DisplayName("null이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenValueIsNull() {
-            // act & assert
+            // arrange & act & assert
             assertThatThrownBy(() -> BirthDate.from(null))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")

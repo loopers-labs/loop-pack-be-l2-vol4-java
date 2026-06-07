@@ -16,6 +16,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.AuthenticatedUser;
 import com.loopers.interfaces.api.auth.LoginUser;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -28,7 +29,7 @@ public class UserV1Controller implements UserV1ApiSpec {
     @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@RequestBody UserV1Dto.SignUpRequest request) {
+    public ApiResponse<UserV1Dto.SignUpResponse> signUp(@Valid @RequestBody UserV1Dto.SignUpRequest request) {
         UserSignUpInfo newUserSignUpInfo = userFacade.signUp(
             request.loginId(),
             request.password(),
@@ -50,7 +51,7 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @Override
     @PatchMapping("/me/password")
-    public ApiResponse<Void> changePassword(@LoginUser AuthenticatedUser loginUser, @RequestBody UserV1Dto.ChangePasswordRequest request) {
+    public ApiResponse<Void> changePassword(@LoginUser AuthenticatedUser loginUser, @Valid @RequestBody UserV1Dto.ChangePasswordRequest request) {
         userFacade.changePassword(loginUser.userId(), request.currentPassword(), request.newPassword());
 
         return ApiResponse.success();

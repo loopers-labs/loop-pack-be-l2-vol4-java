@@ -1,0 +1,77 @@
+### 브랜드 등록 - 정상 (201 Created)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "감성 브랜드",
+  "description": "감성을 담은 브랜드"
+}
+
+### 브랜드 등록 - 설명 생략 (201 Created)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "이름만 있는 브랜드"
+}
+
+### 브랜드 등록 - 관리자 인증 헤더 누락 (403 Forbidden)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+
+{
+  "name": "감성 브랜드",
+  "description": "감성을 담은 브랜드"
+}
+
+### 브랜드 등록 - 이름 빈 값 (400 Bad Request)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "   ",
+  "description": "감성을 담은 브랜드"
+}
+
+### 브랜드 수정 - 정상 (200 OK)
+PUT http://localhost:8080/api-admin/v1/brands/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "수정된 브랜드",
+  "description": "수정된 설명"
+}
+
+### 브랜드 목록 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/brands?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 목록 - size 범위 초과 (400 Bad Request)
+GET http://localhost:8080/api-admin/v1/brands?page=0&size=101
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 상세 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 상세 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/brands/1
+
+### 브랜드 삭제 - 정상 (200 OK, 소속 상품 cascade)
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 반복 요청 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 미존재 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/brands/99999
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
+DELETE http://localhost:8080/api-admin/v1/brands/1

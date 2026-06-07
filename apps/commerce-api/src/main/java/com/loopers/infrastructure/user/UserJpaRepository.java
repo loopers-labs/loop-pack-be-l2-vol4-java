@@ -8,7 +8,9 @@ import com.loopers.domain.user.UserModel;
 
 public interface UserJpaRepository extends JpaRepository<UserModel, Long> {
 
-    Optional<UserModel> findByLoginIdValue(String value);
+    Optional<UserModel> findByIdAndDeletedAtIsNull(Long id);
+
+    Optional<UserModel> findByLoginIdValueAndDeletedAtIsNull(String value);
 
     boolean existsByLoginIdValue(String value);
 

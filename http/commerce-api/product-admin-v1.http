@@ -1,0 +1,171 @@
+### 상품 목록 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 상품 목록 - 브랜드 필터 (200 OK)
+GET http://localhost:8080/api-admin/v1/products?brandId=1&page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 상품 목록 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=20
+
+### 상품 목록 - size 범위 초과 (400 Bad Request)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=101
+X-Loopers-Ldap: loopers.admin
+
+### 상품 상세 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 상세 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/products/1
+
+### 상품 상세 - 미존재 (404 Not Found)
+GET http://localhost:8080/api-admin/v1/products/99999
+X-Loopers-Ldap: loopers.admin
+
+### 상품 등록 - 정상 (201 Created)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "감성 가디건",
+  "description": "포근한 감성 가디건",
+  "price": 39000,
+  "stock": 50
+}
+
+### 상품 등록 - 설명 생략 (201 Created)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "설명 없는 상품",
+  "price": 10000,
+  "stock": 0
+}
+
+### 상품 등록 - 관리자 인증 헤더 누락 (403 Forbidden)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "감성 가디건",
+  "description": "포근한 감성 가디건",
+  "price": 39000,
+  "stock": 50
+}
+
+### 상품 등록 - 브랜드 미존재 (404 Not Found)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 99999,
+  "name": "감성 가디건",
+  "description": "포근한 감성 가디건",
+  "price": 39000,
+  "stock": 50
+}
+
+### 상품 등록 - 이름 범위 위반 (400 Bad Request)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "",
+  "description": "포근한 감성 가디건",
+  "price": 39000,
+  "stock": 50
+}
+
+### 상품 등록 - 가격 음수 (400 Bad Request)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "감성 가디건",
+  "description": "포근한 감성 가디건",
+  "price": -1,
+  "stock": 50
+}
+
+### 상품 수정 - 정상 (200 OK)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 관리자 인증 헤더 누락 (403 Forbidden)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 대상 미존재 (404 Not Found)
+PUT http://localhost:8080/api-admin/v1/products/99999
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 이름 범위 위반 (400 Bad Request)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "",
+  "description": "새 설명",
+  "price": 42000,
+  "stock": 30
+}
+
+### 상품 수정 - 가격 음수 (400 Bad Request)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "리뉴얼 가디건",
+  "description": "새 설명",
+  "price": -1,
+  "stock": 30
+}
+
+### 상품 삭제 - 정상 (200 OK)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 삭제 - 반복 요청 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
+DELETE http://localhost:8080/api-admin/v1/products/1

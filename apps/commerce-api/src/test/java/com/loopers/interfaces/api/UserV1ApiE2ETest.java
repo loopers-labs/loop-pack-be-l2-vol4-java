@@ -292,7 +292,7 @@ class UserV1ApiE2ETest {
 
         private static final String ENDPOINT_READ_MY_INFO = "/api/v1/users/me";
 
-        private void saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
+        private UserModel saveUser(String loginId, String password, String name, LocalDate birthDate, String email) {
             UserModel user = UserModel.builder()
                 .rawLoginId(loginId)
                 .rawPassword(password)
@@ -302,7 +302,7 @@ class UserV1ApiE2ETest {
                 .passwordEncrypter(passwordEncrypter)
                 .build();
 
-            userJpaRepository.save(user);
+            return userJpaRepository.save(user);
         }
 
         private HttpEntity<Void> authHeaders(String loginId, String password) {
@@ -460,6 +460,33 @@ class UserV1ApiE2ETest {
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("kylekim", "Wrong!2030"),
+                responseType
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+            );
+        }
+
+        @DisplayName("삭제된 회원으로 요청하면, 401 Unauthorized로 거절된다.")
+        @Test
+        void returnsUnauthorized_whenUserIsDeleted() {
+            // arrange
+            String loginId = "kylekim";
+            String password = "Kyle!2030";
+            UserModel savedUser = saveUser(loginId, password, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
+            savedUser.delete();
+            userJpaRepository.saveAndFlush(savedUser);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
+            };
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_READ_MY_INFO,
+                HttpMethod.GET,
+                authHeaders(loginId, password),
                 responseType
             );
 

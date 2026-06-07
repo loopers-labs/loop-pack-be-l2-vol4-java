@@ -47,7 +47,7 @@ subprojects {
 
     dependencies {
         // Web
-        runtimeOnly("org.springframework.boot:spring-boot-starter-validation")
+        implementation("org.springframework.boot:spring-boot-starter-validation")
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize

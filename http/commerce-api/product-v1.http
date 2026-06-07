@@ -1,0 +1,26 @@
+### 상품 목록 - 정상 (200 OK)
+GET http://localhost:8080/api/v1/products?page=0&size=20
+
+### 상품 목록 - 최신 등록 순 (200 OK)
+GET http://localhost:8080/api/v1/products?sort=latest&page=0&size=20
+
+### 상품 목록 - 가격 오름차순 (200 OK)
+GET http://localhost:8080/api/v1/products?sort=price_asc&page=0&size=20
+
+### 상품 목록 - 좋아요 많은 순 (200 OK)
+GET http://localhost:8080/api/v1/products?sort=likes_desc&page=0&size=20
+
+### 상품 목록 - 브랜드 필터 (200 OK)
+GET http://localhost:8080/api/v1/products?brandId=1&page=0&size=20
+
+### 상품 목록 - 허용되지 않는 정렬 값 (400 Bad Request)
+GET http://localhost:8080/api/v1/products?sort=unknown&page=0&size=20
+
+### 상품 목록 - size 범위 초과 (400 Bad Request)
+GET http://localhost:8080/api/v1/products?page=0&size=101
+
+### 상품 상세 - 정상 (200 OK)
+GET http://localhost:8080/api/v1/products/1
+
+### 상품 상세 - 미존재 (404 Not Found)
+GET http://localhost:8080/api/v1/products/99999
