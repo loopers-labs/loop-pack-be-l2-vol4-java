@@ -93,6 +93,7 @@ erDiagram
         timestamp expires_at "NOT NULL / 발급 시점 스냅샷 = 발급시각 + valid_days"
         timestamp used_at "NULL / 사용 시각"
         bigint order_id "NULL / 사용된 주문"
+        bigint version "NOT NULL / 낙관적 락 @Version"
         timestamp created_at "NOT NULL / 발급 시각"
         timestamp updated_at "NOT NULL"
     }
@@ -216,9 +217,10 @@ erDiagram
 | expires_at | TIMESTAMP | NOT NULL | 만료일 (발급 시점 스냅샷 = 발급시각 + valid_days) |
 | used_at | TIMESTAMP | NULL | 사용 시각 |
 | order_id | BIGINT | NULL | 사용된 주문 (ID 참조) |
+| version | BIGINT | NOT NULL | 낙관적 락 버전 (`@Version`) |
 | created_at | TIMESTAMP | NOT NULL | 발급 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
 **제약** — UNIQUE `(user_id, template_id)`: 한 사용자는 같은 템플릿의 쿠폰을 1장만 가진다(1인 1매). 이 유니크 제약이 **중복 발급의 최종 방어선**이다(애플리케이션의 존재 확인이 동시성으로 뚫려도 DB가 막는다). `status`는 `AVAILABLE`/`USED` 두 값만 저장하고, 만료(`EXPIRED`)는 "`AVAILABLE`이면서 `expires_at < now`"로 조회 시점에 파생한다. `order_id`는 ID 참조로만 두고 객체 그래프는 만들지 않는다.
 
-> **[동시성 예고]** 한 쿠폰이 동시에 두 주문에 사용되는 것을 막기 위해 `user_coupons`에 낙관적 락(`@Version`) 또는 비관적 락 적용을 Phase 5(동시성)에서 다룬다. 이 ERD에는 아직 `version` 컬럼을 두지 않는다.
+**동시성(쿠폰)** — 한 쿠폰이 동시에 두 주문에 사용되는 것(중복 사용)은 **낙관적 락(`version` 컬럼, `@Version`)** 으로 막는다. `AVAILABLE→USED` 전이는 한 유저·한 쿠폰끼리의 **저경합**이라, "충돌은 드물다"고 가정하고 커밋 시점에 버전으로 검출하는 낙관적 락이 가장 싸다 — 동시 사용 시 한쪽만 성공하고 나머지는 충돌(`OptimisticLockingFailureException`)로 전체 주문 트랜잭션이 롤백된다(재고 차감·주문 저장까지 함께 취소 = AC-07-8의 처리 단위 유지). 재고가 **조건부 원자 UPDATE**(고경합 카운터 차감)를 쓰는 것과 대비된다 — 같은 "lost update 방지"라도 경합 정도와 연산 성격이 달라 기법을 달리 택했다.

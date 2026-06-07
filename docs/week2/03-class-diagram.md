@@ -126,6 +126,7 @@ classDiagram
         -datetime expiresAt
         -datetime usedAt
         -Long orderId
+        -Long version
         +issue(userId, template, now)$ UserCoupon
         +calculateDiscount(orderAmount) Money
         +use(orderId, now)
@@ -311,6 +312,7 @@ classDiagram
         -datetime expiresAt
         -datetime usedAt
         -Long orderId
+        -Long version
         +issue(userId, template, now)$ UserCoupon
         +calculateDiscount(orderAmount) Money
         +use(orderId, now)
@@ -343,7 +345,7 @@ classDiagram
 ```
 
 - **`CouponTemplate`** (AggregateRoot) — 어드민이 정의하는 쿠폰의 원형. 할인 정책(`DiscountPolicy`)과 유효일수(`validDays`)를 가진다. `issueExpiresAt(now)` = `now + validDays`로 발급될 쿠폰의 만료일을 계산해 준다. `Brand`처럼 논리 삭제(`BaseEntity.deletedAt`, `isDeleted()`)를 따른다. 템플릿 수정·삭제는 **이후 발급분에만** 영향을 주고, 이미 발급된 `UserCoupon`은 스냅샷이라 영향받지 않는다(AC-22-2·AC-23-2).
-- **`UserCoupon`** (AggregateRoot) — 사용자가 발급받은 쿠폰 한 장. 발급 시 `issue(userId, template, now)`가 템플릿의 **할인 정책·쿠폰명을 복사(스냅샷)** 하고 만료일(`expiresAt = template.issueExpiresAt(now)`)을 확정한다. 템플릿은 `templateId`로 ID 참조만 하므로, 발급 이후 템플릿이 수정·삭제돼도 이 쿠폰의 가치는 변하지 않는다(`OrderItem`의 상품명·단가 스냅샷과 같은 원칙). `calculateDiscount(orderAmount)`는 스냅샷한 `DiscountPolicy`에 위임해 할인액을 구한다. `use(orderId, now)`는 사용 가능(미사용·미만료)일 때만 `USED`로 전이하고 `usedAt`·`orderId`를 기록하며, 위반 시 `CoreException`으로 거부한다(재사용·만료 사용 방지).
+- **`UserCoupon`** (AggregateRoot) — 사용자가 발급받은 쿠폰 한 장. 발급 시 `issue(userId, template, now)`가 템플릿의 **할인 정책·쿠폰명을 복사(스냅샷)** 하고 만료일(`expiresAt = template.issueExpiresAt(now)`)을 확정한다. 템플릿은 `templateId`로 ID 참조만 하므로, 발급 이후 템플릿이 수정·삭제돼도 이 쿠폰의 가치는 변하지 않는다(`OrderItem`의 상품명·단가 스냅샷과 같은 원칙). `calculateDiscount(orderAmount)`는 스냅샷한 `DiscountPolicy`에 위임해 할인액을 구한다. `use(orderId, now)`는 사용 가능(미사용·미만료)일 때만 `USED`로 전이하고 `usedAt`·`orderId`를 기록하며, 위반 시 `CoreException`으로 거부한다(재사용·만료 사용 방지). 동시에 두 주문이 같은 쿠폰을 쓰는 **중복 사용**은 `version`(`@Version`) **낙관적 락**으로 막는다 — 저경합이라 커밋 시 충돌 검출이 가장 싸며, 충돌한 쪽은 주문 트랜잭션 전체가 롤백된다(`Product` 재고의 조건부 원자 UPDATE와 대비; 4단계 ERD 참조).
 - **`DiscountPolicy`** (VO, `@Embeddable`) — 할인 종류(`type`)와 값(`value`)을 묶고 **할인 계산 규칙을 캡슐화**한 불변 값 객체. `calculate(orderAmount)`는 `FIXED`면 `min(value, orderAmount)`(적용 전 금액을 넘지 않음), `RATE`면 `floor(orderAmount × value / 100)`(원 단위 절사)를 돌려준다. 어느 쪽도 적용 전 금액을 초과하지 않아 "최종 금액 ≥ 0" 불변식을 타입 안에서 지킨다. 같은 VO를 `CouponTemplate`(원형 정의)과 `UserCoupon`(발급 스냅샷)이 각각 보유한다.
 - **불변식** — 한 (사용자, 템플릿) 쌍에 쿠폰은 최대 1장(1인 1매). `FIXED` 값 ≥ 1(원), `RATE` 값은 1~100(%), 유효일수 ≥ 1. 사용 완료(`USED`) 쿠폰은 다시 사용할 수 없다.
 - **만료(`EXPIRED`) 판정** — 저장하는 상태는 `AVAILABLE`/`USED` 둘뿐이다. `EXPIRED`는 **저장하지 않고** `displayStatus(now)`가 "`AVAILABLE`이면서 `expiresAt`이 지난" 쿠폰을 조회 시점에 만료로 파생한다. 배치 없이 정확한 현재 상태를 보여주는 대신, "저장된 status"와 "노출 status"가 다를 수 있음을 감수한 선택이다.
