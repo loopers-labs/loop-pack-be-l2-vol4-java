@@ -143,6 +143,8 @@ erDiagram
 | created_at | TIMESTAMP | NOT NULL | 생성 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
+**제약** — `stock_quantity`는 `CHECK (stock_quantity >= 0)`로 음수를 막는다. 동시 주문에서의 **초과 판매(oversell) 방지**는 재고 차감을 **조건부 원자 UPDATE**(`SET stock_quantity = stock_quantity - n WHERE stock_quantity >= n`)로 수행해 보장한다 — 영향 행 수가 0이면 재고 부족으로 거부한다. 검증(`>= n`)과 차감이 한 문장에 묶여 read-modify-write 간극이 없으므로, **낙관적 락의 `version` 컬럼이 필요 없다**(쿠폰의 동시성 예고와 대비 — 재고는 단순 카운터 차감이라 조건부 UPDATE로 충분하다). 여러 상품을 차감할 때는 `id` 오름차순으로 UPDATE해 행 락 획득 순서를 통일, 데드락을 피한다.
+
 ### 좋아요 — `product_likes`
 
 | 컬럼 | 타입 | 제약 | 설명 |
