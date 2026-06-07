@@ -53,11 +53,11 @@ class UserCouponRepositoryIntegrationTest {
         return couponPolicyRepository.save(new CouponPolicy("3천원 할인", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT));
     }
 
-    @DisplayName("발급분을 저장하고 단건 조회할 때, ")
+    @DisplayName("사용자 쿠폰을 저장하고 단건 조회할 때, ")
     @Nested
     class SaveAndFindById {
 
-        @DisplayName("저장한 발급분을 id 로 조회하면, 저장한 값이 그대로 반환된다.")
+        @DisplayName("저장한 사용자 쿠폰을 id 로 조회하면, 저장한 값이 그대로 반환된다.")
         @Test
         void returnsSavedUserCoupon_whenFindById() {
             // given
@@ -79,11 +79,11 @@ class UserCouponRepositoryIntegrationTest {
         }
     }
 
-    @DisplayName("사용자별 발급분을 조회할 때, ")
+    @DisplayName("사용자별 사용자 쿠폰을 조회할 때, ")
     @Nested
     class FindByUserId {
 
-        @DisplayName("해당 사용자의 발급분만 반환한다.")
+        @DisplayName("해당 사용자의 사용자 쿠폰만 반환한다.")
         @Test
         void returnsOnlyOwnUserCoupons() {
             // given
@@ -107,7 +107,7 @@ class UserCouponRepositoryIntegrationTest {
     @Nested
     class FindByCouponPolicyId {
 
-        @DisplayName("해당 정책의 발급분을 페이지 크기만큼 잘라서 전체 개수와 함께 반환한다.")
+        @DisplayName("해당 정책의 사용자 쿠폰을 페이지 크기만큼 잘라서 전체 개수와 함께 반환한다.")
         @Test
         void returnsPagedIssuesOfPolicy_withTotalCount() {
             // given

@@ -45,7 +45,7 @@ class CouponServiceTest {
     @Nested
     class Issue {
 
-        @DisplayName("유효한 정책을 발급하면, 해당 사용자 소유의 AVAILABLE 발급분을 저장한다.")
+        @DisplayName("유효한 정책을 발급하면, 해당 사용자 소유의 AVAILABLE 사용자 쿠폰을 저장한다.")
         @Test
         void issuesAvailableUserCoupon_whenPolicyIsValid() {
             // given
@@ -86,7 +86,7 @@ class CouponServiceTest {
             );
         }
 
-        @DisplayName("같은 정책을 발급할 때, 기존 발급분을 조회하지 않고 새 발급분을 저장한다. (중복 발급 허용)")
+        @DisplayName("같은 정책을 발급할 때, 기존 사용자 쿠폰을 조회하지 않고 새 사용자 쿠폰을 저장한다. (중복 발급 허용)")
         @Test
         void doesNotCheckExistingCoupons_whenIssuing() {
             // given
@@ -110,7 +110,7 @@ class CouponServiceTest {
     @Nested
     class GetMyCoupons {
 
-        @DisplayName("해당 사용자의 발급분 목록을 그대로 반환한다.")
+        @DisplayName("해당 사용자의 사용자 쿠폰 목록을 그대로 반환한다.")
         @Test
         void returnsUserCouponsOfUser() {
             // given
@@ -151,7 +151,7 @@ class CouponServiceTest {
             );
         }
 
-        @DisplayName("존재하지 않는 발급분을 사용하면, COUPON_NOT_FOUND 예외가 발생하고 정책을 조회하지 않는다.")
+        @DisplayName("존재하지 않는 사용자 쿠폰을 사용하면, COUPON_NOT_FOUND 예외가 발생하고 정책을 조회하지 않는다.")
         @Test
         void throwsCouponNotFoundException_whenUserCouponDoesNotExist() {
             // given
@@ -171,7 +171,7 @@ class CouponServiceTest {
             );
         }
 
-        @DisplayName("이미 사용된 쿠폰을 다시 사용하면, 발급분의 COUPON_ALREADY_USED 예외가 그대로 전파된다.")
+        @DisplayName("이미 사용된 쿠폰을 다시 사용하면, 사용자 쿠폰의 COUPON_ALREADY_USED 예외가 그대로 전파된다.")
         @Test
         void propagatesCouponAlreadyUsedException_whenCouponIsAlreadyUsed() {
             // given

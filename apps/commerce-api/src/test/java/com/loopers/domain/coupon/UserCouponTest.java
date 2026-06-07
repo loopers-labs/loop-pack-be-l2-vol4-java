@@ -208,4 +208,67 @@ class UserCouponTest {
             );
         }
     }
+
+    @DisplayName("표시 상태를 파생할 때, ")
+    @Nested
+    class DisplayStatus {
+
+        private static final Long OWNER_ID = 1L;
+
+        @DisplayName("아직 사용되지 않았고 만료 전이면, AVAILABLE 을 반환한다.")
+        @Test
+        void returnsAvailable_whenNotUsedAndNotExpired() {
+            // given
+            UserCoupon userCoupon = UserCoupon.issue(OWNER_ID, availablePolicy(), NOW);
+
+            // when
+            CouponDisplayStatus status = userCoupon.displayStatus(NOW);
+
+            // then
+            assertThat(status).isEqualTo(CouponDisplayStatus.AVAILABLE);
+        }
+
+        @DisplayName("이미 사용되었으면, USED 를 반환한다.")
+        @Test
+        void returnsUsed_whenAlreadyUsed() {
+            // given
+            UserCoupon userCoupon = UserCoupon.issue(OWNER_ID, availablePolicy(), NOW);
+            userCoupon.use(OWNER_ID, 10_000L, NOW);
+
+            // when
+            CouponDisplayStatus status = userCoupon.displayStatus(NOW);
+
+            // then
+            assertThat(status).isEqualTo(CouponDisplayStatus.USED);
+        }
+
+        @DisplayName("사용되지 않았지만 만료 시각이 지났으면, EXPIRED 를 반환한다.")
+        @Test
+        void returnsExpired_whenNotUsedButExpired() {
+            // given
+            UserCoupon userCoupon = UserCoupon.issue(OWNER_ID, availablePolicy(), NOW);
+            ZonedDateTime afterExpiry = ZonedDateTime.parse("2100-01-01T00:00:00+09:00");
+
+            // when
+            CouponDisplayStatus status = userCoupon.displayStatus(afterExpiry);
+
+            // then
+            assertThat(status).isEqualTo(CouponDisplayStatus.EXPIRED);
+        }
+
+        @DisplayName("사용되었고 만료 시각도 지났으면, USED 가 EXPIRED 보다 우선한다.")
+        @Test
+        void returnsUsed_whenUsedAndExpired() {
+            // given
+            UserCoupon userCoupon = UserCoupon.issue(OWNER_ID, availablePolicy(), NOW);
+            userCoupon.use(OWNER_ID, 10_000L, NOW);
+            ZonedDateTime afterExpiry = ZonedDateTime.parse("2100-01-01T00:00:00+09:00");
+
+            // when
+            CouponDisplayStatus status = userCoupon.displayStatus(afterExpiry);
+
+            // then
+            assertThat(status).isEqualTo(CouponDisplayStatus.USED);
+        }
+    }
 }

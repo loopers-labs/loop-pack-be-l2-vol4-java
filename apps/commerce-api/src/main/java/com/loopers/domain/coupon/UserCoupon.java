@@ -84,6 +84,16 @@ public class UserCoupon extends BaseEntity {
         return type.discount(orderAmount, discountValue);
     }
 
+    public CouponDisplayStatus displayStatus(ZonedDateTime now) {
+        if (status == UserCouponStatus.USED) {
+            return CouponDisplayStatus.USED;
+        }
+        if (isExpired(now)) {
+            return CouponDisplayStatus.EXPIRED;
+        }
+        return CouponDisplayStatus.AVAILABLE;
+    }
+
     private boolean isExpired(ZonedDateTime now) {
         return now.isAfter(expiredAt);
     }
@@ -98,6 +108,22 @@ public class UserCoupon extends BaseEntity {
 
     public Long getCouponPolicyId() {
         return couponPolicyId;
+    }
+
+    public CouponType getType() {
+        return type;
+    }
+
+    public long getDiscountValue() {
+        return discountValue;
+    }
+
+    public Long getMinOrderAmount() {
+        return minOrderAmount;
+    }
+
+    public ZonedDateTime getExpiredAt() {
+        return expiredAt;
     }
 
     public UserCouponStatus getStatus() {
