@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface CouponPolicyRepository {
     CouponPolicy save(CouponPolicy couponPolicy);
     Optional<CouponPolicy> findById(Long id);
+    Optional<CouponPolicy> findActiveById(Long id);
     Page<CouponPolicy> findAll(Pageable pageable);
     List<CouponPolicy> findAllByIdIn(Collection<Long> ids);
 }

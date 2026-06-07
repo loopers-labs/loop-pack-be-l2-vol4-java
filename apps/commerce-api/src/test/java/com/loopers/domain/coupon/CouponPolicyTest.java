@@ -241,4 +241,93 @@ class CouponPolicyTest {
             assertThat(expired).isTrue();
         }
     }
+
+    @DisplayName("쿠폰 정책의 메타 정보를 수정할 때, ")
+    @Nested
+    class Update {
+
+        @DisplayName("유효한 값으로 수정하면, 이름·최소주문금액·만료일이 갱신되고 타입과 할인값은 그대로 유지된다.")
+        @Test
+        void updatesMetaFields_whenAllValuesAreValid() {
+            // given
+            CouponPolicy policy = new CouponPolicy("기존 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+            ZonedDateTime newExpiredAt = ZonedDateTime.parse("2100-01-31T23:59:59+09:00");
+
+            // when
+            policy.update("변경된 쿠폰", 20_000L, newExpiredAt);
+
+            // then
+            assertAll(
+                () -> assertThat(policy.getName()).isEqualTo("변경된 쿠폰"),
+                () -> assertThat(policy.getMinOrderAmount()).isEqualTo(20_000L),
+                () -> assertThat(policy.getExpiredAt()).isEqualTo(newExpiredAt),
+                () -> assertThat(policy.getType()).isEqualTo(CouponType.FIXED),
+                () -> assertThat(policy.getValue()).isEqualTo(3_000L)
+            );
+        }
+
+        @DisplayName("최소 주문 금액을 null 로 수정하면(제약 해제), 정상적으로 갱신된다.")
+        @Test
+        void updatesMinOrderAmountToNull_whenNullGiven() {
+            // given
+            CouponPolicy policy = new CouponPolicy("기존 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+
+            // when
+            policy.update("기존 쿠폰", null, EXPIRED_AT);
+
+            // then
+            assertThat(policy.getMinOrderAmount()).isNull();
+        }
+
+        @DisplayName("이름이 공백이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenNameIsBlank() {
+            // given
+            CouponPolicy policy = new CouponPolicy("기존 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> policy.update("   ", 10_000L, EXPIRED_AT));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("쿠폰 정책 이름은 비어있을 수 없습니다.")
+            );
+        }
+
+        @DisplayName("최소 주문 금액이 0 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenMinOrderAmountIsZero() {
+            // given
+            CouponPolicy policy = new CouponPolicy("기존 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> policy.update("기존 쿠폰", 0L, EXPIRED_AT));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("최소 주문 금액은 1 이상이어야 합니다.")
+            );
+        }
+
+        @DisplayName("만료일이 null 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenExpiredAtIsNull() {
+            // given
+            CouponPolicy policy = new CouponPolicy("기존 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> policy.update("기존 쿠폰", 10_000L, null));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("쿠폰 만료일은 비어있을 수 없습니다.")
+            );
+        }
+    }
 }

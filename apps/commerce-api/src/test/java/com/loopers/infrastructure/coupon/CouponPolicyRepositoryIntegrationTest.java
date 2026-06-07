@@ -103,6 +103,45 @@ class CouponPolicyRepositoryIntegrationTest {
         }
     }
 
+    @DisplayName("active 쿠폰 정책을 단건 조회할 때, ")
+    @Nested
+    class FindActiveById {
+
+        @DisplayName("삭제되지 않은 정책을 조회하면, 해당 정책을 반환한다.")
+        @Test
+        void returnsPolicy_whenNotDeleted() {
+            // given
+            CouponPolicy saved = couponPolicyRepository.save(newPolicy("3천원 할인"));
+
+            // when
+            Optional<CouponPolicy> found = couponPolicyRepository.findActiveById(saved.getId());
+
+            // then
+            assertThat(found).isPresent();
+            assertThat(found.get().getId()).isEqualTo(saved.getId());
+        }
+
+        @DisplayName("soft-deleted 된 정책을 조회하면, findById 로는 보이지만 findActiveById 로는 빈 Optional 을 반환한다.")
+        @Test
+        void returnsEmpty_whenSoftDeleted() {
+            // given
+            CouponPolicy saved = couponPolicyRepository.save(newPolicy("삭제될 쿠폰"));
+            saved.delete();
+            couponPolicyRepository.save(saved);
+
+            // when
+            Optional<CouponPolicy> active = couponPolicyRepository.findActiveById(saved.getId());
+            Optional<CouponPolicy> any = couponPolicyRepository.findById(saved.getId());
+
+            // then
+            assertAll(
+                () -> assertThat(active).isEmpty(),
+                () -> assertThat(any).isPresent(),
+                () -> assertThat(any.get().getDeletedAt()).isNotNull()
+            );
+        }
+    }
+
     @DisplayName("쿠폰 정책을 페이징 조회할 때, ")
     @Nested
     class FindAll {

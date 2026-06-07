@@ -9,6 +9,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -51,7 +55,7 @@ class CouponServiceTest {
             // given
             Long userId = 1L;
             Long policyId = 10L;
-            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy()));
+            given(couponPolicyRepository.findActiveById(policyId)).willReturn(Optional.of(policy()));
             given(userCouponRepository.save(any(UserCoupon.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
@@ -72,7 +76,7 @@ class CouponServiceTest {
             // given
             Long userId = 1L;
             Long policyId = 999L;
-            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.empty());
+            given(couponPolicyRepository.findActiveById(policyId)).willReturn(Optional.empty());
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -92,7 +96,7 @@ class CouponServiceTest {
             // given
             Long userId = 1L;
             Long policyId = 10L;
-            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy()));
+            given(couponPolicyRepository.findActiveById(policyId)).willReturn(Optional.of(policy()));
             given(userCouponRepository.save(any(UserCoupon.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
@@ -189,6 +193,213 @@ class CouponServiceTest {
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_ALREADY_USED),
                 () -> assertThat(result.getCustomMessage()).isEqualTo("이미 사용된 쿠폰입니다.")
+            );
+        }
+    }
+
+    @DisplayName("어드민이 쿠폰 정책을 생성할 때, ")
+    @Nested
+    class CreatePolicy {
+
+        @DisplayName("유효한 값으로 생성하면, 정책을 저장하고 저장된 정책을 반환한다.")
+        @Test
+        void createsAndReturnsPolicy() {
+            // given
+            given(couponPolicyRepository.save(any(CouponPolicy.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            CouponPolicy created = couponService.createPolicy("신규 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT);
+
+            // then
+            assertAll(
+                () -> assertThat(created.getName()).isEqualTo("신규 쿠폰"),
+                () -> assertThat(created.getType()).isEqualTo(CouponType.FIXED),
+                () -> assertThat(created.getValue()).isEqualTo(3_000L),
+                () -> assertThat(created.getMinOrderAmount()).isEqualTo(10_000L),
+                () -> verify(couponPolicyRepository).save(any(CouponPolicy.class))
+            );
+        }
+    }
+
+    @DisplayName("어드민이 쿠폰 정책을 단건 조회할 때, ")
+    @Nested
+    class GetPolicy {
+
+        @DisplayName("존재하는 정책이면, 해당 정책을 반환한다. (삭제 포함)")
+        @Test
+        void returnsPolicy_whenExists() {
+            // given
+            Long policyId = 10L;
+            CouponPolicy policy = policy();
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+
+            // when
+            CouponPolicy found = couponService.getPolicy(policyId);
+
+            // then
+            assertThat(found).isSameAs(policy);
+        }
+
+        @DisplayName("존재하지 않는 정책이면, COUPON_POLICY_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsCouponPolicyNotFound_whenNotExists() {
+            // given
+            Long policyId = 999L;
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponService.getPolicy(policyId));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_POLICY_NOT_FOUND),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("쿠폰 정책을 찾을 수 없습니다.")
+            );
+        }
+    }
+
+    @DisplayName("어드민이 쿠폰 정책 목록을 조회할 때, ")
+    @Nested
+    class GetPolicies {
+
+        @DisplayName("삭제 포함 전체 정책 페이지를 그대로 반환한다.")
+        @Test
+        void returnsAllPoliciesPage() {
+            // given
+            Pageable pageable = PageRequest.of(0, 20);
+            given(couponPolicyRepository.findAll(pageable)).willReturn(new PageImpl<>(List.of(policy(), policy())));
+
+            // when
+            Page<CouponPolicy> found = couponService.getPolicies(pageable);
+
+            // then
+            assertThat(found.getContent()).hasSize(2);
+        }
+    }
+
+    @DisplayName("어드민이 쿠폰 정책을 수정할 때, ")
+    @Nested
+    class UpdatePolicy {
+
+        @DisplayName("active 정책을 수정하면, 메타 정보가 갱신된 정책을 저장하고 반환한다.")
+        @Test
+        void updatesActivePolicy() {
+            // given
+            Long policyId = 10L;
+            CouponPolicy policy = policy();
+            given(couponPolicyRepository.findActiveById(policyId)).willReturn(Optional.of(policy));
+            given(couponPolicyRepository.save(any(CouponPolicy.class))).willAnswer(invocation -> invocation.getArgument(0));
+            ZonedDateTime newExpiredAt = ZonedDateTime.parse("2100-01-31T23:59:59+09:00");
+
+            // when
+            CouponPolicy updated = couponService.updatePolicy(policyId, "변경된 쿠폰", 20_000L, newExpiredAt);
+
+            // then
+            assertAll(
+                () -> assertThat(updated.getName()).isEqualTo("변경된 쿠폰"),
+                () -> assertThat(updated.getMinOrderAmount()).isEqualTo(20_000L),
+                () -> assertThat(updated.getExpiredAt()).isEqualTo(newExpiredAt),
+                () -> verify(couponPolicyRepository).save(policy)
+            );
+        }
+
+        @DisplayName("active 정책이 없으면(미존재 또는 삭제됨), COUPON_POLICY_NOT_FOUND 예외가 발생하고 저장하지 않는다.")
+        @Test
+        void throwsCouponPolicyNotFound_whenActivePolicyDoesNotExist() {
+            // given
+            Long policyId = 999L;
+            given(couponPolicyRepository.findActiveById(policyId)).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponService.updatePolicy(policyId, "변경", 10_000L, EXPIRED_AT));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_POLICY_NOT_FOUND),
+                () -> verify(couponPolicyRepository, never()).save(any(CouponPolicy.class))
+            );
+        }
+    }
+
+    @DisplayName("어드민이 쿠폰 정책을 삭제할 때, ")
+    @Nested
+    class DeletePolicy {
+
+        @DisplayName("발급된 사용자 쿠폰 존재 여부와 무관하게, 정책을 soft-delete 한다.")
+        @Test
+        void softDeletesPolicy_regardlessOfIssuedCoupons() {
+            // given
+            Long policyId = 10L;
+            CouponPolicy policy = policy();
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+
+            // when
+            couponService.deletePolicy(policyId);
+
+            // then
+            assertAll(
+                () -> assertThat(policy.getDeletedAt()).isNotNull(),
+                () -> verify(userCouponRepository, never()).findByCouponPolicyId(any(), any())
+            );
+        }
+
+        @DisplayName("존재하지 않는 정책을 삭제하면, COUPON_POLICY_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsCouponPolicyNotFound_whenPolicyDoesNotExist() {
+            // given
+            Long policyId = 999L;
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponService.deletePolicy(policyId));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_POLICY_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("어드민이 정책별 발급 내역을 조회할 때, ")
+    @Nested
+    class GetIssuedCoupons {
+
+        @DisplayName("존재하는 정책이면, 해당 정책으로 발급된 사용자 쿠폰 페이지를 반환한다.")
+        @Test
+        void returnsIssuedCouponsPage_whenPolicyExists() {
+            // given
+            Long policyId = 10L;
+            Pageable pageable = PageRequest.of(0, 20);
+            CouponPolicy policy = policy();
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+            UserCoupon uc1 = UserCoupon.issue(1L, policy, NOW);
+            UserCoupon uc2 = UserCoupon.issue(2L, policy, NOW);
+            given(userCouponRepository.findByCouponPolicyId(policyId, pageable)).willReturn(new PageImpl<>(List.of(uc1, uc2)));
+
+            // when
+            Page<UserCoupon> found = couponService.getIssuedCoupons(policyId, pageable);
+
+            // then
+            assertThat(found.getContent()).containsExactly(uc1, uc2);
+        }
+
+        @DisplayName("존재하지 않는 정책이면, COUPON_POLICY_NOT_FOUND 예외가 발생하고 발급 내역을 조회하지 않는다.")
+        @Test
+        void throwsCouponPolicyNotFound_whenPolicyDoesNotExist() {
+            // given
+            Long policyId = 999L;
+            Pageable pageable = PageRequest.of(0, 20);
+            given(couponPolicyRepository.findById(policyId)).willReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponService.getIssuedCoupons(policyId, pageable));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_POLICY_NOT_FOUND),
+                () -> verify(userCouponRepository, never()).findByCouponPolicyId(any(), any())
             );
         }
     }
