@@ -22,15 +22,16 @@ public class LikeApplicationService {
         if (productRepository.find(productId).isEmpty()) {
             throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.");
         }
-        if (likeRepository.exists(userId, productId)) {
-            return;
+        if (likeRepository.save(Like.create(userId, productId)) == 1) {
+            productRepository.increaseLikeCount(productId);
         }
-        likeRepository.save(Like.create(userId, productId));
     }
 
     @Transactional
     public void cancel(Long userId, Long productId) {
-        likeRepository.delete(userId, productId);
+        if (likeRepository.delete(userId, productId) == 1) {
+            productRepository.decreaseLikeCount(productId);
+        }
     }
 
     @Transactional(readOnly = true)

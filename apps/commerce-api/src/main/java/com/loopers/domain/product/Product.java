@@ -7,6 +7,7 @@ import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "products")
+@Table(name = "products", indexes = @Index(name = "idx_products_like_count", columnList = "like_count desc, id desc"))
 public class Product extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)
@@ -31,6 +32,9 @@ public class Product extends BaseEntity {
     @Embedded
     @AttributeOverride(name = "quantity", column = @Column(name = "stock_quantity", nullable = false))
     private Stock stock;
+
+    @Column(name = "like_count", nullable = false)
+    private long likeCount;
 
     private Product(Long brandId, String name, Money price, Stock stock) {
         validateBrandId(brandId);

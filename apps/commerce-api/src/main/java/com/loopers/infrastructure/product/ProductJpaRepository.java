@@ -29,6 +29,16 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
             "WHERE p.id = :id AND p.stock.quantity >= :qty")
     int decreaseStock(@Param("id") Long id, @Param("qty") int qty);
 
+    // 좋아요 수 원자적 증감 — 검증/증감 사이 간극이 없어 카운터 lost update 를 원천 차단한다.
+    // 증감 여부 게이트(행이 실제로 INSERT/DELETE 됐는가)는 응용에서 affected rows 로 판정한다.
+    @Modifying
+    @Query("UPDATE Product p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    int increaseLikeCount(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Product p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
+    int decreaseLikeCount(@Param("id") Long id);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE Product p
@@ -51,10 +61,8 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     @Query("""
         SELECT p
         FROM Product p
-        LEFT JOIN ProductLike l ON l.productId = p.id
-        WHERE p.deletedAt IS NULL AND p.brandId = :brandId
-        GROUP BY p
-        ORDER BY COUNT(l) DESC, p.id DESC
+        WHERE p.deletedAt IS NULL
+        ORDER BY p.likeCount DESC, p.id DESC
     """)
-    Page<Product> findAllByBrandIdOrderByLikesDesc(Long brandId, Pageable pageable);
+    Page<Product> findAllOrderByLikeCountDesc(Pageable pageable);
 }

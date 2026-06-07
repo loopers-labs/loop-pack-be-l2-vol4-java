@@ -50,6 +50,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int increaseLikeCount(Long productId) {
+        return productJpaRepository.increaseLikeCount(productId);
+    }
+
+    @Override
+    public int decreaseLikeCount(Long productId) {
+        return productJpaRepository.decreaseLikeCount(productId);
+    }
+
+    @Override
     public PageResult<Product> findAll(ProductCommand.Search search) {
         Page<Product> page = switch (search.sort()) {
             case LATEST -> findOrderByLatest(search);
@@ -87,9 +97,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     private Page<Product> findOrderByLikesDesc(ProductCommand.Search s) {
-        Pageable pageable = PageRequest.of(s.page(), s.size());
+        // 비정규화 카운터(like_count) 인덱스 정렬 — COUNT 조인/GROUP BY 없이 첫 페이지만 읽는다.
+        Pageable pageable = PageRequest.of(s.page(), s.size(),
+                Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("id")));
         return s.brandId() == null
-                ? productJpaRepository.findAllOrderByLikesDesc(pageable)
-                : productJpaRepository.findAllByBrandIdOrderByLikesDesc(s.brandId(), pageable);
+                ? productJpaRepository.findAllByDeletedAtIsNull(pageable)
+                : productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(s.brandId(), pageable);
     }
 }

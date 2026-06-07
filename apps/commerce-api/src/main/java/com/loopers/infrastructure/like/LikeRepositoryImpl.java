@@ -20,15 +20,13 @@ public class LikeRepositoryImpl implements LikeRepository {
     private final LikeJpaRepository likeJpaRepository;
 
     @Override
-    public void save(Like like) {
-        // INSERT IGNORE: 동시 요청에서 (user_id, product_id) PK 가 이미 들어가도 PK violation 을 일으키지 않고
-        // 0행 영향으로 조용히 통과한다 — ERD 의 "PK 가 멱등성의 최종 방어선" 명세 그대로 구현.
-        likeJpaRepository.insertIgnore(like.getUserId(), like.getProductId());
+    public int save(Like like) {
+        return likeJpaRepository.insertIgnore(like.getUserId(), like.getProductId());
     }
 
     @Override
-    public void delete(Long userId, Long productId) {
-        likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
+    public int delete(Long userId, Long productId) {
+        return likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
     }
 
     @Override
