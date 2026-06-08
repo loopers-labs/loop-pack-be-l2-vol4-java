@@ -19,7 +19,6 @@ import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
-/** 주문 시점 상품 스냅샷. Order의 불변 구성요소(같은 애그리거트)라 BaseEntity 미상속. Product는 다른 애그리거트라 ID 참조. */
 @Getter
 @Entity
 @Table(name = "order_item")
@@ -67,12 +66,10 @@ public class OrderItem {
         this.quantity = quantity;
     }
 
-    /** 패키지-비공개 — {@link OrderModel#addItem(OrderItem)}만 호출. 외부에서 부모를 바꾸지 못하게 막는다. */
     void assignTo(OrderModel order) {
         this.order = order;
     }
 
-    /** 할인 전 금액. */
     public Money subtotal() {
         return unitPrice.multiply(quantity);
     }
