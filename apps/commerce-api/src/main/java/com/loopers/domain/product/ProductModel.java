@@ -1,75 +1,71 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.domain.brand.BrandModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
+@Getter
 @Entity
-@Table(name = "product")
+@Table(name = "products")
 public class ProductModel extends BaseEntity {
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id", nullable = false, updatable = false)
+    private BrandModel brand;
+
+    @Column(name = "name", nullable = false, length = 200)
     private String name;
-    private String description;
-    private Long price;
-    private Integer stock;
+
+    @Column(name = "price", nullable = false)
+    private int price;
+
+    @Column(name = "like_count", nullable = false)
+    private long likeCount = 0;
 
     protected ProductModel() {}
 
-    public ProductModel(String name, String description, Long price, Integer stock) {
+    public ProductModel(BrandModel brand, String name, int price) {
+        if (brand == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");
+        }
         if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 필수입니다.");
         }
-        if (description == null || description.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
+        if (price <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0보다 커야 합니다.");
         }
-        if (price == null || price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (stock == null || stock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
-        }
-
+        this.brand = brand;
         this.name = name;
-        this.description = description;
         this.price = price;
-        this.stock = stock;
     }
 
-    public String getName() {
-        return name;
+    public boolean isDeleted() {
+        return getDeletedAt() != null;
     }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public Long getPrice() {
-        return price;
-    }
-
-    public Integer getStock() {
-        return stock;
-    }
-
-    public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
-        if (newName == null || newName.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+    public void validateActive() {
+        if (isDeleted()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "삭제된 상품입니다.");
         }
-        if (newDescription == null || newDescription.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
-        }
-        if (newPrice == null || newPrice < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (newStock == null || newStock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
-        }
+    }
 
-        this.name = newName;
-        this.description = newDescription;
-        this.price = newPrice;
-        this.stock = newStock;
+    /** 브랜드는 수정 불가 (FR-PA-02) */
+    public void update(String name, int price) {
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 필수입니다.");
+        }
+        if (price <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0보다 커야 합니다.");
+        }
+        this.name = name;
+        this.price = price;
     }
 }

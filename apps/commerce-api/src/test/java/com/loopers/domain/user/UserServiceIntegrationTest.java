@@ -103,11 +103,8 @@ class UserServiceIntegrationTest {
         @DisplayName("새 비밀번호로 변경 시 변경된 비밀번호가 DB에 반영된다.")
         @Test
         void updatesPasswordInDb_whenCalled() {
-            // arrange
-            String newEncoded = passwordEncoder.encode("NewPassword2@");
-
             // act
-            userService.changePassword(savedUser, newEncoded);
+            userService.changePassword(savedUser, RAW_PASSWORD, "NewPassword2@");
 
             // assert
             UserModel updated = userJpaRepository.findById(savedUser.getId()).orElseThrow();

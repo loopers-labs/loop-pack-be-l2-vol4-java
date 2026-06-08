@@ -38,3 +38,7 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+# 개발 가이드 문서 (커밋 대상 아님)
+docs/dev-guide/
+docs/week2/05-design-decisions.md
