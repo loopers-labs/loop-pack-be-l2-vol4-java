@@ -51,7 +51,9 @@ public class LikeFacade {
         }
 
         try {
-            likeRepository.save(LikeModel.of(userId, productId));
+            // saveAndFlush: 즉시 flush로 UK 위반을 커밋 전에 이 try-catch 안에서 잡기 위함.
+            // save()는 INSERT를 트랜잭션 커밋 시점까지 지연할 수 있어 catch를 우회할 위험이 있다.
+            likeRepository.saveAndFlush(LikeModel.of(userId, productId));
         } catch (DataIntegrityViolationException e) {
             // 동시 요청으로 UK 위반 - 다른 요청이 이미 좋아요를 등록 완료. 멱등성 보장.
         }

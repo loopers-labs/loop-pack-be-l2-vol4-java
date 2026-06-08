@@ -32,6 +32,11 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
+    public LikeModel saveAndFlush(LikeModel like) {
+        return likeJpaRepository.saveAndFlush(like);
+    }
+
+    @Override
     public void delete(Long userId, Long productId) {
         likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
     }

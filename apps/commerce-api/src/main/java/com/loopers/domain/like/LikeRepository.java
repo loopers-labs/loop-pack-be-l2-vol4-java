@@ -8,6 +8,9 @@ public interface LikeRepository {
     boolean existsByUserIdAndProductId(Long userId, Long productId);
     List<LikeModel> findByUserId(Long userId);
     LikeModel save(LikeModel like);
+
+    /** flush를 즉시 강제하여 UK 위반을 try-catch 경계 안에서 잡기 위해 사용한다. */
+    LikeModel saveAndFlush(LikeModel like);
     void delete(Long userId, Long productId);
     Optional<LikeModel> findByUserIdAndProductId(Long userId, Long productId);
     long countByProductId(Long productId);
