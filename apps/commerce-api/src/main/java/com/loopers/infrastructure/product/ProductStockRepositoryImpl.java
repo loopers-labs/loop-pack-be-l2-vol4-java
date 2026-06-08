@@ -2,6 +2,8 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductStockModel;
 import com.loopers.domain.product.ProductStockRepository;
+import com.loopers.domain.product.QProductStockModel;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,7 @@ import java.util.Optional;
 public class ProductStockRepositoryImpl implements ProductStockRepository {
 
     private final ProductStockJpaRepository productStockJpaRepository;
+    private final JPAQueryFactory queryFactory;
 
     @Override
     public ProductStockModel save(ProductStockModel stock) {
@@ -26,6 +29,10 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
 
     @Override
     public List<ProductStockModel> findAllByProductId(Long productId) {
-        return productStockJpaRepository.findAllByProductId(productId);
+        QProductStockModel stock = QProductStockModel.productStockModel;
+        return queryFactory
+                .selectFrom(stock)
+                .where(stock.product.id.eq(productId))
+                .fetch();
     }
 }

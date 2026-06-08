@@ -41,7 +41,12 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public boolean existsByBrandIdAndName(Long brandId, String name) {
-        return productJpaRepository.existsByBrandIdAndName(brandId, name);
+        QProductModel product = QProductModel.productModel;
+        return queryFactory
+                .selectOne()
+                .from(product)
+                .where(product.brandId.eq(brandId).and(product.name.value.eq(name)))
+                .fetchFirst() != null;
     }
 
     @Override
@@ -51,7 +56,12 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public void suspendAllByBrandId(Long brandId) {
-        productJpaRepository.suspendAllByBrandId(brandId);
+        QProductModel product = QProductModel.productModel;
+        queryFactory
+                .update(product)
+                .set(product.status, ProductStatus.INACTIVE)
+                .where(product.brandId.eq(brandId))
+                .execute();
     }
 
     @Override
