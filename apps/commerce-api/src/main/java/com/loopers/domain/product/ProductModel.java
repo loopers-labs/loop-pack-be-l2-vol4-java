@@ -3,6 +3,7 @@ package com.loopers.domain.product;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
@@ -10,6 +11,8 @@ import jakarta.persistence.Table;
 @Table(name = "product")
 public class ProductModel extends BaseEntity {
 
+    @Column(name = "brand_id", nullable = false)
+    private Long brandId;
     private String name;
     private String description;
     private Long price;
@@ -17,7 +20,10 @@ public class ProductModel extends BaseEntity {
 
     protected ProductModel() {}
 
-    public ProductModel(String name, String description, Long price, Integer stock) {
+    public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
+        if (brandId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");
+        }
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -31,10 +37,15 @@ public class ProductModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
         }
 
+        this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
         this.stock = stock;
+    }
+
+    public Long getBrandId() {
+        return brandId;
     }
 
     public String getName() {
@@ -53,7 +64,14 @@ public class ProductModel extends BaseEntity {
         return stock;
     }
 
-    public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
+    public Long getLikeCount() {
+        return 0L;
+    }
+
+    public void update(Long newBrandId, String newName, String newDescription, Long newPrice, Integer newStock) {
+        if (newBrandId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");
+        }
         if (newName == null || newName.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
@@ -67,6 +85,7 @@ public class ProductModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
         }
 
+        this.brandId = newBrandId;
         this.name = newName;
         this.description = newDescription;
         this.price = newPrice;

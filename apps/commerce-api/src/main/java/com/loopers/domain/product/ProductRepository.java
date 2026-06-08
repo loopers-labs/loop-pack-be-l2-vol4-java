@@ -7,5 +7,6 @@ public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> find(Long id);
     List<ProductModel> findAll();
+    ProductPage search(ProductSearchCondition condition);
     void delete(Long id);
 }
