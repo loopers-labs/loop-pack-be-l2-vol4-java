@@ -318,6 +318,76 @@ class CouponAdminV1ApiE2ETest {
         }
     }
 
+    @DisplayName("DELETE /api-admin/v1/coupons/{couponId}")
+    @Nested
+    class DeleteCoupon {
+
+        @DisplayName("어드민 헤더와 존재하는 쿠폰 ID가 주어지면 200 OK를 반환하고, 이후 상세 조회에서 제외한다.")
+        @Test
+        void deletesCoupon_whenAdminHeaderAndCouponIdExist() {
+            // arrange
+            CouponTemplate couponTemplate = createCouponTemplate("1주년 2,000원 할인", EXPIRED_AT);
+
+            // act
+            ResponseEntity<ApiResponse<Object>> deleteResponse = deleteCoupon(couponTemplate.getId(), adminHeaders());
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> getResponse = getCoupon(couponTemplate.getId(), adminHeaders());
+
+            // assert
+            assertAll(
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
+            );
+        }
+
+        @DisplayName("삭제해도 이미 발급된 사용자 쿠폰은 영향받지 않는다.")
+        @Test
+        void keepsIssuedUserCoupons_whenTemplateIsDeleted() {
+            // arrange
+            CouponTemplate couponTemplate = createCouponTemplate("1주년 2,000원 할인", EXPIRED_AT);
+            UserCoupon issued = issueTo(101L, couponTemplate);
+
+            // act
+            ResponseEntity<ApiResponse<Object>> deleteResponse = deleteCoupon(couponTemplate.getId(), adminHeaders());
+
+            // assert
+            UserCoupon survived = userCouponRepository.findById(issued.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(survived.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE)
+            );
+        }
+
+        @DisplayName("어드민 헤더와 존재하지 않는 쿠폰 ID가 주어지면, 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenCouponDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<Object>> response = deleteCoupon(999_999L, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<Object>> response = deleteCoupon(1L, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private ResponseEntity<ApiResponse<Object>> deleteCoupon(Long couponId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_COUPONS + "/" + couponId,
+            HttpMethod.DELETE,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
     private ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> getCouponIssues(Long couponId, int page, int size, HttpHeaders headers) {
         ParameterizedTypeReference<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(

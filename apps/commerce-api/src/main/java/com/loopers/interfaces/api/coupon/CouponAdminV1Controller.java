@@ -8,6 +8,7 @@ import com.loopers.support.pagination.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,5 +59,11 @@ public class CouponAdminV1Controller {
         PageResult<CouponAdminV1Dto.CouponIssueResponse> issues = couponAdminFacade.getCouponIssues(couponId, page, size)
             .map(CouponAdminV1Dto.CouponIssueResponse::from);
         return ApiResponse.success(PageResponse.from(issues));
+    }
+
+    @DeleteMapping("/{couponId}")
+    public ApiResponse<Object> deleteCoupon(@PathVariable Long couponId) {
+        couponAdminFacade.deleteCoupon(couponId);
+        return ApiResponse.success();
     }
 }

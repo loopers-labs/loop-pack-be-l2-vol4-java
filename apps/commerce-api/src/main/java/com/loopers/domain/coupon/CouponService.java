@@ -66,6 +66,12 @@ public class CouponService {
     }
 
     @Transactional
+    public void deleteCoupon(Long couponTemplateId) {
+        CouponTemplate coupon = getCouponTemplate(couponTemplateId);
+        coupon.delete();
+    }
+
+    @Transactional
     public CouponDiscount use(CouponUse couponUse) {
         if (!couponUse.hasCoupon()) {
             return CouponDiscount.none(couponUse.orderAmount());

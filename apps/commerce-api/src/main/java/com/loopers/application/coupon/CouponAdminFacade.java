@@ -44,4 +44,8 @@ public class CouponAdminFacade {
         return couponService.getCouponIssues(couponId, new PageQuery(page, size))
             .map(userCoupon -> CouponIssueInfo.from(userCoupon, now));
     }
+
+    public void deleteCoupon(Long couponId) {
+        couponService.deleteCoupon(couponId);
+    }
 }
