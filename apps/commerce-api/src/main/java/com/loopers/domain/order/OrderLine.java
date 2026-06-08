@@ -12,7 +12,7 @@ import com.loopers.domain.stock.StockModel;
  * 한 리스트만 변형되면 그 즉시 깨지는 약한 결합이다.
  *
  * <p>이 record 로 한 줄 단위 문맥을 명시적으로 묶어 그 위험을 제거한다.
- * 호출 측({@link com.loopers.application.order.OrderFacade})은 OrderLine 리스트를 만들어
+ * 호출 측({@link com.loopers.application.order.OrderApplicationService})은 OrderLine 리스트를 만들어
  * {@link OrderService} 에 넘긴다.
  */
 public record OrderLine(

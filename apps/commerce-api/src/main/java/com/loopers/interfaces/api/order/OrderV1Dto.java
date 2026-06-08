@@ -1,20 +1,32 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderInfo;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.ZonedDateTime;
 import java.util.List;
 
 public class OrderV1Dto {
 
-    public record CreateOrderRequest(List<OrderItemRequest> items) {}
+    public record CreateOrderRequest(
+        @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.") @Valid List<OrderItemRequest> items,
+        Long couponId   // 미적용 시 null
+    ) {}
 
-    public record OrderItemRequest(Long productId, int quantity) {}
+    public record OrderItemRequest(
+        @NotNull(message = "상품 ID는 필수입니다.") Long productId,
+        @Min(value = 1, message = "주문 수량은 1 이상이어야 합니다.") int quantity
+    ) {}
 
     public record OrderResponse(
         Long id,
         Long userId,
         String status,
+        Long originalAmount,
+        Long discountAmount,
         Long totalPrice,
         ZonedDateTime orderedAt,
         List<OrderItemResponse> items
@@ -27,6 +39,8 @@ public class OrderV1Dto {
                 info.id(),
                 info.userId(),
                 info.status(),
+                info.originalAmount(),
+                info.discountAmount(),
                 info.totalPrice(),
                 info.orderedAt(),
                 itemResponses

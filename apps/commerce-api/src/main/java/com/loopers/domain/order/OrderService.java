@@ -8,7 +8,7 @@ import java.util.List;
  * 주문 도메인 협력 Service (스타일 2 - Percival 정통).
  *
  * <p>Repository / 외부 시스템 의존 없이 호출자가 조회해서 넘긴 도메인 객체만으로 협력한다.
- * 모든 영속성 호출과 트랜잭션 경계는 {@link com.loopers.application.order.OrderFacade}가 책임진다.
+ * 모든 영속성 호출과 트랜잭션 경계는 {@link com.loopers.application.order.OrderApplicationService}가 책임진다.
  *
  * <p>한 줄 단위 문맥은 {@link OrderLine} 으로 묶어서 받는다. 여러 리스트(products/stocks/items)를
  * 인덱스로 매칭하던 약한 결합을 제거한다.
@@ -34,14 +34,7 @@ public class OrderService {
                 line.quantity()
             ));
         }
-        order.confirmTotalPrice();
+        order.confirmAmounts();
         return order;
-    }
-
-    /** 결제 실패 시 주문 항목별 재고 복구 도메인 협력. */
-    public void restoreStocks(List<OrderLine> orderLines) {
-        for (OrderLine line : orderLines) {
-            line.stock().restore(line.quantity());
-        }
     }
 }

@@ -9,6 +9,8 @@ public record OrderInfo(
     Long id,
     Long userId,
     String status,
+    Long originalAmount,
+    Long discountAmount,
     Long totalPrice,
     ZonedDateTime orderedAt,
     List<OrderItemInfo> items
@@ -39,6 +41,8 @@ public record OrderInfo(
             order.getId(),
             order.getUserId(),
             order.getStatus().name(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
             order.getTotalPrice(),
             order.getOrderedAt(),
             itemInfos

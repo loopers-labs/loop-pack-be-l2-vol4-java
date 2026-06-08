@@ -84,15 +84,55 @@ class OrderModelTest {
             assertThat(order.calculateTotalPrice()).isZero();
         }
 
-        @DisplayName("confirmTotalPrice 후 totalPrice 가 채워진다.")
+        @DisplayName("confirmAmounts 후 원금/최종금액이 채워지고 할인은 0이다.")
         @Test
-        void confirmsTotalPrice() {
+        void confirmsAmounts() {
             OrderModel order = new OrderModel(1L);
             order.addItem(new OrderItemModel(order, 100L, "신발", 50_000L, 2));
 
-            order.confirmTotalPrice();
+            order.confirmAmounts();
 
-            assertThat(order.getTotalPrice()).isEqualTo(100_000L);
+            assertAll(
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(100_000L),
+                () -> assertThat(order.getDiscountAmount()).isZero(),
+                () -> assertThat(order.getTotalPrice()).isEqualTo(100_000L)
+            );
+        }
+    }
+
+    @DisplayName("쿠폰 할인을 적용할 때,")
+    @Nested
+    class ApplyDiscount {
+
+        @DisplayName("원금에서 할인액을 빼 최종 결제 금액을 확정한다.")
+        @Test
+        void appliesDiscount() {
+            OrderModel order = new OrderModel(1L);
+            order.addItem(new OrderItemModel(order, 100L, "신발", 50_000L, 2));   // 100,000
+            order.confirmAmounts();
+
+            order.applyDiscount(com.loopers.domain.common.Money.of(10_000L));
+
+            assertAll(
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(100_000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(10_000L),
+                () -> assertThat(order.getTotalPrice()).isEqualTo(90_000L)
+            );
+        }
+
+        @DisplayName("할인액이 원금을 초과하면 원금까지만 할인되어 최종 금액은 0이다 (음수 방지).")
+        @Test
+        void capsDiscountAtOriginal() {
+            OrderModel order = new OrderModel(1L);
+            order.addItem(new OrderItemModel(order, 100L, "신발", 5_000L, 1));   // 5,000
+            order.confirmAmounts();
+
+            order.applyDiscount(com.loopers.domain.common.Money.of(10_000L));
+
+            assertAll(
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(5_000L),
+                () -> assertThat(order.getTotalPrice()).isZero()
+            );
         }
     }
 

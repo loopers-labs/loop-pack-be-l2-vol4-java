@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.order;
 
-import com.loopers.application.order.OrderFacade;
+import com.loopers.application.order.OrderApplicationService;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import java.util.List;
 @RequestMapping("/api-admin/v1/orders")
 public class OrderAdminV1Controller {
 
-    private final OrderFacade orderFacade;
+    private final OrderApplicationService orderApplicationService;
 
     @GetMapping
     public ApiResponse<List<OrderAdminV1Dto.OrderResponse>> getAllOrders(
@@ -21,7 +21,7 @@ public class OrderAdminV1Controller {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        List<OrderInfo> infos = orderFacade.getAllOrders(page, size);
+        List<OrderInfo> infos = orderApplicationService.getAllOrders(page, size);
         List<OrderAdminV1Dto.OrderResponse> responses = infos.stream()
             .map(OrderAdminV1Dto.OrderResponse::from)
             .toList();
@@ -33,7 +33,7 @@ public class OrderAdminV1Controller {
         @RequestHeader("X-Loopers-Ldap") String ldap,
         @PathVariable Long orderId
     ) {
-        OrderInfo info = orderFacade.getOrderAdmin(orderId);
+        OrderInfo info = orderApplicationService.getOrderAdmin(orderId);
         return ApiResponse.success(OrderAdminV1Dto.OrderResponse.from(info));
     }
 }
