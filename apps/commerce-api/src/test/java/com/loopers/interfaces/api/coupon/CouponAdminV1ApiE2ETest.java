@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.coupon;
 
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -133,6 +134,120 @@ class CouponAdminV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    @DisplayName("GET /api-admin/v1/coupons/{couponId}")
+    @Nested
+    class GetCoupon {
+
+        @DisplayName("어드민 헤더와 존재하는 쿠폰 ID가 주어지면, 200 OK와 해당 쿠폰 정보를 반환한다.")
+        @Test
+        void returnsCoupon_whenCouponExists() {
+            // arrange
+            CouponAdminV1Dto.CreateCouponRequest request = new CouponAdminV1Dto.CreateCouponRequest(
+                "1주년 2,000원 할인",
+                CouponType.FIXED,
+                2_000L,
+                10_000L,
+                EXPIRED_AT
+            );
+            Long couponId = createCoupon(request, adminHeaders()).getBody().data().id();
+
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = getCoupon(couponId, adminHeaders());
+
+            // assert
+            CouponAdminV1Dto.CouponResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(couponId),
+                () -> assertThat(data.name()).isEqualTo("1주년 2,000원 할인"),
+                () -> assertThat(data.type()).isEqualTo(CouponType.FIXED),
+                () -> assertThat(data.discountValue()).isEqualTo(2_000L),
+                () -> assertThat(data.minimumOrderAmount()).isEqualTo(10_000L),
+                () -> assertThat(data.expiredAt().toInstant()).isEqualTo(EXPIRED_AT.toInstant())
+            );
+        }
+
+        @DisplayName("어드민 헤더와 존재하지 않는 쿠폰 ID가 주어지면, 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenCouponDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = getCoupon(999_999L, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = getCoupon(1L, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("GET /api-admin/v1/coupons")
+    @Nested
+    class GetCoupons {
+
+        @DisplayName("어드민 헤더가 주어지면, 200 OK와 등록된 쿠폰 목록을 최신순으로 반환한다.")
+        @Test
+        void returnsCouponPage_whenAdminHeaderIsProvided() {
+            // arrange
+            createCoupon(new CouponAdminV1Dto.CreateCouponRequest(
+                "1주년 2,000원 할인", CouponType.FIXED, 2_000L, 10_000L, EXPIRED_AT
+            ), adminHeaders());
+            createCoupon(new CouponAdminV1Dto.CreateCouponRequest(
+                "1주년 10% 할인", CouponType.RATE, 10L, 10_000L, EXPIRED_AT
+            ), adminHeaders());
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponResponse>>> response = getCoupons(0, 20, adminHeaders());
+
+            // assert
+            PageResponse<CouponAdminV1Dto.CouponResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.totalElements()).isEqualTo(2),
+                () -> assertThat(data.content()).hasSize(2),
+                () -> assertThat(data.content().get(0).name()).isEqualTo("1주년 10% 할인"),
+                () -> assertThat(data.content().get(1).name()).isEqualTo("1주년 2,000원 할인")
+            );
+        }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponResponse>>> response = getCoupons(0, 20, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> getCoupon(Long couponId, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<CouponAdminV1Dto.CouponResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_COUPONS + "/" + couponId,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponResponse>>> getCoupons(int page, int size, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<CouponAdminV1Dto.CouponResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_COUPONS + "?page=" + page + "&size=" + size,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
     }
 
     private ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> createCoupon(

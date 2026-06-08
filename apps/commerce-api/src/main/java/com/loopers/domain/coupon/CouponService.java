@@ -7,6 +7,8 @@ import com.loopers.domain.coupon.specification.UsableCouponSpecification;
 import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,11 @@ public class CouponService {
     public CouponTemplate getCouponTemplate(Long couponTemplateId) {
         return couponTemplateRepository.findActiveById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<CouponTemplate> getCoupons(PageQuery query) {
+        return couponTemplateRepository.findActiveAll(query);
     }
 
     @Transactional
