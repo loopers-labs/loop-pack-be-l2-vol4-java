@@ -4,6 +4,7 @@ import com.loopers.like.domain.Like;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductSortOption;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,15 +85,15 @@ class ProductRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("findAllOnSaleOrderByLatest 는 판매중 상품만 최신순으로 반환한다 (판매중지·삭제 제외)")
-    void givenMixedProducts_whenFindAllOnSaleOrderByLatest_thenReturnsOnlyOnSale() throws Exception {
+    @DisplayName("findAllOnSale(LATEST) 는 판매중 상품만 최신순으로 반환한다 (판매중지·삭제 제외)")
+    void givenMixedProducts_whenFindAllOnSaleLatest_thenReturnsOnlyOnSale() throws Exception {
         save("A", 1000L);
         Thread.sleep(10);
         save("B", 2000L);
         Thread.sleep(10);
         saveSuspended("판매중지", 3000L);
 
-        List<Product> result = productRepository.findAllOnSaleOrderByLatest();
+        List<Product> result = productRepository.findAllOnSale(ProductSortOption.LATEST);
 
         assertThat(result)
                 .extracting(Product::getName)
@@ -100,13 +101,13 @@ class ProductRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("findAllOnSaleOrderByPriceAsc 는 판매중 상품만 가격 오름차순으로 반환한다")
-    void givenMixedProducts_whenFindAllOnSaleOrderByPriceAsc_thenReturnsOnlyOnSaleInPriceAsc() {
+    @DisplayName("findAllOnSale(PRICE_ASC) 는 판매중 상품만 가격 오름차순으로 반환한다")
+    void givenMixedProducts_whenFindAllOnSalePriceAsc_thenReturnsOnlyOnSaleInPriceAsc() {
         save("비싼것", 50_000L);
         save("싼것", 10_000L);
         saveSuspended("판매중지", 1L);
 
-        List<Product> result = productRepository.findAllOnSaleOrderByPriceAsc();
+        List<Product> result = productRepository.findAllOnSale(ProductSortOption.PRICE_ASC);
 
         assertThat(result)
                 .extracting(Product::getName)
@@ -130,8 +131,8 @@ class ProductRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("findAllOnSaleOrderByLikeCountDesc 는 활성 좋아요 수 내림차순 정렬하며, 취소 좋아요·판매중지는 제외한다")
-    void givenProductsWithLikes_whenFindAllOnSaleOrderByLikeCountDesc_thenOrdersByActiveLikeCount() {
+    @DisplayName("findAllOnSale(LIKES_DESC) 는 활성 좋아요 수 내림차순 정렬하며, 취소 좋아요·판매중지는 제외한다")
+    void givenProductsWithLikes_whenFindAllOnSaleLikesDesc_thenOrdersByActiveLikeCount() {
         Product many = save("많이", 1000L);
         Product few = save("적게", 2000L);
         save("없음", 3000L);
@@ -147,7 +148,7 @@ class ProductRepositoryIntegrationTest {
         likeRepository.save(Like.create(2L, suspended.getId()));
         likeRepository.save(Like.create(3L, suspended.getId()));
 
-        List<Product> result = productRepository.findAllOnSaleOrderByLikeCountDesc();
+        List<Product> result = productRepository.findAllOnSale(ProductSortOption.LIKES_DESC);
 
         assertThat(result)
                 .extracting(Product::getName)

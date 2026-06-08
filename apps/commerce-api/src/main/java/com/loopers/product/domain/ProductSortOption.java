@@ -1,4 +1,4 @@
-package com.loopers.product.application;
+package com.loopers.product.domain;
 
 public enum ProductSortOption {
     LATEST,

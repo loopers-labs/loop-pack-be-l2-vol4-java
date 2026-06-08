@@ -5,6 +5,7 @@ import com.loopers.like.application.LikeReader;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDisplayStatus;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductSortOption;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
@@ -98,7 +99,7 @@ class ProductQueryServiceTest {
     void givenLatestOption_whenGetAll_thenReturnsDetailsInLatestOrder() {
         Product a = Product.create(BRAND_ID, "A", "설명", 1000L, null);
         Product b = Product.create(BRAND_ID, "B", "설명", 2000L, null);
-        when(productRepository.findAllOnSaleOrderByLatest()).thenReturn(List.of(b, a));
+        when(productRepository.findAllOnSale(ProductSortOption.LATEST)).thenReturn(List.of(b, a));
         when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
         when(brandReader.getNames(anyList())).thenReturn(Map.of());
         when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
@@ -115,7 +116,7 @@ class ProductQueryServiceTest {
     void givenPriceAscOption_whenGetAll_thenReturnsDetailsInPriceAscOrder() {
         Product cheap = Product.create(BRAND_ID, "싼것", "설명", 1000L, null);
         Product expensive = Product.create(BRAND_ID, "비싼것", "설명", 9000L, null);
-        when(productRepository.findAllOnSaleOrderByPriceAsc()).thenReturn(List.of(cheap, expensive));
+        when(productRepository.findAllOnSale(ProductSortOption.PRICE_ASC)).thenReturn(List.of(cheap, expensive));
         when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
         when(brandReader.getNames(anyList())).thenReturn(Map.of());
         when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
@@ -132,7 +133,7 @@ class ProductQueryServiceTest {
     void givenLikesDescOption_whenGetAll_thenReturnsDetailsInRepositoryOrder() {
         Product popular = Product.create(BRAND_ID, "인기", "설명", 1000L, null);
         Product unpopular = Product.create(BRAND_ID, "비인기", "설명", 2000L, null);
-        when(productRepository.findAllOnSaleOrderByLikeCountDesc()).thenReturn(List.of(popular, unpopular));
+        when(productRepository.findAllOnSale(ProductSortOption.LIKES_DESC)).thenReturn(List.of(popular, unpopular));
         when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
         when(brandReader.getNames(anyList())).thenReturn(Map.of());
         when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());

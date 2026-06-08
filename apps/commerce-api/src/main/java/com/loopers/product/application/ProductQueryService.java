@@ -4,6 +4,7 @@ import com.loopers.brand.application.BrandReader;
 import com.loopers.like.application.LikeReader;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductSortOption;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
@@ -36,11 +37,7 @@ public class ProductQueryService {
 
     @Transactional(readOnly = true)
     public List<ProductResult.Detail> getProducts(ProductSortOption sortOption) {
-        List<Product> products = switch (sortOption) {
-            case LATEST -> productRepository.findAllOnSaleOrderByLatest();
-            case PRICE_ASC -> productRepository.findAllOnSaleOrderByPriceAsc();
-            case LIKES_DESC -> productRepository.findAllOnSaleOrderByLikeCountDesc();
-        };
+        List<Product> products = productRepository.findAllOnSale(sortOption);
 
         if (products.isEmpty()) {
             return List.of();
