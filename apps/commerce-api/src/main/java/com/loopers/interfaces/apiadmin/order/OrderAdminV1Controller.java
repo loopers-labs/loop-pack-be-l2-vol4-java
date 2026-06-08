@@ -21,13 +21,13 @@ public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
     @Override
     public ApiResponse<PageResponse<OrderAdminV1Dto.OrderResponse>> getOrders(Pageable pageable) {
         return ApiResponse.success(
-                PageResponse.from(orderFacade.getAdminOrders(pageable).map(OrderAdminV1Dto.OrderResponse::from))
+                PageResponse.from(OrderAdminV1Dto.OrderResponse.from(orderFacade.getAdminOrders(pageable)))
         );
     }
 
     @GetMapping("/{orderId}")
     @Override
     public ApiResponse<OrderAdminV1Dto.OrderResponse> getOrder(@PathVariable Long orderId) {
-        return ApiResponse.success(OrderAdminV1Dto.OrderResponse.from(orderFacade.getOrder(orderId)));
+        return ApiResponse.success(OrderAdminV1Dto.OrderResponse.from(orderFacade.getAdminOrder(orderId)));
     }
 }

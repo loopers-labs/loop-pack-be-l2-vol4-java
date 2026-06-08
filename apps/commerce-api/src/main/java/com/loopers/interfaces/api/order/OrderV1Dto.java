@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderInfo;
+import com.loopers.domain.order.OrderItemInput;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -17,7 +18,13 @@ public class OrderV1Dto {
 
     public record OrderRequest(
             @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.") @Valid List<OrderItemRequest> items
-    ) {}
+    ) {
+        public List<OrderItemInput> toInputs() {
+            return items.stream()
+                    .map(req -> new OrderItemInput(req.stockId(), req.quantity()))
+                    .toList();
+        }
+    }
 
     public record OrderResponse(
             Long id,
@@ -49,6 +56,10 @@ public class OrderV1Dto {
                     info.status(),
                     info.items().stream().map(OrderItemResponse::from).toList()
             );
+        }
+
+        public static List<OrderResponse> from(List<OrderInfo> infos) {
+            return infos.stream().map(OrderResponse::from).toList();
         }
     }
 }

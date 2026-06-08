@@ -1,6 +1,7 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.order.OrderItemInput;
+import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.ProductStockModel;
@@ -28,15 +29,17 @@ public class OrderFacade {
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemInput> items) {
-        List<OrderItemInput> mergedItems = orderService.mergeItems(items);
-        List<ProductStockModel> stocks = productStockService.decrease(mergedItems);
-        return OrderInfo.from(orderService.placeOrder(new OrderModel(userId), stocks, mergedItems));
+        List<OrderLine> lines = OrderLine.from(items);
+        List<ProductStockModel> stocks = lines.stream()
+                .map(line -> productStockService.decrease(line.stockId(), line.quantity()))
+                .toList();
+        return OrderInfo.from(orderService.placeOrder(new OrderModel(userId), stocks, lines));
     }
 
     @Transactional
-    public OrderInfo cancelOrder(Long orderId) {
-        OrderModel order = orderService.cancel(orderId);
-        productStockService.restore(order.getItems());
+    public OrderInfo cancelOrder(Long orderId, Long userId) {
+        OrderModel order = orderService.cancel(orderId, userId);
+        order.getItems().forEach(item -> productStockService.increase(item.getStockId(), item.getQuantity().getValue()));
         return OrderInfo.from(order);
     }
 
@@ -46,8 +49,13 @@ public class OrderFacade {
     }
 
     @Transactional(readOnly = true)
-    public OrderInfo getOrder(Long orderId) {
+    public OrderInfo getAdminOrder(Long orderId) {
         return OrderInfo.from(orderService.get(orderId));
+    }
+
+    @Transactional(readOnly = true)
+    public OrderInfo getOrder(Long orderId, Long userId) {
+        return OrderInfo.from(orderService.getByUser(orderId, userId));
     }
 
     @Transactional(readOnly = true)

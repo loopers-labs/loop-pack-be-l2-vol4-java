@@ -37,6 +37,16 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdAndUserId(Long id, Long userId) {
+        QOrderModel order = QOrderModel.orderModel;
+        return Optional.ofNullable(
+                queryFactory.selectFrom(order)
+                        .where(order.id.eq(id).and(order.userId.eq(userId)))
+                        .fetchOne()
+        );
+    }
+
+    @Override
     public List<OrderModel> findAllByUserId(Long userId) {
         return orderJpaRepository.findAllByUserId(userId);
     }

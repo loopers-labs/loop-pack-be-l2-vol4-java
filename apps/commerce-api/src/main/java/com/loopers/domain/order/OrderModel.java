@@ -19,11 +19,9 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "orders", uniqueConstraints = {
@@ -31,8 +29,6 @@ import java.util.stream.Collectors;
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderModel extends BaseEntity {
-
-    private static final int PAYMENT_EXPIRY_MINUTES = 15;
 
     @Column(name = "order_number", nullable = false, length = 20)
     private String orderNumber;
@@ -79,24 +75,7 @@ public class OrderModel extends BaseEntity {
     }
 
     public boolean isPayable() {
-        return this.status == OrderStatus.REQUESTED
-                && ZonedDateTime.now().isBefore(getCreatedAt().plusMinutes(PAYMENT_EXPIRY_MINUTES));
-    }
-
-    public boolean isExpirable() {
-        return this.status == OrderStatus.REQUESTED
-                && ZonedDateTime.now().isAfter(getCreatedAt().plusMinutes(PAYMENT_EXPIRY_MINUTES));
-    }
-
-    public static List<OrderItemInput> merge(List<OrderItemInput> inputs) {
-        return inputs.stream()
-                .collect(Collectors.groupingBy(
-                        OrderItemInput::stockId,
-                        Collectors.summingInt(OrderItemInput::quantity)
-                ))
-                .entrySet().stream()
-                .map(e -> new OrderItemInput(e.getKey(), e.getValue()))
-                .toList();
+        return this.status == OrderStatus.REQUESTED;
     }
 
     public void addItem(OrderItemModel item) {

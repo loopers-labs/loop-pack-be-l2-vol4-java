@@ -28,29 +28,25 @@ public class OrderService {
         return orderRepository.findAll(pageable);
     }
 
-    public List<OrderItemInput> mergeItems(List<OrderItemInput> items) {
-        return OrderModel.merge(items);
-    }
-
     @Transactional
-    public OrderModel placeOrder(OrderModel order, List<ProductStockModel> stocks, List<OrderItemInput> inputs) {
-        buildItems(order, stocks, inputs);
+    public OrderModel placeOrder(OrderModel order, List<ProductStockModel> stocks, List<OrderLine> lines) {
+        buildItems(order, stocks, lines);
         order.updateTotal(orderTotalPolicy.calculate(order.getItems()));
         return orderRepository.save(order);
     }
 
-    private void buildItems(OrderModel order, List<ProductStockModel> stocks, List<OrderItemInput> inputs) {
+    private void buildItems(OrderModel order, List<ProductStockModel> stocks, List<OrderLine> lines) {
         Map<Long, ProductStockModel> stockMap = stocks.stream()
                 .collect(Collectors.toMap(ProductStockModel::getId, s -> s));
-        inputs.forEach(input -> {
-            ProductStockModel stock = stockMap.get(input.stockId());
+        lines.forEach(line -> {
+            ProductStockModel stock = stockMap.get(line.stockId());
             order.addItem(new OrderItemModel(
                     order,
                     stock.getId(),
                     stock.getProduct().getId(),
                     new ProductName(stock.getProduct().getName()),
                     stock.getPrice(),
-                    new StockQuantity(input.quantity())
+                    new StockQuantity(line.quantity())
             ));
         });
     }
@@ -58,6 +54,12 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderModel get(Long id) {
         return orderRepository.findById(id)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public OrderModel getByUser(Long id, Long userId) {
+        return orderRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
     }
 
@@ -83,8 +85,8 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderModel cancel(Long id) {
-        OrderModel order = get(id);
+    public OrderModel cancel(Long id, Long userId) {
+        OrderModel order = getByUser(id, userId);
         order.cancel();
         return order;
     }

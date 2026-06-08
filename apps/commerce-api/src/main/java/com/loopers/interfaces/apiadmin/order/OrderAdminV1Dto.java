@@ -1,6 +1,7 @@
 package com.loopers.interfaces.apiadmin.order;
 
 import com.loopers.application.order.OrderInfo;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -27,6 +28,10 @@ public class OrderAdminV1Dto {
                         item.productPrice(), item.quantity()
                 );
             }
+        }
+
+        public static Page<OrderResponse> from(Page<OrderInfo> page) {
+            return page.map(OrderResponse::from);
         }
 
         public static OrderResponse from(OrderInfo info) {

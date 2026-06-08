@@ -1,12 +1,10 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderFacade;
-import com.loopers.domain.order.OrderItemInput;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,10 +33,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @Valid @RequestBody OrderV1Dto.OrderRequest request,
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        List<OrderItemInput> items = request.items().stream()
-                .map(req -> new OrderItemInput(req.stockId(), req.quantity()))
-                .toList();
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.createOrder(userId, items)));
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.createOrder(userId, request.toInputs())));
     }
 
     @GetMapping
@@ -48,9 +43,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt
     ) {
-        return ApiResponse.success(orderFacade.getOrders(userId, startAt, endAt).stream()
-                .map(OrderV1Dto.OrderResponse::from)
-                .toList());
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.getOrders(userId, startAt, endAt)));
     }
 
     @GetMapping("/{orderId}")
@@ -59,7 +52,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @PathVariable Long orderId,
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.getOrder(orderId)));
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.getOrder(orderId, userId)));
     }
 
     @PostMapping("/{orderId}/cancel")
@@ -69,7 +62,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @PathVariable Long orderId,
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.cancelOrder(orderId)));
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.cancelOrder(orderId, userId)));
     }
 
 }

@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface OrderRepository {
     OrderModel save(OrderModel order);
     Optional<OrderModel> findById(Long id);
+    Optional<OrderModel> findByIdAndUserId(Long id, Long userId);
     Optional<OrderModel> findByOrderNumber(String orderNumber);
     List<OrderModel> findAllByUserId(Long userId);
     List<OrderModel> findAllByUserIdWithDateRange(Long userId, ZonedDateTime startAt, ZonedDateTime endAt);
