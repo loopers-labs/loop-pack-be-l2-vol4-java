@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -44,10 +45,10 @@ public class OrderService {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목이 비어있습니다.");
         }
         OrderModel order = new OrderModel(userId, method);
+        // 1) 상품/브랜드 검증 + 주문 항목 구성 (요청 순서 — 검증 에러 우선순위 보존)
         for (OrderLine line : lines) {
             ProductModel product = productService.getActiveProduct(line.productId());
             BrandModel brand = brandService.getActiveBrand(product.getBrandId());
-            stockService.decrease(product.getId(), line.quantity());
             order.addItem(new OrderItem(
                     product.getId(),
                     product.getName(),
@@ -57,6 +58,11 @@ public class OrderService {
                     line.quantity()
             ));
         }
+        // 2) 재고 차감 — 여러 상품의 락을 항상 productId 오름차순으로 획득해 데드락을 방지한다.
+        //    (두 주문이 겹치는 상품을 서로 다른 순서로 잠그면 상호 대기 → 데드락)
+        lines.stream()
+                .sorted(Comparator.comparingLong(OrderLine::productId))
+                .forEach(line -> stockService.decrease(line.productId(), line.quantity()));
         order.calculateTotals();
         if (couponId != null) {
             AppliedCoupon applied = userCouponService.useForOrder(userId, couponId, order.getTotalAmount().getAmount());
@@ -77,9 +83,10 @@ public class OrderService {
     public OrderModel markFailed(Long orderId, String reason) {
         OrderModel order = getOrderForUpdate(orderId);
         order.markFailed(reason);
-        for (OrderItem item : order.getItems()) {
-            stockService.increase(item.getProductId(), item.getQuantity());
-        }
+        // 재고 원복도 productId 오름차순으로 락을 잡아 차감(placeOrderPending)과 동일한 락 순서를 유지(데드락 방지).
+        order.getItems().stream()
+                .sorted(Comparator.comparingLong(OrderItem::getProductId))
+                .forEach(item -> stockService.increase(item.getProductId(), item.getQuantity()));
         if (order.getUserCouponId() != null) {
             userCouponService.restore(order.getUserCouponId());
         }
