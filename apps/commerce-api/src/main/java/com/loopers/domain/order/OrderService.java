@@ -67,7 +67,7 @@ public class OrderService {
 
     @Transactional
     public OrderModel markPaid(Long orderId) {
-        OrderModel order = getOrder(orderId);
+        OrderModel order = getOrderForUpdate(orderId);
         order.markPaid();
         return orderRepository.save(order);
     }
@@ -75,7 +75,7 @@ public class OrderService {
     /** 결제 실패 처리 — 상태 전이 + 항목별 재고 원복 + (적용됐다면) 쿠폰 원복 (01 §7.6, UC-19). */
     @Transactional
     public OrderModel markFailed(Long orderId, String reason) {
-        OrderModel order = getOrder(orderId);
+        OrderModel order = getOrderForUpdate(orderId);
         order.markFailed(reason);
         for (OrderItem item : order.getItems()) {
             stockService.increase(item.getProductId(), item.getQuantity());
@@ -89,6 +89,17 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderModel getOrder(Long orderId) {
         return orderRepository.find(orderId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
+    }
+
+    /**
+     * 결제 결과 반영용 주문 로드 — 비관적 락(FOR UPDATE)으로 행을 잠근다.
+     * 동시 확정(reconcile/콜백)이 같은 주문에 들어와도 선행 트랜잭션 커밋까지 대기 → 재조회 시
+     * 이미 PAID/FAILED라 OrderModel.requirePending()이 CONFLICT를 던져 이중 보상을 막는다.
+     * markPaid/markFailed 전용 (쓰기 트랜잭션 안에서 호출).
+     */
+    private OrderModel getOrderForUpdate(Long orderId) {
+        return orderRepository.findForUpdate(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
     }
 
