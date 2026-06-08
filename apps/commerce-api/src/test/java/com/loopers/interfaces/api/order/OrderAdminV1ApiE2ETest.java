@@ -114,7 +114,7 @@ class OrderAdminV1ApiE2ETest {
                 .getBody().data().id();
     }
 
-    @DisplayName("GET /api/v1/admin/orders")
+    @DisplayName("GET /api-admin/v1/orders")
     @Nested
     class GetOrders {
 
@@ -126,14 +126,14 @@ class OrderAdminV1ApiE2ETest {
 
             ParameterizedTypeReference<ApiResponse<PageResponse<OrderAdminV1Dto.OrderResponse>>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<PageResponse<OrderAdminV1Dto.OrderResponse>>> response =
-                    testRestTemplate.exchange("/api/v1/admin/orders", HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType);
+                    testRestTemplate.exchange("/api-admin/v1/orders", HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().content()).hasSize(2);
         }
     }
 
-    @DisplayName("GET /api/v1/admin/orders/{orderId}")
+    @DisplayName("GET /api-admin/v1/orders/{orderId}")
     @Nested
     class GetOrder {
 
@@ -144,7 +144,7 @@ class OrderAdminV1ApiE2ETest {
 
             ParameterizedTypeReference<ApiResponse<OrderAdminV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderAdminV1Dto.OrderResponse>> response =
-                    testRestTemplate.exchange("/api/v1/admin/orders/" + orderId, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType);
+                    testRestTemplate.exchange("/api-admin/v1/orders/" + orderId, HttpMethod.GET, new HttpEntity<>(adminHeaders()), responseType);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().id()).isEqualTo(orderId);
