@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -34,10 +35,16 @@ public class OrderFacade {
 
     /**
      * 주문 생성. 하나의 쓰기 트랜잭션 안에서:
-     *   1) 상품 조회 → 2) (couponId 있으면) 쿠폰 사용 + 할인 산정 → 3) 재고 차감 + 주문 생성 → 4) 영속화
-     * 쿠폰이 만료/타인 소유/이미 사용 등 무효한 경우 CouponService 가 던지는 예외로 트랜잭션 전체가 롤백된다
-     * (재고 차감, 쿠폰 USED 전이, Order 생성 모두 원자성 보장).
-     * CouponService.useCoupon 의 @Transactional 은 REQUIRED 로 합류해 동일 트랜잭션이 된다.
+     *   1) 상품을 비관적 락(PESSIMISTIC_WRITE) 으로 조회 → 2) (couponId 있으면) 쿠폰 사용 + 할인 산정
+     *   → 3) 재고 차감 + 주문 생성 → 4) 영속화
+     *
+     * 동시성 전략:
+     * - **재고**: 비관적 락. 인기 상품 동시 주문이 빈번하고 음수 재고 절대 금지라 강한 일관성이 필요.
+     * - **쿠폰**: 낙관적 락(@Version, CouponService). 충돌 빈도가 낮아 재시도 비용 최소.
+     * - **데드락 회피**: 같은 트랜잭션 내에서 여러 상품을 잠글 때는 productId 오름차순으로 락 획득 순서를 고정.
+     *   (주문 A: P1→P2, 주문 B: P2→P1 같은 cross-lock 시나리오를 차단)
+     *
+     * 쿠폰 무효/낙관적 락 충돌/재고 부족 어디서 실패하든 트랜잭션 전체가 롤백되어 원자성이 보장된다.
      */
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> items, Long couponId) {
@@ -48,8 +55,13 @@ public class OrderFacade {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
 
-        List<OrderLine> lines = items.stream()
-            .map(item -> new OrderLine(productService.getProduct(item.productId()), item.quantity()))
+        // 데드락 회피: 락 획득 순서를 productId 오름차순으로 고정한다.
+        List<OrderItemCommand> sortedItems = items.stream()
+            .sorted(Comparator.comparing(OrderItemCommand::productId))
+            .toList();
+
+        List<OrderLine> lines = sortedItems.stream()
+            .map(item -> new OrderLine(productService.getProductForUpdate(item.productId()), item.quantity()))
             .toList();
 
         // 1) 할인 금액 산정 위해 원금을 먼저 계산 (재고 차감 전 가격 기반; 차감 후 OrderItem 도 동일 결과)
