@@ -18,10 +18,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.util.AntPathMatcher;
 
 @RequiredArgsConstructor
 public class AuthFilter extends OncePerRequestFilter {
+
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/v1/products/**",
+            "/api/v1/brands/**"
+    );
+    private static final AntPathMatcher MATCHER = new AntPathMatcher();
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -30,12 +38,7 @@ public class AuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path.startsWith("/api-admin")) return false;
-        if (path.endsWith("/likes")) return false;
-        if (path.endsWith("/me")) return false;
-        if (path.endsWith("/password")) return false;
-        if (path.startsWith("/api/v1/orders")) return false;
-        return true;
+        return PUBLIC_PATHS.stream().anyMatch(p -> MATCHER.match(p, path));
     }
 
     @Override
