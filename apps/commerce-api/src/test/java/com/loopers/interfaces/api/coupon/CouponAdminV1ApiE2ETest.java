@@ -1,6 +1,12 @@
 package com.loopers.interfaces.api.coupon;
 
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.UserCouponStatus;
+import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -30,16 +36,24 @@ class CouponAdminV1ApiE2ETest {
     private static final String HEADER_ADMIN_LDAP = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
     private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
+    private static final ZonedDateTime PAST_EXPIRED_AT = ZonedDateTime.parse("2026-01-01T00:00:00+09:00");
+    private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     private final TestRestTemplate testRestTemplate;
+    private final CouponTemplateRepository couponTemplateRepository;
+    private final UserCouponRepository userCouponRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     CouponAdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
+        CouponTemplateRepository couponTemplateRepository,
+        UserCouponRepository userCouponRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
+        this.couponTemplateRepository = couponTemplateRepository;
+        this.userCouponRepository = userCouponRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -228,6 +242,105 @@ class CouponAdminV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    @DisplayName("GET /api-admin/v1/coupons/{couponId}/issues")
+    @Nested
+    class GetCouponIssues {
+
+        @DisplayName("어드민 헤더와 발급 내역이 있는 쿠폰 ID가 주어지면, 200 OK와 발급 내역을 최신순으로 반환한다.")
+        @Test
+        void returnsIssuePage_whenCouponHasIssues() {
+            // arrange
+            CouponTemplate couponTemplate = createCouponTemplate("1주년 2,000원 할인", EXPIRED_AT);
+            issueTo(101L, couponTemplate);
+            UserCoupon latest = issueTo(102L, couponTemplate);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> response =
+                getCouponIssues(couponTemplate.getId(), 0, 20, adminHeaders());
+
+            // assert
+            PageResponse<CouponAdminV1Dto.CouponIssueResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.totalElements()).isEqualTo(2),
+                () -> assertThat(data.content()).hasSize(2),
+                () -> assertThat(data.content().get(0).userCouponId()).isEqualTo(latest.getId()),
+                () -> assertThat(data.content().get(0).userId()).isEqualTo(102L),
+                () -> assertThat(data.content().get(0).status()).isEqualTo(UserCouponStatus.AVAILABLE),
+                () -> assertThat(data.content().get(0).issuedAt()).isNotNull(),
+                () -> assertThat(data.content().get(0).usedAt()).isNull(),
+                () -> assertThat(data.content().get(1).userId()).isEqualTo(101L)
+            );
+        }
+
+        @DisplayName("발급분이 만료일을 지났으면, display 상태로 EXPIRED를 반환한다.")
+        @Test
+        void returnsExpiredDisplayStatus_whenIssuedCouponIsPastExpiration() {
+            // arrange
+            CouponTemplate expiredTemplate = createCouponTemplate("1주년 2,000원 할인", PAST_EXPIRED_AT);
+            issueTo(101L, expiredTemplate);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> response =
+                getCouponIssues(expiredTemplate.getId(), 0, 20, adminHeaders());
+
+            // assert
+            PageResponse<CouponAdminV1Dto.CouponIssueResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content()).hasSize(1),
+                () -> assertThat(data.content().get(0).status()).isEqualTo(UserCouponStatus.EXPIRED)
+            );
+        }
+
+        @DisplayName("어드민 헤더와 존재하지 않는 쿠폰 ID가 주어지면, 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenCouponDoesNotExist() {
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> response =
+                getCouponIssues(999_999L, 0, 20, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // act
+            ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> response =
+                getCouponIssues(1L, 0, 20, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> getCouponIssues(Long couponId, int page, int size, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_COUPONS + "/" + couponId + "/issues?page=" + page + "&size=" + size,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            responseType
+        );
+    }
+
+    private CouponTemplate createCouponTemplate(String name, ZonedDateTime expiredAt) {
+        return couponTemplateRepository.save(CouponTemplate.create(
+            name,
+            CouponType.FIXED,
+            2_000L,
+            10_000L,
+            expiredAt,
+            FIXED_POLICY
+        ));
+    }
+
+    private UserCoupon issueTo(Long userId, CouponTemplate couponTemplate) {
+        return userCouponRepository.save(UserCoupon.issue(userId, couponTemplate.getId(), couponTemplate));
     }
 
     private ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> getCoupon(Long couponId, HttpHeaders headers) {

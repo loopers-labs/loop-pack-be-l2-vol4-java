@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+
 @RequiredArgsConstructor
 @Component
 public class CouponAdminFacade {
@@ -34,5 +36,12 @@ public class CouponAdminFacade {
     public PageResult<CouponInfo> getCoupons(int page, int size) {
         return couponService.getCoupons(new PageQuery(page, size))
             .map(CouponInfo::from);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<CouponIssueInfo> getCouponIssues(Long couponId, int page, int size) {
+        ZonedDateTime now = ZonedDateTime.now();
+        return couponService.getCouponIssues(couponId, new PageQuery(page, size))
+            .map(userCoupon -> CouponIssueInfo.from(userCoupon, now));
     }
 }

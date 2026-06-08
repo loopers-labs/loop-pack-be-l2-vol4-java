@@ -59,6 +59,12 @@ public class CouponService {
         return couponTemplateRepository.findActiveAll(query);
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<UserCoupon> getCouponIssues(Long couponTemplateId, PageQuery query) {
+        getCouponTemplate(couponTemplateId);
+        return userCouponRepository.findAllByCouponTemplateId(couponTemplateId, query);
+    }
+
     @Transactional
     public CouponDiscount use(CouponUse couponUse) {
         if (!couponUse.hasCoupon()) {

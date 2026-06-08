@@ -48,4 +48,15 @@ public class CouponAdminV1Controller {
             .map(CouponAdminV1Dto.CouponResponse::from);
         return ApiResponse.success(PageResponse.from(coupons));
     }
+
+    @GetMapping("/{couponId}/issues")
+    public ApiResponse<PageResponse<CouponAdminV1Dto.CouponIssueResponse>> getCouponIssues(
+        @PathVariable Long couponId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        PageResult<CouponAdminV1Dto.CouponIssueResponse> issues = couponAdminFacade.getCouponIssues(couponId, page, size)
+            .map(CouponAdminV1Dto.CouponIssueResponse::from);
+        return ApiResponse.success(PageResponse.from(issues));
+    }
 }

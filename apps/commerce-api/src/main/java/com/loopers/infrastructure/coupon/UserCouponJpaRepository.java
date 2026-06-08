@@ -2,6 +2,8 @@ package com.loopers.infrastructure.coupon;
 
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +15,8 @@ import java.util.Optional;
 public interface UserCouponJpaRepository extends JpaRepository<UserCoupon, Long> {
 
     Optional<UserCoupon> findByOwnerUserIdAndCouponTemplateIdValue(Long userId, Long couponTemplateId);
+
+    Page<UserCoupon> findByCouponTemplateIdValue(Long couponTemplateId, Pageable pageable);
 
     @Modifying(flushAutomatically = true)
     @Query("""
