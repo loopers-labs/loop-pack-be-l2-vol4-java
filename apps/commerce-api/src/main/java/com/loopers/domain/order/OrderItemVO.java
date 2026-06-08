@@ -6,7 +6,7 @@ import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
 
-public class OrderItemVO extends BaseEntity {
+public class OrderItemVO {
 
     private Long orderId;
     private Long productId;
@@ -27,16 +27,14 @@ public class OrderItemVO extends BaseEntity {
         this.quantity = quantity;
     }
 
-    public static OrderItemVO of(Long id, Long orderId, Long productId, String productName,
-                                 Long productPrice, Integer quantity,
-                                 ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+    public static OrderItemVO of(Long orderId, Long productId, String productName,
+                                 Long productPrice, Integer quantity) {
         OrderItemVO entity = new OrderItemVO();
         entity.orderId = orderId;
         entity.productId = productId;
         entity.productName = productName;
         entity.productPrice = productPrice;
         entity.quantity = quantity;
-        entity.reconstruct(id, createdAt, updatedAt, deletedAt);
         return entity;
     }
 

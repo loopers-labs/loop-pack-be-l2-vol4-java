@@ -21,7 +21,7 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public OrderEntity save(OrderEntity order) {
         OrderJpaEntity savedOrder = orderJpaRepository.save(OrderMapper.toJpaEntity(order));
-        List<OrderItemJpaEntity> savedItems = order.getItems().stream()
+        List<OrderItemJpaVO> savedItems = order.getItems().stream()
                 .map(item -> orderItemJpaRepository.save(OrderMapper.toItemJpaEntity(item, savedOrder.getId())))
                 .toList();
         return OrderMapper.toDomain(savedOrder, savedItems);
@@ -31,7 +31,7 @@ public class OrderRepositoryImpl implements OrderRepository {
     public Optional<OrderEntity> findById(Long id) {
         return orderJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(order -> {
-                    List<OrderItemJpaEntity> items =
+                    List<OrderItemJpaVO> items =
                             orderItemJpaRepository.findAllByOrderIdAndDeletedAtIsNull(order.getId());
                     return OrderMapper.toDomain(order, items);
                 });
@@ -41,7 +41,7 @@ public class OrderRepositoryImpl implements OrderRepository {
     public Page<OrderEntity> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdWithDateRange(userId, startAt, endAt, pageable)
                 .map(order -> {
-                    List<OrderItemJpaEntity> items =
+                    List<OrderItemJpaVO> items =
                             orderItemJpaRepository.findAllByOrderIdAndDeletedAtIsNull(order.getId());
                     return OrderMapper.toDomain(order, items);
                 });
@@ -51,7 +51,7 @@ public class OrderRepositoryImpl implements OrderRepository {
     public Page<OrderEntity> findAll(Pageable pageable) {
         return orderJpaRepository.findAllByDeletedAtIsNull(pageable)
                 .map(order -> {
-                    List<OrderItemJpaEntity> items =
+                    List<OrderItemJpaVO> items =
                             orderItemJpaRepository.findAllByOrderIdAndDeletedAtIsNull(order.getId());
                     return OrderMapper.toDomain(order, items);
                 });
