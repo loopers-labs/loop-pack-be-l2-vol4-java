@@ -112,7 +112,7 @@ class OrderConcurrencyIntegrationTest {
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
-                    orderFacade.placeOrder(userId, List.of(new OrderLineCommand(productId, 1, couponId)));
+                    orderFacade.placeOrder(userId, List.of(new OrderLineCommand(productId, 1)), couponId);
                     success.incrementAndGet();
                 } catch (Exception e) {
                     failure.incrementAndGet();

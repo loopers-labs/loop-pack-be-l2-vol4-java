@@ -1,5 +1,6 @@
 package com.loopers.domain.order;
 
+import com.loopers.domain.common.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +16,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
 
     @Transactional
-    public OrderModel place(Long userId, List<OrderItem> items) {
-        return orderRepository.save(new OrderModel(userId, items));
+    public OrderModel place(Long userId, List<OrderItem> items, Long issuedCouponId, Money discountAmount) {
+        return orderRepository.save(new OrderModel(userId, items, issuedCouponId, discountAmount));
     }
 
     @Transactional(readOnly = true)

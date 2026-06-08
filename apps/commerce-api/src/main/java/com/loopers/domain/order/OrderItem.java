@@ -19,7 +19,7 @@ import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
-/** 주문 시점 상품 스냅샷. Order의 불변 구성요소(같은 애그리거트)라 BaseEntity 미상속. Product·IssuedCoupon은 다른 애그리거트라 ID 참조. */
+/** 주문 시점 상품 스냅샷. Order의 불변 구성요소(같은 애그리거트)라 BaseEntity 미상속. Product는 다른 애그리거트라 ID 참조. */
 @Getter
 @Entity
 @Table(name = "order_item")
@@ -46,26 +46,12 @@ public class OrderItem {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    /** 이 항목에 적용된 발급 쿠폰 id. 미적용 시 null. 쿠폰 → 주문 역추적의 키. */
-    @Column(name = "issued_coupon_id")
-    private Long issuedCouponId;
-
-    /** 이 항목에 적용된 쿠폰 할인액. 미적용 시 0. */
-    @Convert(converter = MoneyConverter.class)
-    @Column(name = "discount_amount", nullable = false)
-    private Money discountAmount;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private ZonedDateTime createdAt;
 
     protected OrderItem() {}
 
-    /** 쿠폰 미적용 항목. */
     public OrderItem(Long productId, String productName, Long unitPrice, Integer quantity) {
-        this(productId, productName, unitPrice, quantity, null, Money.ZERO);
-    }
-
-    public OrderItem(Long productId, String productName, Long unitPrice, Integer quantity, Long issuedCouponId, Money discountAmount) {
         if (productId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "제품 ID는 비어있을 수 없습니다.");
         }
@@ -79,8 +65,6 @@ public class OrderItem {
         this.productName = productName;
         this.unitPrice = Money.of(unitPrice);
         this.quantity = quantity;
-        this.issuedCouponId = issuedCouponId;
-        this.discountAmount = discountAmount == null ? Money.ZERO : discountAmount;
     }
 
     /** 패키지-비공개 — {@link OrderModel#addItem(OrderItem)}만 호출. 외부에서 부모를 바꾸지 못하게 막는다. */
@@ -91,11 +75,6 @@ public class OrderItem {
     /** 할인 전 금액. */
     public Money subtotal() {
         return unitPrice.multiply(quantity);
-    }
-
-    /** 쿠폰 할인 후 결제 금액. 할인액이 subtotal을 초과하면 Money가 BAD_REQUEST로 막는다. */
-    public Money payable() {
-        return subtotal().subtract(discountAmount);
     }
 
     @PrePersist

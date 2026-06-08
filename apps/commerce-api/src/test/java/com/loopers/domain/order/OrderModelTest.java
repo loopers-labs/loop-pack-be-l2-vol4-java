@@ -31,7 +31,7 @@ class OrderModelTest {
             OrderItem a = item(101L, 10_000L, 2);   // 20_000
             OrderItem b = item(102L, 5_000L, 3);    // 15_000
 
-            OrderModel order = new OrderModel(USER_ID, List.of(a, b));
+            OrderModel order = new OrderModel(USER_ID, List.of(a, b), null, Money.ZERO);
 
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(USER_ID),
@@ -46,7 +46,7 @@ class OrderModelTest {
         void wiresBothEnds_onCreation() {
             OrderItem itm = item(101L, 1_000L, 1);
 
-            OrderModel order = new OrderModel(USER_ID, List.of(itm));
+            OrderModel order = new OrderModel(USER_ID, List.of(itm), null, Money.ZERO);
 
             assertThat(itm.getOrder()).isSameAs(order);
         }
@@ -55,7 +55,7 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenUserIdIsNull() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(null, List.of(item(1L, 100L, 1))));
+                () -> new OrderModel(null, List.of(item(1L, 100L, 1)), null, Money.ZERO));
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -63,8 +63,8 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenItemsAreNullOrEmpty() {
             assertAll(
-                () -> assertThat(assertThrows(CoreException.class, () -> new OrderModel(USER_ID, null)).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
-                () -> assertThat(assertThrows(CoreException.class, () -> new OrderModel(USER_ID, List.of())).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST)
+                () -> assertThat(assertThrows(CoreException.class, () -> new OrderModel(USER_ID, null, null, Money.ZERO)).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(assertThrows(CoreException.class, () -> new OrderModel(USER_ID, List.of(), null, Money.ZERO)).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST)
             );
         }
     }
@@ -73,31 +73,41 @@ class OrderModelTest {
     @Nested
     class AmountSnapshot {
 
-        @DisplayName("항목별 할인액을 합산해 discountAmount와 finalAmount를 계산한다")
+        @DisplayName("주문 전체 금액에 쿠폰 할인을 적용해 discountAmount와 finalAmount를 계산하고 적용 쿠폰을 추적한다")
         @Test
-        void aggregatesItemDiscounts() {
-            // given - item1: subtotal 20,000, 할인 5,000 / item2: subtotal 15,000, 할인 0
-            OrderItem a = new OrderItem(101L, "상품-101", 10_000L, 2, 500L, Money.of(5_000L));
-            OrderItem b = item(102L, 5_000L, 3);
+        void appliesOrderLevelDiscount() {
+            // given - 항목 합계 35,000, 쿠폰(id=500)으로 5,000 할인
+            OrderItem a = item(101L, 10_000L, 2);   // 20_000
+            OrderItem b = item(102L, 5_000L, 3);    // 15_000
 
-            OrderModel order = new OrderModel(USER_ID, List.of(a, b));
+            OrderModel order = new OrderModel(USER_ID, List.of(a, b), 500L, Money.of(5_000L));
 
             assertAll(
                 () -> assertThat(order.getTotalAmount().value()).isEqualTo(35_000L),
                 () -> assertThat(order.getDiscountAmount().value()).isEqualTo(5_000L),
-                () -> assertThat(order.getFinalAmount().value()).isEqualTo(30_000L)
+                () -> assertThat(order.getFinalAmount().value()).isEqualTo(30_000L),
+                () -> assertThat(order.getIssuedCouponId()).isEqualTo(500L)
             );
         }
 
-        @DisplayName("쿠폰 미적용 항목만 있으면 할인액은 0이고 finalAmount는 totalAmount와 같다")
+        @DisplayName("쿠폰 미적용이면 할인액은 0이고 finalAmount는 totalAmount와 같으며 적용 쿠폰은 null이다")
         @Test
         void noDiscount_whenNoCouponApplied() {
-            OrderModel order = new OrderModel(USER_ID, List.of(item(101L, 10_000L, 1)));
+            OrderModel order = new OrderModel(USER_ID, List.of(item(101L, 10_000L, 1)), null, Money.ZERO);
 
             assertAll(
                 () -> assertThat(order.getDiscountAmount().value()).isZero(),
-                () -> assertThat(order.getFinalAmount().value()).isEqualTo(10_000L)
+                () -> assertThat(order.getFinalAmount().value()).isEqualTo(10_000L),
+                () -> assertThat(order.getIssuedCouponId()).isNull()
             );
+        }
+
+        @DisplayName("할인액이 주문 총액을 초과하면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenDiscountExceedsTotal() {
+            CoreException ex = assertThrows(CoreException.class,
+                () -> new OrderModel(USER_ID, List.of(item(101L, 10_000L, 1)), 1L, Money.of(10_001L)));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 
@@ -108,7 +118,7 @@ class OrderModelTest {
         @DisplayName("외부에 노출되는 items 리스트는 수정 불가능하다 (불변 컬렉션)")
         @Test
         void itemsListIsUnmodifiable() {
-            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)));
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
 
             assertThrows(UnsupportedOperationException.class,
                 () -> order.getItems().add(item(2L, 200L, 1)));

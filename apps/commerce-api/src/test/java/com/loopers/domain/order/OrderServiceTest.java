@@ -1,5 +1,6 @@
 package com.loopers.domain.order;
 
+import com.loopers.domain.common.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,7 @@ class OrderServiceTest {
             OrderItem b = item(2L, 15_000L, 1);
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            OrderModel result = orderService.place(1L, List.of(a, b));
+            OrderModel result = orderService.place(1L, List.of(a, b), null, Money.ZERO);
 
             assertAll(
                 () -> assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED),
@@ -60,7 +61,7 @@ class OrderServiceTest {
         @DisplayName("존재하는 주문이면 그대로 반환한다")
         @Test
         void returnsOrder_whenIdExists() {
-            OrderModel order = new OrderModel(1L, List.of(item(1L, 100L, 1)));
+            OrderModel order = new OrderModel(1L, List.of(item(1L, 100L, 1)), null, Money.ZERO);
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
             assertThat(orderService.getById(1L)).isSameAs(order);

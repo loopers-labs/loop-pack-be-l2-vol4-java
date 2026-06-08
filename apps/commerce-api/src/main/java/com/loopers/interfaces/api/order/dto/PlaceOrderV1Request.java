@@ -9,20 +9,19 @@ import jakarta.validation.constraints.Positive;
 import java.util.List;
 
 public record PlaceOrderV1Request(
-    @NotEmpty @Valid List<OrderLineV1Request> items
+    @NotEmpty @Valid List<OrderLineV1Request> items,
+    Long couponId
 ) {
     public List<OrderLineCommand> toCommands() {
         return items.stream().map(OrderLineV1Request::toCommand).toList();
     }
 
-    /** couponId는 해당 항목에 적용할 발급 쿠폰 id. 미적용 시 생략(null). 주문 1건당 1장만 허용된다. */
     public record OrderLineV1Request(
         @NotNull Long productId,
-        @NotNull @Positive Integer quantity,
-        Long couponId
+        @NotNull @Positive Integer quantity
     ) {
         public OrderLineCommand toCommand() {
-            return new OrderLineCommand(productId, quantity, couponId);
+            return new OrderLineCommand(productId, quantity);
         }
     }
 }

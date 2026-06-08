@@ -10,6 +10,7 @@ import java.util.List;
 public record OrderV1Response(
     Long id,
     OrderStatus status,
+    Long issuedCouponId,
     Long totalAmount,
     Long discountAmount,
     Long finalAmount,
@@ -20,6 +21,7 @@ public record OrderV1Response(
         return new OrderV1Response(
             info.id(),
             info.status(),
+            info.issuedCouponId(),
             info.totalAmount(),
             info.discountAmount(),
             info.finalAmount(),
@@ -33,10 +35,7 @@ public record OrderV1Response(
         String productName,
         Long unitPrice,
         Integer quantity,
-        Long subtotal,
-        Long issuedCouponId,
-        Long discountAmount,
-        Long payable
+        Long subtotal
     ) {
         public static OrderItemV1Response from(OrderItemInfo info) {
             return new OrderItemV1Response(
@@ -44,10 +43,7 @@ public record OrderV1Response(
                 info.productName(),
                 info.unitPrice(),
                 info.quantity(),
-                info.subtotal(),
-                info.issuedCouponId(),
-                info.discountAmount(),
-                info.payable()
+                info.subtotal()
             );
         }
     }

@@ -7,10 +7,7 @@ public record OrderItemInfo(
     String productName,
     Long unitPrice,
     Integer quantity,
-    Long subtotal,
-    Long issuedCouponId,
-    Long discountAmount,
-    Long payable
+    Long subtotal
 ) {
     public static OrderItemInfo from(OrderItem item) {
         return new OrderItemInfo(
@@ -18,10 +15,7 @@ public record OrderItemInfo(
             item.getProductName(),
             item.getUnitPrice().value(),
             item.getQuantity(),
-            item.subtotal().value(),
-            item.getIssuedCouponId(),
-            item.getDiscountAmount().value(),
-            item.payable().value()
+            item.subtotal().value()
         );
     }
 }

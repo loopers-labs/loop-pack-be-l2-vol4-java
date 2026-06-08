@@ -24,7 +24,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @PostMapping
     @Override
     public ApiResponse<OrderV1Response> placeOrder(@LoginUser AuthUser authUser, @Valid @RequestBody PlaceOrderV1Request request) {
-        OrderInfo info = orderFacade.placeOrder(authUser.id(), request.toCommands());
+        OrderInfo info = orderFacade.placeOrder(authUser.id(), request.toCommands(), request.couponId());
         return ApiResponse.success(OrderV1Response.from(info));
     }
 }

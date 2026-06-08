@@ -12,7 +12,7 @@ public interface OrderV1ApiSpec {
 
     @Operation(
         summary = "주문 생성",
-        description = "상품 항목으로 주문을 생성합니다. 항목별 쿠폰을 적용할 수 있으며 쿠폰은 주문 1건당 1장만 허용됩니다."
+        description = "상품 항목으로 주문을 생성합니다. 쿠폰은 주문 1건당 1장을 주문 전체 금액에 적용할 수 있습니다."
     )
     ApiResponse<OrderV1Response> placeOrder(AuthUser authUser, PlaceOrderV1Request request);
 }

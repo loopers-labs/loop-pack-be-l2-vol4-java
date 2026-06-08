@@ -103,9 +103,9 @@ class OrderApiE2ETest {
         void returns200_andAmounts_whenValidOrderWithoutCoupon() {
             // given
             PlaceOrderV1Request request = new PlaceOrderV1Request(List.of(
-                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 2, null),
-                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 1, null)
-            ));
+                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 2),
+                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 1)
+            ), null);
 
             // when
             ResponseEntity<ApiResponse<OrderV1Response>> response = restTemplate.exchange(
@@ -129,8 +129,8 @@ class OrderApiE2ETest {
         @Test
         void returns401_whenAuthHeadersMissing() {
             PlaceOrderV1Request request = new PlaceOrderV1Request(List.of(
-                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 1, null)
-            ));
+                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 1)
+            ), null);
 
             ResponseEntity<ApiResponse<OrderV1Response>> response = restTemplate.exchange(
                 ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, new HttpHeaders()),
@@ -144,8 +144,8 @@ class OrderApiE2ETest {
         @Test
         void returns409_whenStockInsufficient() {
             PlaceOrderV1Request request = new PlaceOrderV1Request(List.of(
-                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 10, null)
-            ));
+                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 10)
+            ), null);
 
             ResponseEntity<ApiResponse<OrderV1Response>> response = restTemplate.exchange(
                 ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, userHeaders()),
@@ -155,7 +155,7 @@ class OrderApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
-        @DisplayName("어드민이 만든 쿠폰을 발급받아 항목에 적용하면 할인이 반영된다")
+        @DisplayName("어드민이 만든 쿠폰을 발급받아 주문 전체 금액에 적용하면 할인이 반영된다")
         @Test
         void appliesCoupon_throughFullFlow() {
             // given - 어드민이 정률 10% 쿠폰 템플릿 생성
@@ -174,23 +174,23 @@ class OrderApiE2ETest {
             );
             Long couponId = issueRes.getBody().data().couponId();
 
-            // when - product1(50,000 x 2 = 100,000)에 쿠폰 적용
+            // when - 주문 전체(130,000)에 쿠폰 적용
             PlaceOrderV1Request orderReq = new PlaceOrderV1Request(List.of(
-                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 2, couponId),
-                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 1, null)
-            ));
+                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 2),
+                new PlaceOrderV1Request.OrderLineV1Request(product2Id, 1)
+            ), couponId);
             ResponseEntity<ApiResponse<OrderV1Response>> orderRes = restTemplate.exchange(
                 ENDPOINT, HttpMethod.POST, new HttpEntity<>(orderReq, userHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
-            // then - 100,000의 10% = 10,000 할인
+            // then - 130,000의 10% = 13,000 할인
             OrderV1Response data = orderRes.getBody().data();
             assertAll(
                 () -> assertThat(orderRes.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.totalAmount()).isEqualTo(130_000L),
-                () -> assertThat(data.discountAmount()).isEqualTo(10_000L),
-                () -> assertThat(data.finalAmount()).isEqualTo(120_000L)
+                () -> assertThat(data.discountAmount()).isEqualTo(13_000L),
+                () -> assertThat(data.finalAmount()).isEqualTo(117_000L)
             );
         }
     }
