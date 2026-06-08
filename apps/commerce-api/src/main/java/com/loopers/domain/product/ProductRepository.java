@@ -1,11 +1,19 @@
 package com.loopers.domain.product;
 
-import java.util.Optional;
+import com.loopers.domain.product.enums.ProductSortType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
-    void delete(Long id);
+    boolean existsByBrandIdAndName(Long brandId, String name);
+    List<ProductModel> findAllByBrandId(Long brandId);
+    void suspendAllByBrandId(Long brandId);
+    Page<ProductModel> findAll(Long brandId, ProductSortType sort, Pageable pageable);
+    Page<ProductModel> findAllForAdmin(Long brandId, Pageable pageable);
+    List<ProductModel> findAllByIds(List<Long> ids);
 }

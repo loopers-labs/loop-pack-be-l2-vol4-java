@@ -190,6 +190,30 @@ docker compose -f docker/monitoring-compose.yml up -d
 
 ---
 
+## 도메인 & 객체 설계 전략
+
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 한다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 한다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행한다.
+
+---
+
+## 아키텍처 & 패키지 구성 전략
+
+- 레이어드 아키텍처를 따르며, DIP (의존성 역전 원칙) 를 준수한다.
+- API request/response DTO와 응용 레이어의 DTO는 분리해 작성한다.
+- 패키징 전략: 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징한다.
+
+```text
+/interfaces/api/..    # Presentation 레이어 - Controller, Dto, ApiSpec
+/application/..       # Application 레이어 - 도메인 레이어를 조합해 기능 제공 (Facade, Info)
+/domain/..            # Domain 레이어 - 도메인 객체, Entity, Repository 인터페이스
+/infrastructure/..    # Infrastructure 레이어 - JPA/Redis 등 Repository 구현체
+```
+
+---
+
 ## 개발 규칙
 
 ### 진행 Workflow - 증강 코딩

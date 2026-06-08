@@ -2,36 +2,27 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
 
-public class ProductV1Dto {
-    public record CreateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
+import java.util.List;
 
-    public record UpdateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer stock
-    ) {}
+public class ProductV1Dto {
 
     public record ProductResponse(
-        Long id,
-        String name,
-        String description,
-        Long price,
-        Integer stock
+            Long id,
+            String name,
+            String status,
+            Long brandId,
+            String brandName,
+            long likeCount
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
-                info.id(),
-                info.name(),
-                info.description(),
-                info.price(),
-                info.stock()
+                    info.id(), info.name(), info.status(),
+                    info.brandId(), info.brandName(), info.likeCount()
             );
+        }
+
+        public static List<ProductResponse> from(List<ProductInfo> infoList) {
+            return infoList.stream().map(ProductResponse::from).toList();
         }
     }
 }

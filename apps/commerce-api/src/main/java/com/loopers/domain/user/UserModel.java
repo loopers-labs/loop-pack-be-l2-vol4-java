@@ -1,112 +1,74 @@
 package com.loopers.domain.user;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.domain.user.enums.UserRole;
+import com.loopers.domain.user.vo.BirthDay;
+import com.loopers.domain.user.vo.RawPassword;
+import com.loopers.domain.user.vo.RawPassword;
+import com.loopers.support.Guard;
+import com.loopers.domain.user.vo.Email;
+import com.loopers.domain.user.vo.Name;
+import com.loopers.domain.user.vo.Password;
+import com.loopers.domain.user.vo.UserId;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-
-import java.util.regex.Pattern;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "user", uniqueConstraints = {
+@Table(name = "users", uniqueConstraints = {
         @UniqueConstraint(name = "uq_user_userid", columnNames = {"userid"})
 })
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserModel extends BaseEntity {
 
-    private String userid;
-    private String password;
-    private String name;
-    private String birthDay;
-    private String email;
+    @Embedded
+    private UserId userId;
 
-    private UserModel() {}
+    @Embedded
+    private Password password;
 
-    private static final Pattern USERID_PATTERN =
-            Pattern.compile("^[a-zA-Z0-9]+$");
+    @Embedded
+    private Name name;
 
-    private static final Pattern PASSWORD_PATTERN =
-            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=])[a-zA-Z0-9!@#$%^&*()_+\\-=]{8,16}$");
+    @Embedded
+    private BirthDay birthDay;
 
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile(
-                    "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
-            );
+    @Embedded
+    private Email email;
 
-    private static final Pattern BIRTHDAY_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
 
-    public static void validatePassword(String rawPassword, String birthDay) {
-        if (rawPassword == null || rawPassword.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 빈값이 들어올 수 없습니다.");
-        }
-        
-        if (!PASSWORD_PATTERN.matcher(rawPassword).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 8~16자의 영문 대소문자, 숫자, 특수문자만 가능합니다.");
-        }
-        if (rawPassword.contains(birthDay.replace("-", ""))) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 비밀번호에 포함될 수 없습니다.");
-        }
-    }
-
-    public static void validateUserId(String userid) {
-        if (userid == null || userid.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 빈값이 들어올 수 없습니다.");
-        }
-
-        if (!USERID_PATTERN.matcher(userid).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 영문과 숫자만 허용됩니다.");
-        }
-    }
-
-    public UserModel(String userid, String encodedPassword, String name, String birthDay, String email) {
-        validateUserId(userid);
-        validateBirthDay(birthDay);
-        validateEmail(email);
-
-        if (name == null || name.isBlank() || name.length() < 2) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이름은 2글자 이상으로 작성해 주세요.");
-        }
-
-        this.userid = userid;
-        this.password = encodedPassword;
+    public UserModel(UserId userid, Password password, Name name, BirthDay birthDay, Email email, UserRole role) {
+        Guard.notNull(role, "역할은 필수입니다.");
+        this.userId = userid;
+        this.password = password;
         this.name = name;
         this.birthDay = birthDay;
         this.email = email;
+        this.role = role;
     }
 
-    private void validateBirthDay(String birthDay) {
-        if (birthDay == null || birthDay.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 빈값이 들어올 수 없습니다.");
-        }
-        
-        if (!BIRTHDAY_PATTERN.matcher(birthDay).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "생년월일은 yyyy-MM-dd 형식에 맞춰 주세요.");
-        }
-    }
-
-    private void validateEmail(String email) {
-        if (email == null || email.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이메일은 빈값이 들어올 수 없습니다.");
-        }
-        
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 올바르지 않습니다.");
-        }
-    }
-
-    public void changePassword(String encodedPassword) {
+    public void changePassword(Password encodedPassword) {
         this.password = encodedPassword;
     }
 
-    public String getUserid() { return userid; }
+    public UserId getUserId() { return userId; }
 
-    public String getPassword() { return password; }
+    public Password getPassword() { return password; }
 
-    public String getName() { return name; }
+    public Name getName() { return name; }
 
-    public String getBirthDay() { return birthDay; }
+    public BirthDay getBirthDay() { return birthDay; }
 
-    public String getEmail() { return email; }
+    public Email getEmail() { return email; }
 
+    public UserRole getRole() { return role; }
 }
