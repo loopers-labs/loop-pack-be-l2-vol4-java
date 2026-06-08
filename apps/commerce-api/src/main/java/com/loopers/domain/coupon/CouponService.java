@@ -38,6 +38,21 @@ public class CouponService {
     }
 
     @Transactional
+    public CouponTemplate updateCoupon(
+        Long couponTemplateId,
+        String name,
+        CouponType type,
+        long discountValue,
+        Long minimumOrderAmount,
+        ZonedDateTime expiredAt
+    ) {
+        CouponDiscountPolicy policy = couponDiscountMethod.match(type);
+        CouponTemplate coupon = getCouponTemplate(couponTemplateId);
+        coupon.update(name, type, discountValue, minimumOrderAmount, expiredAt, policy);
+        return coupon;
+    }
+
+    @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
         if (userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId()).isPresent()) {

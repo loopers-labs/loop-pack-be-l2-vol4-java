@@ -80,6 +80,22 @@ public class CouponTemplate extends BaseEntity {
         );
     }
 
+    public void update(
+        String name,
+        CouponType type,
+        long discountValue,
+        Long minimumOrderAmount,
+        ZonedDateTime expiredAt,
+        CouponDiscountPolicy policy
+    ) {
+        confirmCanCreate(type, policy);
+        this.name = CouponName.of(name);
+        this.type = type;
+        this.discountValue = createDiscountValue(discountValue, policy);
+        this.minimumOrderAmount = createMinimumOrderAmount(minimumOrderAmount);
+        this.expiration = CouponExpiration.of(expiredAt);
+    }
+
     public CouponDiscount apply(CouponMoney orderAmount, ZonedDateTime now, CouponDiscountPolicy policy) {
         confirmDiscountPolicy(type, policy);
         confirmCanApplyToOrder(orderAmount, now);

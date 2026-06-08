@@ -318,6 +318,92 @@ class CouponAdminV1ApiE2ETest {
         }
     }
 
+    @DisplayName("PUT /api-admin/v1/coupons/{couponId}")
+    @Nested
+    class UpdateCoupon {
+
+        @DisplayName("어드민 헤더와 유효한 수정 요청이 주어지면, 200 OK와 수정된 쿠폰 정보를 반환한다.")
+        @Test
+        void updatesCoupon_whenAdminHeaderAndValidRequest() {
+            // arrange
+            Long couponId = createCoupon(new CouponAdminV1Dto.CreateCouponRequest(
+                "1주년 2,000원 할인", CouponType.FIXED, 2_000L, 10_000L, EXPIRED_AT
+            ), adminHeaders()).getBody().data().id();
+            CouponAdminV1Dto.UpdateCouponRequest request = new CouponAdminV1Dto.UpdateCouponRequest(
+                "1주년 10% 할인", CouponType.RATE, 10L, 20_000L, EXPIRED_AT
+            );
+
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = updateCoupon(couponId, request, adminHeaders());
+
+            // assert
+            CouponAdminV1Dto.CouponResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(couponId),
+                () -> assertThat(data.name()).isEqualTo("1주년 10% 할인"),
+                () -> assertThat(data.type()).isEqualTo(CouponType.RATE),
+                () -> assertThat(data.discountValue()).isEqualTo(10L),
+                () -> assertThat(data.minimumOrderAmount()).isEqualTo(20_000L)
+            );
+        }
+
+        @DisplayName("어드민 헤더와 존재하지 않는 쿠폰 ID가 주어지면, 404 NOT FOUND를 반환한다.")
+        @Test
+        void returnsNotFound_whenCouponDoesNotExist() {
+            // arrange
+            CouponAdminV1Dto.UpdateCouponRequest request = new CouponAdminV1Dto.UpdateCouponRequest(
+                "1주년 10% 할인", CouponType.RATE, 10L, 20_000L, EXPIRED_AT
+            );
+
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = updateCoupon(999_999L, request, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("어드민 헤더와 쿠폰 이름이 빈 요청이 주어지면, 400 BAD REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenNameIsBlank() {
+            // arrange
+            CouponAdminV1Dto.UpdateCouponRequest request = new CouponAdminV1Dto.UpdateCouponRequest(
+                " ", CouponType.RATE, 10L, 20_000L, EXPIRED_AT
+            );
+
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = updateCoupon(1L, request, adminHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("어드민 헤더가 없으면, 401 UNAUTHORIZED 응답을 반환한다.")
+        @Test
+        void returnsUnauthorized_whenAdminHeaderIsMissing() {
+            // arrange
+            CouponAdminV1Dto.UpdateCouponRequest request = new CouponAdminV1Dto.UpdateCouponRequest(
+                "1주년 10% 할인", CouponType.RATE, 10L, 20_000L, EXPIRED_AT
+            );
+
+            // act
+            ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> response = updateCoupon(1L, request, new HttpHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private ResponseEntity<ApiResponse<CouponAdminV1Dto.CouponResponse>> updateCoupon(Long couponId, CouponAdminV1Dto.UpdateCouponRequest request, HttpHeaders headers) {
+        ParameterizedTypeReference<ApiResponse<CouponAdminV1Dto.CouponResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_COUPONS + "/" + couponId,
+            HttpMethod.PUT,
+            new HttpEntity<>(request, headers),
+            responseType
+        );
+    }
+
     @DisplayName("DELETE /api-admin/v1/coupons/{couponId}")
     @Nested
     class DeleteCoupon {

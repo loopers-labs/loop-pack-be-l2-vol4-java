@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.coupon;
 import com.loopers.application.coupon.CouponInfo;
 import com.loopers.application.coupon.CouponIssueInfo;
 import com.loopers.application.coupon.CreateCouponCommand;
+import com.loopers.application.coupon.UpdateCouponCommand;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponStatus;
 import jakarta.validation.constraints.NotBlank;
@@ -33,6 +34,28 @@ public class CouponAdminV1Dto {
     ) {
         public CreateCouponCommand toCommand() {
             return new CreateCouponCommand(name, type, value, minOrderAmount, expiredAt);
+        }
+    }
+
+    public record UpdateCouponRequest(
+        @NotBlank(message = "쿠폰 이름은 비어있을 수 없습니다.")
+        String name,
+
+        @NotNull(message = "쿠폰 타입은 비어있을 수 없습니다.")
+        CouponType type,
+
+        @NotNull(message = "쿠폰 할인 값은 비어있을 수 없습니다.")
+        @Positive(message = "쿠폰 할인 값은 0보다 커야 합니다.")
+        Long value,
+
+        @PositiveOrZero(message = "최소 주문 금액은 0 이상이어야 합니다.")
+        Long minOrderAmount,
+
+        @NotNull(message = "쿠폰 만료일은 비어있을 수 없습니다.")
+        ZonedDateTime expiredAt
+    ) {
+        public UpdateCouponCommand toCommand(Long couponId) {
+            return new UpdateCouponCommand(couponId, name, type, value, minOrderAmount, expiredAt);
         }
     }
 

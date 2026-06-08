@@ -27,6 +27,18 @@ public class CouponAdminFacade {
         return CouponInfo.from(coupon);
     }
 
+    public CouponInfo updateCoupon(UpdateCouponCommand command) {
+        CouponTemplate coupon = couponService.updateCoupon(
+            command.couponId(),
+            command.name(),
+            command.type(),
+            command.discountValue(),
+            command.minimumOrderAmount(),
+            command.expiredAt()
+        );
+        return CouponInfo.from(coupon);
+    }
+
     @Transactional(readOnly = true)
     public CouponInfo getCoupon(Long couponId) {
         return CouponInfo.from(couponService.getCouponTemplate(couponId));
