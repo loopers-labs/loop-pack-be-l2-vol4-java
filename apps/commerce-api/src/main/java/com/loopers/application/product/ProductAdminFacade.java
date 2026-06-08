@@ -63,7 +63,6 @@ public class ProductAdminFacade {
         return productStock;
     }
 
-    @Transactional
     public void deleteProduct(Long productId) {
         productService.deleteProduct(productId);
     }
