@@ -32,7 +32,7 @@ class NameTest {
             // assert
             assertAll(
                 () -> assertThat(name).isNotNull(),
-                () -> assertThat(name.value()).isEqualTo(value)
+                () -> assertThat(name.getValue()).isEqualTo(value)
             );
         }
 

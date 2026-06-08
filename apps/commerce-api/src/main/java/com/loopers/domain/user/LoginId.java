@@ -2,17 +2,29 @@ package com.loopers.domain.user;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Embeddable;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.regex.Pattern;
 
-public record LoginId(String value) {
+@Embeddable
+@Getter
+@EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class LoginId {
 
     private static final Pattern ALPHANUMERIC = Pattern.compile("^[a-zA-Z0-9]+$");
     private static final int MIN_LENGTH = 4;
     private static final int MAX_LENGTH = 20;
 
-    public LoginId {
+    private String value;
+
+    public LoginId(String value) {
         validate(value);
+        this.value = value;
     }
 
     private static void validate(String value) {

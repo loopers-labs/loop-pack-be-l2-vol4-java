@@ -31,7 +31,7 @@ class EmailTest {
             // assert
             assertAll(
                 () -> assertThat(email).isNotNull(),
-                () -> assertThat(email.value()).isEqualTo(value)
+                () -> assertThat(email.getValue()).isEqualTo(value)
             );
         }
 
@@ -90,7 +90,7 @@ class EmailTest {
             Email email = new Email(input);
 
             // assert
-            assertThat(email.value()).isEqualTo("foo@bar.com");
+            assertThat(email.getValue()).isEqualTo("foo@bar.com");
         }
     }
 }

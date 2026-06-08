@@ -38,10 +38,10 @@ class UserTest {
 
             // assert
             assertAll(
-                () -> assertThat(user.getLoginId()).isEqualTo(loginId.value()),
-                () -> assertThat(user.getName()).isEqualTo(name.value()),
-                () -> assertThat(user.getBirth()).isEqualTo(birth.value()),
-                () -> assertThat(user.getEmail()).isEqualTo(email.value()),
+                () -> assertThat(user.getLoginId()).isEqualTo(loginId),
+                () -> assertThat(user.getName()).isEqualTo(name),
+                () -> assertThat(user.getBirth()).isEqualTo(birth),
+                () -> assertThat(user.getEmail()).isEqualTo(email),
                 () -> assertThat(user.getEncodedPassword()).isEqualTo(encodedPassword)
             );
         }

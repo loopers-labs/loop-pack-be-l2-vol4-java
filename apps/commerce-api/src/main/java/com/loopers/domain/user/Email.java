@@ -2,18 +2,30 @@ package com.loopers.domain.user;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Embeddable;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.regex.Pattern;
 
-public record Email(String value) {
+@Embeddable
+@Getter
+@EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Email {
 
     private static final Pattern EMAIL_PATTERN =
         Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     private static final int MAX_LENGTH = 254;
 
-    public Email {
-        value = normalize(value);
-        validate(value);
+    private String value;
+
+    public Email(String value) {
+        String normalized = normalize(value);
+        validate(normalized);
+        this.value = normalized;
     }
 
     private static String normalize(String value) {

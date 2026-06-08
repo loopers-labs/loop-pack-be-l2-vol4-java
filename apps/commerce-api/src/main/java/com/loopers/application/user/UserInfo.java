@@ -14,20 +14,20 @@ public record UserInfo(
     public static UserInfo from(User user) {
         return new UserInfo(
             user.getId(),
-            user.getLoginId(),
-            user.getName(),
-            user.getBirth(),
-            user.getEmail()
+            user.getLoginId().getValue(),
+            user.getName().getValue(),
+            user.getBirth().getValue(),
+            user.getEmail().getValue()
         );
     }
 
     public static UserInfo fromMasked(User user) {
         return new UserInfo(
             user.getId(),
-            user.getLoginId(),
+            user.getLoginId().getValue(),
             user.maskedName(),
-            user.getBirth(),
-            user.getEmail()
+            user.getBirth().getValue(),
+            user.getEmail().getValue()
         );
     }
 }

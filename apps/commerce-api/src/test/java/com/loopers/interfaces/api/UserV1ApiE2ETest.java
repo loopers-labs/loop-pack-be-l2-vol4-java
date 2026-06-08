@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api;
 
+import com.loopers.domain.user.LoginId;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -139,7 +140,7 @@ class UserV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-            assertThat(userJpaRepository.findByLoginId("loopers123")).isEmpty();
+            assertThat(userJpaRepository.findByLoginId(new LoginId("loopers123"))).isEmpty();
         }
 
         @DisplayName("이미 등록된 email 로 회원가입 시, 409 CONFLICT 응답을 받는다.")

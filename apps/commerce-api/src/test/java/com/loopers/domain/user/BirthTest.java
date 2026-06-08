@@ -27,7 +27,7 @@ class BirthTest {
             Birth birth = new Birth(value);
 
             // assert
-            assertThat(birth.value()).isEqualTo(value);
+            assertThat(birth.getValue()).isEqualTo(value);
         }
 
         @DisplayName("오늘 날짜이면, 정상적으로 생성된다.")
@@ -40,7 +40,7 @@ class BirthTest {
             Birth birth = new Birth(today);
 
             // assert
-            assertThat(birth.value()).isEqualTo(today);
+            assertThat(birth.getValue()).isEqualTo(today);
         }
 
         @DisplayName("값이 null 이면, BAD_REQUEST 예외가 발생한다.")

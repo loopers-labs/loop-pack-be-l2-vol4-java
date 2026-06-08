@@ -31,7 +31,7 @@ class LoginIdTest {
             // assert
             assertAll(
                 () -> assertThat(loginId).isNotNull(),
-                () -> assertThat(loginId.value()).isEqualTo(value)
+                () -> assertThat(loginId.getValue()).isEqualTo(value)
             );
         }
 

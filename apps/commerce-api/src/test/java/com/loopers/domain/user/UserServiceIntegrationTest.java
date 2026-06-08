@@ -21,24 +21,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 class UserServiceIntegrationTest {
 
-    private final UserService userService;
-    private final UserJpaRepository userJpaRepository;
-    private final DatabaseCleanUp databaseCleanUp;
+    @Autowired
+    private UserService userService;
 
     @Autowired
-    UserServiceIntegrationTest(
-        UserService userService,
-        UserJpaRepository userJpaRepository,
-        DatabaseCleanUp databaseCleanUp
-    ) {
-        this.userService = userService;
-        this.userJpaRepository = userJpaRepository;
-        this.databaseCleanUp = databaseCleanUp;
-    }
+    private UserJpaRepository userJpaRepository;
+
+    @Autowired
+    private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
     void tearDown() {
@@ -65,7 +60,7 @@ class UserServiceIntegrationTest {
             );
 
             // assert
-            User saved = userJpaRepository.findByLoginId("loopers123").orElseThrow();
+            User saved = userJpaRepository.findByLoginId(new LoginId("loopers123")).orElseThrow();
             assertThat(saved.getEncodedPassword()).isNotEqualTo(rawPassword);
         }
 
@@ -116,6 +111,66 @@ class UserServiceIntegrationTest {
                 () -> assertThat(conflictCount.get()).isEqualTo(1),
                 () -> assertThat(userJpaRepository.count()).isEqualTo(1)
             );
+        }
+    }
+
+    @DisplayName("로그인할 때,")
+    @Nested
+    class Authenticate {
+
+        @DisplayName("로그인 ID 와 비밀번호가 일치하면, 해당 사용자를 반환한다.")
+        @Test
+        void returnsUser_whenCredentialsAreValid() {
+            // arrange
+            String rawPassword = "Pass1234!";
+            User registered = userService.register(
+                new LoginId("loopers123"),
+                rawPassword,
+                new Name("김민우"),
+                new Birth(LocalDate.of(1990, 1, 1)),
+                new Email("user@example.com")
+            );
+
+            // act
+            User result = userService.authenticate(new LoginId("loopers123"), rawPassword);
+
+            // assert
+            assertThat(result.getId()).isEqualTo(registered.getId());
+        }
+
+        @DisplayName("존재하지 않는 로그인 ID 면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenUserNotFound() {
+            // act
+            CoreException result = assertThrows(
+                CoreException.class,
+                () -> userService.authenticate(new LoginId("notexist01"), "Pass1234!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+
+        @DisplayName("비밀번호가 일치하지 않으면, UNAUTHORIZED 예외가 발생한다.")
+        @Test
+        void throwsUnauthorized_whenPasswordDoesNotMatch() {
+            // arrange
+            userService.register(
+                new LoginId("loopers123"),
+                "Pass1234!",
+                new Name("김민우"),
+                new Birth(LocalDate.of(1990, 1, 1)),
+                new Email("user@example.com")
+            );
+
+            // act
+            CoreException result = assertThrows(
+                CoreException.class,
+                () -> userService.authenticate(new LoginId("loopers123"), "Wrong123!")
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
         }
     }
 }

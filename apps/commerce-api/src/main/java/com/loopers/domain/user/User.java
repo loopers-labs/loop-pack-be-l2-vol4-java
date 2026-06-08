@@ -3,14 +3,14 @@ package com.loopers.domain.user;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
 
 @Entity
 @Table(name = "user")
@@ -18,26 +18,34 @@ import java.time.LocalDate;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseEntity {
 
-    @Column(name = "login_id", nullable = false, unique = true, length = 20)
-    private String loginId;
+    @Embedded
+    @AttributeOverride(name = "value",
+        column = @Column(name = "login_id", nullable = false, unique = true, length = 20))
+    private LoginId loginId;
 
-    @Column(nullable = false, length = 50)
-    private String name;
+    @Embedded
+    @AttributeOverride(name = "value",
+        column = @Column(name = "name", nullable = false, length = 50))
+    private Name name;
 
-    @Column(nullable = false)
-    private LocalDate birth;
+    @Embedded
+    @AttributeOverride(name = "value",
+        column = @Column(name = "birth", nullable = false))
+    private Birth birth;
 
-    @Column(nullable = false, unique = true, length = 254)
-    private String email;
+    @Embedded
+    @AttributeOverride(name = "value",
+        column = @Column(name = "email", nullable = false, unique = true, length = 254))
+    private Email email;
 
     @Column(name = "encoded_password", nullable = false)
     private String encodedPassword;
 
     public User(LoginId loginId, Name name, Birth birth, Email email, String encodedPassword) {
-        this.loginId = loginId.value();
-        this.name = name.value();
-        this.birth = birth.value();
-        this.email = email.value();
+        this.loginId = loginId;
+        this.name = name;
+        this.birth = birth;
+        this.email = email;
         this.encodedPassword = encodedPassword;
     }
 
@@ -55,7 +63,7 @@ public class User extends BaseEntity {
     }
 
     public String maskedName() {
-        return new Name(this.name).masked();
+        return this.name.masked();
     }
 
     public void authenticate(String rawPassword, PasswordEncoder encoder) {
@@ -71,7 +79,7 @@ public class User extends BaseEntity {
         if (currentPassword.equals(newPassword)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 같을 수 없습니다.");
         }
-        Password validated = Password.of(newPassword, new Birth(this.birth));
+        Password validated = Password.of(newPassword, this.birth);
         this.encodedPassword = encoder.encode(validated.value());
     }
 }

@@ -1,7 +1,11 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.application.support.PageResult;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -11,30 +15,23 @@ import java.util.List;
 @Component
 public class ProductFacade {
     private final ProductService productService;
-
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
-        return ProductInfo.from(product);
-    }
+    private final BrandService brandService;
 
     public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
+        Product product = productService.getProduct(id);
+        Brand brand = brandService.getBrand(product.getBrandId());
+        return ProductInfo.from(product, brand);
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
+    public PageResult<ProductInfo> getProducts(Long brandId, String sortValue, int page, int size) {
+        ProductSort sort = ProductSort.from(sortValue);
+        List<ProductInfo> items = productService.getProducts(brandId, sort, page, size).stream()
+            .map(product -> {
+                Brand brand = brandService.getBrand(product.getBrandId());
+                return ProductInfo.from(product, brand);
+            })
             .toList();
-    }
-
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
-    }
-
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+        long totalElements = productService.countProducts(brandId);
+        return new PageResult<>(items, page, size, totalElements);
     }
 }

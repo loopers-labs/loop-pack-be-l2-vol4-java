@@ -39,6 +39,6 @@ public class UserFacade {
     }
 
     public void changePassword(User user, String currentPassword, String newPassword) {
-        userService.changePassword(new LoginId(user.getLoginId()), currentPassword, newPassword);
+        userService.changePassword(user.getLoginId(), currentPassword, newPassword);
     }
 }
