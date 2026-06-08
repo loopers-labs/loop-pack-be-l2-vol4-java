@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +45,7 @@ public class ProductAdminV1Controller {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ProductAdminV1Dto.ProductResponse> createProduct(
         @RequestHeader("X-Loopers-Ldap") String ldap,
-        @RequestBody ProductAdminV1Dto.CreateProductRequest request
+        @Valid @RequestBody ProductAdminV1Dto.CreateProductRequest request
     ) {
         ProductInfo info = productFacade.createProduct(
             request.brandId(),
@@ -60,7 +61,7 @@ public class ProductAdminV1Controller {
     public ApiResponse<ProductAdminV1Dto.ProductResponse> updateProduct(
         @RequestHeader("X-Loopers-Ldap") String ldap,
         @PathVariable Long productId,
-        @RequestBody ProductAdminV1Dto.UpdateProductRequest request
+        @Valid @RequestBody ProductAdminV1Dto.UpdateProductRequest request
     ) {
         ProductInfo info = productFacade.updateProduct(
             productId,

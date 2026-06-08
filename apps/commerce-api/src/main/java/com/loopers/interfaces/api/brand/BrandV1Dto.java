@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.brand;
 
 import com.loopers.application.brand.BrandInfo;
+import jakarta.validation.constraints.NotBlank;
 
 public class BrandV1Dto {
 
@@ -10,7 +11,13 @@ public class BrandV1Dto {
         }
     }
 
-    public record CreateBrandRequest(String name, String description) {}
+    public record CreateBrandRequest(
+        @NotBlank(message = "브랜드명은 필수입니다.") String name,
+        @NotBlank(message = "브랜드 설명은 필수입니다.") String description
+    ) {}
 
-    public record UpdateBrandRequest(String name, String description) {}
+    public record UpdateBrandRequest(
+        @NotBlank(message = "브랜드명은 필수입니다.") String name,
+        @NotBlank(message = "브랜드 설명은 필수입니다.") String description
+    ) {}
 }
