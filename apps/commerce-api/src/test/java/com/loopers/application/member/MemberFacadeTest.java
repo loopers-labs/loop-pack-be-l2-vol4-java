@@ -1,8 +1,8 @@
 package com.loopers.application.member;
 
-import com.loopers.domain.member.Member;
-import com.loopers.domain.member.MemberService;
-import com.loopers.domain.member.Password;
+import com.loopers.domain.member.model.Member;
+import com.loopers.domain.member.service.MemberService;
+import com.loopers.domain.member.model.Password;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

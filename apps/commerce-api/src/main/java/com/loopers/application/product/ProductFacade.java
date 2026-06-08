@@ -1,40 +1,34 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.model.Product;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
+    private final ProductApplicationService productApplicationService;
+
+    public ProductInfo getProduct(Long productId) {
+        return productApplicationService.getProduct(productId);
+    }
+
+    public Page<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
+        return productApplicationService.getProducts(brandId, ProductSort.from(sort), page, size);
+    }
+
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, int initialQuantity) {
+        Product product = productApplicationService.createProduct(brandId, name, description, price, initialQuantity);
         return ProductInfo.from(product);
     }
 
-    public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
+    public void updateProduct(Long productId, String name, String description, Long price) {
+        productApplicationService.updateProduct(productId, name, description, price);
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
-            .toList();
-    }
-
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
-    }
-
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+    public void deleteProduct(Long productId) {
+        productApplicationService.deleteProduct(productId);
     }
 }

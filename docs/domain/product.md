@@ -1,0 +1,205 @@
+# Product 도메인 비즈니스 규칙
+
+## 상품 등록
+
+### 입력 필드
+
+| 필드 | 타입 | 제약조건 |
+|---|---|---|
+| brandId | Long | null 불가, 존재하는 브랜드여야 함 |
+| name | String | null/blank 불가, 최대 50자 |
+| description | String | null/blank 불가, 최대 200자 |
+| price | Long | null 불가, 1 이상 (price > 0) |
+| initialStock | Integer | null 불가, 0 이상 (stock >= 0) |
+
+> `likeCount`는 등록 시 0으로 초기화. 입력값 아님.
+
+### 비즈니스 규칙 (Entity)
+
+- `name`: null/blank 불가, 50자 초과 시 `BAD_REQUEST`
+- `description`: null/blank 불가, 200자 초과 시 `BAD_REQUEST`
+- `price`: null 불가, 0 이하 시 `BAD_REQUEST`
+- `likeCount`: 초기값 0, 0 미만 불가 (`BAD_REQUEST`)
+- 상품명 중복: **허용** (브랜드가 다르든 같든 동일 이름 등록 가능)
+
+### 비즈니스 규칙 (DomainService)
+
+- `brandId`가 실제 존재하는(삭제되지 않은) 브랜드인지 확인 → `NOT_FOUND`
+
+### 유스케이스 흐름 (ApplicationService)
+
+1. `BrandDomainService.getBrand(brandId)` — 브랜드 존재 확인
+2. `Product.create(brandId, name, description, price)` — 상품 엔티티 생성 (Entity 내부 검증)
+3. `ProductRepository.save(product)` — 상품 저장
+4. `StockService.createStock(product.getId(), initialStock)` — 재고 생성
+
+### 트랜잭션 경계
+
+- 상품 저장 + 재고 생성을 **하나의 트랜잭션**으로 묶음
+- 이유: 상품만 저장되고 재고가 없으면 시스템 불일치 상태 발생
+- `@Transactional` 위치: `ProductApplicationService.createProduct()`
+
+### 접근 제어
+
+- 어드민만 가능 (`X-Loopers-Ldap: loopers.admin`)
+- `AdminInterceptor`가 `/api-admin/**` 경로에서 일괄 처리
+
+---
+
+## 상품 수정 (어드민)
+
+### 입력 필드
+- `productId`: Path variable, null 불가
+- `name`: null/blank 불가, 최대 50자
+- `description`: null/blank 불가, 최대 200자
+- `price`: null 불가, 1 이상
+- `brandId`: 요청 바디에 포함 시 → `BAD_REQUEST` (수정 불가 필드)
+
+### 비즈니스 규칙 (Entity)
+- `name`, `description`, `price` 검증은 `Product.update()` 내부 처리
+- `brandId` 변경은 Entity가 허용하지 않음
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름 (ApplicationService)
+1. Request에 `brandId` 포함 시 → `BAD_REQUEST`
+2. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 `NOT_FOUND`)
+3. `product.update(name, description, price)` — Entity 검증 + 수정
+4. Dirty Checking으로 자동 저장 (`save()` 불필요)
+
+### 트랜잭션 경계
+- `@Transactional` 위치: `ProductApplicationService.updateProduct()`
+- 단일 엔티티 수정 → 하나의 트랜잭션
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+---
+
+## 상품 삭제 (어드민)
+
+### 입력 필드
+- `productId`: Path variable, null 불가
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND` (`@SQLRestriction`으로 조회 자체가 실패)
+
+### 유스케이스 흐름 (ApplicationService)
+1. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 `NOT_FOUND`)
+2. `product.delete()` — 소프트딜리트 (`deletedAt` = now, 멱등)
+3. `StockRepository.softDeleteByProductId(productId)` — Stock 소프트딜리트
+4. `LikeRepository.deleteAllByProductId(productId)` — Like 하드딜리트 (물리 삭제)
+
+### 트랜잭션 경계
+- `@Transactional` 위치: `ProductApplicationService.deleteProduct()`
+- 상품 삭제 + 재고 소프트딜리트 + 좋아요 하드딜리트를 **하나의 트랜잭션**으로 묶음
+- 이유: 상품만 삭제되고 재고·좋아요가 남으면 데이터 불일치
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+---
+
+## 상품 목록 조회 (고객)
+
+### 입력 필드
+- `brandId`: 선택, 특정 브랜드 상품만 필터링
+- `sort`: 필수, `latest`(기본값) / `price_asc` / `likes_desc`
+- `page`: 기본값 0
+- `size`: 기본값 20
+
+### 비즈니스 규칙
+- 없음 (단순 페이징 조회)
+- `sort` 값이 정의된 값 외의 경우 → `BAD_REQUEST`
+
+### 유스케이스 흐름
+1. `ProductRepository.findAllWithBrand(brandId, sort, pageable)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 각 상품의 재고 조회 → `inStock = stock.quantity > 0`
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 인증 불필요
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandName`, `likeCount`, `inStock`
+
+---
+
+## 상품 상세 조회 (고객)
+
+### 입력 필드
+- `productId`: Path variable
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `ProductRepository.findByIdWithBrand(productId)` — JOIN 쿼리로 브랜드명 포함 조회
+2. 재고 조회 → `inStock = stock.quantity > 0`
+3. 결과 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 인증 불필요
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandName`, `likeCount`, `inStock`
+
+---
+
+## 상품 목록 조회 (어드민)
+
+### 입력 필드
+- `brandId`: 선택, 특정 브랜드 상품만 필터링
+- `page`: 기본값 0
+- `size`: 기본값 20
+- 정렬: 지원하지 않음 (항상 최신순 `createdAt DESC`)
+
+### 비즈니스 규칙
+- 없음
+
+### 유스케이스 흐름
+1. `ProductRepository.findAll(brandId, pageable)` — 브랜드 필터 + 최신순 페이징
+2. 배치 조회: `BrandRepository.findAllByIdIn(brandIds)` → brandName Map
+3. 배치 조회: `StockRepository.findAllByProductIdIn(productIds)` → stock Map
+4. 결과 조립 후 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandId`, `brandName`, `likeCount`, `stock`(수량), `createdAt`, `updatedAt`
+
+---
+
+## 상품 상세 조회 (어드민)
+
+### 입력 필드
+- `productId`: Path variable
+
+### 비즈니스 규칙 (DomainService)
+- 존재하지 않거나 삭제된 상품 → `NOT_FOUND`
+
+### 유스케이스 흐름
+1. `ProductDomainService.getProduct(productId)` — 상품 조회 (없으면 NOT_FOUND)
+2. `BrandDomainService.getBrand(brandId)` — 브랜드명 조회
+3. `StockDomainService.getStock(productId)` — 재고 수량 조회
+4. 결과 조립 후 반환
+
+### 트랜잭션 경계
+- `@Transactional(readOnly = true)`
+
+### 접근 제어
+- 어드민 전용 (`X-Loopers-Ldap: loopers.admin`)
+
+### 응답 필드
+- `id`, `name`, `description`, `price`, `brandId`, `brandName`, `likeCount`, `stock`(수량), `createdAt`, `updatedAt`

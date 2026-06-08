@@ -1,5 +1,10 @@
 package com.loopers.domain.member;
 
+import com.loopers.domain.member.model.Member;
+import com.loopers.domain.member.model.Password;
+import com.loopers.domain.member.service.MemberService;
+import com.loopers.domain.member.repository.MemberRepository;
+
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -120,6 +125,42 @@ class MemberServiceTest {
 
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
+        }
+    }
+
+    @DisplayName("회원을 조회할 때, ")
+    @Nested
+    class GetMember {
+
+        @DisplayName("존재하는 loginId이면, 회원을 반환한다.")
+        @Test
+        void returnsMember_whenLoginIdExists() {
+            // Arrange
+            String loginId = "testUser1";
+            Password password = Password.of("Password1!", "1990-01-01", new BCryptPasswordEncoder().encode("Password1!"));
+            Member member = new Member(loginId, password, "홍길동", "1990-01-01", "test@example.com");
+            when(memberRepository.findByLoginId(loginId)).thenReturn(Optional.of(member));
+
+            // Act
+            Member result = memberService.getMember(loginId);
+
+            // Assert
+            assertThat(result.getLoginId()).isEqualTo(loginId);
+        }
+
+        @DisplayName("존재하지 않는 loginId이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenLoginIdDoesNotExist() {
+            // Arrange
+            when(memberRepository.findByLoginId("notExist")).thenReturn(Optional.empty());
+
+            // Act
+            CoreException result = assertThrows(CoreException.class, () ->
+                memberService.getMember("notExist")
+            );
+
+            // Assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 

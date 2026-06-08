@@ -3,71 +3,79 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/v1/products")
+@RequestMapping("/api-admin/v1/products")
 public class ProductV1Controller {
 
     private final ProductFacade productFacade;
 
-    @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
+    @GetMapping
+    public ApiResponse<Page<ProductV1Dto.ProductAdminResponse>> getProducts(
+        @RequestParam(required = false) Long brandId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
     ) {
-        ProductInfo info = productFacade.createProduct(
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        Page<ProductInfo> products = productFacade.getProducts(brandId, "latest", page, size);
+        return ApiResponse.success(products.map(ProductV1Dto.ProductAdminResponse::from));
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-        @PathVariable(value = "productId") Long productId
+    public ApiResponse<ProductV1Dto.ProductAdminResponse> getProduct(
+        @PathVariable Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductAdminResponse.from(info));
     }
 
-    @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
-            .toList();
-        return ApiResponse.success(responses);
-    }
-
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<ProductV1Dto.ProductResponse> register(
+        @RequestBody ProductV1Dto.RegisterRequest request
     ) {
-        ProductInfo info = productFacade.updateProduct(
-            productId,
+        ProductInfo info = productFacade.createProduct(
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.initialQuantity()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+    }
+
+    @PutMapping("/{productId}")
+    public ApiResponse<Object> updateProduct(
+        @PathVariable Long productId,
+        @RequestBody ProductV1Dto.UpdateRequest request
+    ) {
+        if (request.brandId() != null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "brandId는 수정할 수 없습니다.");
+        }
+        productFacade.updateProduct(productId, request.name(), request.description(), request.price());
+        return ApiResponse.success();
     }
 
     @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
+    public ApiResponse<Object> deleteProduct(
+        @PathVariable Long productId
     ) {
         productFacade.deleteProduct(productId);
-        return ApiResponse.success(null);
+        return ApiResponse.success();
     }
 }
