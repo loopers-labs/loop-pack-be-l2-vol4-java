@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 상품 유스케이스 Facade.
@@ -27,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
+
+    private static final Set<String> VALID_SORT_VALUES = Set.of("latest", "price_asc", "likes_desc");
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
@@ -53,6 +56,7 @@ public class ProductFacade {
      */
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
+        validateSort(sort);
         List<ProductModel> products = productRepository.findAll(brandId, sort, page, size);
         if (products.isEmpty()) {
             return List.of();
@@ -100,6 +104,7 @@ public class ProductFacade {
     /** 어드민 - 상품 목록 (재고 IN 쿼리로 N+1 회피, 어셈블은 DTO에 위임) */
     @Transactional(readOnly = true)
     public List<ProductInfo> getProductsForAdmin(Long brandId, String sort, int page, int size) {
+        validateSort(sort);
         List<ProductModel> products = productRepository.findAll(brandId, sort, page, size);
         if (products.isEmpty()) {
             return List.of();
@@ -116,6 +121,13 @@ public class ProductFacade {
         ProductModel product = findActiveProductOrThrow(productId);
         product.delete();
         productRepository.save(product);
+    }
+
+    private void validateSort(String sort) {
+        if (sort != null && !VALID_SORT_VALUES.contains(sort)) {
+            throw new CoreException(ErrorType.BAD_REQUEST,
+                "유효하지 않은 정렬 옵션입니다. (허용값: latest, price_asc, likes_desc)");
+        }
     }
 
     private ProductModel findActiveProductOrThrow(Long productId) {
