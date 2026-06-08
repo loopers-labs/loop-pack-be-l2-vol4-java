@@ -1,9 +1,9 @@
 package com.loopers.user.application;
 
 import com.loopers.user.domain.User;
+import com.loopers.user.domain.UserErrorCode;
 import com.loopers.user.domain.UserRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -72,7 +72,7 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.signUp(signUpCommand()))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.LOGIN_ID_DUPLICATED);
 
         verify(userRepository, never()).save(any());
     }
@@ -84,7 +84,7 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.signUp(signUpCommand()))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.EMAIL_DUPLICATED);
 
         verify(userRepository, never()).save(any());
     }
@@ -98,7 +98,7 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.signUp(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
 
         verify(userRepository, never()).save(any());
     }
@@ -162,7 +162,7 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
     }
 
     @Test
@@ -174,7 +174,7 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.CURRENT_PASSWORD_MISMATCH);
     }
 
     @Test
@@ -186,6 +186,6 @@ class UserAccountServiceTest {
 
         assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
     }
 }

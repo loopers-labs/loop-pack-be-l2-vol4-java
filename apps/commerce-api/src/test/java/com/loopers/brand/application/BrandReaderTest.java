@@ -3,7 +3,7 @@ package com.loopers.brand.application;
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +36,6 @@ class BrandReaderTest {
 
         assertThatThrownBy(() -> brandReader.getName(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
     }
 }

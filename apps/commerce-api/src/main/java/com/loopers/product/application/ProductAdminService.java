@@ -7,6 +7,8 @@ import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
+import com.loopers.product.domain.ProductErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +28,7 @@ public class ProductAdminService {
     @Transactional
     public ProductResult.AdminDetail create(ProductCommand.Create command) {
         if (!brandRepository.existsById(command.brandId())) {
-            throw new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다.");
+            throw new CoreException(ErrorType.NOT_FOUND, BrandErrorCode.BRAND_NOT_FOUND);
         }
         Product product = Product.create(
                 command.brandId(), command.name(), command.description(), command.price(), command.thumbnailUrl()
@@ -83,11 +85,11 @@ public class ProductAdminService {
 
     private Product get(Long productId) {
         return productRepository.findById(productId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.PRODUCT_NOT_FOUND));
     }
 
     private ProductStock getStock(Long productId) {
         return productStockRepository.findByProductId(productId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품 재고를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.STOCK_NOT_FOUND));
     }
 }

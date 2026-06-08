@@ -11,6 +11,7 @@ import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
+import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.user.application.UserReader;
@@ -114,7 +115,7 @@ class PlaceOrderServiceTest {
 
         assertThatThrownBy(() -> placeOrderService.place(command(List.of(new OrderCommand.Line(10L, 5)))))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.OUT_OF_STOCK);
 
         verify(orderRepository, never()).save(any());
         verify(orderItemRepository, never()).save(any());
@@ -128,7 +129,7 @@ class PlaceOrderServiceTest {
 
         assertThatThrownBy(() -> placeOrderService.place(command(List.of(new OrderCommand.Line(99L, 1)))))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(orderRepository, never()).save(any());
     }
@@ -141,7 +142,7 @@ class PlaceOrderServiceTest {
 
         assertThatThrownBy(() -> placeOrderService.place(command(List.of(new OrderCommand.Line(10L, 1)))))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(productStockRepository, never()).findByProductIdForUpdate(any());
         verify(orderRepository, never()).save(any());

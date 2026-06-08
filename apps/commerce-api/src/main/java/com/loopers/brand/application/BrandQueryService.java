@@ -4,6 +4,7 @@ import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,6 @@ public class BrandQueryService {
 
     private Brand get(Long brandId) {
         return brandRepository.findById(brandId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, BrandErrorCode.BRAND_NOT_FOUND));
     }
 }

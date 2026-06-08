@@ -1,13 +1,14 @@
 package com.loopers.product.application;
 
+import com.loopers.brand.domain.BrandErrorCode;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.product.domain.Product;
+import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductStatus;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -62,7 +63,7 @@ class ProductAdminServiceTest {
 
         assertThatThrownBy(() -> productAdminService.create(createCommand()))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
 
         verify(productRepository, never()).save(any());
         verify(productStockRepository, never()).save(any());
@@ -93,7 +94,7 @@ class ProductAdminServiceTest {
 
         assertThatThrownBy(() -> productAdminService.update(new ProductCommand.Update(999L, "이름", "설명", 1000L, null)))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.PRODUCT_NOT_FOUND);
     }
 
     @Test

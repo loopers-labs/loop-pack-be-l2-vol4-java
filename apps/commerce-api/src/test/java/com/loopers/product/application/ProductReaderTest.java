@@ -3,7 +3,7 @@ package com.loopers.product.application;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.product.domain.ProductErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +36,7 @@ class ProductReaderTest {
 
         assertThatThrownBy(() -> productReader.ensureActiveExists(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.PRODUCT_NOT_FOUND);
     }
 
     @Test
@@ -61,6 +61,6 @@ class ProductReaderTest {
 
         assertThatThrownBy(() -> productReader.getInfo(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.PRODUCT_NOT_FOUND);
     }
 }

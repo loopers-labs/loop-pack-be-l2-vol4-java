@@ -6,6 +6,7 @@ import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +24,7 @@ public class BrandAdminService {
     @Transactional
     public BrandResult.Detail create(BrandCommand.Create command) {
         if (brandRepository.existsByName(command.name())) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 브랜드명입니다.");
+            throw new CoreException(ErrorType.CONFLICT, BrandErrorCode.BRAND_NAME_DUPLICATED);
         }
         Brand brand = Brand.create(command.name(), command.description(), command.logoUrl());
         return BrandResult.Detail.from(brandRepository.save(brand));
@@ -33,7 +34,7 @@ public class BrandAdminService {
     public BrandResult.Detail update(BrandCommand.Update command) {
         Brand brand = get(command.brandId());
         if (!brand.getName().equals(command.name()) && brandRepository.existsByName(command.name())) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 브랜드명입니다.");
+            throw new CoreException(ErrorType.CONFLICT, BrandErrorCode.BRAND_NAME_DUPLICATED);
         }
         brand.update(command.name(), command.description(), command.logoUrl());
         return BrandResult.Detail.from(brand);
@@ -61,6 +62,6 @@ public class BrandAdminService {
 
     private Brand get(Long brandId) {
         return brandRepository.findById(brandId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, BrandErrorCode.BRAND_NOT_FOUND));
     }
 }

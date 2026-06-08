@@ -5,7 +5,7 @@ import com.loopers.brand.domain.BrandRepository;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,7 +58,7 @@ class BrandAdminServiceTest {
 
         assertThatThrownBy(() -> brandAdminService.create(command))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NAME_DUPLICATED);
 
         verify(brandRepository, never()).save(any());
     }
@@ -90,7 +90,7 @@ class BrandAdminServiceTest {
 
         assertThatThrownBy(() -> brandAdminService.update(command))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NAME_DUPLICATED);
     }
 
     @Test
@@ -114,7 +114,7 @@ class BrandAdminServiceTest {
 
         assertThatThrownBy(() -> brandAdminService.update(command))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
     }
 
     @Test
@@ -136,7 +136,7 @@ class BrandAdminServiceTest {
 
         assertThatThrownBy(() -> brandAdminService.delete(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
 
         verify(productStockRepository, never()).softDeleteByBrandId(any());
         verify(productRepository, never()).softDeleteByBrandId(any());

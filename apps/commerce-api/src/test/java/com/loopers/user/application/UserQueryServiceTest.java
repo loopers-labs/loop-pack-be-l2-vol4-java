@@ -3,7 +3,7 @@ package com.loopers.user.application;
 import com.loopers.user.domain.User;
 import com.loopers.user.domain.UserRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.user.domain.UserErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +40,6 @@ class UserQueryServiceTest {
 
         assertThatThrownBy(() -> userQueryService.getUser(999L))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
     }
 }

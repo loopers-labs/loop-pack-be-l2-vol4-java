@@ -9,7 +9,7 @@ import com.loopers.product.domain.ProductSortOption;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.product.domain.ProductErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -91,7 +91,7 @@ class ProductQueryServiceTest {
 
         assertThatThrownBy(() -> productQueryService.getProduct(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.PRODUCT_NOT_FOUND);
     }
 
     @Test

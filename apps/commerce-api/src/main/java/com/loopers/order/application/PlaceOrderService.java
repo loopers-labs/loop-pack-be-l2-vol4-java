@@ -13,6 +13,7 @@ import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.user.application.UserReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -50,7 +51,7 @@ public class PlaceOrderService {
             // getInfo 는 ON_SALE·미삭제 상품만 반환하므로 삭제·판매중지(SUSPENDED) 상품 주문을 함께 막는다.
             ProductInfo product = productReader.getInfo(line.productId());
             ProductStock stock = productStockRepository.findByProductIdForUpdate(line.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품 재고를 찾을 수 없습니다."));
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.STOCK_NOT_FOUND));
             stock.decrease(line.quantity());
 
             String brandName = brandReader.getName(product.brandId());

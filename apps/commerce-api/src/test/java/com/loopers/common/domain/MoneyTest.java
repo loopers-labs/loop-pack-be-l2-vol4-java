@@ -21,7 +21,7 @@ class MoneyTest {
     void givenNegative_whenOf_thenThrowsBadRequest() {
         assertThatThrownBy(() -> Money.of(-1L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.BAD_REQUEST);
     }
 
     @Test

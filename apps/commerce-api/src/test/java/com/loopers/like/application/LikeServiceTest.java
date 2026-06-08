@@ -78,7 +78,7 @@ class LikeServiceTest {
 
         assertThatThrownBy(() -> likeService.register(USER_ID, PRODUCT_ID))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(likeRepository, never()).save(any());
     }

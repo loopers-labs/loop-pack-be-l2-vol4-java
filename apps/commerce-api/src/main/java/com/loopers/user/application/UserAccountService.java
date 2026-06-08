@@ -5,6 +5,7 @@ import com.loopers.user.domain.UserPasswordPolicy;
 import com.loopers.user.domain.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.user.domain.UserErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -50,27 +51,27 @@ public class UserAccountService {
 
     private User get(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, UserErrorCode.USER_NOT_FOUND));
     }
 
     private void validateSignUp(UserCommand.SignUp command) {
         if (userRepository.existsByLoginId(command.loginId())) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 로그인 ID입니다.");
+            throw new CoreException(ErrorType.CONFLICT, UserErrorCode.LOGIN_ID_DUPLICATED);
         }
         if (userRepository.existsByEmail(command.email())) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 사용 중인 이메일입니다.");
+            throw new CoreException(ErrorType.CONFLICT, UserErrorCode.EMAIL_DUPLICATED);
         }
         if (UserPasswordPolicy.containsBirthDate(command.password(), command.birthDate())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
         }
     }
 
     private void validateChangePassword(User user, String currentRawPassword, String newRawPassword) {
         if (!passwordEncoder.matches(currentRawPassword, user.getPassword())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, UserErrorCode.CURRENT_PASSWORD_MISMATCH);
         }
         if (UserPasswordPolicy.containsBirthDate(newRawPassword, user.getBirthDate())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호에 생년월일을 포함할 수 없습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
         }
     }
 }
