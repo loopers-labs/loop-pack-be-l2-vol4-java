@@ -104,5 +104,89 @@ class OrderModelTest {
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.EMPTY_ORDER_ITEMS);
         }
+
+        @DisplayName("쿠폰 없이 생성하면, discountAmount = 0, finalAmount = totalAmount, usedCouponId = null 이다.")
+        @Test
+        void createsOrderWithoutDiscount_whenNoCouponIsApplied() {
+            // given
+            Long userId = 1L;
+            OrderLines lines = OrderLines.of(List.of(
+                new OrderLine(100L, 2, "에어맥스 270", 100_000L, "나이키")
+            ));
+
+            // when
+            OrderModel order = OrderModel.create(userId, lines);
+
+            // then
+            assertAll(
+                () -> assertThat(order.getTotalAmount()).isEqualTo(200_000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(0L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(200_000L),
+                () -> assertThat(order.getUsedCouponId()).isNull()
+            );
+        }
+
+        @DisplayName("할인이 적용되면, finalAmount = totalAmount − discountAmount 로 계산되고 usedCouponId 가 스냅샷된다.")
+        @Test
+        void createsOrderWithDiscount_whenCouponIsApplied() {
+            // given
+            Long userId = 1L;
+            Long usedCouponId = 77L;
+            long discountAmount = 30_000L;
+            OrderLines lines = OrderLines.of(List.of(
+                new OrderLine(100L, 2, "에어맥스 270", 100_000L, "나이키")
+            ));
+
+            // when
+            OrderModel order = OrderModel.create(userId, lines, discountAmount, usedCouponId);
+
+            // then
+            assertAll(
+                () -> assertThat(order.getTotalAmount()).isEqualTo(200_000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(30_000L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(170_000L),
+                () -> assertThat(order.getUsedCouponId()).isEqualTo(77L)
+            );
+        }
+
+        @DisplayName("할인 금액이 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenDiscountAmountIsNegative() {
+            // given
+            Long userId = 1L;
+            OrderLines lines = OrderLines.of(List.of(
+                new OrderLine(100L, 1, "에어맥스 270", 100_000L, "나이키")
+            ));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> OrderModel.create(userId, lines, -1L, 77L));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("할인 금액은 음수일 수 없습니다.")
+            );
+        }
+
+        @DisplayName("할인 금액이 주문 금액을 초과하면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenDiscountAmountExceedsTotalAmount() {
+            // given
+            Long userId = 1L;
+            OrderLines lines = OrderLines.of(List.of(
+                new OrderLine(100L, 1, "에어맥스 270", 100_000L, "나이키")
+            ));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> OrderModel.create(userId, lines, 100_001L, 77L));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("할인 금액은 주문 금액을 초과할 수 없습니다.")
+            );
+        }
     }
 }

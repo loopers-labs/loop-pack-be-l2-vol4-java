@@ -31,6 +31,15 @@ public class CouponService {
     }
 
     @Transactional
+    public DiscountResult apply(Long requesterId, Long userCouponId, long orderAmount) {
+        if (userCouponId == null) {
+            return DiscountResult.none();
+        }
+        long discount = use(requesterId, userCouponId, orderAmount);
+        return new DiscountResult(userCouponId, discount);
+    }
+
+    @Transactional
     public long use(Long requesterId, Long userCouponId, long orderAmount) {
         UserCoupon userCoupon = userCouponRepository.findById(userCouponId)
             .orElseThrow(() -> new CoreException(ErrorType.COUPON_NOT_FOUND, "쿠폰을 찾을 수 없습니다."));

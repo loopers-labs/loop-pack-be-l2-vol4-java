@@ -197,6 +197,70 @@ class CouponServiceTest {
         }
     }
 
+    @DisplayName("주문에 쿠폰을 적용할 때, ")
+    @Nested
+    class Apply {
+
+        @DisplayName("couponId 가 null 이면, 저장소를 조회하지 않고 할인 없음(0원) 결과를 반환한다.")
+        @Test
+        void returnsNoDiscount_whenCouponIdIsNull() {
+            // given
+            Long userId = 1L;
+            Long userCouponId = null;
+
+            // when
+            DiscountResult result = couponService.apply(userId, userCouponId, 10_000L);
+
+            // then
+            assertAll(
+                () -> assertThat(result.usedCouponId()).isNull(),
+                () -> assertThat(result.amount()).isEqualTo(0L),
+                () -> verify(userCouponRepository, never()).findById(any())
+            );
+        }
+
+        @DisplayName("유효한 쿠폰을 적용하면, 사용한 쿠폰 식별자와 할인액을 담은 결과를 반환하고 USED 상태로 전이한다.")
+        @Test
+        void returnsDiscountResultAndUsesCoupon_whenCouponIsValid() {
+            // given
+            Long userId = 1L;
+            Long userCouponId = 100L;
+            UserCoupon userCoupon = UserCoupon.issue(userId, policy(), NOW);
+            given(userCouponRepository.findById(userCouponId)).willReturn(Optional.of(userCoupon));
+
+            // when
+            DiscountResult result = couponService.apply(userId, userCouponId, 10_000L);
+
+            // then
+            assertAll(
+                () -> assertThat(result.usedCouponId()).isEqualTo(100L),
+                () -> assertThat(result.amount()).isEqualTo(3_000L),
+                () -> assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.USED)
+            );
+        }
+
+        @DisplayName("타 유저 소유 쿠폰을 적용하면, COUPON_NOT_OWNED 예외가 전파된다.")
+        @Test
+        void propagatesCouponNotOwnedException_whenCouponBelongsToAnotherUser() {
+            // given
+            Long ownerId = 1L;
+            Long requesterId = 2L;
+            Long userCouponId = 100L;
+            UserCoupon userCoupon = UserCoupon.issue(ownerId, policy(), NOW);
+            given(userCouponRepository.findById(userCouponId)).willReturn(Optional.of(userCoupon));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponService.apply(requesterId, userCouponId, 10_000L));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_NOT_OWNED),
+                () -> assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE)
+            );
+        }
+    }
+
     @DisplayName("어드민이 쿠폰 정책을 생성할 때, ")
     @Nested
     class CreatePolicy {
