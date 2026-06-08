@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface IssuedCouponRepository {
     IssuedCoupon save(IssuedCoupon issuedCoupon);
     Optional<IssuedCoupon> findById(Long id);
-    boolean existsByCouponIdAndUserId(Long couponId, Long userId);
+    Optional<IssuedCoupon> findByIdForUpdate(Long id);
     List<IssuedCoupon> findAllByUserId(Long userId);
     Page<IssuedCoupon> findAllByCouponId(Long couponId, Pageable pageable);
 }

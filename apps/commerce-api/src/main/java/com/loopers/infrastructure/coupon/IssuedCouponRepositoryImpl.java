@@ -21,7 +21,7 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
     @Override
     public IssuedCoupon save(IssuedCoupon issuedCoupon) {
         if (issuedCoupon.getId() == null) {
-            return issuedCouponJpaRepository.save(
+            return issuedCouponJpaRepository.saveAndFlush(
                 new IssuedCouponEntity(issuedCoupon.getCouponId(), issuedCoupon.getUserId())
             ).toDomain();
         }
@@ -37,8 +37,8 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
     }
 
     @Override
-    public boolean existsByCouponIdAndUserId(Long couponId, Long userId) {
-        return issuedCouponJpaRepository.existsByCouponIdAndUserId(couponId, userId);
+    public Optional<IssuedCoupon> findByIdForUpdate(Long id) {
+        return issuedCouponJpaRepository.findByIdForUpdate(id).map(IssuedCouponEntity::toDomain);
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -26,10 +27,11 @@ public class CouponService {
     public IssuedCoupon issue(Long couponId, Long userId) {
         couponRepository.findById(couponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
-        if (issuedCouponRepository.existsByCouponIdAndUserId(couponId, userId)) {
+        try {
+            return issuedCouponRepository.save(new IssuedCoupon(couponId, userId));
+        } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
         }
-        return issuedCouponRepository.save(new IssuedCoupon(couponId, userId));
     }
 
     public List<CouponInfo.MyCoupon> getUserCoupons(Long userId) {
@@ -46,7 +48,7 @@ public class CouponService {
     // OrderFacade의 @Transactional에 합류하여 쿠폰 사용·재고 차감·주문 생성이 단일 트랜잭션으로 묶인다.
     @Transactional
     public BigDecimal validateAndUse(Long issuedCouponId, Long userId, BigDecimal totalAmount) {
-        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdForUpdate(issuedCouponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 발급 쿠폰입니다."));
         if (!issuedCoupon.getUserId().equals(userId)) {
             throw new CoreException(ErrorType.FORBIDDEN, "본인의 쿠폰만 사용할 수 있습니다.");

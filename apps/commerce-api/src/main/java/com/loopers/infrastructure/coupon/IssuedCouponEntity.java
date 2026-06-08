@@ -8,13 +8,15 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
 @Getter
 @Entity(name = "IssuedCoupon")
-@Table(name = "issued_coupon")
+@Table(name = "issued_coupon",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"coupon_id", "user_id"}))
 public class IssuedCouponEntity extends BaseEntity {
 
     @Column(name = "coupon_id", nullable = false)
