@@ -23,7 +23,7 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @Component
-public class OrderService {
+public class PlaceOrderService {
 
     private final UserReader userReader;
     private final ProductReader productReader;
@@ -35,7 +35,7 @@ public class OrderService {
     private final PaymentService paymentService;
 
     @Transactional
-    public OrderResult.Detail create(OrderCommand.Create command) {
+    public OrderResult.Detail place(OrderCommand.Create command) {
         // 주문자가 존재하지 않으면 재고 차감 전에 NOT_FOUND 로 종료한다.
         userReader.ensureExists(command.userId());
 
@@ -76,12 +76,5 @@ public class OrderService {
         paymentService.pay(saved);
 
         return OrderResult.Detail.of(saved, orderItems);
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderResult.Summary> getMyOrders(Long userId) {
-        return orderRepository.findByUserId(userId).stream()
-                .map(OrderResult.Summary::from)
-                .toList();
     }
 }
