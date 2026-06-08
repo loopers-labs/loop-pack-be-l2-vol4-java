@@ -28,29 +28,25 @@ public class WishlistV1Controller implements WishlistV1ApiSpec {
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
         wishlistFacade.addLike(userId, productId);
-        return ApiResponse.success((Void) null);
+        return ApiResponse.success(null);
     }
 
     @DeleteMapping("/api/v1/products/{productId}/likes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Override
     public ApiResponse<Void> removeLike(
             @PathVariable Long productId,
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
         wishlistFacade.removeLike(userId, productId);
-        return ApiResponse.success((Void) null);
+        return ApiResponse.success(null);
     }
 
-    @GetMapping("/api/v1/users/{userId}/likes")
+    @GetMapping("/api/v1/users/me/likes")
     @Override
     public ApiResponse<List<WishlistV1Dto.LikedProductResponse>> getLikedProducts(
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        return ApiResponse.success(
-                wishlistFacade.getLikedProducts(userId)
-                        .stream()
-                        .map(WishlistV1Dto.LikedProductResponse::from)
-                        .toList()
-        );
+        return ApiResponse.success(WishlistV1Dto.LikedProductResponse.from(wishlistFacade.getLikedProducts(userId)));
     }
 }

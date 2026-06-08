@@ -1,6 +1,8 @@
 package com.loopers.interfaces.api.wishlist;
 
-import com.loopers.application.product.ProductInfo;
+import com.loopers.application.wishlist.WishlistInfo;
+
+import java.util.List;
 
 public class WishlistV1Dto {
 
@@ -8,10 +10,23 @@ public class WishlistV1Dto {
             Long id,
             String name,
             String status,
-            Long brandId
+            String brandName,
+            Long price,
+            Integer stockQuantity
     ) {
-        public static LikedProductResponse from(ProductInfo info) {
-            return new LikedProductResponse(info.id(), info.name(), info.status(), info.brandId());
+        public static LikedProductResponse from(WishlistInfo info) {
+            return new LikedProductResponse(
+                    info.id(),
+                    info.name(),
+                    info.status(),
+                    info.brandName(),
+                    info.price(),
+                    info.stockQuantity()
+            );
+        }
+
+        public static List<LikedProductResponse> from(List<WishlistInfo> infos) {
+            return infos.stream().map(LikedProductResponse::from).toList();
         }
     }
 }
