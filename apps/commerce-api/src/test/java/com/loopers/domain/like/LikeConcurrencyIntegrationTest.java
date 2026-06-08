@@ -70,4 +70,38 @@ class LikeConcurrencyIntegrationTest {
         // then - 좋아요 수가 정확히 10
         assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(10L);
     }
+
+    @DisplayName("여러 명이 동시에 같은 상품의 좋아요를 취소하면 좋아요 수가 정확히 0까지 감소하고 음수가 되지 않는다")
+    @Test
+    void likeCountReflectsAllConcurrentUnlikes() throws InterruptedException {
+        // given - 상품 + 10명이 미리 좋아요 (likeCount 10)
+        BrandModel brand = brandRepository.save(new BrandModel("Loopers", "감성"));
+        Long productId = productRepository.save(new ProductModel(brand.getId(), "후드", "포근함", 50_000L)).getId();
+
+        int threadCount = 10;
+        for (int i = 0; i < threadCount; i++) {
+            likeFacade.like((long) (i + 1), productId);
+        }
+        assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(10L);
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        // when - 좋아요한 10명이 동시에 취소
+        for (int i = 0; i < threadCount; i++) {
+            long userId = i + 1;
+            executor.submit(() -> {
+                try {
+                    likeFacade.unlike(userId, productId);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        latch.await();
+        executor.shutdown();
+
+        // then - 좋아요 수가 정확히 0 (유실·음수 없음)
+        assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(0L);
+    }
 }
