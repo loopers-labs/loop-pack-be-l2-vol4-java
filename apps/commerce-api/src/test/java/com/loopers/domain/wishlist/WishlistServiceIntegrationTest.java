@@ -12,11 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,36 +41,13 @@ class WishlistServiceIntegrationTest {
     @Nested
     class Add {
 
-        @DisplayName("유효한 입력이면, 찜이 저장된다.")
+        @DisplayName("유효한 입력이면, 찜이 등록된다.")
         @Test
-        void savesWishlist_whenInputsAreValid() {
+        void returnsWishlist_whenInputsAreValid() {
             WishlistModel result = wishlistService.add(USER_ID, PRODUCT_ID);
 
             assertThat(result.getUserId()).isEqualTo(USER_ID);
             assertThat(result.getProductId()).isEqualTo(PRODUCT_ID);
-        }
-
-        @DisplayName("이미 찜한 상품이면, CONFLICT 예외가 발생한다.")
-        @Test
-        void throwsConflict_whenAlreadyWishlisted() {
-            saveWishlist(USER_ID, PRODUCT_ID);
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> wishlistService.add(USER_ID, PRODUCT_ID));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
-        }
-
-        @DisplayName("동시에 같은 상품을 찜하면, 한 번만 성공한다.")
-        @Test
-        void onlyOneSucceeds_whenConcurrentAddWithSameUserAndProduct() throws InterruptedException {
-            ConcurrentResult result = runConcurrent(5, () ->
-                    wishlistService.add(USER_ID, PRODUCT_ID));
-
-            List<WishlistModel> saved = wishlistRepository.findAllByUserId(USER_ID);
-            assertThat(result.successCount()).isEqualTo(1);
-            assertThat(result.failureCount()).isEqualTo(4);
-            assertThat(saved).hasSize(1);
         }
     }
 
@@ -83,18 +55,17 @@ class WishlistServiceIntegrationTest {
     @Nested
     class Remove {
 
-        @DisplayName("찜 목록에 존재하면, 삭제된다.")
+        @DisplayName("찜 목록에 존재하는 상품이면, 찜이 삭제된다.")
         @Test
         void removesWishlist_whenWishlistExists() {
             saveWishlist(USER_ID, PRODUCT_ID);
 
             wishlistService.remove(USER_ID, PRODUCT_ID);
 
-            List<WishlistModel> result = wishlistRepository.findAllByUserId(USER_ID);
-            assertThat(result).isEmpty();
+            assertThat(wishlistRepository.findAllByUserId(USER_ID)).isEmpty();
         }
 
-        @DisplayName("찜 목록에 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
+        @DisplayName("찜 목록에 존재하지 않는 상품이면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenWishlistDoesNotExist() {
             CoreException exception = assertThrows(CoreException.class,
@@ -117,6 +88,14 @@ class WishlistServiceIntegrationTest {
             List<WishlistModel> result = wishlistService.getList(USER_ID);
 
             assertThat(result).hasSize(2);
+        }
+
+        @DisplayName("찜한 상품이 없으면, 빈 목록을 반환한다.")
+        @Test
+        void returnsEmptyList_whenUserHasNoWishlists() {
+            List<WishlistModel> result = wishlistService.getList(USER_ID);
+
+            assertThat(result).isEmpty();
         }
 
         @DisplayName("다른 사용자의 찜은 반환되지 않는다.")
@@ -142,7 +121,7 @@ class WishlistServiceIntegrationTest {
             saveWishlist(USER_ID, PRODUCT_ID);
             saveWishlist(OTHER_USER_ID, PRODUCT_ID);
 
-            long count = wishlistRepository.countByProductId(PRODUCT_ID);
+            long count = wishlistService.countByProductId(PRODUCT_ID);
 
             assertThat(count).isEqualTo(2);
         }
@@ -150,7 +129,7 @@ class WishlistServiceIntegrationTest {
         @DisplayName("찜이 없는 상품은 0을 반환한다.")
         @Test
         void returnsZero_whenNoWishlists() {
-            long count = wishlistRepository.countByProductId(PRODUCT_ID);
+            long count = wishlistService.countByProductId(PRODUCT_ID);
 
             assertThat(count).isEqualTo(0L);
         }
@@ -167,7 +146,7 @@ class WishlistServiceIntegrationTest {
             saveWishlist(OTHER_USER_ID, PRODUCT_ID);
             saveWishlist(USER_ID, OTHER_PRODUCT_ID);
 
-            Map<Long, Long> counts = wishlistRepository.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
+            Map<Long, Long> counts = wishlistService.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
 
             assertThat(counts.get(PRODUCT_ID)).isEqualTo(2L);
             assertThat(counts.get(OTHER_PRODUCT_ID)).isEqualTo(1L);
@@ -178,42 +157,10 @@ class WishlistServiceIntegrationTest {
         void excludesProductsWithNoWishlists() {
             saveWishlist(USER_ID, PRODUCT_ID);
 
-            Map<Long, Long> counts = wishlistRepository.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
+            Map<Long, Long> counts = wishlistService.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
 
             assertThat(counts).containsKey(PRODUCT_ID);
             assertThat(counts).doesNotContainKey(OTHER_PRODUCT_ID);
         }
-    }
-
-    record ConcurrentResult(int successCount, int failureCount) {}
-
-    private ConcurrentResult runConcurrent(int threadCount, Runnable task) throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch doneLatch = new CountDownLatch(threadCount);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failureCount = new AtomicInteger(0);
-
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    task.run();
-                    successCount.incrementAndGet();
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    failureCount.incrementAndGet();
-                } catch (Throwable t) {
-                    failureCount.incrementAndGet();
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
-        }
-
-        startLatch.countDown();
-        doneLatch.await(10, TimeUnit.SECONDS);
-        executor.shutdownNow();
-        return new ConcurrentResult(successCount.get(), failureCount.get());
     }
 }

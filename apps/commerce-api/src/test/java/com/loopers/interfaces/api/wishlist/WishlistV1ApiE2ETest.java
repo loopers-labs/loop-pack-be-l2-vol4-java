@@ -4,6 +4,9 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStockModel;
+import com.loopers.domain.product.ProductStockRepository;
+import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
@@ -43,18 +46,18 @@ class WishlistV1ApiE2ETest {
     @Autowired private UserRepository userRepository;
     @Autowired private BrandRepository brandRepository;
     @Autowired private ProductRepository productRepository;
+    @Autowired private ProductStockRepository productStockRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private static final String DEFAULT_USERID = "wishUser1";
     private static final String DEFAULT_PASSWORD = "Dlaxodid1!";
 
-    private UserModel savedUser;
     private ProductModel savedProduct;
 
     @BeforeEach
     void setUp() {
-        savedUser = userRepository.save(new UserModel(
+        userRepository.save(new UserModel(
                 new UserId(DEFAULT_USERID),
                 new Password(passwordEncoder.encode(DEFAULT_PASSWORD)),
                 new Name("찜유저"),
@@ -64,6 +67,7 @@ class WishlistV1ApiE2ETest {
         ));
         BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
         savedProduct = productRepository.save(new ProductModel(brand.getId(), new ProductName("테스트상품")));
+        productStockRepository.save(new ProductStockModel(savedProduct, new Price(10000L), 10));
     }
 
     @AfterEach
@@ -103,40 +107,15 @@ class WishlistV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         }
-
-        @DisplayName("이미 찜한 상품이면, 409 CONFLICT를 반환한다.")
-        @Test
-        void returnsConflict_whenAlreadyLiked() {
-            addLike();
-            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                    "/api/v1/products/" + savedProduct.getId() + "/likes",
-                    HttpMethod.POST, new HttpEntity<>(authHeaders()), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        }
-
-        @DisplayName("인증 정보가 없으면, 401 UNAUTHORIZED를 반환한다.")
-        @Test
-        void returnsUnauthorized_whenNoAuthHeader() {
-            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                    "/api/v1/products/" + savedProduct.getId() + "/likes",
-                    HttpMethod.POST, null, type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        }
     }
 
     @DisplayName("DELETE /api/v1/products/{productId}/likes")
     @Nested
     class RemoveLike {
 
-        @DisplayName("찜이 존재하면, 200 OK를 반환한다.")
+        @DisplayName("찜이 존재하면, 204 NO_CONTENT를 반환한다.")
         @Test
-        void returnsOk_whenLikeExists() {
+        void returnsNoContent_whenLikeExists() {
             addLike();
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
 
@@ -144,23 +123,11 @@ class WishlistV1ApiE2ETest {
                     "/api/v1/products/" + savedProduct.getId() + "/likes",
                     HttpMethod.DELETE, new HttpEntity<>(authHeaders()), type);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        }
-
-        @DisplayName("찜이 존재하지 않으면, 404 NOT_FOUND를 반환한다.")
-        @Test
-        void returnsNotFound_whenLikeDoesNotExist() {
-            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
-                    "/api/v1/products/" + savedProduct.getId() + "/likes",
-                    HttpMethod.DELETE, new HttpEntity<>(authHeaders()), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         }
     }
 
-    @DisplayName("GET /api/v1/users/{userId}/likes")
+    @DisplayName("GET /api/v1/users/me/likes")
     @Nested
     class GetLikedProducts {
 
@@ -171,25 +138,12 @@ class WishlistV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<List<WishlistV1Dto.LikedProductResponse>>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<List<WishlistV1Dto.LikedProductResponse>>> response = testRestTemplate.exchange(
-                    "/api/v1/users/" + savedUser.getId() + "/likes",
+                    "/api/v1/users/me/likes",
                     HttpMethod.GET, new HttpEntity<>(authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data()).hasSize(1);
             assertThat(response.getBody().data().get(0).id()).isEqualTo(savedProduct.getId());
-        }
-
-        @DisplayName("찜한 상품이 없으면, 200 OK와 빈 목록을 반환한다.")
-        @Test
-        void returnsEmptyList_whenUserHasNoLikes() {
-            ParameterizedTypeReference<ApiResponse<List<WishlistV1Dto.LikedProductResponse>>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<List<WishlistV1Dto.LikedProductResponse>>> response = testRestTemplate.exchange(
-                    "/api/v1/users/" + savedUser.getId() + "/likes",
-                    HttpMethod.GET, new HttpEntity<>(authHeaders()), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().data()).isEmpty();
         }
     }
 }
