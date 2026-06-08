@@ -27,7 +27,7 @@ public class OrderResult {
                 order.getId(),
                 order.getOrderNumber(),
                 order.getStatus(),
-                order.getTotalAmount(),
+                order.getTotalAmount().value(),
                 order.getOrderedAt(),
                 Recipient.from(order.getShippingDestination()),
                 items.stream().map(Item::from).toList()
@@ -52,7 +52,7 @@ public class OrderResult {
                 order.getUserId(),
                 order.getOrderNumber(),
                 order.getStatus(),
-                order.getTotalAmount(),
+                order.getTotalAmount().value(),
                 order.getOrderedAt()
             );
         }
@@ -73,9 +73,9 @@ public class OrderResult {
                 item.getProductName(),
                 item.getBrandId(),
                 item.getBrandName(),
-                item.getPrice(),
+                item.getPrice().value(),
                 item.getQuantity(),
-                item.subtotal()
+                item.subtotal().value()
             );
         }
     }

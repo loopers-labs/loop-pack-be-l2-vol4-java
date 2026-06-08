@@ -1,8 +1,10 @@
 package com.loopers.order.domain;
 
+import com.loopers.common.domain.Money;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -41,8 +43,9 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false)
     private OrderStatus status;
 
-    @Column(name = "total_amount", nullable = false)
-    private long totalAmount;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "total_amount", nullable = false))
+    private Money totalAmount;
 
     @Embedded
     private ShippingDestination shippingDestination;
@@ -60,7 +63,7 @@ public class Order extends BaseEntity {
         this.orderNumber = orderNumber;
         this.shippingDestination = shippingDestination;
         validate(items);
-        this.totalAmount = items.stream().mapToLong(OrderItem::subtotal).sum();
+        this.totalAmount = items.stream().map(OrderItem::subtotal).reduce(Money.ZERO, Money::plus);
         this.status = OrderStatus.PENDING;
         this.orderedAt = ZonedDateTime.now();
     }

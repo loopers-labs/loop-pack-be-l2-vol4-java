@@ -1,9 +1,12 @@
 package com.loopers.order.domain;
 
+import com.loopers.common.domain.Money;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -36,8 +39,9 @@ public class OrderItem extends BaseEntity {
     @Column(name = "brand_name", nullable = false)
     private String brandName;
 
-    @Column(name = "price", nullable = false)
-    private long price;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
+    private Money price;
 
     @Column(name = "quantity", nullable = false)
     private int quantity;
@@ -47,7 +51,7 @@ public class OrderItem extends BaseEntity {
         this.productName = productName;
         this.brandId = brandId;
         this.brandName = brandName;
-        this.price = price;
+        this.price = Money.of(price);
         this.quantity = quantity;
         validate();
     }
@@ -62,8 +66,8 @@ public class OrderItem extends BaseEntity {
         this.orderId = orderId;
     }
 
-    public long subtotal() {
-        return price * quantity;
+    public Money subtotal() {
+        return price.times(quantity);
     }
 
     @Override
@@ -85,9 +89,6 @@ public class OrderItem extends BaseEntity {
         }
         if (brandName == null || brandName.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
-        }
-        if (price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
         if (quantity < 1) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");

@@ -6,6 +6,7 @@ import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.OrderStatus;
+import com.loopers.payment.application.PaymentService;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
 import com.loopers.product.domain.ProductStock;
@@ -79,7 +80,7 @@ class PlaceOrderServiceTest {
         assertAll(
                 () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(savedOrder.getOrderNumber()).isEqualTo("20260528-000001"),
-                () -> assertThat(savedOrder.getTotalAmount()).isEqualTo(58_000L),
+                () -> assertThat(savedOrder.getTotalAmount().value()).isEqualTo(58_000L),
                 () -> assertThat(result.totalAmount()).isEqualTo(58_000L),
                 () -> assertThat(result.items()).hasSize(1),
                 () -> assertThat(result.items().get(0).productName()).isEqualTo("셔츠"),
@@ -157,7 +158,7 @@ class PlaceOrderServiceTest {
 
         InOrder inOrder = inOrder(orderRepository, paymentService);
         inOrder.verify(orderRepository).save(any());
-        inOrder.verify(paymentService).pay(any());
+        inOrder.verify(paymentService).pay(any(), any());
     }
 
     @Test

@@ -19,7 +19,7 @@ public class LikeResult {
                 product.getBrandId(),
                 product.getName(),
                 product.getDescription(),
-                product.getPrice(),
+                product.getPrice().value(),
                 product.getStatus()
             );
         }

@@ -6,6 +6,7 @@ import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.ShippingDestination;
+import com.loopers.payment.application.PaymentService;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
 import com.loopers.product.domain.ProductStock;
@@ -73,7 +74,7 @@ public class PlaceOrderService {
         });
 
         // 결제 통합 지점. 현재 범위에서는 stub 이라 상태 전이 없이 PENDING 으로 종료된다.
-        paymentService.pay(saved);
+        paymentService.pay(saved.getId(), saved.getTotalAmount());
 
         return OrderResult.Detail.of(saved, orderItems);
     }

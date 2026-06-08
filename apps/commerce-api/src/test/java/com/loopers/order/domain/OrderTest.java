@@ -48,7 +48,7 @@ class OrderTest {
     void givenItems_whenCreate_thenTotalAmountIsSumOfSubtotals() {
         Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
 
-        assertThat(order.getTotalAmount()).isEqualTo(29_000L * 2 + 15_000L);
+        assertThat(order.getTotalAmount().value()).isEqualTo(29_000L * 2 + 15_000L);
     }
 
     @Test

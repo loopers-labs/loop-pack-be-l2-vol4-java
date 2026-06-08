@@ -61,7 +61,7 @@ class ProductRepositoryIntegrationTest {
 
         assertThat(found).isPresent();
         assertThat(found.get().getName()).isEqualTo("셔츠");
-        assertThat(found.get().getPrice()).isEqualTo(29_000L);
+        assertThat(found.get().getPrice().value()).isEqualTo(29_000L);
     }
 
     @Test

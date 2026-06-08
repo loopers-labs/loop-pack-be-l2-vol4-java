@@ -27,7 +27,7 @@ public class ProductJpaRepositoryCustomImpl implements ProductJpaRepositoryCusto
 
         return switch (sort) {
             case LATEST -> query.orderBy(product.createdAt.desc(), product.id.desc()).fetch();
-            case PRICE_ASC -> query.orderBy(product.price.asc(), product.id.desc()).fetch();
+            case PRICE_ASC -> query.orderBy(product.price.value.asc(), product.id.desc()).fetch();
             case LIKES_DESC -> query
                     .leftJoin(like).on(like.productId.eq(product.id), like.deletedAt.isNull())
                     .groupBy(product.id)

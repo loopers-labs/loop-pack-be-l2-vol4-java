@@ -1,9 +1,12 @@
 package com.loopers.product.domain;
 
+import com.loopers.common.domain.Money;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -27,8 +30,9 @@ public class Product extends BaseEntity {
     @Column
     private String description;
 
-    @Column(nullable = false)
-    private long price;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
+    private Money price;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -41,7 +45,7 @@ public class Product extends BaseEntity {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
-        this.price = price;
+        this.price = Money.of(price);
         this.thumbnailUrl = thumbnailUrl;
         this.status = ProductStatus.ON_SALE;
         validate();
@@ -54,7 +58,7 @@ public class Product extends BaseEntity {
     public void update(String name, String description, long price, String thumbnailUrl) {
         this.name = name;
         this.description = description;
-        this.price = price;
+        this.price = Money.of(price);
         this.thumbnailUrl = thumbnailUrl;
         validate();
     }
@@ -83,9 +87,6 @@ public class Product extends BaseEntity {
         }
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 이름은 비어있을 수 없습니다.");
-        }
-        if (price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
     }
 }

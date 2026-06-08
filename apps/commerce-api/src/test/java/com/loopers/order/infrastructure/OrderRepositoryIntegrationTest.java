@@ -102,7 +102,7 @@ class OrderRepositoryIntegrationTest {
         List<Order> orders = orderRepository.findByUserId(USER_ID);
 
         assertThat(orders).hasSize(1);
-        assertThat(orders.get(0).getTotalAmount()).isEqualTo(29_000L * 2 + 15_000L);
+        assertThat(orders.get(0).getTotalAmount().value()).isEqualTo(29_000L * 2 + 15_000L);
     }
 
     @Test

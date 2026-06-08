@@ -22,6 +22,6 @@ public class ProductReader {
     public ProductInfo getInfo(Long productId) {
         Product product = productRepository.findActiveById(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
-        return new ProductInfo(product.getName(), product.getBrandId(), product.getPrice());
+        return new ProductInfo(product.getName(), product.getBrandId(), product.getPrice().value());
     }
 }
