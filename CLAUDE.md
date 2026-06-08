@@ -46,6 +46,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 도메인 & 객체 설계 전략
+
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
+
+### Entity / Value Object / Domain Service 구분
+
+- **Entity** — ID로 동일성을 판단하며, 상태가 변하고 연속성을 가지는 객체 (예: `User`, `Order`, `Product`)
+- **Value Object** — 값 자체로 동일성을 판단하며 불변(immutable). 비교/계산 중심 (예: `Money`, `Quantity`, `Address`)
+- **Domain Service** — 상태를 갖지 않고, 단일 도메인 객체에 두기 애매한 여러 도메인 간 협력 로직을 담는 객체
+- 원시 타입(`Long`, `int` 등)에 비즈니스 규칙이 반복적으로 붙기 시작하면 VO 도입을 검토합니다.
+- "X하는 놈(Manager/Doer)"처럼 상태/정체성 없이 연산만 하는 객체는 도메인이 아니라 서비스로 분리합니다.
+
+### 도메인 로직 위치 휴리스틱
+
+판단 순서:
+1. **단일 객체 내부에서 결정되는 규칙인가?** → Entity 메서드
+2. **여러 도메인 객체가 협력해야 하는가?** → Domain Service
+3. **유스케이스 흐름의 조율인가?** → Application Layer (Facade)
+4. **외부 기술/시스템에 의존하는 작업인가?** → Infrastructure
+
+### Application Layer 경량 원칙
+
+- Facade는 **도메인 호출 조율 + DTO 매핑**까지만 담당합니다.
+- Facade에 `if`로 비즈니스 조건 분기가 쌓이기 시작하면 도메인으로 옮길 시점입니다.
+- 비즈니스 규칙/계산/검증은 Entity, VO, Domain Service로 위임합니다.
+
+---
+
+## 아키텍처, 패키지 구성 전략
+
+- 본 프로젝트는 레이어드 아키텍처를 따르며, DIP (의존성 역전 원칙) 을 준수합니다.
+- API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
+- 패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
+  - 예시
+    > /interfaces/api (presentation 레이어 - API)
+      /application/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
+      /domain/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
+      /infrastructure/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
+
+### DTO 분리 규칙
+
+- `interfaces/api/{domain}/{Domain}V1Dto` — API 요청/응답 DTO (예: `RegisterRequest`, `UserResponse`)
+- `application/{domain}/{Domain}Info` — Application Layer 결과 객체. Domain Entity를 외부로 노출하지 않습니다.
+- Controller는 Facade가 반환한 `Info`를 받아 `Response DTO`로 변환해 응답합니다.
+- Domain Entity는 Application Layer 경계를 넘지 않습니다.
+
+### Aggregate 경계 규칙
+
+- DB FK 제약은 **같은 애그리거트 내부에서만** 사용합니다 (예: `order_items.order_id`).
+- 다른 애그리거트 간 참조는 **Long ID 참조**로 처리하고, 정합성은 애플리케이션 레벨에서 보장합니다.
+- 사유: 락 경쟁 회피, 마이그레이션 유연성, 추후 샤딩 대비.
+
+### 단위 테스트 의존성 처리
+
+- 단위 테스트는 외부 의존성을 **Fake/Stub**으로 대체합니다. (Domain Layer의 Repository Interface 활용)
+- Mockito는 협력 객체의 **호출 검증**이 필요한 경우에 한정해 사용하고, 데이터 흐름 검증에는 Fake 구현체를 우선합니다.
+- Entity, VO, Domain Service 단위 테스트는 Spring 컨텍스트 없이 작성합니다.
+
+---
+
 ## 프로젝트 개요
 
 Loopers 부트캠프 Spring Java 템플릿 프로젝트. Java 21 + Spring Boot 3.4.4 기반 멀티 모듈 구성.

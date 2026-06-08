@@ -104,6 +104,7 @@ erDiagram
 - `likes`는 `(user_id, product_id)` 복합 UK 제약으로 DB 레벨에서 중복 좋아요 방지. 좋아요 등록 시 애플리케이션 사전 체크 + DB UK가 이중 방어선이며, UK 위반 예외는 멱등 응답으로 변환한다.
 - `payments`는 `order_id`에 UK 제약을 두어 1주문 1결제 관계를 보장한다 (FK는 없음). 결제 시도/결과를 모두 기록하여 PG 대조와 감사 추적에 사용한다.
 - 가격 관련 컬럼(`price`, `total_price`, `product_price`, `amount`)은 `bigint`로 선언한다. `int` 범위(약 21억)를 초과하는 경우를 대비한다.
+- **VO ↔ DB 매핑**: 도메인 계층의 `Money` VO는 `bigint` 컬럼 1개에, `Quantity` VO는 `int` 컬럼 1개에 매핑된다. JPA `@Embedded` 또는 `AttributeConverter`를 사용해 컬럼 구조 변경 없이 VO를 적용한다 (테이블 스키마 자체는 영향 없음). 클래스 다이어그램 참조.
 
 ---
 

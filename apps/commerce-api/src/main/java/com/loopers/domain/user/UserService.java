@@ -44,6 +44,12 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserModel getUserById(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+    }
+
+    @Transactional(readOnly = true)
     public UserModel authenticate(String loginId, String rawPassword) {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다."));
@@ -55,8 +61,8 @@ public class UserService {
     }
 
     @Transactional
-    public void changePassword(String loginId, String currentPassword, String newPassword) {
-        UserModel user = getUser(loginId);
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        UserModel user = getUserById(userId);
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다.");

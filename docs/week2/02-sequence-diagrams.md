@@ -278,55 +278,83 @@ sequenceDiagram
     alt 상품 없음 or 삭제됨
         서버-->>사용자: 404 Not Found
     end
-    서버->>DB: 재고 조회
     서버->>DB: 브랜드명 조회
-    서버-->>사용자: 200 OK (브랜드명, 재고 유무 포함)
+    서버->>DB: 재고 조회
+    서버->>DB: 좋아요 수 집계
+    서버-->>사용자: 200 OK (브랜드명, 재고 정보, 좋아요 수 포함)
 ```
 
 ### 상세
 
-인증 없이 접근 가능. 브랜드명과 재고 정보를 함께 반환한다.
+인증 없이 접근 가능. 브랜드명, 재고 정보, 좋아요 수를 함께 반환한다.
+
+**도메인 협력 구조**
+- `Product + Brand` 조합은 **Domain Service (`ProductDetailService`)** 가 담당한다. 두 도메인 객체의 협력 로직을 Application 계층으로 새지 않게 한다.
+- Application Facade (`ProductFacade`) 는 `ProductDetailService` 의 결과 + `Stock` + 좋아요 수를 모아 `ProductDetailInfo` 로 어셈블하는 흐름 조율만 담당한다.
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant ProductController
     participant ProductFacade
+    participant ProductDetailService
     participant ProductService
-    participant StockService
     participant BrandService
+    participant StockService
+    participant LikeService
     participant ProductRepository
-    participant StockRepository
     participant BrandRepository
+    participant StockRepository
+    participant LikeRepository
 
     Client->>ProductController: GET /api/v1/products/{productId}
 
     ProductController->>ProductFacade: getProduct(productId)
 
-    ProductFacade->>ProductService: getProduct(productId)
+    Note over ProductFacade: ① Product + Brand 조합 (Domain Service에 위임)
+    ProductFacade->>ProductDetailService: assemble(productId)
+    ProductDetailService->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
     alt 상품 없음 or soft delete됨
         ProductRepository-->>ProductService: Optional.empty()
-        ProductService-->>ProductFacade: throw NOT_FOUND
+        ProductService-->>ProductDetailService: throw NOT_FOUND
+        ProductDetailService-->>ProductFacade: throw NOT_FOUND
         ProductFacade-->>ProductController: throw NOT_FOUND
         ProductController-->>Client: 404 Not Found
     end
     ProductRepository-->>ProductService: Product
-    ProductService-->>ProductFacade: Product
+    ProductService-->>ProductDetailService: Product
 
+    ProductDetailService->>BrandService: getBrand(product.brandId)
+    BrandService->>BrandRepository: findById(brandId)
+    BrandRepository-->>BrandService: Brand
+    BrandService-->>ProductDetailService: Brand
+
+    Note over ProductDetailService: ProductWithBrand(product, brand) 생성
+    ProductDetailService-->>ProductFacade: ProductWithBrand
+
+    Note over ProductFacade: ② 재고 정보 조회
     ProductFacade->>StockService: getStock(productId)
-    StockRepository-->>ProductFacade: Stock
+    StockService->>StockRepository: findByProductId(productId)
+    StockRepository-->>StockService: Stock
+    StockService-->>ProductFacade: Stock
 
-    ProductFacade->>BrandService: getBrand(brandId)
-    BrandRepository-->>ProductFacade: Brand
+    Note over ProductFacade: ③ 좋아요 수 집계
+    ProductFacade->>LikeService: countByProductId(productId)
+    LikeService->>LikeRepository: countByProductId(productId)
+    LikeRepository-->>LikeService: long
+    LikeService-->>ProductFacade: likeCount
 
-    ProductFacade-->>ProductController: ProductInfo (brandName, inStock, remainingStock 포함)
+    Note over ProductFacade: ④ ProductDetailInfo 어셈블<br/>(ProductWithBrand + Stock 표시 정책 + likeCount)
+    ProductFacade-->>ProductController: ProductDetailInfo
     ProductController-->>Client: 200 OK
 ```
 
 **읽는 포인트**
-- 상품, 재고, 브랜드 총 3번의 DB 조회가 발생한다. 성능 이슈 시 단일 쿼리(JOIN)로 개선 가능하다.
-- 재고가 10개 이하면 `remainingStock`에 수량이 담기고, 초과 시 null이 반환된다.
+- **Domain Service 도입 이유**: `Product + Brand` 두 도메인 객체의 조합은 도메인 협력 로직이므로 Application Facade가 아닌 Domain Service에 위치시킨다. Facade는 "유스케이스 흐름 조율 + DTO 어셈블"만 책임진다.
+- `ProductWithBrand`는 두 도메인 객체를 묶은 **Domain Object** 다. Application/Interface 계층 DTO가 아니라 도메인 내부에서만 유통된다.
+- 상품, 브랜드, 재고, 좋아요 수 총 **4번의 DB 조회**가 발생한다. 성능 이슈 시 단일 쿼리(JOIN + COUNT 서브쿼리)로 개선 가능하다.
+- 재고가 10개 이하면 `remainingStock`에 수량이 담기고, 초과 시 `null`이 반환된다. 이 표시 정책은 `Stock.getDisplayQuantity()` 도메인 메서드에 캡슐화되어 있다.
 - 삭제된 상품(`deleted_at IS NULL` 조건 미충족)은 404로 처리된다.
 
 ---

@@ -246,12 +246,12 @@ class UserServiceIntegrationTest {
         @Test
         void changesPassword_whenCurrentPasswordIsCorrectAndNewPasswordIsValid() {
             // arrange
-            userService.register(new UserRegisterCommand(
+            UserModel user = userService.register(new UserRegisterCommand(
                 "user123", "Password1!", "홍길동", BIRTH_DATE, "user@example.com"
             ));
 
             // act
-            userService.changePassword("user123", "Password1!", "NewPass2@");
+            userService.changePassword(user.getId(), "Password1!", "NewPass2@");
 
             // assert: 새 비밀번호로 인증 가능
             UserModel result = userService.authenticate("user123", "NewPass2@");
@@ -262,13 +262,13 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenCurrentPasswordIsWrong() {
             // arrange
-            userService.register(new UserRegisterCommand(
+            UserModel user = userService.register(new UserRegisterCommand(
                 "user123", "Password1!", "홍길동", BIRTH_DATE, "user@example.com"
             ));
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> userService.changePassword("user123", "WrongPass1!", "NewPass2@"));
+                () -> userService.changePassword(user.getId(), "WrongPass1!", "NewPass2@"));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -278,13 +278,13 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenNewPasswordIsInvalidFormat() {
             // arrange
-            userService.register(new UserRegisterCommand(
+            UserModel user = userService.register(new UserRegisterCommand(
                 "user123", "Password1!", "홍길동", BIRTH_DATE, "user@example.com"
             ));
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> userService.changePassword("user123", "Password1!", "short"));
+                () -> userService.changePassword(user.getId(), "Password1!", "short"));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -294,13 +294,13 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenNewPasswordIsSameAsCurrent() {
             // arrange
-            userService.register(new UserRegisterCommand(
+            UserModel user = userService.register(new UserRegisterCommand(
                 "user123", "Password1!", "홍길동", BIRTH_DATE, "user@example.com"
             ));
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> userService.changePassword("user123", "Password1!", "Password1!"));
+                () -> userService.changePassword(user.getId(), "Password1!", "Password1!"));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -310,13 +310,13 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenNewPasswordContainsBirthDate() {
             // arrange
-            userService.register(new UserRegisterCommand(
+            UserModel user = userService.register(new UserRegisterCommand(
                 "user123", "Password1!", "홍길동", BIRTH_DATE, "user@example.com"
             ));
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> userService.changePassword("user123", "Password1!", "19900101Pw!"));
+                () -> userService.changePassword(user.getId(), "Password1!", "19900101Pw!"));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

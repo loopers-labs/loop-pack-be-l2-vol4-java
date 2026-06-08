@@ -40,7 +40,6 @@ public class AuthUserArgumentResolver implements HandlerMethodArgumentResolver {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다.");
         }
 
-        String authenticatedLoginId = userFacade.authenticate(loginId, loginPw);
-        return new AuthUserContext(authenticatedLoginId);
+        return userFacade.authenticate(loginId, loginPw);
     }
 }

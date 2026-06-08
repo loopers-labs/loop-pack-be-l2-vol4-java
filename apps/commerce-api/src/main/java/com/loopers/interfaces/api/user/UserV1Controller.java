@@ -37,7 +37,7 @@ public class UserV1Controller implements UserV1ApiSpec {
     @GetMapping("/me")
     @Override
     public ApiResponse<UserV1Dto.UserResponse> getMe(@AuthUser AuthUserContext authUser) {
-        UserInfo info = userFacade.getMe(authUser.loginId());
+        UserInfo info = userFacade.getMe(authUser.userId());
         return ApiResponse.success(UserV1Dto.UserResponse.from(info));
     }
 
@@ -47,7 +47,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         @AuthUser AuthUserContext authUser,
         @RequestBody UserV1Dto.ChangePasswordRequest request
     ) {
-        userFacade.changePassword(authUser.loginId(), request.currentPassword(), request.newPassword());
+        userFacade.changePassword(authUser.userId(), request.currentPassword(), request.newPassword());
         return ApiResponse.success(null);
     }
 
