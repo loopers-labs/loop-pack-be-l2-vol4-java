@@ -10,6 +10,8 @@ public interface BrandRepository {
     BrandModel save(BrandModel brand);
     Optional<BrandModel> findById(Long id);
     boolean existsByName(String name);
+
+    boolean existsByNameAndIdNot(String name, Long id);
     Page<BrandModel> findAll(Pageable pageable);
     List<BrandModel> findAllByIds(List<Long> ids);
 }

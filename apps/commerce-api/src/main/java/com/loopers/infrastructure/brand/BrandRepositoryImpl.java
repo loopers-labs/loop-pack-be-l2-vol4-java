@@ -32,6 +32,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
+    public boolean existsByNameAndIdNot(String name, Long id) {
+        return brandJpaRepository.existsByNameAndIdNot(name, id);
+    }
+
+    @Override
     public Page<BrandModel> findAll(Pageable pageable) {
         return brandJpaRepository.findAllByDeletedAtIsNull(pageable);
     }

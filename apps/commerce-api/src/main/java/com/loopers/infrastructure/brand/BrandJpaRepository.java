@@ -9,5 +9,7 @@ public interface BrandJpaRepository extends JpaRepository<BrandModel, Long> {
 
     boolean existsByName(String name);
 
+    boolean existsByNameAndIdNot(String name, Long id);
+
     Page<BrandModel> findAllByDeletedAtIsNull(Pageable pageable);
 }

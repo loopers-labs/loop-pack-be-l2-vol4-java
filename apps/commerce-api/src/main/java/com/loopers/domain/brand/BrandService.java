@@ -1,6 +1,5 @@
 package com.loopers.domain.brand;
 
-import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -41,8 +40,10 @@ public class BrandService {
 
     @Transactional
     public BrandModel update(Long id, String name) {
-        validateDuplicateName(name);
         BrandModel brand = get(id);
+        if (brandRepository.existsByNameAndIdNot(name, id)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 존재하는 브랜드명입니다.");
+        }
         brand.update(name);
         return brand;
     }
