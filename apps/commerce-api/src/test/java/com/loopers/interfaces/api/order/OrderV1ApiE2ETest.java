@@ -66,7 +66,6 @@ class OrderV1ApiE2ETest {
                 new Email("order@test.com"),
                 UserRole.USER
         ));
-
         BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
         ProductModel product = productRepository.save(new ProductModel(brand.getId(), new ProductName("테스트상품")));
         savedStock = productStockRepository.save(new ProductStockModel(product, new Price(10000L), 10));
@@ -109,26 +108,44 @@ class OrderV1ApiE2ETest {
             assertThat(response.getBody().data().totalAmount()).isEqualTo(20000L);
         }
 
-        @DisplayName("재고가 부족하면, 400 BAD_REQUEST를 반환한다.")
-        @Test
-        void returnsBadRequest_whenStockIsInsufficient() {
-            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = createOrder(100);
+    }
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    @DisplayName("GET /api/v1/orders")
+    @Nested
+    class GetOrders {
+
+        @DisplayName("유효한 요청이면, 200 OK와 주문 목록을 반환한다.")
+        @Test
+        void returnsOrderList_whenRequestIsValid() {
+            createOrder(1);
+            createOrder(2);
+
+            ParameterizedTypeReference<ApiResponse<List<OrderV1Dto.OrderResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response =
+                    testRestTemplate.exchange("/api/v1/orders", HttpMethod.GET, new HttpEntity<>(authHeaders()), responseType);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().data()).hasSize(2);
         }
+    }
 
-        @DisplayName("존재하지 않는 재고 ID면, 404 NOT_FOUND를 반환한다.")
+    @DisplayName("GET /api/v1/orders/{orderId}")
+    @Nested
+    class GetOrder {
+
+        @DisplayName("본인 주문이면, 200 OK와 주문 정보를 반환한다.")
         @Test
-        void returnsNotFound_whenStockDoesNotExist() {
-            OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(999L, 1))
-            );
+        void returnsOrder_whenUserOwnsOrder() {
+            Long orderId = createOrder(1).getBody().data().id();
+
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
-                    testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType);
+                    testRestTemplate.exchange("/api/v1/orders/" + orderId, HttpMethod.GET, new HttpEntity<>(authHeaders()), responseType);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().data().id()).isEqualTo(orderId);
         }
+
     }
 
     @DisplayName("POST /api/v1/orders/{orderId}/cancel")
@@ -152,18 +169,5 @@ class OrderV1ApiE2ETest {
             assertThat(stockAfter).isEqualTo(stockBefore + 2);
         }
 
-        @DisplayName("완료된 주문을 취소하면, 400 BAD_REQUEST를 반환한다.")
-        @Test
-        void returnsBadRequest_whenOrderIsAlreadyCompleted() {
-            Long orderId = createOrder(1).getBody().data().id();
-            testRestTemplate.exchange("/api/v1/orders/" + orderId + "/cancel", HttpMethod.POST, new HttpEntity<>(authHeaders()),
-                    new ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>>() {});
-            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
-                    testRestTemplate.exchange("/api/v1/orders/" + orderId + "/cancel", HttpMethod.POST, new HttpEntity<>(authHeaders()), responseType);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
     }
 }

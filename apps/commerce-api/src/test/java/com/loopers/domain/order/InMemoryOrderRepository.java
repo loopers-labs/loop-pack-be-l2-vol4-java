@@ -29,6 +29,13 @@ class InMemoryOrderRepository implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdAndUserId(Long id, Long userId) {
+        return store.values().stream()
+                .filter(o -> o.getId() != null && o.getId().equals(id) && o.getUserId().equals(userId))
+                .findFirst();
+    }
+
+    @Override
     public Optional<OrderModel> findByOrderNumber(String orderNumber) {
         return store.values().stream()
                 .filter(o -> o.getOrderNumber().equals(orderNumber))

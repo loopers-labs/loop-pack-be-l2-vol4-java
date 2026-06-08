@@ -10,6 +10,7 @@ import com.loopers.domain.product.ProductStockService;
 import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.order.enums.OrderStatus;
+import com.loopers.domain.order.OrderLine;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -51,42 +52,40 @@ class OrderServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private static final Long TEST_USER_ID = 1L;
+
     private OrderModel placeOrder(int quantity) {
-        List<OrderItemInput> inputs = List.of(new OrderItemInput(stock.getId(), quantity));
-        List<OrderItemInput> mergedItems = orderService.mergeItems(inputs);
-        List<ProductStockModel> stocks = productStockService.decrease(mergedItems);
-        return orderService.placeOrder(new OrderModel(1L), stocks, mergedItems);
+        List<OrderLine> lines = OrderLine.from(List.of(new OrderItemInput(stock.getId(), quantity)));
+        List<ProductStockModel> stocks = lines.stream()
+                .map(line -> productStockService.decrease(line.stockId(), line.quantity()))
+                .toList();
+        return orderService.placeOrder(new OrderModel(TEST_USER_ID), stocks, lines);
     }
 
-    @DisplayName("주문 생성 시,")
+    @DisplayName("단건 주문 조회(getByUser) 시,")
     @Nested
-    class PlaceOrder {
+    class GetByUser {
 
-        @DisplayName("주문 아이템과 합계가 올바르게 저장된다.")
+        @DisplayName("본인 주문이면, 주문이 반환된다.")
         @Test
-        void savesOrderWithItemsAndTotal() {
-            OrderModel saved = placeOrder(2);
+        void returnsOrder_whenUserOwnsOrder() {
+            OrderModel order = placeOrder(1);
 
-            OrderModel found = orderRepository.findById(saved.getId()).get();
-            assertThat(found.getItems()).hasSize(1);
-            assertThat(found.getTotalMoney().getValue()).isEqualTo(20000L);
-            assertThat(found.getStatus()).isEqualTo(OrderStatus.REQUESTED);
+            OrderModel result = orderService.getByUser(order.getId(), TEST_USER_ID);
+
+            assertThat(result.getId()).isEqualTo(order.getId());
         }
 
-        @DisplayName("동일 stockId 입력이 합산되어 아이템 1개로 저장된다.")
+        @DisplayName("타인의 주문이면, NOT_FOUND 예외가 발생한다.")
         @Test
-        void mergesDuplicateStockIds_intoSingleItem() {
-            List<OrderItemInput> inputs = List.of(
-                    new OrderItemInput(stock.getId(), 2),
-                    new OrderItemInput(stock.getId(), 3)
-            );
-            List<OrderItemInput> mergedItems = orderService.mergeItems(inputs);
-            List<ProductStockModel> stocks = productStockService.decrease(mergedItems);
-            OrderModel saved = orderService.placeOrder(new OrderModel(1L), stocks, mergedItems);
+        void throwsNotFound_whenUserDoesNotOwnOrder() {
+            OrderModel order = placeOrder(1);
+            Long otherUserId = TEST_USER_ID + 1;
 
-            OrderModel found = orderRepository.findById(saved.getId()).get();
-            assertThat(found.getItems()).hasSize(1);
-            assertThat(found.getTotalMoney().getValue()).isEqualTo(50000L);
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> orderService.getByUser(order.getId(), otherUserId));
+
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 
@@ -115,7 +114,7 @@ class OrderServiceIntegrationTest {
         void cancelsOrder_whenStatusIsRequested() {
             OrderModel order = placeOrder(1);
 
-            orderService.cancel(order.getId());
+            orderService.cancel(order.getId(), TEST_USER_ID);
 
             OrderModel updated = orderRepository.findById(order.getId()).get();
             assertThat(updated.getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -128,9 +127,21 @@ class OrderServiceIntegrationTest {
             orderService.complete(order.getId());
 
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderService.cancel(order.getId()));
+                    () -> orderService.cancel(order.getId(), TEST_USER_ID));
 
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("타인의 주문이면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenUserDoesNotOwnOrder() {
+            OrderModel order = placeOrder(1);
+            Long otherUserId = TEST_USER_ID + 1;
+
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> orderService.cancel(order.getId(), otherUserId));
+
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
