@@ -29,13 +29,18 @@ public class LikeService {
         if (like != null && like.isActive()) {
             return; // 이미 좋아요 — 멱등 no-op
         }
+        // 좋아요 변화와 카운터 증가는 동일 트랜잭션 (04 §4.2).
+        // 카운터는 "이 트랜잭션이 실제로 좋아요로 전이시켰을 때"만 올린다 → 동시 reactivate 이중카운트 방지.
+        boolean transitioned;
         if (like == null) {
-            like = new LikeModel(userId, productId);
+            likeRepository.save(new LikeModel(userId, productId)); // 최초 — UNIQUE 제약이 동시 INSERT를 차단
+            transitioned = true;
         } else {
-            like.reactivate();
+            transitioned = likeRepository.activate(userId, productId) > 0; // 원자적 비활성→활성
         }
-        likeRepository.save(like);
-        productService.increaseLikesCount(productId);
+        if (transitioned) {
+            productService.increaseLikesCount(productId);
+        }
     }
 
     /**
@@ -48,9 +53,10 @@ public class LikeService {
         if (like == null || !like.isActive()) {
             return; // 좋아요 없음 — 멱등 no-op
         }
-        like.delete();
-        likeRepository.save(like);
-        productService.decreaseLikesCount(productId);
+        // 원자적 활성→비활성 전이. 실제 전이한 트랜잭션만(영향 행 1) 카운터를 내린다 → 동시 unlike 이중차감 방지.
+        if (likeRepository.deactivate(userId, productId) > 0) {
+            productService.decreaseLikesCount(productId);
+        }
     }
 
     @Transactional(readOnly = true)

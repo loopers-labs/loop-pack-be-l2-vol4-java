@@ -11,6 +11,15 @@ public interface LikeRepository {
     /** (userId, productId) 단일 행 조회 — 활성/비활성 무관 (UNIQUE 제약, reactivate 패턴용). */
     Optional<LikeModel> findByUserIdAndProductId(Long userId, Long productId);
 
+    /**
+     * 비활성→활성 전이를 원자적으로 수행하고 영향 행 수(0/1)를 반환한다.
+     * 1이면 이 호출이 실제로 전이시킨 것 → 호출부가 카운터를 증가한다(동시 reactivate 이중카운트 방지).
+     */
+    int activate(Long userId, Long productId);
+
+    /** 활성→비활성 전이를 원자적으로 수행하고 영향 행 수를 반환한다(동시 unlike 이중차감 방지). */
+    int deactivate(Long userId, Long productId);
+
     /** 특정 상품의 활성 좋아요 전체 — Product 비활성 시 cascade 전파용 (01 §7.5). */
     List<LikeModel> findActiveByProductId(Long productId);
 

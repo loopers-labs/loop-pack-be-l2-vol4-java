@@ -63,17 +63,31 @@ class LikeServiceTest {
             verify(productService, never()).increaseLikesCount(anyLong());
         }
 
-        @DisplayName("취소된 좋아요가 있으면, 재활성하고 likesCount를 1 증가시킨다.")
+        @DisplayName("취소된 좋아요가 있으면, 원자적으로 활성화하고 likesCount를 1 증가시킨다.")
         @Test
-        void given_canceledLike_when_like_then_reactivatesAndIncrements() {
+        void given_canceledLike_when_like_then_activatesAndIncrements() {
             LikeModel canceled = new LikeModel(USER_ID, PRODUCT_ID);
             canceled.delete();
             when(likeRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.of(canceled));
+            when(likeRepository.activate(USER_ID, PRODUCT_ID)).thenReturn(1);   // 이 트랜잭션이 실제 전이
 
             likeService.like(USER_ID, PRODUCT_ID);
 
-            verify(likeRepository).save(canceled);
+            verify(likeRepository).activate(USER_ID, PRODUCT_ID);
             verify(productService).increaseLikesCount(PRODUCT_ID);
+        }
+
+        @DisplayName("취소된 좋아요를 동시에 재활성하면, 실제 전이하지 못한 쪽(영향 행 0)은 카운터를 올리지 않는다.")
+        @Test
+        void given_canceledLike_when_activateAffectsNoRow_then_noIncrement() {
+            LikeModel canceled = new LikeModel(USER_ID, PRODUCT_ID);
+            canceled.delete();
+            when(likeRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.of(canceled));
+            when(likeRepository.activate(USER_ID, PRODUCT_ID)).thenReturn(0);   // 다른 트랜잭션이 먼저 전이
+
+            likeService.like(USER_ID, PRODUCT_ID);
+
+            verify(productService, never()).increaseLikesCount(anyLong());
         }
     }
 
@@ -81,16 +95,29 @@ class LikeServiceTest {
     @DisplayName("좋아요 취소")
     class Unlike {
 
-        @DisplayName("활성 좋아요가 있으면, 비활성하고 likesCount를 1 감소시킨다.")
+        @DisplayName("활성 좋아요가 있으면, 원자적으로 비활성화하고 likesCount를 1 감소시킨다.")
         @Test
-        void given_activeLike_when_unlike_then_deletesAndDecrements() {
+        void given_activeLike_when_unlike_then_deactivatesAndDecrements() {
             LikeModel active = new LikeModel(USER_ID, PRODUCT_ID);
             when(likeRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.of(active));
+            when(likeRepository.deactivate(USER_ID, PRODUCT_ID)).thenReturn(1);
 
             likeService.unlike(USER_ID, PRODUCT_ID);
 
-            verify(likeRepository).save(active);
+            verify(likeRepository).deactivate(USER_ID, PRODUCT_ID);
             verify(productService).decreaseLikesCount(PRODUCT_ID);
+        }
+
+        @DisplayName("활성 좋아요를 동시에 취소하면, 실제 전이하지 못한 쪽(영향 행 0)은 카운터를 내리지 않는다.")
+        @Test
+        void given_activeLike_when_deactivateAffectsNoRow_then_noDecrement() {
+            LikeModel active = new LikeModel(USER_ID, PRODUCT_ID);
+            when(likeRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.of(active));
+            when(likeRepository.deactivate(USER_ID, PRODUCT_ID)).thenReturn(0);
+
+            likeService.unlike(USER_ID, PRODUCT_ID);
+
+            verify(productService, never()).decreaseLikesCount(anyLong());
         }
 
         @DisplayName("좋아요가 없으면, 멱등하게 저장·카운터 감소를 하지 않는다.")

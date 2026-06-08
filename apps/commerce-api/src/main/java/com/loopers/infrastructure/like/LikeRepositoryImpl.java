@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +49,16 @@ public class LikeRepositoryImpl implements LikeRepository {
     @Override
     public Optional<LikeModel> findByUserIdAndProductId(Long userId, Long productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId).map(LikeEntityMapper::toDomain);
+    }
+
+    @Override
+    public int activate(Long userId, Long productId) {
+        return likeJpaRepository.activate(userId, productId, ZonedDateTime.now());
+    }
+
+    @Override
+    public int deactivate(Long userId, Long productId) {
+        return likeJpaRepository.deactivate(userId, productId, ZonedDateTime.now());
     }
 
     @Override

@@ -80,6 +80,20 @@ public class LikeConcurrencyIntegrationTest {
         assertThat(likesCount()).isEqualTo(0L);
     }
 
+    @DisplayName("취소한 좋아요를 같은 사용자가 동시에 재등록(reactivate)해도 likesCount는 1이다(이중카운트 없음)")
+    @Test
+    void given_canceledLike_when_concurrentReactivate_then_countIsOne() throws InterruptedException {
+        Long sameUser = 555L;
+        likeService.like(sameUser, productId);
+        likeService.unlike(sameUser, productId);
+        assertThat(likesCount()).isEqualTo(0L);   // 취소 상태(비활성 행 존재)
+
+        // 비활성 행을 여러 스레드가 동시에 재활성 — 원자적 전이로 실제 전이한 1건만 카운터를 올려야 한다.
+        runConcurrent(THREADS, ignored -> likeService.like(sameUser, productId));
+
+        assertThat(likesCount()).isEqualTo(1L);
+    }
+
     /** THREADS개 스레드가 동시에(같은 출발선) userId 0..THREADS-1로 action을 실행한다. */
     private void runConcurrent(int threads, java.util.function.LongConsumer action) throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(threads);
