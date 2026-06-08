@@ -8,7 +8,10 @@ import java.util.List;
 public record OrderInfo(
     Long orderId,
     Long userId,
-    Long totalPrice,
+    Long originalAmount,
+    Long discountAmount,
+    Long finalAmount,
+    Long userCouponId,
     String status,
     List<OrderItemInfo> items
 ) {
@@ -19,7 +22,10 @@ public record OrderInfo(
         return new OrderInfo(
             order.getId(),
             order.getUserId(),
-            order.getTotalPrice().amount().longValue(),
+            order.getOriginalAmount().amount().longValue(),
+            order.getDiscountAmount().amount().longValue(),
+            order.getFinalAmount().amount().longValue(),
+            order.getUserCouponId(),
             order.getStatus().name(),
             items
         );

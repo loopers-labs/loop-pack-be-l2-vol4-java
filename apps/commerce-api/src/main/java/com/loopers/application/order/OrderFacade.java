@@ -1,11 +1,12 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.shared.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -28,10 +29,18 @@ public class OrderFacade {
 
     private final OrderService orderService;
     private final ProductService productService;
+    private final CouponService couponService;
     private final OrderRepository orderRepository;
 
+    /**
+     * 주문 생성. 하나의 쓰기 트랜잭션 안에서:
+     *   1) 상품 조회 → 2) (couponId 있으면) 쿠폰 사용 + 할인 산정 → 3) 재고 차감 + 주문 생성 → 4) 영속화
+     * 쿠폰이 만료/타인 소유/이미 사용 등 무효한 경우 CouponService 가 던지는 예외로 트랜잭션 전체가 롤백된다
+     * (재고 차감, 쿠폰 USED 전이, Order 생성 모두 원자성 보장).
+     * CouponService.useCoupon 의 @Transactional 은 REQUIRED 로 합류해 동일 트랜잭션이 된다.
+     */
     @Transactional
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> items) {
+    public OrderInfo createOrder(Long userId, List<OrderItemCommand> items, Long couponId) {
         if (userId == null) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "주문하려면 로그인이 필요합니다.");
         }
@@ -43,8 +52,18 @@ public class OrderFacade {
             .map(item -> new OrderLine(productService.getProduct(item.productId()), item.quantity()))
             .toList();
 
-        // 같은 트랜잭션에서 조회한 상품의 재고 변경은 dirty checking 으로 반영된다.
-        Order order = orderService.createOrder(userId, lines);
+        // 1) 할인 금액 산정 위해 원금을 먼저 계산 (재고 차감 전 가격 기반; 차감 후 OrderItem 도 동일 결과)
+        Money originalAmount = lines.stream()
+            .map(line -> line.product().getPrice().multiply(line.quantity()))
+            .reduce(Money.zero(), Money::plus);
+
+        // 2) 쿠폰 적용 - useCoupon 은 USED 전이 + 할인 금액 반환. 무효 시 예외 → 전체 롤백.
+        Money discount = (couponId == null)
+            ? Money.zero()
+            : couponService.useCoupon(userId, couponId, originalAmount);
+
+        // 3) 도메인 서비스에 위임: 재고 차감(dirty checking) + OrderItem 스냅샷 + Order 생성
+        Order order = orderService.createOrder(userId, lines, couponId, discount);
         return OrderInfo.from(orderRepository.save(order));
     }
 
