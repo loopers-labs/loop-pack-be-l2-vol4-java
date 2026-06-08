@@ -45,6 +45,13 @@ public class ProductService {
     }
 
     @Transactional
+    public ProductModel deductStock(Long id, int quantity) {
+        ProductModel product = getProduct(id);
+        product.deductStock(quantity);
+        return productRepository.save(product);
+    }
+
+    @Transactional
     public void deleteProduct(Long id) {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);

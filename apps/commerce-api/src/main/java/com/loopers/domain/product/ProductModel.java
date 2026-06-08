@@ -68,6 +68,13 @@ public class ProductModel extends BaseEntity {
         return 0L;
     }
 
+    public void deductStock(int quantity) {
+        if (this.stock < quantity) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+        }
+        this.stock -= quantity;
+    }
+
     public void update(Long newBrandId, String newName, String newDescription, Long newPrice, Integer newStock) {
         if (newBrandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");
