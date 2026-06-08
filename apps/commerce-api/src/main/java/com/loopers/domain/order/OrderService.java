@@ -1,0 +1,48 @@
+package com.loopers.domain.order;
+
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+
+    @Transactional
+    public Long createOrder(Long userId, List<OrderItemRequest> items) {
+        OrderModel order = new OrderModel(userId);
+
+        for (OrderItemRequest item : items) {
+            ProductSnapshot snapshot = new ProductSnapshot(item.name(), item.price(), item.brandName());
+            OrderItemModel orderItem = new OrderItemModel(order, item.productId(), snapshot, item.quantity());
+            order.addItem(orderItem);
+        }
+
+        return orderRepository.save(order).getId();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderModel> getOrders(Long userId) {
+        return orderRepository.findAllByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderModel getOrder(Long orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND));
+    }
+
+    public record OrderItemRequest(
+        Long productId,
+        String name,
+        java.math.BigDecimal price,
+        String brandName,
+        int quantity
+    ) {}
+}

@@ -19,8 +19,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Optional<ProductModel> find(Long id) {
+    public Optional<ProductModel> findById(Long id) {
         return productJpaRepository.findById(id);
+    }
+
+    @Override
+    public List<ProductModel> findByIds(List<Long> ids) {
+        return productJpaRepository.findAllById(ids);
     }
 
     @Override
@@ -29,7 +34,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public org.springframework.data.domain.Page<ProductModel> findAll(Long brandId, String sort, org.springframework.data.domain.Pageable pageable) {
+        return org.springframework.data.domain.Page.empty();
+    }
+
+    @Override
     public void delete(Long id) {
         productJpaRepository.deleteById(id);
+    }
+
+    @Override
+    public void deleteByBrandId(Long brandId) {
     }
 }

@@ -1,19 +1,25 @@
 package com.loopers.domain.example;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.BaseTimeEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "example")
-public class ExampleModel extends BaseEntity {
+public class ExampleModel extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     private String name;
     private String description;
-
-    protected ExampleModel() {}
 
     public ExampleModel(String name, String description) {
         if (name == null || name.isBlank()) {
@@ -25,14 +31,6 @@ public class ExampleModel extends BaseEntity {
 
         this.name = name;
         this.description = description;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     public void update(String newDescription) {
