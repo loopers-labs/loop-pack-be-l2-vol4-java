@@ -132,7 +132,7 @@ class UsableCouponSpecificationTest {
         Long userId,
         CouponMoney orderAmount
     ) {
-        return new CouponUseAttempt(userCoupon, userId, orderAmount, NOW);
+        return CouponUseAttempt.attempt(userCoupon, userId, orderAmount, NOW);
     }
 
     private UserCoupon issueCoupon(Long userId, Long minimumOrderAmount, ZonedDateTime expiredAt) {

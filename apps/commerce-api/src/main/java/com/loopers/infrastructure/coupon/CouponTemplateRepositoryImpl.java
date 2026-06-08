@@ -19,7 +19,7 @@ public class CouponTemplateRepositoryImpl implements CouponTemplateRepository {
     }
 
     @Override
-    public Optional<CouponTemplate> findIssuingCoupon(Long couponTemplateId) {
+    public Optional<CouponTemplate> findActiveById(Long couponTemplateId) {
         return couponTemplateJpaRepository.findByIdAndDeletedAtIsNull(couponTemplateId);
     }
 }

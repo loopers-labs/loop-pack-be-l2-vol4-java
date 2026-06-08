@@ -144,6 +144,20 @@ class CouponV1ApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
+
+        @DisplayName("만료된 쿠폰 템플릿 ID로 요청하면, 409 CONFLICT를 반환한다.")
+        @Test
+        void returnsConflict_whenCouponTemplateIsExpired() {
+            // arrange
+            signUpUser();
+            CouponTemplate couponTemplate = createCouponTemplate(COUPON_NAME, PAST_EXPIRED_AT);
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = issueCouponForError(couponTemplate.getId(), authHeaders());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
     }
 
     @DisplayName("GET /api/v1/users/me/coupons")
@@ -160,7 +174,7 @@ class CouponV1ApiE2ETest {
             CouponTemplate expiredCoupon = createCouponTemplate(EXPIRED_COUPON_NAME, PAST_EXPIRED_AT);
             issueCoupon(availableCoupon.getId(), authHeaders());
             issueCoupon(usedCoupon.getId(), authHeaders());
-            issueCoupon(expiredCoupon.getId(), authHeaders());
+            userCouponRepository.save(UserCoupon.issue(userId, expiredCoupon.getId(), expiredCoupon));
             useCoupon(userId, usedCoupon.getId());
 
             // act

@@ -70,25 +70,26 @@ public class CouponTemplate extends BaseEntity {
         ZonedDateTime expiredAt,
         CouponDiscountPolicy policy
     ) {
-        validateType(type);
-        validatePolicy(type, policy);
-        CouponName couponName = CouponName.of(name);
-        DiscountValue discount = DiscountValue.of(discountValue);
-        policy.validateDiscountValue(discount);
-        CouponMoney minimum = minimumOrderAmount == null ? null : CouponMoney.of(minimumOrderAmount);
-        CouponExpiration expiration = CouponExpiration.of(expiredAt);
-        return new CouponTemplate(couponName, type, discount, minimum, expiration);
+        confirmCanCreate(type, policy);
+        return new CouponTemplate(
+            CouponName.of(name),
+            type,
+            createDiscountValue(discountValue, policy),
+            createMinimumOrderAmount(minimumOrderAmount),
+            CouponExpiration.of(expiredAt)
+        );
     }
 
     public CouponDiscount apply(CouponMoney orderAmount, ZonedDateTime now, CouponDiscountPolicy policy) {
-        validatePolicy(type, policy);
-        confirmApplicableTo(orderAmount, now);
+        confirmDiscountPolicy(type, policy);
+        confirmCanApplyToOrder(orderAmount, now);
 
         CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
         return CouponDiscount.of(orderAmount, discountAmount);
     }
 
-    public UserCoupon issue(Long userId) {
+    public UserCoupon issue(Long userId, ZonedDateTime issuedAt) {
+        confirmCanIssue(issuedAt);
         return UserCoupon.issue(userId, getId(), this);
     }
 
@@ -96,52 +97,66 @@ public class CouponTemplate extends BaseEntity {
         return name.value();
     }
 
-    public boolean isExpiredAt(ZonedDateTime now) {
+    private boolean isExpiredAt(ZonedDateTime now) {
         return expiration.isExpiredAt(now);
     }
 
-    public boolean canApplyTo(CouponMoney orderAmount, ZonedDateTime now) {
-        validateOrderAmount(orderAmount);
-        return !isExpiredAt(now) && satisfiesMinimumOrderAmount(orderAmount);
+    private void confirmCanApplyToOrder(CouponMoney orderAmount, ZonedDateTime now) {
+        confirmOrderAmount(orderAmount);
+        confirmNotExpired(now);
+        confirmMinimumOrderAmount(orderAmount);
     }
 
-    public void confirmApplicableTo(CouponMoney orderAmount, ZonedDateTime now) {
-        validateOrderAmount(orderAmount);
-        validateNotExpired(now);
-        validateMinimumOrderAmount(orderAmount);
+    private static void confirmCanCreate(CouponType type, CouponDiscountPolicy policy) {
+        confirmCouponType(type);
+        confirmDiscountPolicy(type, policy);
     }
 
-    private static void validateType(CouponType type) {
+    private static DiscountValue createDiscountValue(long discountValue, CouponDiscountPolicy policy) {
+        DiscountValue discount = DiscountValue.of(discountValue);
+        policy.confirmDiscountValue(discount);
+        return discount;
+    }
+
+    private static CouponMoney createMinimumOrderAmount(Long minimumOrderAmount) {
+        return minimumOrderAmount == null ? null : CouponMoney.of(minimumOrderAmount);
+    }
+
+    private static void confirmCouponType(CouponType type) {
         if (type == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 타입은 비어있을 수 없습니다.");
         }
     }
 
-    private static void validatePolicy(CouponType type, CouponDiscountPolicy policy) {
+    private static void confirmDiscountPolicy(CouponType type, CouponDiscountPolicy policy) {
         if (policy == null || policy.type() != type) {
             throw new CoreException(ErrorType.INTERNAL_ERROR, "쿠폰 타입에 맞는 할인 정책이 없습니다.");
         }
     }
 
-    private static void validateOrderAmount(CouponMoney orderAmount) {
+    private static void confirmOrderAmount(CouponMoney orderAmount) {
         if (orderAmount == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 금액은 비어있을 수 없습니다.");
         }
     }
 
-    private void validateNotExpired(ZonedDateTime now) {
+    private void confirmCanIssue(ZonedDateTime issuedAt) {
+        confirmNotExpired(issuedAt);
+    }
+
+    private void confirmNotExpired(ZonedDateTime now) {
         if (isExpiredAt(now)) {
             throw new CoreException(ErrorType.CONFLICT, "만료된 쿠폰입니다.");
         }
     }
 
-    private void validateMinimumOrderAmount(CouponMoney orderAmount) {
-        if (!satisfiesMinimumOrderAmount(orderAmount)) {
+    private void confirmMinimumOrderAmount(CouponMoney orderAmount) {
+        if (!meetsMinimumOrderAmount(orderAmount)) {
             throw new CoreException(ErrorType.CONFLICT, "최소 주문 금액을 충족하지 못했습니다.");
         }
     }
 
-    private boolean satisfiesMinimumOrderAmount(CouponMoney orderAmount) {
+    private boolean meetsMinimumOrderAmount(CouponMoney orderAmount) {
         return minimumOrderAmount == null || !orderAmount.isLessThan(minimumOrderAmount);
     }
 }

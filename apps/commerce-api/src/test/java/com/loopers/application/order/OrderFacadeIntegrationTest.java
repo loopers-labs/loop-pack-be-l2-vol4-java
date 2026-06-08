@@ -185,7 +185,7 @@ class OrderFacadeIntegrationTest {
             );
             productStockService.createProductStock(iphone.getId(), 10);
             CouponTemplate couponTemplate = createFixedCouponTemplate();
-            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId, EXPIRED_AT.minusDays(1)));
             CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
                 new CreateOrderCommand.Item(iphone.getId(), 1)
             ), userCoupon.getId());
@@ -222,7 +222,7 @@ class OrderFacadeIntegrationTest {
             );
             productStockService.createProductStock(iphone.getId(), 10);
             CouponTemplate couponTemplate = createFixedCouponTemplate();
-            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId, EXPIRED_AT.minusDays(1)));
             userCoupon.use(userId, ZonedDateTime.parse("2026-06-01T12:00:00+09:00"));
             userCouponRepository.save(userCoupon);
             CreateOrderCommand command = new CreateOrderCommand(userId, List.of(
@@ -254,7 +254,7 @@ class OrderFacadeIntegrationTest {
             );
             productStockService.createProductStock(iphone.getId(), 2);
             CouponTemplate couponTemplate = createFixedCouponTemplate();
-            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId, EXPIRED_AT.minusDays(1)));
             CreateOrderCommand firstCommand = new CreateOrderCommand(userId, List.of(
                 new CreateOrderCommand.Item(iphone.getId(), 1)
             ), userCoupon.getId());

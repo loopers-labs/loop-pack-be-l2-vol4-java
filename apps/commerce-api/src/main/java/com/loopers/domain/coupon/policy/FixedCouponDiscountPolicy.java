@@ -16,7 +16,7 @@ public class FixedCouponDiscountPolicy implements CouponDiscountPolicy {
     }
 
     @Override
-    public void validateDiscountValue(DiscountValue discountValue) {
+    public void confirmDiscountValue(DiscountValue discountValue) {
         if (discountValue == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "정액 쿠폰 값은 비어있을 수 없습니다.");
         }

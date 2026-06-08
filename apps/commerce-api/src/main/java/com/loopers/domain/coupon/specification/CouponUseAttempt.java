@@ -12,6 +12,15 @@ public record CouponUseAttempt(
     ZonedDateTime now
 ) {
 
+    public static CouponUseAttempt attempt(
+        UserCoupon userCoupon,
+        Long userId,
+        CouponMoney orderAmount,
+        ZonedDateTime now
+    ) {
+        return new CouponUseAttempt(userCoupon, userId, orderAmount, now);
+    }
+
     public boolean canUse() {
         return userCoupon.canBeUsedBy(userId)
             && userCoupon.canApplyTo(orderAmount, now);

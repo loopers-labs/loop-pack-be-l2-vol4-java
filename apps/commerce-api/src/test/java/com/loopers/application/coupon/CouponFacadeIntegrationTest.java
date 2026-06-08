@@ -4,7 +4,7 @@ import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.CouponService;
-import com.loopers.domain.coupon.CouponUseCommand;
+import com.loopers.domain.coupon.CouponUse;
 import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.domain.coupon.vo.CouponDiscount;
@@ -106,11 +106,11 @@ class CouponFacadeIntegrationTest {
         }
     }
 
-    @DisplayName("荑좏룿 ?ъ슜????")
+    @DisplayName("쿠폰을 사용할 때")
     @Nested
     class UseCoupon {
 
-        @DisplayName("諛쒓툒 ?댄썑 荑좏룿 ?쒗뵆由우씠 ??젣?섎뜑?쇰룄, 諛쒓툒 ??議곌굔?쇰줈 ?좎씤 湲덉븸??怨꾩궛?쒕떎.")
+        @DisplayName("발급 이후 쿠폰 템플릿이 삭제되더라도, 발급 당시 조건으로 할인 금액을 계산한다.")
         @Test
         void calculatesDiscountWithIssuedSnapshot_whenCouponTemplateIsDeletedAfterIssue() {
             // arrange
@@ -119,7 +119,7 @@ class CouponFacadeIntegrationTest {
             IssuedCouponInfo issuedCoupon = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplate.getId()));
             couponTemplate.delete();
             couponTemplateRepository.save(couponTemplate);
-            CouponUseCommand command = CouponUseCommand.forOrder(
+            CouponUse couponUse = CouponUse.create(
                 userId,
                 issuedCoupon.coupon().id(),
                 12_000L,
@@ -127,7 +127,7 @@ class CouponFacadeIntegrationTest {
             );
 
             // act
-            CouponDiscount discount = couponService.applyToOrder(command);
+            CouponDiscount discount = couponService.use(couponUse);
 
             // assert
             assertAll(

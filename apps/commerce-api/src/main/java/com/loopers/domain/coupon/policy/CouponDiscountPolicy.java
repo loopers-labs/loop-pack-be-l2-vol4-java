@@ -8,7 +8,7 @@ public interface CouponDiscountPolicy {
 
     CouponType type();
 
-    void validateDiscountValue(DiscountValue discountValue);
+    void confirmDiscountValue(DiscountValue discountValue);
 
     CouponMoney discount(CouponMoney orderAmount, DiscountValue discountValue);
 }

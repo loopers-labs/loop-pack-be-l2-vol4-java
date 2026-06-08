@@ -136,7 +136,7 @@ class OrderV1ApiE2ETest {
             Brand brand = createBrand();
             Product iphone = createProduct(brand, "아이폰 16 Pro", "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰", 1_550_000L, 10);
             CouponTemplate couponTemplate = createFixedCouponTemplate();
-            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId));
+            UserCoupon userCoupon = userCouponRepository.save(couponTemplate.issue(userId, EXPIRED_AT.minusDays(1)));
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                 new OrderV1Dto.CreateOrderRequest.Item(iphone.getId(), 1)
             ), userCoupon.getId());

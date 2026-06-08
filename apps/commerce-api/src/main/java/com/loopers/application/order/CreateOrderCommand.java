@@ -1,10 +1,8 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.coupon.CouponUseCommand;
-import com.loopers.domain.stock.StockDeduction;
-
-import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public record CreateOrderCommand(
     Long userId,
@@ -20,21 +18,9 @@ public record CreateOrderCommand(
         this(userId, items, null);
     }
 
-    public CouponUseCommand couponUseCommand(long orderAmount, ZonedDateTime orderedAt) {
-        return CouponUseCommand.forOrder(userId, userCouponId, orderAmount, orderedAt);
-    }
-
-    public List<Long> requestedProductIds() {
+    public Map<Long, Integer> orderQuantities() {
         return items.stream()
-            .map(Item::productId)
-            .distinct()
-            .toList();
-    }
-
-    public List<StockDeduction> stockDeductions() {
-        return items.stream()
-            .map(item -> new StockDeduction(item.productId(), item.quantity()))
-            .toList();
+            .collect(Collectors.toMap(Item::productId, Item::quantity));
     }
 
     public record Item(

@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+
 @RequiredArgsConstructor
 @Component
 public class CouponService {
@@ -21,40 +23,58 @@ public class CouponService {
     private final UsableCouponSpecification usableCouponSpecification;
 
     @Transactional
+    public CouponTemplate createCoupon(
+        String name,
+        CouponType type,
+        long discountValue,
+        Long minimumOrderAmount,
+        ZonedDateTime expiredAt
+    ) {
+        CouponDiscountPolicy policy = couponDiscountMethod.match(type);
+        CouponTemplate coupon = CouponTemplate.create(name, type, discountValue, minimumOrderAmount, expiredAt, policy);
+        return couponTemplateRepository.save(coupon);
+    }
+
+    @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
         if (userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId()).isPresent()) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
         }
 
-        UserCoupon issuedCoupon = couponTemplate.issue(userId);
+        UserCoupon issuedCoupon = couponTemplate.issue(userId, ZonedDateTime.now());
         UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
         return CouponIssueResult.issued(savedCoupon);
     }
 
     public CouponTemplate getCouponTemplate(Long couponTemplateId) {
-        return couponTemplateRepository.findIssuingCoupon(couponTemplateId)
+        return couponTemplateRepository.findActiveById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
     }
 
     @Transactional
-    public CouponDiscount applyToOrder(CouponUseCommand command) {
-        if (!command.hasCoupon()) {
-            return CouponDiscount.none(command.orderAmount());
+    public CouponDiscount use(CouponUse couponUse) {
+        if (!couponUse.hasCoupon()) {
+            return CouponDiscount.none(couponUse.orderAmount());
         }
 
-        UserCoupon userCoupon = userCouponRepository.findById(command.userCouponId())
+        UserCoupon userCoupon = userCouponRepository.findById(couponUse.userCouponId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
-        CouponUseAttempt attempt = command.toAttempt(userCoupon);
+        CouponUseAttempt attempt = CouponUseAttempt.attempt(
+            userCoupon,
+            couponUse.userId(),
+            couponUse.orderAmount(),
+            couponUse.usedAt()
+        );
         usableCouponSpecification.confirmUsable(attempt);
 
         CouponDiscountPolicy policy = couponDiscountMethod.match(userCoupon.getType());
-        CouponDiscount discount = userCoupon.apply(command.orderAmount(), command.usedAt(), policy);
+        CouponDiscount discount = userCoupon.apply(couponUse.orderAmount(), couponUse.usedAt(), policy);
 
         boolean couponUsed = userCouponRepository.useAvailableCoupon(
-            command.userCouponId(),
-            command.userId(),
-            command.usedAt()
+            couponUse.userCouponId(),
+            couponUse.userId(),
+            couponUse.usedAt()
         );
         if (!couponUsed) {
             throw new CoreException(ErrorType.CONFLICT, "사용할 수 없는 쿠폰입니다.");

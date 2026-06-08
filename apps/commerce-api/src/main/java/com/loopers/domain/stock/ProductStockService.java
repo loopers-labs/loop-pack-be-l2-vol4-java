@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,20 +50,23 @@ public class ProductStockService {
     }
 
     @Transactional
-    public void deduct(List<StockDeduction> deductions) {
-        if (deductions.isEmpty()) {
+    public void deduct(Map<Long, Integer> quantitiesByProductId) {
+        if (quantitiesByProductId.isEmpty()) {
             return;
         }
-        List<Long> productIds = deductions.stream()
-            .map(StockDeduction::productId)
+        List<StockDeductItem> deductItems = quantitiesByProductId.entrySet().stream()
+            .map(entry -> StockDeductItem.of(entry.getKey(), entry.getValue()))
+            .toList();
+        List<Long> productIds = deductItems.stream()
+            .map(StockDeductItem::productId)
             .toList();
         Map<Long, ProductStock> productStocks = getProductStocksForUpdate(productIds).stream()
             .collect(Collectors.toMap(ProductStock::getProductId, Function.identity()));
-        if (productStocks.size() != Set.copyOf(productIds).size()) {
+        if (productStocks.size() != productIds.size()) {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품 재고입니다.");
         }
-        deductions.forEach(deduction ->
-            productStocks.get(deduction.productId()).deduct(deduction.quantity()));
+        deductItems.forEach(item ->
+            productStocks.get(item.productId()).deduct(item.quantity()));
     }
 
     @Transactional

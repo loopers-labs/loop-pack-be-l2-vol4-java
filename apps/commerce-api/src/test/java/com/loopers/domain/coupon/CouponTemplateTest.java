@@ -140,6 +140,26 @@ class CouponTemplateTest {
             .isEqualTo(ErrorType.CONFLICT);
     }
 
+    @DisplayName("만료된 쿠폰은 발급할 수 없으므로, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenCouponIsExpiredForIssue() {
+        // arrange
+        CouponTemplate couponTemplate = CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.FIXED,
+            2_000L,
+            10_000L,
+            EXPIRED_AT,
+            FIXED_POLICY
+        );
+
+        // act & assert
+        assertThatThrownBy(() -> couponTemplate.issue(1L, EXPIRED_AT))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
     @DisplayName("정액 쿠폰 금액이 0 이하이면, BAD_REQUEST 예외를 던진다.")
     @Test
     void throwsBadRequest_whenFixedDiscountValueIsNotPositive() {

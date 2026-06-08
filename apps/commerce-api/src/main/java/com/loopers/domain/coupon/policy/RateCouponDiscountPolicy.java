@@ -15,7 +15,7 @@ public class RateCouponDiscountPolicy implements CouponDiscountPolicy {
     }
 
     @Override
-    public void validateDiscountValue(DiscountValue discountValue) {
+    public void confirmDiscountValue(DiscountValue discountValue) {
         DiscountRate.of(discountValue);
     }
 
