@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.product;
 
+import com.loopers.domain.product.QProductModel;
 import com.loopers.domain.product.ProductStockModel;
 import com.loopers.domain.product.ProductStockRepository;
 import com.loopers.domain.product.QProductStockModel;
@@ -24,7 +25,14 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
 
     @Override
     public Optional<ProductStockModel> findById(Long id) {
-        return productStockJpaRepository.findById(id);
+        QProductStockModel stock = QProductStockModel.productStockModel;
+        QProductModel product = QProductModel.productModel;
+        return Optional.ofNullable(
+                queryFactory.selectFrom(stock)
+                        .join(stock.product, product).fetchJoin()
+                        .where(stock.id.eq(id))
+                        .fetchOne()
+        );
     }
 
     @Override
