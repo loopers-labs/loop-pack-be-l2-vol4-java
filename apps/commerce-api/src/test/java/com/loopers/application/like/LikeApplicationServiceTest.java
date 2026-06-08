@@ -14,6 +14,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class LikeApplicationServiceTest {
@@ -33,48 +34,39 @@ class LikeApplicationServiceTest {
     @Nested
     class AddLike {
 
-        @DisplayName("상품이 존재하고 좋아요가 없으면, likeCount가 증가한다.")
+        @DisplayName("상품이 존재하고 좋아요가 없으면, incrementLikeCount가 호출된다.")
         @Test
-        void incrementsLikeCount_whenLikeIsNew() {
-            // Arrange
+        void callsIncrementLikeCount_whenLikeIsNew() {
             Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
             when(productRepository.findById(2L)).thenReturn(Optional.of(product));
             when(likeDomainService.addLike(1L, 2L)).thenReturn(true);
 
-            // Act
             likeApplicationService.addLike(1L, 2L);
 
-            // Assert
-            assertThat(product.getLikeCount()).isEqualTo(1);
+            verify(productRepository).incrementLikeCount(2L);
         }
 
-        @DisplayName("이미 좋아요가 존재하면, likeCount가 변경되지 않는다.")
+        @DisplayName("이미 좋아요가 존재하면, incrementLikeCount가 호출되지 않는다.")
         @Test
-        void doesNotChangeLikeCount_whenLikeAlreadyExists() {
-            // Arrange
+        void doesNotCallIncrement_whenLikeAlreadyExists() {
             Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
             when(productRepository.findById(2L)).thenReturn(Optional.of(product));
             when(likeDomainService.addLike(1L, 2L)).thenReturn(false);
 
-            // Act
             likeApplicationService.addLike(1L, 2L);
 
-            // Assert
-            assertThat(product.getLikeCount()).isZero();
+            verify(productRepository, never()).incrementLikeCount(anyLong());
         }
 
         @DisplayName("상품이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductDoesNotExist() {
-            // Arrange
             when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
-            // Act
             CoreException result = assertThrows(CoreException.class, () ->
                 likeApplicationService.addLike(1L, 99L)
             );
 
-            // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeDomainService, never()).addLike(anyLong(), anyLong());
         }
@@ -84,49 +76,39 @@ class LikeApplicationServiceTest {
     @Nested
     class RemoveLike {
 
-        @DisplayName("상품이 존재하고 좋아요가 있으면, likeCount가 감소한다.")
+        @DisplayName("상품이 존재하고 좋아요가 있으면, decrementLikeCount가 호출된다.")
         @Test
-        void decrementsLikeCount_whenLikeExists() {
-            // Arrange
+        void callsDecrementLikeCount_whenLikeExists() {
             Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
-            product.incrementLikeCount();
             when(productRepository.findById(2L)).thenReturn(Optional.of(product));
             when(likeDomainService.removeLike(1L, 2L)).thenReturn(true);
 
-            // Act
             likeApplicationService.removeLike(1L, 2L);
 
-            // Assert
-            assertThat(product.getLikeCount()).isZero();
+            verify(productRepository).decrementLikeCount(2L);
         }
 
-        @DisplayName("좋아요가 존재하지 않으면, likeCount가 변경되지 않는다.")
+        @DisplayName("좋아요가 존재하지 않으면, decrementLikeCount가 호출되지 않는다.")
         @Test
-        void doesNotChangeLikeCount_whenLikeDoesNotExist() {
-            // Arrange
+        void doesNotCallDecrement_whenLikeDoesNotExist() {
             Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
             when(productRepository.findById(2L)).thenReturn(Optional.of(product));
             when(likeDomainService.removeLike(1L, 2L)).thenReturn(false);
 
-            // Act
             likeApplicationService.removeLike(1L, 2L);
 
-            // Assert
-            assertThat(product.getLikeCount()).isZero();
+            verify(productRepository, never()).decrementLikeCount(anyLong());
         }
 
         @DisplayName("상품이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductDoesNotExist() {
-            // Arrange
             when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
-            // Act
             CoreException result = assertThrows(CoreException.class, () ->
                 likeApplicationService.removeLike(1L, 99L)
             );
 
-            // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeDomainService, never()).removeLike(anyLong(), anyLong());
         }

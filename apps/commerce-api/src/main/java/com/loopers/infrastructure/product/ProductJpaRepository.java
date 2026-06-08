@@ -19,7 +19,15 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p.id FROM Product p WHERE p.brandId = :brandId")
     List<Long> findIdsByBrandId(@Param("brandId") Long brandId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Product p SET p.deletedAt = :now WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
     int softDeleteAllByBrandId(@Param("brandId") Long brandId, @Param("now") ZonedDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Product p SET p.likeCount = p.likeCount + 1 WHERE p.id = :productId AND p.deletedAt IS NULL")
+    int incrementLikeCount(@Param("productId") Long productId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Product p SET p.likeCount = p.likeCount - 1 WHERE p.id = :productId AND p.likeCount > 0 AND p.deletedAt IS NULL")
+    int decrementLikeCount(@Param("productId") Long productId);
 }

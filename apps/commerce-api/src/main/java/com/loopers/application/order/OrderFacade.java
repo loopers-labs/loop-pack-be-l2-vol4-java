@@ -13,8 +13,8 @@ public class OrderFacade {
 
     private final OrderApplicationService orderApplicationService;
 
-    public Long createOrder(String loginId, List<OrderItemRequest> items) {
-        return orderApplicationService.createOrder(loginId, items);
+    public Long createOrder(String loginId, List<OrderItemRequest> items, Long issuedCouponId) {
+        return orderApplicationService.createOrder(loginId, items, issuedCouponId);
     }
 
     public Page<OrderSummary> getOrders(String loginId, ZonedDateTime startAt, ZonedDateTime endAt, int page, int size) {

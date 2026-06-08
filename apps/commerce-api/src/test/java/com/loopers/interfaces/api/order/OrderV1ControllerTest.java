@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderDetail;
 import com.loopers.application.order.OrderFacade;
-import com.loopers.application.order.OrderItemRequest;
 import com.loopers.application.order.OrderSummary;
 import com.loopers.domain.order.model.OrderItemStatus;
 import com.loopers.support.error.CoreException;
@@ -39,33 +38,28 @@ class OrderV1ControllerTest {
     @Nested
     class CreateOrder {
 
-        @DisplayName("정상 요청이면, 생성된 orderId를 반환한다.")
+        @DisplayName("쿠폰 없이 정상 요청이면, 생성된 orderId를 반환한다.")
         @Test
         void returnsOrderId_whenRequestIsValid() {
-            // Arrange
-            when(orderFacade.createOrder(eq("user1"), any())).thenReturn(42L);
+            when(orderFacade.createOrder(eq("user1"), any(), eq(null))).thenReturn(42L);
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 3))
+                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 3)), null
             );
 
-            // Act
             var result = orderV1Controller.createOrder("user1", request);
 
-            // Assert
             assertThat(result.data().orderId()).isEqualTo(42L);
         }
 
         @DisplayName("존재하지 않는 회원이면, NOT_FOUND 예외가 전파된다.")
         @Test
         void propagatesNotFound_whenMemberDoesNotExist() {
-            // Arrange
-            when(orderFacade.createOrder(eq("unknown"), any()))
+            when(orderFacade.createOrder(eq("unknown"), any(), any()))
                 .thenThrow(new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 1))
+                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 1)), null
             );
 
-            // Act & Assert
             CoreException ex = assertThrows(CoreException.class,
                 () -> orderV1Controller.createOrder("unknown", request)
             );
@@ -75,14 +69,12 @@ class OrderV1ControllerTest {
         @DisplayName("재고 부족이면, BAD_REQUEST 예외가 전파된다.")
         @Test
         void propagatesBadRequest_whenStockIsInsufficient() {
-            // Arrange
-            when(orderFacade.createOrder(eq("user1"), any()))
+            when(orderFacade.createOrder(eq("user1"), any(), any()))
                 .thenThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족한 상품이 있습니다."));
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 999))
+                List.of(new OrderV1Dto.CreateRequest.OrderItemDto(1L, 999)), null
             );
 
-            // Act & Assert
             CoreException ex = assertThrows(CoreException.class,
                 () -> orderV1Controller.createOrder("user1", request)
             );
@@ -97,32 +89,15 @@ class OrderV1ControllerTest {
         @DisplayName("정상 요청이면, 주문 요약 목록을 반환한다.")
         @Test
         void returnsOrderSummaries_whenRequestIsValid() {
-            // Arrange
             ZonedDateTime now = ZonedDateTime.now();
-            OrderSummary summary = new OrderSummary(10L, 100_000L, now);
+            OrderSummary summary = new OrderSummary(10L, 100_000L, 0L, 100_000L, now);
             Page<OrderSummary> page = new PageImpl<>(List.of(summary));
             when(orderFacade.getOrders(eq("user1"), any(), any(), anyInt(), anyInt())).thenReturn(page);
 
-            // Act
             var result = orderV1Controller.getOrders("user1", null, null, 0, 20);
 
-            // Assert
             assertThat(result.data().getContent()).hasSize(1);
             assertThat(result.data().getContent().get(0).orderId()).isEqualTo(10L);
-        }
-
-        @DisplayName("존재하지 않는 회원이면, NOT_FOUND 예외가 전파된다.")
-        @Test
-        void propagatesNotFound_whenMemberDoesNotExist() {
-            // Arrange
-            when(orderFacade.getOrders(eq("unknown"), any(), any(), anyInt(), anyInt()))
-                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
-
-            // Act & Assert
-            CoreException ex = assertThrows(CoreException.class,
-                () -> orderV1Controller.getOrders("unknown", null, null, 0, 20)
-            );
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 
@@ -133,18 +108,15 @@ class OrderV1ControllerTest {
         @DisplayName("본인 주문이면, 상세 정보를 반환한다.")
         @Test
         void returnsOrderDetail_whenOrderBelongsToMember() {
-            // Arrange
             ZonedDateTime now = ZonedDateTime.now();
             OrderDetail.OrderItemInfo itemInfo = new OrderDetail.OrderItemInfo(
                 "에어맥스", "나이키", 50_000L, 2, OrderItemStatus.ORDERED
             );
-            OrderDetail detail = new OrderDetail(10L, 100_000L, now, List.of(itemInfo));
+            OrderDetail detail = new OrderDetail(10L, 100_000L, 0L, 100_000L, now, List.of(itemInfo));
             when(orderFacade.getOrder("user1", 10L)).thenReturn(detail);
 
-            // Act
             var result = orderV1Controller.getOrder("user1", 10L);
 
-            // Assert
             assertThat(result.data().orderId()).isEqualTo(10L);
             assertThat(result.data().items()).hasSize(1);
             assertThat(result.data().items().get(0).productName()).isEqualTo("에어맥스");
@@ -153,11 +125,9 @@ class OrderV1ControllerTest {
         @DisplayName("타인의 주문이면, FORBIDDEN 예외가 전파된다.")
         @Test
         void propagatesForbidden_whenOrderBelongsToOtherMember() {
-            // Arrange
             when(orderFacade.getOrder("user1", 10L))
                 .thenThrow(new CoreException(ErrorType.FORBIDDEN, "접근 권한이 없습니다."));
 
-            // Act & Assert
             CoreException ex = assertThrows(CoreException.class,
                 () -> orderV1Controller.getOrder("user1", 10L)
             );

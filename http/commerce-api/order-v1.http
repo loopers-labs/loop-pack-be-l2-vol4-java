@@ -1,4 +1,4 @@
-### 주문 생성
+### 주문 생성 (쿠폰 없음)
 POST {{commerce-api}}/api/v1/orders
 Content-Type: application/json
 X-Loopers-LoginId: user1
@@ -14,6 +14,21 @@ X-Loopers-LoginId: user1
       "quantity": 1
     }
   ]
+}
+
+### 주문 생성 (쿠폰 적용)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: user1
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "couponId": 1
 }
 
 ### 주문 목록 조회

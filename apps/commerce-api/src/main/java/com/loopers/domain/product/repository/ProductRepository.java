@@ -14,4 +14,6 @@ public interface ProductRepository {
     List<Long> findIdsByBrandId(Long brandId);
     int softDeleteAllByBrandId(Long brandId);
     Product save(Product product);
+    int incrementLikeCount(Long productId);
+    int decrementLikeCount(Long productId);
 }
