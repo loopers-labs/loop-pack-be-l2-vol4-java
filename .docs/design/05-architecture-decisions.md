@@ -611,8 +611,9 @@ After:
 **결제 플로우와의 연결**
 
 ```
-POST /orders                     → OrderStatus: PENDING_PAYMENT  (재고 변동 없음)
-POST /orders/{id}/pay/start      → StockModel.reserve(quantity)  (reserved_stock += quantity)
+POST /orders                     → StockModel.reserve(quantity)  (reserved_stock += quantity)
+                                 → OrderStatus: PENDING_PAYMENT
+POST /orders/{id}/pay/start      → OrderStatus: IN_PAYMENT       (재고 변동 없음)
 POST /orders/{id}/pay/confirm    → StockModel.confirm(quantity)  (total_stock -= quantity, reserved_stock -= quantity)
                                  → OrderStatus: CONFIRMED
 ```
@@ -736,35 +737,33 @@ POST /api/v1/orders/{id}/pay/confirm   ③ 결제 확정
 **① 주문 생성 (createOrder)**
 
 ```
-Facade.createOrder(userId, items, couponId)
+Facade.createOrder(userId, items, couponId)   ─ 단일 @Transactional
   ├─ 상품 존재 여부 검증
-  ├─ 재고 여유 검증 (락 없는 Fail-fast)              ← 결정 16
+  ├─ 재고 비관적 락 + stock.reserve()          ← 결정 14, 16
+  │    └─ reserved_stock += 주문 수량
   ├─ 쿠폰이 있으면:
   │    ├─ 유효성 검증 (만료 여부)
-  │    ├─ 비관적 락 + couponIssue.use() → USED        ← 결정 13, 14
+  │    ├─ 비관적 락 + couponIssue.use() → USED ← 결정 13, 14
   │    └─ couponIssueId 보관
   └─ OrderService.createOrder(products, quantities, coupon, couponIssueId)
        ├─ OrderItemModel 생성 (상품명·가격 스냅샷)
-       ├─ originalAmount 계산 (items 기준)             ← 결정 17
+       ├─ originalAmount 계산 (items 기준)      ← 결정 17
        ├─ discountAmount 계산 (쿠폰 있으면)
        └─ OrderModel 생성 → status: PENDING_PAYMENT
 ```
 
-> 이 시점 재고 변동 없음. 쿠폰만 소비됨.
+> 재고 선점 + 쿠폰 소비 + 주문 생성이 **한 트랜잭션**으로 묶인다. 셋 중 하나라도 실패하면 모두 롤백된다.
 
 **② 결제 시작 (startPayment)**
 
 ```
 Facade.startPayment(userId, orderId)
   ├─ 소유자 확인
-  ├─ 재고 비관적 락 획득                               ← 결정 14
-  ├─ order.startPayment()
-  │    └─ PENDING_PAYMENT만 통과 → status: IN_PAYMENT  ← 결정 15
-  └─ stock.reserve()
-       └─ reserved_stock += 주문 수량
+  └─ order.startPayment()
+       └─ PENDING_PAYMENT만 통과 → status: IN_PAYMENT  ← 결정 15
 ```
 
-> 재고를 "선점"한다. `total_stock`은 아직 그대로.
+> 재고는 이미 createOrder에서 선점되어 있다. startPayment에서는 상태 전이만 수행한다.
 
 **③ 결제 확정 (confirmPayment)**
 
@@ -789,8 +788,8 @@ PENDING_PAYMENT ──► IN_PAYMENT ──► CONFIRMED
 | | createOrder | startPayment | confirmPayment |
 |---|---|---|---|
 | `total_stock` | 그대로 | 그대로 | `-= 수량` |
-| `reserved_stock` | 그대로 | `+= 수량` | `-= 수량` |
-| `availableStock` (계산값) | 변동 없음 | `-= 수량` | 그대로 |
+| `reserved_stock` | `+= 수량` | 그대로 | `-= 수량` |
+| `availableStock` (계산값) | `-= 수량` | 그대로 | 그대로 |
 
 > `availableStock = total_stock - reserved_stock`
 
@@ -833,24 +832,51 @@ Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 
 - 재고·쿠폰 쓰기 직전 조회에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
 - 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
 
-**배경**
-- 동일 상품 동시 주문, 동일 쿠폰 동시 사용에서 Lost Update 발생 가능
-- 두 경우 모두 조회 직후 상태를 변경하는 패턴 (`reserve()`, `use()`)
+**재고 vs 쿠폰의 동시성 성격 차이**
 
-**트레이드오프**
+두 대상은 충돌 구조가 다르다.
 
-| 항목 | 비관적 락 (선택) | 낙관적 락 (`@Version`) |
-|------|----------------|----------------------|
-| 충돌 처리 | DB가 락을 잡고 순서대로 처리 | 먼저 커밋된 쪽 성공, 나머지 `OptimisticLockException` |
-| 재시도 로직 | 불필요 | 필요 (없으면 충돌 시 500 반환) |
-| 처리량 | 락 대기로 저하 가능 | 충돌이 드물면 처리량 높음 |
-| 에러 메시지 | `reserve()`·`use()` 내부 검증으로 명확한 메시지 | 예외 변환 누락 시 스택트레이스 노출 위험 |
-| 이 도메인 판단 | 재고·쿠폰은 핫 데이터 → 비관적 락이 안전 | 재시도 없이 낙관적 락만 쓰면 불완전 |
+- **재고**: 여러 유저가 동일한 `stocks` row를 동시에 노린다 → 충돌 빈도 높음
+- **쿠폰**: `coupon_issues` row가 유저별로 분리되어 있어 다른 유저는 내 쿠폰 row에 접근할 수 없다. 충돌이 발생하려면 같은 유저가 동시에 두 번 요청(더블클릭, 네트워크 재시도)해야 한다 → 충돌 빈도 낮음
+
+쿠폰만 놓고 보면 낙관적 락(`@Version`)으로도 충분히 안전하다. 현재 비관적 락을 적용한 이유는 재고와 방식을 통일해 코드의 일관성을 유지하기 위해서다.
+
+**재고에 대한 원자적 UPDATE 대안**
+
+`likeCount`(결정 10)처럼 조건부 원자 UPDATE를 쓰는 방법도 있다.
+
+```sql
+UPDATE stocks
+SET reserved_stock = reserved_stock + :qty
+WHERE product_id = :productId
+  AND (total_stock - reserved_stock) >= :qty
+```
+
+affected rows가 0이면 재고 부족으로 처리한다. DB row-level 락이 UPDATE 순간 암묵적으로 걸리므로 명시적 `SELECT FOR UPDATE` 없이도 동시성이 보장된다.
+
+| 항목 | 비관적 락 (현재) | 원자적 UPDATE |
+|------|----------------|--------------|
+| 조건 검증 위치 | `StockModel.reserve()` (도메인) | SQL WHERE 절 (인프라) |
+| 실패 원인 파악 | 즉시 명확한 메시지 | affected rows=0만 반환 → 재고 부족인지 row 없음인지 추가 조회 필요 |
+| 락 유지 시간 | SELECT → Java 처리 → UPDATE | UPDATE 순간만 |
+| 처리량 | 비교적 낮음 | 높음 |
+
+원자적 UPDATE를 선택하지 않은 이유는 `StockModel.reserve()`의 검증 로직(`availableStock() < quantity`)을 도메인에 유지하기 위해서다. SQL WHERE 절로 옮기면 "왜 실패했는지"를 Java에서 알 수 없고, 명확한 에러 메시지를 내려주려면 추가 SELECT가 필요해진다.
+
+**세 방식 비교**
+
+| 항목 | 비관적 락 (현재) | 원자적 UPDATE | 낙관적 락 |
+|------|----------------|--------------|---------|
+| 도메인 로직 위치 | Java (`StockModel`) | SQL WHERE 절 | Java (`StockModel`) |
+| 재시도 로직 | 불필요 | 불필요 | 필요 |
+| 처리량 | 낮음 | 높음 | 충돌 드물면 높음 |
+| 에러 메시지 | 즉시 명확 | 추가 조회 필요 | 예외 변환 필요 |
+| 재고·쿠폰 일관성 | 동일 방식 | 쿠폰엔 부적합 (likeCount처럼 조건 없는 경우에 적합) | 쿠폰에 더 적합 |
 
 **적용 위치**
 
 ```
-StockJpaRepository.findAllByProductIdsWithLock          → startPayment·confirmPayment
+StockJpaRepository.findAllByProductIdsWithLock           → createOrder·confirmPayment
 CouponIssueJpaRepository.findByUserIdAndCouponIdWithLock → createOrder
 ```
 
@@ -891,18 +917,29 @@ findAllByProductIdsWithLock(ids)  → SELECT ... FOR UPDATE
 
 ---
 
-## 결정 16. createOrder 재고 조기 검증 — 락 없는 Fail-fast
+## 결정 16. createOrder 재고 선점 — 쿠폰·재고·주문 원자적 생성
 
 **결정**
-- `createOrder()`에서 재고를 락 없이 조회해 가용량을 검증한다.
-- 실제 재고 선점(reserve)은 `startPayment()`에서 비관적 락과 함께 수행한다.
+- 재고 비관적 락 + `reserve()` + 쿠폰 소비 + 주문 저장을 `createOrder()` 단일 트랜잭션으로 묶는다.
+- `startPayment()`에서는 재고 조작을 수행하지 않고 상태 전이(`IN_PAYMENT`)만 담당한다.
+
+**배경**
+
+기존 설계에서는 쿠폰 소비가 `createOrder()`(TX1), 재고 선점이 `startPayment()`(TX2)로 분리되어 있었다.
+`startPayment()`가 실패하면 TX1에서 이미 소비된 쿠폰은 복구되지 않아 **쿠폰이 영구 소진되는 문제**가 발생했다.
+
+```
+Before: createOrder (쿠폰 소비 커밋) → startPayment 실패 → 쿠폰 영구 소진
+After:  createOrder (쿠폰 소비 + 재고 선점 + 주문 생성 한 트랜잭션) → 셋 중 하나라도 실패하면 모두 롤백
+```
 
 **트레이드오프**
 
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
-| 락 없는 조기 검증 유지 | 재고가 명백히 부족한 요청을 `startPayment()` 전에 빠르게 차단 | 동시 요청이 몰리면 조기 검증을 통과하고도 `startPayment()`에서 실패 가능 |
-| 조기 검증 제거하지 않음 | DB 커넥션·락 경쟁 없이 불필요한 주문 생성을 줄임 | "재고 부족" 오류가 두 단계에서 모두 발생할 수 있어 오류 시점이 일관되지 않음 |
+| createOrder에서 재고 비관적 락 | 락 실패 시 쿠폰도 함께 롤백 — 쿠폰 소진 문제 해결 | createOrder 트랜잭션이 더 길어짐 (상품·재고·쿠폰 락을 모두 보유) |
+| startPayment 단순화 | 상태 전이만 담당 — 코드가 명확해짐 | startPayment 단계에서 동시 재고 경쟁을 막는 역할 상실 (createOrder에서 이미 처리) |
+| 락 없는 Fail-fast 제거 | 락 있는 reserve()가 충분히 빠른 실패를 보장 | 락 없는 사전 검증이 주는 약간의 조기 차단 효과 |
 
 ---
 
