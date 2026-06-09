@@ -1,5 +1,6 @@
 package com.loopers.coupon.interfaces.api;
 
+import com.loopers.coupon.application.CouponIssueService;
 import com.loopers.coupon.domain.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -30,11 +31,17 @@ class CouponAdminV1ApiE2ETest {
     private static final ZonedDateTime EXPIRES = ZonedDateTime.parse("2030-12-31T23:59:59+09:00");
 
     private final TestRestTemplate testRestTemplate;
+    private final CouponIssueService couponIssueService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
-    public CouponAdminV1ApiE2ETest(TestRestTemplate testRestTemplate, DatabaseCleanUp databaseCleanUp) {
+    public CouponAdminV1ApiE2ETest(
+            TestRestTemplate testRestTemplate,
+            CouponIssueService couponIssueService,
+            DatabaseCleanUp databaseCleanUp
+    ) {
         this.testRestTemplate = testRestTemplate;
+        this.couponIssueService = couponIssueService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -199,6 +206,40 @@ class CouponAdminV1ApiE2ETest {
                     () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                     () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
             );
+        }
+    }
+
+    @DisplayName("GET /api/v1/admin/coupons/{couponId}/issues")
+    @Nested
+    class GetIssues {
+
+        @Test
+        @DisplayName("발급 내역을 페이지로 조회하면 200 과 발급 건수를 반환한다")
+        void givenIssues_whenGetIssues_thenReturnsPage() {
+            Long couponId = createCoupon();
+            couponIssueService.issue(1L, couponId);
+            couponIssueService.issue(2L, couponId);
+
+            ParameterizedTypeReference<ApiResponse<CouponAdminV1Response.IssuePage>> type = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<CouponAdminV1Response.IssuePage>> response = testRestTemplate.exchange(
+                    ENDPOINT + "/" + couponId + "/issues?page=0&size=20", HttpMethod.GET,
+                    new HttpEntity<>(adminHeaders()), type);
+
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
+                    () -> assertThat(response.getBody().data().content()).hasSize(2)
+            );
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 템플릿의 발급 내역을 조회하면 404 를 반환한다")
+        void givenMissingTemplate_whenGetIssues_thenReturnsNotFound() {
+            ParameterizedTypeReference<ApiResponse<CouponAdminV1Response.IssuePage>> type = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<CouponAdminV1Response.IssuePage>> response = testRestTemplate.exchange(
+                    ENDPOINT + "/99999/issues", HttpMethod.GET, new HttpEntity<>(adminHeaders()), type);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }

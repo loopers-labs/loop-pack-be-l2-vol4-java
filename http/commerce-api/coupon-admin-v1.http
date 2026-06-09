@@ -78,3 +78,11 @@ X-Loopers-Admin-Id: admin-1
 ### 쿠폰 템플릿 삭제 - 존재하지 않는 id (404)
 DELETE {{commerce-api}}/api/v1/admin/coupons/9999
 X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 발급 내역 조회 (페이지)
+GET {{commerce-api}}/api/v1/admin/coupons/1/issues?page=0&size=20
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 발급 내역 조회 - 존재하지 않는 템플릿 (404)
+GET {{commerce-api}}/api/v1/admin/coupons/9999/issues
+X-Loopers-Admin-Id: admin-1

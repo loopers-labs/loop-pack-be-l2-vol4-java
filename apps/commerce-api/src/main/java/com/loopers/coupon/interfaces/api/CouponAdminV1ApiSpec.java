@@ -37,4 +37,10 @@ public interface CouponAdminV1ApiSpec {
             description = "couponId 의 쿠폰 템플릿을 soft delete 합니다. 이미 발급된 쿠폰은 영향받지 않습니다."
     )
     ApiResponse<Void> delete(Long couponId);
+
+    @Operation(
+            summary = "쿠폰 발급 내역 조회",
+            description = "couponId 템플릿으로 발급된 쿠폰 내역을 페이지 단위로 조회합니다."
+    )
+    ApiResponse<CouponAdminV1Response.IssuePage> getIssues(Long couponId, int page, int size);
 }

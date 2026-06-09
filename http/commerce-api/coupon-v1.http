@@ -1,0 +1,25 @@
+### 쿠폰 발급 - 정상 (인증 필요)
+POST {{commerce-api}}/api/v1/coupons/1/issue
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 쿠폰 발급 - 중복 발급 (두 번째 요청, 409)
+POST {{commerce-api}}/api/v1/coupons/1/issue
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 쿠폰 발급 - 인증 없음 (401)
+POST {{commerce-api}}/api/v1/coupons/1/issue
+
+### 쿠폰 발급 - 존재하지 않는 템플릿 (404)
+POST {{commerce-api}}/api/v1/coupons/99999/issue
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 쿠폰 목록 조회 (AVAILABLE/USED/EXPIRED 파생 상태)
+GET {{commerce-api}}/api/v1/users/me/coupons
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 쿠폰 목록 조회 - 인증 없음 (401)
+GET {{commerce-api}}/api/v1/users/me/coupons

@@ -62,4 +62,16 @@ public class CouponAdminV1Controller implements CouponAdminV1ApiSpec {
         couponAdminService.delete(couponId);
         return ApiResponse.success(null);
     }
+
+    @GetMapping("/{couponId}/issues")
+    @Override
+    public ApiResponse<CouponAdminV1Response.IssuePage> getIssues(
+            @PathVariable Long couponId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(
+                CouponAdminV1Response.IssuePage.from(couponAdminService.getIssues(couponId, PageRequest.of(page, size)))
+        );
+    }
 }
