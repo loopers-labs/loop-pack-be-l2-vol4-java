@@ -101,7 +101,7 @@ public class CouponTemplate extends BaseEntity {
         confirmCanApplyToOrder(orderAmount, now);
 
         CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
-        return CouponDiscount.of(orderAmount, discountAmount);
+        return CouponDiscount.of(discountAmount);
     }
 
     public UserCoupon issue(Long userId, ZonedDateTime issuedAt) {

@@ -42,11 +42,7 @@ class CouponTemplateTest {
         CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, FIXED_POLICY);
 
         // assert
-        assertAll(
-            () -> assertThat(discount.orderAmount()).isEqualTo(orderAmount),
-            () -> assertThat(discount.discountAmount().value()).isEqualTo(2_000L),
-            () -> assertThat(discount.paymentAmount().value()).isEqualTo(10_000L)
-        );
+        assertThat(discount.amount().value()).isEqualTo(2_000L);
     }
 
     @DisplayName("정액 할인 금액이 주문 금액보다 크면, 최종 결제 금액을 0원으로 제한한다.")
@@ -67,10 +63,7 @@ class CouponTemplateTest {
         CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, FIXED_POLICY);
 
         // assert
-        assertAll(
-            () -> assertThat(discount.discountAmount()).isEqualTo(orderAmount),
-            () -> assertThat(discount.paymentAmount().value()).isZero()
-        );
+        assertThat(discount.amount()).isEqualTo(orderAmount);
     }
 
     @DisplayName("정률 쿠폰을 적용하면, 원 단위 미만을 절사한 할인 금액을 차감한다.")
@@ -91,10 +84,7 @@ class CouponTemplateTest {
         CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, RATE_POLICY);
 
         // assert
-        assertAll(
-            () -> assertThat(discount.discountAmount().value()).isEqualTo(1_234L),
-            () -> assertThat(discount.paymentAmount().value()).isEqualTo(11_111L)
-        );
+        assertThat(discount.amount().value()).isEqualTo(1_234L);
     }
 
     @DisplayName("주문 금액이 최소 주문 금액보다 작으면, CONFLICT 예외를 던진다.")

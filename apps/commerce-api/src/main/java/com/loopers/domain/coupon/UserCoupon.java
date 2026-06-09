@@ -153,7 +153,7 @@ public class UserCoupon extends BaseEntity {
         confirmApplicableTo(orderAmount, now);
 
         CouponMoney discountAmount = policy.discount(orderAmount, discountValue);
-        return CouponDiscount.of(orderAmount, discountAmount);
+        return CouponDiscount.of(discountAmount);
     }
 
     public void use(Long userId, ZonedDateTime usedAt) {

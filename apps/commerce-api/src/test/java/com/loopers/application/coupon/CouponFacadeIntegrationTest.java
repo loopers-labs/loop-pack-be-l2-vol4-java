@@ -130,11 +130,7 @@ class CouponFacadeIntegrationTest {
             CouponDiscount discount = couponService.use(couponUse);
 
             // assert
-            assertAll(
-                () -> assertThat(discount.orderAmount().value()).isEqualTo(12_000L),
-                () -> assertThat(discount.discountAmount().value()).isEqualTo(2_000L),
-                () -> assertThat(discount.paymentAmount().value()).isEqualTo(10_000L)
-            );
+            assertThat(discount.amount().value()).isEqualTo(2_000L);
         }
     }
 

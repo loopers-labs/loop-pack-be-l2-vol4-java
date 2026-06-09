@@ -197,7 +197,7 @@ class UserCouponTest {
         CouponDiscount discount = userCoupon.apply(orderAmount, NOW, FIXED_POLICY);
 
         // assert
-        assertThat(discount.discountAmount().value()).isEqualTo(2_000L);
+        assertThat(discount.amount().value()).isEqualTo(2_000L);
     }
 
     @DisplayName("주문 금액이 최소 주문 금액보다 작은 쿠폰을 적용하면, CONFLICT 예외를 던진다.")

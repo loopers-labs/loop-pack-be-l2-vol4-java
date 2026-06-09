@@ -35,6 +35,20 @@ class OrderTest {
         );
     }
 
+    @DisplayName("할인 금액이 주문 금액과 같으면, 결제 금액은 0원이다.")
+    @Test
+    void paymentIsZero_whenDiscountEqualsOrderAmount() {
+        // arrange
+        OrderItem item = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 1);
+        OrderPayment payment = OrderPayment.withDiscount(1_550_000L, 1_550_000L);
+
+        // act
+        Order order = Order.create(1L, OrderItems.of(List.of(item)), 10L, payment);
+
+        // assert
+        assertThat(order.getPaymentAmount()).isZero();
+    }
+
     @DisplayName("사용자 ID와 주문 항목들이 주어지면, 주문을 생성하고 전체 금액을 계산한다.")
     @Test
     void createsOrder_whenUserIdAndItemsAreProvided() {

@@ -86,7 +86,7 @@ public class CouponService {
     @Transactional
     public CouponDiscount use(CouponUse couponUse) {
         if (!couponUse.hasCoupon()) {
-            return CouponDiscount.none(couponUse.orderAmount());
+            return CouponDiscount.none();
         }
 
         UserCoupon userCoupon = userCouponRepository.findById(couponUse.userCouponId())

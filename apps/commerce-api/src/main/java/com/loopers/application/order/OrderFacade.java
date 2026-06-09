@@ -33,12 +33,10 @@ public class OrderFacade {
         ZonedDateTime orderedAt = ZonedDateTime.now();
 
         OrderItems orderItems = orderItemFactory.create(command.items());
-        CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), orderItems.calculateTotalPrice(), orderedAt);
+        long total = orderItems.calculateTotalPrice();
+        CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), total, orderedAt);
         CouponDiscount discount = couponService.use(couponUse);
-        OrderPayment payment = OrderPayment.withDiscount(
-            discount.orderAmount().value(),
-            discount.discountAmount().value()
-        );
+        OrderPayment payment = OrderPayment.withDiscount(total, discount.amount().value());
 
         productStockService.deduct(command.orderQuantities());
 
