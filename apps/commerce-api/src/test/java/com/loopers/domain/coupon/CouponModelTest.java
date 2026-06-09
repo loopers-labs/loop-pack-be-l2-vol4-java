@@ -176,4 +176,53 @@ class CouponModelTest {
                 .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("쿠폰 템플릿의 만료 여부를 확인할 때,")
+    @Nested
+    class IsExpired {
+
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        private CouponModel coupon(ZonedDateTime expiredAt, ZonedDateTime issuedAt) {
+            return CouponModel.builder()
+                .rawName("쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(5_000)
+                .rawMinOrderAmount(10_000)
+                .rawExpiredAt(expiredAt)
+                .now(issuedAt)
+                .build();
+        }
+
+        @DisplayName("만료 시각이 기준 시각 이후이면 만료되지 않은 것으로 판정한다.")
+        @Test
+        void returnsFalse_whenExpiredAtIsAfterNow() {
+            // arrange
+            CouponModel coupon = coupon(now.plusDays(7), now);
+
+            // act & assert
+            assertThat(coupon.isExpired(now)).isFalse();
+        }
+
+        @DisplayName("만료 시각이 기준 시각과 같으면 만료되지 않은 것으로 판정한다.")
+        @Test
+        void returnsFalse_whenExpiredAtEqualsNow() {
+            // arrange
+            CouponModel coupon = coupon(now, now);
+
+            // act & assert
+            assertThat(coupon.isExpired(now)).isFalse();
+        }
+
+        @DisplayName("만료 시각이 기준 시각 이전이면 만료된 것으로 판정한다.")
+        @Test
+        void returnsTrue_whenExpiredAtIsBeforeNow() {
+            // arrange (과거 기준 시각으로 생성해, 실제로는 만료 시각이 지난 템플릿을 만든다)
+            ZonedDateTime pastExpiredAt = now.minusDays(1);
+            CouponModel coupon = coupon(pastExpiredAt, pastExpiredAt.minusDays(1));
+
+            // act & assert
+            assertThat(coupon.isExpired(now)).isTrue();
+        }
+    }
 }
