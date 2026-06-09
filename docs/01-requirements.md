@@ -710,3 +710,5 @@ LikeFacade.removeLike(userId, productId)
 | ADR-030 | ApplicationService 네이밍 — Facade → ApplicationService | `adr/030-coupon-application-service-naming.md` |
 | ADR-031 | 쿠폰 비관적 락 전략 — PESSIMISTIC_WRITE | `adr/031-coupon-pessimistic-lock.md` |
 | ADR-032 | 쿠폰 적용 시 주문 생성 흐름 변경 — 쿠폰 사용 → 재고 차감 → 주문 생성 | `adr/032-order-creation-flow-with-coupon.md` |
+| ADR-033 | 동일 유저에게 동일 템플릿 쿠폰 중복 발급 허용 | `adr/033-coupon-duplicate-issuance.md` |
+| ADR-034 | Coupon 도메인 서비스 미도입 및 레이어 책임 재정의 | `adr/034-coupon-no-domain-service.md` |
