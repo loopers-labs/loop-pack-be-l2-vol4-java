@@ -36,12 +36,16 @@ class ProductV1ApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
     @Autowired
     private LikeJpaRepository likeJpaRepository;
+
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 

@@ -35,6 +35,7 @@ import com.loopers.utils.DatabaseCleanUp;
 class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
+    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -123,13 +124,11 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -148,13 +147,11 @@ class UserV1ApiE2ETest {
         @MethodSource("missingFieldRequests")
         void returnsBadRequest_whenRequiredFieldIsMissing(UserV1Dto.SignUpRequest requestBody) {
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -171,13 +168,11 @@ class UserV1ApiE2ETest {
         @MethodSource("invalidFieldRequests")
         void returnsBadRequest_whenFieldPolicyIsViolated(UserV1Dto.SignUpRequest requestBody) {
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -203,13 +198,11 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -235,13 +228,11 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(duplicateRequest),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -268,13 +259,11 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_SIGN_UP,
                 HttpMethod.POST,
                 jsonRequest(duplicateRequest),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -326,13 +315,11 @@ class UserV1ApiE2ETest {
             saveUser(loginId, password, originalName, birthDate, email);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders(loginId, password),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -359,13 +346,11 @@ class UserV1ApiE2ETest {
             saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -385,13 +370,11 @@ class UserV1ApiE2ETest {
             saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -408,13 +391,11 @@ class UserV1ApiE2ETest {
             saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("kyle!#", "Kyle!2030"),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -431,13 +412,11 @@ class UserV1ApiE2ETest {
             saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("unknown99", "Kyle!2030"),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -454,13 +433,11 @@ class UserV1ApiE2ETest {
             saveUser("kylekim", "Kyle!2030", "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders("kylekim", "Wrong!2030"),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -481,13 +458,11 @@ class UserV1ApiE2ETest {
             userJpaRepository.saveAndFlush(savedUser);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_READ_MY_INFO,
                 HttpMethod.GET,
                 authHeaders(loginId, password),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -554,13 +529,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, newPassword);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -585,13 +558,11 @@ class UserV1ApiE2ETest {
             UserModel savedUser = saveUser(loginId, currentPassword, "김카일", LocalDate.of(1995, 3, 21), "kyle@example.com");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -614,13 +585,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest("Wrong!2030", "Newer!2031");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -644,13 +613,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, invalidNewPassword);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -673,13 +640,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, "Abc19950321!");
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -702,13 +667,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, currentPassword);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -732,13 +695,11 @@ class UserV1ApiE2ETest {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 new HttpEntity<>(requestBody, headers),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert
@@ -762,13 +723,11 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest requestBody = new UserV1Dto.ChangePasswordRequest(currentPassword, invalidNewPassword);
 
             // act
-            ParameterizedTypeReference<ApiResponse<Map<String, Object>>> responseType = new ParameterizedTypeReference<>() {
-            };
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_CHANGE_PASSWORD,
                 HttpMethod.PATCH,
                 authJsonRequest(loginId, currentPassword, requestBody),
-                responseType
+                MAP_RESPONSE
             );
 
             // assert

@@ -35,8 +35,7 @@ class LikeV1ApiE2ETest {
 
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
-    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE =
-        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
 
     @Autowired
     private TestRestTemplate testRestTemplate;

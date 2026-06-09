@@ -39,10 +39,13 @@ class OrderAdminV1ApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
     @Autowired
     private OrderJpaRepository orderJpaRepository;
+
     @Autowired
     private OrderItemJpaRepository orderItemJpaRepository;
+
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
