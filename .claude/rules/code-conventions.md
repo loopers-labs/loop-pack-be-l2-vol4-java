@@ -38,9 +38,7 @@
 - 필드 주입(`@Autowired` 필드)은 사용하지 않는다.
 - 설정 값 바인딩은 `@ConfigurationProperties` 를 우선 사용한다.
 - Bean 등록이 필요한 경우 명확한 설정 클래스 또는 auto-configuration 성격의 모듈에 둔다.
-- 트랜잭션 경계는 Facade/Application Service 또는 명확한 UseCase 단위에 둔다.
-- 조회 전용 트랜잭션은 `@Transactional(readOnly = true)` 를 사용한다.
-- 외부 시스템 호출이 포함되면 DB 트랜잭션과 외부 호출 경계를 명확히 분리한다.
+- 트랜잭션 배치 규칙은 아래 `## 트랜잭션 규칙` 을 따른다.
 - 운영용 profile 설정(`dev`/`qa`/`prd`) 변경은 사용자 확인 후 진행한다.
 
 ## Lombok 규칙
@@ -55,9 +53,12 @@
 
 ## 패키지 / 레이어 규칙
 
+도메인 코드는 `<domain>.<layer>` 형태의 도메인 우선 패키지 구조를 따른다.
+공통 API 응답과 공통 API Advice 처럼 특정 도메인에 속하지 않는 API 구성요소는 `common.interfaces.api` 하위에 둔다.
+
 ### interfaces
 
-- `interfaces.api.<domain>` 하위에 Controller, DTO, Swagger Spec, Advice 를 둔다.
+- `<domain>.interfaces.api` 하위에 Controller, DTO, Swagger Spec 을 둔다.
 - Request/Response DTO 는 외부 API 계약으로 보고 domain model 과 분리한다.
 - 입력 검증은 Bean Validation 애너테이션을 우선 사용한다.
 - Controller 에서 domain model 을 직접 반환하지 않는다.
@@ -65,24 +66,37 @@
 
 ### application
 
-- `application.<domain>` 하위에 Facade 와 Info 를 둔다.
+- `<domain>.application` 하위에 Facade, Service, Info 를 둔다.
 - Facade 는 유스케이스 흐름, 트랜잭션 경계, 여러 도메인 서비스 조합을 담당한다.
+- Repository 조회/저장을 수행하는 Service 는 application 계층에 둔다.
 - 외부로 반환하는 조회 결과는 `Info` 객체로 표현한다.
 - 단순 위임만 반복되는 Facade 는 만들지 않는다.
 
 ### domain
 
-- `domain.<domain>` 하위에 Model, Service, Repository 인터페이스를 둔다.
-- 도메인 규칙은 Model 또는 Service 내부에 둔다.
+- `<domain>.domain` 하위에 Model, Domain Service, Repository 인터페이스를 둔다.
+- Aggregate, Domain Service, Repository 의존 방향 등 DDD 책임 분리는 `.claude/rules/architecture.md` 를 따른다.
 - Repository 는 도메인 계약만 표현하고 JPA, Redis, Kafka 세부 타입에 의존하지 않는다.
-- 도메인 계층은 `interfaces` 또는 `infrastructure` 계층에 의존하지 않는다.
+- 도메인 계층은 `interfaces`, `application`, `infrastructure` 계층에 의존하지 않는다.
 
 ### infrastructure
 
-- `infrastructure.<domain>` 하위에 Repository 구현체와 JpaRepository 를 둔다.
+- `<domain>.infrastructure` 하위에 Repository 구현체와 JpaRepository 를 둔다.
 - QueryDSL, JPA, Redis, Kafka 세부 구현은 이 계층에 한정한다.
 - domain 계층의 Repository 계약을 구현한다.
 - 외부 시스템 연동 예외는 도메인/애플리케이션에서 해석 가능한 형태로 변환한다.
+
+## 트랜잭션 규칙
+
+트랜잭션 경계를 어느 계층이 소유하는지(아키텍처 책임)는 `.claude/rules/architecture.md` 의 Application Service 규칙을 따른다.
+본 절은 `@Transactional` 의 구체적 배치 방식을 정의한다.
+
+- `@Transactional` 은 Application 계층의 단일 진입점인 Facade 에만 둔다. `Controller → Facade → Service` 흐름에서 트랜잭션 경계는 Facade 이다.
+- 기본은 클래스 단위 `@Transactional`(쓰기)로 부여하고, readOnly 등 전파 속성이 달라지는 메서드에만 메서드 단위로 `@Transactional(readOnly = true)` 를 두어 오버라이드한다.
+- domain 계층의 Domain Service 에는 `@Transactional` 을 두지 않는다. 도메인 서비스는 호출자(Facade)의 트랜잭션에 전파되어 동작한다.
+- 트랜잭션 전파는 프록시 기반이므로, 트랜잭션 안에서 빈 경계를 넘어 호출되는 기능(유스케이스) 메서드는 `private` 로 선언하지 않는다(`public`). `private` 메서드는 프록시가 어드바이스할 수 없고, 동일 빈 내부 자기호출(self-invocation)은 프록시를 우회한다.
+- 조회 전용 트랜잭션은 `@Transactional(readOnly = true)` 를 사용한다.
+- 외부 시스템 호출이 포함되면 DB 트랜잭션과 외부 호출 경계를 명확히 분리한다.
 
 ## JPA 규칙
 
