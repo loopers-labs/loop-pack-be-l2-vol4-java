@@ -36,7 +36,7 @@ public class OrderFacade {
     private final BrandRepository brandRepository;
     private final OrderRepository orderRepository;
 
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands) {
+    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands, ZonedDateTime now) {
         UserModel user = userRepository.getActiveById(userId);
 
         validateNoDuplicateProduct(itemCommands);
@@ -44,7 +44,7 @@ public class OrderFacade {
 
         OrderModel order = OrderModel.builder()
             .userId(user.getId())
-            .orderedAt(ZonedDateTime.now())
+            .orderedAt(now)
             .totalPrice(calculateTotalPrice(orderItems))
             .build();
 

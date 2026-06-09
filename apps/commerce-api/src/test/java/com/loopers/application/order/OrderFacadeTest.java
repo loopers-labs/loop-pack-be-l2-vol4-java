@@ -112,7 +112,7 @@ class OrderFacadeTest {
             given(orderRepository.save(any(OrderModel.class), anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
-            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands);
+            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now());
 
             // assert
             assertAll(
@@ -137,7 +137,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
@@ -157,7 +157,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
@@ -178,7 +178,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
@@ -194,7 +194,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.BAD_REQUEST),
@@ -229,7 +229,7 @@ class OrderFacadeTest {
             given(orderRepository.save(any(OrderModel.class), anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
-            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands);
+            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now());
 
             // assert
             assertAll(
@@ -248,7 +248,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.BAD_REQUEST),
@@ -271,7 +271,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
@@ -295,7 +295,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
