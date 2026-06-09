@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import java.time.ZonedDateTime;
@@ -21,10 +22,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponRepository;
 import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -32,7 +38,13 @@ import com.loopers.support.error.ErrorType;
 class CouponFacadeTest {
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private CouponRepository couponRepository;
+
+    @Mock
+    private UserCouponRepository userCouponRepository;
 
     @InjectMocks
     private CouponFacade couponFacade;
@@ -233,6 +245,105 @@ class CouponFacadeTest {
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("쿠폰을 발급할 때,")
+    @Nested
+    class IssueCoupon {
+
+        private final Long userId = 100L;
+        private final Long couponId = 1L;
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        private CouponModel coupon(ZonedDateTime expiredAt, ZonedDateTime issuedAt) {
+            CouponModel coupon = CouponModel.builder()
+                .rawName("신규 가입 쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(5_000)
+                .rawMinOrderAmount(10_000)
+                .rawExpiredAt(expiredAt)
+                .now(issuedAt)
+                .build();
+            ReflectionTestUtils.setField(coupon, "id", couponId);
+
+            return coupon;
+        }
+
+        @DisplayName("활성·미만료 템플릿이고 발급 이력이 없으면 스냅샷을 저장하고 발급 정보를 반환한다.")
+        @Test
+        void returnsIssueInfo_whenIssuable() {
+            // arrange
+            UserModel user = mock(UserModel.class);
+            given(user.getId()).willReturn(userId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(couponRepository.getActiveById(couponId)).willReturn(coupon(now.plusDays(7), now));
+            given(userCouponRepository.existsByUserIdAndCouponId(userId, couponId)).willReturn(false);
+            given(userCouponRepository.save(any(UserCouponModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // act
+            UserCouponIssueInfo issueInfo = couponFacade.issueCoupon(userId, couponId, now);
+
+            // assert
+            assertAll(
+                () -> assertThat(issueInfo).isNotNull(),
+                () -> then(userCouponRepository).should().save(any(UserCouponModel.class))
+            );
+        }
+
+        @DisplayName("대상 템플릿이 활성 상태로 존재하지 않으면 NOT_FOUND 예외가 발생하고 저장하지 않는다.")
+        @Test
+        void throwsNotFound_whenTemplateIsAbsent() {
+            // arrange
+            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
+            given(couponRepository.getActiveById(couponId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> couponFacade.issueCoupon(userId, couponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.NOT_FOUND),
+                () -> then(userCouponRepository).should(never()).save(any(UserCouponModel.class))
+            );
+        }
+
+        @DisplayName("템플릿이 만료됐으면 CONFLICT 예외가 발생하고 저장하지 않는다.")
+        @Test
+        void throwsConflict_whenTemplateIsExpired() {
+            // arrange
+            ZonedDateTime pastExpiredAt = now.minusDays(1);
+            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
+            given(couponRepository.getActiveById(couponId)).willReturn(coupon(pastExpiredAt, pastExpiredAt.minusDays(1)));
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> couponFacade.issueCoupon(userId, couponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> then(userCouponRepository).should(never()).save(any(UserCouponModel.class))
+            );
+        }
+
+        @DisplayName("이미 발급받은 이력이 있으면 CONFLICT 예외가 발생하고 저장하지 않는다.")
+        @Test
+        void throwsConflict_whenAlreadyIssued() {
+            // arrange
+            UserModel user = mock(UserModel.class);
+            given(user.getId()).willReturn(userId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(couponRepository.getActiveById(couponId)).willReturn(coupon(now.plusDays(7), now));
+            given(userCouponRepository.existsByUserIdAndCouponId(userId, couponId)).willReturn(true);
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> couponFacade.issueCoupon(userId, couponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> then(userCouponRepository).should(never()).save(any(UserCouponModel.class))
+            );
         }
     }
 }
