@@ -16,7 +16,9 @@ Vol.1 에서 구현된 User 도메인을 기반으로, 아래 4개 도메인을 
 | Brand | 어드민 CRUD, 고객 단건 조회 |
 | Product (확장) | Brand 연결, 좋아요 수 표시 |
 | Like | 상품 좋아요 등록 / 취소 / 목록 조회 |
-| Order | 주문 생성 / 조회 (재고 차감 + 스냅샷) |
+| Order | 주문 생성 / 조회 (재고 차감 + 스냅샷 + 쿠폰 적용) |
+| CouponTemplate | 어드민 쿠폰 템플릿 등록 (FIXED / RATE 할인 정책 정의) |
+| Coupon | 템플릿 기반 쿠폰 발급 / 내 쿠폰 목록 조회 / 주문 시 사용 |
 
 ---
 
@@ -161,11 +163,24 @@ infrastructure/
 
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
-| POST | `/api/v1/orders` | 주문 생성 | User |
+| POST | `/api/v1/orders` | 주문 생성 (선택적 `couponId` 포함) | User |
 | GET | `/api/v1/orders?startAt=2026-05-01&endAt=2026-05-31&page=0&size=20` | 내 주문 목록 (`startAt`/`endAt`은 날짜만, YYYY-MM-DD) | User |
 | GET | `/api/v1/orders/{orderId}` | 주문 단건 조회 | User |
 | GET | `/api-admin/v1/orders?page=0&size=20` | 주문 목록 (Admin) | Admin |
 | GET | `/api-admin/v1/orders/{orderId}` | 주문 단건 조회 (Admin) | Admin |
+
+### CouponTemplate
+
+| Method | URI | 설명 | 인증 |
+|---|---|---|:---:|
+| POST | `/api-admin/v1/coupon-templates` | 쿠폰 템플릿 등록 | Admin |
+
+### Coupon
+
+| Method | URI | 설명 | 인증 |
+|---|---|---|:---:|
+| POST | `/api-admin/v1/coupons` | 특정 유저에게 쿠폰 발급 | Admin |
+| GET | `/api/v1/coupons` | 내 쿠폰 목록 조회 | User |
 
 ---
 
@@ -239,12 +254,33 @@ infrastructure/
 | orderId | ✅ | ✅ | ✅ | ✅ |
 | userId | ❌ | ❌ | ✅ | ✅ |
 | status | ✅ | ✅ | ✅ | ✅ |
-| totalAmount | ✅ | ✅ | ✅ | ✅ |
+| originalAmount | ✅ | ✅ | ✅ | ✅ |
+| discountAmount | ✅ | ✅ | ✅ | ✅ |
+| finalAmount | ✅ | ✅ | ✅ | ✅ |
+| couponId | ❌ | ✅ | ❌ | ✅ |
 | items | ✅ | ✅ | ✅ | ✅ |
 | createdAt | ✅ | ✅ | ✅ | ✅ |
 
 > Customer: `userId` 미노출 — 자신의 주문만 조회 가능하므로 불필요
 > Admin: `userId` 포함 — 전체 주문 관리 목적
+> `couponId`: 목록에서는 불필요, 단건에서만 노출
+
+---
+
+### Coupon (내 쿠폰 목록)
+
+| 필드 | 반환 여부 |
+|---|:---:|
+| couponId | ✅ |
+| templateName | ✅ |
+| type | ✅ |
+| value | ✅ |
+| minOrderAmount | ✅ |
+| expiredAt | ✅ |
+| status | ✅ |
+
+> `status`는 `resolveStatus(expiredAt)` 기준 lazy 계산값 반환 (DB 값이 AVAILABLE이어도 만료됐으면 EXPIRED 반환, [ADR-029](./adr/029-coupon-status-lazy-expiration.md))
+> 조회 시 USED / EXPIRED 쿠폰도 포함해 반환한다 (사용 이력 확인 목적).
 
 ---
 
@@ -375,11 +411,49 @@ flowchart TD
     B -- 실패 --> C[400 Bad Request]
     B -- 통과 --> D{"상품 조회<br/>PRODUCT JOIN INVENTORY"}
     D -- 없는 상품 포함 --> E[404 Not Found]
-    D -- 성공 --> H["@Transactional 시작<br/>주문 생성 INSERT<br/>OrderEntity + OrderItemEntity 스냅샷"]
-    H --> I{"재고 차감<br/>SELECT FOR UPDATE<br/>productInventory.deduct"}
-    I -- 재고 부족 --> J[Rollback → 400]
-    I -- 성공 --> K[Commit → 201 Created]
+    D -- 성공 --> F{"재고 fast-fail<br/>product.quantity < 요청수량"}
+    F -- 재고 부족 --> C2[400 Bad Request]
+    F -- 통과 --> G{"couponId 있음?"}
+    G -- 있음 --> G2{"쿠폰 사전 검증<br/>소유권 + AVAILABLE 여부"}
+    G2 -- 실패 --> C3[400 / 403 Bad Request]
+    G2 -- 통과 --> H
+    G -- 없음 --> H
+    H["@Transactional 시작<br/>①쿠폰 사용 처리 (PESSIMISTIC_WRITE)"] --> I
+    I{"②재고 차감<br/>SELECT FOR UPDATE<br/>productId 오름차순"} -- 재고 부족 --> J[Rollback → 400]
+    I -- 성공 --> K["③주문 엔티티 생성 및 저장<br/>OrderEntity INSERT + 스냅샷"]
+    K --> L[Commit → 201 Created]
 ```
+
+> - 트랜잭션 내 순서: 쿠폰 사용 → 재고 차감 → 주문 생성 ([ADR-032](./adr/032-order-creation-flow-with-coupon.md))
+> - 쿠폰 없는 주문은 ①을 건너뛰고 ②→③ 수행
+> - 실패 확률이 높은 작업을 먼저 수행해 불필요한 INSERT를 방지
+> - 재고 차감 시 productId 오름차순 정렬로 데드락 방지 ([ADR-014](./adr/014-batch-query-and-lock-ordering.md))
+
+### 쿠폰 템플릿 등록
+
+| 필드 | 규칙 |
+|---|---|
+| `name` | 필수, 빈 문자열 불가 |
+| `type` | `FIXED` 또는 `RATE` |
+| `value` | FIXED: 원 단위 양의 정수, RATE: 1~100 정수 (%) |
+| `minOrderAmount` | nullable, 0 이상 정수 |
+| `expiredAt` | 필수, 미래 일시 |
+
+### 쿠폰 발급 (Admin → User)
+
+- `couponTemplateId`로 템플릿 존재 여부 검증
+- 템플릿 만료 여부 검증 (`isExpired()` — 발급 시점 기준)
+- `userId`로 유저 존재 여부 검증
+- 쿠폰 발급 (AVAILABLE 상태로 INSERT)
+
+### 쿠폰 할인 계산
+
+| 타입 | 계산식 |
+|---|---|
+| FIXED | `min(value, orderAmount)` — 주문금액보다 할인액이 클 수 없음 |
+| RATE | `orderAmount * value / 100` |
+
+- `minOrderAmount` 조건 있으면 `orderAmount < minOrderAmount` 시 `400 Bad Request`
 
 > - 재고 확인은 `SELECT FOR UPDATE` 단일 지점에서만 수행한다 — fast-fail 사전 검증 미적용 ([ADR-024](./adr/024-order-creation-no-fast-fail.md))
 > - 실제 동시성 보장은 FOR UPDATE 락이 담당
@@ -561,6 +635,7 @@ LikeFacade.removeLike(userId, productId)
 | `GET /api/v1/users/{userId}/likes` | |
 | `GET /api/v1/orders` | `startAt` / `endAt` 날짜 필터 함께 사용 — **날짜만 (YYYY-MM-DD)** ([ADR-010](./adr/010-order-list-query-spec.md)) |
 | `GET /api-admin/v1/orders` | |
+| `GET /api/v1/coupons` | |
 
 ### 예외
 
@@ -593,8 +668,13 @@ LikeFacade.removeLike(userId, productId)
 | 어드민 헤더 불일치 | `FORBIDDEN` | 403 |
 | 타인의 좋아요 목록 조회 시도 | `FORBIDDEN` | 403 |
 | 알 수 없는 sort 파라미터 값 | `BAD_REQUEST` | 400 |
-
-> `FORBIDDEN` / `CONFLICT` ErrorType 추가 필요
+| 쿠폰 없음 (couponId 존재하지 않음) | `NOT_FOUND` | 404 |
+| 쿠폰 소유자가 아님 | `FORBIDDEN` | 403 |
+| 쿠폰 이미 사용됨 (`USED` 상태) | `BAD_REQUEST` | 400 |
+| 쿠폰 만료됨 (`EXPIRED` 상태) | `BAD_REQUEST` | 400 |
+| 주문금액이 최소 주문금액 미만 | `BAD_REQUEST` | 400 |
+| 쿠폰 템플릿 없음 | `NOT_FOUND` | 404 |
+| 발급 시 쿠폰 템플릿 만료됨 | `BAD_REQUEST` | 400 |
 
 ---
 
@@ -625,3 +705,8 @@ LikeFacade.removeLike(userId, productId)
 | ADR-024 | 주문 생성 흐름 — fast-fail 사전 재고 검증 미적용 | `adr/024-order-creation-no-fast-fail.md` |
 | ADR-025 | 상품+브랜드 조합 위치 — Facade 유지 (중복 3회↑ 시 Application Service 분리 검토) | `adr/025-product-brand-combination-location.md` |
 | ADR-026 | 좋아요 목록 조회 N+1 문제 — 현행 유지 (Known Issue) | `adr/026-like-list-n-plus-one.md` |
+| ADR-028 | 주문 전체 JSON 스냅샷 — ORDER_ITEM 테이블 대체 | `adr/028-order-full-json-snapshot.md` |
+| ADR-029 | 쿠폰 상태 Lazy 만료 처리 | `adr/029-coupon-status-lazy-expiration.md` |
+| ADR-030 | ApplicationService 네이밍 — Facade → ApplicationService | `adr/030-coupon-application-service-naming.md` |
+| ADR-031 | 쿠폰 비관적 락 전략 — PESSIMISTIC_WRITE | `adr/031-coupon-pessimistic-lock.md` |
+| ADR-032 | 쿠폰 적용 시 주문 생성 흐름 변경 — 쿠폰 사용 → 재고 차감 → 주문 생성 | `adr/032-order-creation-flow-with-coupon.md` |
