@@ -5,6 +5,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.AuthUser;
 import com.loopers.interfaces.api.auth.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/products/{productId}/likes")
 @RequiredArgsConstructor
+@Validated
 public class LikeV1Controller implements LikeV1ApiSpec {
 
     private final LikeFacade likeFacade;
