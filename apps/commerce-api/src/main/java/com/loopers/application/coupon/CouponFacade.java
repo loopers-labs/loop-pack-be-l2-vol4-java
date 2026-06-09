@@ -8,6 +8,8 @@ import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class CouponFacade {
@@ -21,5 +23,14 @@ public class CouponFacade {
         CouponModel coupon = couponService.getCoupon(couponId);
         
         return UserCouponInfo.from(userCoupon, coupon);
+    }
+
+    public List<UserCouponInfo> getMyCoupons(String loginId, String loginPw) {
+        UserModel user = userService.getUser(loginId, loginPw);
+        List<UserCouponModel> userCoupons = couponService.getUserCoupons(user.getId());
+
+        return userCoupons.stream()
+            .map(uc -> UserCouponInfo.from(uc, couponService.getCoupon(uc.getCouponId())))
+            .toList();
     }
 }

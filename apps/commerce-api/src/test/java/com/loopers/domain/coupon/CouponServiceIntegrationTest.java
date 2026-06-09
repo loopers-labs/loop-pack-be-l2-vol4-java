@@ -6,6 +6,8 @@ import com.loopers.domain.user.UserModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -87,6 +89,57 @@ class CouponServiceIntegrationTest {
                 couponService.issueCoupon(user.getId(), coupon.getId())
             );
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    @DisplayName("내 쿠폰 목록 조회 시,")
+    @Nested
+    class GetUserCoupons {
+
+        @DisplayName("보유한 쿠폰이 있으면 전체 목록이 반환된다.")
+        @Test
+        void returnsAllCoupons_whenUserHasCoupons() {
+            // arrange
+            CouponModel coupon1 = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L));
+            CouponModel coupon2 = couponJpaRepository.save(new CouponModel("5,000원 할인", CouponType.FIXED, 5000L));
+            UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
+            couponService.issueCoupon(user.getId(), coupon1.getId());
+            couponService.issueCoupon(user.getId(), coupon2.getId());
+
+            // act
+            List<UserCouponModel> result = couponService.getUserCoupons(user.getId());
+
+            // assert
+            assertThat(result).hasSize(2);
+        }
+
+        @DisplayName("보유한 쿠폰이 없으면 빈 목록이 반환된다.")
+        @Test
+        void returnsEmptyList_whenUserHasNoCoupons() {
+            // arrange
+            UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
+
+            // act
+            List<UserCouponModel> result = couponService.getUserCoupons(user.getId());
+
+            // assert
+            assertThat(result).isEmpty();
+        }
+
+        @DisplayName("본인의 쿠폰만 반환된다.")
+        @Test
+        void returnsOnlyOwnCoupons() {
+            // arrange
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L));
+            UserModel user1 = userJpaRepository.save(new UserModel("user1", "pw1"));
+            UserModel user2 = userJpaRepository.save(new UserModel("user2", "pw2"));
+            couponService.issueCoupon(user1.getId(), coupon.getId());
+
+            // act
+            List<UserCouponModel> result = couponService.getUserCoupons(user2.getId());
+
+            // assert
+            assertThat(result).isEmpty();
         }
     }
 }

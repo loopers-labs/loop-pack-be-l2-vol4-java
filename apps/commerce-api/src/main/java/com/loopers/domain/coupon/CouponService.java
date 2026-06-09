@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class CouponService {
@@ -17,6 +19,11 @@ public class CouponService {
     public CouponModel getCoupon(Long couponId) {
         return couponRepository.find(couponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserCouponModel> getUserCoupons(Long userId) {
+        return userCouponRepository.findAllByUserId(userId);
     }
 
     @Transactional
