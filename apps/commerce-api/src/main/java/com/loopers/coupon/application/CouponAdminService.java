@@ -3,6 +3,7 @@ package com.loopers.coupon.application;
 import com.loopers.coupon.domain.Coupon;
 import com.loopers.coupon.domain.CouponErrorCode;
 import com.loopers.coupon.domain.CouponRepository;
+import com.loopers.coupon.domain.UserCouponRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +12,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+
 @RequiredArgsConstructor
 @Component
 public class CouponAdminService {
 
     private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
     public CouponResult.Detail create(CouponCommand.Create command) {
@@ -47,6 +51,14 @@ public class CouponAdminService {
     @Transactional(readOnly = true)
     public Page<CouponResult.Detail> getCoupons(Pageable pageable) {
         return couponRepository.findAll(pageable).map(CouponResult.Detail::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CouponResult.IssueDetail> getIssues(Long couponId, Pageable pageable) {
+        get(couponId);
+        ZonedDateTime now = ZonedDateTime.now();
+        return userCouponRepository.findByCouponId(couponId, pageable)
+                .map(userCoupon -> CouponResult.IssueDetail.from(userCoupon, now));
     }
 
     private Coupon get(Long couponId) {

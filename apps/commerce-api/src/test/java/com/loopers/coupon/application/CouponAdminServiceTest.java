@@ -4,6 +4,8 @@ import com.loopers.coupon.domain.Coupon;
 import com.loopers.coupon.domain.CouponErrorCode;
 import com.loopers.coupon.domain.CouponRepository;
 import com.loopers.coupon.domain.CouponType;
+import com.loopers.coupon.domain.UserCoupon;
+import com.loopers.coupon.domain.UserCouponRepository;
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +32,9 @@ class CouponAdminServiceTest {
     private static final ZonedDateTime EXPIRES = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
 
     private final CouponRepository couponRepository = mock(CouponRepository.class);
-    private final CouponAdminService couponAdminService = new CouponAdminService(couponRepository);
+    private final UserCouponRepository userCouponRepository = mock(UserCouponRepository.class);
+    private final CouponAdminService couponAdminService =
+            new CouponAdminService(couponRepository, userCouponRepository);
 
     private Coupon coupon() {
         return Coupon.create("신규가입 3천원", CouponType.FIXED, 3_000L, 10_000L, EXPIRES);
@@ -142,5 +146,34 @@ class CouponAdminServiceTest {
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).name()).isEqualTo("신규가입 3천원");
+    }
+
+    @Test
+    @DisplayName("getIssues 로 특정 템플릿의 발급 내역을 페이지로 조회한다")
+    void givenIssues_whenGetIssues_thenReturnsPageOfIssueDetail() {
+        Pageable pageable = PageRequest.of(0, 20);
+        UserCoupon issued = coupon().issueTo(100L);
+        when(couponRepository.findById(10L)).thenReturn(Optional.of(coupon()));
+        when(userCouponRepository.findByCouponId(10L, pageable))
+                .thenReturn(new PageImpl<>(List.of(issued), pageable, 1));
+
+        var result = couponAdminService.getIssues(10L, pageable);
+
+        assertAll(
+                () -> assertThat(result.getTotalElements()).isEqualTo(1),
+                () -> assertThat(result.getContent().get(0).userId()).isEqualTo(100L)
+        );
+    }
+
+    @Test
+    @DisplayName("getIssues 시 템플릿이 없으면 COUPON_NOT_FOUND 가 발생한다")
+    void givenMissingCoupon_whenGetIssues_thenThrowsNotFound() {
+        when(couponRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> couponAdminService.getIssues(99L, PageRequest.of(0, 20)))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorCode")
+                .isEqualTo(CouponErrorCode.COUPON_NOT_FOUND);
+        verify(userCouponRepository, never()).findByCouponId(any(), any());
     }
 }
