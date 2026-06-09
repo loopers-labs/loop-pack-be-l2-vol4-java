@@ -30,18 +30,18 @@ public class OrderFacade {
 
     @Transactional
     public OrderInfo createOrder(CreateOrderCommand command) {
-        ZonedDateTime orderedAt = ZonedDateTime.now();
-
         OrderItems orderItems = orderItemFactory.create(command.items());
-        long total = orderItems.calculateTotalPrice();
-        CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), total, orderedAt);
-        CouponDiscount discount = couponService.use(couponUse);
-        OrderPayment payment = OrderPayment.withDiscount(total, discount.amount().value());
-
+        OrderPayment payment = calculatePayment(command, orderItems);
         productStockService.deduct(command.orderQuantities());
-
         Order order = Order.create(command.userId(), orderItems, command.userCouponId(), payment);
         return OrderInfo.from(orderService.saveOrder(order));
+    }
+
+    private OrderPayment calculatePayment(CreateOrderCommand command, OrderItems orderItems) {
+        long total = orderItems.calculateTotalPrice();
+        CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), total, ZonedDateTime.now());
+        CouponDiscount discount = couponService.use(couponUse);
+        return OrderPayment.withDiscount(total, discount.amount().value());
     }
 
     @Transactional(readOnly = true)
