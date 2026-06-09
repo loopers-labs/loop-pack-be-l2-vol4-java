@@ -290,3 +290,47 @@ sequenceDiagram
 
     OrderFacade-->>OrderV1Controller: OrderInfo
 ```
+
+---
+
+## Coupon
+
+### POST /api/v1/coupons/{couponTemplateId}/issue — 쿠폰 발급 `🔐 User`
+
+```mermaid
+sequenceDiagram
+    Note over CouponV1Controller: 🔐 X-Loopers-LoginId / X-Loopers-LoginPw
+    participant CouponV1Controller
+    participant CouponApplicationService
+    participant CouponTemplateRepository
+    participant CouponRepository
+
+    CouponV1Controller->>CouponApplicationService: issueCoupon(userId, couponTemplateId)
+    CouponApplicationService->>CouponTemplateRepository: findById(couponTemplateId)
+    CouponTemplateRepository-->>CouponApplicationService: CouponTemplateEntity (없으면 404)
+    Note over CouponApplicationService: template.isExpired() → 만료됐으면 400
+    CouponApplicationService->>CouponRepository: save(new CouponEntity(templateId, userId, AVAILABLE))
+    CouponRepository-->>CouponApplicationService: CouponEntity
+    CouponApplicationService-->>CouponV1Controller: CouponInfo (couponId)
+```
+
+---
+
+### DELETE /api-admin/v1/coupons/{couponTemplateId} — 쿠폰 템플릿 삭제 `🔐 Admin`
+
+```mermaid
+sequenceDiagram
+    Note over CouponAdminV1Controller: 🔐 X-Loopers-Ldap: loopers.admin
+    participant CouponAdminV1Controller
+    participant CouponApplicationService
+    participant CouponTemplateRepository
+    participant CouponRepository
+
+    CouponAdminV1Controller->>CouponApplicationService: deleteTemplate(couponTemplateId)
+    CouponApplicationService->>CouponTemplateRepository: findById(couponTemplateId)
+    CouponTemplateRepository-->>CouponApplicationService: CouponTemplateEntity (없으면 404)
+    CouponApplicationService->>CouponApplicationService: couponTemplate.delete()
+    CouponApplicationService->>CouponTemplateRepository: save(couponTemplate)
+    CouponApplicationService->>CouponRepository: softDeleteAllByTemplateId(couponTemplateId)
+    CouponApplicationService-->>CouponAdminV1Controller: void
+```
