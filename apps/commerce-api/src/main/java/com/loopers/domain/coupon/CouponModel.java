@@ -57,4 +57,8 @@ public class CouponModel extends BaseEntity {
         this.minOrderAmount = MinOrderAmount.from(rawMinOrderAmount);
         this.expiredAt = ExpiredAt.of(rawExpiredAt, now);
     }
+
+    public boolean isExpired(ZonedDateTime now) {
+        return expiredAt.isExpired(now);
+    }
 }

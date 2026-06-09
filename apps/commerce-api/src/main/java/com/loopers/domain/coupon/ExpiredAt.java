@@ -25,4 +25,8 @@ public record ExpiredAt(
 
         return new ExpiredAt(value);
     }
+
+    public boolean isExpired(ZonedDateTime now) {
+        return value.isBefore(now);
+    }
 }

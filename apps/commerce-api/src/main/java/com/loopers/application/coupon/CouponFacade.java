@@ -9,6 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponRepository;
 import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,7 +23,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CouponFacade {
 
+    private final UserRepository userRepository;
     private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
 
     public CouponCreateInfo createCoupon(
         String name,
@@ -56,6 +64,23 @@ public class CouponFacade {
 
     public void deleteCoupon(Long couponId) {
         couponRepository.findActiveById(couponId).ifPresent(CouponModel::delete);
+    }
+
+    public UserCouponIssueInfo issueCoupon(Long userId, Long couponId, ZonedDateTime now) {
+        UserModel user = userRepository.getActiveById(userId);
+        CouponModel coupon = couponRepository.getActiveById(couponId);
+
+        if (coupon.isExpired(now)) {
+            throw new CoreException(ErrorType.CONFLICT, "만료된 쿠폰 템플릿은 발급할 수 없습니다.");
+        }
+
+        if (userCouponRepository.existsByUserIdAndCouponId(user.getId(), coupon.getId())) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
+        }
+
+        UserCouponModel issuedCoupon = UserCouponModel.issue(user.getId(), coupon);
+
+        return UserCouponIssueInfo.from(userCouponRepository.save(issuedCoupon));
     }
 
     @Transactional(readOnly = true)
