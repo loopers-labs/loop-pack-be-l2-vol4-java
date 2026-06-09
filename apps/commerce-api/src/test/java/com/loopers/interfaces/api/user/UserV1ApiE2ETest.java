@@ -2,6 +2,14 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.IssuedCouponModel;
+import com.loopers.domain.coupon.IssuedCouponRepository;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockModel;
@@ -11,6 +19,7 @@ import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.coupon.CouponV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +36,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +54,8 @@ class UserV1ApiE2ETest {
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
+    private final CouponTemplateRepository couponTemplateRepository;
+    private final IssuedCouponRepository issuedCouponRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final PasswordEncryptor passwordEncryptor;
 
@@ -56,6 +66,8 @@ class UserV1ApiE2ETest {
         BrandRepository brandRepository,
         ProductRepository productRepository,
         StockRepository stockRepository,
+        CouponTemplateRepository couponTemplateRepository,
+        IssuedCouponRepository issuedCouponRepository,
         DatabaseCleanUp databaseCleanUp,
         PasswordEncryptor passwordEncryptor
     ) {
@@ -64,6 +76,8 @@ class UserV1ApiE2ETest {
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
         this.stockRepository = stockRepository;
+        this.couponTemplateRepository = couponTemplateRepository;
+        this.issuedCouponRepository = issuedCouponRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.passwordEncryptor = passwordEncryptor;
     }
@@ -341,6 +355,127 @@ class UserV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @DisplayName("GET /api/v1/users/me/coupons")
+    @Nested
+    class GetMyCoupons {
+
+        @DisplayName("발급받은 쿠폰이 있으면 내 쿠폰 목록을 반환하고 DB 상태와 일치한다.")
+        @Test
+        void returnsMyCoupons_whenIssuedCouponsExist() {
+            // given
+            UserModel user = userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+            CouponTemplateModel template = couponTemplateRepository.save(new CouponTemplateModel(
+                "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
+                BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30)
+            ));
+            issuedCouponRepository.save(new IssuedCouponModel(template.getId(), user.getId()));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<List<CouponV1Dto.MyIssuedCouponResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<CouponV1Dto.MyIssuedCouponResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/users/me/coupons",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                    responseType
+                );
+
+            // then
+            List<IssuedCouponModel> persisted = issuedCouponRepository.findAllByUserId(user.getId());
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data()).hasSize(1),
+                () -> assertThat(response.getBody().data().get(0).couponId()).isEqualTo(persisted.get(0).getId()),
+                () -> assertThat(response.getBody().data().get(0).name()).isEqualTo(template.getName()),
+                () -> assertThat(response.getBody().data().get(0).status()).isEqualTo(CouponV1Dto.CouponStatusDto.AVAILABLE)
+            );
+        }
+
+        @DisplayName("발급받은 쿠폰이 없으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmptyList_whenNoIssuedCouponsExist() {
+            // given
+            userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<List<CouponV1Dto.MyIssuedCouponResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<CouponV1Dto.MyIssuedCouponResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/users/me/coupons",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, VALID_PASSWORD),
+                    responseType
+                );
+
+            // then
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data()).isEmpty()
+            );
+        }
+
+        @DisplayName("LOGIN_ID 헤더가 없으면 400을 반환한다.")
+        @Test
+        void returnsBadRequest_whenLoginIdHeaderIsMissing() {
+            // when
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                "/api/v1/users/me/coupons",
+                HttpMethod.GET,
+                new HttpEntity<>(null),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("LOGIN_PW 헤더가 없으면 400을 반환한다.")
+        @Test
+        void returnsBadRequest_whenLoginPwHeaderIsMissing() {
+            // given
+            userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                "/api/v1/users/me/coupons",
+                HttpMethod.GET,
+                loginIdOnlyHeaderEntity(LOGIN_ID),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("비밀번호가 틀리면 400을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPasswordIsWrong() {
+            // given
+            userRepository.save(new UserModel(
+                LOGIN_ID, VALID_PASSWORD, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor
+            ));
+
+            // when
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                "/api/v1/users/me/coupons",
+                HttpMethod.GET,
+                authHeaderEntity(LOGIN_ID, "WrongPass1!"),
+                Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 

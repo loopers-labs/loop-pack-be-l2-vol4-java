@@ -28,14 +28,14 @@
 
 ## DELETE /api-admin/v1/coupons/{couponId} — 쿠폰 템플릿 삭제
 
-- [x] `DELETE /api-admin/v1/coupons/{couponId}` 응답: 204 No Content
+- [x] `DELETE /api-admin/v1/coupons/{couponId}` 응답: 200 OK + `ApiResponse<Void>`
 
 ---
 
 ## GET /api-admin/v1/coupons/{couponId}/issues — 특정 쿠폰 발급 내역 조회
 
 - [x] `CouponStatus` enum — AVAILABLE / USED / EXPIRED
-- [x] `IssuedCouponModel` — `CouponStatus status`, `validateUsable(boolean templateExpired)`, `resolveStatus(boolean templateExpired)`
+- [x] `IssuedCouponModel` — `CouponStatus status`, `resolveStatus(boolean templateExpired)`
 - [x] `IssuedCouponRepository` — `findAllByCouponTemplateId`, `findAllByUserId`
 - [x] `IssuedCouponJpaRepository` — JPA 구현
 - [x] `IssuedCouponRepositoryImpl` — domain Repository 구현
@@ -46,14 +46,14 @@
 
 ## POST /api/v1/coupons/{couponId}/issue — 쿠폰 발급 요청
 
-- [ ] `IssuedCouponService.getUsableCoupon(couponId, userId, templateExpired)` — 만료 체크
-- [ ] `CouponFacade.issue(couponId, userId)` — 템플릿 존재 확인 → 발급 저장
-- [ ] `CouponV1ApiSpec` / `CouponV1Controller` / `CouponV1Dto` 생성
-- [ ] `POST /api/v1/coupons/{couponId}/issue` 응답: 발급된 쿠폰
+- [x] `IssuedCouponService.issue(couponTemplateId, userId)` — 발급 저장
+- [x] `CouponFacade.issue(loginId, loginPw, couponId)` — 유저 인증 → 템플릿 존재/만료 확인 → 발급 저장
+- [x] `CouponV1ApiSpec` / `CouponV1Controller` / `CouponV1Dto` 생성
+- [x] `POST /api/v1/coupons/{couponId}/issue` 응답: 발급된 쿠폰
 
 ## GET /api/v1/users/me/coupons — 내 쿠폰 목록 조회
 
-- [ ] `IssuedCouponService.getMyIssuedCoupons(Long userId)` — 발급 목록 조회
-- [ ] `CouponFacade.getMyIssuedCoupons(userId)` — 발급 목록 + 템플릿 만료 여부로 `resolveStatus()` 계산
-- [ ] `UserV1Controller` — `GET /api/v1/users/me/coupons` 엔드포인트 추가
-- [ ] `CouponV1Dto` 목록 응답: `couponId`, `name`, `type`, `value`, `minOrderAmount`, `expiredAt`, `status(AVAILABLE|USED|EXPIRED)`
+- [x] `IssuedCouponService.getMyIssuedCoupons(Long userId)` — 발급 목록 조회
+- [x] `CouponFacade.getMyIssuedCoupons(loginId, loginPw)` — 유저 인증 → 발급 목록 + 템플릿 만료 여부로 `resolveStatus()` 계산
+- [x] `UserV1Controller` — `GET /api/v1/users/me/coupons` 엔드포인트 추가
+- [x] `CouponV1Dto` 목록 응답: `couponId`, `name`, `type`, `value`, `minOrderAmount`, `expiredAt`, `status(AVAILABLE|USED|EXPIRED)`
