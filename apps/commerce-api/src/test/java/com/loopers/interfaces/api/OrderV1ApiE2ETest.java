@@ -391,6 +391,55 @@ class OrderV1ApiE2ETest {
         }
     }
 
+    @DisplayName("동시성 — 중복 결제확정 콜백")
+    @Nested
+    class ConcurrentConfirm {
+
+        @DisplayName("동일 주문에 confirm 콜백이 동시에 여러번 와도, 재고는 한번만 차감된다.")
+        @Test
+        void stockConfirmedOnce_underDuplicateCallback() throws InterruptedException {
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID orderId = created.getBody().data().id();
+            Long amount = created.getBody().data().pgAmount();
+            String body = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-dup", amount));
+
+            int threads = 8;
+            ExecutorService pool = Executors.newFixedThreadPool(threads);
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch start = new CountDownLatch(1);
+
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        testRestTemplate.exchange(PAYMENTS_CONFIRM_URL, HttpMethod.POST,
+                            new HttpEntity<>(body, pgHeaders(body)), new ParameterizedTypeReference<Void>() {});
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+            ready.await();
+            start.countDown();
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+
+            ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> detail = testRestTemplate.exchange(
+                "/api-admin/v1/products/" + productId, HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()), new ParameterizedTypeReference<>() {}
+            );
+            assertAll(
+                () -> assertThat(detail.getBody().data().totalQuantity()).isEqualTo(ProductFixture.INITIAL_QUANTITY - 2),
+                () -> assertThat(detail.getBody().data().reservedQuantity()).isEqualTo(0)
+            );
+        }
+    }
+
     @DisplayName("POST /api/v1/orders — 주문 생성")
     @Nested
     class CreateOrder {

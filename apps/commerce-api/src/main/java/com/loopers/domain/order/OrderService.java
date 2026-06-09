@@ -37,6 +37,23 @@ public class OrderService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
     }
 
+    /** 전이용 — 주문 행 비관적 락 */
+    public OrderModel getForUpdate(UUID id) {
+        return orderRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
+    }
+
+    /** 취소용 — 소유권 + 비관적 락 */
+    public OrderModel getByIdAndUserForUpdate(UUID id, UUID userId) {
+        return orderRepository.findByIdAndUserIdForUpdate(id, userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
+    /** 만료 배치용 — 대상 주문 비관적 락 (snapshot=승자집합 보장) */
+    public List<OrderModel> findExpiredPendingForUpdate(ZonedDateTime before) {
+        return orderRepository.findPendingBeforeForUpdate(before);
+    }
+
     public Page<OrderModel> getListByUser(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderRepository.findAllByUserId(userId, startAt, endAt, pageable);
     }

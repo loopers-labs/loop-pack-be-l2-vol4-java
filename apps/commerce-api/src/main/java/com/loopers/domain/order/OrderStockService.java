@@ -38,11 +38,13 @@ public class OrderStockService {
         orderService.fail(order);
     }
 
-    /** 결제 실패 — PENDING이면 아이템별 재고 해제 + 주문 실패 (멱등) */
-    public void failOrder(OrderModel order) {
+    /** 결제 실패 — PENDING이면 아이템별 재고 해제 + 주문 실패 후 true, 아니면 false (멱등) */
+    public boolean failOrder(OrderModel order) {
         if (order.isPending()) {
             order.getItems().forEach(item -> stockService.release(item.getProductId(), item.getQuantity()));
             orderService.fail(order);
+            return true;
         }
+        return false;
     }
 }

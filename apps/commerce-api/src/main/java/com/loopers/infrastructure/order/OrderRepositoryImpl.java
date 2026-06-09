@@ -35,6 +35,21 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdForUpdate(UUID id) {
+        return orderJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
+    public Optional<OrderModel> findByIdAndUserIdForUpdate(UUID id, UUID userId) {
+        return orderJpaRepository.findByIdAndUserIdForUpdate(id, userId);
+    }
+
+    @Override
+    public List<OrderModel> findPendingBeforeForUpdate(ZonedDateTime before) {
+        return orderJpaRepository.findPendingBeforeForUpdate(before);
+    }
+
+    @Override
     public Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt, pageable);
     }

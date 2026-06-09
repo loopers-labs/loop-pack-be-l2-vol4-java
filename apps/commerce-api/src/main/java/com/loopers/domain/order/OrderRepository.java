@@ -17,6 +17,15 @@ public interface OrderRepository {
     /** 소유자 일치 조회 — 주문자가 아니면 empty */
     Optional<OrderModel> findByIdAndUserId(UUID id, UUID userId);
 
+    /** 전이용 — 주문 행 비관적 락 */
+    Optional<OrderModel> findByIdForUpdate(UUID id);
+
+    /** 취소용 — 소유권 + 비관적 락 */
+    Optional<OrderModel> findByIdAndUserIdForUpdate(UUID id, UUID userId);
+
+    /** 만료 배치용 — 대상 PENDING 주문 비관적 락 */
+    List<OrderModel> findPendingBeforeForUpdate(ZonedDateTime before);
+
     /** 유저 주문 목록 — 기간 필터, 페이징 */
     Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable);
 

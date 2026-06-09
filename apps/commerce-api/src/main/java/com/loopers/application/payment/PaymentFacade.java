@@ -23,9 +23,9 @@ public class PaymentFacade {
     private final PaymentService paymentService;
     private final UserCouponService userCouponService;
 
-    /** 결제 확정 — 재고+주문 확정(금액/상태 검증 포함) + 결제 저장 (멱등) */
+    /** 결제 확정 — 재고+주문 확정(금액/상태 검증 포함) + 결제 저장 (멱등). 주문 행 비관적 락으로 전이 직렬화 */
     public PaymentInfo confirm(UUID orderId, String pgTransactionId, Long amount) {
-        OrderModel order = orderService.get(orderId);
+        OrderModel order = orderService.getForUpdate(orderId);
         orderStockService.confirmOrder(order, amount);
         PaymentModel payment = paymentService.saveIfAbsent(
             orderId,
@@ -34,11 +34,13 @@ public class PaymentFacade {
         return PaymentInfo.from(payment);
     }
 
-    /** 결제 실패 — PENDING이면 재고 해제 + 쿠폰 복구 + 주문 실패 (멱등) + 결제 저장 (멱등) */
+    /** 결제 실패 — PENDING이면 재고 해제 + 쿠폰 복구 + 주문 실패 (멱등) + 결제 저장 (멱등). 주문 행 비관적 락으로 전이 직렬화 */
     public PaymentInfo fail(UUID orderId, String pgTransactionId, Long amount) {
-        OrderModel order = orderService.get(orderId);
-        orderStockService.failOrder(order);
-        userCouponService.releaseByOrderId(orderId); // 적용 쿠폰 USED → AVAILABLE (없으면 no-op)
+        OrderModel order = orderService.getForUpdate(orderId);
+        boolean failed = orderStockService.failOrder(order);
+        if (failed) {
+            userCouponService.releaseByOrderId(orderId); // 실제 FAILED 전이됐을 때만 쿠폰 복구
+        }
         PaymentModel payment = paymentService.saveIfAbsent(
             orderId,
             new PaymentModel(orderId, pgTransactionId, PaymentStatus.FAILED, amount)

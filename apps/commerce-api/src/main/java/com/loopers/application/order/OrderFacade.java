@@ -104,21 +104,23 @@ public class OrderFacade {
         return orderService.getList(pageable).map(OrderInfo::from);
     }
 
-    /** 주문 취소 — CONFIRMED 상태만, 재고 복구 포함 */
+    /** 주문 취소 — CONFIRMED 상태만, 재고 복구 포함. 주문 행 비관적 락으로 전이 직렬화 */
     @Transactional
     public OrderInfo cancel(UUID orderId, UserModel user) {
-        OrderModel order = orderService.getByIdAndUser(orderId, user.getId());
+        OrderModel order = orderService.getByIdAndUserForUpdate(orderId, user.getId());
         orderStockService.cancelOrder(order);
         return OrderInfo.from(order);
     }
 
-    /** 스케줄러용 — 만료된 PENDING 주문 일괄 실패 처리 + 재고 해제 (배치) */
+    /** 스케줄러용 — 만료된 PENDING 주문 일괄 실패 처리 + 재고/쿠폰 복구 (배치) */
     @Transactional
     public void expirePendingOrders(ZonedDateTime before) {
-        List<OrderModel> expiredOrders = orderService.findExpiredPendingWithItems(before);
+        // 대상 주문을 비관적 락으로 조회 — 락 보유 동안 confirm/fail이 끼어들지 못하므로
+        // 이 집합이 곧 FAILED 전이 승자집합 (confirm된 주문은 PENDING이 아니라 애초에 제외됨)
+        List<OrderModel> expiredOrders = orderService.findExpiredPendingForUpdate(before);
         if (expiredOrders.isEmpty()) return;
 
-        // 1단계: productId별 해제 수량 집계
+        // 1단계: productId별 해제 수량 집계 (items lazy 로드)
         Map<UUID, Integer> releaseMap = expiredOrders.stream()
             .flatMap(o -> o.getItems().stream())
             .collect(Collectors.toMap(
@@ -127,15 +129,15 @@ public class OrderFacade {
                 Integer::sum
             ));
 
-        // 2단계: 재고 배치 해제 (원자적 relative UPDATE, SELECT FOR UPDATE 불필요)
+        // 2단계: 재고 배치 해제
         stockService.releaseAll(releaseMap);
 
-        // 3단계: 주문 상태 일괄 FAILED 처리
+        // 3단계: 만료 주문에 적용된 쿠폰 일괄 복구 (USED → AVAILABLE, 없으면 no-op)
         List<UUID> orderIds = expiredOrders.stream().map(OrderModel::getId).toList();
-        orderService.failAllByIds(orderIds, before);
-
-        // 4단계: 만료 주문에 적용된 쿠폰 일괄 복구 (USED → AVAILABLE, 없으면 no-op)
         userCouponService.releaseByOrderIds(orderIds);
+
+        // 4단계: 주문 상태 일괄 FAILED 처리
+        orderService.failAllByIds(orderIds, before);
     }
 
     public record OrderItemRequest(UUID productId, int quantity) {}
