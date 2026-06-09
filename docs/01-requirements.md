@@ -174,12 +174,12 @@ infrastructure/
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
 | GET | `/api-admin/v1/coupons?page=0&size=20` | 쿠폰 템플릿 목록 조회 | Admin |
-| GET | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 단건 조회 | Admin |
 | POST | `/api-admin/v1/coupons` | 쿠폰 템플릿 등록 | Admin |
 | PUT | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 수정 | Admin |
 | DELETE | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 삭제 (soft delete, 발급된 쿠폰 연쇄 삭제) | Admin |
+| GET | `/api-admin/v1/coupons/{couponTemplateId}/issues?page=0&size=20` | 특정 쿠폰 템플릿의 발급 내역 조회 | Admin |
 | POST | `/api/v1/coupons/{couponTemplateId}/issue` | 쿠폰 발급 요청 (유저 self-issue) | User |
-| GET | `/api/v1/coupons` | 내 쿠폰 목록 조회 | User |
+| GET | `/api/v1/users/me/coupons` | 내 쿠폰 목록 조회 | User |
 
 ---
 
