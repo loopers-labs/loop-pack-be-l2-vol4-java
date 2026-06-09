@@ -1,0 +1,55 @@
+package com.loopers.infrastructure.stock;
+
+import com.loopers.domain.stock.StockModel;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface StockJpaRepository extends JpaRepository<StockModel, UUID> {
+
+    Optional<StockModel> findByProductId(UUID productId);
+
+    List<StockModel> findAllByProductIdIn(List<UUID> productIds);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM StockModel s WHERE s.productId = :productId")
+    Optional<StockModel> findByProductIdForUpdate(@Param("productId") UUID productId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE StockModel s
+        SET s.reservedQuantity = s.reservedQuantity + :qty
+        WHERE s.productId = :productId
+          AND (s.totalQuantity - s.reservedQuantity) >= :qty
+        """)
+    int reserve(@Param("productId") UUID productId, @Param("qty") int qty);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE StockModel s
+        SET s.totalQuantity = :newTotal
+        WHERE s.productId = :productId
+          AND :newTotal >= s.reservedQuantity
+        """)
+    int updateTotal(@Param("productId") UUID productId, @Param("newTotal") int newTotal);
+
+    /**
+     * 스케줄러 배치용 원자적 재고 해제 — SELECT FOR UPDATE 없이 단일 UPDATE.
+     * reserved_quantity -= qty (단, 0 미만 방지)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE StockModel s
+        SET s.reservedQuantity = s.reservedQuantity - :qty
+        WHERE s.productId = :productId
+          AND s.reservedQuantity >= :qty
+        """)
+    int releaseByProductId(@Param("productId") UUID productId, @Param("qty") int qty);
+}
