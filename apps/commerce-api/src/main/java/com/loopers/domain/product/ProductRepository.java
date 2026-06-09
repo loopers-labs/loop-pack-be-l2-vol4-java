@@ -30,4 +30,10 @@ public interface ProductRepository {
 
     /** 어드민 목록 — 브랜드 필터 (삭제 포함) */
     Page<ProductModel> findAllByBrandIdPaged(UUID brandId, Pageable pageable);
+
+    /** 원자적 좋아요 수 증가 (동시성 안전) */
+    int incrementLikeCount(UUID id);
+
+    /** 원자적 좋아요 수 감소 (0 미만 방지) */
+    int decrementLikeCount(UUID id);
 }

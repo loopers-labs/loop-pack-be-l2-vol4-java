@@ -25,7 +25,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -99,6 +105,70 @@ class LikeV1ApiE2ETest {
 
     private String likesUrl(UUID uid) {
         return "/api/v1/users/" + uid + "/likes";
+    }
+
+    private HttpHeaders userAuthHeaders(String loginId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Loopers-LoginId", loginId);
+        headers.set("X-Loopers-LoginPw", UserFixture.PASSWORD);
+        return headers;
+    }
+
+    private void registerUser(String loginId) {
+        testRestTemplate.exchange(
+            USERS_URL, HttpMethod.POST,
+            new HttpEntity<>(new UserV1Dto.RegisterRequest(loginId, UserFixture.PASSWORD, UserFixture.NAME,
+                UserFixture.BIRTH, loginId + "@loopers.com")),
+            new ParameterizedTypeReference<Void>() {}
+        );
+    }
+
+    @DisplayName("동시성 — 동일 상품 동시 좋아요")
+    @Nested
+    class ConcurrentLike {
+
+        @DisplayName("서로 다른 N명이 동시에 좋아요해도, like_count 가 정확히 N이 된다.")
+        @Test
+        void likeCountAccurate_underConcurrency() throws InterruptedException {
+            int users = 10;
+            List<String> loginIds = new ArrayList<>();
+            for (int i = 0; i < users; i++) {
+                String id = "user" + i;
+                registerUser(id);
+                loginIds.add(id);
+            }
+
+            ExecutorService pool = Executors.newFixedThreadPool(users);
+            CountDownLatch ready = new CountDownLatch(users);
+            CountDownLatch start = new CountDownLatch(1);
+
+            for (String id : loginIds) {
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        testRestTemplate.exchange(
+                            likeUrl(productId), HttpMethod.POST,
+                            new HttpEntity<>(userAuthHeaders(id)),
+                            new ParameterizedTypeReference<Void>() {}
+                        );
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+
+            ready.await();
+            start.countDown();
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detail = testRestTemplate.exchange(
+                "/api/v1/products/" + productId, HttpMethod.GET, null,
+                new ParameterizedTypeReference<>() {}
+            );
+            assertThat(detail.getBody().data().likeCount()).isEqualTo((long) users);
+        }
     }
 
     @DisplayName("POST /api/v1/products/{productId}/likes")

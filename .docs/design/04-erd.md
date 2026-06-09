@@ -49,7 +49,7 @@ erDiagram
         varchar name "상품명"
         bigint price "기본 판매가 (원)"
         text description "상품 설명"
-        bigint like_count "좋아요 수 | 카운터 캐시, 배치로 주기적 보정"
+        bigint like_count "좋아요 수 | 원자적 UPDATE로 증감 (동시성 안전)"
         datetime created_at "등록일시"
         datetime deleted_at "삭제일시 | 소프트 딜리트 (NULL = 활성), 브랜드 삭제 시 함께 처리"
         boolean likes_purged "좋아요 정리 완료 여부 | 삭제된 상품의 좋아요 비동기 청크 삭제용 마킹"
@@ -160,11 +160,11 @@ erDiagram
 
 ### products
 - `brand_id`: brands 테이블 외래키
-- `like_count`: 좋아요 수 카운터 캐시. 빠른 조회를 위해 비정규화
-  - 좋아요 등록 시 likes INSERT + like_count +1 (같은 트랜잭션)
-  - 좋아요 취소 시 likes DELETE + like_count -1 (같은 트랜잭션)
-  - 정합성 보정: 주기적 배치로 `COUNT(*) FROM likes` 와 동기화
-  - 삭제(소프트 딜리트)된 상품은 노출되지 않으므로 좋아요 비동기 물리삭제 시 `like_count`를 보정하지 않는다 (보정 대상 아님)
+- `like_count`: 좋아요 수. 빠른 조회를 위해 비정규화
+  - 좋아요 등록 시 likes INSERT + **원자적 UPDATE**(`SET like_count = like_count + 1 WHERE id=?`) (같은 트랜잭션)
+  - 좋아요 취소 시 likes DELETE + **원자적 UPDATE**(`SET like_count = like_count - 1 WHERE id=? AND like_count > 0`) (같은 트랜잭션)
+  - 동시 좋아요/취소 시 Lost Update를 원자적 UPDATE로 방지 (인메모리 read-modify-write 미사용)
+  - 삭제(소프트 딜리트)된 상품은 노출되지 않으므로 좋아요 비동기 물리삭제 시 `like_count`를 보정하지 않는다
 - 가격은 주문 시점 스냅샷이 order_items에 저장되므로 변경되어도 과거 주문에 영향 없음
 - `deleted_at`: 소프트 딜리트. 상품/브랜드 삭제 시 기록. 복구 대상(브랜드 복구 시 함께 복구)
 - `likes_purged`: 삭제된 상품의 좋아요(고용량, 복구 가치 없음)를 비동기 배치로 청크 삭제하기 위한 마킹
