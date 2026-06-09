@@ -1,5 +1,6 @@
 package com.loopers.order.domain;
 
+import com.loopers.coupon.domain.CouponModel;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -24,16 +25,18 @@ public class OrderService {
     }
 
     public OrderModel createOrder(Long userId, List<ProductModel> products, Map<Long, Integer> quantities) {
-        return createOrder(userId, products, quantities, null, 0L);
+        return createOrder(userId, products, quantities, null, null);
     }
 
-    public OrderModel createOrder(Long userId, List<ProductModel> products, Map<Long, Integer> quantities, Long couponIssueId, long discountAmount) {
+    public OrderModel createOrder(Long userId, List<ProductModel> products, Map<Long, Integer> quantities, CouponModel coupon, Long couponIssueId) {
         List<OrderItemModel> items = products.stream()
             .map(p -> {
                 int qty = quantities.getOrDefault(p.getId(), 0);
                 return new OrderItemModel(p.getId(), p.getName(), p.getPrice(), qty);
             })
             .toList();
+        long originalAmount = items.stream().mapToLong(i -> i.getPrice() * i.getQuantity()).sum();
+        long discountAmount = coupon != null ? coupon.calculateDiscount(originalAmount) : 0L;
         return new OrderModel(userId, items, couponIssueId, discountAmount);
     }
 }

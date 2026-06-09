@@ -920,24 +920,33 @@ PG 연동 없는 단순 구조라면 `createOrder()` 하나에 쿠폰 + 재고 +
 
 ---
 
-## 결정 19. originalAmount 이중 계산 — 미결 트레이드오프
+## 결정 19. originalAmount 이중 계산 — OrderService 위임
 
-**현재 구조**
+**결정**
 
-`originalAmount`가 두 곳에서 각각 계산된다.
+`OrderService.createOrder()`가 items 생성 후 `originalAmount`를 계산하고, 이어서 쿠폰 할인 계산까지 담당한다.
+`OrderModel` 생성자는 변경 없이 items에서 `originalAmount`를 재계산한다.
 
-- `OrderFacade.createOrder()` — 쿠폰 할인액 계산을 위해 `products` 기준으로 계산
-- `OrderModel` 생성자 — 금액 스냅샷 저장을 위해 `OrderItemModel` 기준으로 재계산
+```java
+// OrderService.createOrder()
+List<OrderItemModel> items = products.stream()
+    .map(p -> new OrderItemModel(p.getId(), p.getName(), p.getPrice(), qty))
+    .toList();
+long originalAmount = items.stream().mapToLong(i -> i.getPrice() * i.getQuantity()).sum();
+long discountAmount = coupon != null ? coupon.calculateDiscount(originalAmount) : 0L;
+return new OrderModel(userId, items, couponIssueId, discountAmount);
+```
 
-정상 흐름에서는 같은 트랜잭션 안에서 동일한 가격이 복사되므로 결과가 일치하지만, `OrderItemModel` 생성 로직이 바뀌어 가격을 다르게 저장하는 경우(할인가 적용, 반올림 처리 등) 두 값이 달라질 수 있다.
+**배경**
 
-**개선 방향 (미구현)**
+기존에는 `OrderFacade`가 `products` 기준으로 `originalAmount`를 먼저 계산해 쿠폰 할인에 사용하고, `OrderModel` 생성자는 `OrderItemModel` 기준으로 다시 계산했다. `products → items` 변환이 가격을 그대로 복사하는 동안은 두 값이 일치하지만, 할인가·반올림 등 변환 로직이 끼어들면 **쿠폰 할인 기준이 실제 저장 금액과 달라지는** 구조적 위험이 있었다.
 
-`OrderService`가 `products`, `quantities`, `coupon`을 파라미터로 받아 `originalAmount` 계산과 `coupon.calculateDiscount()` 호출을 담당하고, `OrderModel` 생성자는 계산된 값을 그대로 받아 저장한다.
+**트레이드오프**
 
-| 항목 | 현재 (이중 계산) | 개선안 (DomainService 위임) |
-|------|----------------|--------------------------|
-| 계산 위치 | Facade + OrderModel 두 곳 | OrderService 한 곳 |
-| Facade 인라인 로직 | originalAmount 계산이 Facade에 존재 | Facade는 데이터 로드·전달만 담당 |
-| OrderModel 자기 검증 | items에서 직접 계산하므로 자기 검증 가능 | 외부에서 넘어온 값을 신뢰해야 함 |
-| 가격 로직 변경 시 | 두 곳 모두 수정 필요, 불일치 위험 | 한 곳만 수정하면 됨 |
+| 항목 | 결정한 이유 | 포기한 것 |
+|------|------------|-----------|
+| OrderService에서 할인 계산 | 할인 기준이 실제 저장될 items 가격과 항상 동일한 소스 | OrderService가 CouponModel(타 도메인)을 파라미터로 받음 |
+| OrderModel 생성자 유지 | items 기준 자기 검증 유지 — items 가격과 스냅샷 불일치 불가 | OrderService·OrderModel 두 곳에서 계산이 일어남 (같은 소스이므로 불일치 없음) |
+| Facade 인라인 계산 제거 | Facade는 데이터 로드·전달만 담당 (결정 1 원칙 준수) | — |
+
+> `OrderService`가 `CouponModel`을 파라미터로 받는 것은 결정 5의 "파라미터로 전달받은 타 도메인 Model 사용 허용" 범위에 해당한다.

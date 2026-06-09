@@ -70,11 +70,11 @@ public class OrderFacade {
             }
         });
 
+        CouponModel coupon = null;
         Long couponIssueId = null;
-        long discountAmount = 0L;
 
         if (couponId != null) {
-            CouponModel coupon = couponRepository.findById(couponId)
+            coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰이 존재하지 않습니다."));
             if (coupon.isExpired()) {
                 throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
@@ -83,15 +83,10 @@ public class OrderFacade {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "보유하지 않은 쿠폰입니다."));
             couponIssue.use();
             couponIssueRepository.save(couponIssue);
-
-            long originalAmount = products.stream()
-                .mapToLong(p -> p.getPrice() * quantities.getOrDefault(p.getId(), 0))
-                .sum();
-            discountAmount = coupon.calculateDiscount(originalAmount);
             couponIssueId = couponIssue.getId();
         }
 
-        OrderModel order = orderService.createOrder(userId, products, quantities, couponIssueId, discountAmount);
+        OrderModel order = orderService.createOrder(userId, products, quantities, coupon, couponIssueId);
         return OrderInfo.from(orderRepository.save(order));
     }
 
