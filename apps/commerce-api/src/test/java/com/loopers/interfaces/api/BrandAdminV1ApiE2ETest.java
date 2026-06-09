@@ -35,12 +35,16 @@ class BrandAdminV1ApiE2ETest {
     private static final String LDAP_HEADER = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
     private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
+
     @Autowired
     private TestRestTemplate testRestTemplate;
+
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
@@ -475,14 +479,14 @@ class BrandAdminV1ApiE2ETest {
             // assert
             @SuppressWarnings("unchecked")
             java.util.List<Map<String, Object>> content =
-                (java.util.List<Map<String, Object>>) response.getBody().data().get("content");
+                (java.util.List<Map<String, Object>>)response.getBody().data().get("content");
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(content).hasSize(2),
-                () -> assertThat(((Number) response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L),
+                () -> assertThat(((Number)response.getBody().data().get("totalElements")).longValue()).isEqualTo(2L),
                 () -> assertThat(content)
                     .extracting(brandItem -> brandItem.get("name"))
                     .containsExactly("브랜드2", "브랜드1"),
@@ -512,7 +516,7 @@ class BrandAdminV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
-                () -> assertThat(((Number) response.getBody().data().get("size")).intValue()).isEqualTo(20)
+                () -> assertThat(((Number)response.getBody().data().get("size")).intValue()).isEqualTo(20)
             );
         }
 

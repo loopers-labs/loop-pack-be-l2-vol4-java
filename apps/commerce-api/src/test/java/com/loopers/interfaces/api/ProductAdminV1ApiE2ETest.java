@@ -39,10 +39,13 @@ class ProductAdminV1ApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
