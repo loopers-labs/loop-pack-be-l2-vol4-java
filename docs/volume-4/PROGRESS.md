@@ -2,7 +2,7 @@
 
 소스: `docs/volume-4/01-requirements.md` ~ `04-erd.md` (+ `.private/volume-4/quests/requirements.md` 원문)
 출력: `docs/volume-4/` (시나리오별 `<ID>-<제목>/` 폴더에 spec·plan·task 산출물)
-현재: CPN-2~5 / 자동 코드리뷰 완료 (commit 대기 — 사용자 지시로 정지)
+현재: CPN-6 / commit ✅ (다음: CPN-7 내 쿠폰 목록)
 
 단계 = `spec → plan → task → analyze → implement → test → review → commit` 중 현재 위치(시작 전이면 `-`).
 상태 = ⬜ todo / 🔄 진행 / ✅ done.
@@ -10,11 +10,11 @@
 | # | ID | 제목 | 도메인 | API | 의존성 | 단계 | 상태 |
 |---|----|------|--------|-----|--------|------|------|
 | 1 | CPN-1 | 쿠폰 템플릿 등록 | Coupon | `POST /api-admin/v1/coupons` | admin 인증(기존) | commit | ✅ done |
-| 2 | CPN-2 | 쿠폰 템플릿 수정 | Coupon | `PUT /api-admin/v1/coupons/{couponId}` | CPN-1 | review | 🔄 진행 |
-| 3 | CPN-3 | 쿠폰 템플릿 삭제 | Coupon | `DELETE /api-admin/v1/coupons/{couponId}` | CPN-1 | review | 🔄 진행 |
-| 4 | CPN-4 | 쿠폰 템플릿 목록 | Coupon | `GET /api-admin/v1/coupons` | CPN-1 | review | 🔄 진행 |
-| 5 | CPN-5 | 쿠폰 템플릿 상세 | Coupon | `GET /api-admin/v1/coupons/{couponId}` | CPN-1 | review | 🔄 진행 |
-| 6 | CPN-6 | 쿠폰 발급 | Coupon | `POST /api/v1/coupons/{couponId}/issue` | CPN-1, User | - | ⬜ todo |
+| 2 | CPN-2 | 쿠폰 템플릿 수정 | Coupon | `PUT /api-admin/v1/coupons/{couponId}` | CPN-1 | commit | ✅ done |
+| 3 | CPN-3 | 쿠폰 템플릿 삭제 | Coupon | `DELETE /api-admin/v1/coupons/{couponId}` | CPN-1 | commit | ✅ done |
+| 4 | CPN-4 | 쿠폰 템플릿 목록 | Coupon | `GET /api-admin/v1/coupons` | CPN-1 | commit | ✅ done |
+| 5 | CPN-5 | 쿠폰 템플릿 상세 | Coupon | `GET /api-admin/v1/coupons/{couponId}` | CPN-1 | commit | ✅ done |
+| 6 | CPN-6 | 쿠폰 발급 | Coupon | `POST /api/v1/coupons/{couponId}/issue` | CPN-1, User | commit | ✅ done |
 | 7 | CPN-7 | 내 쿠폰 목록 (상태 포함) | Coupon | `GET /api/v1/users/me/coupons` | CPN-6 | - | ⬜ todo |
 | 8 | CPN-8 | 쿠폰 발급 내역 조회 | Coupon | `GET /api-admin/v1/coupons/{couponId}/issues` | CPN-6 | - | ⬜ todo |
 | 9 | ORD-7 | 주문 쿠폰 적용 | Order | `POST /api/v1/orders` 변경 | CPN-6, 기존 Order | - | ⬜ todo |

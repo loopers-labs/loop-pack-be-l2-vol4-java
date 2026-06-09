@@ -49,7 +49,7 @@ erDiagram
         VARCHAR(100) name "쿠폰 이름 스냅샷"
         VARCHAR(20) discount_type "할인 타입 스냅샷 (FIXED/RATE)"
         INT discount_value "할인 값 스냅샷"
-        INT min_order_amount "최소 주문 금액 스냅샷 (원), nullable"
+        INT min_order_amount "최소 주문 금액 스냅샷 (원, 0이면 제약 없음)"
         DATETIME expired_at "사용 만료 시각 스냅샷 (UTC)"
         DATETIME used_at "사용 시각 (UTC), nullable, null이면 미사용"
         DATETIME created_at "생성 일시 (UTC, 발급 시각)"
@@ -99,7 +99,7 @@ CREATE TABLE user_coupons (
     name             VARCHAR(100) NOT NULL COMMENT '발급 시점 쿠폰 이름 스냅샷',
     discount_type    VARCHAR(20)  NOT NULL COMMENT '발급 시점 할인 타입 스냅샷 (FIXED/RATE)',
     discount_value   INT          NOT NULL COMMENT '발급 시점 할인 값 스냅샷',
-    min_order_amount INT          NULL     COMMENT '발급 시점 최소 주문 금액 스냅샷 (원)',
+    min_order_amount INT          NOT NULL COMMENT '발급 시점 최소 주문 금액 스냅샷 (원, 0이면 제약 없음)',
     expired_at       DATETIME     NOT NULL COMMENT '사용 만료 시각 스냅샷 (UTC)',
     used_at          DATETIME     NULL     COMMENT '사용 시각 (UTC). NULL이면 미사용',
     created_at       DATETIME     NOT NULL COMMENT '생성 일시 (UTC, 발급 시각)',
