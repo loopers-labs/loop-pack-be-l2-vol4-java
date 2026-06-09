@@ -34,13 +34,16 @@ public class OrderV1Request {
         String address1,
 
         @Size(max = 255, message = "상세주소는 255자 이내여야 합니다.")
-        String address2
+        String address2,
+
+        Long userCouponId
     ) {
         public OrderCommand.Create toCommand(Long userId) {
             return new OrderCommand.Create(
                 userId,
                 items.stream().map(Line::toCommandLine).toList(),
-                recipientName, recipientPhone, zipcode, address1, address2
+                recipientName, recipientPhone, zipcode, address1, address2,
+                userCouponId
             );
         }
 

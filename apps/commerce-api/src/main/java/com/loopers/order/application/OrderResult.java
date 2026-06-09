@@ -18,6 +18,9 @@ public class OrderResult {
         String orderNumber,
         OrderStatus status,
         long totalAmount,
+        long discountAmount,
+        long finalAmount,
+        Long userCouponId,
         ZonedDateTime orderedAt,
         Recipient recipient,
         List<Item> items
@@ -28,6 +31,9 @@ public class OrderResult {
                 order.getOrderNumber(),
                 order.getStatus(),
                 order.getTotalAmount().value(),
+                order.getDiscountAmount().value(),
+                order.getFinalAmount().value(),
+                order.getUserCouponId(),
                 order.getOrderedAt(),
                 Recipient.from(order.getShippingDestination()),
                 items.stream().map(Item::from).toList()

@@ -1,6 +1,9 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandReader;
+import com.loopers.coupon.domain.CouponErrorCode;
+import com.loopers.coupon.domain.UserCoupon;
+import com.loopers.coupon.domain.UserCouponRepository;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
@@ -19,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,6 +39,7 @@ public class PlaceOrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderNumberGenerator orderNumberGenerator;
     private final PaymentService paymentService;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
     public OrderResult.Detail place(OrderCommand.Create command) {
@@ -67,6 +72,7 @@ public class PlaceOrderService {
                 command.address1(), command.address2()
         );
         Order order = Order.create(command.userId(), orderNumber, shipping, orderItems);
+        applyCoupon(command, order);
         Order saved = orderRepository.save(order);
 
         orderItems.forEach(item -> {
@@ -75,8 +81,19 @@ public class PlaceOrderService {
         });
 
         // 결제 통합 지점. 현재 범위에서는 stub 이라 상태 전이 없이 PENDING 으로 종료된다.
-        paymentService.pay(saved.getId(), saved.getTotalAmount());
+        paymentService.pay(saved.getId(), saved.getFinalAmount());
 
         return OrderResult.Detail.of(saved, orderItems);
+    }
+
+    private void applyCoupon(OrderCommand.Create command, Order order) {
+        if (command.userCouponId() == null) {
+            return;
+        }
+        UserCoupon coupon = userCouponRepository.findByIdForUpdate(command.userCouponId())
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, CouponErrorCode.COUPON_NOT_FOUND));
+        long orderAmount = order.getTotalAmount().value();
+        coupon.use(command.userId(), orderAmount, ZonedDateTime.now());
+        order.applyDiscount(command.userCouponId(), coupon.calculateDiscount(orderAmount));
     }
 }

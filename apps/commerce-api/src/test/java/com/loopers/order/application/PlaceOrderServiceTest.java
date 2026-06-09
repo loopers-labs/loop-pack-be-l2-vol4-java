@@ -1,6 +1,13 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandReader;
+import com.loopers.common.domain.Money;
+import com.loopers.coupon.domain.Coupon;
+import com.loopers.coupon.domain.CouponErrorCode;
+import com.loopers.coupon.domain.CouponStatus;
+import com.loopers.coupon.domain.CouponType;
+import com.loopers.coupon.domain.UserCoupon;
+import com.loopers.coupon.domain.UserCouponRepository;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
@@ -20,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,17 +54,28 @@ class PlaceOrderServiceTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final OrderNumberGenerator orderNumberGenerator = mock(OrderNumberGenerator.class);
     private final PaymentService paymentService = mock(PaymentService.class);
+    private final UserCouponRepository userCouponRepository = mock(UserCouponRepository.class);
 
     private final PlaceOrderService placeOrderService = new PlaceOrderService(
             userReader, productReader, productStockRepository, brandReader,
-            orderRepository, orderItemRepository, orderNumberGenerator, paymentService
+            orderRepository, orderItemRepository, orderNumberGenerator, paymentService,
+            userCouponRepository
     );
 
     private OrderCommand.Create command(List<OrderCommand.Line> lines) {
+        return command(lines, null);
+    }
+
+    private OrderCommand.Create command(List<OrderCommand.Line> lines, Long userCouponId) {
         return new OrderCommand.Create(
                 USER_ID, lines,
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
+                userCouponId
         );
+    }
+
+    private UserCoupon issuedCoupon(CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+        return Coupon.create("쿠폰", type, value, minOrderAmount, expiredAt).issueTo(USER_ID);
     }
 
     private void stubProduct(Long productId, Long brandId, String name, long price, int stockQty) {
@@ -174,5 +193,61 @@ class PlaceOrderServiceTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getOrderId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("쿠폰 적용: 비관적 락으로 쿠폰을 조회해 USED 로 전이하고 할인 적용 후 최종 금액으로 결제한다")
+    void givenCoupon_whenPlace_thenUsesCouponAndPaysFinalAmount() {
+        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
+        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        UserCoupon coupon = issuedCoupon(CouponType.FIXED, 3_000L, null, ZonedDateTime.now().plusDays(30));
+        when(userCouponRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(coupon));
+
+        placeOrderService.place(command(List.of(new OrderCommand.Line(10L, 2)), 50L));
+
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+        ArgumentCaptor<Money> payCaptor = ArgumentCaptor.forClass(Money.class);
+        verify(paymentService).pay(any(), payCaptor.capture());
+        assertAll(
+                () -> assertThat(coupon.getStatus()).isEqualTo(CouponStatus.USED),
+                () -> assertThat(savedOrder.getUserCouponId()).isEqualTo(50L),
+                () -> assertThat(savedOrder.getDiscountAmount().value()).isEqualTo(3_000L),
+                () -> assertThat(savedOrder.getFinalAmount().value()).isEqualTo(55_000L),
+                () -> assertThat(payCaptor.getValue().value()).isEqualTo(55_000L)
+        );
+    }
+
+    @Test
+    @DisplayName("쿠폰 적용: 존재하지 않는 쿠폰이면 COUPON_NOT_FOUND 가 전파되고 주문을 저장하지 않는다")
+    void givenMissingCoupon_whenPlace_thenThrowsNotFoundAndSavesNothing() {
+        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
+        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
+        when(userCouponRepository.findByIdForUpdate(50L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> placeOrderService.place(command(List.of(new OrderCommand.Line(10L, 1)), 50L)))
+                .isInstanceOf(CoreException.class)
+                .hasFieldOrPropertyWithValue("errorCode", CouponErrorCode.COUPON_NOT_FOUND);
+
+        verify(orderRepository, never()).save(any());
+        verify(paymentService, never()).pay(any(), any());
+    }
+
+    @Test
+    @DisplayName("쿠폰 적용: 만료된 쿠폰이면 COUPON_EXPIRED 가 전파되고 주문을 저장하지 않는다")
+    void givenExpiredCoupon_whenPlace_thenThrowsExpiredAndSavesNothing() {
+        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
+        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
+        UserCoupon expired = issuedCoupon(CouponType.FIXED, 3_000L, null, ZonedDateTime.now().minusDays(1));
+        when(userCouponRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(expired));
+
+        assertThatThrownBy(() -> placeOrderService.place(command(List.of(new OrderCommand.Line(10L, 1)), 50L)))
+                .isInstanceOf(CoreException.class)
+                .hasFieldOrPropertyWithValue("errorCode", CouponErrorCode.COUPON_EXPIRED);
+
+        verify(orderRepository, never()).save(any());
+        verify(paymentService, never()).pay(any(), any());
     }
 }

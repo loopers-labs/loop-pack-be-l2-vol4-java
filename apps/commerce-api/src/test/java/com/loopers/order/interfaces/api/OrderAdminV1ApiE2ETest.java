@@ -93,7 +93,8 @@ class OrderAdminV1ApiE2ETest {
     private void placeOrder(String loginId) {
         OrderV1Request.Create body = new OrderV1Request.Create(
                 List.of(new OrderV1Request.Create.Line(productId, 1)),
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
+                null
         );
         testRestTemplate.exchange(
                 "/api/v1/orders", HttpMethod.POST, new HttpEntity<>(body, userHeaders(loginId)),

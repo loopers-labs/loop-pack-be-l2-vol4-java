@@ -16,6 +16,24 @@ X-Loopers-LoginPw: Passw0rd!
   "address2": "101동 202호"
 }
 
+### 주문 요청 - 쿠폰 적용 (userCouponId 는 내 쿠폰 목록의 id)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ],
+  "recipientName": "김루퍼",
+  "recipientPhone": "010-1234-5678",
+  "zipcode": "12345",
+  "address1": "서울시 강남구 테헤란로 1",
+  "address2": "101동 202호",
+  "userCouponId": 1
+}
+
 ### 주문 요청 - 존재하지 않는/삭제된 상품 (404)
 POST {{commerce-api}}/api/v1/orders
 Content-Type: application/json

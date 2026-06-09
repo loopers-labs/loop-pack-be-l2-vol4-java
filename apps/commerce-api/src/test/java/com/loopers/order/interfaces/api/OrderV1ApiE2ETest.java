@@ -2,6 +2,10 @@ package com.loopers.order.interfaces.api;
 
 import com.loopers.brand.application.BrandAdminService;
 import com.loopers.brand.application.BrandCommand;
+import com.loopers.coupon.application.CouponAdminService;
+import com.loopers.coupon.application.CouponCommand;
+import com.loopers.coupon.application.CouponIssueService;
+import com.loopers.coupon.domain.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
@@ -25,6 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,8 +45,11 @@ class OrderV1ApiE2ETest {
     private final UserAccountService userAccountService;
     private final BrandAdminService brandAdminService;
     private final ProductAdminService productAdminService;
+    private final CouponAdminService couponAdminService;
+    private final CouponIssueService couponIssueService;
     private final DatabaseCleanUp databaseCleanUp;
 
+    private Long userId;
     private Long productId;
     private Long otherProductId;
     private Long deletedProductId;
@@ -54,20 +62,24 @@ class OrderV1ApiE2ETest {
             UserAccountService userAccountService,
             BrandAdminService brandAdminService,
             ProductAdminService productAdminService,
+            CouponAdminService couponAdminService,
+            CouponIssueService couponIssueService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userAccountService = userAccountService;
         this.brandAdminService = brandAdminService;
         this.productAdminService = productAdminService;
+        this.couponAdminService = couponAdminService;
+        this.couponIssueService = couponIssueService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
     @BeforeEach
     void setUp() {
-        userAccountService.signUp(new UserCommand.SignUp(
+        userId = userAccountService.signUp(new UserCommand.SignUp(
                 LOGIN_ID, RAW_PASSWORD, "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
-        ));
+        )).id();
         Long brandId = brandAdminService.create(new BrandCommand.Create("루퍼스", "설명", null)).id();
         productId = productAdminService.create(new ProductCommand.Create(brandId, "셔츠", "설명", 29_000L, "thumb.jpg", 50)).id();
         otherProductId = productAdminService.create(new ProductCommand.Create(brandId, "바지", "설명", 15_000L, "thumb.jpg", 50)).id();
@@ -98,9 +110,14 @@ class OrderV1ApiE2ETest {
     }
 
     private OrderV1Request.Create orderOf(OrderV1Request.Create.Line... lines) {
+        return orderWithCoupon(null, lines);
+    }
+
+    private OrderV1Request.Create orderWithCoupon(Long userCouponId, OrderV1Request.Create.Line... lines) {
         return new OrderV1Request.Create(
                 List.of(lines),
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
+                userCouponId
         );
     }
 
@@ -137,6 +154,30 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(data.totalAmount()).isEqualTo(29_000L * 2 + 15_000L),
                     () -> assertThat(data.items()).hasSize(2),
                     () -> assertThat(data.recipient().recipientName()).isEqualTo("김루퍼")
+            );
+        }
+
+        @Test
+        @DisplayName("쿠폰을 적용해 주문하면 할인된 최종 결제 금액이 반영된다")
+        void givenCoupon_whenPlaceOrder_thenAppliesDiscount() {
+            Long couponTemplateId = couponAdminService.create(
+                    new CouponCommand.Create("3천원 할인", CouponType.FIXED, 3_000L, null,
+                            ZonedDateTime.now().plusDays(30))
+            ).id();
+            Long userCouponId = couponIssueService.issue(userId, couponTemplateId).id();
+
+            ResponseEntity<ApiResponse<OrderV1Response.Detail>> response = placeOrder(
+                    orderWithCoupon(userCouponId, new OrderV1Request.Create.Line(productId, 2)),
+                    authHeaders()
+            );
+
+            OrderV1Response.Detail data = response.getBody().data();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(data.totalAmount()).isEqualTo(58_000L),
+                    () -> assertThat(data.discountAmount()).isEqualTo(3_000L),
+                    () -> assertThat(data.finalAmount()).isEqualTo(55_000L),
+                    () -> assertThat(data.userCouponId()).isEqualTo(userCouponId)
             );
         }
 
