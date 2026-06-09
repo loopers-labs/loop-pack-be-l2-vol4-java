@@ -81,7 +81,10 @@ classDiagram
         +UUID id
         +UUID userId
         +OrderStatus status
+        +Money originalAmount
+        +Money discountAmount
         +Money pgAmount
+        +UUID couponId
         +ShippingInfo shippingInfo
         +List~OrderItem~ items
         +confirm() void
@@ -138,6 +141,50 @@ classDiagram
         FAILED
     }
 
+    class CouponTemplate {
+        +UUID id
+        +String name
+        +CouponType type
+        +Long value
+        +Money minOrderAmount
+        +LocalDateTime expiredAt
+        +LocalDateTime deletedAt
+        +softDelete() void
+        +isExpired(now) boolean
+        +calculateDiscount(originalAmount) Money
+    }
+
+    class UserCoupon {
+        +UUID id
+        +UUID templateId
+        +UUID userId
+        +UserCouponStatus status
+        +CouponType type
+        +Long value
+        +Money minOrderAmount
+        +LocalDateTime expiredAt
+        +UUID orderId
+        +LocalDateTime usedAt
+        +isExpired(now) boolean
+        +calculateDiscount(originalAmount) Money
+        +use(orderId) void
+        +release() void
+        +displayStatus(now) UserCouponStatus
+    }
+
+    class CouponType {
+        <<enumeration>>
+        FIXED
+        RATE
+    }
+
+    class UserCouponStatus {
+        <<enumeration>>
+        AVAILABLE
+        USED
+        EXPIRED
+    }
+
     class OrderStatus {
         <<enumeration>>
         PENDING
@@ -165,6 +212,13 @@ classDiagram
     Payment --> PaymentStatus
     Like --> User
     Like --> Product
+    CouponTemplate --> CouponType
+    CouponTemplate *-- Money
+    UserCoupon --> CouponType
+    UserCoupon --> UserCouponStatus
+    UserCoupon *-- Money
+    UserCoupon ..> CouponTemplate
+    Order ..> UserCoupon
 ```
 
 ## 도메인별 책임 설명
@@ -193,13 +247,22 @@ classDiagram
 ### Order / OrderItem
 - Order가 상태 전이 메서드(`confirm`, `fail`, `cancel`)를 직접 보유
 - Order는 1개 이상의 OrderItem을 가짐 (복수 상품 주문)
-- 포인트 제거로 금액은 `pgAmount` 하나만 보유. `totalAmount()`는 주문 라인 합계 = pgAmount
+- 금액은 3종 보유: `originalAmount`(쿠폰 적용 전, 주문 라인 합계 = `totalAmount()`), `discountAmount`(할인액, 쿠폰 미적용 시 0), `pgAmount`(최종 결제액 = original - discount)
+- `couponId`는 적용된 발급 쿠폰(`UserCoupon`) ID. 미적용 시 NULL. Order는 쿠폰 도메인을 직접 참조하지 않고 ID만 보관(느슨한 결합)
 - OrderItem은 주문 시점의 상품명, 브랜드명, 단가, 수량을 스냅샷으로 저장 (옵션 없음)
 - 상품이 소프트 딜리트되어도 OrderItem 스냅샷은 보존되어 과거 주문 조회에 영향 없음
 
 ### Payment
 - PG 트랜잭션 ID와 결제 상태를 보관
 - Order와 1:1 관계 (재시도 없음)
+
+### CouponTemplate / UserCoupon
+- **CouponTemplate**(쿠폰 템플릿): 관리자가 관리하는 할인 규칙. 타입(`FIXED`/`RATE`), 할인값, 최소 주문 금액, 만료일시를 보유. `deletedAt`으로 소프트 딜리트. 할인 계산(`calculateDiscount`)·만료 판정(`isExpired`) 로직을 직접 보유
+- **UserCoupon**(발급 쿠폰): 유저가 소유하는 발급 단위. **발급 시점에 템플릿의 할인 규칙(type/value/minOrderAmount/expiredAt)을 스냅샷**으로 복사 보관 → 이후 템플릿 수정/삭제가 발급 쿠폰에 영향 없음 (order_items 스냅샷과 동일 철학)
+- UserCoupon이 상태 전이(`use`, `release`)와 할인 계산을 직접 책임. `use(orderId)`는 `AVAILABLE`일 때만 `USED`로 전이(조건부 UPDATE로 동시성 방어), `release()`는 `USED → AVAILABLE` 복구
+- 저장 status는 `AVAILABLE`/`USED` 2종. `EXPIRED`는 조회 시 `expiredAt < now`로 동적 판정(`displayStatus`)하며 DB에 저장하지 않음
+- `(userId, templateId)` 복합 유니크로 동일 템플릿 중복 발급을 DB 레벨에서 방어
+- Order와는 ID(`couponId`/`orderId`)로만 연결. Service 간 직접 참조 금지 원칙에 따라 OrderFacade가 OrderService·CouponService·StockService를 조합
 
 ## 의존 방향 원칙
 - 상위 도메인(Order, Payment)이 하위 도메인(Stock)을 참조하는 방향

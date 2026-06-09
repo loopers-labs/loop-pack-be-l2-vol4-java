@@ -24,7 +24,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/v1/users/*/likes",
                 "/api/v1/orders",
                 "/api/v1/orders/*",
-                "/api/v1/orders/*/cancel"
+                "/api/v1/orders/*/cancel",
+                "/api/v1/coupons/*/issue",
+                "/api/v1/users/me/coupons"
             );
 
         // 어드민 API — LDAP 헤더 검증 (payment은 HMAC 보안이므로 제외)
@@ -32,7 +34,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
             .addPathPatterns(
                 "/api-admin/v1/brands/**",
                 "/api-admin/v1/products/**",
-                "/api-admin/v1/orders/**"
+                "/api-admin/v1/orders/**",
+                "/api-admin/v1/coupons/**"
             );
     }
 }
