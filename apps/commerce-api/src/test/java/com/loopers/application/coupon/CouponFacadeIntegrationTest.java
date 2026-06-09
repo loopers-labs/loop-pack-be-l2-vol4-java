@@ -3,13 +3,20 @@ package com.loopers.application.coupon;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponTemplateService;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.IssuedCouponModel;
 import com.loopers.domain.coupon.IssuedCouponRepository;
+import com.loopers.application.coupon.MyIssuedCouponInfo;
+import com.loopers.domain.user.Gender;
+import com.loopers.domain.user.PasswordEncryptor;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -28,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @SpringBootTest
 class CouponFacadeIntegrationTest {
 
+    private static final String LOGIN_ID = "couponusr1";
+    private static final String LOGIN_PW = "Password1!";
+
     @Autowired
     private CouponFacade couponFacade;
 
@@ -35,10 +46,28 @@ class CouponFacadeIntegrationTest {
     private CouponTemplateRepository couponTemplateRepository;
 
     @Autowired
+    private CouponTemplateService couponTemplateService;
+
+    @Autowired
     private IssuedCouponRepository issuedCouponRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncryptor passwordEncryptor;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    private UserModel savedUser;
+
+    @BeforeEach
+    void setUp() {
+        savedUser = userRepository.save(new UserModel(
+                LOGIN_ID, LOGIN_PW, "쿠폰테스터", "1990-01-01", "coupon@example.com", Gender.MALE, passwordEncryptor
+        ));
+    }
 
     @AfterEach
     void tearDown() {
@@ -112,6 +141,106 @@ class CouponFacadeIntegrationTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("내 발급 쿠폰 목록을 조회할 때,")
+    @Nested
+    class GetMyIssuedCoupons {
+
+        @DisplayName("발급받은 쿠폰이 있으면 해당 목록이 반환되고 만료 여부에 따라 status가 결정된다.")
+        @Test
+        void returnsMyIssuedCoupons_withResolvedStatus() {
+            // given
+            CouponTemplateModel activeTemplate = saveTemplate(ZonedDateTime.now().plusDays(30));
+            CouponTemplateModel expiredTemplate = saveTemplate(ZonedDateTime.now().minusDays(1));
+            issuedCouponRepository.save(new IssuedCouponModel(activeTemplate.getId(), savedUser.getId()));
+            issuedCouponRepository.save(new IssuedCouponModel(expiredTemplate.getId(), savedUser.getId()));
+
+            // when
+            List<MyIssuedCouponInfo> result = couponFacade.getMyIssuedCoupons(LOGIN_ID, LOGIN_PW);
+
+            // then
+            assertAll(
+                    () -> assertThat(result).hasSize(2),
+                    () -> assertThat(result).anyMatch(info -> info.status() == CouponStatus.AVAILABLE),
+                    () -> assertThat(result).anyMatch(info -> info.status() == CouponStatus.EXPIRED)
+            );
+        }
+
+        @DisplayName("발급받은 쿠폰이 없으면 빈 목록이 반환된다.")
+        @Test
+        void returnsEmptyList_whenNoIssuedCouponsExist() {
+            // when
+            List<MyIssuedCouponInfo> result = couponFacade.getMyIssuedCoupons(LOGIN_ID, LOGIN_PW);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @DisplayName("발급된 쿠폰의 템플릿이 소프트 삭제된 경우 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenIssuedCouponTemplateIsDeleted() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+            issuedCouponRepository.save(new IssuedCouponModel(template.getId(), savedUser.getId()));
+            couponTemplateService.deleteTemplate(template.getId());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.getMyIssuedCoupons(LOGIN_ID, LOGIN_PW));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("쿠폰을 발급할 때,")
+    @Nested
+    class Issue {
+
+        @DisplayName("유효한 쿠폰 템플릿으로 발급 요청하면 AVAILABLE 상태의 발급 쿠폰이 반환되고 DB에 저장된다.")
+        @Test
+        void issuedCouponIsReturnedAndPersisted_whenValid() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+
+            // when
+            IssuedCouponInfo result = couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId());
+
+            // then
+            List<IssuedCouponModel> saved = issuedCouponRepository.findAllByUserId(savedUser.getId());
+            assertAll(
+                    () -> assertThat(result.couponTemplateId()).isEqualTo(template.getId()),
+                    () -> assertThat(result.userId()).isEqualTo(savedUser.getId()),
+                    () -> assertThat(result.status()).isEqualTo(CouponStatus.AVAILABLE),
+                    () -> assertThat(saved).hasSize(1)
+            );
+        }
+
+        @DisplayName("존재하지 않는 쿠폰 템플릿으로 발급 요청하면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenTemplateDoesNotExist() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, 99999L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("만료된 쿠폰 템플릿으로 발급 요청하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenTemplateIsExpired() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().minusDays(1));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 }
