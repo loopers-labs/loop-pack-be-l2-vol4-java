@@ -1,6 +1,7 @@
 package com.loopers.like.application;
 
 import com.loopers.like.domain.Like;
+import com.loopers.like.domain.LikeErrorCode;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.application.ProductReader;
 import com.loopers.support.error.CoreException;
@@ -8,6 +9,7 @@ import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
@@ -81,6 +83,19 @@ class LikeServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(likeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("register: 동시 요청으로 unique 제약을 위반하면 CONFLICT 로 변환한다")
+    void givenUniqueViolation_whenRegister_thenThrowsConflict() {
+        when(likeRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.empty());
+        when(likeRepository.save(any()))
+                .thenThrow(new DataIntegrityViolationException("uk_likes_user_id_product_id"));
+
+        assertThatThrownBy(() -> likeService.register(USER_ID, PRODUCT_ID))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorCode")
+                .isEqualTo(LikeErrorCode.ALREADY_LIKED);
     }
 
     @Test

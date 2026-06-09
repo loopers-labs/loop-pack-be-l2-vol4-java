@@ -1,9 +1,13 @@
 package com.loopers.like.application;
 
 import com.loopers.like.domain.Like;
+import com.loopers.like.domain.LikeErrorCode;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.application.ProductReader;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,8 +24,16 @@ public class LikeService {
         likeRepository.findByUserIdAndProductId(userId, productId)
                 .ifPresentOrElse(
                         Like::restore,
-                        () -> likeRepository.save(Like.create(userId, productId))
+                        () -> saveNewLike(userId, productId)
                 );
+    }
+
+    private void saveNewLike(Long userId, Long productId) {
+        try {
+            likeRepository.save(Like.create(userId, productId));
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, LikeErrorCode.ALREADY_LIKED);
+        }
     }
 
     @Transactional
