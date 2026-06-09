@@ -721,206 +721,192 @@ com.loopers/
 
 ---
 
-## 결정 13. 주문+쿠폰 통합 — 트랜잭션 경계 및 쿠폰 처리 시점
+## 결제 플로우 전체 흐름
+
+> 결정 12–17의 설계가 실제로 어떻게 맞물리는지 한눈에 본다.
+
+**3단계 API**
+
+```
+POST /api/v1/orders                    ① 주문 생성
+POST /api/v1/orders/{id}/pay/start     ② 결제 시작
+POST /api/v1/orders/{id}/pay/confirm   ③ 결제 확정
+```
+
+**① 주문 생성 (createOrder)**
+
+```
+Facade.createOrder(userId, items, couponId)
+  ├─ 상품 존재 여부 검증
+  ├─ 재고 여유 검증 (락 없는 Fail-fast)              ← 결정 16
+  ├─ 쿠폰이 있으면:
+  │    ├─ 유효성 검증 (만료 여부)
+  │    ├─ 비관적 락 + couponIssue.use() → USED        ← 결정 13, 14
+  │    └─ couponIssueId 보관
+  └─ OrderService.createOrder(products, quantities, coupon, couponIssueId)
+       ├─ OrderItemModel 생성 (상품명·가격 스냅샷)
+       ├─ originalAmount 계산 (items 기준)             ← 결정 17
+       ├─ discountAmount 계산 (쿠폰 있으면)
+       └─ OrderModel 생성 → status: PENDING_PAYMENT
+```
+
+> 이 시점 재고 변동 없음. 쿠폰만 소비됨.
+
+**② 결제 시작 (startPayment)**
+
+```
+Facade.startPayment(userId, orderId)
+  ├─ 소유자 확인
+  ├─ 재고 비관적 락 획득                               ← 결정 14
+  ├─ order.startPayment()
+  │    └─ PENDING_PAYMENT만 통과 → status: IN_PAYMENT  ← 결정 15
+  └─ stock.reserve()
+       └─ reserved_stock += 주문 수량
+```
+
+> 재고를 "선점"한다. `total_stock`은 아직 그대로.
+
+**③ 결제 확정 (confirmPayment)**
+
+```
+Facade.confirmPayment(userId, orderId)
+  ├─ 소유자 확인
+  ├─ 재고 비관적 락 + confirm()                        ← 결정 14
+  │    ├─ total_stock    -= 주문 수량
+  │    └─ reserved_stock -= 주문 수량
+  └─ order.confirm() → status: CONFIRMED
+```
+
+**상태 전이**
+
+```
+PENDING_PAYMENT ──► IN_PAYMENT ──► CONFIRMED
+  (주문 생성)        (결제 시작)    (결제 확정)
+```
+
+**재고 변화**
+
+| | createOrder | startPayment | confirmPayment |
+|---|---|---|---|
+| `total_stock` | 그대로 | 그대로 | `-= 수량` |
+| `reserved_stock` | 그대로 | `+= 수량` | `-= 수량` |
+| `availableStock` (계산값) | 변동 없음 | `-= 수량` | 그대로 |
+
+> `availableStock = total_stock - reserved_stock`
+
+---
+
+## 결정 13. 쿠폰 소비 시점 — createOrder · 금액 스냅샷
 
 **결정**
-- 쿠폰 유효성 검증·할인 금액 계산은 `createOrder`에서 수행하고, 쿠폰 실제 소비(`use()`)는 `startPayment`에서 재고 `reserve()`와 **동일한 `@Transactional`** 안에서 수행한다.
-- `OrderModel`에 `couponIssueId`, `originalAmount`, `discountAmount`, `finalAmount` 필드를 추가해 주문 시점의 금액 스냅샷을 영구 보존한다.
+- 쿠폰 락 획득 + `use()` + 저장을 `createOrder()` 트랜잭션 안에서 처리한다.
+- `OrderModel`에 `couponIssueId`, `originalAmount`, `discountAmount`, `finalAmount`를 저장해 주문 시점 금액 스냅샷을 영구 보존한다.
 
-**배경**
-- 요구사항: "쿠폰, 재고 처리 등 하나라도 실패하면 모두 롤백"
-- 기존 3단계 결제 플로우(`createOrder` → `startPayment` → `confirmPayment`)를 유지하면서 원자성을 확보해야 함
+**설계 변경 과정**
+
+처음에는 쿠폰 소비(`use()`)를 `startPayment`에서 재고 `reserve()`와 같은 트랜잭션으로 묶었다. 이 구조에서는 `createOrder()` 커밋 시 쿠폰 락이 없어, 두 요청이 동시에 `AVAILABLE`을 확인하고 각자 주문을 생성할 수 있었다.
+
+```
+Thread 1: createOrder(couponId=42) → AVAILABLE 확인 → 주문1 저장  ← 락 없음
+Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 통과됨
+→ 동일 쿠폰으로 주문 2개 생성 (고아 주문 발생)
+```
+
+이를 해결하기 위해 쿠폰 락 + `use()` + 저장을 `createOrder()`로 이동했다.
 
 **트레이드오프**
 
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
-| 쿠폰 소비를 `startPayment`에서 처리 | 재고 reserve와 같은 트랜잭션 → 재고·쿠폰 롤백이 함께 보장됨 | `createOrder`~`startPayment` 사이에 동일 쿠폰을 다른 요청이 선점할 수 있는 짧은 시간 창이 존재 |
-| `createOrder`에서 유효성 검증만 수행 | 쿠폰 소비 없이 주문 생성이 실패해도 쿠폰 상태에 영향 없음 | 만료·중복 체크가 두 단계에 분산됨 (`startPayment`에서 재검증 불필요하나 혼동 가능) |
-| `OrderModel`에 금액 스냅샷 저장 | 주문 이력 조회 시 금액 재계산 불필요, 상품 가격 변경과 무관 | `OrderModel`이 쿠폰 할인 개념을 직접 가짐 |
+| `createOrder`에서 쿠폰 소비 | 락 + USED + 주문 저장이 한 트랜잭션 → 고아 주문 없음 | 신규 락 메서드 `findByUserIdAndCouponIdWithLock()` 추가 필요 |
+| `OrderModel`에 금액 스냅샷 저장 | 이력 조회 시 재계산 불필요, 상품 가격 변경 영향 없음 | `OrderModel`이 쿠폰 할인 개념을 직접 가짐 |
 
-**결제 플로우 변경**
-
-```
-POST /orders              → 쿠폰 유효성 검증 + 할인 금액 계산 + OrderModel 저장 (쿠폰 AVAILABLE 유지)
-POST /orders/{id}/pay/start → 재고 reserve + couponIssue.use() [동일 트랜잭션]
-POST /orders/{id}/pay/confirm → 재고 confirm + OrderStatus.CONFIRMED
-```
-
-**도메인 간 의존 방향**
+**도메인 간 의존**
 - `order/application` → `coupon/domain` (`CouponRepository`, `CouponIssueRepository` 참조)
-- `coupon/domain`은 `order/domain`을 알지 못함
+- `coupon/domain`은 `order/domain`을 모름
 
 ---
 
-## 결정 14. 동시성 제어 — 비관적 락 선택
+## 결정 14. 동시성 제어 — 비관적 락
 
 **결정**
-- 재고(`StockJpaRepository.findAllByProductIdsForUpdate`)와 쿠폰 사용(`CouponIssueJpaRepository.findByIdForUpdate`) 쿼리에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
-- 단, 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
+- 재고·쿠폰 쓰기 직전 조회에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
+- 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
 
 **배경**
-- 동일 상품에 대한 동시 주문, 동일 쿠폰의 동시 사용 요청에서 Lost Update가 발생할 수 있음
+- 동일 상품 동시 주문, 동일 쿠폰 동시 사용에서 Lost Update 발생 가능
 - 두 경우 모두 조회 직후 상태를 변경하는 패턴 (`reserve()`, `use()`)
 
 **트레이드오프**
 
 | 항목 | 비관적 락 (선택) | 낙관적 락 (`@Version`) |
 |------|----------------|----------------------|
-| 충돌 처리 방식 | DB가 락을 잡고 대기 → 순서대로 처리 | 먼저 커밋된 쪽 성공, 나머지 `OptimisticLockException` |
+| 충돌 처리 | DB가 락을 잡고 순서대로 처리 | 먼저 커밋된 쪽 성공, 나머지 `OptimisticLockException` |
 | 재시도 로직 | 불필요 | 필요 (없으면 충돌 시 500 반환) |
 | 처리량 | 락 대기로 저하 가능 | 충돌이 드물면 처리량 높음 |
-| 에러 메시지 | `reserve()`·`use()` 내부 검증으로 명확한 메시지 반환 | 예외 변환 누락 시 스택트레이스 노출 위험 |
-| 이 도메인에서의 판단 | 재고·쿠폰은 핫 데이터 (충돌 다발 가능) → 비관적 락이 더 안전 | 재시도 로직 없이 낙관적 락만 쓰면 불완전한 구현 |
+| 에러 메시지 | `reserve()`·`use()` 내부 검증으로 명확한 메시지 | 예외 변환 누락 시 스택트레이스 노출 위험 |
+| 이 도메인 판단 | 재고·쿠폰은 핫 데이터 → 비관적 락이 안전 | 재시도 없이 낙관적 락만 쓰면 불완전 |
 
 **적용 위치**
 
 ```
-StockJpaRepository.findAllByProductIdsForUpdate   → PESSIMISTIC_WRITE  (startPayment·confirmPayment)
-CouponIssueJpaRepository.findByIdForUpdate        → PESSIMISTIC_WRITE  (startPayment)
+StockJpaRepository.findAllByProductIdsWithLock          → startPayment·confirmPayment
+CouponIssueJpaRepository.findByUserIdAndCouponIdWithLock → createOrder
 ```
 
-> `findByUserIdAndCouponId`는 `createOrder`에서 유효성 검증 용도로만 쓰이고 해당 트랜잭션에서 write가 발생하지 않으므로 락 미적용
+**락 메서드 분리 규칙**
 
-**회귀 수정 — 락 메서드 분리 필요성**
+처음에 기존 조회 메서드에 직접 `@Lock`을 달았다가 테스트 9개가 실패했다.
 
-처음에 `findAllByProductIds`와 `findById`에 직접 `@Lock`을 달았다가 기존 테스트 9개가 실패했다.
-
-원인: 동일 메서드가 `@Transactional(readOnly = true)` 컨텍스트(`getLikedProducts`, 상품 목록 조회 등)에서도 호출되는데, `PESSIMISTIC_WRITE`는 readOnly 트랜잭션에서 `SELECT ... FOR UPDATE`를 발급할 수 없어 `GenericJDBCException`이 발생함.
-
-해결: 쓰기 락이 필요한 경우에만 사용하는 전용 메서드를 별도로 추출했다.
+원인: 동일 메서드가 `@Transactional(readOnly = true)` 컨텍스트에서 호출될 때 `PESSIMISTIC_WRITE`가 `SELECT ... FOR UPDATE`를 발급할 수 없어 `GenericJDBCException` 발생.
 
 ```
 // 일반 조회 (기존 유지)
-findAllByProductIds(ids)          → SELECT (no lock)
-findById(id)                      → SELECT (no lock)
-
-// 쓰기 직전 전용 (신규 추가)
+findAllByProductIds(ids)          → SELECT
+// 쓰기 직전 전용 (별도 추가)
 findAllByProductIdsWithLock(ids)  → SELECT ... FOR UPDATE
-findByIdWithLock(id)              → SELECT ... FOR UPDATE
 ```
 
-> 규칙: `@Lock(PESSIMISTIC_WRITE)`는 반드시 전용 메서드(`ForUpdate` / `WithLock` 접미사)로 격리하고, 기존 조회 메서드에 덮어쓰지 않는다.
+> 규칙: `@Lock(PESSIMISTIC_WRITE)`는 반드시 전용 메서드(`WithLock` 접미사)로 격리하고, 기존 조회 메서드에 덮어쓰지 않는다.
 
 ---
 
-## 결정 15. 쿠폰 소비 시점 변경 — `startPayment` → `createOrder`
-
-> 결정 13의 쿠폰 처리 시점을 수정한다.
+## 결정 15. startPayment 중복 호출 방어 — IN_PAYMENT 상태
 
 **결정**
-- 쿠폰 락 획득 + `use()` + 저장을 `createOrder()` 트랜잭션 안으로 이동한다.
-- `CouponIssueRepository`에 `findByUserIdAndCouponIdWithLock()` 메서드를 추가한다.
-- `startPayment()`에서 쿠폰 처리 블록을 제거한다.
-
-**배경 (결정 13의 허점)**
-
-결정 13에서는 `createOrder()`에서 쿠폰 상태를 조회만 하고(`findByUserIdAndCouponId`), 실제 소비(`use()`)는 `startPayment()`에서 수행했다. 이 구조에서는 `createOrder()` 트랜잭션이 커밋될 때 쿠폰 락이 없으므로, 두 요청이 동시에 `AVAILABLE` 상태를 확인한 뒤 각자 주문을 생성할 수 있다.
-
-```
-Thread 1: createOrder(couponId=42) → AVAILABLE 확인 → 주문1 저장  ← 락 없음
-Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 통과됨
-→ 동일 쿠폰으로 주문 2개가 DB에 존재 (고아 주문 발생)
-```
-
-요구사항 "주문 성공 시 해당 쿠폰은 즉시 USED 상태로 변경"과도 불일치한다.
-
-**변경된 결제 플로우**
-
-```
-POST /orders              → 쿠폰 락 + USED 처리 + 주문 저장  [단일 @Transactional]
-POST /orders/{id}/pay/start → 재고 reserve                  [단일 @Transactional]
-POST /orders/{id}/pay/confirm → 재고 confirm + CONFIRMED    [단일 @Transactional]
-```
-
-**트레이드오프**
-
-| 항목 | 변경 전 (결정 13) | 변경 후 (결정 15) |
-|------|-----------------|-----------------|
-| 쿠폰 소비 시점 | `startPayment` | `createOrder` |
-| 주문 생성 원자성 | 쿠폰 상태 체크만 → 고아 주문 가능 | 락 + USED + 주문 저장이 한 트랜잭션 → 고아 주문 없음 |
-| 결제 실패 시 쿠폰 | `startPayment` 롤백으로 AVAILABLE 복원 | `createOrder` 롤백으로 AVAILABLE 복원 (동일하게 안전) |
-| 신규 락 메서드 | 불필요 | `findByUserIdAndCouponIdWithLock()` 추가 필요 |
-
-**락 적용 위치 변경 (결정 14 보완)**
-
-```
-// 제거
-CouponIssueJpaRepository.findByIdForUpdate  ← startPayment에서 사용하던 락
-
-// 추가
-CouponIssueJpaRepository.findByUserIdAndCouponIdForUpdate  ← createOrder에서 사용할 락
-```
-
----
-
-## 결정 16. 3단계 결제 플로우 원자성 — 트레이드오프로 수용
-
-**결정**
-- `createOrder → startPayment → confirmPayment` 3단계 플로우 전체에 걸친 원자성은 보장하지 않는다.
-- 각 단계 내부의 원자성만 `@Transactional`로 보장한다.
+- `OrderStatus`에 `IN_PAYMENT` 상태를 추가한다.
+- `startPayment()` 진입 시 `PENDING_PAYMENT` 상태만 통과, 그 외는 예외를 던진다.
+- `startPayment()` 성공 시 상태를 `IN_PAYMENT`로 변경한다.
 
 **배경**
 
-각 단계는 별개 트랜잭션이므로 단계 사이 서버 장애 시 부분 반영 상태가 남을 수 있다.
+`PENDING_PAYMENT`와 `CONFIRMED`만 있던 구조에서 `startPayment()`를 동일 주문으로 여러 번 호출하면 재고가 중복으로 선점된다.
 
-```
-createOrder()    → 주문 생성, 쿠폰 USED  [트랜잭션 1]
-startPayment()   → 재고 reserve          [트랜잭션 2]
-confirmPayment() → 재고 confirm          [트랜잭션 3]
-```
+**트레이드오프**
 
-예: `startPayment()` 도중 서버가 죽으면 일부 재고는 reserve됐지만 나머지는 아닌 불일치 상태가 발생할 수 있다.
-
-**수용한 이유**
-
-이 플로우는 실제 PG사 연동을 고려한 설계다 (결정 12). 결제 요청 → PG 응답 대기 → 결제 완료 확인의 흐름에서 전 구간을 단일 트랜잭션으로 묶는 것은 현실적으로 불가능하다. 각 단계 내 원자성을 보장하는 것이 이 구조에서 달성 가능한 최선이다.
-
-**완전한 원자성이 필요하다면**
-
-PG 연동 없는 단순 구조라면 `createOrder()` 하나에 쿠폰 + 재고 + 주문 저장을 모두 묶을 수 있다. 현재 프로젝트에서는 3단계 플로우의 설계 의도를 유지하는 것을 우선으로 한다.
+| 항목 | 결정한 이유 | 포기한 것 |
+|------|------------|-----------|
+| 상태 체크로 방어 | 한 사용자의 중복 요청이 대상이므로 락 없이 상태 체크만으로 충분 | `IN_PAYMENT` 추가로 상태 전이 경우의 수 증가 |
+| 별도 락 미적용 | 동일 주문에 동시 요청이 몰리는 상황은 현실적으로 드묾 | 극단적 동시 중복 요청 시 상태 체크를 동시에 통과할 가능성이 이론적으로 존재 |
 
 ---
 
-## 결정 17. createOrder 재고 조기 검증 — 락 없는 Fail-fast
+## 결정 16. createOrder 재고 조기 검증 — 락 없는 Fail-fast
 
 **결정**
 - `createOrder()`에서 재고를 락 없이 조회해 가용량을 검증한다.
 - 실제 재고 선점(reserve)은 `startPayment()`에서 비관적 락과 함께 수행한다.
 
-**배경**
-- 재고 선점은 `startPayment()`에서 이루어지므로, `createOrder()` 시점의 재고 검증은 정합성을 보장하지 않는다.
-- 동시 요청이 몰리면 두 요청 모두 조기 검증을 통과해 주문을 생성할 수 있고, 이후 `startPayment()`에서 한 쪽이 실패한다.
-
 **트레이드오프**
 
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
-| 락 없는 조기 검증 유지 | 재고가 명백히 부족한 요청(예: 재고 1개인데 100개 주문)을 `startPayment()` 전에 빠르게 차단 | 동시 요청이 몰리면 조기 검증을 통과하고도 `startPayment()`에서 실패하는 경우 발생 |
-| 조기 검증을 제거하지 않음 | DB 커넥션·락 경쟁 없이 불필요한 주문 생성을 줄임 | "재고 부족" 오류가 `createOrder()`와 `startPayment()` 두 곳에서 모두 발생할 수 있어 오류 발생 시점이 일관되지 않음 |
+| 락 없는 조기 검증 유지 | 재고가 명백히 부족한 요청을 `startPayment()` 전에 빠르게 차단 | 동시 요청이 몰리면 조기 검증을 통과하고도 `startPayment()`에서 실패 가능 |
+| 조기 검증 제거하지 않음 | DB 커넥션·락 경쟁 없이 불필요한 주문 생성을 줄임 | "재고 부족" 오류가 두 단계에서 모두 발생할 수 있어 오류 시점이 일관되지 않음 |
 
 ---
 
-## 결정 18. startPayment 중복 호출 방어 — 주문 상태 전이
-
-**결정**
-- `OrderStatus`에 `IN_PAYMENT` 상태를 추가한다.
-- `startPayment()` 진입 시 주문 상태가 `PENDING_PAYMENT`일 때만 통과시키고, 그 외 상태면 예외를 던진다.
-- `startPayment()` 성공 시 주문 상태를 `IN_PAYMENT`로 변경한다.
-
-**배경**
-- 기존 `OrderStatus`는 `PENDING_PAYMENT`와 `CONFIRMED` 두 가지뿐이라, `startPayment()`를 동일 주문으로 여러 번 호출하면 재고가 중복으로 선점된다.
-
-**트레이드오프**
-
-| 항목 | 결정한 이유 | 포기한 것 |
-|------|------------|-----------|
-| 상태 체크로 중복 호출 방어 | 한 사용자가 자신의 주문에 결제를 중복 요청하는 경우이므로 락 없이 상태 체크만으로 충분 | `IN_PAYMENT` 상태가 추가되어 상태 전이 경우의 수가 늘어남 |
-| 별도 락 미적용 | 동일 주문에 동시 요청이 몰리는 상황은 여러 사용자가 경쟁하는 재고와 달리 현실적으로 드묾 | 극단적인 동시 중복 요청 시 상태 체크를 동시에 통과할 가능성이 이론적으로 존재 |
-
----
-
-## 결정 19. originalAmount 이중 계산 — OrderService 위임
+## 결정 17. originalAmount 계산 — OrderService 위임
 
 **결정**
 
@@ -929,9 +915,7 @@ PG 연동 없는 단순 구조라면 `createOrder()` 하나에 쿠폰 + 재고 +
 
 ```java
 // OrderService.createOrder()
-List<OrderItemModel> items = products.stream()
-    .map(p -> new OrderItemModel(p.getId(), p.getName(), p.getPrice(), qty))
-    .toList();
+List<OrderItemModel> items = ...;
 long originalAmount = items.stream().mapToLong(i -> i.getPrice() * i.getQuantity()).sum();
 long discountAmount = coupon != null ? coupon.calculateDiscount(originalAmount) : 0L;
 return new OrderModel(userId, items, couponIssueId, discountAmount);
@@ -946,7 +930,7 @@ return new OrderModel(userId, items, couponIssueId, discountAmount);
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
 | OrderService에서 할인 계산 | 할인 기준이 실제 저장될 items 가격과 항상 동일한 소스 | OrderService가 CouponModel(타 도메인)을 파라미터로 받음 |
-| OrderModel 생성자 유지 | items 기준 자기 검증 유지 — items 가격과 스냅샷 불일치 불가 | OrderService·OrderModel 두 곳에서 계산이 일어남 (같은 소스이므로 불일치 없음) |
+| OrderModel 생성자 유지 | items 기준 자기 검증 유지 — items 가격과 스냅샷 불일치 불가 | OrderService·OrderModel 두 곳에서 계산 (같은 소스이므로 불일치 없음) |
 | Facade 인라인 계산 제거 | Facade는 데이터 로드·전달만 담당 (결정 1 원칙 준수) | — |
 
 > `OrderService`가 `CouponModel`을 파라미터로 받는 것은 결정 5의 "파라미터로 전달받은 타 도메인 Model 사용 허용" 범위에 해당한다.
