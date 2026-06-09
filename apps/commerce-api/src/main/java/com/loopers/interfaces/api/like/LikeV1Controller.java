@@ -20,15 +20,15 @@ public class LikeV1Controller implements LikeV1ApiSpec {
 
     @PostMapping
     @Override
-    public ApiResponse<Object> like(@LoginUser AuthUser authUser, @PathVariable Long productId) {
+    public ApiResponse<Void> like(@LoginUser AuthUser authUser, @PathVariable Long productId) {
         likeFacade.like(authUser.id(), productId);
-        return ApiResponse.success();
+        return ApiResponse.success(null);
     }
 
     @DeleteMapping
     @Override
-    public ApiResponse<Object> unlike(@LoginUser AuthUser authUser, @PathVariable Long productId) {
+    public ApiResponse<Void> unlike(@LoginUser AuthUser authUser, @PathVariable Long productId) {
         likeFacade.unlike(authUser.id(), productId);
-        return ApiResponse.success();
+        return ApiResponse.success(null);
     }
 }

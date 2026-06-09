@@ -23,7 +23,11 @@ public enum CouponType {
     RATE {
         @Override
         public Money discount(Money orderAmount, long value) {
-            return Money.of(Math.multiplyExact(orderAmount.value(), value) / 100);
+            try {
+                return Money.of(Math.multiplyExact(orderAmount.value(), value) / 100);
+            } catch (ArithmeticException e) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액 계산이 표현 범위를 초과했습니다.");
+            }
         }
 
         @Override

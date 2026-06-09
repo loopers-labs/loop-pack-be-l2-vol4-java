@@ -10,14 +10,14 @@ import java.util.List;
 
 public record PlaceOrderV1Request(
     @NotEmpty @Valid List<OrderLineV1Request> items,
-    Long couponId
+    @Positive Long couponId
 ) {
     public List<OrderLineCommand> toCommands() {
         return items.stream().map(OrderLineV1Request::toCommand).toList();
     }
 
     public record OrderLineV1Request(
-        @NotNull Long productId,
+        @NotNull @Positive Long productId,
         @NotNull @Positive Integer quantity
     ) {
         public OrderLineCommand toCommand() {

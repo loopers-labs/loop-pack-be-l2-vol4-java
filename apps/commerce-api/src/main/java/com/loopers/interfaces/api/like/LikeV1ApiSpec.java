@@ -9,8 +9,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public interface LikeV1ApiSpec {
 
     @Operation(summary = "좋아요 등록", description = "상품에 좋아요를 등록합니다. (멱등)")
-    ApiResponse<Object> like(AuthUser authUser, Long productId);
+    ApiResponse<Void> like(AuthUser authUser, Long productId);
 
     @Operation(summary = "좋아요 취소", description = "상품 좋아요를 취소합니다. (멱등)")
-    ApiResponse<Object> unlike(AuthUser authUser, Long productId);
+    ApiResponse<Void> unlike(AuthUser authUser, Long productId);
 }
