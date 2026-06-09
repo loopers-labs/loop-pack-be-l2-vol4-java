@@ -1,6 +1,8 @@
 package com.loopers.domain.coupon;
 
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
+import com.loopers.domain.coupon.vo.CouponDiscount;
+import com.loopers.domain.coupon.vo.CouponMoney;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +20,7 @@ class UserCouponTest {
     private static final Long COUPON_TEMPLATE_ID = 10L;
     private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
     private static final ZonedDateTime USED_AT = ZonedDateTime.parse("2026-05-31T12:00:00+09:00");
+    private static final ZonedDateTime NOW = ZonedDateTime.parse("2026-06-01T12:00:00+09:00");
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
 
     @DisplayName("사용자 ID와 쿠폰 템플릿이 주어지면, 발급 당시 쿠폰 조건을 스냅샷으로 가진 유저 쿠폰을 발급한다.")
@@ -183,17 +186,67 @@ class UserCouponTest {
             .isEqualTo(ErrorType.CONFLICT);
     }
 
+    @DisplayName("사용 가능한 유저 쿠폰에 적용하면, 할인 금액을 계산한다.")
+    @Test
+    void appliesDiscount_whenCouponIsApplicable() {
+        // arrange
+        UserCoupon userCoupon = issueCoupon(1L);
+        CouponMoney orderAmount = CouponMoney.of(12_000L);
+
+        // act
+        CouponDiscount discount = userCoupon.apply(orderAmount, NOW, FIXED_POLICY);
+
+        // assert
+        assertThat(discount.discountAmount().value()).isEqualTo(2_000L);
+    }
+
+    @DisplayName("주문 금액이 최소 주문 금액보다 작은 쿠폰을 적용하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenOrderAmountIsLessThanMinimum() {
+        // arrange
+        UserCoupon userCoupon = issueCoupon(1L);
+        CouponMoney orderAmount = CouponMoney.of(9_999L);
+
+        // act & assert
+        assertThatThrownBy(() -> userCoupon.apply(orderAmount, NOW, FIXED_POLICY))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
+    @DisplayName("만료일이 지난 유저 쿠폰을 적용하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenIssuedCouponIsExpired() {
+        // arrange
+        UserCoupon userCoupon = issueCoupon(1L, NOW.minusSeconds(1));
+        CouponMoney orderAmount = CouponMoney.of(12_000L);
+
+        // act & assert
+        assertThatThrownBy(() -> userCoupon.apply(orderAmount, NOW, FIXED_POLICY))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
     private UserCoupon issueCoupon(Long userId) {
         return UserCoupon.issue(userId, COUPON_TEMPLATE_ID, createCouponTemplate());
     }
 
+    private UserCoupon issueCoupon(Long userId, ZonedDateTime expiredAt) {
+        return UserCoupon.issue(userId, COUPON_TEMPLATE_ID, createCouponTemplate(expiredAt));
+    }
+
     private CouponTemplate createCouponTemplate() {
+        return createCouponTemplate(EXPIRED_AT);
+    }
+
+    private CouponTemplate createCouponTemplate(ZonedDateTime expiredAt) {
         return CouponTemplate.create(
             COUPON_NAME,
             CouponType.FIXED,
             2_000L,
             10_000L,
-            EXPIRED_AT,
+            expiredAt,
             FIXED_POLICY
         );
     }

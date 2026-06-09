@@ -2,8 +2,6 @@ package com.loopers.domain.coupon;
 
 import com.loopers.domain.coupon.policy.CouponDiscountPolicy;
 import com.loopers.domain.coupon.policy.CouponDiscountMethod;
-import com.loopers.domain.coupon.specification.CouponUseAttempt;
-import com.loopers.domain.coupon.specification.UsableCouponSpecification;
 import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -22,7 +20,6 @@ public class CouponService {
     private final CouponTemplateRepository couponTemplateRepository;
     private final UserCouponRepository userCouponRepository;
     private final CouponDiscountMethod couponDiscountMethod;
-    private final UsableCouponSpecification usableCouponSpecification;
 
     @Transactional
     public CouponTemplate createCoupon(
@@ -94,13 +91,7 @@ public class CouponService {
 
         UserCoupon userCoupon = userCouponRepository.findById(couponUse.userCouponId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
-        CouponUseAttempt attempt = CouponUseAttempt.attempt(
-            userCoupon,
-            couponUse.userId(),
-            couponUse.orderAmount(),
-            couponUse.usedAt()
-        );
-        usableCouponSpecification.confirmUsable(attempt);
+        userCoupon.confirmUsableBy(couponUse.userId());
 
         CouponDiscountPolicy policy = couponDiscountMethod.match(userCoupon.getType());
         CouponDiscount discount = userCoupon.apply(couponUse.orderAmount(), couponUse.usedAt(), policy);
