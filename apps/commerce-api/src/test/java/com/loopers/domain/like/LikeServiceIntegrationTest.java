@@ -46,31 +46,30 @@ class LikeServiceIntegrationTest {
     @Nested
     class Like {
 
-        @DisplayName("신규 좋아요이면, LikeModel이 저장되어 반환된다.")
+        @DisplayName("신규 좋아요이면, true를 반환하고 저장된다.")
         @Test
         void savesLike_whenNew() {
             // act
-            LikeModel like = likeService.like(userId, productId);
+            boolean result = likeService.like(userId, productId);
 
             // assert
             assertAll(
-                () -> assertThat(like.getId()).isNotNull(),
-                () -> assertThat(like.getUserId()).isEqualTo(userId),
-                () -> assertThat(like.getProductId()).isEqualTo(productId)
+                () -> assertThat(result).isTrue(),
+                () -> assertThat(likeService.find(userId, productId)).isPresent()
             );
         }
 
-        @DisplayName("이미 좋아요한 경우, 기존 레코드를 반환한다 (멱등).")
+        @DisplayName("이미 좋아요한 경우, false를 반환한다 (멱등 — 중복 삽입 안 됨).")
         @Test
-        void returnsExisting_whenAlreadyLiked() {
-            // arrange
-            LikeModel first = likeService.like(userId, productId);
+        void returnsFalse_whenAlreadyLiked() {
+            // arrange — 신규 좋아요 (true)
+            assertThat(likeService.like(userId, productId)).isTrue();
 
-            // act
-            LikeModel second = likeService.like(userId, productId);
+            // act — 중복 좋아요
+            boolean second = likeService.like(userId, productId);
 
             // assert
-            assertThat(second.getId()).isEqualTo(first.getId());
+            assertThat(second).isFalse();
         }
     }
 

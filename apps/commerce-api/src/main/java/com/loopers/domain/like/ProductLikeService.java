@@ -19,19 +19,16 @@ public class ProductLikeService {
     private final LikeService likeService;
     private final ProductRepository productRepository;
 
-    /** 좋아요 — 신규이면 Like 저장 + likeCount 원자적 증가 (멱등) */
+    /** 좋아요 — 멱등 삽입이 실제로 새로 넣었을 때만 likeCount 원자적 증가 */
     public void like(UUID userId, UUID productId) {
-        boolean isNew = likeService.find(userId, productId).isEmpty();
-        if (isNew) {
-            likeService.like(userId, productId);
+        if (likeService.like(userId, productId)) {
             productRepository.incrementLikeCount(productId);
         }
     }
 
-    /** 좋아요 취소 — 삭제되었으면 likeCount 원자적 감소 (멱등) */
+    /** 좋아요 취소 — 실제로 삭제됐을 때만 likeCount 원자적 감소 */
     public void unlike(UUID userId, UUID productId) {
-        boolean deleted = likeService.unlike(userId, productId);
-        if (deleted) {
+        if (likeService.unlike(userId, productId)) {
             productRepository.decrementLikeCount(productId);
         }
     }

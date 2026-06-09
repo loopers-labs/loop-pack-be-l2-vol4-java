@@ -32,6 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -168,6 +169,52 @@ class LikeV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {}
             );
             assertThat(detail.getBody().data().likeCount()).isEqualTo((long) users);
+        }
+
+        @DisplayName("같은 유저가 같은 상품에 동시에 여러번 좋아요해도, like_count 는 1 이고 모든 응답이 2xx 여야 한다. (멱등)")
+        @Test
+        void likeCountStaysOne_whenSameUserConcurrent() throws InterruptedException {
+            int threads = 10; // setUp 에서 등록된 단일 유저(UserFixture)로 동시 요청
+
+            ExecutorService pool = Executors.newFixedThreadPool(threads);
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            AtomicInteger ok = new AtomicInteger();
+            AtomicInteger error = new AtomicInteger();
+
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        ResponseEntity<ApiResponse<Void>> r = testRestTemplate.exchange(
+                            likeUrl(productId), HttpMethod.POST,
+                            new HttpEntity<>(authHeaders()),
+                            new ParameterizedTypeReference<>() {}
+                        );
+                        if (r.getStatusCode().is2xxSuccessful()) ok.incrementAndGet();
+                        else error.incrementAndGet();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+
+            ready.await();
+            start.countDown();
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detail = testRestTemplate.exchange(
+                "/api/v1/products/" + productId, HttpMethod.GET, null,
+                new ParameterizedTypeReference<>() {}
+            );
+            System.out.println("[ConcurrentLike-sameUser] 2xx=" + ok.get() + " error=" + error.get()
+                + " likeCount=" + detail.getBody().data().likeCount());
+            assertAll(
+                () -> assertThat(detail.getBody().data().likeCount()).isEqualTo(1L),
+                () -> assertThat(error.get()).isZero() // 모든 응답 2xx (멱등) — 깨지면 500 발생 의미
+            );
         }
     }
 
