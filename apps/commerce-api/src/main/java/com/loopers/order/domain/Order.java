@@ -48,6 +48,17 @@ public class Order extends BaseEntity {
     private Money totalAmount;
 
     @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "final_amount", nullable = false))
+    private Money finalAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
+
+    @Embedded
     private ShippingDestination shippingDestination;
 
     @Column(name = "ordered_at", nullable = false)
@@ -64,6 +75,8 @@ public class Order extends BaseEntity {
         this.shippingDestination = shippingDestination;
         validate(items);
         this.totalAmount = items.stream().map(OrderItem::subtotal).reduce(Money.ZERO, Money::plus);
+        this.discountAmount = Money.ZERO;
+        this.finalAmount = this.totalAmount;
         this.status = OrderStatus.PENDING;
         this.orderedAt = ZonedDateTime.now();
     }
@@ -75,6 +88,17 @@ public class Order extends BaseEntity {
             List<OrderItem> items
     ) {
         return new Order(userId, orderNumber, shippingDestination, items);
+    }
+
+    public void applyDiscount(Long userCouponId, Money discountAmount) {
+        Money effectiveDiscount = discountAmount.value() > totalAmount.value() ? totalAmount : discountAmount;
+        this.userCouponId = userCouponId;
+        this.discountAmount = effectiveDiscount;
+        this.finalAmount = Money.of(totalAmount.value() - effectiveDiscount.value());
+    }
+
+    public void markFailed() {
+        this.status = OrderStatus.FAILED;
     }
 
     private void validate(List<OrderItem> items) {

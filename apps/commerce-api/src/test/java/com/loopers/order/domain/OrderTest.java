@@ -1,5 +1,6 @@
 package com.loopers.order.domain;
 
+import com.loopers.common.domain.Money;
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -83,5 +84,56 @@ class OrderTest {
         assertThatThrownBy(() -> Order.create(USER_ID, ORDER_NUMBER, shipping(), List.of()))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("주문 항목은 하나 이상이어야 합니다.");
+    }
+
+    @Test
+    @DisplayName("쿠폰 미적용 시 할인은 0, 최종 결제 금액은 총액과 같고 적용 쿠폰은 없다")
+    void givenNoCoupon_whenCreate_thenFinalEqualsTotalWithNoDiscount() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+
+        assertAll(
+                () -> assertThat(order.getDiscountAmount().value()).isEqualTo(0L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(order.getTotalAmount()),
+                () -> assertThat(order.getUserCouponId()).isNull()
+        );
+    }
+
+    @Test
+    @DisplayName("할인을 적용하면 적용 쿠폰·할인액을 저장하고 최종 결제 금액은 총액에서 차감된다")
+    void givenDiscount_whenApplyDiscount_thenStoresDiscountAndReducesFinal() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+        long total = order.getTotalAmount().value(); // 29,000*2 + 15,000 = 73,000
+
+        order.applyDiscount(50L, Money.of(3_000L));
+
+        assertAll(
+                () -> assertThat(order.getUserCouponId()).isEqualTo(50L),
+                () -> assertThat(order.getDiscountAmount().value()).isEqualTo(3_000L),
+                () -> assertThat(order.getFinalAmount().value()).isEqualTo(total - 3_000L)
+        );
+    }
+
+    @Test
+    @DisplayName("할인액이 총액보다 크면 총액으로 클램핑되고 최종 결제 금액은 0 이다")
+    void givenDiscountOverTotal_whenApplyDiscount_thenClampsToZero() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+        long total = order.getTotalAmount().value();
+
+        order.applyDiscount(50L, Money.of(total + 10_000L));
+
+        assertAll(
+                () -> assertThat(order.getDiscountAmount().value()).isEqualTo(total),
+                () -> assertThat(order.getFinalAmount().value()).isEqualTo(0L)
+        );
+    }
+
+    @Test
+    @DisplayName("markFailed 로 주문을 FAILED 상태로 전이한다")
+    void givenOrder_whenMarkFailed_thenStatusIsFailed() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+
+        order.markFailed();
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
     }
 }
