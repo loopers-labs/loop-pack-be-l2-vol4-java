@@ -32,12 +32,6 @@ public class OrderStockService {
         orderService.cancel(order);
     }
 
-    /** 주문 만료 — 아이템별 재고 해제 + 주문 실패 (스케줄러용) */
-    public void expireOrder(OrderModel order) {
-        order.getItems().forEach(item -> stockService.release(item.getProductId(), item.getQuantity()));
-        orderService.fail(order);
-    }
-
     /** 결제 실패 — PENDING이면 아이템별 재고 해제 + 주문 실패 후 true, 아니면 false (멱등) */
     public boolean failOrder(OrderModel order) {
         if (order.isPending()) {

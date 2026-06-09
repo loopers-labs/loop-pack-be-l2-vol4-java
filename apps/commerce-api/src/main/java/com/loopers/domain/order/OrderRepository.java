@@ -32,12 +32,6 @@ public interface OrderRepository {
     /** 어드민 전체 주문 목록 */
     Page<OrderModel> findAll(Pageable pageable);
 
-    /** 스케줄러용 — createdAt 기준 특정 시각 이전 PENDING 주문 */
-    List<OrderModel> findPendingBefore(ZonedDateTime before);
-
-    /** 스케줄러 배치용 — 아이템 fetch join 포함 (N+1 방지) */
-    List<OrderModel> findPendingBeforeWithItems(ZonedDateTime before);
-
     /** 스케줄러 배치 상태 변경 — 단일 UPDATE */
     int failAllByIds(List<UUID> orderIds, ZonedDateTime now);
 }

@@ -104,11 +104,14 @@ public class OrderFacade {
         return orderService.getList(pageable).map(OrderInfo::from);
     }
 
-    /** 주문 취소 — CONFIRMED 상태만, 재고 복구 포함. 주문 행 비관적 락으로 전이 직렬화 */
+    /** 주문 취소 — CONFIRMED 상태만, 재고 복구 + 쿠폰 복구. 주문 행 비관적 락으로 전이 직렬화 */
     @Transactional
     public OrderInfo cancel(UUID orderId, UserModel user) {
         OrderModel order = orderService.getByIdAndUserForUpdate(orderId, user.getId());
-        orderStockService.cancelOrder(order);
+        orderStockService.cancelOrder(order); // CANCELLED 전이 + 재고 복구 (CONFIRMED 아니면 예외)
+        if (order.getCouponId() != null) {
+            userCouponService.releaseByOrderId(orderId); // 적용 쿠폰 USED → AVAILABLE
+        }
         return OrderInfo.from(order);
     }
 

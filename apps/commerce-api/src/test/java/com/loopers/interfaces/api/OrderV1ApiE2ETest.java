@@ -295,6 +295,40 @@ class OrderV1ApiE2ETest {
 
             assertThat(reorder.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
+
+        @DisplayName("쿠폰 적용 주문을 취소하면, 쿠폰이 복구되어 재사용 가능하다.")
+        @Test
+        void releasesCoupon_whenCancelled() {
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
+            UUID couponId = issueCoupon(templateId);
+
+            // 주문(쿠폰 사용) → 결제 확정(CONFIRMED)
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID orderId = created.getBody().data().id();
+            Long amount = created.getBody().data().pgAmount();
+            String confirmBody = toJson(new PaymentV1Dto.ConfirmRequest(orderId, "pg-tx-cancel", amount));
+            testRestTemplate.exchange(PAYMENTS_CONFIRM_URL, HttpMethod.POST,
+                new HttpEntity<>(confirmBody, pgHeaders(confirmBody)), new ParameterizedTypeReference<Void>() {});
+
+            // 주문 취소 → 쿠폰 복구
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> cancelled = testRestTemplate.exchange(
+                ORDERS_URL + "/" + orderId + "/cancel", HttpMethod.POST,
+                new HttpEntity<>(authHeaders()), new ParameterizedTypeReference<>() {}
+            );
+            assertThat(cancelled.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+            // 같은 쿠폰으로 재주문 → 성공 (복구 확인)
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> reorder = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            assertThat(reorder.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
     }
 
     @DisplayName("동시성 — 동일 쿠폰 동시 주문")
