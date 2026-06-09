@@ -169,17 +169,16 @@ infrastructure/
 | GET | `/api-admin/v1/orders?page=0&size=20` | 주문 목록 (Admin) | Admin |
 | GET | `/api-admin/v1/orders/{orderId}` | 주문 단건 조회 (Admin) | Admin |
 
-### CouponTemplate
-
-| Method | URI | 설명 | 인증 |
-|---|---|---|:---:|
-| POST | `/api-admin/v1/coupon-templates` | 쿠폰 템플릿 등록 | Admin |
-
 ### Coupon
 
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
-| POST | `/api-admin/v1/coupons` | 특정 유저에게 쿠폰 발급 | Admin |
+| GET | `/api-admin/v1/coupons?page=0&size=20` | 쿠폰 템플릿 목록 조회 | Admin |
+| GET | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 단건 조회 | Admin |
+| POST | `/api-admin/v1/coupons` | 쿠폰 템플릿 등록 | Admin |
+| PUT | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 수정 | Admin |
+| DELETE | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 삭제 (soft delete, 발급된 쿠폰 연쇄 삭제) | Admin |
+| POST | `/api/v1/coupons/{couponTemplateId}/issue` | 쿠폰 발급 요청 (유저 self-issue) | User |
 | GET | `/api/v1/coupons` | 내 쿠폰 목록 조회 | User |
 
 ---
@@ -439,12 +438,30 @@ flowchart TD
 | `minOrderAmount` | nullable, 0 이상 정수 |
 | `expiredAt` | 필수, 미래 일시 |
 
-### 쿠폰 발급 (Admin → User)
+### 쿠폰 템플릿 수정 검증
 
-- `couponTemplateId`로 템플릿 존재 여부 검증
-- 템플릿 만료 여부 검증 (`isExpired()` — 발급 시점 기준)
-- `userId`로 유저 존재 여부 검증
-- 쿠폰 발급 (AVAILABLE 상태로 INSERT)
+| 필드 | 규칙 |
+|---|---|
+| `name` | 필수, 빈 문자열 불가 |
+| `type` | 수정 불가 — 발급된 쿠폰의 할인 타입이 변경되면 정합성 깨짐 |
+| `value` | 수정 불가 — 동일 이유 |
+| `minOrderAmount` | 수정 가능 |
+| `expiredAt` | 수정 가능 (미래 일시만 허용) |
+
+### 쿠폰 템플릿 삭제
+
+```
+CouponApplicationService.deleteTemplate(couponTemplateId)
+  ├── CouponTemplateEntity 조회 → 없으면 404
+  ├── couponTemplate.delete()
+  └── 발급된 쿠폰 전체 soft delete (COUPONS WHERE coupon_template_id = ?)
+```
+
+### 쿠폰 발급 (User self-issue)
+
+- `couponTemplateId`로 템플릿 존재 여부 검증 (없으면 404)
+- 템플릿 만료 여부 검증 (`isExpired()` — 발급 시점 기준, 만료됐으면 400)
+- 쿠폰 발급 (AVAILABLE 상태로 INSERT, userId = 인증된 유저)
 
 ### 쿠폰 할인 계산
 

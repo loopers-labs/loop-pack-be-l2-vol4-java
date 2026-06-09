@@ -232,9 +232,9 @@ sequenceDiagram
 sequenceDiagram
     Note over OrderV1Controller: 🔐 X-Loopers-LoginId / X-Loopers-LoginPw
     participant OrderV1Controller
-    participant OrderApplicationService
+    participant OrderFacade
     participant ProductService
-    participant CouponService
+    participant CouponApplicationService
     participant InventoryService
     participant OrderService
     participant ProductRepository
@@ -242,52 +242,52 @@ sequenceDiagram
     participant InventoryRepository
     participant OrderRepository
 
-    OrderV1Controller->>OrderApplicationService: createOrder(userId, items, couponId?)
+    OrderV1Controller->>OrderFacade: createOrder(userId, items, couponId?)
 
-    Note over OrderApplicationService,ProductRepository: [ 트랜잭션 외부 — 읽기 전용 ]
+    Note over OrderFacade,ProductRepository: [ 트랜잭션 외부 — 읽기 전용 ]
 
-    OrderApplicationService->>ProductService: getProducts(productIds)
+    OrderFacade->>ProductService: getProducts(productIds)
     ProductService->>ProductRepository: findAllByIds(productIds)
     ProductRepository-->>ProductService: List~ProductEntity~ (없는 상품 있으면 404)
-    ProductService-->>OrderApplicationService: List~ProductEntity~
+    ProductService-->>OrderFacade: List~ProductEntity~
 
-    Note over OrderApplicationService: 재고 fast-fail (락 없음) — product.quantity < 요청수량이면 400
+    Note over OrderFacade: 재고 fast-fail (락 없음) — product.quantity < 요청수량이면 400
 
     opt couponId 있음
-        OrderApplicationService->>CouponService: getCoupon(couponId)
-        CouponService->>CouponRepository: findById(couponId)
-        CouponRepository-->>CouponService: CouponEntity (없으면 404)
-        CouponService-->>OrderApplicationService: CouponEntity
-        Note over OrderApplicationService: 소유권 검증 (isOwnedBy) → 불일치 시 403
-        Note over OrderApplicationService: resolveStatus(expiredAt) → EXPIRED 시 400
-        Note over OrderApplicationService: status == USED 시 400
+        OrderFacade->>CouponApplicationService: getCoupon(couponId)
+        CouponApplicationService->>CouponRepository: findById(couponId)
+        CouponRepository-->>CouponApplicationService: CouponEntity (없으면 404)
+        CouponApplicationService-->>OrderFacade: CouponEntity
+        Note over OrderFacade: 소유권 검증 (isOwnedBy) → 불일치 시 403
+        Note over OrderFacade: resolveStatus(expiredAt) → EXPIRED 시 400
+        Note over OrderFacade: status == USED 시 400
     end
 
-    Note over OrderApplicationService,OrderRepository: ── @Transactional 시작 ──
+    Note over OrderFacade,OrderRepository: ── @Transactional 시작 ──
 
     opt couponId 있음
-        Note over OrderApplicationService: ① 쿠폰 유효성 재검증 + 사용 처리 (PESSIMISTIC_WRITE, ADR-031)
-        OrderApplicationService->>CouponService: useCoupon(couponId, userId)
-        CouponService->>CouponRepository: findByIdForUpdate(couponId)
+        Note over OrderFacade: ① 쿠폰 유효성 재검증 + 사용 처리 (PESSIMISTIC_WRITE, ADR-031)
+        OrderFacade->>CouponApplicationService: useCoupon(couponId, userId)
+        CouponApplicationService->>CouponRepository: findByIdForUpdate(couponId)
         Note over CouponRepository: SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
-        CouponRepository-->>CouponService: CouponEntity
-        CouponService->>CouponService: coupon.use() — AVAILABLE → USED
-        CouponService-->>OrderApplicationService: discountAmount
+        CouponRepository-->>CouponApplicationService: CouponEntity
+        CouponApplicationService->>CouponApplicationService: coupon.use() — AVAILABLE → USED
+        CouponApplicationService-->>OrderFacade: discountAmount
     end
 
-    Note over OrderApplicationService: ② 재고 차감 (productId 오름차순 정렬, ADR-014)
-    OrderApplicationService->>InventoryService: deductAll(productId-quantity 쌍)
+    Note over OrderFacade: ② 재고 차감 (productId 오름차순 정렬, ADR-014)
+    OrderFacade->>InventoryService: deductAll(productId-quantity 쌍)
     InventoryService->>InventoryRepository: findAllByProductIds(productIds) FOR UPDATE
     Note over InventoryRepository: WHERE product_id IN (...) ORDER BY product_id FOR UPDATE
     InventoryService->>InventoryService: 각 inventory.deduct(quantity) — 재고 부족 시 400
 
-    Note over OrderApplicationService: ③ 주문 엔티티 생성 및 저장
-    OrderApplicationService->>OrderService: createOrder(userId, items, originalAmount, discountAmount, finalAmount, couponId?)
+    Note over OrderFacade: ③ 주문 엔티티 생성 및 저장
+    OrderFacade->>OrderService: createOrder(userId, items, originalAmount, discountAmount, finalAmount, couponId?)
     OrderService->>OrderRepository: save(OrderEntity + OrderSnapshot)
     OrderRepository-->>OrderService: OrderEntity
-    OrderService-->>OrderApplicationService: OrderEntity
+    OrderService-->>OrderFacade: OrderEntity
 
-    Note over OrderApplicationService,OrderRepository: ── 성공 시 Commit / 실패 시 전체 Rollback ──
+    Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 실패 시 전체 Rollback ──
 
-    OrderApplicationService-->>OrderV1Controller: OrderInfo
+    OrderFacade-->>OrderV1Controller: OrderInfo
 ```
