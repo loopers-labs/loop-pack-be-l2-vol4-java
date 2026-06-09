@@ -53,10 +53,35 @@ classDiagram
         +Long productId
     }
     ProductLike --|> BaseTimeEntity
+
+    class CouponTemplate {
+        +Long id
+        +String name
+        +CouponType type
+        +BigDecimal value
+        +BigDecimal minOrderAmount
+        +BigDecimal maxDiscountAmount
+        +LocalDateTime expiredAt
+    }
+    CouponTemplate --|> BaseSoftDeleteEntity
+
+    class CouponIssue {
+        +Long id
+        +Long userId
+        +Long couponTemplateId
+        +CouponStatus status
+        +Long version
+        +use()
+    }
+    CouponIssue --|> BaseTimeEntity
     
     class Order {
         +Long id
         +Long userId
+        +Long couponIssueId
+        +BigDecimal totalOriginalAmount
+        +BigDecimal totalDiscountAmount
+        +BigDecimal totalPaymentAmount
         +OrderStatus status
         +List~OrderItem~ items
     }
@@ -84,6 +109,8 @@ classDiagram
     Order "1" -- "*" OrderItem : contains
     User "1" -- "*" ProductLike : likes
     Product "1" -- "*" ProductLike : liked by
+    User "1" -- "*" CouponIssue : owns
+    CouponTemplate "1" -- "*" CouponIssue : issues
 
     %% 파사드(Facade) 계층 (복합 트랜잭션 제어)
     class OrderFacade {
@@ -96,10 +123,13 @@ classDiagram
         +addLike(userId, productId)
         +removeLike(userId, productId)
     }
+    class CouponFacade {
+        +issueCoupon(userId, couponTemplateId)
+    }
 
     %% 서비스(Service) 계층 (단일 도메인 로직 및 조회)
     class OrderService {
-        +createOrder(userId, items)
+        +createOrder(userId, items, discountAmount)
     }
     class ProductService {
         +getProducts(brandId, sort, pageable)
@@ -120,15 +150,23 @@ classDiagram
         +addLikeRecord(userId, productId)
         +removeLikeRecord(userId, productId)
     }
+    class CouponService {
+        +issueCoupon(userId, templateId)
+        +getUserCoupons(userId)
+        +verifyAndUseCoupon(couponIssueId, orderAmount)
+    }
 
     %% 의존 방향
     OrderFacade ..> OrderService
     OrderFacade ..> ProductService
     OrderFacade ..> StockService
+    OrderFacade ..> CouponService
     
     BrandAdminFacade ..> BrandService
     BrandAdminFacade ..> ProductService
     
     LikeFacade ..> LikeService
     LikeFacade ..> ProductService
+
+    CouponFacade ..> CouponService
 ```
