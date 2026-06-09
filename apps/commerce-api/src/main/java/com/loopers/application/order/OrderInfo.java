@@ -9,7 +9,9 @@ import java.util.List;
 public record OrderInfo(
     Long orderId,
     OrderStatus status,
-    Long totalPrice,
+    Long originalPrice,
+    Long discountAmount,
+    Long finalPrice,
     List<OrderItemInfo> items,
     ZonedDateTime createdAt
 ) {
@@ -17,7 +19,9 @@ public record OrderInfo(
         return new OrderInfo(
             order.getId(),
             order.getStatus(),
-            order.getTotalPrice(),
+            order.getOriginalPrice(),
+            order.getDiscountAmount(),
+            order.getFinalPrice(),
             items,
             order.getCreatedAt()
         );

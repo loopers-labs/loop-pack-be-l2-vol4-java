@@ -8,14 +8,16 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    public record CreateOrderRequest(List<OrderItemRequest> items) {}
+    public record CreateOrderRequest(List<OrderItemRequest> items, Long userCouponId) {}
 
     public record OrderItemRequest(Long productId, Integer quantity) {}
 
     public record OrderResponse(
         Long orderId,
         String status,
-        Long totalPrice,
+        Long originalPrice,
+        Long discountAmount,
+        Long finalPrice,
         List<OrderItemResponse> items,
         ZonedDateTime createdAt
     ) {
@@ -23,7 +25,9 @@ public class OrderV1Dto {
             return new OrderResponse(
                 info.orderId(),
                 info.status().name(),
-                info.totalPrice(),
+                info.originalPrice(),
+                info.discountAmount(),
+                info.finalPrice(),
                 info.items().stream().map(OrderItemResponse::from).toList(),
                 info.createdAt()
             );

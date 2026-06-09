@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,13 +57,13 @@ class OrderFacadeTest {
             // arrange
             UserModel user = new UserModel("user1", "pw1");
             ProductModel product = new ProductModel(1L, "에어맥스 90", "편한 신발", 159000L, 10);
-            OrderModel order = new OrderModel(user.getId(), 318000L);
+            OrderModel order = new OrderModel(user.getId(), 318000L, 0L, 318000L, null);
             OrderItemModel item = new OrderItemModel(order.getId(), product.getId(), "에어맥스 90", 159000L, 2);
 
             when(userService.getUser("user1", "pw1")).thenReturn(user);
             when(productService.getProduct(anyLong())).thenReturn(product);
             when(productService.deductStock(anyLong(), anyInt())).thenReturn(product);
-            when(orderService.createOrder(anyLong(), anyLong(), any())).thenReturn(order);
+            when(orderService.createOrder(anyLong(), anyLong(), anyLong(), anyLong(), nullable(Long.class), any())).thenReturn(order);
             when(orderService.getOrderItems(anyLong())).thenReturn(List.of(item));
 
             // act
@@ -72,7 +73,7 @@ class OrderFacadeTest {
             // assert
             assertAll(
                 () -> assertThat(result.status()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(result.totalPrice()).isEqualTo(318000L),
+                () -> assertThat(result.originalPrice()).isEqualTo(318000L),
                 () -> assertThat(result.items()).hasSize(1)
             );
             verify(productService).deductStock(anyLong(), eq(2));
@@ -113,7 +114,7 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            verify(orderService, never()).createOrder(anyLong(), anyLong(), any());
+            verify(orderService, never()).createOrder(anyLong(), anyLong(), anyLong(), anyLong(), nullable(Long.class), any());
         }
 
         @DisplayName("재고가 부족하면, BAD_REQUEST 예외가 발생하고 주문이 생성되지 않는다.")
@@ -135,7 +136,7 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            verify(orderService, never()).createOrder(anyLong(), anyLong(), any());
+            verify(orderService, never()).createOrder(anyLong(), anyLong(), anyLong(), anyLong(), nullable(Long.class), any());
         }
     }
 }

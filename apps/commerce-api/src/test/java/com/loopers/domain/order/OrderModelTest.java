@@ -19,11 +19,13 @@ class OrderModelTest {
         @DisplayName("유효한 값이 주어지면, PENDING 상태로 생성된다.")
         @Test
         void createsOrder_withPendingStatus_whenValid() {
-            OrderModel order = new OrderModel(1L, 30000L);
+            OrderModel order = new OrderModel(1L, 30000L, 0L, 30000L, null);
 
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(1L),
-                () -> assertThat(order.getTotalPrice()).isEqualTo(30000L),
+                () -> assertThat(order.getOriginalPrice()).isEqualTo(30000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(0L),
+                () -> assertThat(order.getFinalPrice()).isEqualTo(30000L),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING)
             );
         }
@@ -32,16 +34,16 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenUserIdIsNull() {
             CoreException result = assertThrows(CoreException.class, () ->
-                new OrderModel(null, 30000L)
+                new OrderModel(null, 30000L, 0L, 30000L, null)
             );
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("totalPrice가 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("originalPrice가 음수이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenTotalPriceIsNegative() {
             CoreException result = assertThrows(CoreException.class, () ->
-                new OrderModel(1L, -1L)
+                new OrderModel(1L, -1L, 0L, -1L, null)
             );
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }

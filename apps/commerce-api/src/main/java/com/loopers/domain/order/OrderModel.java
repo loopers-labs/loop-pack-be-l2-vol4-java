@@ -20,21 +20,39 @@ public class OrderModel extends BaseEntity {
     @Column(nullable = false)
     private OrderStatus status;
 
-    @Column(name = "total_price", nullable = false)
-    private Long totalPrice;
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
+
+    @Column(name = "original_price", nullable = false)
+    private Long originalPrice;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
+    @Column(name = "final_price", nullable = false)
+    private Long finalPrice;
 
     protected OrderModel() {}
 
-    public OrderModel(Long userId, Long totalPrice) {
+    public OrderModel(Long userId, Long originalPrice, Long discountAmount, Long finalPrice, Long userCouponId) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "유저는 필수입니다.");
         }
-        if (totalPrice == null || totalPrice < 0) {
+        if (originalPrice == null || originalPrice < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "총 금액은 0 이상이어야 합니다.");
+        }
+        if (discountAmount == null || discountAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 0 이상이어야 합니다.");
+        }
+        if (finalPrice == null || finalPrice < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "최종 금액은 0 이상이어야 합니다.");
         }
         this.userId = userId;
         this.status = OrderStatus.PENDING;
-        this.totalPrice = totalPrice;
+        this.userCouponId = userCouponId;
+        this.originalPrice = originalPrice;
+        this.discountAmount = discountAmount;
+        this.finalPrice = finalPrice;
     }
 
     public Long getUserId() {
@@ -45,8 +63,20 @@ public class OrderModel extends BaseEntity {
         return status;
     }
 
-    public Long getTotalPrice() {
-        return totalPrice;
+    public Long getUserCouponId() {
+        return userCouponId;
+    }
+
+    public Long getOriginalPrice() {
+        return originalPrice;
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getFinalPrice() {
+        return finalPrice;
     }
 
     public void confirm() {

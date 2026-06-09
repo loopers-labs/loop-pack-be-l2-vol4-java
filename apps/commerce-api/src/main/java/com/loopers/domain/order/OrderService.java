@@ -15,11 +15,20 @@ public class OrderService {
     private final OrderRepository orderRepository;
 
     @Transactional
-    public OrderModel createOrder(Long userId, Long totalPrice, List<OrderItemCommand> itemCommands) {
+    public OrderModel createOrder(
+        Long userId,
+        Long originalPrice,
+        Long discountAmount,
+        Long finalPrice,
+        Long userCouponId,
+        List<OrderItemCommand> itemCommands
+    ) {
         if (itemCommands == null || itemCommands.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
-        OrderModel order = orderRepository.save(new OrderModel(userId, totalPrice));
+        OrderModel order = orderRepository.save(
+            new OrderModel(userId, originalPrice, discountAmount, finalPrice, userCouponId)
+        );
         for (OrderItemCommand cmd : itemCommands) {
             orderRepository.saveItem(new OrderItemModel(
                 order.getId(), cmd.productId(), cmd.productName(), cmd.unitPrice(), cmd.quantity()

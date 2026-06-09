@@ -48,7 +48,7 @@ public class OrderFacade {
             totalPrice += product.getPrice() * req.quantity();
         }
 
-        OrderModel order = orderService.createOrder(user.getId(), totalPrice, itemCommands);
+        OrderModel order = orderService.createOrder(user.getId(), totalPrice, 0L, totalPrice, null, itemCommands);
         List<OrderItemModel> savedItems = orderService.getOrderItems(order.getId());
 
         return OrderInfo.of(order, savedItems.stream().map(OrderItemInfo::from).toList());
