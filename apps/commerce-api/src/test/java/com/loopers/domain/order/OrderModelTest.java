@@ -36,7 +36,10 @@ class OrderModelTest {
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(USER_ID),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(0L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(0L),
                 () -> assertThat(order.getPgAmount()).isEqualTo(0L),
+                () -> assertThat(order.getCouponId()).isNull(),
                 () -> assertThat(order.getItems()).isEmpty()
             );
         }
@@ -56,6 +59,7 @@ class OrderModelTest {
 
             assertAll(
                 () -> assertThat(order.getItems()).hasSize(1),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(ProductFixture.PRICE * 3),
                 () -> assertThat(order.getPgAmount()).isEqualTo(ProductFixture.PRICE * 3)
             );
         }
@@ -68,6 +72,42 @@ class OrderModelTest {
             );
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("쿠폰을 적용할 때,")
+    @Nested
+    class ApplyCoupon {
+
+        @DisplayName("할인 적용 시, discountAmount 가 기록되고 pgAmount = original - discount 가 된다.")
+        @Test
+        void appliesDiscount_andRecalculatesPgAmount() {
+            OrderModel order = OrderFixture.createModel(USER_ID);
+            order.addItem(new OrderItemModel(PRODUCT_ID, ProductFixture.NAME, BrandFixture.NAME, ProductFixture.PRICE, 3));
+            long original = ProductFixture.PRICE * 3;
+            UUID couponId = UUID.randomUUID();
+
+            order.applyCoupon(couponId, 3000L);
+
+            assertAll(
+                () -> assertThat(order.getCouponId()).isEqualTo(couponId),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(original),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(3000L),
+                () -> assertThat(order.getPgAmount()).isEqualTo(original - 3000L)
+            );
+        }
+
+        @DisplayName("할인 적용 후 확정 시, pgAmount(최종 결제액) 기준으로 금액 검증한다.")
+        @Test
+        void confirmsAgainstFinalPgAmount() {
+            OrderModel order = OrderFixture.createModel(USER_ID);
+            order.addItem(new OrderItemModel(PRODUCT_ID, ProductFixture.NAME, BrandFixture.NAME, ProductFixture.PRICE, 3));
+            long original = ProductFixture.PRICE * 3;
+            order.applyCoupon(UUID.randomUUID(), 3000L);
+
+            order.confirm(original - 3000L);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         }
     }
 

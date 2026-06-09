@@ -1,5 +1,6 @@
 package com.loopers.application.payment;
 
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderStockService;
@@ -20,6 +21,7 @@ public class PaymentFacade {
     private final OrderService orderService;
     private final OrderStockService orderStockService;
     private final PaymentService paymentService;
+    private final UserCouponService userCouponService;
 
     /** 결제 확정 — 재고+주문 확정(금액/상태 검증 포함) + 결제 저장 (멱등) */
     public PaymentInfo confirm(UUID orderId, String pgTransactionId, Long amount) {
@@ -32,10 +34,11 @@ public class PaymentFacade {
         return PaymentInfo.from(payment);
     }
 
-    /** 결제 실패 — PENDING이면 재고 해제 + 주문 실패 (멱등) + 결제 저장 (멱등) */
+    /** 결제 실패 — PENDING이면 재고 해제 + 쿠폰 복구 + 주문 실패 (멱등) + 결제 저장 (멱등) */
     public PaymentInfo fail(UUID orderId, String pgTransactionId, Long amount) {
         OrderModel order = orderService.get(orderId);
         orderStockService.failOrder(order);
+        userCouponService.releaseByOrderId(orderId); // 적용 쿠폰 USED → AVAILABLE (없으면 no-op)
         PaymentModel payment = paymentService.saveIfAbsent(
             orderId,
             new PaymentModel(orderId, pgTransactionId, PaymentStatus.FAILED, amount)

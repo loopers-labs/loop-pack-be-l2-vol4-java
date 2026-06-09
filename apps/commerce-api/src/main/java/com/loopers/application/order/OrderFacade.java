@@ -1,5 +1,7 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
@@ -32,10 +34,11 @@ public class OrderFacade {
     private final OrderStockService orderStockService;
     private final ProductService productService;
     private final StockService stockService;
+    private final UserCouponService userCouponService;
 
-    /** 주문 생성 — 상품 유효성 검증 + 재고 예약 + 주문 저장 */
+    /** 주문 생성 — 상품 유효성 검증 + 쿠폰 적용 + 재고 예약 + 주문 저장 (단일 트랜잭션) */
     @Transactional
-    public OrderInfo create(UUID userId, ShippingInfo shippingInfo, List<OrderItemRequest> itemRequests) {
+    public OrderInfo create(UUID userId, ShippingInfo shippingInfo, List<OrderItemRequest> itemRequests, UUID couponId) {
         OrderModel order = orderService.create(userId, shippingInfo);
 
         // 1단계: 상품 검증 + 아이템 추가
@@ -51,12 +54,31 @@ public class OrderFacade {
             ));
         }
 
-        // 2단계: 재고 예약
+        // 2단계: 쿠폰 적용 — 재고 예약(1LC clear) 전에 order에 할인 반영
+        if (couponId != null) {
+            applyCoupon(order, userId, couponId);
+        }
+
+        // 3단계: 재고 예약
         // (flushAutomatically가 order+items를 DB에 저장, clearAutomatically가 1LC 클리어)
         itemRequests.forEach(req -> stockService.reserve(req.productId(), req.quantity()));
 
-        // 3단계: 1LC에서 detach된 order 재조회
+        // 4단계: 1LC에서 detach된 order 재조회
         return OrderInfo.from(orderService.get(order.getId()));
+    }
+
+    /** 쿠폰 검증(소유/만료/최소금액) → 사용(조건부 UPDATE) → 할인 반영. 재고예약과 동일 트랜잭션이라 실패 시 함께 롤백 */
+    private void applyCoupon(OrderModel order, UUID userId, UUID couponId) {
+        UserCouponModel coupon = userCouponService.getOwned(couponId, userId);
+        long original = order.getOriginalAmount();
+        if (coupon.isExpired(ZonedDateTime.now())) {
+            throw new CoreException(ErrorType.CONFLICT, "만료된 쿠폰입니다.");
+        }
+        if (!coupon.meetsMinOrderAmount(original)) {
+            throw new CoreException(ErrorType.CONFLICT, "최소 주문 금액을 충족하지 않습니다.");
+        }
+        userCouponService.use(couponId, order.getId());
+        order.applyCoupon(couponId, coupon.calculateDiscount(original));
     }
 
     /** 주문 단건 조회 — 본인 주문만 허용 */
@@ -111,6 +133,9 @@ public class OrderFacade {
         // 3단계: 주문 상태 일괄 FAILED 처리
         List<UUID> orderIds = expiredOrders.stream().map(OrderModel::getId).toList();
         orderService.failAllByIds(orderIds, before);
+
+        // 4단계: 만료 주문에 적용된 쿠폰 일괄 복구 (USED → AVAILABLE, 없으면 no-op)
+        userCouponService.releaseByOrderIds(orderIds);
     }
 
     public record OrderItemRequest(UUID productId, int quantity) {}

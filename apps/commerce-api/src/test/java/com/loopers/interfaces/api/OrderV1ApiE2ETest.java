@@ -2,10 +2,12 @@ package com.loopers.interfaces.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.coupon.CouponType;
 import com.loopers.fixture.BrandFixture;
 import com.loopers.fixture.ProductFixture;
 import com.loopers.fixture.UserFixture;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
+import com.loopers.interfaces.api.coupon.CouponV1Dto;
 import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.interfaces.api.common.response.PageResponse;
 import com.loopers.interfaces.api.order.OrderV1Dto;
@@ -31,11 +33,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -49,6 +57,7 @@ class OrderV1ApiE2ETest {
     private static final String ORDERS_URL   = "/api/v1/orders";
     private static final String PAYMENTS_CONFIRM_URL = "/api-webhook/v1/payments/confirm";
     private static final String PAYMENTS_FAIL_URL    = "/api-webhook/v1/payments/fail";
+    private static final String ADMIN_COUPONS_URL    = "/api-admin/v1/coupons";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -64,6 +73,7 @@ class OrderV1ApiE2ETest {
 
     private UUID userId;
     private UUID productId;
+    private UUID brandId;
 
     @BeforeEach
     void setUp() {
@@ -80,7 +90,7 @@ class OrderV1ApiE2ETest {
             new HttpEntity<>(new BrandV1Dto.CreateRequest(BrandFixture.NAME, BrandFixture.DESCRIPTION), adminHeaders()),
             new ParameterizedTypeReference<>() {}
         );
-        UUID brandId = brandResp.getBody().data().id();
+        brandId = brandResp.getBody().data().id();
 
         ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> productResp = testRestTemplate.exchange(
             PRODUCTS_URL, HttpMethod.POST,
@@ -132,6 +142,253 @@ class OrderV1ApiE2ETest {
             "홍길동", "010-1234-5678", "12345", "서울시 강남구 테헤란로 1", "101호"
         );
         return new OrderV1Dto.CreateRequest(shipping, List.of(new OrderV1Dto.OrderItemRequest(productId, 2)));
+    }
+
+    /** 쿠폰 템플릿 생성(admin) → templateId */
+    private UUID createCouponTemplate(CouponType type, long value, Long minOrderAmount) {
+        ResponseEntity<ApiResponse<CouponV1Dto.TemplateResponse>> resp = testRestTemplate.exchange(
+            ADMIN_COUPONS_URL, HttpMethod.POST,
+            new HttpEntity<>(new CouponV1Dto.CreateRequest("쿠폰" + UUID.randomUUID(), type, value, minOrderAmount,
+                LocalDateTime.now().plusDays(30)), adminHeaders()),
+            new ParameterizedTypeReference<>() {}
+        );
+        return resp.getBody().data().id();
+    }
+
+    /** 본인에게 발급 → userCouponId */
+    private UUID issueCoupon(UUID templateId) {
+        ResponseEntity<ApiResponse<CouponV1Dto.UserCouponResponse>> resp = testRestTemplate.exchange(
+            "/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST,
+            new HttpEntity<>(authHeaders()),
+            new ParameterizedTypeReference<>() {}
+        );
+        return resp.getBody().data().id();
+    }
+
+    private OrderV1Dto.CreateRequest createRequestWithCoupon(int quantity, UUID couponId) {
+        OrderV1Dto.ShippingInfoRequest shipping = new OrderV1Dto.ShippingInfoRequest(
+            "홍길동", "010-1234-5678", "12345", "서울시", "101호"
+        );
+        return new OrderV1Dto.CreateRequest(shipping, List.of(new OrderV1Dto.OrderItemRequest(productId, quantity)), couponId);
+    }
+
+    /** 지정 재고로 상품 생성(admin) → productId */
+    private UUID createProduct(int quantity) {
+        ResponseEntity<ApiResponse<ProductV1Dto.AdminProductResponse>> resp = testRestTemplate.exchange(
+            PRODUCTS_URL, HttpMethod.POST,
+            new HttpEntity<>(new ProductV1Dto.CreateRequest(
+                brandId, "상품" + UUID.randomUUID(), ProductFixture.DESCRIPTION, ProductFixture.PRICE, quantity
+            ), adminHeaders()),
+            new ParameterizedTypeReference<>() {}
+        );
+        return resp.getBody().data().id();
+    }
+
+    private OrderV1Dto.CreateRequest orderRequest(UUID pid, int quantity) {
+        OrderV1Dto.ShippingInfoRequest shipping = new OrderV1Dto.ShippingInfoRequest(
+            "홍길동", "010-1234-5678", "12345", "서울시", "101호"
+        );
+        return new OrderV1Dto.CreateRequest(shipping, List.of(new OrderV1Dto.OrderItemRequest(pid, quantity)), null);
+    }
+
+    @DisplayName("POST /api/v1/orders — 쿠폰 적용")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        @DisplayName("정액 쿠폰 적용 시, 200 + 할인액·최종금액이 반영된다.")
+        @Test
+        void appliesFixedCoupon() {
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
+            UUID couponId = issueCoupon(templateId);
+            long original = ProductFixture.PRICE * 2;
+
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().originalAmount()).isEqualTo(original),
+                () -> assertThat(response.getBody().data().discountAmount()).isEqualTo(3000L),
+                () -> assertThat(response.getBody().data().pgAmount()).isEqualTo(original - 3000L),
+                () -> assertThat(response.getBody().data().couponId()).isEqualTo(couponId)
+            );
+        }
+
+        @DisplayName("존재하지 않는 쿠폰으로 주문 시, 404 를 반환한다.")
+        @Test
+        void returnsNotFound_whenCouponNotExists() {
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, UUID.randomUUID()), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("이미 사용된 쿠폰으로 재주문 시, 409 를 반환한다.")
+        @Test
+        void returnsConflict_whenCouponAlreadyUsed() {
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
+            UUID couponId = issueCoupon(templateId);
+            testRestTemplate.exchange(ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<Void>() {});
+
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+
+        @DisplayName("최소 주문 금액 미달 쿠폰으로 주문 시, 409 를 반환한다.")
+        @Test
+        void returnsConflict_whenBelowMinOrderAmount() {
+            long original = ProductFixture.PRICE * 2;
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, original + 1);
+            UUID couponId = issueCoupon(templateId);
+
+            ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        }
+
+        @DisplayName("결제 실패 시, 쿠폰이 복구되어 동일 쿠폰으로 재주문할 수 있다.")
+        @Test
+        void releasesCoupon_whenPaymentFails() {
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
+            UUID couponId = issueCoupon(templateId);
+
+            // 1차 주문 — 쿠폰 사용
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+            UUID orderId = created.getBody().data().id();
+            Long amount = created.getBody().data().pgAmount();
+
+            // 결제 실패 웹훅 → 쿠폰 복구
+            String failBody = toJson(new PaymentV1Dto.FailRequest(orderId, "pg-tx-fail-001", amount));
+            testRestTemplate.exchange(
+                PAYMENTS_FAIL_URL, HttpMethod.POST,
+                new HttpEntity<>(failBody, pgHeaders(failBody)),
+                new ParameterizedTypeReference<Void>() {}
+            );
+
+            // 같은 쿠폰으로 재주문 → 성공 (복구 확인)
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> reorder = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(reorder.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+    }
+
+    @DisplayName("동시성 — 동일 쿠폰 동시 주문")
+    @Nested
+    class ConcurrentCouponOrder {
+
+        @DisplayName("동일 쿠폰으로 여러 기기에서 동시 주문해도, 쿠폰은 단 한번만 사용된다.")
+        @Test
+        void couponUsedOnce_underConcurrency() throws InterruptedException {
+            UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
+            UUID couponId = issueCoupon(templateId);
+
+            int threads = 8;
+            ExecutorService pool = Executors.newFixedThreadPool(threads);
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            AtomicInteger success = new AtomicInteger();
+            AtomicInteger conflict = new AtomicInteger();
+
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        ResponseEntity<ApiResponse<Void>> r = testRestTemplate.exchange(
+                            ORDERS_URL, HttpMethod.POST,
+                            new HttpEntity<>(createRequestWithCoupon(1, couponId), authHeaders()),
+                            new ParameterizedTypeReference<>() {}
+                        );
+                        if (r.getStatusCode() == HttpStatus.OK) success.incrementAndGet();
+                        else if (r.getStatusCode() == HttpStatus.CONFLICT) conflict.incrementAndGet();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+
+            ready.await();
+            start.countDown(); // 동시 출발
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+
+            assertAll(
+                () -> assertThat(success.get()).isEqualTo(1),
+                () -> assertThat(conflict.get()).isEqualTo(threads - 1)
+            );
+        }
+    }
+
+    @DisplayName("동시성 — 동일 상품 동시 주문(재고 차감)")
+    @Nested
+    class ConcurrentStockOrder {
+
+        @DisplayName("재고 5개 상품에 10명이 동시 주문해도, 정확히 5건만 성공하고 오버셀이 없다.")
+        @Test
+        void noOversell_underConcurrency() throws InterruptedException {
+            int stock = 5;
+            int threads = 10;
+            UUID pid = createProduct(stock);
+
+            ExecutorService pool = Executors.newFixedThreadPool(threads);
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            AtomicInteger success = new AtomicInteger();
+            AtomicInteger conflict = new AtomicInteger();
+
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        ResponseEntity<ApiResponse<Void>> r = testRestTemplate.exchange(
+                            ORDERS_URL, HttpMethod.POST,
+                            new HttpEntity<>(orderRequest(pid, 1), authHeaders()),
+                            new ParameterizedTypeReference<>() {}
+                        );
+                        if (r.getStatusCode() == HttpStatus.OK) success.incrementAndGet();
+                        else if (r.getStatusCode() == HttpStatus.CONFLICT) conflict.incrementAndGet();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+
+            ready.await();
+            start.countDown();
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+
+            assertAll(
+                () -> assertThat(success.get()).isEqualTo(stock),
+                () -> assertThat(conflict.get()).isEqualTo(threads - stock)
+            );
+        }
     }
 
     @DisplayName("POST /api/v1/orders — 주문 생성")

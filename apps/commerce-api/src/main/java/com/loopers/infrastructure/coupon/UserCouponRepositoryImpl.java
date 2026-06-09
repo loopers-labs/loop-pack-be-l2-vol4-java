@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,5 +45,20 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     @Override
     public Page<UserCouponModel> findByTemplateId(UUID templateId, Pageable pageable) {
         return userCouponJpaRepository.findByTemplateId(templateId, pageable);
+    }
+
+    @Override
+    public int useIfAvailable(UUID id, UUID orderId, ZonedDateTime usedAt) {
+        return userCouponJpaRepository.useIfAvailable(id, orderId, usedAt);
+    }
+
+    @Override
+    public int releaseByOrderId(UUID orderId) {
+        return userCouponJpaRepository.releaseByOrderId(orderId);
+    }
+
+    @Override
+    public int releaseByOrderIds(List<UUID> orderIds) {
+        return userCouponJpaRepository.releaseByOrderIds(orderIds);
     }
 }

@@ -12,7 +12,10 @@ public record OrderInfo(
     UUID id,
     UUID userId,
     OrderStatus status,
+    Long originalAmount,
+    Long discountAmount,
     Long pgAmount,
+    UUID couponId,
     ShippingInfoValue shippingInfo,
     List<OrderItemInfo> items,
     ZonedDateTime createdAt
@@ -61,7 +64,10 @@ public record OrderInfo(
             order.getId(),
             order.getUserId(),
             order.getStatus(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
             order.getPgAmount(),
+            order.getCouponId(),
             shippingInfo,
             items,
             order.getCreatedAt()

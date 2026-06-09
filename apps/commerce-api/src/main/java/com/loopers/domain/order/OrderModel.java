@@ -35,8 +35,17 @@ public class OrderModel extends BaseEntity {
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
 
+    @Column(name = "original_amount", nullable = false)
+    private Long originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
     @Column(name = "pg_amount", nullable = false)
     private Long pgAmount;
+
+    @Column(name = "coupon_id", columnDefinition = "BINARY(16)")
+    private UUID couponId;
 
     @Embedded
     private ShippingInfo shippingInfo;
@@ -48,12 +57,22 @@ public class OrderModel extends BaseEntity {
     public OrderModel(UUID userId, ShippingInfo shippingInfo) {
         this.userId = userId;
         this.shippingInfo = shippingInfo;
+        this.originalAmount = 0L;
+        this.discountAmount = 0L;
         this.pgAmount = 0L;
     }
 
     public void addItem(OrderItemModel item) {
         items.add(item);
-        this.pgAmount += item.getSubtotal();
+        this.originalAmount += item.getSubtotal();
+        this.pgAmount = this.originalAmount - this.discountAmount;
+    }
+
+    /** 쿠폰 할인 적용 — 할인액은 호출 측에서 cap/floor 처리해 전달한다. pgAmount = 원금 - 할인. */
+    public void applyCoupon(UUID couponId, long discountAmount) {
+        this.couponId = couponId;
+        this.discountAmount = discountAmount;
+        this.pgAmount = this.originalAmount - discountAmount;
     }
 
     public boolean isPending() {
