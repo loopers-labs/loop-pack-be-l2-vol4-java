@@ -15,7 +15,7 @@ public class BrandFacade {
 
     @Transactional
     public void deleteBrand(Long id) {
-        productService.deleteAllByBrandId(id);
         brandService.deleteBrand(id);
+        productService.deleteAllByBrandId(id);
     }
 }

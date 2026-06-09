@@ -61,6 +61,11 @@ class BrandServiceUnitTest {
         }
 
         @Override
+        public Optional<Brand> findByIdForUpdate(Long id) {
+            return findById(id);
+        }
+
+        @Override
         public Page<Brand> findAll(Pageable pageable) {
             List<Brand> active = store.values().stream()
                 .filter(b -> b.getDeletedAt() == null)
