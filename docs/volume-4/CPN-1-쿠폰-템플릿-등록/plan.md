@@ -5,7 +5,7 @@
 
 ## 요약
 
-`POST /api-admin/v1/coupons`로 쿠폰 템플릿을 등록한다. Coupon 도메인의 첫 시나리오라 aggregate 골격(`CouponModel` + `Name`·`DiscountValue`·`MinOrderAmount` VO + `DiscountType` enum + `CouponRepository`/`Impl`/`JpaRepository`)을 세우고, Brand 도메인의 등록 흐름(Controller → Facade → Model.builder → Repository.save)을 그대로 본뜬다. 관리자 인증은 기존 `AdminAuthInterceptor`가 `/api-admin/**`에 자동 적용되므로 신규 작업이 없다.
+`POST /api-admin/v1/coupons`로 쿠폰 템플릿을 등록한다. Coupon 도메인의 첫 시나리오라 aggregate 골격(`CouponModel` + `Name`·`MinOrderAmount`·`ExpiredAt` VO + `DiscountType` enum + `CouponRepository`/`Impl`/`JpaRepository`)을 세우고, Brand 도메인의 등록 흐름(Controller → Facade → Model.builder → Repository.save)을 그대로 본뜬다. 관리자 인증은 기존 `AdminAuthInterceptor`가 `/api-admin/**`에 자동 적용되므로 신규 작업이 없다.
 
 ## 기술 컨텍스트
 
@@ -44,14 +44,14 @@
 
 ### domain
 - `domain/coupon/CouponModel.java` — `@Entity @Table(name="coupons")`, `BaseEntity` 상속
-  - 필드: `@Embedded Name name`, `@Enumerated(STRING) @Column(discount_type) DiscountType type`, `@Column(discount_value) int discountValue`, `@Embedded MinOrderAmount minOrderAmount`(nullable), `@Embedded ExpiredAt expiredAt`
-  - `@Builder private CouponModel(String rawName, DiscountType type, Integer rawValue, Integer rawMinOrderAmount, ZonedDateTime rawExpiredAt)`:
-    - `Name.from` / `type.validate(rawValue)`(null·타입별 전체 범위) / `discountValue = rawValue` / `minOrderAmount = rawMinOrderAmount==null ? null : MinOrderAmount.from(...)` / `ExpiredAt.from(rawExpiredAt)`
+  - 필드: `@Embedded Name name`, `@Enumerated(STRING) @Column(discount_type) DiscountType type`, `@Column(discount_value) int discountValue`, `@Embedded MinOrderAmount minOrderAmount`(NOT NULL, 0=제약 없음), `@Embedded ExpiredAt expiredAt`
+  - `@Builder private CouponModel(String rawName, DiscountType type, Integer rawValue, Integer rawMinOrderAmount, ZonedDateTime rawExpiredAt, ZonedDateTime now)`:
+    - `Name.from` / `type.validate(rawValue)`(null·타입별 전체 범위) / `discountValue = rawValue` / `minOrderAmount = MinOrderAmount.from(rawMinOrderAmount)`(null→0) / `ExpiredAt.of(rawExpiredAt, now)`
   - `update`/`delete`/`isExpired`는 후속 cycle 범위 — 도입하지 않음
 - VO (`@Embeddable record`, Brand `Name`/Product `Price` 패턴):
   - `domain/coupon/Name.java` — `from(String)`, 1~100자, BAD_REQUEST
-  - `domain/coupon/MinOrderAmount.java` — `from(Integer)`, ≥1, BAD_REQUEST (`@Column min_order_amount` nullable)
-  - `domain/coupon/ExpiredAt.java` — `from(ZonedDateTime)`, null·과거 금지, BAD_REQUEST (`@Column expired_at`)
+  - `domain/coupon/MinOrderAmount.java` — `from(Integer)`, ≥0, BAD_REQUEST. null→0(제약 없음). (`@Column min_order_amount` NOT NULL)
+  - `domain/coupon/ExpiredAt.java` — `from(value, now)`, null·`now` 이전 금지, BAD_REQUEST (`@Column expired_at`). `now`는 `DateTimeUtil`로 주입
 - `domain/coupon/DiscountType.java` — `enum { FIXED, RATE }`
   - `public final void validate(Integer value)`: null 가드 후 `validateRange`에 위임 (template method)
   - `abstract void validateRange(int value)`: FIXED는 `value < 1` 시 BAD_REQUEST, RATE는 `value < 1 || value > 100` 시 BAD_REQUEST
@@ -68,7 +68,7 @@
 |------|------|----------------------|
 | `DiscountType`를 template method enum으로 (`validate` + `validateRange`) | review 결정 B — 할인 값 유효성이 타입과 분리 불가하므로 null·범위 전체를 `DiscountType`이 단일 소유. 분기 없이 다형 디스패치, ORD-7 `calculate`도 같은 구조로 확장 | `if (type == RATE)` 분기를 모델에 두기 / `DiscountValue` VO로 하한만 검증(타입 의존 상한을 못 담아 단일 원천 실패) |
 | `discountValue`를 VO 없이 원시 `int` | 검증이 타입 의존이라 단독 VO가 불가능 — 행위·독립 검증 없는 값은 원시 타입(model.md) | `DiscountValue` VO 유지 — 하한만 검증해 거짓 안전감 |
-| 만료 시각 검증을 `ExpiredAt` VO `from()`에서 `ZonedDateTime.now()` 비교 | 사용자 입력값 + 생성 시점 불변식이라 VO로 단일화(`BirthDate` 미래 금지 대칭). Clock 주입은 과설계 | `CouponModel`에 외톨이 검증 메서드 — 검증이 모델에 흩어짐 |
+| 만료 시각 검증을 `ExpiredAt` VO `from(value, now)`에서 비교, `now`는 `DateTimeUtil`로 표현 계층에서 주입 | 사용자 입력값 + 생성 시점 불변식이라 VO로 단일화(`BirthDate` 미래 금지 대칭). 기준 시각을 주입받아 요청 단위로 고정하고 테스트를 결정적으로 만든다(review 결정 — 만료 템플릿 조회 검증 가능) | `ExpiredAt`이 내부에서 `ZonedDateTime.now()` 직접 호출 — 만료 상태를 테스트로 구성 불가 |
 | discountType enum 수신(`from` 제거) | `ApiControllerAdvice`가 enum `InvalidFormatException`을 이미 BAD_REQUEST + 허용목록으로 처리 — 수동 파싱 잉여 | `String` 수신 + `DiscountType.from` 수동 파싱 |
 
-> **설계 산출물 정합**: 본 cycle의 review 결정(B·ExpiredAt VO·enum 수신)은 `docs/volume-4/03-class-diagram.md`의 `DiscountValue` VO / `LocalDateTime expiredAt` / `DiscountType.validate(value)` 표기와 어긋난다. 03은 stage-1 승인 산출물이라 본 plan에서 분기만 기록하고, 동기화 여부는 사용자 확인 후 별도 반영한다.
+> **설계 산출물 정합**: 본 cycle의 review 결정(B·ExpiredAt VO·enum 수신·MinOrderAmount 0 기본·DateTimeUtil 주입)은 `docs/volume-4/03-class-diagram.md`·`04-erd.md`·`01-requirements.md`에 이미 동기화 반영했다(사용자 승인).

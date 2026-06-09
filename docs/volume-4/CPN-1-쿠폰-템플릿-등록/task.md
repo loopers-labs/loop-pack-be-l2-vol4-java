@@ -10,7 +10,7 @@
 - [X] T002 `ExpiredAt` VO 작성 (null·과거 금지) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/ExpiredAt.java` *(review B: 당초 `DiscountValue` VO 대체)*
 - [X] T003 `MinOrderAmount` VO 작성 (≥1, nullable column) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/MinOrderAmount.java`
 - [X] T004 `DiscountType` enum 작성 (template method: `validate(Integer)` null 가드 + abstract `validateRange(int)`; FIXED ≥1, RATE 1~100) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/DiscountType.java`
-- [X] T005 `CouponModel` 작성 (`@Builder`, VO 조립 + `type.validate` + `ExpiredAt.from`; `discountValue`는 원시 int) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/CouponModel.java`
+- [X] T005 `CouponModel` 작성 (`@Builder`, VO 조립 + `type.validate` + `ExpiredAt.of`; `discountValue`는 원시 int) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/CouponModel.java`
 - [X] T006 `CouponRepository` 인터페이스 (`save`) `apps/commerce-api/src/main/java/com/loopers/domain/coupon/CouponRepository.java`
 - [X] T007 `CouponJpaRepository` + `CouponRepositoryImpl` `apps/commerce-api/src/main/java/com/loopers/infrastructure/coupon/`
 

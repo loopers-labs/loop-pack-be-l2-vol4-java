@@ -36,7 +36,7 @@ erDiagram
         VARCHAR(100) name "쿠폰 이름 (1~100자)"
         VARCHAR(20) discount_type "할인 타입 (FIXED/RATE)"
         INT discount_value "할인 값 (정액 원 / 정률 %)"
-        INT min_order_amount "최소 주문 금액 (원), nullable"
+        INT min_order_amount "최소 주문 금액 (원, 0이면 제약 없음)"
         DATETIME expired_at "발급 가능 만료 시각 (UTC)"
         DATETIME created_at "생성 일시 (UTC)"
         DATETIME updated_at "수정 일시 (UTC)"
@@ -73,7 +73,7 @@ CREATE TABLE coupons (
     name             VARCHAR(100) NOT NULL COMMENT '쿠폰 이름 (1~100자)',
     discount_type    VARCHAR(20)  NOT NULL COMMENT '할인 타입 (FIXED: 정액, RATE: 정률)',
     discount_value   INT          NOT NULL COMMENT '할인 값 (정액은 원, 정률은 %)',
-    min_order_amount INT          NULL     COMMENT '최소 주문 금액 (원, 1 이상). 미지정 시 제약 없음',
+    min_order_amount INT          NOT NULL COMMENT '최소 주문 금액 (원, 0 이상). 0이면 제약 없음(미지정 시 0)',
     expired_at       DATETIME     NOT NULL COMMENT '발급 가능 만료 시각 (UTC)',
     created_at       DATETIME     NOT NULL COMMENT '생성 일시 (UTC)',
     updated_at       DATETIME     NOT NULL COMMENT '수정 일시 (UTC)',
