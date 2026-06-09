@@ -19,6 +19,7 @@ import com.loopers.application.order.OrderInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.AuthenticatedUser;
 import com.loopers.interfaces.api.auth.LoginUser;
+import com.loopers.support.utils.DateTimeUtil;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class OrderV1Controller implements OrderV1ApiSpec {
 
     private final OrderFacade orderFacade;
+    private final DateTimeUtil dateTimeUtil;
 
     @Override
     @PostMapping
@@ -37,7 +39,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
         @Valid @RequestBody OrderV1Dto.CreateRequest request,
         @LoginUser AuthenticatedUser loginUser
     ) {
-        OrderInfo orderInfo = orderFacade.createOrder(loginUser.userId(), request.toCommandItems());
+        OrderInfo orderInfo = orderFacade.createOrder(loginUser.userId(), request.toCommandItems(), dateTimeUtil.now());
 
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderInfo));
     }
