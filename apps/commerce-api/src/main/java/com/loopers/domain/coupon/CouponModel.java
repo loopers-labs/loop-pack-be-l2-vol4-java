@@ -40,12 +40,21 @@ public class CouponModel extends BaseEntity {
     private ExpiredAt expiredAt;
 
     @Builder
-    private CouponModel(String rawName, DiscountType type, Integer rawValue, Integer rawMinOrderAmount, ZonedDateTime rawExpiredAt) {
+    private CouponModel(String rawName, DiscountType type, Integer rawValue, Integer rawMinOrderAmount, ZonedDateTime rawExpiredAt, ZonedDateTime now) {
         this.name = Name.from(rawName);
         this.type = type;
         type.validate(rawValue);
         this.discountValue = rawValue;
-        this.minOrderAmount = rawMinOrderAmount == null ? null : MinOrderAmount.from(rawMinOrderAmount);
-        this.expiredAt = ExpiredAt.from(rawExpiredAt);
+        this.minOrderAmount = MinOrderAmount.from(rawMinOrderAmount);
+        this.expiredAt = ExpiredAt.of(rawExpiredAt, now);
+    }
+
+    public void update(String rawName, DiscountType type, Integer rawValue, Integer rawMinOrderAmount, ZonedDateTime rawExpiredAt, ZonedDateTime now) {
+        this.name = Name.from(rawName);
+        this.type = type;
+        type.validate(rawValue);
+        this.discountValue = rawValue;
+        this.minOrderAmount = MinOrderAmount.from(rawMinOrderAmount);
+        this.expiredAt = ExpiredAt.of(rawExpiredAt, now);
     }
 }

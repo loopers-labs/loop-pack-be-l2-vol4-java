@@ -14,12 +14,12 @@ public record ExpiredAt(
     ZonedDateTime value
 ) {
 
-    public static ExpiredAt from(ZonedDateTime value) {
+    public static ExpiredAt of(ZonedDateTime value, ZonedDateTime now) {
         if (value == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료 시각은 필수입니다.");
         }
 
-        if (value.isBefore(ZonedDateTime.now())) {
+        if (value.isBefore(now)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료 시각은 현재 시각 이후여야 합니다.");
         }
 

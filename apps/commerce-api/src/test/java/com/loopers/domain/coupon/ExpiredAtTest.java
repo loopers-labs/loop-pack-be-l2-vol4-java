@@ -18,27 +18,29 @@ class ExpiredAtTest {
     @Nested
     class Create {
 
-        @DisplayName("현재 시각 이후면 입력값을 그대로 보존한 만료 시각이 생성된다.")
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        @DisplayName("기준 시각 이후면 입력값을 그대로 보존한 만료 시각이 생성된다.")
         @Test
         void createsExpiredAt_whenValueIsFuture() {
             // arrange
-            ZonedDateTime value = ZonedDateTime.now().plusDays(7);
+            ZonedDateTime value = now.plusDays(7);
 
             // act
-            ExpiredAt expiredAt = ExpiredAt.from(value);
+            ExpiredAt expiredAt = ExpiredAt.of(value, now);
 
             // assert
             assertThat(expiredAt.value()).isEqualTo(value);
         }
 
-        @DisplayName("현재 시각 이전이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("기준 시각 이전이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenValueIsPast() {
             // arrange
-            ZonedDateTime value = ZonedDateTime.now().minusDays(1);
+            ZonedDateTime value = now.minusDays(1);
 
             // act & assert
-            assertThatThrownBy(() -> ExpiredAt.from(value))
+            assertThatThrownBy(() -> ExpiredAt.of(value, now))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -48,7 +50,7 @@ class ExpiredAtTest {
         @Test
         void throwsBadRequest_whenValueIsNull() {
             // arrange & act & assert
-            assertThatThrownBy(() -> ExpiredAt.from(null))
+            assertThatThrownBy(() -> ExpiredAt.of(null, now))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
