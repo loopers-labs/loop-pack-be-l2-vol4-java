@@ -174,6 +174,7 @@ infrastructure/
 | Method | URI | 설명 | 인증 |
 |---|---|---|:---:|
 | GET | `/api-admin/v1/coupons?page=0&size=20` | 쿠폰 템플릿 목록 조회 | Admin |
+| GET | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 단건 조회 | Admin |
 | POST | `/api-admin/v1/coupons` | 쿠폰 템플릿 등록 | Admin |
 | PUT | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 수정 | Admin |
 | DELETE | `/api-admin/v1/coupons/{couponTemplateId}` | 쿠폰 템플릿 삭제 (soft delete, 발급된 쿠폰 연쇄 삭제) | Admin |
