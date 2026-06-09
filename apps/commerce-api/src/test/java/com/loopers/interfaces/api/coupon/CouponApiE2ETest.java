@@ -103,15 +103,23 @@ class CouponApiE2ETest {
     @DisplayName("같은 템플릿을 두 번 발급하면 내 쿠폰 목록에 2건이 조회된다(다중 발급)")
     @Test
     void issueTwice_listsTwoCoupons() {
-        restTemplate.exchange("/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<IssueCouponV1Response>>() {});
-        restTemplate.exchange("/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<IssueCouponV1Response>>() {});
+        ResponseEntity<ApiResponse<IssueCouponV1Response>> firstIssue = restTemplate.exchange(
+            "/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()),
+            new ParameterizedTypeReference<>() {});
+        ResponseEntity<ApiResponse<IssueCouponV1Response>> secondIssue = restTemplate.exchange(
+            "/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()),
+            new ParameterizedTypeReference<>() {});
 
         ResponseEntity<ApiResponse<List<MyCouponV1Response>>> listRes = restTemplate.exchange(
             "/api/v1/users/me/coupons", HttpMethod.GET, new HttpEntity<>(userHeaders()),
             new ParameterizedTypeReference<>() {}
         );
 
-        assertThat(listRes.getBody().data()).hasSize(2);
+        assertAll(
+            () -> assertThat(firstIssue.getStatusCode()).isEqualTo(HttpStatus.OK),
+            () -> assertThat(secondIssue.getStatusCode()).isEqualTo(HttpStatus.OK),
+            () -> assertThat(listRes.getBody().data()).hasSize(2)
+        );
     }
 
     @DisplayName("인증 헤더 없이 발급하면 401 UNAUTHORIZED 를 반환한다")

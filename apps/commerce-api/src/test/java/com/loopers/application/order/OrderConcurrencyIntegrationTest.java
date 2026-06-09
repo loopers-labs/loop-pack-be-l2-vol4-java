@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,7 +105,8 @@ class OrderConcurrencyIntegrationTest {
         // given
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
         AtomicInteger success = new AtomicInteger();
         AtomicInteger failure = new AtomicInteger();
 
@@ -112,16 +114,20 @@ class OrderConcurrencyIntegrationTest {
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
+                    startGate.await();
                     orderFacade.placeOrder(userId, List.of(new OrderLineCommand(productId, 1)), couponId);
                     success.incrementAndGet();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } catch (Exception e) {
                     failure.incrementAndGet();
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown();
                 }
             });
         }
-        latch.await();
+        startGate.countDown();
+        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
         executor.shutdown();
 
         // then - 주문 1건만 성공, 쿠폰 1회 USED, 재고도 1개만 차감

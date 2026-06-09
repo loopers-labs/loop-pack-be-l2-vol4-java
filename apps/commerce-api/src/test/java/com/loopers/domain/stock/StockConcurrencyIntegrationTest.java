@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +46,8 @@ class StockConcurrencyIntegrationTest {
 
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
         AtomicInteger success = new AtomicInteger();
         AtomicInteger failure = new AtomicInteger();
 
@@ -53,16 +55,20 @@ class StockConcurrencyIntegrationTest {
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
+                    startGate.await();
                     stockService.decrease(productId, 1);
                     success.incrementAndGet();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } catch (Exception e) {
                     failure.incrementAndGet();
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown();
                 }
             });
         }
-        latch.await();
+        startGate.countDown();
+        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
         executor.shutdown();
 
         // then - 5건만 성공, 5건 실패, 재고 0 (음수 없음)

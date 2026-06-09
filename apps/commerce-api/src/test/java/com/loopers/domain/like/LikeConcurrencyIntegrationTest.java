@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,20 +52,25 @@ class LikeConcurrencyIntegrationTest {
 
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
 
         // when - 서로 다른 유저 10명이 동시에 좋아요
         for (int i = 0; i < threadCount; i++) {
             long userId = i + 1;
             executor.submit(() -> {
                 try {
+                    startGate.await();
                     likeFacade.like(userId, productId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown();
                 }
             });
         }
-        latch.await();
+        startGate.countDown();
+        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
         executor.shutdown();
 
         // then - 좋아요 수가 정확히 10
@@ -85,20 +91,25 @@ class LikeConcurrencyIntegrationTest {
         assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(10L);
 
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
 
         // when - 좋아요한 10명이 동시에 취소
         for (int i = 0; i < threadCount; i++) {
             long userId = i + 1;
             executor.submit(() -> {
                 try {
+                    startGate.await();
                     likeFacade.unlike(userId, productId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown();
                 }
             });
         }
-        latch.await();
+        startGate.countDown();
+        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
         executor.shutdown();
 
         // then - 좋아요 수가 정확히 0 (유실·음수 없음)

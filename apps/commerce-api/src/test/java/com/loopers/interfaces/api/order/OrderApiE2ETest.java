@@ -165,6 +165,8 @@ class OrderApiE2ETest {
                 "/api-admin/v1/coupons", HttpMethod.POST, new HttpEntity<>(createReq, adminHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
+            assertThat(createRes.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(createRes.getBody()).isNotNull();
             Long templateId = createRes.getBody().data().id();
 
             // 유저가 쿠폰 발급
@@ -172,6 +174,8 @@ class OrderApiE2ETest {
                 "/api/v1/coupons/" + templateId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
+            assertThat(issueRes.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(issueRes.getBody()).isNotNull();
             Long couponId = issueRes.getBody().data().couponId();
 
             // when - 주문 전체(130,000)에 쿠폰 적용
