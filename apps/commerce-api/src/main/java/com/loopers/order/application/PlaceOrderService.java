@@ -1,9 +1,8 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandReader;
-import com.loopers.coupon.domain.CouponErrorCode;
-import com.loopers.coupon.domain.UserCoupon;
-import com.loopers.coupon.domain.UserCouponRepository;
+import com.loopers.common.domain.Money;
+import com.loopers.coupon.application.CouponUsageService;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
@@ -22,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -39,7 +37,7 @@ public class PlaceOrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderNumberGenerator orderNumberGenerator;
     private final PaymentService paymentService;
-    private final UserCouponRepository userCouponRepository;
+    private final CouponUsageService couponUsageService;
 
     @Transactional
     public OrderResult.Detail place(OrderCommand.Create command) {
@@ -90,10 +88,8 @@ public class PlaceOrderService {
         if (command.userCouponId() == null) {
             return;
         }
-        UserCoupon coupon = userCouponRepository.findByIdForUpdate(command.userCouponId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, CouponErrorCode.COUPON_NOT_FOUND));
-        long orderAmount = order.getTotalAmount().value();
-        coupon.use(command.userId(), orderAmount, ZonedDateTime.now());
-        order.applyDiscount(command.userCouponId(), coupon.calculateDiscount(orderAmount));
+        Money discount = couponUsageService.use(
+                command.userCouponId(), command.userId(), order.getTotalAmount().value());
+        order.applyDiscount(command.userCouponId(), discount);
     }
 }
