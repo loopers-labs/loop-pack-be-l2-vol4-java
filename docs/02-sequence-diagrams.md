@@ -258,14 +258,19 @@ sequenceDiagram
     opt couponId 있음
         Note over OrderFacade: ① 쿠폰 유효성 검증 + 사용 처리 (PESSIMISTIC_WRITE, ADR-031)
         Note over OrderFacade: 검증은 락 획득 후 단일 지점에서만 수행 (이중 검증 없음)
-        OrderFacade->>CouponApplicationService: useCoupon(couponId, userId)
+        OrderFacade->>CouponApplicationService: useCoupon(couponId, userId, originalAmount)
         CouponApplicationService->>CouponRepository: findByIdForUpdate(couponId)
         Note over CouponRepository: SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
         CouponRepository-->>CouponApplicationService: CouponEntity (없으면 404)
         Note over CouponApplicationService: isOwnedBy(userId) → 불일치 시 403
-        Note over CouponApplicationService: resolveStatus(expiredAt) → EXPIRED 시 400
+        CouponApplicationService->>CouponTemplateRepository: findById(coupon.couponTemplateId)
+        CouponTemplateRepository-->>CouponApplicationService: CouponTemplateEntity
+        Note over CouponApplicationService: resolveStatus(template.expiredAt) → EXPIRED 시 400
         Note over CouponApplicationService: status == USED 시 400
-        CouponApplicationService->>CouponApplicationService: coupon.use() — AVAILABLE → USED
+        Note over CouponApplicationService: originalAmount < template.minOrderAmount → 400
+        CouponApplicationService->>CouponApplicationService: discountAmount = template.calculateDiscount(originalAmount)
+        CouponApplicationService->>CouponApplicationService: coupon.use() — AVAILABLE → USED (인메모리)
+        CouponApplicationService->>CouponRepository: save(coupon)
         CouponApplicationService-->>OrderFacade: discountAmount
     end
 

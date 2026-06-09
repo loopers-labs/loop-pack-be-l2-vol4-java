@@ -413,7 +413,7 @@ flowchart TD
     D -- 성공 --> F{"재고 fast-fail<br/>product.quantity < 요청수량"}
     F -- 재고 부족 --> C2[400 Bad Request]
     F -- 통과 --> H
-    H["@Transactional 시작<br/>①쿠폰 유효성 검증 + 사용 처리 (PESSIMISTIC_WRITE)<br/>소유권·상태 검증은 락 획득 후 단일 지점에서 수행"] --> I
+    H["@Transactional 시작<br/>①쿠폰 유효성 검증 + 사용 처리 (PESSIMISTIC_WRITE)<br/>CouponEntity 락 → CouponTemplateEntity 조회 → 검증 → use() → save()"] --> I
     I{"②재고 차감<br/>SELECT FOR UPDATE<br/>productId 오름차순"} -- 재고 부족 --> J[Rollback → 400]
     I -- 성공 --> K["③주문 엔티티 생성 및 저장<br/>OrderEntity INSERT + 스냅샷"]
     K --> L[Commit → 201 Created]
@@ -459,6 +459,24 @@ CouponApplicationService.deleteTemplate(couponTemplateId)
 - `couponTemplateId`로 템플릿 존재 여부 검증 (없으면 404)
 - 템플릿 만료 여부 검증 (`isExpired()` — 발급 시점 기준, 만료됐으면 400)
 - 쿠폰 발급 (AVAILABLE 상태로 INSERT, userId = 인증된 유저)
+
+### 쿠폰 사용 처리 (`CouponApplicationService.useCoupon`)
+
+```
+useCoupon(couponId, userId, originalAmount)
+  1. CouponRepository.findByIdForUpdate(couponId)        → CouponEntity (PESSIMISTIC_WRITE, 없으면 404)
+  2. coupon.isOwnedBy(userId)                            → 불일치 시 403
+  3. CouponTemplateRepository.findById(couponTemplateId) → CouponTemplateEntity
+  4. coupon.resolveStatus(template.expiredAt)            → EXPIRED 시 400
+  5. coupon.status == USED                               → 400
+  6. originalAmount < template.minOrderAmount            → 400
+  7. discountAmount = template.calculateDiscount(originalAmount)
+  8. coupon.use()                                        → AVAILABLE → USED (인메모리)
+  9. CouponRepository.save(coupon)                       → DB 반영
+  10. return discountAmount
+```
+
+> 도메인 엔티티와 JPA 엔티티가 분리된 구조이므로 `coupon.use()` 후 반드시 명시적 `save()` 호출 필요 — JPA 더티 체킹 미적용
 
 ### 쿠폰 할인 계산
 
