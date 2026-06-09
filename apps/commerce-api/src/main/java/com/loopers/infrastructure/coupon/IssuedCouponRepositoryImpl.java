@@ -28,17 +28,12 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
         IssuedCouponEntity entity = issuedCouponJpaRepository.findById(issuedCoupon.getId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 발급 쿠폰입니다."));
         entity.updateFrom(issuedCoupon);
-        return issuedCouponJpaRepository.save(entity).toDomain();
+        return issuedCouponJpaRepository.saveAndFlush(entity).toDomain();
     }
 
     @Override
     public Optional<IssuedCoupon> findById(Long id) {
         return issuedCouponJpaRepository.findById(id).map(IssuedCouponEntity::toDomain);
-    }
-
-    @Override
-    public Optional<IssuedCoupon> findByIdForUpdate(Long id) {
-        return issuedCouponJpaRepository.findByIdForUpdate(id).map(IssuedCouponEntity::toDomain);
     }
 
     @Override

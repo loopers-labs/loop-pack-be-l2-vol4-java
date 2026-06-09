@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 import java.time.ZonedDateTime;
@@ -16,6 +17,9 @@ import java.time.ZonedDateTime;
 @Entity(name = "IssuedCoupon")
 @Table(name = "issued_coupon")
 public class IssuedCouponEntity extends BaseEntity {
+
+    @Version
+    private Long version;
 
     @Column(name = "coupon_id", nullable = false)
     private Long couponId;
