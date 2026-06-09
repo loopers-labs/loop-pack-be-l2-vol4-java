@@ -83,3 +83,76 @@ X-Loopers-Ldap: loopers.admin
   "discountValue": 5000,
   "expiredAt": "2020-01-01T00:00:00+09:00"
 }
+
+### 쿠폰 템플릿 수정 - 정상 (200 OK)
+PUT http://localhost:8080/api-admin/v1/coupons/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "변경된 쿠폰",
+  "discountType": "RATE",
+  "discountValue": 20,
+  "minOrderAmount": 50000,
+  "expiredAt": "2027-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 수정 - 대상 미존재 (404 Not Found)
+PUT http://localhost:8080/api-admin/v1/coupons/99999
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "변경된 쿠폰",
+  "discountType": "FIXED",
+  "discountValue": 3000,
+  "expiredAt": "2027-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 수정 - 관리자 인증 헤더 누락 (403 Forbidden)
+PUT http://localhost:8080/api-admin/v1/coupons/1
+Content-Type: application/json
+
+{
+  "name": "변경된 쿠폰",
+  "discountType": "FIXED",
+  "discountValue": 3000,
+  "expiredAt": "2027-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 목록 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/coupons?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 목록 - size 생략 (기본 20)
+GET http://localhost:8080/api-admin/v1/coupons?page=0
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 목록 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/coupons?page=0&size=20
+
+### 쿠폰 템플릿 상세 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 상세 - 대상 미존재 (404 Not Found)
+GET http://localhost:8080/api-admin/v1/coupons/99999
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 상세 - 관리자 인증 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/coupons/1
+
+### 쿠폰 템플릿 삭제 - 정상 (200 OK, soft delete)
+DELETE http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 삭제 - 반복 요청 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 삭제 - 미존재 (200 OK, 멱등)
+DELETE http://localhost:8080/api-admin/v1/coupons/99999
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 템플릿 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
+DELETE http://localhost:8080/api-admin/v1/coupons/1

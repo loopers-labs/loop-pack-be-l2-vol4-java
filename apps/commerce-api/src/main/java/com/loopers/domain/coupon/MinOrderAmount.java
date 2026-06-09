@@ -8,15 +8,15 @@ import jakarta.persistence.Embeddable;
 
 @Embeddable
 public record MinOrderAmount(
-    @Column(name = "min_order_amount")
+    @Column(name = "min_order_amount", nullable = false)
     Integer value
 ) {
 
-    private static final int MIN_VALUE = 1;
+    private static final int MIN_VALUE = 0;
 
     public static MinOrderAmount from(Integer value) {
         if (value == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액은 필수입니다.");
+            return new MinOrderAmount(MIN_VALUE);
         }
 
         if (value < MIN_VALUE) {
