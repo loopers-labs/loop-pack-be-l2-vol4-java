@@ -26,7 +26,9 @@ import org.springframework.http.ResponseEntity;
 
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.infrastructure.coupon.CouponJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.interfaces.api.coupon.CouponAdminV1Dto;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -44,6 +46,9 @@ class CouponAdminV1ApiE2ETest {
 
     @Autowired
     private CouponJpaRepository couponJpaRepository;
+
+    @Autowired
+    private UserCouponJpaRepository userCouponJpaRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -751,6 +756,142 @@ class CouponAdminV1ApiE2ETest {
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
                 ENDPOINT_REGISTER + "/99999",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+    }
+
+    @DisplayName("쿠폰 발급 내역 조회 - GET /api-admin/v1/coupons/{couponId}/issues")
+    @Nested
+    class ReadCouponIssues {
+
+        @SuppressWarnings("unchecked")
+        private List<Map<String, Object>> contentOf(ResponseEntity<ApiResponse<Map<String, Object>>> response) {
+            return (List<Map<String, Object>>) response.getBody().data().get("content");
+        }
+
+        private void saveUserCoupon(Long userId, CouponModel coupon) {
+            userCouponJpaRepository.save(UserCouponModel.issue(userId, coupon));
+        }
+
+        @DisplayName("정상 요청이면, 200 OK와 함께 발급 내역과 페이지 메타가 반환된다.")
+        @Test
+        void returnsOk_withIssuesAndMeta() {
+            // arrange
+            CouponModel coupon = saveCoupon("신규 가입 쿠폰", 10_000);
+            saveUserCoupon(100L, coupon);
+            saveUserCoupon(200L, coupon);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + coupon.getId() + "/issues?page=0&size=20",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            List<Map<String, Object>> content = contentOf(response);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data())
+                    .containsKeys("content", "page", "size", "totalElements", "totalPages"),
+                () -> assertThat(content).hasSize(2),
+                () -> assertThat(content.get(0)).containsOnlyKeys("userCouponId", "userId", "status", "issuedAt"),
+                () -> assertThat(content)
+                    .extracting(issue -> ((Number) issue.get("userId")).longValue())
+                    .containsExactlyInAnyOrder(100L, 200L),
+                () -> assertThat(content)
+                    .extracting(issue -> issue.get("status"))
+                    .containsOnly("AVAILABLE")
+            );
+        }
+
+        @DisplayName("발급분이 없으면, 200 OK와 함께 빈 목록이 반환된다.")
+        @Test
+        void returnsOk_withEmptyContent() {
+            // arrange
+            CouponModel coupon = saveCoupon("신규 가입 쿠폰", 10_000);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + coupon.getId() + "/issues",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(contentOf(response)).isEmpty(),
+                () -> assertThat(((Number) response.getBody().data().get("size")).intValue()).isEqualTo(20)
+            );
+        }
+
+        @DisplayName("admin 헤더가 없으면, 403 Forbidden으로 거절된다.")
+        @Test
+        void returnsForbidden_whenAdminHeaderIsMissing() {
+            // arrange
+            CouponModel coupon = saveCoupon("신규 가입 쿠폰", 10_000);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + coupon.getId() + "/issues",
+                HttpMethod.GET,
+                guestGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode())
+            );
+        }
+
+        @DisplayName("대상 템플릿이 존재하지 않으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenTemplateIsAbsent() {
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/99999/issues",
+                HttpMethod.GET,
+                adminGet(),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("대상 템플릿이 삭제됐으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenTemplateIsDeleted() {
+            // arrange
+            CouponModel coupon = saveCoupon("신규 가입 쿠폰", 10_000);
+            saveUserCoupon(100L, coupon);
+            coupon.delete();
+            couponJpaRepository.saveAndFlush(coupon);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT_REGISTER + "/" + coupon.getId() + "/issues",
                 HttpMethod.GET,
                 adminGet(),
                 MAP_RESPONSE

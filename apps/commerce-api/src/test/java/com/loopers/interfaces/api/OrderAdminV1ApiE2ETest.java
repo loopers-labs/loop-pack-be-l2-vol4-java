@@ -62,7 +62,9 @@ class OrderAdminV1ApiE2ETest {
         OrderModel savedOrder = orderJpaRepository.save(OrderModel.builder()
             .userId(userId)
             .orderedAt(orderedAt)
-            .totalPrice(78_000)
+            .originalAmount(78_000)
+            .discountAmount(0)
+            .finalAmount(78_000)
             .build());
 
         OrderItemModel orderItem = OrderItemModel.builder()
@@ -123,10 +125,10 @@ class OrderAdminV1ApiE2ETest {
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(2),
-                () -> assertThat(firstItem).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "totalPrice"),
+                () -> assertThat(firstItem).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount"),
                 () -> assertThat(((Number) firstItem.get("userId")).longValue()).isEqualTo(secondOrder.getUserId()),
                 () -> assertThat(firstItem.get("status")).isEqualTo("CREATED"),
-                () -> assertThat(((Number) firstItem.get("totalPrice")).intValue()).isEqualTo(78_000),
+                () -> assertThat(((Number) firstItem.get("finalAmount")).intValue()).isEqualTo(78_000),
                 () -> assertThat(contentOf(response))
                     .extracting(o -> ZonedDateTime.parse((String) o.get("orderedAt")))
                     .isSortedAccordingTo(Comparator.reverseOrder())
@@ -195,7 +197,7 @@ class OrderAdminV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
-                () -> assertThat(data).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "totalPrice", "items"),
+                () -> assertThat(data).containsOnlyKeys("orderId", "userId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount", "items"),
                 () -> assertThat(((Number) data.get("userId")).longValue()).isEqualTo(7L)
             );
         }

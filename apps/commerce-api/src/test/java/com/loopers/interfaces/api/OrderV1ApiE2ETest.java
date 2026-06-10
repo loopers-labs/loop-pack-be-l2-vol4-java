@@ -24,12 +24,17 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.coupon.CouponModel;
+import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.coupon.CouponJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -64,6 +69,12 @@ class OrderV1ApiE2ETest {
 
     @Autowired
     private OrderItemJpaRepository orderItemJpaRepository;
+
+    @Autowired
+    private CouponJpaRepository couponJpaRepository;
+
+    @Autowired
+    private UserCouponJpaRepository userCouponJpaRepository;
 
     @Autowired
     private PasswordEncrypter passwordEncrypter;
@@ -108,7 +119,9 @@ class OrderV1ApiE2ETest {
         OrderModel savedOrder = orderJpaRepository.save(OrderModel.builder()
             .userId(userId)
             .orderedAt(ZonedDateTime.now())
-            .totalPrice(78_000)
+            .originalAmount(78_000)
+            .discountAmount(0)
+            .finalAmount(78_000)
             .build());
 
         OrderItemModel orderItem = OrderItemModel.builder()
@@ -174,7 +187,7 @@ class OrderV1ApiE2ETest {
             BrandModel brand = saveBrand("감성 브랜드");
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
             OrderV1Dto.CreateRequest requestBody =
-                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2)));
+                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -191,9 +204,11 @@ class OrderV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
-                () -> assertThat(data).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items"),
+                () -> assertThat(data).containsOnlyKeys("orderId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount", "items"),
                 () -> assertThat(data.get("status")).isEqualTo("CREATED"),
-                () -> assertThat(((Number) data.get("totalPrice")).intValue()).isEqualTo(78_000),
+                () -> assertThat(((Number) data.get("originalAmount")).intValue()).isEqualTo(78_000),
+                () -> assertThat(((Number) data.get("discountAmount")).intValue()).isZero(),
+                () -> assertThat(((Number) data.get("finalAmount")).intValue()).isEqualTo(78_000),
                 () -> assertThat(itemsOf(response)).hasSize(1),
                 () -> assertThat(item).containsOnlyKeys("productId", "productName", "brandName", "unitPrice", "quantity"),
                 () -> assertThat(((Number) item.get("productId")).longValue()).isEqualTo(product.getId()),
@@ -213,7 +228,7 @@ class OrderV1ApiE2ETest {
             BrandModel brand = saveBrand("감성 브랜드");
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
             OrderV1Dto.CreateRequest requestBody =
-                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2)));
+                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -237,7 +252,7 @@ class OrderV1ApiE2ETest {
             // arrange
             saveUser("kylekim");
             OrderV1Dto.CreateRequest requestBody =
-                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(99999L, 2)));
+                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(99999L, 2)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -264,7 +279,7 @@ class OrderV1ApiE2ETest {
             BrandModel brand = saveBrand("감성 브랜드");
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
             OrderV1Dto.CreateRequest requestBody =
-                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 0)));
+                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 0)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -291,7 +306,7 @@ class OrderV1ApiE2ETest {
             BrandModel brand = saveBrand("감성 브랜드");
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 3);
             OrderV1Dto.CreateRequest requestBody =
-                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 5)));
+                new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 5)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -322,7 +337,7 @@ class OrderV1ApiE2ETest {
             ProductModel secondProduct = saveProduct(brand.getId(), "감성 머플러", 5_000, 50);
             OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of(
                 new OrderV1Dto.OrderItemRequest(firstProduct.getId(), 1),
-                new OrderV1Dto.OrderItemRequest(secondProduct.getId(), 2)));
+                new OrderV1Dto.OrderItemRequest(secondProduct.getId(), 2)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -339,7 +354,7 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
                 () -> assertThat(itemsOf(response)).hasSize(2),
-                () -> assertThat(((Number) response.getBody().data().get("totalPrice")).intValue()).isEqualTo(20_000),
+                () -> assertThat(((Number) response.getBody().data().get("originalAmount")).intValue()).isEqualTo(20_000),
                 () -> assertThat(reloadedFirst.getStock().value()).isEqualTo(49),
                 () -> assertThat(reloadedSecond.getStock().value()).isEqualTo(48)
             );
@@ -350,7 +365,7 @@ class OrderV1ApiE2ETest {
         void returnsBadRequest_whenItemsAreEmpty() {
             // arrange
             saveUser("kylekim");
-            OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of());
+            OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of(), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -378,7 +393,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
             OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of(
                 new OrderV1Dto.OrderItemRequest(product.getId(), 1),
-                new OrderV1Dto.OrderItemRequest(product.getId(), 2)));
+                new OrderV1Dto.OrderItemRequest(product.getId(), 2)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -406,7 +421,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
             OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of(
                 new OrderV1Dto.OrderItemRequest(product.getId(), 1),
-                new OrderV1Dto.OrderItemRequest(99999L, 1)));
+                new OrderV1Dto.OrderItemRequest(99999L, 1)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -437,7 +452,7 @@ class OrderV1ApiE2ETest {
             ProductModel insufficientProduct = saveProduct(brand.getId(), "재고 부족 상품", 5_000, 2);
             OrderV1Dto.CreateRequest requestBody = new OrderV1Dto.CreateRequest(List.of(
                 new OrderV1Dto.OrderItemRequest(sufficientProduct.getId(), 5),
-                new OrderV1Dto.OrderItemRequest(insufficientProduct.getId(), 5)));
+                new OrderV1Dto.OrderItemRequest(insufficientProduct.getId(), 5)), null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -454,6 +469,256 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
                 () -> assertThat(reloadedSufficient.getStock().value()).isEqualTo(10),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+    }
+
+    @DisplayName("쿠폰 적용 주문 생성 - POST /api/v1/orders (userCouponId)")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        private CouponModel saveCoupon(int discountValue, Integer minOrderAmount) {
+            return couponJpaRepository.save(CouponModel.builder()
+                .rawName("할인 쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(discountValue)
+                .rawMinOrderAmount(minOrderAmount)
+                .rawExpiredAt(ZonedDateTime.now().plusDays(7))
+                .now(ZonedDateTime.now())
+                .build());
+        }
+
+        private UserCouponModel saveUserCoupon(Long userId, CouponModel coupon) {
+            return userCouponJpaRepository.save(UserCouponModel.issue(userId, coupon));
+        }
+
+        private UserCouponModel saveUsedUserCoupon(Long userId, CouponModel coupon) {
+            return userCouponJpaRepository.save(UserCouponModel.builder()
+                .userId(userId)
+                .couponId(coupon.getId())
+                .name(coupon.getName().value())
+                .discountType(coupon.getType())
+                .discountValue(coupon.getDiscountValue())
+                .minOrderAmount(coupon.getMinOrderAmount().value())
+                .expiredAt(coupon.getExpiredAt().value())
+                .usedAt(ZonedDateTime.now())
+                .build());
+        }
+
+        private UserCouponModel saveExpiredUserCoupon(Long userId) {
+            ZonedDateTime pastExpiredAt = ZonedDateTime.now().minusDays(1);
+            CouponModel expiredCoupon = couponJpaRepository.save(CouponModel.builder()
+                .rawName("만료 쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(5_000)
+                .rawMinOrderAmount(10_000)
+                .rawExpiredAt(pastExpiredAt)
+                .now(pastExpiredAt.minusDays(1))
+                .build());
+
+            return userCouponJpaRepository.save(UserCouponModel.issue(userId, expiredCoupon));
+        }
+
+        private OrderV1Dto.CreateRequest requestWithCoupon(Long productId, int quantity, Long userCouponId) {
+            return new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(productId, quantity)), userCouponId);
+        }
+
+        @DisplayName("사용 가능한 쿠폰을 적용하면, 201 Created와 함께 세 금액·적용 쿠폰 식별자가 반환되고 쿠폰이 사용 완료로 전이된다.")
+        @Test
+        void returnsCreated_withDiscount_andUsesCoupon() {
+            // arrange (78,000원 주문 + 정액 5,000원 쿠폰)
+            UserModel user = saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            UserCouponModel userCoupon = saveUserCoupon(user.getId(), saveCoupon(5_000, 10_000));
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, userCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            Map<String, Object> data = response.getBody().data();
+            UserCouponModel reloadedCoupon = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(data)
+                    .containsOnlyKeys("orderId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount", "userCouponId", "items"),
+                () -> assertThat(((Number) data.get("originalAmount")).intValue()).isEqualTo(78_000),
+                () -> assertThat(((Number) data.get("discountAmount")).intValue()).isEqualTo(5_000),
+                () -> assertThat(((Number) data.get("finalAmount")).intValue()).isEqualTo(73_000),
+                () -> assertThat(((Number) data.get("userCouponId")).longValue()).isEqualTo(userCoupon.getId()),
+                () -> assertThat(reloadedCoupon.getUsedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("존재하지 않는 쿠폰을 지정하면, 404 Not Found로 거절되고 재고는 원복된다.")
+        @Test
+        void returnsNotFound_whenCouponIsAbsent_andRollsBack() {
+            // arrange
+            saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, 99999L)),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode()),
+                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(50),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("타 회원 소유 쿠폰을 지정하면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenCouponBelongsToOther() {
+            // arrange
+            UserModel owner = saveUser("owner");
+            saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            UserCouponModel othersCoupon = saveUserCoupon(owner.getId(), saveCoupon(5_000, 10_000));
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, othersCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode()),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("이미 사용한 쿠폰을 지정하면, 409 Conflict로 거절된다.")
+        @Test
+        void returnsConflict_whenCouponIsAlreadyUsed() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            UserCouponModel usedCoupon = saveUsedUserCoupon(user.getId(), saveCoupon(5_000, 10_000));
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, usedCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("만료된 쿠폰을 지정하면, 409 Conflict로 거절된다.")
+        @Test
+        void returnsConflict_whenCouponIsExpired() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            UserCouponModel expiredCoupon = saveExpiredUserCoupon(user.getId());
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, expiredCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("할인 전 주문 금액이 최소 주문 금액에 미치지 못하면, 409 Conflict로 거절되고 재고가 원복되며 쿠폰은 사용되지 않는다.")
+        @Test
+        void returnsConflict_whenOrderAmountIsBelowMinimum_andRollsBack() {
+            // arrange (78,000원 주문 + 최소 100,000원 쿠폰)
+            UserModel user = saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            UserCouponModel userCoupon = saveUserCoupon(user.getId(), saveCoupon(5_000, 100_000));
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 2, userCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            UserCouponModel reloadedCoupon = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
+                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(50),
+                () -> assertThat(reloadedCoupon.getUsedAt()).isNull(),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("재고가 부족하면, 409 Conflict로 거절되고 쿠폰은 사용되지 않는다(전체 롤백).")
+        @Test
+        void returnsConflict_whenStockIsInsufficient_andCouponStaysUnused() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 1);
+            UserCouponModel userCoupon = saveUserCoupon(user.getId(), saveCoupon(5_000, 10_000));
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                memberJsonRequest("kylekim", requestWithCoupon(product.getId(), 5, userCoupon.getId())),
+                MAP_RESPONSE
+            );
+
+            // assert
+            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            UserCouponModel reloadedCoupon = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.CONFLICT.getCode()),
+                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(1),
+                () -> assertThat(reloadedCoupon.getUsedAt()).isNull(),
                 () -> assertThat(orderJpaRepository.findAll()).isEmpty()
             );
         }
@@ -484,7 +749,7 @@ class OrderV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
-                () -> assertThat(data).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items"),
+                () -> assertThat(data).containsOnlyKeys("orderId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount", "items"),
                 () -> assertThat(((Number) data.get("orderId")).longValue()).isEqualTo(order.getId()),
                 () -> assertThat(itemsOf(response)).hasSize(1),
                 () -> assertThat(item).containsOnlyKeys("productId", "productName", "brandName", "unitPrice", "quantity")
@@ -590,7 +855,7 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().data())
                     .containsKeys("content", "page", "size", "totalElements", "totalPages"),
                 () -> assertThat(contentOf(response)).hasSize(1),
-                () -> assertThat(order).containsOnlyKeys("orderId", "status", "orderedAt", "totalPrice", "items"),
+                () -> assertThat(order).containsOnlyKeys("orderId", "status", "orderedAt", "originalAmount", "discountAmount", "finalAmount", "items"),
                 () -> assertThat(firstItem).containsOnlyKeys("productId", "productName", "brandName", "unitPrice", "quantity"),
                 () -> assertThat(firstItem.get("productName")).isEqualTo("감성 가디건"),
                 () -> assertThat(firstItem.get("brandName")).isEqualTo("감성 브랜드"),

@@ -29,6 +29,7 @@ import com.loopers.domain.coupon.CouponRepository;
 import com.loopers.domain.coupon.DiscountType;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
@@ -344,6 +345,114 @@ class CouponFacadeTest {
                     .isEqualTo(ErrorType.CONFLICT),
                 () -> then(userCouponRepository).should(never()).save(any(UserCouponModel.class))
             );
+        }
+    }
+
+    @DisplayName("내 쿠폰 목록을 조회할 때,")
+    @Nested
+    class ReadMyCoupons {
+
+        private final Long userId = 100L;
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        private UserCouponModel userCoupon(String name, ZonedDateTime usedAt) {
+            return UserCouponModel.builder()
+                .userId(userId)
+                .couponId(1L)
+                .name(name)
+                .discountType(DiscountType.FIXED)
+                .discountValue(5_000)
+                .minOrderAmount(10_000)
+                .expiredAt(now.plusDays(7))
+                .usedAt(usedAt)
+                .build();
+        }
+
+        @DisplayName("본인 발급 쿠폰을 상태가 포함된 정보로 매핑해 반환한다.")
+        @Test
+        void returnsMappedCoupons_withStatus() {
+            // arrange
+            UserCouponModel availableCoupon = userCoupon("사용 가능 쿠폰", null);
+            UserCouponModel usedCoupon = userCoupon("사용 완료 쿠폰", now);
+            given(userCouponRepository.findByUserIdOrderByCreatedAtDesc(userId)).willReturn(List.of(usedCoupon, availableCoupon));
+
+            // act
+            List<UserCouponInfo> myCouponsInfo = couponFacade.readMyCoupons(userId, now);
+
+            // assert
+            assertAll(
+                () -> assertThat(myCouponsInfo).hasSize(2),
+                () -> assertThat(myCouponsInfo)
+                    .extracting(UserCouponInfo::status)
+                    .containsExactly(UserCouponStatus.USED, UserCouponStatus.AVAILABLE),
+                () -> assertThat(myCouponsInfo)
+                    .extracting(UserCouponInfo::name)
+                    .containsExactly("사용 완료 쿠폰", "사용 가능 쿠폰")
+            );
+        }
+
+        @DisplayName("발급 이력이 없으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmpty_whenNoCouponIssued() {
+            // arrange
+            given(userCouponRepository.findByUserIdOrderByCreatedAtDesc(userId)).willReturn(List.of());
+
+            // act & assert
+            assertThat(couponFacade.readMyCoupons(userId, now)).isEmpty();
+        }
+    }
+
+    @DisplayName("쿠폰 발급 내역을 조회할 때,")
+    @Nested
+    class ReadCouponIssues {
+
+        private final Long couponId = 1L;
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        @DisplayName("대상 템플릿이 활성 존재하면 발급분 페이지를 상태가 포함된 정보로 매핑해 반환한다.")
+        @Test
+        void returnsMappedIssues_whenTemplateIsActive() {
+            // arrange
+            CouponModel coupon = CouponModel.builder()
+                .rawName("신규 쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(5_000)
+                .rawMinOrderAmount(10_000)
+                .rawExpiredAt(now.plusDays(7))
+                .now(now)
+                .build();
+            ReflectionTestUtils.setField(coupon, "id", couponId);
+            UserCouponModel issuedCoupon = UserCouponModel.issue(100L, coupon);
+            given(couponRepository.getActiveById(couponId)).willReturn(coupon);
+            given(userCouponRepository.findByCouponIdOrderByCreatedAtDesc(couponId, 0, 20))
+                .willReturn(new PageImpl<>(List.of(issuedCoupon)));
+
+            // act
+            Page<CouponIssueInfo> issuesInfo = couponFacade.readCouponIssues(couponId, 0, 20, now);
+
+            // assert
+            assertAll(
+                () -> assertThat(issuesInfo.getTotalElements()).isEqualTo(1),
+                () -> assertThat(issuesInfo.getContent())
+                    .extracting(CouponIssueInfo::userId)
+                    .containsExactly(100L),
+                () -> assertThat(issuesInfo.getContent())
+                    .extracting(CouponIssueInfo::status)
+                    .containsExactly(UserCouponStatus.AVAILABLE)
+            );
+        }
+
+        @DisplayName("대상 템플릿이 활성 상태로 존재하지 않으면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenTemplateIsAbsent() {
+            // arrange
+            given(couponRepository.getActiveById(couponId)).willThrow(new CoreException(ErrorType.NOT_FOUND));
+
+            // act & assert
+            assertThatThrownBy(() -> couponFacade.readCouponIssues(couponId, 0, 20, now))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
