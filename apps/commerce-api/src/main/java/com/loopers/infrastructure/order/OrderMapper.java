@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderEntity;
-import com.loopers.domain.order.OrderItemEntity;
+import com.loopers.domain.order.OrderItemVO;
 
 import java.util.List;
 
@@ -16,30 +16,24 @@ public class OrderMapper {
         );
     }
 
-    public static OrderItemJpaEntity toItemJpaEntity(OrderItemEntity item, Long orderId) {
-        return new OrderItemJpaEntity(
-                item.getId(),
+    public static OrderItemJpaVO toItemJpaEntity(OrderItemVO item, Long orderId) {
+        return new OrderItemJpaVO(
                 orderId,
                 item.getProductId(),
                 item.getProductName(),
                 item.getProductPrice(),
-                item.getQuantity(),
-                item.getDeletedAt()
+                item.getQuantity()
         );
     }
 
-    public static OrderEntity toDomain(OrderJpaEntity order, List<OrderItemJpaEntity> items) {
-        List<OrderItemEntity> domainItems = items.stream()
-                .map(item -> OrderItemEntity.of(
-                        item.getId(),
+    public static OrderEntity toDomain(OrderJpaEntity order, List<OrderItemJpaVO> items) {
+        List<OrderItemVO> domainItems = items.stream()
+                .map(item -> OrderItemVO.of(
                         item.getOrderId(),
                         item.getProductId(),
                         item.getProductName(),
                         item.getProductPrice(),
-                        item.getQuantity(),
-                        item.getCreatedAt(),
-                        item.getUpdatedAt(),
-                        item.getDeletedAt()
+                        item.getQuantity()
                 ))
                 .toList();
         return OrderEntity.of(

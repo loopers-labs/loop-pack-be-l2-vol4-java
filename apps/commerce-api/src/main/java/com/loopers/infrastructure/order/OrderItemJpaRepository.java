@@ -4,6 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface OrderItemJpaRepository extends JpaRepository<OrderItemJpaEntity, Long> {
-    List<OrderItemJpaEntity> findAllByOrderIdAndDeletedAtIsNull(Long orderId);
+public interface OrderItemJpaRepository extends JpaRepository<OrderItemJpaVO, Long> {
+    List<OrderItemJpaVO> findAllByOrderIdAndDeletedAtIsNull(Long orderId);
 }

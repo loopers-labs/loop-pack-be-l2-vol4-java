@@ -1,7 +1,7 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.order.OrderEntity;
-import com.loopers.domain.order.OrderItemEntity;
+import com.loopers.domain.order.OrderItemVO;
 import com.loopers.domain.order.OrderStatus;
 
 import java.time.ZonedDateTime;
@@ -22,7 +22,7 @@ public record OrderInfo(
             Integer quantity,
             Long subtotal
     ) {
-        public static OrderItemInfo from(OrderItemEntity item) {
+        public static OrderItemInfo from(OrderItemVO item) {
             return new OrderItemInfo(
                     item.getProductId(),
                     item.getProductName(),

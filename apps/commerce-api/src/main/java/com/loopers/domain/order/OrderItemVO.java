@@ -6,7 +6,7 @@ import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
 
-public class OrderItemEntity extends BaseEntity {
+public class OrderItemVO {
 
     private Long orderId;
     private Long productId;
@@ -14,9 +14,9 @@ public class OrderItemEntity extends BaseEntity {
     private Long productPrice;
     private Integer quantity;
 
-    protected OrderItemEntity() {}
+    protected OrderItemVO() {}
 
-    public OrderItemEntity(Long productId, String productName, Long productPrice, Integer quantity) {
+    public OrderItemVO(Long productId, String productName, Long productPrice, Integer quantity) {
         validateProductId(productId);
         validateProductName(productName);
         validateProductPrice(productPrice);
@@ -27,16 +27,14 @@ public class OrderItemEntity extends BaseEntity {
         this.quantity = quantity;
     }
 
-    public static OrderItemEntity of(Long id, Long orderId, Long productId, String productName,
-            Long productPrice, Integer quantity,
-            ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
-        OrderItemEntity entity = new OrderItemEntity();
+    public static OrderItemVO of(Long orderId, Long productId, String productName,
+                                 Long productPrice, Integer quantity) {
+        OrderItemVO entity = new OrderItemVO();
         entity.orderId = orderId;
         entity.productId = productId;
         entity.productName = productName;
         entity.productPrice = productPrice;
         entity.quantity = quantity;
-        entity.reconstruct(id, createdAt, updatedAt, deletedAt);
         return entity;
     }
 

@@ -2,16 +2,17 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.infrastructure.BaseJpaEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
 import java.time.ZonedDateTime;
 
-@Entity
+@Embeddable
 @Table(name = "order_items")
 @Getter
-public class OrderItemJpaEntity extends BaseJpaEntity {
+public class OrderItemJpaVO {
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
@@ -28,11 +29,10 @@ public class OrderItemJpaEntity extends BaseJpaEntity {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    protected OrderItemJpaEntity() {}
+    protected OrderItemJpaVO() {}
 
-    OrderItemJpaEntity(Long id, Long orderId, Long productId, String productName,
-            Long productPrice, Integer quantity, ZonedDateTime deletedAt) {
-        super(id, deletedAt);
+    OrderItemJpaVO(Long orderId, Long productId, String productName,
+                   Long productPrice, Integer quantity) {
         this.orderId = orderId;
         this.productId = productId;
         this.productName = productName;
