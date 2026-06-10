@@ -25,4 +25,12 @@ public record Stock(
 
         return new Stock(value);
     }
+
+    public Stock decrease(int quantity) {
+        if (value < quantity) {
+            throw new CoreException(ErrorType.CONFLICT, "상품 재고가 부족합니다.");
+        }
+
+        return new Stock(value - quantity);
+    }
 }

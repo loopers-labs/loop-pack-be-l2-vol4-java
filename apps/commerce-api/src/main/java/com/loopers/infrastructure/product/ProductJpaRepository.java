@@ -6,14 +6,15 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.projection.ProductAdminView;
 import com.loopers.domain.product.projection.ProductDetail;
 import com.loopers.domain.product.projection.ProductSummary;
+
+import jakarta.persistence.LockModeType;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
 
@@ -21,14 +22,9 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
 
     List<ProductModel> findByBrandIdAndDeletedAtIsNull(Long brandId);
 
-    @Transactional
-    @Modifying
-    @Query("""
-        UPDATE ProductModel p
-        SET p.stock.value = p.stock.value - :quantity
-        WHERE p.id = :productId AND p.deletedAt IS NULL AND p.stock.value >= :quantity
-        """)
-    int decreaseStock(Long productId, int quantity);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM ProductModel p WHERE p.id = :id AND p.deletedAt IS NULL")
+    Optional<ProductModel> findByIdAndDeletedAtIsNullForUpdate(Long id);
 
     @Query(value = """
         SELECT new com.loopers.domain.product.projection.ProductSummary(

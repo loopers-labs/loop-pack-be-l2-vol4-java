@@ -13,9 +13,9 @@ public interface ProductRepository {
 
     ProductModel save(ProductModel product);
 
-    int decreaseStock(Long productId, int quantity);
-
     ProductModel getActiveById(Long id);
+
+    ProductModel getActiveByIdForUpdate(Long id);
 
     Optional<ProductModel> findActiveById(Long id);
 
