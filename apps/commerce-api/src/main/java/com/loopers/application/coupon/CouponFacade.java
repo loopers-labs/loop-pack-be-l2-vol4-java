@@ -26,7 +26,7 @@ public class CouponFacade {
     public Page<IssuedCouponInfo> getIssuedCouponsByTemplateId(Long couponTemplateId, Pageable pageable) {
         CouponTemplateModel template = couponTemplateService.getById(couponTemplateId);
         return issuedCouponService.findAllByCouponTemplateId(template.getId(), pageable)
-                .map(issued -> IssuedCouponInfo.from(issued, template.isExpired()));
+                .map(IssuedCouponInfo::from);
     }
 
     public List<MyIssuedCouponInfo> getMyIssuedCoupons(String loginId, String loginPw) {
@@ -46,6 +46,6 @@ public class CouponFacade {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰 템플릿입니다.");
         }
         IssuedCouponModel issued = issuedCouponService.issue(template.getId(), user.getId());
-        return IssuedCouponInfo.from(issued, false);
+        return IssuedCouponInfo.from(issued);
     }
 }
