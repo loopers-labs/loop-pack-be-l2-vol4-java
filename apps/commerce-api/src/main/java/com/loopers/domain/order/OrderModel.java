@@ -54,9 +54,10 @@ public class OrderModel extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderItemModel> items = new ArrayList<>();
 
-    public OrderModel(UUID userId, ShippingInfo shippingInfo) {
+    public OrderModel(UUID userId, String receiverName, String receiverPhone,
+                      String zipCode, String address, String detailAddress) {
         this.userId = userId;
-        this.shippingInfo = shippingInfo;
+        this.shippingInfo = new ShippingInfo(receiverName, receiverPhone, zipCode, address, detailAddress);
         this.originalAmount = 0L;
         this.discountAmount = 0L;
         this.pgAmount = 0L;

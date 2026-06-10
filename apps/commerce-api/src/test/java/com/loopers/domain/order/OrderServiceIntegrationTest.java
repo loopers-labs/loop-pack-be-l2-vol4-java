@@ -62,6 +62,11 @@ class OrderServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private OrderModel createOrder(UUID userId) {
+        return orderService.create(userId, OrderFixture.RECEIVER_NAME, OrderFixture.RECEIVER_PHONE,
+            OrderFixture.ZIP_CODE, OrderFixture.ADDRESS, OrderFixture.DETAIL_ADDRESS);
+    }
+
     @DisplayName("주문을 생성할 때,")
     @Nested
     class Create {
@@ -70,7 +75,7 @@ class OrderServiceIntegrationTest {
         @Test
         void returnsSavedOrder_whenValid() {
             // arrange & act
-            OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel order = createOrder(userId);
 
             // assert
             assertAll(
@@ -90,7 +95,7 @@ class OrderServiceIntegrationTest {
         @Test
         void increasesPgAmount_whenItemAdded() {
             // arrange
-            OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel order = createOrder(userId);
             OrderItemModel item = OrderFixture.createItem(productId);
 
             // act
@@ -121,7 +126,7 @@ class OrderServiceIntegrationTest {
         @Test
         void returnsOrder_whenExists() {
             // arrange
-            OrderModel saved = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel saved = createOrder(userId);
 
             // act
             OrderModel found = orderService.get(saved.getId());
@@ -139,7 +144,7 @@ class OrderServiceIntegrationTest {
         @Test
         void confirmsOrder_whenPendingAndAmountMatches() {
             // arrange
-            OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel order = createOrder(userId);
 
             // act
             orderService.confirm(order, 0L); // 아이템 없으므로 pgAmount = 0
@@ -157,7 +162,7 @@ class OrderServiceIntegrationTest {
         @Test
         void failsOrder_whenPending() {
             // arrange
-            OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel order = createOrder(userId);
 
             // act
             orderService.fail(order);
@@ -175,7 +180,7 @@ class OrderServiceIntegrationTest {
         @Test
         void cancelsOrder_whenConfirmed() {
             // arrange
-            OrderModel order = orderService.create(userId, OrderFixture.shippingInfo());
+            OrderModel order = createOrder(userId);
             orderService.confirm(order, 0L);
 
             // act

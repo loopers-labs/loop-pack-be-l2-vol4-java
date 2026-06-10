@@ -10,7 +10,6 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
-import com.loopers.domain.vo.ShippingInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +25,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
+
 @Component
 @Transactional(readOnly = true)
 public class OrderFacade {
@@ -40,8 +40,7 @@ public class OrderFacade {
     @Transactional
     public OrderInfo create(UUID userId, List<OrderItemRequest> itemRequests, UUID couponId,
                             String receiverName, String receiverPhone, String zipCode, String address, String detailAddress) {
-        ShippingInfo shippingInfo = new ShippingInfo(receiverName, receiverPhone, zipCode, address, detailAddress);
-        OrderModel order = orderService.create(userId, shippingInfo);
+        OrderModel order = orderService.create(userId, receiverName, receiverPhone, zipCode, address, detailAddress);
 
         // 1단계: 상품 검증 + 아이템 추가
         // (brand lazy load를 reserve() 전에 완료 — reserve의 clearAutomatically가 1LC 클리어하기 때문)

@@ -1,6 +1,5 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.vo.ShippingInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +17,9 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    public OrderModel create(UUID userId, ShippingInfo shippingInfo) {
-        return orderRepository.save(new OrderModel(userId, shippingInfo));
+    public OrderModel create(UUID userId, String receiverName, String receiverPhone,
+                             String zipCode, String address, String detailAddress) {
+        return orderRepository.save(new OrderModel(userId, receiverName, receiverPhone, zipCode, address, detailAddress));
     }
 
     public void addItem(OrderModel order, OrderItemModel item) {
