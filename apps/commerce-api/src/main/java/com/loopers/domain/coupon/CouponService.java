@@ -91,7 +91,7 @@ public class CouponService {
 
         UserCoupon userCoupon = userCouponRepository.findById(couponUse.userCouponId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
-        userCoupon.confirmUsableBy(couponUse.userId());
+        userCoupon.checkUsableBy(couponUse.userId());
 
         CouponDiscountPolicy policy = couponDiscountMethod.match(userCoupon.getType());
         CouponDiscount discount = userCoupon.apply(couponUse.orderAmount(), couponUse.usedAt(), policy);
