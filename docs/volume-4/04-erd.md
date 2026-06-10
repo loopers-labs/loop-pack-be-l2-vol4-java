@@ -52,6 +52,7 @@ erDiagram
         INT min_order_amount "최소 주문 금액 스냅샷 (원, 0이면 제약 없음)"
         DATETIME expired_at "사용 만료 시각 스냅샷 (UTC)"
         DATETIME used_at "사용 시각 (UTC), nullable, null이면 미사용"
+        BIGINT version "낙관적 락 버전 (결정 9)"
         DATETIME created_at "생성 일시 (UTC, 발급 시각)"
         DATETIME updated_at "수정 일시 (UTC)"
         DATETIME deleted_at "삭제 일시 (UTC), nullable"
@@ -102,6 +103,7 @@ CREATE TABLE user_coupons (
     min_order_amount INT          NOT NULL COMMENT '발급 시점 최소 주문 금액 스냅샷 (원, 0이면 제약 없음)',
     expired_at       DATETIME     NOT NULL COMMENT '사용 만료 시각 스냅샷 (UTC)',
     used_at          DATETIME     NULL     COMMENT '사용 시각 (UTC). NULL이면 미사용',
+    version          BIGINT       NOT NULL DEFAULT 0 COMMENT '낙관적 락 버전 (결정 9). 동일 쿠폰 동시 사용 차단',
     created_at       DATETIME     NOT NULL COMMENT '생성 일시 (UTC, 발급 시각)',
     updated_at       DATETIME     NOT NULL COMMENT '수정 일시 (UTC)',
     deleted_at       DATETIME     NULL     COMMENT '삭제 일시 (UTC)',
@@ -113,7 +115,7 @@ CREATE TABLE user_coupons (
   COMMENT='발급 쿠폰';
 ```
 
-> 한 회원이 한 템플릿에서 한 장만 발급받으므로(1인 1매, 결정 5) `(user_id, coupon_id)`에 UK를 둔다. 발급 시각은 별도 컬럼 없이 `created_at`으로 제공한다(CPN-7·8 정렬·노출).
+> 한 회원이 한 템플릿에서 한 장만 발급받으므로(1인 1매, 결정 5) `(user_id, coupon_id)`에 UK를 둔다. 발급 시각은 별도 컬럼 없이 `created_at`으로 제공한다(CPN-7·8 정렬·노출). 동일 발급 쿠폰의 동시 사용(`used_at` 전이 경합)은 `version` 컬럼의 낙관적 락으로 차단한다 — 사용 전이 커밋 시 버전이 바뀌었으면 두 번째 트랜잭션이 실패하며, 재시도 없이 자원 충돌로 응답한다(결정 9).
 
 ---
 

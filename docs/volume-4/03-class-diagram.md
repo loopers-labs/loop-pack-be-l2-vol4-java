@@ -140,11 +140,10 @@ classDiagram
         +int minOrderAmount
         +LocalDateTime expiredAt
         +LocalDateTime usedAt
+        +Long version
         +issue(userId, coupon)$ UserCoupon
-        +calculateDiscount(orderAmount) int
-        +use()
-        +isAvailable() boolean
-        +getStatus() UserCouponStatus
+        +apply(orderAmount, now) int
+        +getStatus(now) UserCouponStatus
     }
     class Name {
         +String value
@@ -190,7 +189,7 @@ classDiagram
 | 객체 | 종류 | 책임 |
 | --- | --- | --- |
 | `Coupon` | Entity (Aggregate Root) | 이름·할인 타입·할인 값·최소 주문 금액·만료 시각 보유. 값이 최초로 들어오는 검증 원천 지점이라 `Name`·`MinOrderAmount`·`ExpiredAt` VO와 `DiscountType.validate`로 입력을 검증한다. `create`(정적 팩토리 — VO 검증에 더해 할인 값 전체 검증을 `DiscountType.validate`에 위임), `update`(자기 속성 갱신), `delete`(자기 soft delete), `isExpired`(만료 시각 경과 여부 질의 — 발급 가능 판단의 일부). 발급 쿠폰 생성은 자기 책임이 아니라 `UserCoupon`이 가져간다. 삭제 시 발급 중단·발급 쿠폰 독립은 응용 계층 책임. |
-| `UserCoupon` | Entity (Aggregate Root) | 소유 회원 ID·템플릿 ID와 스냅샷(이름·할인 타입·할인 값·최소 주문 금액·만료 시각)·사용 시각 보유. 스냅샷은 템플릿에서 VO로 검증된 값이라 원시 타입으로 보유(재검증 없음). `issue(userId, coupon)`(정적 팩토리, 템플릿 정보 스냅샷 복사 생성), `calculateDiscount(orderAmount)`(최소 주문 금액 검증 통합 — 할인 전 금액이 `minOrderAmount` 미달 시 예외, 통과 시 `DiscountType.calculate`에 위임해 할인액 산출), `use`(사용 완료 전이 — `usedAt` 기록, 이미 사용·만료 시 예외), `isAvailable`(`getStatus() == AVAILABLE` 질의), `getStatus`(`usedAt`이 있으면 `USED`, 없고 만료 시각 경과면 `EXPIRED`, 아니면 `AVAILABLE` — 사용 완료가 만료보다 우선). 1인 1매 중복 검사와 본인 소유 검증(레포지토리 조회로 부재·타인을 한 번에 차단, 결정 7)은 응용 계층 책임. |
+| `UserCoupon` | Entity (Aggregate Root) | 소유 회원 ID·템플릿 ID와 스냅샷(이름·할인 타입·할인 값·최소 주문 금액·만료 시각)·사용 시각·버전(낙관적 락, 결정 9) 보유. 스냅샷은 템플릿에서 VO로 검증된 값이라 원시 타입으로 보유(재검증 없음). `issue(userId, coupon)`(정적 팩토리, 템플릿 정보 스냅샷 복사 생성), `apply(orderAmount, now)`(쿠폰 적용 단일 진입점 — `getStatus(now)`가 `AVAILABLE`이 아니면 예외, 할인 전 금액이 `minOrderAmount` 미달 시 예외, 통과 시 `DiscountType.calculate`로 할인액 산출 후 `usedAt`을 기록하고 할인액 반환), `getStatus(now)`(`usedAt`이 있으면 `USED`, 없고 만료 시각 경과면 `EXPIRED`, 아니면 `AVAILABLE` — 사용 완료가 만료보다 우선). 가용성 검증·할인 계산·사용 전이를 한 메서드로 묶어 검증과 전이 사이의 경합 여지를 줄인다. 1인 1매 중복 검사와 본인 소유 검증(레포지토리 조회로 부재·타인을 한 번에 차단, 결정 7)은 응용 계층 책임. 동일 쿠폰 동시 사용은 버전 충돌로 차단한다(결정 9). |
 | `Name` | VO | `Coupon`의 이름. 1~100자 검증을 `create()` 팩토리에 단일화. 발급 시 `UserCoupon`에는 `String`으로 스냅샷. |
 | `ExpiredAt` | VO | `Coupon`의 만료 시각. 사용자 입력값이라 null·기준 시각(`now`) 이전 금지를 `create(value, now)` 팩토리에 단일화(`BirthDate`의 미래 날짜 금지와 대칭). 비교 기준 시각은 표현 계층이 `DateTimeUtil`로 확정해 주입한다(요청 단위 시각 고정·테스트 용이). 발급 시 `UserCoupon`에는 원시 시각 타입으로 스냅샷. |
 | `MinOrderAmount` | VO | `Coupon`의 최소 주문 금액(0 이상). `create()` 팩토리에 검증 단일화하며, 미지정(null) 시 0(제약 없음)으로 흡수해 항상 non-null로 보유한다. 발급 시 `UserCoupon`에는 `int`로 스냅샷되며, 충족 판정은 `UserCoupon.calculateDiscount`가 직접 비교 (결정 8). |
@@ -255,7 +254,7 @@ classDiagram
 
 | 객체 | 종류 | 책임 |
 | --- | --- | --- |
-| `Order` | Entity (Aggregate Root) | 회원 ID·적용 쿠폰 ID·상태·시각·세 금액·주문 항목 보유. 매개변수가 많아 정적 팩토리 대신 Lombok `@Builder`로 생성하며, 세 금액의 정합(`최종 = 원금 − 할인`)은 단일 호출자인 응용 계층이 계산해 보장한다. `isOwnedBy`(본인 검증). 쿠폰 미적용 시 응용 계층이 할인 금액 0·`userCouponId` 없이 생성한다. 할인 금액 계산(쿠폰)·항목 정렬·재고 차감·트랜잭션은 응용 계층 책임. |
+| `Order` | Entity (Aggregate Root) | 회원 ID·적용 쿠폰 ID·상태·시각·세 금액·주문 항목 보유. 매개변수가 많아 정적 팩토리 대신 Lombok `@Builder`로 생성하며, 세 금액의 정합(`최종 = 원금 − 할인`)은 단일 호출자인 응용 계층이 계산해 보장한다. `isOwnedBy`(본인 검증). 쿠폰 미적용 시 응용 계층이 할인 금액 0·`userCouponId` 없이 생성한다. 할인 금액 계산(쿠폰)·항목 정렬·재고 차감(상품을 잠금 조회해 비관적 락으로 직렬화, 결정 10)·트랜잭션은 응용 계층 책임. |
 | `OrderItem` | Entity (Order 종속) | 주문 시점 상품 스냅샷(`productId`·`productName`·`productBrandName`·`unitPrice`)과 수량 보유. volume-2와 동일. |
 | `Quantity` | VO | 주문 항목 수량(1 이상). volume-2와 동일. |
 | `OrderStatus` | Enum | 본 라운드 `CREATED`만. volume-2와 동일. |
