@@ -86,7 +86,7 @@ class PaymentV1ApiE2ETest {
 
     private Long createOrder() {
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), 1))
+                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), 1)), null
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST,
@@ -97,7 +97,7 @@ class PaymentV1ApiE2ETest {
         PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(orderId);
         ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/payments", HttpMethod.POST,
-                new HttpEntity<>(request), type).getBody().data().id();
+                new HttpEntity<>(request, authHeaders()), type).getBody().data().id();
     }
 
     @DisplayName("POST /api/v1/payments")
@@ -112,7 +112,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request), type);
+                    "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody().data().orderId()).isEqualTo(orderId);
@@ -132,7 +132,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, null, type);
+                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 승인");
@@ -150,7 +150,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, null, type);
+                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 실패");
