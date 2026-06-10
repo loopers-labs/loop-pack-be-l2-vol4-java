@@ -7,8 +7,10 @@ import org.springframework.data.domain.Page;
 
 import com.loopers.application.coupon.CouponAdminInfo;
 import com.loopers.application.coupon.CouponCreateInfo;
+import com.loopers.application.coupon.CouponIssueInfo;
 import com.loopers.application.coupon.CouponUpdateInfo;
 import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponStatus;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -108,6 +110,47 @@ public class CouponAdminV1Dto {
                 couponsInfo.getSize(),
                 couponsInfo.getTotalElements(),
                 couponsInfo.getTotalPages()
+            );
+        }
+    }
+
+    public record IssueResponse(
+        Long userCouponId,
+        Long userId,
+        UserCouponStatus status,
+        ZonedDateTime issuedAt
+    ) {
+
+        public static IssueResponse from(CouponIssueInfo couponIssueInfo) {
+            return new IssueResponse(
+                couponIssueInfo.userCouponId(),
+                couponIssueInfo.userId(),
+                couponIssueInfo.status(),
+                couponIssueInfo.issuedAt()
+            );
+        }
+    }
+
+    public record IssuePageResponse(
+        List<IssueResponse> content,
+        int page,
+        int size,
+        long totalElements,
+        int totalPages
+    ) {
+
+        public static IssuePageResponse from(Page<CouponIssueInfo> issuesInfo) {
+            List<IssueResponse> content = issuesInfo.getContent()
+                .stream()
+                .map(IssueResponse::from)
+                .toList();
+
+            return new IssuePageResponse(
+                content,
+                issuesInfo.getNumber(),
+                issuesInfo.getSize(),
+                issuesInfo.getTotalElements(),
+                issuesInfo.getTotalPages()
             );
         }
     }

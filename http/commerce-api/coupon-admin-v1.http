@@ -156,3 +156,14 @@ X-Loopers-Ldap: loopers.admin
 
 ### 쿠폰 템플릿 삭제 - 관리자 인증 헤더 누락 (403 Forbidden)
 DELETE http://localhost:8080/api-admin/v1/coupons/1
+
+### 쿠폰 발급 내역 - 정상 (200 OK)
+GET http://localhost:8080/api-admin/v1/coupons/1/issues?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 발급 내역 - admin 헤더 누락 (403 Forbidden)
+GET http://localhost:8080/api-admin/v1/coupons/1/issues
+
+### 쿠폰 발급 내역 - 템플릿 미존재 (404 Not Found)
+GET http://localhost:8080/api-admin/v1/coupons/99999/issues
+X-Loopers-Ldap: loopers.admin

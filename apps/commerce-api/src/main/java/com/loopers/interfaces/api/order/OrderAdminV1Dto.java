@@ -16,7 +16,9 @@ public class OrderAdminV1Dto {
         Long userId,
         String status,
         ZonedDateTime orderedAt,
-        Integer totalPrice
+        Integer originalAmount,
+        Integer discountAmount,
+        Integer finalAmount
     ) {
 
         public static SummaryResponse from(OrderAdminSummaryInfo orderAdminSummaryInfo) {
@@ -25,7 +27,9 @@ public class OrderAdminV1Dto {
                 orderAdminSummaryInfo.userId(),
                 orderAdminSummaryInfo.status().name(),
                 orderAdminSummaryInfo.orderedAt(),
-                orderAdminSummaryInfo.totalPrice()
+                orderAdminSummaryInfo.originalAmount(),
+                orderAdminSummaryInfo.discountAmount(),
+                orderAdminSummaryInfo.finalAmount()
             );
         }
     }
@@ -78,7 +82,10 @@ public class OrderAdminV1Dto {
         Long userId,
         String status,
         ZonedDateTime orderedAt,
-        Integer totalPrice,
+        Integer originalAmount,
+        Integer discountAmount,
+        Integer finalAmount,
+        Long userCouponId,
         List<ItemResponse> items
     ) {
 
@@ -88,7 +95,10 @@ public class OrderAdminV1Dto {
                 orderAdminInfo.userId(),
                 orderAdminInfo.status().name(),
                 orderAdminInfo.orderedAt(),
-                orderAdminInfo.totalPrice(),
+                orderAdminInfo.originalAmount(),
+                orderAdminInfo.discountAmount(),
+                orderAdminInfo.finalAmount(),
+                orderAdminInfo.userCouponId(),
                 orderAdminInfo.items()
                     .stream()
                     .map(ItemResponse::from)

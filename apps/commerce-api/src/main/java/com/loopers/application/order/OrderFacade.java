@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -35,17 +37,25 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final OrderRepository orderRepository;
+    private final UserCouponRepository userCouponRepository;
 
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands, ZonedDateTime now) {
+    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands, Long userCouponId, ZonedDateTime now) {
         UserModel user = userRepository.getActiveById(userId);
 
         validateNoDuplicateProduct(itemCommands);
         List<OrderItemModel> orderItems = createOrderItems(itemCommands);
 
+        int originalAmount = calculateOriginalAmount(orderItems);
+        int discountAmount = applyCoupon(user.getId(), userCouponId, originalAmount, now);
+        int finalAmount = originalAmount - discountAmount;
+
         OrderModel order = OrderModel.builder()
             .userId(user.getId())
             .orderedAt(now)
-            .totalPrice(calculateTotalPrice(orderItems))
+            .originalAmount(originalAmount)
+            .discountAmount(discountAmount)
+            .finalAmount(finalAmount)
+            .userCouponId(userCouponId)
             .build();
 
         OrderModel savedOrder = orderRepository.save(order, orderItems);
@@ -99,10 +109,20 @@ public class OrderFacade {
         }
     }
 
-    private int calculateTotalPrice(List<OrderItemModel> orderItems) {
+    private int calculateOriginalAmount(List<OrderItemModel> orderItems) {
         return orderItems.stream()
             .mapToInt(OrderItemModel::totalPrice)
             .sum();
+    }
+
+    private int applyCoupon(Long userId, Long userCouponId, int originalAmount, ZonedDateTime now) {
+        if (userCouponId == null) {
+            return 0;
+        }
+
+        UserCouponModel userCoupon = userCouponRepository.getActiveByIdAndUserId(userCouponId, userId);
+
+        return userCoupon.apply(originalAmount, now);
     }
 
     @Transactional(readOnly = true)

@@ -3,6 +3,8 @@ package com.loopers.domain.coupon;
 import java.time.ZonedDateTime;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,6 +24,7 @@ import lombok.NoArgsConstructor;
     name = "user_coupons",
     uniqueConstraints = @UniqueConstraint(name = "uk_user_coupons_user_id_coupon_id", columnNames = {"user_id", "coupon_id"})
 )
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserCouponModel extends BaseEntity {
@@ -51,25 +54,6 @@ public class UserCouponModel extends BaseEntity {
     @Column(name = "used_at")
     private ZonedDateTime usedAt;
 
-    @Builder
-    private UserCouponModel(
-        Long userId,
-        Long couponId,
-        String name,
-        DiscountType discountType,
-        int discountValue,
-        int minOrderAmount,
-        ZonedDateTime expiredAt
-    ) {
-        this.userId = userId;
-        this.couponId = couponId;
-        this.name = name;
-        this.discountType = discountType;
-        this.discountValue = discountValue;
-        this.minOrderAmount = minOrderAmount;
-        this.expiredAt = expiredAt;
-    }
-
     public static UserCouponModel issue(Long userId, CouponModel coupon) {
         return UserCouponModel.builder()
             .userId(userId)
@@ -80,5 +64,32 @@ public class UserCouponModel extends BaseEntity {
             .minOrderAmount(coupon.getMinOrderAmount().value())
             .expiredAt(coupon.getExpiredAt().value())
             .build();
+    }
+
+    public UserCouponStatus getStatus(ZonedDateTime now) {
+        if (usedAt != null) {
+            return UserCouponStatus.USED;
+        }
+
+        if (expiredAt.isBefore(now)) {
+            return UserCouponStatus.EXPIRED;
+        }
+
+        return UserCouponStatus.AVAILABLE;
+    }
+
+    public int apply(int orderAmount, ZonedDateTime now) {
+        if (getStatus(now) != UserCouponStatus.AVAILABLE) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용했거나 만료된 쿠폰입니다.");
+        }
+
+        if (orderAmount < minOrderAmount) {
+            throw new CoreException(ErrorType.CONFLICT, String.format("주문 금액이 쿠폰의 최소 주문 금액(%d원)에 미치지 못합니다.", minOrderAmount));
+        }
+
+        int discountAmount = discountType.calculate(orderAmount, discountValue);
+        this.usedAt = now;
+
+        return discountAmount;
     }
 }

@@ -12,6 +12,11 @@ public enum DiscountType {
                 throw new CoreException(ErrorType.BAD_REQUEST, String.format("정액 할인 값은 %d 이상만 허용됩니다.", MIN_VALUE));
             }
         }
+
+        @Override
+        public int calculate(int orderAmount, int value) {
+            return Math.min(orderAmount, value);
+        }
     },
     RATE {
         @Override
@@ -20,10 +25,16 @@ public enum DiscountType {
                 throw new CoreException(ErrorType.BAD_REQUEST, String.format("정률 할인 값은 %d~%d만 허용됩니다.", MIN_VALUE, MAX_RATE));
             }
         }
+
+        @Override
+        public int calculate(int orderAmount, int value) {
+            return orderAmount * value / RATE_DENOMINATOR;
+        }
     };
 
     private static final int MIN_VALUE = 1;
     private static final int MAX_RATE = 100;
+    private static final int RATE_DENOMINATOR = 100;
 
     public final void validate(Integer value) {
         if (value == null) {
@@ -34,4 +45,6 @@ public enum DiscountType {
     }
 
     abstract void validateRange(int value);
+
+    public abstract int calculate(int orderAmount, int value);
 }

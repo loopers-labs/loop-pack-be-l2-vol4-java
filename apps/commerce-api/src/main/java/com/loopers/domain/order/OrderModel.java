@@ -34,6 +34,15 @@ public class OrderModel extends BaseEntity {
     @Column(name = "ordered_at", nullable = false)
     private ZonedDateTime orderedAt;
 
-    @Column(name = "total_price", nullable = false)
-    private Integer totalPrice;
+    @Column(name = "original_amount", nullable = false)
+    private Integer originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Integer discountAmount;
+
+    @Column(name = "final_amount", nullable = false)
+    private Integer finalAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
 }

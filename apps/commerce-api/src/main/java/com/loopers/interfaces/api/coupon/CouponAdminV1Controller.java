@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.loopers.application.coupon.CouponAdminInfo;
 import com.loopers.application.coupon.CouponCreateInfo;
 import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.CouponIssueInfo;
 import com.loopers.application.coupon.CouponUpdateInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.utils.DateTimeUtil;
@@ -91,5 +92,17 @@ public class CouponAdminV1Controller implements CouponAdminV1ApiSpec {
         CouponAdminInfo couponAdminInfo = couponFacade.readCoupon(couponId);
 
         return ApiResponse.success(CouponAdminV1Dto.DetailResponse.from(couponAdminInfo));
+    }
+
+    @Override
+    @GetMapping("/{couponId}/issues")
+    public ApiResponse<CouponAdminV1Dto.IssuePageResponse> readCouponIssues(
+        @PathVariable Long couponId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<CouponIssueInfo> issuesInfo = couponFacade.readCouponIssues(couponId, page, size, dateTimeUtil.now());
+
+        return ApiResponse.success(CouponAdminV1Dto.IssuePageResponse.from(issuesInfo));
     }
 }
