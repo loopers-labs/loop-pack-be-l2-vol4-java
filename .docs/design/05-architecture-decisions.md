@@ -743,7 +743,9 @@ Facade.createOrder(userId, items, couponId)   ─ 단일 @Transactional
   │    └─ reserved_stock += 주문 수량
   ├─ 쿠폰이 있으면:
   │    ├─ 유효성 검증 (만료 여부)
-  │    ├─ 비관적 락 + couponIssue.use() → USED ← 결정 13, 14
+  │    ├─ 소유 확인 (락 없는 조회)
+  │    ├─ 원자적 UPDATE: AVAILABLE → USED        ← 결정 13, 14
+  │    │    └─ 0 rows: 이미 사용된 쿠폰 예외
   │    └─ couponIssueId 보관
   └─ OrderService.createOrder(products, quantities, coupon, couponIssueId)
        ├─ OrderItemModel 생성 (상품명·가격 스냅샷)
@@ -798,7 +800,7 @@ PENDING_PAYMENT ──► IN_PAYMENT ──► CONFIRMED
 ## 결정 13. 쿠폰 소비 시점 — createOrder · 금액 스냅샷
 
 **결정**
-- 쿠폰 락 획득 + `use()` + 저장을 `createOrder()` 트랜잭션 안에서 처리한다.
+- 쿠폰 소유 확인 후 원자적 UPDATE(`AVAILABLE → USED`)를 `createOrder()` 트랜잭션 안에서 처리한다.
 - `OrderModel`에 `couponIssueId`, `originalAmount`, `discountAmount`, `finalAmount`를 저장해 주문 시점 금액 스냅샷을 영구 보존한다.
 
 **설계 변경 과정**
@@ -811,13 +813,13 @@ Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 
 → 동일 쿠폰으로 주문 2개 생성 (고아 주문 발생)
 ```
 
-이를 해결하기 위해 쿠폰 락 + `use()` + 저장을 `createOrder()`로 이동했다.
+이를 해결하기 위해 쿠폰 소비 처리를 `createOrder()`로 이동했고, 동시성은 원자적 UPDATE(→ 결정 14)로 처리한다.
 
 **트레이드오프**
 
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
-| `createOrder`에서 쿠폰 소비 | 락 + USED + 주문 저장이 한 트랜잭션 → 고아 주문 없음 | 신규 락 메서드 `findByUserIdAndCouponIdWithLock()` 추가 필요 |
+| `createOrder`에서 쿠폰 소비 | 원자적 UPDATE + 주문 저장이 한 트랜잭션 → 고아 주문 없음 | `affected rows = 0`으로만 실패 원인 판단 (소유 없음과 이미 사용을 구분하려면 사전 조회 필요) |
 | `OrderModel`에 금액 스냅샷 저장 | 이력 조회 시 재계산 불필요, 상품 가격 변경 영향 없음 | `OrderModel`이 쿠폰 할인 개념을 직접 가짐 |
 
 **도메인 간 의존**
@@ -826,11 +828,12 @@ Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 
 
 ---
 
-## 결정 14. 동시성 제어 — 비관적 락
+## 결정 14. 동시성 제어 — 재고: 비관적 락 / 쿠폰: 원자적 UPDATE
 
 **결정**
-- 재고·쿠폰 쓰기 직전 조회에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
-- 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
+- **재고**: 쓰기 직전 조회에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용
+- **쿠폰**: 원자적 UPDATE(`AVAILABLE → USED`) 적용 — `SELECT FOR UPDATE` 없이 DB 레벨 원자성으로 처리
+- 재고의 락 메서드와 일반 조회 메서드를 **명시적으로 분리**하여 readOnly 컨텍스트와 혼용 방지
 
 **재고 vs 쿠폰의 동시성 성격 차이**
 
@@ -839,9 +842,9 @@ Thread 2: createOrder(couponId=42) → AVAILABLE 확인 → 주문2 저장  ← 
 - **재고**: 여러 유저가 동일한 `stocks` row를 동시에 노린다 → 충돌 빈도 높음
 - **쿠폰**: `coupon_issues` row가 유저별로 분리되어 있어 다른 유저는 내 쿠폰 row에 접근할 수 없다. 충돌이 발생하려면 같은 유저가 동시에 두 번 요청(더블클릭, 네트워크 재시도)해야 한다 → 충돌 빈도 낮음
 
-쿠폰만 놓고 보면 낙관적 락(`@Version`)으로도 충분히 안전하다. 현재 비관적 락을 적용한 이유는 재고와 방식을 통일해 코드의 일관성을 유지하기 위해서다.
+쿠폰만 놓고 보면 낙관적 락(`@Version`)으로도 충분히 안전하다. `AVAILABLE → USED` 단순 상태 전이이므로 `UPDATE ... WHERE status = 'AVAILABLE'` 원자적 UPDATE로 처리할 수 있어, 비관적 락 없이 DB 레벨에서 동시성을 보장했다.
 
-**재고에 대한 원자적 UPDATE 대안**
+**재고에 원자적 UPDATE를 적용하지 않은 이유**
 
 `likeCount`(결정 10)처럼 조건부 원자 UPDATE를 쓰는 방법도 있다.
 
@@ -854,30 +857,42 @@ WHERE product_id = :productId
 
 affected rows가 0이면 재고 부족으로 처리한다. DB row-level 락이 UPDATE 순간 암묵적으로 걸리므로 명시적 `SELECT FOR UPDATE` 없이도 동시성이 보장된다.
 
-| 항목 | 비관적 락 (현재) | 원자적 UPDATE |
+원자적 UPDATE를 선택하지 않은 이유는 `StockModel.reserve()`의 검증 로직(`availableStock() < quantity`)을 도메인에 유지하기 위해서다. SQL WHERE 절로 옮기면 "왜 실패했는지"를 Java에서 알 수 없고, 명확한 에러 메시지를 내려주려면 추가 SELECT가 필요해진다.
+
+| 항목 | 비관적 락 (재고) | 원자적 UPDATE |
 |------|----------------|--------------|
 | 조건 검증 위치 | `StockModel.reserve()` (도메인) | SQL WHERE 절 (인프라) |
 | 실패 원인 파악 | 즉시 명확한 메시지 | affected rows=0만 반환 → 재고 부족인지 row 없음인지 추가 조회 필요 |
 | 락 유지 시간 | SELECT → Java 처리 → UPDATE | UPDATE 순간만 |
 | 처리량 | 비교적 낮음 | 높음 |
 
-원자적 UPDATE를 선택하지 않은 이유는 `StockModel.reserve()`의 검증 로직(`availableStock() < quantity`)을 도메인에 유지하기 위해서다. SQL WHERE 절로 옮기면 "왜 실패했는지"를 Java에서 알 수 없고, 명확한 에러 메시지를 내려주려면 추가 SELECT가 필요해진다.
+**쿠폰에 원자적 UPDATE를 적용한 이유**
 
-**세 방식 비교**
+쿠폰은 수량 계산 없이 `AVAILABLE → USED` 단순 상태 전이라 조건이 간단하다.
 
-| 항목 | 비관적 락 (현재) | 원자적 UPDATE | 낙관적 락 |
-|------|----------------|--------------|---------|
-| 도메인 로직 위치 | Java (`StockModel`) | SQL WHERE 절 | Java (`StockModel`) |
-| 재시도 로직 | 불필요 | 불필요 | 필요 |
-| 처리량 | 낮음 | 높음 | 충돌 드물면 높음 |
-| 에러 메시지 | 즉시 명확 | 추가 조회 필요 | 예외 변환 필요 |
-| 재고·쿠폰 일관성 | 동일 방식 | 쿠폰엔 부적합 (likeCount처럼 조건 없는 경우에 적합) | 쿠폰에 더 적합 |
+```java
+// CouponIssueJpaRepository
+@Transactional @Modifying
+@Query("UPDATE CouponIssueModel c SET c.status = :newStatus WHERE c.id = :id AND c.status = :curStatus")
+int updateStatusIfAvailable(...);
+```
+
+affected rows가 0이면 "이미 사용됨"으로 명확하게 해석된다. 재고처럼 "부족인지 row 없음인지"를 구분할 필요가 없다. 소유 확인(락 없는 조회)과 USED 전환(원자적 UPDATE)을 분리해 두 오류 케이스를 명확히 처리한다.
+
+**도메인별 전략 비교**
+
+| 항목 | 재고 (비관적 락) | 쿠폰 (원자적 UPDATE) |
+|------|----------------|---------------------|
+| 충돌 빈도 | 높음 (모든 유저가 같은 row 경쟁) | 낮음 (유저별 row 분리) |
+| 조건 복잡도 | `availableStock() >= qty` (수량 계산) | `status = AVAILABLE` (단순 상태) |
+| 도메인 로직 위치 | Java (`StockModel.reserve()`) | SQL WHERE 절으로 충분 |
+| 실패 원인 파악 | 즉시 명확 | 사전 소유 확인으로 구분 |
 
 **적용 위치**
 
 ```
-StockJpaRepository.findAllByProductIdsWithLock           → createOrder·confirmPayment
-CouponIssueJpaRepository.findByUserIdAndCouponIdWithLock → createOrder
+StockJpaRepository.findAllByProductIdsWithLock              → createOrder·confirmPayment  (비관적 락)
+CouponIssueJpaRepository.updateStatusIfAvailable(...)       → createOrder                 (원자적 UPDATE)
 ```
 
 **락 메서드 분리 규칙**
@@ -906,7 +921,7 @@ findAllByProductIdsWithLock(ids)  → SELECT ... FOR UPDATE
 
 **배경**
 
-`PENDING_PAYMENT`와 `CONFIRMED`만 있던 구조에서 `startPayment()`를 동일 주문으로 여러 번 호출하면 재고가 중복으로 선점된다.
+`PENDING_PAYMENT`와 `CONFIRMED`만 있던 구조에서 `startPayment()`를 동일 주문으로 여러 번 호출하면 결제 요청이 중복 처리된다. 재고 선점은 결정 16에 의해 `createOrder()`로 이동했으므로 `startPayment()`는 상태 전이만 담당하지만, 같은 주문으로 두 번 호출되면 `PENDING_PAYMENT` 체크가 막아야 한다.
 
 **트레이드오프**
 
@@ -937,7 +952,7 @@ After:  createOrder (쿠폰 소비 + 재고 선점 + 주문 생성 한 트랜잭
 
 | 항목 | 결정한 이유 | 포기한 것 |
 |------|------------|-----------|
-| createOrder에서 재고 비관적 락 | 락 실패 시 쿠폰도 함께 롤백 — 쿠폰 소진 문제 해결 | createOrder 트랜잭션이 더 길어짐 (상품·재고·쿠폰 락을 모두 보유) |
+| createOrder에서 재고 비관적 락 + 쿠폰 원자적 UPDATE | 어느 것이 실패해도 함께 롤백 — 쿠폰 소진 문제 해결 | createOrder 트랜잭션에 재고 비관적 락 + 쿠폰 원자적 UPDATE가 포함되어 트랜잭션 범위 증가 |
 | startPayment 단순화 | 상태 전이만 담당 — 코드가 명확해짐 | startPayment 단계에서 동시 재고 경쟁을 막는 역할 상실 (createOrder에서 이미 처리) |
 | 락 없는 Fail-fast 제거 | 락 있는 reserve()가 충분히 빠른 실패를 보장 | 락 없는 사전 검증이 주는 약간의 조기 차단 효과 |
 
