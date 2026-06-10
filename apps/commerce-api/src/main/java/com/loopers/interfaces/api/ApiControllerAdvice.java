@@ -8,6 +8,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,6 +24,9 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class ApiControllerAdvice {
+
+    private static final Pattern MISSING_PARAM_PATTERN = Pattern.compile("'(.+?)'");
+
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handle(CoreException e) {
         log.warn("CoreException : {}", e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage(), e);
@@ -43,6 +47,12 @@ public class ApiControllerAdvice {
         String name = e.getParameterName();
         String type = e.getParameterType();
         String message = String.format("필수 요청 파라미터 '%s' (타입: %s)가 누락되었습니다.", name, type);
+        return failureResponse(ErrorType.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleBadRequest(MissingRequestHeaderException e) {
+        String message = String.format("필수 요청 헤더 '%s'가 누락되었습니다.", e.getHeaderName());
         return failureResponse(ErrorType.BAD_REQUEST, message);
     }
 
@@ -114,8 +124,7 @@ public class ApiControllerAdvice {
     }
 
     private String extractMissingParameter(String message) {
-        Pattern pattern = Pattern.compile("'(.+?)'");
-        Matcher matcher = pattern.matcher(message);
+        Matcher matcher = MISSING_PARAM_PATTERN.matcher(message);
         return matcher.find() ? matcher.group(1) : "";
     }
 
