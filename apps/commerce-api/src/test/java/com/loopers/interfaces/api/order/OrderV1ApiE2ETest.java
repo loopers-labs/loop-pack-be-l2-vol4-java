@@ -86,7 +86,7 @@ class OrderV1ApiE2ETest {
 
     private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createOrder(int quantity) {
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity))
+                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity)), null
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType);

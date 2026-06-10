@@ -62,7 +62,7 @@ class OrderFacadeIntegrationTest {
         void createsOrderAndDecreasesStock() {
             List<OrderItemInput> inputs = List.of(new OrderItemInput(stock.getId(), 3));
 
-            OrderInfo result = orderFacade.createOrder(USER_ID, inputs);
+            OrderInfo result = orderFacade.createOrder(USER_ID, inputs, null);
 
             assertThat(result.totalAmount()).isEqualTo(30000L);
             assertThat(result.items()).hasSize(1);
@@ -78,7 +78,7 @@ class OrderFacadeIntegrationTest {
             List<OrderItemInput> inputs = List.of(new OrderItemInput(stock.getId(), 100));
 
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(USER_ID, inputs));
+                    () -> orderFacade.createOrder(USER_ID, inputs, null));
 
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
@@ -89,7 +89,7 @@ class OrderFacadeIntegrationTest {
             List<OrderItemInput> inputs = List.of(new OrderItemInput(999L, 1));
 
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(USER_ID, inputs));
+                    () -> orderFacade.createOrder(USER_ID, inputs, null));
 
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
@@ -102,7 +102,7 @@ class OrderFacadeIntegrationTest {
                     new OrderItemInput(stock.getId(), 3)
             );
 
-            OrderInfo result = orderFacade.createOrder(USER_ID, inputs);
+            OrderInfo result = orderFacade.createOrder(USER_ID, inputs, null);
 
             assertThat(result.items()).hasSize(1);
             assertThat(result.totalAmount()).isEqualTo(50000L);
@@ -119,7 +119,7 @@ class OrderFacadeIntegrationTest {
         @DisplayName("주문이 취소되고, 재고가 복구된다.")
         @Test
         void cancelsOrderAndRestoresStock() {
-            OrderInfo order = orderFacade.createOrder(USER_ID, List.of(new OrderItemInput(stock.getId(), 3)));
+            OrderInfo order = orderFacade.createOrder(USER_ID, List.of(new OrderItemInput(stock.getId(), 3)), null);
 
             OrderInfo result = orderFacade.cancelOrder(order.id(), USER_ID);
 
