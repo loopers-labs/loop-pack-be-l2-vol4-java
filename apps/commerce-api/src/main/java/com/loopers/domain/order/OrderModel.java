@@ -37,8 +37,19 @@ public class OrderModel extends BaseEntity {
     private Long userId;
 
     @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "original_amount", nullable = false))
+    private Money originalAmount;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "total_amount", nullable = false))
     private Money totalMoney;
+
+    @Column
+    private Long userCouponId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -47,17 +58,23 @@ public class OrderModel extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItemModel> items = new ArrayList<>();
 
-    public OrderModel(Long userId) {
+    public OrderModel(Long userId, Long userCouponId) {
         Guard.notNull(userId, "사용자 ID는 필수입니다.");
         this.orderNumber = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         this.userId = userId;
+        this.userCouponId = userCouponId;
+        this.originalAmount = new Money(0L);
+        this.discountAmount = new Money(0L);
         this.totalMoney = new Money(0L);
         this.status = OrderStatus.REQUESTED;
     }
 
-    public void updateTotal(Money total) {
-        Guard.notNull(total, "주문 금액은 필수입니다.");
-        this.totalMoney = total;
+    public void applyAmounts(Money originalAmount, Money discountAmount) {
+        Guard.notNull(originalAmount, "원금은 필수입니다.");
+        Guard.notNull(discountAmount, "할인 금액은 필수입니다.");
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.totalMoney = new Money(originalAmount.getValue() - discountAmount.getValue());
     }
 
     public void complete() {
@@ -86,7 +103,13 @@ public class OrderModel extends BaseEntity {
 
     public Long getUserId() { return userId; }
 
+    public Money getOriginalAmount() { return originalAmount; }
+
+    public Money getDiscountAmount() { return discountAmount; }
+
     public Money getTotalMoney() { return totalMoney; }
+
+    public Long getUserCouponId() { return userCouponId; }
 
     public OrderStatus getStatus() { return status; }
 

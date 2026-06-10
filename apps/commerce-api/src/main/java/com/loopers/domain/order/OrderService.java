@@ -1,6 +1,6 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.product.ProductStockModel;
+import com.loopers.domain.order.vo.Money;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.product.vo.StockQuantity;
 import com.loopers.support.error.CoreException;
@@ -13,15 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderTotalPolicy orderTotalPolicy;
 
     @Transactional(readOnly = true)
     public Page<OrderModel> getAdminList(Pageable pageable) {
@@ -29,26 +26,17 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderModel placeOrder(OrderModel order, List<ProductStockModel> stocks, List<OrderLine> lines) {
-        buildItems(order, stocks, lines);
-        order.updateTotal(orderTotalPolicy.calculate(order.getItems()));
+    public OrderModel placeOrder(OrderModel order, List<OrderLine> lines, Money originalAmount, Money discountAmount) {
+        lines.forEach(line -> order.addItem(new OrderItemModel(
+                order,
+                line.stockId(),
+                line.productId(),
+                new ProductName(line.productName()),
+                line.price(),
+                new StockQuantity(line.quantity())
+        )));
+        order.applyAmounts(originalAmount, discountAmount);
         return orderRepository.save(order);
-    }
-
-    private void buildItems(OrderModel order, List<ProductStockModel> stocks, List<OrderLine> lines) {
-        Map<Long, ProductStockModel> stockMap = stocks.stream()
-                .collect(Collectors.toMap(ProductStockModel::getId, s -> s));
-        lines.forEach(line -> {
-            ProductStockModel stock = stockMap.get(line.stockId());
-            order.addItem(new OrderItemModel(
-                    order,
-                    stock.getId(),
-                    stock.getProduct().getId(),
-                    new ProductName(stock.getProduct().getName()),
-                    stock.getPrice(),
-                    new StockQuantity(line.quantity())
-            ));
-        });
     }
 
     @Transactional(readOnly = true)

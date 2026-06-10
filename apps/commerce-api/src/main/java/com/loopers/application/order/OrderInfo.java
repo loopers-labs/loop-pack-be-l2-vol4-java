@@ -9,6 +9,8 @@ public record OrderInfo(
         Long id,
         String orderNumber,
         Long userId,
+        Long originalAmount,
+        Long discountAmount,
         Long totalAmount,
         String status,
         List<OrderItemInfo> items
@@ -36,6 +38,8 @@ public record OrderInfo(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getUserId(),
+                order.getOriginalAmount().getValue(),
+                order.getDiscountAmount().getValue(),
                 order.getTotalMoney().getValue(),
                 order.getStatus().getDescription(),
                 order.getItems().stream().map(OrderItemInfo::from).toList()

@@ -17,7 +17,8 @@ public class OrderV1Dto {
     ) {}
 
     public record OrderRequest(
-            @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.") @Valid List<OrderItemRequest> items
+            @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.") @Valid List<OrderItemRequest> items,
+            Long userCouponId
     ) {
         public List<OrderItemInput> toInputs() {
             return items.stream()
@@ -29,6 +30,8 @@ public class OrderV1Dto {
     public record OrderResponse(
             Long id,
             String orderNumber,
+            Long originalAmount,
+            Long discountAmount,
             Long totalAmount,
             String status,
             List<OrderItemResponse> items
@@ -52,6 +55,8 @@ public class OrderV1Dto {
             return new OrderResponse(
                     info.id(),
                     info.orderNumber(),
+                    info.originalAmount(),
+                    info.discountAmount(),
                     info.totalAmount(),
                     info.status(),
                     info.items().stream().map(OrderItemResponse::from).toList()
