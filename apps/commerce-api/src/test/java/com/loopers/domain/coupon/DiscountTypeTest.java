@@ -1,5 +1,6 @@
 package com.loopers.domain.coupon;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -63,6 +64,39 @@ class DiscountTypeTest {
         void passes_whenRateValueIsWithinRange(int value) {
             // arrange & act & assert
             assertThatCode(() -> DiscountType.RATE.validate(value)).doesNotThrowAnyException();
+        }
+    }
+
+    @DisplayName("할인 금액을 타입별로 계산할 때,")
+    @Nested
+    class Calculate {
+
+        @DisplayName("정액은 할인 값이 주문 금액 이하면 할인 값 그대로 계산된다.")
+        @Test
+        void returnsFixedValue_whenValueIsWithinOrderAmount() {
+            // arrange & act & assert
+            assertThat(DiscountType.FIXED.calculate(30_000, 5_000)).isEqualTo(5_000);
+        }
+
+        @DisplayName("정액은 할인 값이 주문 금액보다 크면 주문 금액으로 캡된다.")
+        @Test
+        void capsAtOrderAmount_whenFixedValueExceedsOrderAmount() {
+            // arrange & act & assert
+            assertThat(DiscountType.FIXED.calculate(30_000, 50_000)).isEqualTo(30_000);
+        }
+
+        @DisplayName("정률은 주문 금액의 비율로 계산되며 소수점 이하는 내림한다.")
+        @Test
+        void floorsRateDiscount() {
+            // arrange & act & assert (10,001원의 10% = 1,000.1원 → 1,000원)
+            assertThat(DiscountType.RATE.calculate(10_001, 10)).isEqualTo(1_000);
+        }
+
+        @DisplayName("정률 100%면 주문 금액 전액이 할인된다.")
+        @Test
+        void returnsFullAmount_whenRateIsHundred() {
+            // arrange & act & assert
+            assertThat(DiscountType.RATE.calculate(30_000, 100)).isEqualTo(30_000);
         }
     }
 }
