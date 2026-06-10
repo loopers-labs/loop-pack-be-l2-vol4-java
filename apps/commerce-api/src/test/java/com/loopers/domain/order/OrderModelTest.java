@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class OrderModelTest {
 
     private OrderModel createOrder() {
-        return new OrderModel(1L);
+        return new OrderModel(1L, null);
     }
 
     @DisplayName("주문 생성 시,")
@@ -26,7 +26,7 @@ class OrderModelTest {
         @DisplayName("userId가 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenUserIdIsNull() {
-            CoreException exception = assertThrows(CoreException.class, () -> new OrderModel(null));
+            CoreException exception = assertThrows(CoreException.class, () -> new OrderModel(null, null));
 
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
