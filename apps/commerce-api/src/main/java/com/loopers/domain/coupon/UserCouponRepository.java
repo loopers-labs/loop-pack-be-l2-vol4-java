@@ -3,7 +3,6 @@ package com.loopers.domain.coupon;
 import com.loopers.support.pagination.PageQuery;
 import com.loopers.support.pagination.PageResult;
 
-import java.time.ZonedDateTime;
 import java.util.Optional;
 
 public interface UserCouponRepository {
@@ -16,5 +15,5 @@ public interface UserCouponRepository {
 
     PageResult<UserCoupon> findAllByCouponTemplateId(Long couponTemplateId, PageQuery query);
 
-    boolean useAvailableCoupon(Long userCouponId, Long userId, ZonedDateTime usedAt);
+    void applyUse(UserCoupon userCoupon);
 }

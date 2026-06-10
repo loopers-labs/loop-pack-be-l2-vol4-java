@@ -96,14 +96,8 @@ public class CouponService {
         CouponDiscountPolicy policy = couponDiscountMethod.match(userCoupon.getType());
         CouponDiscount discount = userCoupon.apply(couponUse.orderAmount(), couponUse.usedAt(), policy);
 
-        boolean couponUsed = userCouponRepository.useAvailableCoupon(
-            couponUse.userCouponId(),
-            couponUse.userId(),
-            couponUse.usedAt()
-        );
-        if (!couponUsed) {
-            throw new CoreException(ErrorType.CONFLICT, "사용할 수 없는 쿠폰입니다.");
-        }
+        userCoupon.use(couponUse.userId(), couponUse.usedAt());
+        userCouponRepository.applyUse(userCoupon);
 
         return discount;
     }

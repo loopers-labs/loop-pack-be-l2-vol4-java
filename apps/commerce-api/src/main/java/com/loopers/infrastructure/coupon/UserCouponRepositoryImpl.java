@@ -2,7 +2,6 @@ package com.loopers.infrastructure.coupon;
 
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
-import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.pagination.PageQuery;
@@ -12,9 +11,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
-import java.time.ZonedDateTime;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -52,14 +51,11 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     }
 
     @Override
-    public boolean useAvailableCoupon(Long userCouponId, Long userId, ZonedDateTime usedAt) {
-        int updatedCount = userCouponJpaRepository.useAvailableCoupon(
-            userCouponId,
-            userId,
-            usedAt,
-            UserCouponStatus.AVAILABLE,
-            UserCouponStatus.USED
-        );
-        return updatedCount == 1;
+    public void applyUse(UserCoupon userCoupon) {
+        try {
+            userCouponJpaRepository.saveAndFlush(userCoupon);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new CoreException(ErrorType.CONFLICT, "사용할 수 없는 쿠폰입니다.");
+        }
     }
 }
