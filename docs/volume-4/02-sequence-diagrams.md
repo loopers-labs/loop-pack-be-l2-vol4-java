@@ -128,7 +128,7 @@ sequenceDiagram
         end
     end
 
-    F->>O: of(items, originalAmount, discountAmount, finalAmount, userCouponId)
+    F->>O: builder(originalAmount, discountAmount, finalAmount, userCouponId)
     O-->>F: OrderModel
     F->>OR: save(order, orderItems)
     OR-->>F: 저장된 주문
@@ -141,7 +141,7 @@ sequenceDiagram
 - **트랜잭션 경계**: `OrderFacade.createOrder`에 `@Transactional`. 재고 차감·쿠폰 사용·주문 저장이 한 경계 안에서 처리되며, 어느 단계라도 실패하면 차감된 재고와 사용 전이된 쿠폰이 모두 처음 상태로 되돌아간다.
 - **쿠폰 검증 응답 어휘 (결정 7)**: 쿠폰 부재·타인 소유는 자원 부재로, 사용됨·만료·최소 금액 미달은 자원 충돌로 응답한다. 다이어그램의 두 실패 분기가 이 구분에 대응한다.
 - **할인 계산 (결정 8)**: `UserCouponModel.calculateDiscount(originalAmount)`가 최소 주문 금액 검증(할인 전 금액 기준)과 할인 계산(정액은 주문 금액으로 캡, 정률은 내림)을 함께 수행한다.
-- **금액 스냅샷 (결정 6)**: `OrderModel.of(...)`에 원 주문 금액·할인 금액·최종 결제 금액·적용 쿠폰 식별자를 기록한다. 쿠폰 미적용 주문은 할인 금액 0, 적용 쿠폰 식별자가 비어 있다.
+- **금액 스냅샷 (결정 6)**: `OrderModel`은 매개변수가 많아 정적 팩토리 대신 Lombok `@Builder`로 생성하며, 원 주문 금액·할인 금액·최종 결제 금액·적용 쿠폰 식별자를 기록한다. 세 금액의 정합(`최종 = 원금 − 할인`)은 단일 호출자인 `OrderFacade`가 계산해 보장한다. 쿠폰 미적용 주문은 할인 금액 0, 적용 쿠폰 식별자가 비어 있다.
 - **브랜드명 스냅샷**: 주문 항목 생성 시 `BrandRepository`로 브랜드명도 조회해 함께 스냅샷한다(ORD-2 흐름 승계). 본 다이어그램에서는 핵심 흐름에 집중하기 위해 생략했다.
 - **검증 순서**: 다이어그램은 재고 차감 → 쿠폰 적용 순으로 그렸다. 명세상 순서는 무관하며, 단계 4에서 락 보유 시간을 줄이기 위해 락 없는 쿠폰 검증을 앞당기는 등 순서를 조정할 수 있다.
 - **동시성 미래 작업 (단계 4)**: 본 다이어그램은 동시 주문을 고려하지 않는다. 동일 쿠폰의 동시 사용(USED 전이 경합)과 동일 상품의 동시 재고 차감은 단계 4에서 락으로 보강하며, 이 다이어그램도 그때 함께 갱신한다.
