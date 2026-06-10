@@ -110,7 +110,6 @@ class CouponV1ApiE2ETest {
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                     () -> assertThat(response.getBody().data().couponTemplateId()).isEqualTo(template.getId()),
                     () -> assertThat(response.getBody().data().userId()).isEqualTo(savedUser.getId()),
-                    () -> assertThat(response.getBody().data().status()).isEqualTo(CouponV1Dto.CouponStatusDto.AVAILABLE),
                     () -> assertThat(issuedCouponRepository.findAllByUserId(savedUser.getId())).hasSize(1)
             );
         }

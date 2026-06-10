@@ -52,35 +52,4 @@ class IssuedCouponModelTest {
         }
     }
 
-    @DisplayName("유효 상태를 판별할 때(resolveStatus),")
-    @Nested
-    class ResolveStatus {
-
-        @DisplayName("AVAILABLE 상태이고 템플릿이 만료되지 않으면 AVAILABLE을 반환한다.")
-        @Test
-        void returnsAvailable_whenStatusIsAvailableAndTemplateIsNotExpired() {
-            // given
-            IssuedCouponModel coupon = issuedCoupon();
-
-            // when
-            CouponStatus result = coupon.resolveStatus(false);
-
-            // then
-            assertThat(result).isEqualTo(CouponStatus.AVAILABLE);
-        }
-
-        @DisplayName("AVAILABLE 상태이고 템플릿이 만료되었으면 EXPIRED를 반환한다.")
-        @Test
-        void returnsExpired_whenStatusIsAvailableAndTemplateIsExpired() {
-            // given
-            IssuedCouponModel coupon = issuedCoupon();
-
-            // when
-            CouponStatus result = coupon.resolveStatus(true);
-
-            // then
-            assertThat(result).isEqualTo(CouponStatus.EXPIRED);
-        }
-    }
-
 }

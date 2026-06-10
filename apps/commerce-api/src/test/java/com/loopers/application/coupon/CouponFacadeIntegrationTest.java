@@ -98,8 +98,7 @@ class CouponFacadeIntegrationTest {
             // then
             assertAll(
                     () -> assertThat(result.getTotalElements()).isEqualTo(2),
-                    () -> assertThat(result.getContent()).hasSize(2),
-                    () -> assertThat(result.getContent()).allMatch(info -> info.status() == CouponStatus.AVAILABLE)
+                    () -> assertThat(result.getContent()).hasSize(2)
             );
         }
 
@@ -115,21 +114,6 @@ class CouponFacadeIntegrationTest {
 
             // then
             assertThat(result.getTotalElements()).isEqualTo(0);
-        }
-
-        @DisplayName("템플릿이 만료된 경우 발급 쿠폰의 상태가 EXPIRED로 반환된다.")
-        @Test
-        void returnsExpiredStatus_whenTemplateIsExpired() {
-            // given
-            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().minusDays(1));
-            issuedCouponRepository.save(new IssuedCouponModel(template.getId(), 1L));
-
-            // when
-            Page<IssuedCouponInfo> result = couponFacade.getIssuedCouponsByTemplateId(
-                    template.getId(), PageRequest.of(0, 20));
-
-            // then
-            assertThat(result.getContent().get(0).status()).isEqualTo(CouponStatus.EXPIRED);
         }
 
         @DisplayName("존재하지 않는 쿠폰 템플릿의 발급 내역을 조회하면 NOT_FOUND 예외가 발생한다.")
@@ -148,9 +132,9 @@ class CouponFacadeIntegrationTest {
     @Nested
     class GetMyIssuedCoupons {
 
-        @DisplayName("발급받은 쿠폰이 있으면 해당 목록이 반환되고 만료 여부에 따라 status가 결정된다.")
+        @DisplayName("발급받은 쿠폰이 있으면 템플릿 정보와 함께 목록이 반환된다.")
         @Test
-        void returnsMyIssuedCoupons_withResolvedStatus() {
+        void returnsMyIssuedCoupons_withTemplateInfo() {
             // given
             CouponTemplateModel activeTemplate = saveTemplate(ZonedDateTime.now().plusDays(30));
             CouponTemplateModel expiredTemplate = saveTemplate(ZonedDateTime.now().minusDays(1));
@@ -163,8 +147,9 @@ class CouponFacadeIntegrationTest {
             // then
             assertAll(
                     () -> assertThat(result).hasSize(2),
-                    () -> assertThat(result).anyMatch(info -> info.status() == CouponStatus.AVAILABLE),
-                    () -> assertThat(result).anyMatch(info -> info.status() == CouponStatus.EXPIRED)
+                    () -> assertThat(result).allMatch(info -> info.status() == CouponStatus.AVAILABLE),
+                    () -> assertThat(result).anyMatch(info -> info.expiredAt().isAfter(ZonedDateTime.now())),
+                    () -> assertThat(result).anyMatch(info -> info.expiredAt().isBefore(ZonedDateTime.now()))
             );
         }
 
@@ -213,7 +198,6 @@ class CouponFacadeIntegrationTest {
             assertAll(
                     () -> assertThat(result.couponTemplateId()).isEqualTo(template.getId()),
                     () -> assertThat(result.userId()).isEqualTo(savedUser.getId()),
-                    () -> assertThat(result.status()).isEqualTo(CouponStatus.AVAILABLE),
                     () -> assertThat(saved).hasSize(1)
             );
         }

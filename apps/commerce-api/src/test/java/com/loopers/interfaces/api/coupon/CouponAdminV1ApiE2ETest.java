@@ -473,9 +473,7 @@ class CouponAdminV1ApiE2ETest {
                     () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
                     () -> assertThat(response.getBody().data().content()).hasSize(2),
                     () -> assertThat(response.getBody().data().content())
-                            .allMatch(c -> c.couponTemplateId().equals(template.getId())),
-                    () -> assertThat(response.getBody().data().content())
-                            .allMatch(c -> c.status() == CouponAdminV1Dto.CouponStatusDto.AVAILABLE)
+                            .allMatch(c -> c.couponTemplateId().equals(template.getId()))
             );
         }
 
