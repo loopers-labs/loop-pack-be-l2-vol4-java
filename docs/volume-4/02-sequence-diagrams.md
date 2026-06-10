@@ -72,7 +72,7 @@ sequenceDiagram
 
 ### 흐름 요약
 
-`OrderV1Controller`가 주문 요청(항목들과 선택적 `userCouponId`)을 받아 `OrderFacade`에 위임한다. `Facade`는 항목마다 `ProductRepository`로 상품을 조회하고 재고를 차감한다. 쿠폰이 지정되면 `UserCouponRepository`로 본인 소유의 발급 쿠폰을 조회해 사용 가능 여부를 `UserCouponModel`에 위임 검증하고, 할인 전 금액 기준으로 할인 금액을 계산한 뒤 쿠폰을 사용 완료로 전이한다. 마지막으로 원 주문 금액·할인 금액·최종 결제 금액·적용 쿠폰 식별자를 스냅샷한 `OrderModel`을 저장한다. 재고 부족, 쿠폰 부재·타인 소유, 사용됨·만료·최소 금액 미달 중 어느 하나라도 발생하면 전체가 롤백된다.
+`OrderV1Controller`가 주문 요청(항목들과 선택적 `userCouponId`)을 받아 `OrderFacade`에 위임한다. `Facade`는 항목마다 `ProductRepository`로 상품을 **잠금 조회(비관적 락, 결정 10)** 한 뒤 `ProductModel`에 재고 차감을 위임한다. 쿠폰이 지정되면 `UserCouponRepository`로 본인 소유의 발급 쿠폰을 조회해 `UserCouponModel.apply`에 가용성 검증·최소 금액 검증·할인 계산·사용 전이를 한 번에 위임한다(동일 쿠폰 동시 사용은 낙관적 락으로 차단, 결정 9). 마지막으로 원 주문 금액·할인 금액·최종 결제 금액·적용 쿠폰 식별자를 스냅샷한 `OrderModel`을 저장한다. 재고 부족, 쿠폰 부재·타인 소유, 사용됨·만료·최소 금액 미달 중 어느 하나라도 발생하면 전체가 롤백된다.
 
 ### 다이어그램
 
@@ -82,6 +82,7 @@ sequenceDiagram
     participant C as OrderV1Controller
     participant F as OrderFacade
     participant PR as ProductRepository
+    participant P as ProductModel
     participant UCR as UserCouponRepository
     participant UC as UserCouponModel
     participant O as OrderModel
@@ -92,15 +93,16 @@ sequenceDiagram
 
     Note over F,OR: 재고 차감·쿠폰 사용·주문 저장은 한 트랜잭션.<br/>어느 단계라도 실패하면 전체 롤백
 
-    loop 각 주문 항목 (상품 식별자 순)
-        F->>PR: getActiveById(productId)
-        PR-->>F: ProductModel (단가·브랜드명 스냅샷용)
-        F->>PR: decreaseStock(productId, quantity)
+    loop 각 주문 항목 (상품 식별자 순 — 데드락 방지)
+        F->>PR: getByIdForUpdate(productId)
+        Note over PR: 비관적 락 — 행 잠금 조회 (FOR UPDATE, 결정 10)
+        PR-->>F: ProductModel (행 잠금 보유, 단가·브랜드·재고)
+        F->>P: decreaseStock(quantity)
         alt 재고 부족
-            PR-->>F: 차감 실패
+            P-->>F: 예외 (자원 충돌)
             F-->>C: 주문 실패 (자원 충돌)
         else 차감 성공
-            PR-->>F: 차감 완료
+            P-->>F: 재고 차감 (커밋까지 행 잠금 유지)
         end
     end
 
@@ -111,18 +113,21 @@ sequenceDiagram
             F-->>C: 주문 실패 (자원 부재)
         else 본인 소유 쿠폰
             UCR-->>F: UserCouponModel
-            F->>UC: isAvailable() — 미사용·미만료 질의
-            UC-->>F: 사용 가능 여부
-            alt 사용 불가 (사용됨·만료)
+            F->>UC: apply(originalAmount, now)
+            Note over UC: 가용성(미사용·미만료) + 최소 금액 검증<br/>+ 할인 계산 + usedAt 전이를 한 번에
+            alt 사용 불가·만료·최소 금액 미달
+                UC-->>F: 예외 (자원 충돌)
                 F-->>C: 주문 실패 (자원 충돌)
-            else 사용 가능
-                F->>UC: calculateDiscount(originalAmount) — 최소 금액 검증 + 할인 계산
-                alt 최소 주문 금액 미달
-                    UC-->>F: 검증 실패
+            else 적용 가능
+                UC-->>F: 할인 금액 (usedAt 전이됨)
+                F->>UCR: saveAndFlush(userCoupon)
+                Note over UCR: flush 시 version 검증 (결정 9)
+                alt 버전 충돌 (동시 사용)
+                    UCR-->>F: OptimisticLockingFailureException
+                    Note over F: CoreException(자원 충돌)으로 번역
                     F-->>C: 주문 실패 (자원 충돌)
-                else 적용 가능
-                    UC-->>F: 할인 금액
-                    F->>UC: use() — 사용 완료 전이
+                else 충돌 없음
+                    UCR-->>F: 사용 확정
                 end
             end
         end
@@ -139,9 +144,11 @@ sequenceDiagram
 ### 구현 메모
 
 - **트랜잭션 경계**: `OrderFacade.createOrder`에 `@Transactional`. 재고 차감·쿠폰 사용·주문 저장이 한 경계 안에서 처리되며, 어느 단계라도 실패하면 차감된 재고와 사용 전이된 쿠폰이 모두 처음 상태로 되돌아간다.
+- **쿠폰 적용 단일 진입점**: `UserCouponModel.apply(originalAmount, now)`가 가용성 검증(`getStatus(now)`가 `AVAILABLE`이 아니면 예외)·최소 주문 금액 검증(할인 전 금액 기준, 결정 8)·할인 계산(정액은 주문 금액으로 캡, 정률은 내림)·사용 전이(`usedAt` 기록)를 한 메서드로 수행하고 할인액을 반환한다. 검증과 전이가 한 메서드에 묶여 그 사이에 다른 흐름이 끼어들 여지가 없다.
 - **쿠폰 검증 응답 어휘 (결정 7)**: 쿠폰 부재·타인 소유는 자원 부재로, 사용됨·만료·최소 금액 미달은 자원 충돌로 응답한다. 다이어그램의 두 실패 분기가 이 구분에 대응한다.
-- **할인 계산 (결정 8)**: `UserCouponModel.calculateDiscount(originalAmount)`가 최소 주문 금액 검증(할인 전 금액 기준)과 할인 계산(정액은 주문 금액으로 캡, 정률은 내림)을 함께 수행한다.
+- **재고 비관적 락 (결정 10)**: 재고 차감은 `ProductRepository.getByIdForUpdate`로 상품 행을 잠금 조회(`@Lock(PESSIMISTIC_WRITE)`)한 뒤 `ProductModel.decreaseStock(quantity)`로 메모리에서 차감한다. 행 잠금은 트랜잭션 커밋까지 유지되어 같은 상품의 동시 차감을 직렬화한다. 다중 항목 주문은 상품 식별자 순으로 잠금을 획득해 데드락을 피한다.
+- **쿠폰 낙관적 락 (결정 9)**: 발급 쿠폰에 버전을 두어, 사용 전이 flush 시 버전이 바뀌었으면 `OptimisticLockingFailureException`이 발생한다. 버전 충돌은 flush 시점에 나는데 트랜잭션 커밋은 `OrderFacade.createOrder` 메서드 밖이라, `apply` 직후 `UserCouponRepository.saveAndFlush`로 명시적 flush해 충돌을 메서드 안에서 감지한다. `OrderFacade`가 이 예외를 잡아 `CoreException(CONFLICT)`로 번역하므로(advice가 인프라 예외를 직접 처리하지 않음), 동일 쿠폰 동시 사용 시 두 번째 요청은 재시도 없이 자원 충돌(409)로 응답한다.
+- **할인 계산 (결정 8)**: 최소 주문 금액 검증(할인 전 금액 기준)과 할인 계산(정액 캡·정률 내림)은 위 `apply` 안에서 함께 수행한다.
 - **금액 스냅샷 (결정 6)**: `OrderModel`은 매개변수가 많아 정적 팩토리 대신 Lombok `@Builder`로 생성하며, 원 주문 금액·할인 금액·최종 결제 금액·적용 쿠폰 식별자를 기록한다. 세 금액의 정합(`최종 = 원금 − 할인`)은 단일 호출자인 `OrderFacade`가 계산해 보장한다. 쿠폰 미적용 주문은 할인 금액 0, 적용 쿠폰 식별자가 비어 있다.
 - **브랜드명 스냅샷**: 주문 항목 생성 시 `BrandRepository`로 브랜드명도 조회해 함께 스냅샷한다(ORD-2 흐름 승계). 본 다이어그램에서는 핵심 흐름에 집중하기 위해 생략했다.
-- **검증 순서**: 다이어그램은 재고 차감 → 쿠폰 적용 순으로 그렸다. 명세상 순서는 무관하며, 단계 4에서 락 보유 시간을 줄이기 위해 락 없는 쿠폰 검증을 앞당기는 등 순서를 조정할 수 있다.
-- **동시성 미래 작업 (단계 4)**: 본 다이어그램은 동시 주문을 고려하지 않는다. 동일 쿠폰의 동시 사용(USED 전이 경합)과 동일 상품의 동시 재고 차감은 단계 4에서 락으로 보강하며, 이 다이어그램도 그때 함께 갱신한다.
+- **검증 순서**: 다이어그램은 재고 차감 → 쿠폰 적용 순으로 그렸다. 명세상 순서는 무관하다.
