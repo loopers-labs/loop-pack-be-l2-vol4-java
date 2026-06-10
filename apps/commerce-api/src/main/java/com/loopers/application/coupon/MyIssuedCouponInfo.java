@@ -25,7 +25,7 @@ public record MyIssuedCouponInfo(
                 template.getDiscountPolicy().value(),
                 template.getMinOrderAmount(),
                 template.getExpiredAt(),
-                issued.resolveStatus(template.isExpired())
+                issued.getStatus()
         );
     }
 }

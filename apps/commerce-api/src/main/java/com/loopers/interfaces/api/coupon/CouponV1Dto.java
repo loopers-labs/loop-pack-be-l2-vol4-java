@@ -19,11 +19,7 @@ public class CouponV1Dto {
     }
 
     public enum CouponStatusDto {
-        AVAILABLE, USED, EXPIRED;
-
-        public static CouponStatusDto from(CouponStatus status) {
-            return valueOf(status.name());
-        }
+        AVAILABLE, USED, EXPIRED
     }
 
     public record MyIssuedCouponResponse(
@@ -43,7 +39,9 @@ public class CouponV1Dto {
                     info.value(),
                     info.minOrderAmount(),
                     info.expiredAt(),
-                    CouponStatusDto.from(info.status())
+                    info.status() == CouponStatus.USED
+                            ? CouponStatusDto.USED
+                            : ZonedDateTime.now().isAfter(info.expiredAt()) ? CouponStatusDto.EXPIRED : CouponStatusDto.AVAILABLE
             );
         }
     }
@@ -52,7 +50,6 @@ public class CouponV1Dto {
             Long id,
             Long couponTemplateId,
             Long userId,
-            CouponStatusDto status,
             ZonedDateTime createdAt,
             ZonedDateTime updatedAt
     ) {
@@ -61,7 +58,6 @@ public class CouponV1Dto {
                     info.id(),
                     info.couponTemplateId(),
                     info.userId(),
-                    CouponStatusDto.from(info.status()),
                     info.createdAt(),
                     info.updatedAt()
             );

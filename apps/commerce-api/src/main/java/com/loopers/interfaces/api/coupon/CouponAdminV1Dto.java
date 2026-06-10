@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.coupon;
 
 import com.loopers.application.coupon.CouponInfo;
 import com.loopers.application.coupon.IssuedCouponInfo;
-import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
 
 import java.math.BigDecimal;
@@ -19,14 +18,6 @@ public class CouponAdminV1Dto {
 
         public CouponType toDomain() {
             return CouponType.valueOf(this.name());
-        }
-    }
-
-    public enum CouponStatusDto {
-        AVAILABLE, USED, EXPIRED;
-
-        public static CouponStatusDto from(CouponStatus domainStatus) {
-            return valueOf(domainStatus.name());
         }
     }
 
@@ -74,7 +65,6 @@ public class CouponAdminV1Dto {
             Long id,
             Long couponTemplateId,
             Long userId,
-            CouponStatusDto status,
             ZonedDateTime createdAt,
             ZonedDateTime updatedAt
     ) {
@@ -83,7 +73,6 @@ public class CouponAdminV1Dto {
                     info.id(),
                     info.couponTemplateId(),
                     info.userId(),
-                    CouponStatusDto.from(info.status()),
                     info.createdAt(),
                     info.updatedAt()
             );

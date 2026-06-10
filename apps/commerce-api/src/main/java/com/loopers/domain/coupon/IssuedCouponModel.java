@@ -36,15 +36,4 @@ public class IssuedCouponModel extends BaseEntity {
         this.status = CouponStatus.AVAILABLE;
     }
 
-    public CouponStatus resolveStatus(boolean templateExpired) {
-        if (this.status == CouponStatus.USED) {
-            return CouponStatus.USED;
-        }
-        if (templateExpired) {
-            return CouponStatus.EXPIRED;
-        }
-        return CouponStatus.AVAILABLE;
-    }
-
-
 }
