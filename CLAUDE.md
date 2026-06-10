@@ -67,6 +67,26 @@ commerce-streamer → modules/jpa, modules/redis, modules/kafka, supports/*
 
 ---
 
+## 도메인 & 객체 설계 전략
+
+- 도메인 객체는 비즈니스 규칙을 캡슐화해야 합니다.
+- 애플리케이션 서비스는 서로 다른 도메인을 조립해, 도메인 로직을 조정하여 기능을 제공해야 합니다.
+- 규칙이 여러 서비스에 나타나면 도메인 객체에 속할 가능성이 높습니다.
+- 각 기능에 대한 책임과 결합도에 대해 개발자의 의도를 확인하고 개발을 진행합니다.
+
+## 아키텍처, 패키지 구성 전략
+
+- 본 프로젝트는 레이어드 아키텍처를 따르며, DIP (의존성 역전 원칙) 을 준수합니다.
+- API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
+- 패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
+  - 예시
+    > /interfaces/api (presentation 레이어 - API)
+      /application/.. (application 레이어 - 도메인 레이어를 조합해 사용 가능한 기능을 제공)
+      /domain/.. (domain 레이어 - 도메인 객체 및 엔티티, Repository 인터페이스가 위치)
+      /infrastructure/.. (infrastructure 레이어 - JPA, Redis 등을 활용해 Repository 구현체를 제공)
+
+---
+
 ## 레이어드 아키텍처 (commerce-api 기준)
 
 ```text
@@ -96,6 +116,25 @@ infrastructure          JpaRepository, RepositoryImpl 등
 | **Domain Component** | `PasswordEncryptor` | 도메인 부품(인프라 래퍼 등). 이름에 `Service`를 붙이지 않는다. **Service가 자유롭게 의존 가능**. |
 | **Service** | `UserService` | 도메인 흐름·검증·예외, 트랜잭션 경계. Repository와 Domain Component에 의존. 기본은 도메인 단위 1개, *시그널*이 보이면 유스케이스 단위로 분할 (아래 *Service 분할 원칙* 참조). |
 | **Repository (인터페이스)** | `UserRepository` | 도메인이 소유. 구현은 infrastructure. |
+
+### 애그리거트 경계와 엔티티 매핑
+
+> 도메인 모델은 그래프로 그리되, 경계는 애그리거트가 정한다. 이 규약은 *매핑 결정*과 *N+1 책임 소재*를 분리한다.
+
+**규칙 — 매핑은 애그리거트 경계로 결정한다.**
+
+| 관계 | 매핑 방식 | 예시 |
+|---|---|---|
+| **같은 애그리거트 내부** | **물리 매핑** — `@OneToMany` / `@ManyToOne` (기본 `FetchType.LAZY`, cascade는 루트 → 구성요소만) | `OrderModel.items` ↔ `OrderItem.order` |
+| **서로 다른 애그리거트** | **ID 참조 (논리 매핑)** — `Long xxxId` 컬럼. 필요하면 *값을 스냅샷*으로 함께 저장 | `OrderItem.productId` (+ `productName`/`unitPrice` 스냅샷), `OrderModel.userId`, `ProductModel.brandId`, `StockModel.productId`, `LikeModel.userId`/`productId` |
+
+**이유:**
+
+- 같은 애그리거트 안에서 ID로만 연결하면 *애플리케이션 서비스가 매번 다시 꺼내야* 해서 도메인 객체의 그래프 탐색 이점을 잃는다. 객체지향적 표현력과 cascade·orphanRemoval로 영속성 일관성을 보장하기 위해 물리 매핑이 정당하다.
+- 서로 다른 애그리거트를 물리 매핑으로 묶으면 *경계가 흐려져* 한쪽 변경이 다른 쪽 트랜잭션에 끌려 들어오고, 결국 모놀리식 그래프가 된다. ID 참조로 *느슨한 결합*을 유지하고, 필요하면 *주문 시점의 상품 가격/이름*처럼 값 스냅샷을 컬럼으로 복제한다(불변 이력 보존 효과까지).
+- **N+1 문제는 도메인 설계의 문제가 아니라 JPA의 조회 전략 문제다.** 매핑은 도메인 모델 기준으로 하고, 폭발이 보이면 *조회 측에서* fetch join / `@EntityGraph` / Projection으로 푼다. "N+1 무서워서 매핑을 안 한다"는 본말 전도.
+
+**예외 — 시그널 없이는 매핑을 늘리지 않는다.** 같은 애그리거트로 보이더라도, *해당 도메인 내에서 그래프 탐색이 실제로 필요한 흐름*이 없다면 ID 참조로 두고 시그널(예: Facade가 매번 자식을 다시 조회) 발생 시 매핑으로 승격한다. 매핑은 일단 박으면 LAZY 초기화 시점·detached entity·cascade 부작용까지 따라붙는다.
 
 ### Facade · Service · Component 책임 분담
 
@@ -275,6 +314,16 @@ test: 유저 회원가입 E2E 테스트 ← UserApiE2ETest
 | 통합 테스트 | H2 인메모리 데이터베이스 | 레이어 간 연동 및 영속성 검증 |
 | E2E 테스트 | 실제 HTTP 요청 (`TestRestTemplate`) | API 전체 흐름 검증 |
 
+**테스트 더블 정책 — H2 통합이 Fake/InMemory 권장의 적법한 대체이다.**
+
+DDD 교재류가 권장하는 `FakeRepository`/`InMemoryRepository` 별도 구현은 *이 프로젝트에서는 만들지 않는다*. 외부 의존성 분리는 **단위 테스트의 Mockito Mock** + **통합 테스트의 H2 인메모리 DB**로 충족한다. 이유:
+
+- H2는 *실제 JPA 쿼리·제약·트랜잭션·dirty checking*까지 검증해 Fake보다 회귀 검출이 강하다.
+- Fake/InMemory를 별도로 두면 *프로덕션 Repository와의 동작 불일치*가 새로운 회귀 원천이 된다(쿼리 동작은 결국 H2/MySQL에서 또 검증해야 함).
+- 단위 자리에서 *외부 시스템 안 띄움*은 Mockito Mock이 이미 보장한다.
+
+체크리스트류에서 "Fake/Stub 등을 사용한 단위 테스트" 항목은 *외부 의존성 분리*가 본질이며, 그 본질은 위 두 도구 조합으로 달성된다. Fake 클래스 부재를 갭으로 보지 않는다.
+
 #### 단위 vs 통합 — 역할 분리
 
 같은 시나리오를 두 곳에서 검증하지 않는다. 시나리오 종류에 따라 자리를 명확히 분리한다:
@@ -293,7 +342,14 @@ test: 유저 회원가입 E2E 테스트 ← UserApiE2ETest
 
 **Facade Integration**은 *합성/공유 트랜잭션 경계*가 도입되기 전까지 작성하지 않는다 (Service Integration + E2E가 흡수). 1:1 위임만 하는 동안에는 *중간 레이어 중복 테스트*가 됨.
 
-**Facade 단위 테스트**도 *합성/조건부 변환*이 도입되기 전까지 작성하지 않는다. 단순 위임을 `verify`로 검증하는 것은 *delegate test 안티패턴* — 시그니처 거울일 뿐이라 회귀 검출 가치가 없고 변경 저항만 만든다. 도메인 모델 → DTO 변환은 *DTO record의 책임*이므로 굳이 별도 테스트 없이 record 자체가 단순하면 통합/E2E로 충분.
+**Facade 단위 테스트는 작성하지 않는다 — 합성이 들어가도 동일.** 합성 흐름은 Facade Integration(H2)로만 검증하고, 단위는 모델·도메인 서비스에 집중한다. 이유:
+
+- *단순 위임*은 delegate test 안티패턴(시그니처 거울) — 회귀 검출 가치 없음, 변경 저항만.
+- *합성*도 Mock으로 가면 ReflectionTestUtils로 도메인 내부 id를 박는 *새는 추상화*로 흐른다. 도메인 모델이 점점 테스트 더블의 인질이 됨.
+- "호출이 안 됨"(`verifyNoInteractions`/`never`) 같은 negative verify는 Facade Integration에서 *부수 효과 없음*("Order row 안 생김, 재고 안 깎임")으로 동일하게 검증된다.
+- 합성이 커져 Integration만으로 부족해지면 *단위 테스트 보강이 아니라* Facade를 쪼개거나 Application Service로 옮긴다(코드가 잘못 모인 신호를 테스트로 가리지 않는다).
+
+도메인 모델 → DTO 변환은 *DTO record의 책임*이라 record가 단순하면 통합/E2E로 충분.
 
 ### 테스트 코드 컨벤션
 

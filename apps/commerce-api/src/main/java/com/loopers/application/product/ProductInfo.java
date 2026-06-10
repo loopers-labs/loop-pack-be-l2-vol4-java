@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
 
 public record ProductInfo(
@@ -7,15 +8,21 @@ public record ProductInfo(
     String name,
     String description,
     Long price,
-    Integer stock
+    Long brandId,
+    String brandName,
+    Long likeCount,
+    boolean available
 ) {
-    public static ProductInfo from(ProductModel product) {
+    public static ProductInfo from(ProductModel product, BrandModel brand, boolean available) {
         return new ProductInfo(
             product.getId(),
             product.getName(),
             product.getDescription(),
-            product.getPrice(),
-            product.getStock()
+            product.getPrice().value(),
+            product.getBrandId(),
+            brand.getName(),
+            product.getLikeCount(),
+            available
         );
     }
 }

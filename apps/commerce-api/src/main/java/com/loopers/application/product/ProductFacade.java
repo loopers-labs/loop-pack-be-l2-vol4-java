@@ -1,40 +1,24 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.SortOption;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
-        return ProductInfo.from(product);
+    private final ProductCompositionReader reader;
+
+    public ProductInfo getProductDetail(Long productId) {
+        ProductWithDeps c = reader.getDetail(productId);
+        return ProductInfo.from(c.product(), c.brand(), c.stockQuantity() > 0);
     }
 
-    public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
-    }
-
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
-            .toList();
-    }
-
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
-    }
-
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+    public Page<ProductInfo> search(Long brandId, SortOption sort, Pageable pageable) {
+        return reader.search(brandId, sort, pageable)
+            .map(c -> ProductInfo.from(c.product(), c.brand(), c.stockQuantity() > 0));
     }
 }

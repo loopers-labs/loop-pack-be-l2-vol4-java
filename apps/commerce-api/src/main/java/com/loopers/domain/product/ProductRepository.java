@@ -1,11 +1,25 @@
 package com.loopers.domain.product;
 
-import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public interface ProductRepository {
     ProductModel save(ProductModel product);
-    Optional<ProductModel> find(Long id);
-    List<ProductModel> findAll();
-    void delete(Long id);
+    Optional<ProductModel> findById(Long id);
+    List<ProductModel> findAllByIds(Collection<Long> ids);
+    /** soft-delete 필터링된 존재 여부 — 가벼운 검증용 (엔티티 적재 없이 SELECT 1). */
+    boolean existsById(Long id);
+    Page<ProductModel> search(Long brandId, SortOption sort, Pageable pageable);
+    long countByBrandId(Long brandId);
+    Map<Long, Long> countByBrandIds(Collection<Long> brandIds);
+
+    /** 원자 +1. 동시 like 시 read-modify-write 경합을 제거한다. 반환값은 영향받은 행 수. */
+    int incrementLikeCount(Long productId);
+    /** 원자 -1 (likeCount > 0 가드 포함, 음수 방지). 반환값은 영향받은 행 수. */
+    int decrementLikeCount(Long productId);
 }
