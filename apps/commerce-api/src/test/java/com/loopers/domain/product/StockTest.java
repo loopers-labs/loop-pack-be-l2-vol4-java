@@ -65,4 +65,48 @@ class StockTest {
                 .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("재고를 차감할 때,")
+    @Nested
+    class Decrease {
+
+        @DisplayName("차감 수량이 재고보다 적으면 그만큼 줄어든 Stock이 반환된다.")
+        @Test
+        void returnsDecreasedStock_whenQuantityIsLessThanStock() {
+            // arrange
+            Stock stock = Stock.from(10);
+
+            // act
+            Stock decreased = stock.decrease(4);
+
+            // assert
+            assertThat(decreased.value()).isEqualTo(6);
+        }
+
+        @DisplayName("차감 수량이 재고와 같으면 0인 Stock이 반환된다.")
+        @Test
+        void returnsZeroStock_whenQuantityEqualsStock() {
+            // arrange
+            Stock stock = Stock.from(5);
+
+            // act
+            Stock decreased = stock.decrease(5);
+
+            // assert
+            assertThat(decreased.value()).isEqualTo(0);
+        }
+
+        @DisplayName("차감 수량이 재고보다 많으면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenQuantityExceedsStock() {
+            // arrange
+            Stock stock = Stock.from(3);
+
+            // act & assert
+            assertThatThrownBy(() -> stock.decrease(5))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
+        }
+    }
 }

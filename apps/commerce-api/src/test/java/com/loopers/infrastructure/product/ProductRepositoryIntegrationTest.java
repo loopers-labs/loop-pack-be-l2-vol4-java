@@ -5,11 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import java.util.Comparator;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -569,97 +564,4 @@ class ProductRepositoryIntegrationTest {
         }
     }
 
-    @DisplayName("재고를 차감할 때,")
-    @Nested
-    class DecreaseStock {
-
-        @DisplayName("재고가 요청 수량 이상이면 1건이 갱신되고 재고가 그만큼 줄어든다.")
-        @Test
-        void decreasesStock_whenStockIsSufficient() {
-            // arrange
-            BrandModel brand = saveBrand("감성 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 10);
-
-            // act
-            int decreasedCount = productRepository.decreaseStock(product.getId(), 4);
-
-            // assert
-            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertAll(
-                () -> assertThat(decreasedCount).isEqualTo(1),
-                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(6)
-            );
-        }
-
-        @DisplayName("재고가 요청 수량과 같으면 0까지 차감된다.")
-        @Test
-        void decreasesToZero_whenStockEqualsQuantity() {
-            // arrange
-            BrandModel brand = saveBrand("감성 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 5);
-
-            // act
-            int decreasedCount = productRepository.decreaseStock(product.getId(), 5);
-
-            // assert
-            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertAll(
-                () -> assertThat(decreasedCount).isEqualTo(1),
-                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(0)
-            );
-        }
-
-        @DisplayName("재고가 요청 수량보다 적으면 0건이 갱신되고 재고는 변하지 않는다.")
-        @Test
-        void doesNotDecrease_whenStockIsInsufficient() {
-            // arrange
-            BrandModel brand = saveBrand("감성 브랜드");
-            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 3);
-
-            // act
-            int decreasedCount = productRepository.decreaseStock(product.getId(), 5);
-
-            // assert
-            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertAll(
-                () -> assertThat(decreasedCount).isEqualTo(0),
-                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(3)
-            );
-        }
-
-        @DisplayName("같은 상품에 동시에 차감이 몰려도 재고는 음수가 되지 않고 성공 건수는 초기 재고를 넘지 않는다.")
-        @Test
-        void neverGoesNegative_underConcurrentDecrease() throws InterruptedException {
-            // arrange
-            BrandModel brand = saveBrand("감성 브랜드");
-            int initialStock = 50;
-            int threadCount = 100;
-            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, initialStock);
-            ExecutorService executor = Executors.newFixedThreadPool(16);
-            CountDownLatch latch = new CountDownLatch(threadCount);
-            AtomicInteger successCount = new AtomicInteger();
-
-            // act
-            for (int i = 0; i < threadCount; i++) {
-                executor.submit(() -> {
-                    try {
-                        if (productRepository.decreaseStock(product.getId(), 1) == 1) {
-                            successCount.incrementAndGet();
-                        }
-                    } finally {
-                        latch.countDown();
-                    }
-                });
-            }
-            latch.await(10, TimeUnit.SECONDS);
-            executor.shutdown();
-
-            // assert
-            ProductModel reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertAll(
-                () -> assertThat(successCount.get()).isEqualTo(initialStock),
-                () -> assertThat(reloadedProduct.getStock().value()).isEqualTo(0)
-            );
-        }
-    }
 }
