@@ -270,14 +270,5 @@ public class CouponTemplateEntityTest {
             assertThrows(CoreException.class, () -> template.update("", null, FUTURE.plusDays(10)));
         }
 
-        @DisplayName("expiredAt이 과거이면 예외가 발생한다.")
-        @Test
-        void throwsException_whenUpdateExpiredAtIsInThePast() {
-            // arrange
-            CouponTemplateEntity template = new CouponTemplateEntity(VALID_NAME, VALID_TYPE, VALID_VALUE, null, FUTURE);
-
-            // act & assert
-            assertThrows(CoreException.class, () -> template.update(VALID_NAME, null, PAST));
-        }
     }
 }

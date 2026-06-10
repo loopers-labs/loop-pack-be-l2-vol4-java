@@ -80,7 +80,9 @@ public class CouponTemplateEntity extends BaseEntity {
 
     public void update(String name, Long minOrderAmount, ZonedDateTime expiredAt) {
         validateName(name);
-        validateExpiredAt(expiredAt);
+        if (expiredAt == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 만료일은 필수입니다.");
+        }
         this.name = name;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
