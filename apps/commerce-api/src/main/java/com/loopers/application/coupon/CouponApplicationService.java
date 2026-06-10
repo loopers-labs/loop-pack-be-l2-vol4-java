@@ -1,6 +1,7 @@
 package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.model.CouponTemplate;
+import com.loopers.domain.coupon.model.CouponType;
 import com.loopers.domain.coupon.model.IssuedCoupon;
 import com.loopers.domain.coupon.repository.CouponTemplateRepository;
 import com.loopers.domain.coupon.repository.IssuedCouponRepository;
@@ -59,8 +60,8 @@ public class CouponApplicationService {
 
     // ADMIN
     @Transactional
-    public CouponTemplate createTemplate(String name, com.loopers.domain.coupon.model.CouponType type,
-                                          Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+    public CouponTemplate createTemplate(String name, CouponType type,
+                                         Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
         return couponTemplateRepository.save(CouponTemplate.create(name, type, value, minOrderAmount, expiredAt));
     }
 
@@ -77,7 +78,7 @@ public class CouponApplicationService {
 
     @Transactional
     public CouponTemplate updateTemplate(Long couponTemplateId, String name,
-                                          com.loopers.domain.coupon.model.CouponType type,
+                                          CouponType type,
                                           Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
         CouponTemplate template = couponTemplateRepository.findById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
