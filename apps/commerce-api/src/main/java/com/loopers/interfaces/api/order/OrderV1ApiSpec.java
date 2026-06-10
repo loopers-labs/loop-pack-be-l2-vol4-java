@@ -15,7 +15,8 @@ public interface OrderV1ApiSpec {
 
     @Operation(
         summary = "주문 생성",
-        description = "회원이 1개 이상의 상품 항목을 묶어 주문한다. 각 항목의 재고를 차감하고 주문 시점 상품 정보를 스냅샷으로 기록한다."
+        description = "회원이 1개 이상의 상품 항목을 묶어 주문한다. 각 항목의 재고를 차감하고 주문 시점 상품 정보를 스냅샷으로 기록한다. "
+            + "보유한 발급 쿠폰(userCouponId)을 한 장 적용하면 할인 금액을 계산해 쿠폰을 사용 완료로 전이하고, 원 주문 금액·할인 금액·최종 결제 금액을 함께 기록한다."
     )
     ApiResponse<OrderV1Dto.OrderResponse> createOrder(
         OrderV1Dto.CreateRequest request,

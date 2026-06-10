@@ -10,7 +10,9 @@ public record OrderAdminSummaryInfo(
     Long userId,
     OrderStatus status,
     ZonedDateTime orderedAt,
-    Integer totalPrice
+    Integer originalAmount,
+    Integer discountAmount,
+    Integer finalAmount
 ) {
 
     public static OrderAdminSummaryInfo from(OrderModel order) {
@@ -19,7 +21,9 @@ public record OrderAdminSummaryInfo(
             order.getUserId(),
             order.getStatus(),
             order.getOrderedAt(),
-            order.getTotalPrice()
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount()
         );
     }
 }

@@ -125,3 +125,42 @@ X-Loopers-LoginPw: Kyle!2030
 
 ### 본인 주문 상세 - 회원 인증 헤더 누락 (401 Unauthorized)
 GET http://localhost:8080/api/v1/orders/1
+
+### 쿠폰 적용 주문 - 정상 (201 Created, 세 금액 + userCouponId)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ],
+  "userCouponId": 1
+}
+
+### 쿠폰 적용 주문 - 쿠폰 미존재/타인 소유 (404 Not Found)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ],
+  "userCouponId": 99999
+}
+
+### 쿠폰 적용 주문 - 사용됨/만료/최소금액 미달 (409 Conflict)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ],
+  "userCouponId": 1
+}

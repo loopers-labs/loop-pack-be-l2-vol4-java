@@ -37,4 +37,10 @@ public interface CouponAdminV1ApiSpec {
         description = "관리자가 특정 쿠폰 템플릿의 상세 정보를 조회한다. 만료된 템플릿도 정상 조회되며, 삭제된 템플릿은 찾을 수 없다."
     )
     ApiResponse<CouponAdminV1Dto.DetailResponse> readCoupon(Long couponId);
+
+    @Operation(
+        summary = "쿠폰 발급 내역 조회",
+        description = "관리자가 특정 쿠폰 템플릿의 발급 내역을 발급 시각 내림차순으로 페이징 조회한다. 각 항목에 발급 쿠폰 상태가 포함되며, 삭제된 템플릿의 내역은 찾을 수 없다."
+    )
+    ApiResponse<CouponAdminV1Dto.IssuePageResponse> readCouponIssues(Long couponId, int page, int size);
 }

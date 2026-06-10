@@ -11,7 +11,10 @@ public record OrderInfo(
     Long orderId,
     OrderStatus status,
     ZonedDateTime orderedAt,
-    Integer totalPrice,
+    Integer originalAmount,
+    Integer discountAmount,
+    Integer finalAmount,
+    Long userCouponId,
     List<OrderItemInfo> items
 ) {
 
@@ -24,7 +27,10 @@ public record OrderInfo(
             order.getId(),
             order.getStatus(),
             order.getOrderedAt(),
-            order.getTotalPrice(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
+            order.getUserCouponId(),
             orderItemsInfo
         );
     }

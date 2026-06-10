@@ -20,3 +20,11 @@ X-Loopers-LoginPw: Kyle!2030
 POST http://localhost:8080/api/v1/coupons/1/issue
 X-Loopers-LoginId: testuser
 X-Loopers-LoginPw: Kyle!2030
+
+### 내 쿠폰 목록 - 정상 (200 OK, 상태 포함 전체)
+GET http://localhost:8080/api/v1/users/me/coupons
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+### 내 쿠폰 목록 - 회원 인증 헤더 누락 (401 Unauthorized)
+GET http://localhost:8080/api/v1/users/me/coupons

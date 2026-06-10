@@ -1,6 +1,7 @@
 package com.loopers.application.coupon;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -92,5 +93,21 @@ public class CouponFacade {
     @Transactional(readOnly = true)
     public CouponAdminInfo readCoupon(Long couponId) {
         return CouponAdminInfo.from(couponRepository.getActiveById(couponId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserCouponInfo> readMyCoupons(Long userId, ZonedDateTime now) {
+        return userCouponRepository.findByUserIdOrderByCreatedAtDesc(userId)
+            .stream()
+            .map(userCoupon -> UserCouponInfo.of(userCoupon, now))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CouponIssueInfo> readCouponIssues(Long couponId, int page, int size, ZonedDateTime now) {
+        CouponModel coupon = couponRepository.getActiveById(couponId);
+
+        return userCouponRepository.findByCouponIdOrderByCreatedAtDesc(coupon.getId(), page, size)
+            .map(userCoupon -> CouponIssueInfo.of(userCoupon, now));
     }
 }
