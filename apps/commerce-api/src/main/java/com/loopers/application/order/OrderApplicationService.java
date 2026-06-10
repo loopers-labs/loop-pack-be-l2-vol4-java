@@ -46,7 +46,7 @@ public class OrderApplicationService {
     private final CouponTemplateRepository couponTemplateRepository;
 
     @Transactional
-    public Long createOrder(String loginId, List<OrderItemRequest> items, Long issuedCouponId) {
+    public Long  createOrder(String loginId, List<OrderItemRequest> items, Long issuedCouponId) {
         // 1. 회원 조회
         Member member = memberService.getMember(loginId);
 
@@ -94,7 +94,7 @@ public class OrderApplicationService {
         Long appliedCouponId = null;
 
         if (issuedCouponId != null) {
-            IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(issuedCouponId)
+            IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
 
             if (!issuedCoupon.getMemberId().equals(member.getId())) {

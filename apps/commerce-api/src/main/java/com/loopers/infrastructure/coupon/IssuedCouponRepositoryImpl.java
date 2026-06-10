@@ -27,11 +27,6 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
     }
 
     @Override
-    public Optional<IssuedCoupon> findByIdWithLock(Long id) {
-        return jpaRepository.findByIdWithLock(id);
-    }
-
-    @Override
     public boolean existsByMemberIdAndCouponTemplateId(Long memberId, Long couponTemplateId) {
         return jpaRepository.existsByMemberIdAndCouponTemplateId(memberId, couponTemplateId);
     }

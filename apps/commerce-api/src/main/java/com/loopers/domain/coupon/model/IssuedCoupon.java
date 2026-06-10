@@ -9,6 +9,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 @Entity
@@ -28,6 +29,10 @@ public class IssuedCoupon extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private CouponStatus status;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     protected IssuedCoupon() {}
 

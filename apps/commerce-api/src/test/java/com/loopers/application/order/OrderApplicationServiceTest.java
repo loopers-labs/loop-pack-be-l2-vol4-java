@@ -137,7 +137,7 @@ class OrderApplicationServiceTest {
             when(productRepository.findAllByIdIn(List.of(1L))).thenReturn(List.of(product));
             when(brandRepository.findAllByIdIn(anyList())).thenReturn(List.of(brand));
             when(stockRepository.deductStock(anyLong(), anyInt())).thenReturn(1);
-            when(issuedCouponRepository.findByIdWithLock(42L)).thenReturn(Optional.of(issuedCoupon));
+            when(issuedCouponRepository.findById(42L)).thenReturn(Optional.of(issuedCoupon));
             when(couponTemplateRepository.findById(5L)).thenReturn(Optional.of(template));
 
             Order savedOrder = mock(Order.class);
@@ -167,7 +167,7 @@ class OrderApplicationServiceTest {
             when(productRepository.findAllByIdIn(List.of(1L))).thenReturn(List.of(product));
             when(brandRepository.findAllByIdIn(anyList())).thenReturn(List.of());
             when(stockRepository.deductStock(anyLong(), anyInt())).thenReturn(1);
-            when(issuedCouponRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
+            when(issuedCouponRepository.findById(999L)).thenReturn(Optional.empty());
 
             CoreException ex = assertThrows(CoreException.class, () ->
                 orderApplicationService.createOrder("user1", List.of(new OrderItemRequest(1L, 1)), 999L)
@@ -193,7 +193,7 @@ class OrderApplicationServiceTest {
             when(productRepository.findAllByIdIn(List.of(1L))).thenReturn(List.of(product));
             when(brandRepository.findAllByIdIn(anyList())).thenReturn(List.of());
             when(stockRepository.deductStock(anyLong(), anyInt())).thenReturn(1);
-            when(issuedCouponRepository.findByIdWithLock(42L)).thenReturn(Optional.of(issuedCoupon));
+            when(issuedCouponRepository.findById(42L)).thenReturn(Optional.of(issuedCoupon));
 
             CoreException ex = assertThrows(CoreException.class, () ->
                 orderApplicationService.createOrder("user1", List.of(new OrderItemRequest(1L, 1)), 42L)
@@ -222,7 +222,7 @@ class OrderApplicationServiceTest {
             when(productRepository.findAllByIdIn(List.of(1L))).thenReturn(List.of(product));
             when(brandRepository.findAllByIdIn(anyList())).thenReturn(List.of());
             when(stockRepository.deductStock(anyLong(), anyInt())).thenReturn(1);
-            when(issuedCouponRepository.findByIdWithLock(42L)).thenReturn(Optional.of(issuedCoupon));
+            when(issuedCouponRepository.findById(42L)).thenReturn(Optional.of(issuedCoupon));
             when(couponTemplateRepository.findById(5L)).thenReturn(Optional.of(template));
 
             CoreException ex = assertThrows(CoreException.class, () ->
