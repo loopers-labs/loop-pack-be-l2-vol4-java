@@ -58,6 +58,14 @@ public class Product extends BaseEntity {
         this.price = price;
     }
 
+    public void decreaseStock(int qty) {
+        if (!stock.hasAtLeast(qty)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 재고가 부족합니다.");
+        }
+        this.stock = stock.decrease(qty);
+    }
+
+
     public boolean isSoldOut() {
         return this.stock.isSoldOut();
     }

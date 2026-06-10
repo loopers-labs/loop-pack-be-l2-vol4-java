@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,7 +35,7 @@ class OrderTest {
             );
 
             // act
-            Order order = Order.create(USER_ID, items, Money.of(0));
+            Order order = Order.create(USER_ID, OrderItems.from(items), Money.of(0));
 
             // assert
             assertThat(order.getId()).isEqualTo(0L);
@@ -53,7 +54,7 @@ class OrderTest {
         void appliesDiscount_toTotalAmount() {
             List<OrderItem> items = List.of(item(1L, 1_000L, 3)); // 3_000
 
-            Order order = Order.create(USER_ID, items, Money.of(500));
+            Order order = Order.create(USER_ID, OrderItems.from(items), Money.of(500));
 
             assertThat(order.getOriginalAmount().getAmount()).isEqualTo(3_000L);
             assertThat(order.getDiscountAmount().getAmount()).isEqualTo(500L);
@@ -65,7 +66,7 @@ class OrderTest {
         void allowsTotalZero_whenDiscountEqualsOriginal() {
             List<OrderItem> items = List.of(item(1L, 1_000L, 2)); // 2_000
 
-            Order order = Order.create(USER_ID, items, Money.of(2_000));
+            Order order = Order.create(USER_ID, OrderItems.from(items), Money.of(2_000));
 
             assertThat(order.getTotalAmount().getAmount()).isEqualTo(0L);
         }
@@ -75,7 +76,7 @@ class OrderTest {
         void throwsBadRequest_whenDiscountExceedsOriginal() {
             List<OrderItem> items = List.of(item(1L, 1_000L, 1)); // 1_000
             CoreException result = assertThrows(CoreException.class,
-                    () -> Order.create(USER_ID, items, Money.of(1_001)));
+                    () -> Order.create(USER_ID, OrderItems.from(items), Money.of(1_001)));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -84,7 +85,7 @@ class OrderTest {
         void throwsBadRequest_whenDiscountIsNull() {
             List<OrderItem> items = List.of(item(1L, 100L, 1));
             CoreException result = assertThrows(CoreException.class,
-                    () -> Order.create(USER_ID, items, null));
+                    () -> Order.create(USER_ID, OrderItems.from(items), null));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -93,7 +94,7 @@ class OrderTest {
         void throwsBadRequest_whenUserIdIsNull() {
             List<OrderItem> items = List.of(item(1L, 100L, 1));
             CoreException result = assertThrows(CoreException.class,
-                    () -> Order.create(null, items, Money.of(0)));
+                    () -> Order.create(null, OrderItems.from(items), Money.of(0)));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -109,7 +110,7 @@ class OrderTest {
         @Test
         void throwsBadRequest_whenItemsIsEmpty() {
             CoreException result = assertThrows(CoreException.class,
-                    () -> Order.create(USER_ID, List.of(), Money.of(0)));
+                    () -> Order.create(USER_ID, OrderItems.from(List.of()), Money.of(0)));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
@@ -121,21 +122,21 @@ class OrderTest {
         @DisplayName("동일한 userId 면 true 를 반환한다.")
         @Test
         void returnsTrue_whenSameUserId() {
-            Order order = Order.create(USER_ID, List.of(item(1L, 100L, 1)), Money.of(0));
+            Order order = Order.create(USER_ID, OrderItems.from(List.of(item(1L, 100L, 1))), Money.of(0));
             assertThat(order.isOwnedBy(USER_ID)).isTrue();
         }
 
         @DisplayName("다른 userId 면 false 를 반환한다.")
         @Test
         void returnsFalse_whenDifferentUserId() {
-            Order order = Order.create(USER_ID, List.of(item(1L, 100L, 1)), Money.of(0));
+            Order order = Order.create(USER_ID, OrderItems.from(List.of(item(1L, 100L, 1))), Money.of(0));
             assertThat(order.isOwnedBy(999L)).isFalse();
         }
 
         @DisplayName("null 이면 false 를 반환한다.")
         @Test
         void returnsFalse_whenNull() {
-            Order order = Order.create(USER_ID, List.of(item(1L, 100L, 1)), Money.of(0));
+            Order order = Order.create(USER_ID, OrderItems.from(List.of(item(1L, 100L, 1))), Money.of(0));
             assertThat(order.isOwnedBy(null)).isFalse();
         }
     }
@@ -145,9 +146,9 @@ class OrderTest {
     void itemsAreDefensivelyCopied() {
         // arrange
         OrderItem original = item(1L, 100L, 1);
-        java.util.ArrayList<OrderItem> mutable = new java.util.ArrayList<>();
+        List<OrderItem> mutable = new ArrayList<>();
         mutable.add(original);
-        Order order = Order.create(USER_ID, mutable, Money.of(0));
+        Order order = Order.create(USER_ID, OrderItems.from(mutable), Money.of(0));
 
         // act
         assertThrows(UnsupportedOperationException.class, () -> order.getItems().add(item(2L, 200L, 1)));

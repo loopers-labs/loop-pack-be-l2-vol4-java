@@ -22,9 +22,6 @@ public class OrderDomainService {
                         List<OrderCommand.OrderLine> rawLines,
                         UserCoupon userCoupon,
                         ZonedDateTime now) {
-        if (userId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문자는 비어있을 수 없습니다.");
-        }
 
         OrderLines lines = OrderLines.from(rawLines);
         Map<Long, Product> productById = (products == null ? List.<Product>of() : products).stream()
@@ -33,6 +30,7 @@ public class OrderDomainService {
         List<Long> missing = lines.productIds().stream()
                 .filter(id -> !productById.containsKey(id))
                 .toList();
+
         if (!missing.isEmpty()) {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품: " + missing);
         }
@@ -50,16 +48,17 @@ public class OrderDomainService {
         for (Long productId : lines.productIds()) {
             Product product = productById.get(productId);
             int qty = lines.quantityOf(productId);
+            product.decreaseStock(qty);
             items.add(OrderItem.of(product.getId(), product.getName(), product.getPrice(), qty));
         }
 
-        Money original = items.stream()
-                .map(OrderItem::subtotal)
-                .reduce(Money.of(0), Money::add);
+        OrderItems orderItems = OrderItems.from(items);
+
+        Money original = orderItems.totalAmount();
         Money discount = userCoupon == null
                 ? Money.of(0)
                 : userCoupon.calculateDiscount(original);
 
-        return Order.create(userId, items, discount);
+        return Order.create(userId, orderItems, discount);
     }
 }

@@ -19,7 +19,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.BatchSize;
-import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -59,7 +58,7 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status;
 
-    private Order(Long userId, List<OrderItem> items,
+    private Order(Long userId, OrderItems items,
                   Money originalAmount, Money discountAmount, Money totalAmount, OrderStatus status) {
         validateUserId(userId);
         validateItems(items);
@@ -67,35 +66,24 @@ public class Order extends BaseEntity {
         validateAmount(discountAmount, "할인액");
         validateAmount(totalAmount, "최종 금액");
         validateStatus(status);
+        if (!originalAmount.isGreaterThanOrEqual(discountAmount)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인액은 주문 금액을 초과할 수 없습니다.");
+        }
         this.userId = userId;
-        this.items = new ArrayList<>(items);
+        this.items = items.asList();
         this.originalAmount = originalAmount;
         this.discountAmount = discountAmount;
         this.totalAmount = totalAmount;
         this.status = status;
     }
 
-    /**
-     * 적용 전 금액은 항목 소계 합으로 산출하고, 할인액을 받아 최종 금액(= 적용 전 − 할인)을 확정한다.
-     * 할인액은 적용 전 금액을 초과할 수 없으며(AC-07-9), 쿠폰 미사용 시 호출자가 0원을 넘긴다.
-     */
-    public static Order create(Long userId, List<OrderItem> items, Money discountAmount) {
+    public static Order create(Long userId, OrderItems items, Money discountAmount) {
         validateItems(items);
-        validateAmount(discountAmount, "할인액");
-        Money original = items.stream()
-                .map(OrderItem::subtotal)
-                .reduce(Money.of(0), Money::add);
-        if (!original.isGreaterThanOrEqual(discountAmount)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "할인액은 주문 금액을 초과할 수 없습니다.");
-        }
+        Money original = items.totalAmount();
         Money total = original.subtract(discountAmount);
         return new Order(userId, items, original, discountAmount, total, OrderStatus.CREATED);
     }
 
-    /**
-     * 항목 컬렉션은 외부에서 변경할 수 없도록 불변 뷰로 노출한다.
-     * (영속성 컨텍스트는 필드 접근으로 내부 리스트를 직접 다루므로 이 게터의 영향을 받지 않는다.)
-     */
     public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
     }
@@ -123,9 +111,9 @@ public class Order extends BaseEntity {
         }
     }
 
-    private static void validateItems(List<OrderItem> items) {
-        if (CollectionUtils.isEmpty(items)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
+    private static void validateItems(OrderItems items) {
+        if (items == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
         }
     }
 
