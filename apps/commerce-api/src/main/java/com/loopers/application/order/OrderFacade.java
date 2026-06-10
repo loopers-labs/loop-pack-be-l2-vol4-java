@@ -38,7 +38,9 @@ public class OrderFacade {
 
     /** 주문 생성 — 상품 유효성 검증 + 쿠폰 적용 + 재고 예약 + 주문 저장 (단일 트랜잭션) */
     @Transactional
-    public OrderInfo create(UUID userId, ShippingInfo shippingInfo, List<OrderItemRequest> itemRequests, UUID couponId) {
+    public OrderInfo create(UUID userId, List<OrderItemRequest> itemRequests, UUID couponId,
+                            String receiverName, String receiverPhone, String zipCode, String address, String detailAddress) {
+        ShippingInfo shippingInfo = new ShippingInfo(receiverName, receiverPhone, zipCode, address, detailAddress);
         OrderModel order = orderService.create(userId, shippingInfo);
 
         // 1단계: 상품 검증 + 아이템 추가
@@ -143,5 +145,4 @@ public class OrderFacade {
         orderService.failAllByIds(orderIds, before);
     }
 
-    public record OrderItemRequest(UUID productId, int quantity) {}
 }
