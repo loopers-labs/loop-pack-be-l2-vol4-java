@@ -1,5 +1,8 @@
-package com.loopers.domain.user;
+package com.loopers.application.user;
 
+import com.loopers.domain.user.Gender;
+import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -16,14 +19,14 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
-class UserServiceIntegrationTest {
+class UserFacadeIntegrationTest {
 
     @Autowired
-    private UserService userService;
+    private UserFacade userFacade;
 
     @MockitoSpyBean
     private UserRepository userRepository;
@@ -36,26 +39,25 @@ class UserServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private SignUpCommand command(String loginId) {
+        return new SignUpCommand(loginId, "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M);
+    }
+
     @DisplayName("회원 가입을 할 때, ")
     @Nested
     class SignUp {
 
-        @DisplayName("정상 입력이면, User 저장이 수행되고 저장된 User 가 반환된다.")
+        @DisplayName("정상 입력이면, User 저장이 수행되고 저장된 정보가 반환된다.")
         @Test
         void persistsUser_whenInputIsValid() {
-            // arrange
-            UserModel user = new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            );
-
             // act
-            UserModel saved = userService.signUp(user);
+            UserInfo info = userFacade.signUp(command("tester01"));
 
             // assert
             assertAll(
-                () -> verify(userRepository).save(same(user)),
-                () -> assertThat(saved.getId()).isPositive(),
-                () -> assertThat(saved.getLoginId()).isEqualTo("tester01")
+                () -> verify(userRepository).save(any(UserModel.class)),
+                () -> assertThat(info.id()).isPositive(),
+                () -> assertThat(info.loginId()).isEqualTo("tester01")
             );
         }
 
@@ -63,17 +65,11 @@ class UserServiceIntegrationTest {
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // arrange
-            UserModel existing = new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            );
-            userService.signUp(existing);
-
-            UserModel duplicate = new UserModel(
-                "tester01", "Password2@", "김철수", "1991-06-15", "another@example.com", Gender.F
-            );
+            userFacade.signUp(command("tester01"));
 
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> userService.signUp(duplicate));
+            CoreException ex = assertThrows(CoreException.class, () -> userFacade.signUp(
+                new SignUpCommand("tester01", "Password2@", "김철수", "1991-06-15", "another@example.com", Gender.F)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
@@ -81,17 +77,12 @@ class UserServiceIntegrationTest {
 
         @DisplayName("회원 가입 시 비밀번호는 평문이 아닌 해시로 저장된다.")
         @Test
-        void storesHashedPassword_whenSignUp() {
-            // arrange
-            UserModel user = new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            );
-
+        void storesHashedPassword() {
             // act
-            userService.signUp(user);
+            userFacade.signUp(command("tester01"));
 
             // assert
-            UserModel reloaded = userService.getMyInfo("tester01").orElseThrow();
+            UserModel reloaded = userRepository.findByLoginId("tester01").orElseThrow();
             assertAll(
                 () -> assertThat(reloaded.getPassword()).isNotEqualTo("Password1!"),
                 () -> assertThat(reloaded.matchesPassword("Password1!")).isTrue()
@@ -103,31 +94,28 @@ class UserServiceIntegrationTest {
     @Nested
     class GetMyInfo {
 
-        @DisplayName("해당 로그인 ID 의 회원이 존재하면, 회원 정보가 반환된다.")
+        @DisplayName("로그인 ID·비밀번호가 일치하면, 회원 정보가 반환된다.")
         @Test
-        void returnsUser_whenLoginIdExists() {
+        void returnsUser_whenCredentialsMatch() {
             // arrange
-            UserModel saved = userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            ));
+            userFacade.signUp(command("tester01"));
 
             // act
-            Optional<UserModel> result = userService.getMyInfo("tester01");
+            Optional<UserInfo> result = userFacade.getMyInfo("tester01", "Password1!");
 
             // assert
             assertAll(
                 () -> assertThat(result).isPresent(),
-                () -> assertThat(result.get().getId()).isEqualTo(saved.getId()),
-                () -> assertThat(result.get().getLoginId()).isEqualTo("tester01"),
-                () -> assertThat(result.get().getName()).isEqualTo("홍길동")
+                () -> assertThat(result.get().loginId()).isEqualTo("tester01"),
+                () -> assertThat(result.get().name()).isEqualTo("홍길동")
             );
         }
 
-        @DisplayName("해당 로그인 ID 의 회원이 존재하지 않으면, Optional.empty 가 반환된다.")
+        @DisplayName("존재하지 않는 로그인 ID 면, Optional.empty 가 반환된다.")
         @Test
         void returnsEmpty_whenLoginIdNotFound() {
             // act
-            Optional<UserModel> result = userService.getMyInfo("nonexistent");
+            Optional<UserInfo> result = userFacade.getMyInfo("nonexistent", "Password1!");
 
             // assert
             assertThat(result).isEmpty();
@@ -142,15 +130,13 @@ class UserServiceIntegrationTest {
         @Test
         void persistsNewPassword_whenInputIsValid() {
             // arrange
-            userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            ));
+            userFacade.signUp(command("tester01"));
 
             // act
-            userService.changePassword("tester01", "Password1!", "NewPass2@");
+            userFacade.changePassword("tester01", "Password1!", "NewPass2@");
 
             // assert
-            UserModel reloaded = userService.getMyInfo("tester01").orElseThrow();
+            UserModel reloaded = userRepository.findByLoginId("tester01").orElseThrow();
             assertAll(
                 () -> assertThat(reloaded.matchesPassword("NewPass2@")).isTrue(),
                 () -> assertThat(reloaded.matchesPassword("Password1!")).isFalse()
@@ -161,13 +147,11 @@ class UserServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenCurrentPasswordMismatch() {
             // arrange
-            userService.signUp(new UserModel(
-                "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
-            ));
+            userFacade.signUp(command("tester01"));
 
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> userService.changePassword("tester01", "WrongPw1!", "NewPass2@"));
+                () -> userFacade.changePassword("tester01", "WrongPw1!", "NewPass2@"));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
