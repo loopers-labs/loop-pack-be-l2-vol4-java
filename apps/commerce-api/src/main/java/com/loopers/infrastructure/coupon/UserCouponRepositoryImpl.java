@@ -25,6 +25,11 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     }
 
     @Override
+    public UserCouponModel saveAndFlush(UserCouponModel userCoupon) {
+        return userCouponJpaRepository.saveAndFlush(userCoupon);
+    }
+
+    @Override
     public boolean existsByUserIdAndCouponId(Long userId, Long couponId) {
         return userCouponJpaRepository.existsByUserIdAndCouponId(userId, couponId);
     }

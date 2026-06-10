@@ -31,13 +31,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public int decreaseStock(Long productId, int quantity) {
-        return productJpaRepository.decreaseStock(productId, quantity);
+    public ProductModel getActiveById(Long id) {
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
     }
 
     @Override
-    public ProductModel getActiveById(Long id) {
-        return productJpaRepository.findByIdAndDeletedAtIsNull(id)
+    public ProductModel getActiveByIdForUpdate(Long id) {
+        return productJpaRepository.findByIdAndDeletedAtIsNullForUpdate(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
     }
 

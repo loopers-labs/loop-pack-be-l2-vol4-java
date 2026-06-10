@@ -49,4 +49,8 @@ public class ProductModel extends BaseEntity {
         this.price = Price.from(rawPrice);
         this.stock = Stock.from(rawStock);
     }
+
+    public void decreaseStock(int quantity) {
+        this.stock = stock.decrease(quantity);
+    }
 }
