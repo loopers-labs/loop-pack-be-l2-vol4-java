@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -90,22 +91,24 @@ class LikeConcurrencyIntegrationTest {
         assertThat(counter).as("비정규화 카운터는 행 수와 정확히 일치해야 한다").isEqualTo(users);
     }
 
-    @DisplayName("동일 상품에 좋아요와 취소가 뒤섞여 동시에 들어와도, 카운터는 최종 행 수와 일치한다.")
+    @DisplayName("동일 상품에 좋아요와 취소가 뒤섞여 동시에 들어와도, 취소 50건이 반영되어 행·카운터가 정확히 50이 된다.")
     @Test
     void concurrentLikeAndCancel_countMatchesRows() throws InterruptedException {
         int users = 100;
-        // 먼저 절반은 좋아요 상태로 만들어 둔다 — 이들에 대한 취소가 섞이게.
+        // 100명 전원을 먼저 좋아요 상태로 만들어 둔다.
         for (int i = 0; i < users; i++) {
             likeApplicationService.register(1_000L + i, productId);
         }
+        assertThat(likeRepository.countByProductId(productId)).as("사전 상태: 100건 좋아요").isEqualTo(users);
 
         ExecutorService executor = Executors.newFixedThreadPool(32);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneGate = new CountDownLatch(users);
+        AtomicInteger exceptions = new AtomicInteger();
 
         for (int i = 0; i < users; i++) {
             final long userId = 1_000L + i;
-            final boolean cancel = i % 2 == 0; // 짝수 유저는 취소, 홀수 유저는 재좋아요(멱등)
+            final boolean cancel = i % 2 == 0; // 짝수 50명은 취소, 홀수 50명은 재좋아요(멱등)
             executor.submit(() -> {
                 try {
                     startGate.await();
@@ -114,7 +117,8 @@ class LikeConcurrencyIntegrationTest {
                     } else {
                         likeApplicationService.register(userId, productId);
                     }
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    exceptions.incrementAndGet();
                 } finally {
                     doneGate.countDown();
                 }
@@ -129,6 +133,10 @@ class LikeConcurrencyIntegrationTest {
         long rows = likeRepository.countByProductId(productId);
         long counter = productJpaRepository.findById(productId).orElseThrow().getLikeCount();
 
-        assertThat(counter).as("카운터는 최종 좋아요 행 수와 일치해야 한다").isEqualTo(rows);
+        // 예외를 삼키지 않고 검증 — 동시 처리 중 어떤 작업도 실패하지 않아야 한다.
+        assertThat(exceptions.get()).as("동시 좋아요/취소 중 예외는 발생하지 않아야 한다").isZero();
+        // 짝수 50명 취소 반영 → 홀수 50명만 남는다. 멱등 재좋아요는 행 수를 늘리지 않는다.
+        assertThat(rows).as("취소 50건이 반영되어 최종 좋아요 행은 50이어야 한다").isEqualTo(50);
+        assertThat(counter).as("비정규화 카운터도 최종 행 수와 정확히 일치(50)해야 한다").isEqualTo(50);
     }
 }
