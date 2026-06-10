@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-쿠폰 동시성 제어를 비관적 락에서 원자적 UPDATE로 전환해 트랜잭션 락 보유 구간을 제거했다.
+쿠폰 동시성 제어를 비관적 락에서 원자적 UPDATE로 전환해, 조회 시점부터 락을 선점하는 방식을 없앴다.
 재고(비관적 락)와 쿠폰(원자적 UPDATE)을 도메인 특성에 따라 전략을 분기했고, 두 전략 모두 `createOrder` 단일 트랜잭션 안에서 원자적으로 처리된다.
 
 ---
@@ -22,7 +22,7 @@
 |---|---|---|
 | 트랜잭션 범위 | `createOrder` 단일 트랜잭션으로 통합 | 쿠폰·재고·주문 중 하나라도 실패하면 모두 롤백, 부분 성공 제거 |
 | 재고 동시성 | 비관적 락 (`SELECT FOR UPDATE`) | 모든 유저가 같은 row 경쟁 → 충돌 빈도 높음. 도메인 검증 로직(`StockModel.reserve()`)을 Java에서 유지해야 함 |
-| 쿠폰 동시성 | 원자적 UPDATE (`WHERE status = 'AVAILABLE'`) | 유저별 row 분리 → 낮은 충돌. 단순 상태 전이라 SQL 조건으로 충분. 락 보유 구간 없음 |
+| 쿠폰 동시성 | 원자적 UPDATE (`WHERE status = 'AVAILABLE'`) | 유저별 row 분리 → 낮은 충돌. 단순 상태 전이라 SQL 조건으로 충분. 조회 시점 선제 락 없음 |
 | 쿠폰 실패 원인 구분 | 소유 확인(락 없는 SELECT) + 원자적 UPDATE 2단계 분리 | 원자적 UPDATE 단독으로는 "미보유"(404)와 "이미 사용"(400)을 구분 불가 |
 
 ---
@@ -130,6 +130,7 @@ UPDATE coupon_issues SET status = 'USED' WHERE id = ? AND status = 'AVAILABLE'
 DB 엔진(InnoDB)은 이 구문을 원자적으로 실행한다. WHERE 조건 확인과 쓰기가 분리되지 않는다.
 
 락 동작은 결과에 따라 달라진다.
+
 - **1 row affected** (AVAILABLE → USED 성공): 해당 row에 X 락을 획득하고 **커밋까지 유지**한다. SELECT FOR UPDATE와 동일하다. 차이는 락 획득 시점 — SELECT FOR UPDATE는 조회 시점부터 잡지만, 원자적 UPDATE는 실제 쓰기 시점에만 잡는다.
 - **0 rows affected** (이미 USED): WHERE 조건이 맞지 않아 X 락을 유지하지 않고 즉시 반환한다. SELECT FOR UPDATE라면 이미 USED인 row에도 X 락을 걸고 롤백까지 유지했겠지만, 여기서는 락 없이 끝난다.
 
@@ -165,7 +166,9 @@ WHERE product_id = ? AND (total_stock - reserved_stock) >= ?
 1. 재고 부족 (`total_stock - reserved_stock < qty`)
 2. 해당 상품의 재고 row가 존재하지 않음
 
-Java에서 이 둘을 구분할 수 없어 정확한 예외를 던질 수 없다. 또한 `StockModel.reserve()`의 도메인 검증 로직(수량 계산, 예외 처리)이 Java에 있어, SQL WHERE 절로 이전하면 그 로직을 잃게 된다. 비관적 락으로 row를 잠근 뒤 Java에서 도메인 로직을 실행하는 방식이 적합하다.
+Java에서 이 둘을 구분할 수 없어 정확한 예외를 던질 수 없다.
+
+또한 `StockModel.reserve()`의 도메인 검증 로직(수량 계산, 예외 처리)이 Java에 있어, SQL WHERE 절로 이전하면 그 로직을 잃게 된다. 비관적 락으로 row를 잠근 뒤 Java에서 도메인 로직을 실행하는 방식이 적합하다.
 
 ---
 
