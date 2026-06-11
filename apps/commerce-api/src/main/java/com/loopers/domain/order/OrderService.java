@@ -47,6 +47,13 @@ public class OrderService {
         orderRepository.save(order);
     }
 
+    public void cancelOrder(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND));
+        order.cancel();
+        orderRepository.save(order);
+    }
+
     @Transactional(readOnly = true)
     public List<OrderModel> getOrders(Long userId) {
         return orderRepository.findAllByUserId(userId);

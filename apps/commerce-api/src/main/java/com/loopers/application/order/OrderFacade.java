@@ -8,6 +8,7 @@ import com.loopers.domain.product.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderFacade {
@@ -24,6 +26,7 @@ public class OrderFacade {
     private final StockService stockService;
     private final com.loopers.domain.coupon.CouponService couponService;
     private final com.loopers.domain.payment.PaymentService paymentService;
+    private final com.loopers.domain.payment.PaymentGateway paymentGateway;
 
     @Transactional
     public Long createOrder(Long userId, OrderCreateRequest request) {
@@ -125,5 +128,61 @@ public class OrderFacade {
         if (order.getCouponIssueId() != null) {
             couponService.completeCouponUse(order.getCouponIssueId(), order.getTotalOriginalAmount());
         }
+    }
+
+    public Long checkout(Long userId, OrderCheckoutRequest request) {
+        Long orderId = null;
+        try {
+            // [트랜잭션 1] 주문 생성 및 재고 가선점
+            OrderCreateRequest createRequest = new OrderCreateRequest(
+                    request.items().stream()
+                            .map(item -> new OrderCreateRequest.Item(item.productId(), item.quantity()))
+                            .toList()
+            );
+            orderId = createOrderAndPreoccupyStock(userId, createRequest, request.couponIssueId());
+        } catch (Exception e) {
+            throw e;
+        }
+
+        // [트랜잭션 외부] PG사 결제 승인 요청
+        OrderModel order = orderService.getOrder(orderId);
+        com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult pgResult = null;
+        try {
+            pgResult = paymentGateway.requestPayment(orderId, order.getTotalPaymentAmount(), request.paymentMethod());
+        } catch (Exception e) {
+            // 결제 요청 실패 시 보상 트랜잭션 (주문 취소 및 재고 원복)
+            cancelOrderAndRestoreStock(orderId);
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인 요청 중 오류가 발생했습니다: " + e.getMessage());
+        }
+
+        try {
+            // [트랜잭션 2] 결제 완료 처리 및 상태 업데이트
+            approvePayment(orderId, request.paymentMethod(), pgResult.transactionId(), pgResult.approvedAt());
+        } catch (Exception e) {
+            // 승인 완료 후처리 실패 시 보상 트랜잭션 (주문 취소, 재고 원복 및 외부 PG 결제 승인 취소)
+            cancelOrderAndRestoreStock(orderId);
+            try {
+                paymentGateway.cancelPayment(pgResult.transactionId(), order.getTotalPaymentAmount());
+            } catch (Exception cancelEx) {
+                log.error("PG 결제 취소 중 오류 발생. transactionId: {}, orderId: {}", pgResult.transactionId(), orderId, cancelEx);
+            }
+            throw e;
+        }
+
+        return orderId;
+    }
+
+    @Transactional
+    public void cancelOrderAndRestoreStock(Long orderId) {
+        OrderModel order = orderService.getOrder(orderId);
+        
+        // 1. 주문 취소 상태 변경
+        orderService.cancelOrder(orderId);
+
+        // 2. 재고 원복
+        List<StockService.StockRequest> stockRequests = order.getItems().stream()
+                .map(item -> new StockService.StockRequest(item.getProductId(), item.getQuantity()))
+                .toList();
+        stockService.increaseStocks(stockRequests);
     }
 }
