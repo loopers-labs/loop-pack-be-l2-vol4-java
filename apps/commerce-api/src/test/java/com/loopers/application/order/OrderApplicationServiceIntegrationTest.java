@@ -312,7 +312,7 @@ class OrderApplicationServiceIntegrationTest {
         void onlyOneCouponUseSucceeds_whenConcurrentOrdersWithSameCoupon() throws InterruptedException {
             // arrange
             int threadCount = 5;
-            UserEntity user = createUser("coupon-concurrent-user");
+            UserEntity user = createUser("couponconcurrent");
             BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 10_000L, 100);
             CouponTemplateInfo template = createCouponTemplate(1_000L);
@@ -367,7 +367,7 @@ class OrderApplicationServiceIntegrationTest {
 
             UserEntity[] users = new UserEntity[threadCount];
             for (int i = 0; i < threadCount; i++) {
-                users[i] = createUser("inventory-user-" + i);
+                users[i] = createUser("inventoryuser" + i);
             }
             BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 10_000L, initialStock);

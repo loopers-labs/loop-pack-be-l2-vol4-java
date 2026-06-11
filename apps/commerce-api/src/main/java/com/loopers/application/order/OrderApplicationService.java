@@ -30,8 +30,30 @@ public class OrderApplicationService {
 
     @Transactional
     public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands, Long couponId) {
-        // TODO: Green Phase 에서 구현
-        throw new UnsupportedOperationException("미구현");
+        List<OrderSnapshotItem> snapshotItems = commands.stream()
+                .map(cmd -> {
+                    ProductEntity product = productService.getProduct(cmd.productId());
+                    long subtotal = product.getPrice() * cmd.quantity();
+                    return new OrderSnapshotItem(product.getId(), product.getName(), product.getPrice(), cmd.quantity(), subtotal);
+                })
+                .toList();
+
+        long originalAmount = snapshotItems.stream().mapToLong(OrderSnapshotItem::subtotal).sum();
+
+        long discountAmount = 0L;
+        if (couponId != null) {
+            discountAmount = couponApplicationService.useCoupon(couponId, userId, originalAmount);
+        }
+
+        Map<Long, Integer> productQuantities = commands.stream()
+                .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
+        inventoryService.deductAll(productQuantities);
+
+        long finalAmount = originalAmount - discountAmount;
+        OrderSnapshot snapshot = new OrderSnapshot(snapshotItems, originalAmount, discountAmount, finalAmount, couponId);
+        OrderEntity order = orderService.createOrder(userId, snapshot);
+
+        return OrderInfo.from(order);
     }
 
     public OrderInfo getOrder(Long authUserId, Long orderId) {
