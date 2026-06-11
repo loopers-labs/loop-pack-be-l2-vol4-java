@@ -1,75 +1,75 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.util.Objects;
 
 @Entity
-@Table(name = "product")
+@Table(name = "products")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductModel extends BaseEntity {
 
-    private String name;
-    private String description;
-    private Long price;
-    private Integer stock;
+    @Column(name = "brand_id", nullable = false)
+    private Long brandId;
 
-    protected ProductModel() {}
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "name", nullable = false))
+    private ProductName name;
 
-    public ProductModel(String name, String description, Long price, Integer stock) {
-        if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
-        }
-        if (description == null || description.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
-        }
-        if (price == null || price < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (stock == null || stock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
-        }
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "description", nullable = false))
+    private ProductDescription description;
 
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
+    private ProductPrice price;
+
+    private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+        this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
-        this.stock = stock;
     }
 
-    public String getName() {
-        return name;
+    public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+        return new ProductModel(brandId, name, description, price);
     }
 
-    public String getDescription() {
-        return description;
+    public void update(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+        this.brandId = brandId;
+        this.name = name;
+        this.description = description;
+        this.price = price;
     }
 
-    public Long getPrice() {
-        return price;
-    }
-
-    public Integer getStock() {
-        return stock;
-    }
-
-    public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
-        if (newName == null || newName.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
         }
-        if (newDescription == null || newDescription.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
-        }
-        if (newPrice == null || newPrice < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
-        }
-        if (newStock == null || newStock < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        if (!(object instanceof ProductModel that)) {
+            return false;
         }
 
-        this.name = newName;
-        this.description = newDescription;
-        this.price = newPrice;
-        this.stock = newStock;
+        Long id = getId();
+        Long otherId = that.getId();
+        if (id == null || id == 0L || otherId == null || otherId == 0L) {
+            return false;
+        }
+        return Objects.equals(id, otherId);
+    }
+
+    @Override
+    public int hashCode() {
+        return ProductModel.class.hashCode();
     }
 }

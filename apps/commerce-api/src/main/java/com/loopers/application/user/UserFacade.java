@@ -2,7 +2,6 @@ package com.loopers.application.user;
 
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +13,6 @@ public class UserFacade {
 
     private final UserService userService;
 
-    @Transactional
     public UserInfo createUser(
             String loginId,
             String password,
@@ -39,7 +37,6 @@ public class UserFacade {
         return UserInfo.from(userModel);
     }
 
-    @Transactional
     public UserInfo changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel userModel = userService.changePassword(loginId, currentPassword, newPassword);
         return UserInfo.from(userModel);

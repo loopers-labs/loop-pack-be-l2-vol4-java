@@ -3,7 +3,6 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,8 +14,9 @@ import java.time.format.DateTimeFormatter;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordEncoder;
 
+    @Transactional
     public UserModel createUser(
             String loginId,
             String password,
@@ -44,6 +44,7 @@ public class UserService {
                 );
     }
 
+    @Transactional
     public UserModel changePassword(String loginId, String currentPassword, String newPassword) {
         UserModel userModel = userRepository.findByLoginId(loginId)
                 .orElseThrow(

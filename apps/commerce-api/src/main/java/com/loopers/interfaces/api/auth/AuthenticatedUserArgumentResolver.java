@@ -1,12 +1,12 @@
 package com.loopers.interfaces.api.auth;
 
+import com.loopers.domain.user.PasswordHasher;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -21,7 +21,7 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
     public static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordEncoder;
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {

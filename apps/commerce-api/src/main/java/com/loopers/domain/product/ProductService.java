@@ -3,44 +3,62 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
+@Service
 @RequiredArgsConstructor
-@Component
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductStockService productStockService;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
-        return productRepository.save(product);
+    public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = ProductModel.of(
+                brandId,
+                ProductName.of(name),
+                ProductDescription.of(description),
+                ProductPrice.of(price)
+        );
+        ProductModel productModel = productRepository.save(product);
+        productStockService.createStock(productModel.getId(), stock);
+        return productModel;
     }
 
     @Transactional(readOnly = true)
     public ProductModel getProduct(Long id) {
         return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+                .orElseThrow(
+                    () -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.")
+                );
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public Page<ProductModel> getProducts(Long brandId, ProductSortType sort, Pageable pageable) {
+        return productRepository.search(brandId, sort, pageable);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
         ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
-        return productRepository.save(product);
+        product.update(
+                brandId,
+                ProductName.of(name),
+                ProductDescription.of(description),
+                ProductPrice.of(price)
+        );
+        productStockService.changeStock(id, stock);
+        return product;
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+        ProductModel product = getProduct(id);
+        product.delete();
+        productRepository.save(product);
+        productStockService.deleteStock(id);
     }
 }

@@ -1,39 +1,58 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.ProductStockModel;
+import com.loopers.domain.product.ProductStockService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
-@RequiredArgsConstructor
 @Component
+@RequiredArgsConstructor
 public class ProductFacade {
-    private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
-        return ProductInfo.from(product);
+    private final ProductService productService;
+    private final ProductStockService productStockService;
+    private final BrandService brandService;
+
+    public Page<ProductSummaryInfo> getProducts(Long brandId, ProductSortType sort, Pageable pageable) {
+        Page<ProductModel> products = productService.getProducts(brandId, sort, pageable);
+        return products.map(ProductSummaryInfo::from);
     }
 
+    public ProductDetailInfo getProductDetail(Long productId) {
+        ProductModel product = productService.getProduct(productId);
+        BrandModel brand = brandService.getBrand(product.getBrandId());
+        return ProductDetailInfo.from(product, brand);
+    }
+
+    // TODO: 관리자 기능으로 변경될 것
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
+        ProductStockModel stockModel = productStockService.getStock(product.getId());
+        return ProductInfo.from(product, stockModel);
+    }
+
+    // TODO: 관리자 기능으로 변경될 것
     public ProductInfo getProduct(Long id) {
         ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
+        ProductStockModel stockModel = productStockService.getStock(id);
+        return ProductInfo.from(product, stockModel);
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
-            .toList();
+    // TODO: 관리자 기능으로 변경될 것
+    public ProductInfo updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
+        ProductModel product = productService.updateProduct(id, brandId, name, description, price, stock);
+        ProductStockModel stockModel = productStockService.getStock(id);
+        return ProductInfo.from(product, stockModel);
     }
 
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
-    }
-
+    // TODO: 관리자 기능으로 변경될 것
     public void deleteProduct(Long id) {
         productService.deleteProduct(id);
     }

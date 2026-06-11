@@ -15,8 +15,9 @@ dependencies {
     // security (password encoding)
     implementation("org.springframework.security:spring-security-crypto")
 
-    // querydsl
-    annotationProcessor("com.querydsl:querydsl-apt::jakarta")
+    // openfeign querydsl
+    implementation("io.github.openfeign.querydsl:querydsl-jpa:${project.properties["queryDslVersion"]}")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["queryDslVersion"]}:jpa")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 
