@@ -103,19 +103,22 @@ class CouponV1ApiE2ETest {
             );
         }
 
-        @DisplayName("이미 발급된 쿠폰 템플릿 ID로 다시 요청하면, 409 CONFLICT를 반환한다.")
+        @DisplayName("이미 발급된 쿠폰 템플릿 ID로 다시 요청하면, 200 OK와 기존 발급 쿠폰을 반환한다.")
         @Test
-        void returnsConflict_whenCouponIsAlreadyIssued() {
+        void returnsExistingCoupon_whenCouponIsAlreadyIssued() {
             // arrange
             signUpUser();
             CouponTemplate couponTemplate = createCouponTemplate();
-            issueCoupon(couponTemplate.getId(), authHeaders());
+            ResponseEntity<ApiResponse<CouponV1Dto.UserCouponResponse>> firstResponse = issueCoupon(couponTemplate.getId(), authHeaders());
 
             // act
-            ResponseEntity<ApiResponse<Object>> response = issueCouponForError(couponTemplate.getId(), authHeaders());
+            ResponseEntity<ApiResponse<CouponV1Dto.UserCouponResponse>> response = issueCoupon(couponTemplate.getId(), authHeaders());
 
             // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().id()).isEqualTo(firstResponse.getBody().data().id())
+            );
         }
 
         @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED를 반환한다.")

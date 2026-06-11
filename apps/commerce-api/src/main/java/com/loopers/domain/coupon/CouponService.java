@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -52,13 +53,20 @@ public class CouponService {
     @Transactional
     public CouponIssueResult issueCoupon(Long userId, Long couponTemplateId) {
         CouponTemplate couponTemplate = getCouponTemplate(couponTemplateId);
-        if (userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId()).isPresent()) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
-        }
+        return userCouponRepository.findIssuedCoupon(userId, couponTemplate.getId())
+            .map(CouponIssueResult::alreadyIssued)
+            .orElseGet(() -> issueNewCoupon(userId, couponTemplate));
+    }
 
+    @Transactional(readOnly = true)
+    public Optional<CouponIssueResult> findIssuedCoupon(Long userId, Long couponTemplateId) {
+        return userCouponRepository.findIssuedCoupon(userId, couponTemplateId)
+            .map(CouponIssueResult::alreadyIssued);
+    }
+
+    private CouponIssueResult issueNewCoupon(Long userId, CouponTemplate couponTemplate) {
         UserCoupon issuedCoupon = couponTemplate.issue(userId, ZonedDateTime.now());
-        UserCoupon savedCoupon = userCouponRepository.save(issuedCoupon);
-        return CouponIssueResult.issued(savedCoupon);
+        return CouponIssueResult.issued(userCouponRepository.save(issuedCoupon));
     }
 
     public CouponTemplate getCouponTemplate(Long couponTemplateId) {

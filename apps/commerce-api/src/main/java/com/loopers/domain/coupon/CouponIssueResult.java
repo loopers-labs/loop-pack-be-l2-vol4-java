@@ -8,4 +8,8 @@ public record CouponIssueResult(
     public static CouponIssueResult issued(UserCoupon userCoupon) {
         return new CouponIssueResult(userCoupon, CouponIssueStatus.ISSUED);
     }
+
+    public static CouponIssueResult alreadyIssued(UserCoupon userCoupon) {
+        return new CouponIssueResult(userCoupon, CouponIssueStatus.ALREADY_ISSUED);
+    }
 }

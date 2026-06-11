@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.coupon;
 import com.loopers.application.coupon.CouponFacade;
 import com.loopers.application.coupon.IssuedCouponInfo;
 import com.loopers.application.coupon.IssueCouponCommand;
+import com.loopers.domain.coupon.CouponIssueStatus;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,7 +27,8 @@ public class CouponV1Controller {
         @PathVariable("couponId") Long couponTemplateId
     ) {
         IssuedCouponInfo issuedCoupon = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplateId));
-        return ResponseEntity.status(HttpStatus.CREATED)
+        HttpStatus status = issuedCoupon.status() == CouponIssueStatus.ISSUED ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status)
             .body(ApiResponse.success(CouponV1Dto.UserCouponResponse.from(issuedCoupon.coupon())));
     }
 }

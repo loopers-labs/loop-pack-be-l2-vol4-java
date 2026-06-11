@@ -1,5 +1,6 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueStatus;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
@@ -9,8 +10,6 @@ import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,9 +70,29 @@ class CouponFacadeIntegrationTest {
     @Nested
     class IssueCoupon {
 
-        @DisplayName("같은 사용자가 같은 쿠폰을 동시에 발급 요청하면, 하나의 쿠폰만 발급하고 나머지는 실패한다.")
+        @DisplayName("같은 사용자가 이미 발급받은 쿠폰을 다시 요청하면, 실패 대신 기존 쿠폰을 ALREADY_ISSUED로 반환한다.")
         @Test
-        void issuesOnlyOneCouponAndRejectsDuplicate_whenSameUserRequestsSameCouponConcurrently() throws Exception {
+        void returnsExistingCoupon_whenSameUserRequestsAgain() {
+            // arrange
+            Long userId = 1L;
+            CouponTemplate couponTemplate = createCouponTemplate();
+            IssuedCouponInfo firstIssued = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplate.getId()));
+
+            // act
+            IssuedCouponInfo secondIssued = couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplate.getId()));
+
+            // assert
+            assertAll(
+                () -> assertThat(firstIssued.status()).isEqualTo(CouponIssueStatus.ISSUED),
+                () -> assertThat(secondIssued.status()).isEqualTo(CouponIssueStatus.ALREADY_ISSUED),
+                () -> assertThat(secondIssued.coupon().id()).isEqualTo(firstIssued.coupon().id()),
+                () -> assertThat(userCouponJpaRepository.count()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("같은 사용자가 같은 쿠폰을 동시에 발급 요청해도, 한 장만 생성되고 모든 요청이 같은 쿠폰을 반환한다.")
+        @Test
+        void issuesOnlyOneCoupon_whenSameUserRequestsSameCouponConcurrently() throws Exception {
             // arrange
             Long userId = 1L;
             CouponTemplate couponTemplate = createCouponTemplate();
@@ -81,23 +100,22 @@ class CouponFacadeIntegrationTest {
             ExecutorService executor = Executors.newFixedThreadPool(2);
 
             try {
-                Future<CouponIssueAttempt> first = executor.submit(() -> issueCouponAfter(start, userId, couponTemplate.getId()));
-                Future<CouponIssueAttempt> second = executor.submit(() -> issueCouponAfter(start, userId, couponTemplate.getId()));
+                Future<IssuedCouponInfo> first = executor.submit(() -> issueCouponAfter(start, userId, couponTemplate.getId()));
+                Future<IssuedCouponInfo> second = executor.submit(() -> issueCouponAfter(start, userId, couponTemplate.getId()));
 
                 // act
                 start.countDown();
-                List<CouponIssueAttempt> attempts = List.of(
+                List<IssuedCouponInfo> results = List.of(
                     first.get(10, TimeUnit.SECONDS),
                     second.get(10, TimeUnit.SECONDS)
                 );
 
                 // assert
                 assertAll(
-                    () -> assertThat(attempts).filteredOn(CouponIssueAttempt::succeeded).hasSize(1),
-                    () -> assertThat(attempts)
-                        .filteredOn(attempt -> !attempt.succeeded())
-                        .extracting(CouponIssueAttempt::errorType)
-                        .containsExactly(ErrorType.CONFLICT),
+                    () -> assertThat(results.get(1).coupon().id()).isEqualTo(results.get(0).coupon().id()),
+                    () -> assertThat(results)
+                        .extracting(IssuedCouponInfo::status)
+                        .containsExactlyInAnyOrder(CouponIssueStatus.ISSUED, CouponIssueStatus.ALREADY_ISSUED),
                     () -> assertThat(userCouponJpaRepository.count()).isEqualTo(1)
                 );
             } finally {
@@ -167,27 +185,13 @@ class CouponFacadeIntegrationTest {
         ));
     }
 
-    private CouponIssueAttempt issueCouponAfter(CountDownLatch start, Long userId, Long couponTemplateId) {
+    private IssuedCouponInfo issueCouponAfter(CountDownLatch start, Long userId, Long couponTemplateId) {
         try {
             start.await();
-            couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplateId));
-            return CouponIssueAttempt.success();
+            return couponFacade.issueCoupon(new IssueCouponCommand(userId, couponTemplateId));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("쿠폰 발급 시작 대기 중 인터럽트가 발생했습니다.", e);
-        } catch (CoreException e) {
-            return CouponIssueAttempt.failure(e.getErrorType());
-        }
-    }
-
-    private record CouponIssueAttempt(boolean succeeded, ErrorType errorType) {
-
-        private static CouponIssueAttempt success() {
-            return new CouponIssueAttempt(true, null);
-        }
-
-        private static CouponIssueAttempt failure(ErrorType errorType) {
-            return new CouponIssueAttempt(false, errorType);
         }
     }
 }
