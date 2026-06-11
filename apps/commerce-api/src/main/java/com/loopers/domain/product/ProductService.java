@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -18,6 +20,20 @@ public class ProductService {
     public Product getProduct(Long id) {
         return productRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    }
+
+    /**
+     * 상품 행에 비관적 락을 걸어 조회한다. 재고 차감처럼 전원 차례 처리가 필요한 경로 전용.
+     */
+    @Transactional
+    public List<Product> getProductsForUpdate(List<Long> ids) {
+        List<Product> products = productRepository.findAllByIdForUpdate(ids);
+        if (products.size() != ids.size()) {
+            Set<Long> foundIds = products.stream().map(Product::getId).collect(Collectors.toSet());
+            Long missingId = ids.stream().filter(id -> !foundIds.contains(id)).findFirst().orElse(null);
+            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + missingId + "] 상품을 찾을 수 없습니다.");
+        }
+        return products;
     }
 
     @Transactional(readOnly = true)

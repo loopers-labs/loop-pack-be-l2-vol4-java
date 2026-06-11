@@ -26,6 +26,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<Product> findAllByIdForUpdate(List<Long> ids) {
+        return productJpaRepository.findAllByIdForUpdate(ids);
+    }
+
+    @Override
     public List<Product> findAll(Long brandId, ProductSort sort, int page, int size) {
         return queryFactory
             .selectFrom(product)
