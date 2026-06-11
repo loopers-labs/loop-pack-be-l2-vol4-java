@@ -10,6 +10,9 @@ public record OrderInfo(
         Long userId,
         OrderStatus status,
         Long totalAmount,
+        Long couponId,
+        Long discountAmount,
+        Long finalAmount,
         List<OrderItemInfo> items
 ) {
     public static OrderInfo from(OrderModel order) {
@@ -21,6 +24,9 @@ public record OrderInfo(
             order.getUserId(),
             order.getStatus(),
             order.getTotalAmount(),
+            order.getCouponId(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             orderItemInfos
         );
     }

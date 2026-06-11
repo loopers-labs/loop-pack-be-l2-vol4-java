@@ -36,22 +36,38 @@ public class OrderModel extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
+    @Column(name = "coupon_id")
+    private Long couponId;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
+    @Column(name = "final_amount", nullable = false)
+    private Long finalAmount;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
     private List<OrderItemModel> orderItems = new ArrayList<>();
 
-    private OrderModel(Long userId, List<OrderItemModel> items) {
+    private OrderModel(Long userId, List<OrderItemModel> items, Long couponId, Long discountAmount) {
         this.userId = userId;
         this.orderItems = new ArrayList<>(items);
         this.status = OrderStatus.PENDING;
         this.totalAmount = calculateTotalAmount();
+        this.couponId = couponId;
+        this.discountAmount = discountAmount == null ? 0L : discountAmount;
+        this.finalAmount = this.totalAmount - this.discountAmount;
     }
 
     public static OrderModel of(Long userId, List<OrderItemModel> items) {
+        return of(userId, items, null, 0L);
+    }
+
+    public static OrderModel of(Long userId, List<OrderItemModel> items, Long couponId, Long discountAmount) {
         if (items == null || items.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 최소 1개 이상이어야 합니다.");
         }
-        return new OrderModel(userId, items);
+        return new OrderModel(userId, items, couponId, discountAmount);
     }
 
     public Long calculateTotalAmount() {
