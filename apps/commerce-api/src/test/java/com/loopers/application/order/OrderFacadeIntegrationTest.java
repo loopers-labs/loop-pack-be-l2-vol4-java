@@ -56,7 +56,7 @@ class OrderFacadeIntegrationTest {
 
     private OrderCreateCommand commandWith(int quantity) {
         return new OrderCreateCommand(USER_ID,
-            List.of(new OrderItemCommand(savedProduct.getId(), quantity)));
+            List.of(new OrderItemCommand(savedProduct.getId(), quantity)), null);
     }
 
     @DisplayName("createOrder()를 호출할 때,")
@@ -104,7 +104,7 @@ class OrderFacadeIntegrationTest {
         @Test
         void throwsNotFound_whenProductDoesNotExist() {
             OrderCreateCommand command = new OrderCreateCommand(USER_ID,
-                List.of(new OrderItemCommand(999L, 1)));
+                List.of(new OrderItemCommand(999L, 1)), null);
 
             CoreException result = assertThrows(CoreException.class,
                 () -> orderFacade.createOrder(command)
@@ -116,7 +116,7 @@ class OrderFacadeIntegrationTest {
         @DisplayName("주문 항목이 비어있으면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenItemsIsEmpty() {
-            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of());
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID, List.of(), null);
 
             CoreException result = assertThrows(CoreException.class,
                 () -> orderFacade.createOrder(command)
@@ -146,7 +146,7 @@ class OrderFacadeIntegrationTest {
         void excludesOtherUsersOrders() {
             orderFacade.createOrder(commandWith(1));
             OrderCreateCommand otherCommand = new OrderCreateCommand(99L,
-                List.of(new OrderItemCommand(savedProduct.getId(), 1)));
+                List.of(new OrderItemCommand(savedProduct.getId(), 1)), null);
             orderFacade.createOrder(otherCommand);
 
             Page<OrderInfo> result = orderFacade.getMyOrders(USER_ID, PageRequest.of(0, 20));
