@@ -27,6 +27,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAllForUpdate(List<Long> ids) {
+        return productJpaRepository.findAllByIdInForUpdate(ids);
+    }
+
+    @Override
     public List<ProductModel> findAll(Long brandId, ProductSortType sort, int page, int size) {
         ProductSortType sortType = (sort != null) ? sort : ProductSortType.LATEST;
         if (sortType == ProductSortType.LIKES_DESC) {

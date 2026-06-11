@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -34,11 +37,22 @@ public class OrderFacade {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
+        // 비관적 락 배치 조회 — productId 오름차순으로 잠가 다중 상품 주문 간 교차 데드락 방지
+        List<Long> productIds = command.items().stream()
+            .map(PlaceOrderCommand.Item::productId)
+            .distinct()
+            .sorted()
+            .toList();
+        Map<Long, ProductModel> products = productRepository.findAllForUpdate(productIds).stream()
+            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+
         List<OrderLine> lines = command.items().stream()
             .map(item -> {
-                ProductModel product = productRepository.find(item.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
-                        "[id = " + item.productId() + "] 상품을 찾을 수 없습니다."));
+                ProductModel product = products.get(item.productId());
+                if (product == null) {
+                    throw new CoreException(ErrorType.NOT_FOUND,
+                        "[id = " + item.productId() + "] 상품을 찾을 수 없습니다.");
+                }
                 return new OrderLine(product, item.quantity());
             })
             .toList();

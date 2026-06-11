@@ -8,6 +8,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,6 +32,13 @@ public class ApiControllerAdvice {
     public ResponseEntity<ApiResponse<?>> handle(CoreException e) {
         log.warn("CoreException : {}", e.getCustomMessage() != null ? e.getCustomMessage() : e.getMessage(), e);
         return failureResponse(e.getErrorType(), e.getCustomMessage());
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(ObjectOptimisticLockingFailureException e) {
+        // 낙관적 락(@Version) 충돌 — 동시 요청 중 1건만 성공하고 나머지는 409 로 실패시킨다
+        log.warn("OptimisticLockConflict : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, "동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
     }
 
     @ExceptionHandler

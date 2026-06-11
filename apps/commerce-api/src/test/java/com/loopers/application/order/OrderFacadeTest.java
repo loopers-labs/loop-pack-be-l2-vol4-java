@@ -28,8 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +61,13 @@ class OrderFacadeTest {
         return new PlaceOrderCommand(List.of(new PlaceOrderCommand.Item(productId, quantity)), couponId);
     }
 
+    /** 단위 테스트에선 JPA 가 id 를 채우지 않으므로(항상 0), spy 로 id 만 스텁한다. */
+    private ProductModel productWithId(Long id, long price, int stock) {
+        ProductModel product = spy(new ProductModel(1L, "에어맥스", "운동화", price, stock));
+        doReturn(id).when(product).getId();
+        return product;
+    }
+
     @DisplayName("주문을 생성할 때, ")
     @Nested
     class CreateOrder {
@@ -67,9 +76,9 @@ class OrderFacadeTest {
         @Test
         void createsOrder() {
             // arrange
-            ProductModel product = new ProductModel(1L, "에어맥스", "운동화", 1000L, 10);
+            ProductModel product = productWithId(11L, 1000L, 10);
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.of(product));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
@@ -105,7 +114,7 @@ class OrderFacadeTest {
         void throwsNotFound_whenProductMissing() {
             // arrange
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.empty());
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of());
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -120,9 +129,9 @@ class OrderFacadeTest {
         @Test
         void throwsBadRequest_whenStockInsufficient() {
             // arrange
-            ProductModel product = new ProductModel(1L, "에어맥스", "운동화", 1000L, 1);
+            ProductModel product = productWithId(11L, 1000L, 1);
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.of(product));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -148,10 +157,10 @@ class OrderFacadeTest {
         @Test
         void appliesCouponAndSaves() {
             // arrange
-            ProductModel product = new ProductModel(1L, "에어맥스", "운동화", 10000L, 10);
+            ProductModel product = productWithId(11L, 10000L, 10);
             UserCoupon userCoupon = couponOwnedBy(7L);
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.of(product));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(userCouponRepository.find(42L)).thenReturn(Optional.of(userCoupon));
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -172,9 +181,9 @@ class OrderFacadeTest {
         @Test
         void throwsNotFound_whenCouponMissing() {
             // arrange
-            ProductModel product = new ProductModel(1L, "에어맥스", "운동화", 10000L, 10);
+            ProductModel product = productWithId(11L, 10000L, 10);
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.of(product));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(userCouponRepository.find(42L)).thenReturn(Optional.empty());
 
             // act
@@ -190,9 +199,9 @@ class OrderFacadeTest {
         @Test
         void skipsCouponSave_whenNoCoupon() {
             // arrange
-            ProductModel product = new ProductModel(1L, "에어맥스", "운동화", 1000L, 10);
+            ProductModel product = productWithId(11L, 1000L, 10);
             givenUser(7L);
-            when(productRepository.find(11L)).thenReturn(Optional.of(product));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act

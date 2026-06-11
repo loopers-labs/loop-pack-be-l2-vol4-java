@@ -1,12 +1,15 @@
 package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
@@ -30,4 +33,9 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
         ORDER BY COALESCE(plc.count, 0) DESC, p.id DESC
         """)
     Page<ProductModel> findByBrandIdOrderByLikesDesc(@Param("brandId") Long brandId, Pageable pageable);
+
+    // 비관적 락 (SELECT ... FOR UPDATE). id 오름차순 잠금으로 교차 데드락 방지
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM ProductModel p WHERE p.id IN :ids AND p.deletedAt IS NULL ORDER BY p.id ASC")
+    List<ProductModel> findAllByIdInForUpdate(@Param("ids") List<Long> ids);
 }
