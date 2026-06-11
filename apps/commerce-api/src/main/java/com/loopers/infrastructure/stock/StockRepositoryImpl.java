@@ -5,6 +5,7 @@ import com.loopers.domain.stock.StockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,5 +33,10 @@ public class StockRepositoryImpl implements StockRepository {
     @Override
     public int decreaseQuantity(Long productId, Long quantity) {
         return stockJpaRepository.decreaseQuantity(productId, quantity);
+    }
+
+    @Override
+    public void softDeleteAllByProductIdIn(Collection<Long> productIds, ZonedDateTime deletedAt) {
+        stockJpaRepository.softDeleteAllByProductIdIn(productIds, deletedAt);
     }
 }

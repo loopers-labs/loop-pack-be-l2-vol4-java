@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,6 +84,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public void decreaseLikeCount(Long id) {
         productJpaRepository.decreaseLikeCount(id);
+    }
+
+    @Override
+    public void softDeleteAllByBrandId(Long brandId, ZonedDateTime deletedAt) {
+        productJpaRepository.softDeleteAllByBrandId(brandId, deletedAt);
     }
 
     private OrderSpecifier<?>[] toOrderSpecifiers(Sort sort, QProductModel product) {

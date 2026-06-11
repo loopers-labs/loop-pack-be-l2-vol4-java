@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class BrandFacade {
@@ -18,10 +20,10 @@ public class BrandFacade {
     @Transactional
     public void deleteBrand(Long id) {
         brandService.delete(id);
-        productService.findAllByBrandId(id).forEach(p -> {
-            productService.delete(p.getId());
-            stockService.delete(p.getId());
-        });
+        List<Long> productIds = productService.findAllByBrandId(id)
+            .stream().map(p -> p.getId()).toList();
+        productService.softDeleteAllByBrandId(id);
+        stockService.softDeleteAllByProductIds(productIds);
     }
 
 }

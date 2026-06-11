@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -64,6 +65,10 @@ public class ProductService {
         product.delete();
 
         productRepository.save(product);
+    }
+
+    public void softDeleteAllByBrandId(Long brandId) {
+        productRepository.softDeleteAllByBrandId(brandId, ZonedDateTime.now());
     }
 
     @Transactional

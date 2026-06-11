@@ -62,7 +62,7 @@ class BrandFacadeIntegrationTest {
     @Nested
     class DeleteBrand {
 
-        @DisplayName("브랜드와 관련 상품이 있으면 브랜드 및 모든 관련 상품이 소프트 삭제된다.")
+        @DisplayName("브랜드와 관련 상품이 있으면 브랜드·상품·재고가 모두 소프트 삭제된다.")
         @Test
         void deletesBrandAndRelatedProducts_whenBrandHasProducts() {
             // given
@@ -79,7 +79,9 @@ class BrandFacadeIntegrationTest {
             assertAll(
                 () -> assertThat(brandRepository.findById(brand.getId())).isEmpty(),
                 () -> assertThat(productRepository.find(product1.getId())).isEmpty(),
-                () -> assertThat(productRepository.find(product2.getId())).isEmpty()
+                () -> assertThat(productRepository.find(product2.getId())).isEmpty(),
+                () -> assertThat(stockRepository.findByProductId(product1.getId())).isEmpty(),
+                () -> assertThat(stockRepository.findByProductId(product2.getId())).isEmpty()
             );
         }
 
