@@ -45,8 +45,8 @@ class OrderFacadeTest {
         when(userRepository.findByLoginId(LOGIN_ID)).thenReturn(Optional.of(user));
     }
 
-    private PlaceOrderCriteria criteria(Long productId, int quantity) {
-        return new PlaceOrderCriteria(List.of(new PlaceOrderCriteria.Item(productId, quantity)));
+    private PlaceOrderCommand command(Long productId, int quantity) {
+        return new PlaceOrderCommand(List.of(new PlaceOrderCommand.Item(productId, quantity)));
     }
 
     @DisplayName("주문을 생성할 때, ")
@@ -63,7 +63,7 @@ class OrderFacadeTest {
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
-            OrderInfo info = orderFacade.createOrder(LOGIN_ID, criteria(11L, 2));
+            OrderInfo info = orderFacade.createOrder(LOGIN_ID, command(11L, 2));
 
             // assert
             assertAll(
@@ -83,7 +83,7 @@ class OrderFacadeTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> orderFacade.createOrder("ghost", criteria(11L, 1)));
+                () -> orderFacade.createOrder("ghost", command(11L, 1)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -99,7 +99,7 @@ class OrderFacadeTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> orderFacade.createOrder(LOGIN_ID, criteria(11L, 1)));
+                () -> orderFacade.createOrder(LOGIN_ID, command(11L, 1)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -116,7 +116,7 @@ class OrderFacadeTest {
 
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> orderFacade.createOrder(LOGIN_ID, criteria(11L, 5)));
+                () -> orderFacade.createOrder(LOGIN_ID, command(11L, 5)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

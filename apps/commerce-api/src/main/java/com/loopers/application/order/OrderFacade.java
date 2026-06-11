@@ -26,11 +26,11 @@ public class OrderFacade {
     private final UserRepository userRepository;
 
     @Transactional
-    public OrderInfo createOrder(String loginId, PlaceOrderCriteria criteria) {
+    public OrderInfo createOrder(String loginId, PlaceOrderCommand command) {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
-        List<OrderLine> lines = criteria.items().stream()
+        List<OrderLine> lines = command.items().stream()
             .map(item -> {
                 ProductModel product = productRepository.find(item.productId())
                     .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,

@@ -2,7 +2,7 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderItemInfo;
-import com.loopers.application.order.PlaceOrderCriteria;
+import com.loopers.application.order.PlaceOrderCommand;
 
 import java.util.List;
 
@@ -11,13 +11,13 @@ public class OrderV1Dto {
     public record CreateOrderRequest(
         List<OrderItemRequest> items
     ) {
-        public PlaceOrderCriteria toCriteria() {
+        public PlaceOrderCommand toCommand() {
             if (items == null) {
-                return new PlaceOrderCriteria(List.of());
+                return new PlaceOrderCommand(List.of());
             }
-            return new PlaceOrderCriteria(
+            return new PlaceOrderCommand(
                 items.stream()
-                    .map(item -> new PlaceOrderCriteria.Item(item.productId(), item.quantity()))
+                    .map(item -> new PlaceOrderCommand.Item(item.productId(), item.quantity()))
                     .toList()
             );
         }
