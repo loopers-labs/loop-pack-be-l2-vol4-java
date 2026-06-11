@@ -4,7 +4,9 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.UserModel;
+import com.loopers.domain.like.ProductLikeCount;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.like.ProductLikeCountJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -32,6 +34,7 @@ class LikeV1ApiE2ETest {
     private final UserJpaRepository userJpaRepository;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final ProductLikeCountJpaRepository productLikeCountJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     private Long productId;
@@ -42,12 +45,14 @@ class LikeV1ApiE2ETest {
         UserJpaRepository userJpaRepository,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
+        ProductLikeCountJpaRepository productLikeCountJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userJpaRepository = userJpaRepository;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.productLikeCountJpaRepository = productLikeCountJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -78,8 +83,10 @@ class LikeV1ApiE2ETest {
         );
     }
 
-    private int currentLikeCount() {
-        return productJpaRepository.findById(productId).orElseThrow().getLikeCount();
+    private long currentLikeCount() {
+        return productLikeCountJpaRepository.findByProductId(productId)
+            .map(ProductLikeCount::getCount)
+            .orElse(0L);
     }
 
     @DisplayName("POST /api/v1/products/{productId}/likes")

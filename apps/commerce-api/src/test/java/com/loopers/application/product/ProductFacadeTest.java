@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -25,7 +26,8 @@ class ProductFacadeTest {
 
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final BrandRepository brandRepository = mock(BrandRepository.class);
-    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository);
+    private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
+    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository);
 
     @DisplayName("상품 상세를 조회할 때, ")
     @Nested
@@ -39,6 +41,7 @@ class ProductFacadeTest {
             BrandModel brand = new BrandModel("나이키", "Just Do It");
             when(productRepository.find(1L)).thenReturn(Optional.of(product));
             when(brandRepository.find(5L)).thenReturn(Optional.of(brand));
+            when(likeCountRepository.find(1L)).thenReturn(Optional.empty());
 
             // act
             ProductDetailInfo info = productFacade.getProductDetail(1L);
