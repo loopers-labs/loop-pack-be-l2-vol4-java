@@ -73,6 +73,20 @@ class CouponTypeTest {
             // then
             assertThat(discount).isEqualTo(Money.of(1_000L));
         }
+
+        @DisplayName("주문 금액이 매우 커서 할인 계산이 long 범위를 초과하면 BAD_REQUEST 예외가 발생하고 원인이 보존된다")
+        @Test
+        void throwsBadRequest_whenCalculationOverflows() {
+            // given - Long.MAX_VALUE * 10 은 long 곱셈 범위를 초과한다
+            Money orderAmount = Money.of(Long.MAX_VALUE);
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> CouponType.RATE.discount(orderAmount, 10L));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            assertThat(ex.getCause()).isInstanceOf(ArithmeticException.class);
+        }
     }
 
     @DisplayName("할인 값 유효성 검증 시")
