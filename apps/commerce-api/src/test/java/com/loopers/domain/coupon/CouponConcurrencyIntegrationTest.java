@@ -79,8 +79,11 @@ class CouponConcurrencyIntegrationTest {
             });
         }
         startGate.countDown();
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-        executor.shutdown();
+        try {
+            assertThat(doneLatch.await(3, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
 
         // then - 단 1건만 성공, 나머지는 실패, 쿠폰은 한 번만 USED
         assertAll(

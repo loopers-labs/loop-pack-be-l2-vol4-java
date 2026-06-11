@@ -127,8 +127,11 @@ class OrderConcurrencyIntegrationTest {
             });
         }
         startGate.countDown();
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-        executor.shutdown();
+        try {
+            assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
 
         // then - 주문 1건만 성공, 쿠폰 1회 USED, 재고도 1개만 차감
         assertAll(

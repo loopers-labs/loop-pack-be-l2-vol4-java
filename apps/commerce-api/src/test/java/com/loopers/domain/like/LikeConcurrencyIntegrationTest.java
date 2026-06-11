@@ -70,8 +70,11 @@ class LikeConcurrencyIntegrationTest {
             });
         }
         startGate.countDown();
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-        executor.shutdown();
+        try {
+            assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
 
         // then - 좋아요 수가 정확히 10
         assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(10L);
@@ -109,8 +112,11 @@ class LikeConcurrencyIntegrationTest {
             });
         }
         startGate.countDown();
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-        executor.shutdown();
+        try {
+            assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
 
         // then - 좋아요 수가 정확히 0 (유실·음수 없음)
         assertThat(productRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(0L);
