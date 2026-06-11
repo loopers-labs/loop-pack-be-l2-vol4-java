@@ -98,6 +98,9 @@ class ProductApiE2ETest {
             new ParameterizedTypeReference<>() {}
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertAll(
+            () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+            () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+        );
     }
 }

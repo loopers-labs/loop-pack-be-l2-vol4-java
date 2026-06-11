@@ -189,12 +189,31 @@ class OrderApiE2ETest {
             );
 
             // then - 130,000의 10% = 13,000 할인
+            assertThat(orderRes.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(orderRes.getBody()).isNotNull();
             OrderV1Response data = orderRes.getBody().data();
             assertAll(
-                () -> assertThat(orderRes.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.totalAmount()).isEqualTo(130_000L),
                 () -> assertThat(data.discountAmount()).isEqualTo(13_000L),
                 () -> assertThat(data.finalAmount()).isEqualTo(117_000L)
+            );
+        }
+
+        @DisplayName("존재하지 않는 쿠폰으로 주문하면 404 NOT_FOUND 이고 표준 에러 응답(FAIL) 형식을 따른다")
+        @Test
+        void returns404_whenCouponNotFound() {
+            PlaceOrderV1Request request = new PlaceOrderV1Request(List.of(
+                new PlaceOrderV1Request.OrderLineV1Request(product1Id, 1)
+            ), 99999L);
+
+            ResponseEntity<ApiResponse<OrderV1Response>> response = restTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, userHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
             );
         }
     }

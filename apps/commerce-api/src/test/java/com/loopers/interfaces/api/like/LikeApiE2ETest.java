@@ -102,8 +102,10 @@ class LikeApiE2ETest {
     @Test
     void like_isIdempotent() {
         restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
-        restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
+        ResponseEntity<ApiResponse<Object>> second = restTemplate.exchange(
+            likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
 
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(likeCount()).isEqualTo(1L);
     }
 
@@ -111,8 +113,10 @@ class LikeApiE2ETest {
     @Test
     void unlike_decreasesLikeCount() {
         restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
-        restTemplate.exchange(likeUrl(), HttpMethod.DELETE, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
+        ResponseEntity<ApiResponse<Object>> deleteRes = restTemplate.exchange(
+            likeUrl(), HttpMethod.DELETE, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
 
+        assertThat(deleteRes.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(likeCount()).isZero();
     }
 

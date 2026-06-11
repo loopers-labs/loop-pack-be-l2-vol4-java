@@ -132,4 +132,35 @@ class CouponApiE2ETest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @DisplayName("존재하지 않는 템플릿으로 발급하면 404 NOT_FOUND 이고 표준 에러 응답(FAIL) 형식을 따른다")
+    @Test
+    void issue_returns404_whenTemplateNotFound() {
+        ResponseEntity<ApiResponse<IssueCouponV1Response>> response = restTemplate.exchange(
+            "/api/v1/coupons/99999/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()),
+            new ParameterizedTypeReference<>() {}
+        );
+
+        assertAll(
+            () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+            () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+        );
+    }
+
+    @DisplayName("만료된 템플릿으로 발급하면 409 CONFLICT 이고 표준 에러 응답(FAIL) 형식을 따른다")
+    @Test
+    void issue_returns409_whenTemplateExpired() {
+        Long expiredId = couponTemplateRepository.save(
+            new CouponTemplate("만료 쿠폰", CouponType.FIXED, 3_000L, null, ZonedDateTime.now().minusDays(1))).getId();
+
+        ResponseEntity<ApiResponse<IssueCouponV1Response>> response = restTemplate.exchange(
+            "/api/v1/coupons/" + expiredId + "/issue", HttpMethod.POST, new HttpEntity<>(userHeaders()),
+            new ParameterizedTypeReference<>() {}
+        );
+
+        assertAll(
+            () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+            () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL)
+        );
+    }
 }
