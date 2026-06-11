@@ -1,0 +1,113 @@
+### 회원가입 - 정상
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "loopers01",
+  "password": "Passw0rd!",
+  "name": "김루퍼",
+  "birthDate": "1995-03-21",
+  "email": "looper@example.com"
+}
+
+### 회원가입 - 검증 실패 (로그인 ID 형식 위반: 대문자/길이)
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "AB",
+  "password": "Passw0rd!",
+  "name": "김루퍼",
+  "birthDate": "1995-03-21",
+  "email": "looper@example.com"
+}
+
+### 회원가입 - 검증 실패 (비밀번호에 생년월일 포함)
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "loopers02",
+  "password": "19950321aA",
+  "name": "김루퍼",
+  "birthDate": "1995-03-21",
+  "email": "looper@example.com"
+}
+
+### 회원가입 - 중복 로그인 ID (위 "정상" 요청을 먼저 보낸 뒤 실행)
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "loopers01",
+  "password": "Passw0rd!",
+  "name": "김루퍼",
+  "birthDate": "1995-03-21",
+  "email": "looper@example.com"
+}
+
+### 내 정보 조회 - 정상 (위 "회원가입 - 정상"을 먼저 보낸 뒤 실행, 이름은 마스킹되어 반환)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+
+### 내 정보 조회 - 비밀번호 틀림 (401)
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: WrongPass1!
+
+### 내 정보 조회 - 인증 헤더 없음 (401)
+GET {{commerce-api}}/api/v1/users/me
+
+### 비밀번호 수정 - 정상 (위 "회원가입 - 정상"을 먼저 보낸 뒤 실행)
+PUT {{commerce-api}}/api/v1/users/password
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+Content-Type: application/json
+
+{
+  "currentPassword": "Passw0rd!",
+  "newPassword": "NewPass1!"
+}
+
+### 비밀번호 수정 - 새 비밀번호 형식 위반 (400)
+PUT {{commerce-api}}/api/v1/users/password
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+Content-Type: application/json
+
+{
+  "currentPassword": "Passw0rd!",
+  "newPassword": "short"
+}
+
+### 비밀번호 수정 - 현재 비밀번호 불일치 (400)
+PUT {{commerce-api}}/api/v1/users/password
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+Content-Type: application/json
+
+{
+  "currentPassword": "WrongPass1!",
+  "newPassword": "NewPass1!"
+}
+
+### 비밀번호 수정 - 새 비밀번호에 생년월일 포함 (400)
+PUT {{commerce-api}}/api/v1/users/password
+X-Loopers-LoginId: loopers01
+X-Loopers-LoginPw: Passw0rd!
+Content-Type: application/json
+
+{
+  "currentPassword": "Passw0rd!",
+  "newPassword": "19950321aA"
+}
+
+### 비밀번호 수정 - 인증 헤더 없음 (401)
+PUT {{commerce-api}}/api/v1/users/password
+Content-Type: application/json
+
+{
+  "currentPassword": "Passw0rd!",
+  "newPassword": "NewPass1!"
+}

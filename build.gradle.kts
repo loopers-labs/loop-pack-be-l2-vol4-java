@@ -47,7 +47,7 @@ subprojects {
 
     dependencies {
         // Web
-        runtimeOnly("org.springframework.boot:spring-boot-starter-validation")
+        implementation("org.springframework.boot:spring-boot-starter-validation")
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize
@@ -83,6 +83,9 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        // Testcontainers 가 Docker 소켓을 컨테이너에 마운트할 때 쓸 경로.
+        // VM 기반 Docker(Colima 등)에서 호스트 경로 대신 VM 내부 표준 경로를 쓰도록 한다.
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
     }
 
     tasks.withType<JacocoReport> {
