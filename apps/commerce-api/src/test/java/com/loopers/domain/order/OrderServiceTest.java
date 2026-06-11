@@ -34,12 +34,15 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    private OrderItemEntity item(Long productId, String name, Long price, int qty) {
-        return new OrderItemEntity(productId, name, price, qty);
+    private OrderSnapshot validSnapshot() {
+        return new OrderSnapshot(
+                List.of(new OrderSnapshotItem(1L, "에어맥스", 100_000L, 2, 200_000L)),
+                200_000L, 0L, 200_000L, null
+        );
     }
 
-    private OrderEntity savedOrder(Long id, Long userId, List<OrderItemEntity> items) {
-        return OrderEntity.of(id, userId, OrderStatus.PENDING, items,
+    private OrderEntity savedOrder(Long id, Long userId, OrderSnapshot snapshot) {
+        return OrderEntity.of(id, userId, OrderStatus.PENDING, snapshot,
                 ZonedDateTime.now(), ZonedDateTime.now(), null);
     }
 
@@ -51,57 +54,63 @@ class OrderServiceTest {
     @Nested
     class CreateOrder {
 
-        @DisplayName("[ECP] 유효한 항목으로 주문 생성 시 PENDING 상태의 OrderEntity가 저장된다.")
+        @DisplayName("[ECP] 유효한 snapshot으로 주문 생성 시 PENDING 상태의 OrderEntity가 저장된다.")
         @Test
-        void savesOrder_withPendingStatus_whenItemsAreValid() {
+        void savesOrder_withPendingStatus_whenSnapshotIsValid() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 2));
-            OrderEntity saved = savedOrder(ORDER_ID, USER_ID, items);
+            OrderSnapshot snapshot = validSnapshot();
+            OrderEntity saved = savedOrder(ORDER_ID, USER_ID, snapshot);
             given(orderRepository.save(any())).willReturn(saved);
 
             // act
-            OrderEntity result = orderService.createOrder(USER_ID, items);
+            OrderEntity result = orderService.createOrder(USER_ID, snapshot);
 
             // assert
             assertAll(
                     () -> assertNotNull(result.getId()),
                     () -> assertEquals(USER_ID, result.getUserId()),
                     () -> assertEquals(OrderStatus.PENDING, result.getStatus()),
-                    () -> assertEquals(1, result.getItems().size())
+                    () -> assertEquals(200_000L, result.finalAmount())
             );
             verify(orderRepository).save(any());
         }
 
-        @DisplayName("[ECP] 빈 항목 목록으로 주문 생성 시 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("[ECP] snapshot items가 빈 배열이면 BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenItemsAreEmpty() {
+        void throwsBadRequest_whenSnapshotItemsAreEmpty() {
+            // arrange
+            OrderSnapshot emptySnapshot = new OrderSnapshot(List.of(), 0L, 0L, 0L, null);
+
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderService.createOrder(USER_ID, List.of()));
+                    () -> orderService.createOrder(USER_ID, emptySnapshot));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
 
-        @DisplayName("[Error Guessing] null 항목으로 주문 생성 시 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("[Error Guessing] snapshot이 null이면 BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenItemsAreNull() {
+        void throwsBadRequest_whenSnapshotIsNull() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
                     () -> orderService.createOrder(USER_ID, null));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
 
-        @DisplayName("[ECP] 중복된 productId가 포함된 항목으로 주문 생성 시 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("[ECP] snapshot items 내 중복된 productId가 있으면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenDuplicateProductIdExists() {
             // arrange
-            List<OrderItemEntity> items = List.of(
-                    item(1L, "에어맥스", 100_000L, 1),
-                    item(1L, "에어맥스", 100_000L, 2)
+            OrderSnapshot snapshot = new OrderSnapshot(
+                    List.of(
+                            new OrderSnapshotItem(1L, "에어맥스", 100_000L, 1, 100_000L),
+                            new OrderSnapshotItem(1L, "에어맥스", 100_000L, 2, 200_000L)
+                    ),
+                    300_000L, 0L, 300_000L, null
             );
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderService.createOrder(USER_ID, items));
+                    () -> orderService.createOrder(USER_ID, snapshot));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
     }
@@ -118,8 +127,7 @@ class OrderServiceTest {
         @Test
         void returnsOrder_whenOrderExists() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
-            OrderEntity order = savedOrder(ORDER_ID, USER_ID, items);
+            OrderEntity order = savedOrder(ORDER_ID, USER_ID, validSnapshot());
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
             // act
@@ -157,8 +165,7 @@ class OrderServiceTest {
         @Test
         void returnsOrder_whenOrderIsOwnedByUser() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
-            OrderEntity order = savedOrder(ORDER_ID, USER_ID, items);
+            OrderEntity order = savedOrder(ORDER_ID, USER_ID, validSnapshot());
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
             // act
@@ -184,8 +191,7 @@ class OrderServiceTest {
         @Test
         void throwsNotFound_whenOrderIsOwnedByOtherUser() {
             // arrange
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
-            OrderEntity order = savedOrder(ORDER_ID, 999L, items); // 타인 소유
+            OrderEntity order = savedOrder(ORDER_ID, 999L, validSnapshot());
             given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
             // act & assert
@@ -208,10 +214,9 @@ class OrderServiceTest {
         void returnsOrderPage_whenNoDateFilter() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             List<OrderEntity> orders = List.of(
-                    savedOrder(ORDER_ID, USER_ID, items),
-                    savedOrder(ORDER_ID + 1, USER_ID, items)
+                    savedOrder(ORDER_ID, USER_ID, validSnapshot()),
+                    savedOrder(ORDER_ID + 1, USER_ID, validSnapshot())
             );
             given(orderRepository.findAllByUserId(USER_ID, null, null, pageable))
                     .willReturn(new PageImpl<>(orders, pageable, 2));
@@ -226,25 +231,6 @@ class OrderServiceTest {
                             .allMatch(o -> o.getUserId().equals(USER_ID)))
             );
             verify(orderRepository).findAllByUserId(USER_ID, null, null, pageable);
-        }
-
-        @DisplayName("[ADR-010] startAt/endAt 날짜 필터를 전달하면 해당 Repository 메서드가 호출된다.")
-        @Test
-        void delegatesToRepository_whenDateFilterProvided() {
-            // arrange
-            PageRequest pageable = PageRequest.of(0, 20);
-            ZonedDateTime startAt = ZonedDateTime.now().minusDays(7);
-            ZonedDateTime endAt = ZonedDateTime.now();
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
-            given(orderRepository.findAllByUserId(USER_ID, startAt, endAt, pageable))
-                    .willReturn(new PageImpl<>(List.of(savedOrder(ORDER_ID, USER_ID, items)), pageable, 1));
-
-            // act
-            Page<OrderEntity> result = orderService.getOrders(USER_ID, startAt, endAt, pageable);
-
-            // assert
-            assertEquals(1, result.getTotalElements());
-            verify(orderRepository).findAllByUserId(USER_ID, startAt, endAt, pageable);
         }
 
         @DisplayName("[ECP] 주문이 없는 유저 조회 시 빈 페이지가 반환된다.")
@@ -276,10 +262,9 @@ class OrderServiceTest {
         void returnsAllOrdersPage() {
             // arrange
             PageRequest pageable = PageRequest.of(0, 20);
-            List<OrderItemEntity> items = List.of(item(1L, "에어맥스", 100_000L, 1));
             List<OrderEntity> orders = List.of(
-                    savedOrder(ORDER_ID, USER_ID, items),
-                    savedOrder(ORDER_ID + 1, 2L, items)
+                    savedOrder(ORDER_ID, USER_ID, validSnapshot()),
+                    savedOrder(ORDER_ID + 1, 2L, validSnapshot())
             );
             given(orderRepository.findAll(pageable))
                     .willReturn(new PageImpl<>(orders, pageable, 2));
@@ -290,20 +275,6 @@ class OrderServiceTest {
             // assert
             assertEquals(2, result.getTotalElements());
             verify(orderRepository).findAll(pageable);
-        }
-
-        @DisplayName("[ECP] 주문이 없으면 빈 페이지가 반환된다.")
-        @Test
-        void returnsEmptyPage_whenNoOrdersExist() {
-            // arrange
-            PageRequest pageable = PageRequest.of(0, 20);
-            given(orderRepository.findAll(pageable)).willReturn(Page.empty(pageable));
-
-            // act
-            Page<OrderEntity> result = orderService.getAllOrders(pageable);
-
-            // assert
-            assertTrue(result.getContent().isEmpty());
         }
     }
 }

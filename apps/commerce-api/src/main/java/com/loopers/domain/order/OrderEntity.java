@@ -6,31 +6,30 @@ import com.loopers.support.error.ErrorType;
 
 import java.time.ZonedDateTime;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public class OrderEntity extends BaseEntity {
 
     private Long userId;
     private OrderStatus status;
-    private List<OrderItemEntity> items;
+    private OrderSnapshot snapshot;
 
     protected OrderEntity() {}
 
-    public OrderEntity(Long userId, List<OrderItemEntity> items) {
+    public OrderEntity(Long userId, OrderSnapshot snapshot) {
         validateUserId(userId);
-        validateItems(items);
+        validateSnapshot(snapshot);
         this.userId = userId;
         this.status = OrderStatus.PENDING;
-        this.items = items;
+        this.snapshot = snapshot;
     }
 
-    public static OrderEntity of(Long id, Long userId, OrderStatus status, List<OrderItemEntity> items,
+    public static OrderEntity of(Long id, Long userId, OrderStatus status, OrderSnapshot snapshot,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         OrderEntity entity = new OrderEntity();
         entity.userId = userId;
         entity.status = status;
-        entity.items = items;
+        entity.snapshot = snapshot;
         entity.reconstruct(id, createdAt, updatedAt, deletedAt);
         return entity;
     }
@@ -43,14 +42,12 @@ public class OrderEntity extends BaseEntity {
         return status;
     }
 
-    public List<OrderItemEntity> getItems() {
-        return items;
+    public OrderSnapshot getSnapshot() {
+        return snapshot;
     }
 
-    public Long calculateTotalAmount() {
-        return items.stream()
-                .mapToLong(OrderItemEntity::subtotal)
-                .sum();
+    public Long finalAmount() {
+        return snapshot.finalAmount();
     }
 
     public boolean isOwnedBy(Long userId) {
@@ -63,13 +60,13 @@ public class OrderEntity extends BaseEntity {
         }
     }
 
-    private void validateItems(List<OrderItemEntity> items) {
-        if (items == null || items.isEmpty()) {
+    private void validateSnapshot(OrderSnapshot snapshot) {
+        if (snapshot == null || snapshot.items() == null || snapshot.items().isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
         Set<Long> productIds = new HashSet<>();
-        for (OrderItemEntity item : items) {
-            if (!productIds.add(item.getProductId())) {
+        for (OrderSnapshotItem item : snapshot.items()) {
+            if (!productIds.add(item.productId())) {
                 throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목에 중복된 상품이 있습니다.");
             }
         }

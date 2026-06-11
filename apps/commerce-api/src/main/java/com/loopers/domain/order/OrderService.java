@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -18,8 +17,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
 
     @Transactional
-    public OrderEntity createOrder(Long userId, List<OrderItemEntity> items) {
-        return orderRepository.save(new OrderEntity(userId, items));
+    public OrderEntity createOrder(Long userId, OrderSnapshot snapshot) {
+        return orderRepository.save(new OrderEntity(userId, snapshot));
     }
 
     @Transactional(readOnly = true)

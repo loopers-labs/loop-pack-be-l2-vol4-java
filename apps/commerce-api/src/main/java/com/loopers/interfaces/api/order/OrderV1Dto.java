@@ -14,7 +14,8 @@ import java.util.List;
 public class OrderV1Dto {
 
     public record CreateOrderRequest(
-            @NotEmpty List<@Valid OrderItemRequest> items
+            @NotEmpty List<@Valid OrderItemRequest> items,
+            Long couponId
     ) {
         public record OrderItemRequest(
                 @NotNull Long productId,
@@ -55,7 +56,10 @@ public class OrderV1Dto {
     public record OrderResponse(
             Long orderId,
             OrderStatus status,
-            Long totalAmount,
+            Long originalAmount,
+            Long discountAmount,
+            Long finalAmount,
+            Long couponId,
             List<OrderItemResponse> items,
             ZonedDateTime createdAt
     ) {
@@ -63,7 +67,10 @@ public class OrderV1Dto {
             return new OrderResponse(
                     info.orderId(),
                     info.status(),
-                    info.totalAmount(),
+                    info.originalAmount(),
+                    info.discountAmount(),
+                    info.finalAmount(),
+                    info.couponId(),
                     info.items().stream().map(OrderItemResponse::from).toList(),
                     info.createdAt()
             );
@@ -74,7 +81,10 @@ public class OrderV1Dto {
             Long orderId,
             Long userId,
             OrderStatus status,
-            Long totalAmount,
+            Long originalAmount,
+            Long discountAmount,
+            Long finalAmount,
+            Long couponId,
             List<OrderItemResponse> items,
             ZonedDateTime createdAt
     ) {
@@ -83,7 +93,10 @@ public class OrderV1Dto {
                     info.orderId(),
                     info.userId(),
                     info.status(),
-                    info.totalAmount(),
+                    info.originalAmount(),
+                    info.discountAmount(),
+                    info.finalAmount(),
+                    info.couponId(),
                     info.items().stream().map(OrderItemResponse::from).toList(),
                     info.createdAt()
             );
