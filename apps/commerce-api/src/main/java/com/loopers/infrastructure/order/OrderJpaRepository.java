@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -28,4 +29,6 @@ public interface OrderJpaRepository extends JpaRepository<OrderModel, Long> {
 
     @EntityGraph(attributePaths = {"items"})
     Page<OrderModel> findAll(Pageable pageable);
+
+    List<OrderModel> findByStatusAndOrderedAtBefore(OrderStatus status, ZonedDateTime before);
 }

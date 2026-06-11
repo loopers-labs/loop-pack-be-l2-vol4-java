@@ -4,8 +4,10 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import java.util.TimeZone;
 
+@EnableScheduling   // PENDING 주문 만료 스케줄러 (PendingOrderExpirationScheduler)
 @ConfigurationPropertiesScan
 @SpringBootApplication
 public class CommerceApiApplication {

@@ -2,6 +2,7 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.OrderStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -34,5 +35,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public List<OrderModel> findAll(int page, int size) {
         return orderJpaRepository.findAll(PageRequest.of(page, size)).getContent();
+    }
+
+    @Override
+    public List<OrderModel> findByStatusAndOrderedAtBefore(OrderStatus status, ZonedDateTime before) {
+        return orderJpaRepository.findByStatusAndOrderedAtBefore(status, before);
     }
 }
