@@ -1,40 +1,40 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.like.LikeService;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.product.ProductService;
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
+
     private final ProductService productService;
+    private final BrandService brandService;
+    private final LikeService likeService;
+    private final ProductListQuery productListQuery;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
-        return ProductInfo.from(product);
+    @Transactional(readOnly = true)
+    public PageResult<ProductListInfo> getProducts(int page, int size, Long brandId, String sort) {
+        return productListQuery.findVisibleProducts(
+            new PageQuery(page, size),
+            brandId,
+            ProductSort.from(sort)
+        );
     }
 
-    public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
-    }
-
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
-            .toList();
-    }
-
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
-    }
-
-    public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+    @Transactional(readOnly = true)
+    public ProductDetailInfo getProduct(Long productId) {
+        Product product = productService.getVisibleProduct(productId);
+        Brand brand = brandService.getBrand(product.getBrandId());
+        long likeCount = likeService.countProductLikes(product.getId());
+        return ProductDetailInfo.from(product, brand, likeCount);
     }
 }

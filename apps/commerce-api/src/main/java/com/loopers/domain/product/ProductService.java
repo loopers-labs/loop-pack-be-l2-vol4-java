@@ -1,12 +1,16 @@
 package com.loopers.domain.product;
 
+import com.loopers.support.pagination.PageQuery;
+import com.loopers.support.pagination.PageResult;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -15,32 +19,71 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public Product createProduct(Long brandId, String name, String description, long price) {
+        Product product = Product.create(brandId, name, description, price);
         return productRepository.save(product);
     }
 
     @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
-        return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    public Product getProduct(Long productId) {
+        return productRepository.findActiveById(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다."));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public Product getVisibleProduct(Long productId) {
+        return productRepository.findVisibleById(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> getProducts(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findActiveAllByIds(productIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> getAllByIds(Collection<Long> productIds) {
+        List<Product> products = getProducts(productIds);
+        if (products.size() != Set.copyOf(productIds).size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다.");
+        }
+        return products;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<Product> getProducts(PageQuery query, Long brandId) {
+        return productRepository.findActiveAll(query, brandId);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<Product> getVisibleProducts(PageQuery query, Long brandId, ProductSort sort) {
+        return productRepository.findVisibleAll(query, brandId, sort);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<Product> getLikedProducts(Long userId, PageQuery query) {
+        return productRepository.findVisibleLikedAllByUserId(userId, query);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
-        return productRepository.save(product);
+    public void deleteProduct(Long productId) {
+        Product product = getProduct(productId);
+        product.delete();
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+    public void deleteProductsByBrandId(Long brandId) {
+        productRepository.findActiveAllByBrandId(brandId)
+            .forEach(Product::delete);
+    }
+
+    @Transactional
+    public Product updateProduct(Long productId, String name, String description, long price) {
+        Product product = getProduct(productId);
+        product.update(name, description, price);
+        return product;
     }
 }
