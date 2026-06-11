@@ -31,17 +31,17 @@ public class OrderFacade {
     @Transactional
     public OrderInfo createOrder(CreateOrderCommand command) {
         OrderItems orderItems = orderItemFactory.create(command.items());
-        OrderPayment payment = calculatePayment(command, orderItems);
-        productStockService.deduct(command.orderQuantities());
+        OrderPayment payment = applyCoupon(command, orderItems);
+        productStockService.deduct(orderItems.quantitiesByProductId());
         Order order = Order.create(command.userId(), orderItems, command.userCouponId(), payment);
         return OrderInfo.from(orderService.saveOrder(order));
     }
 
-    private OrderPayment calculatePayment(CreateOrderCommand command, OrderItems orderItems) {
+    private OrderPayment applyCoupon(CreateOrderCommand command, OrderItems orderItems) {
         long total = orderItems.calculateTotalPrice();
         CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), total, ZonedDateTime.now());
         CouponDiscount discount = couponService.use(couponUse);
-        return OrderPayment.withDiscount(total, discount.amount().value());
+        return OrderPayment.withDiscount(total, discount.value());
     }
 
     @Transactional(readOnly = true)

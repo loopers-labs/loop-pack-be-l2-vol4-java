@@ -1,8 +1,6 @@
 package com.loopers.application.order;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public record CreateOrderCommand(
     Long userId,
@@ -16,11 +14,6 @@ public record CreateOrderCommand(
 
     public CreateOrderCommand(Long userId, List<Item> items) {
         this(userId, items, null);
-    }
-
-    public Map<Long, Integer> orderQuantities() {
-        return items.stream()
-            .collect(Collectors.toMap(Item::productId, Item::quantity));
     }
 
     public record Item(

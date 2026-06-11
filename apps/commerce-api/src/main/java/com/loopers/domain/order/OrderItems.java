@@ -4,6 +4,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,5 +31,10 @@ public record OrderItems(List<OrderItem> values) {
         return values.stream()
             .mapToLong(OrderItem::getTotalPrice)
             .sum();
+    }
+
+    public Map<Long, Integer> quantitiesByProductId() {
+        return values.stream()
+            .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
     }
 }

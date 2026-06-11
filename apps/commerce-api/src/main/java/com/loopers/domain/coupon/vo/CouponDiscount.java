@@ -18,4 +18,8 @@ public record CouponDiscount(CouponMoney amount) {
     public static CouponDiscount none() {
         return new CouponDiscount(CouponMoney.of(0L));
     }
+
+    public long value() {
+        return amount.value();
+    }
 }
