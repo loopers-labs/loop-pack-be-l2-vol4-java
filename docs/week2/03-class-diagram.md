@@ -71,7 +71,7 @@ classDiagram
         +Long couponTemplateId
         +CouponStatus status
         +Long version
-        +use()
+        +use(template: CouponTemplate, orderAmount: BigDecimal): BigDecimal
     }
     CouponIssue --|> BaseTimeEntity
     
@@ -82,8 +82,10 @@ classDiagram
         +BigDecimal totalOriginalAmount
         +BigDecimal totalDiscountAmount
         +BigDecimal totalPaymentAmount
-        +OrderStatus status
+        +OrderStatus status "PENDING, COMPLETED, CANCELED"
         +List~OrderItem~ items
+        +complete()
+        +cancel()
     }
     Order --|> BaseTimeEntity
     
@@ -102,6 +104,47 @@ classDiagram
         +String brandName
     }
 
+    class Payment {
+        +Long id
+        +Long orderId
+        +PaymentMethod method "CARD, TRANSFER"
+        +PaymentStatus status "READY, APPROVED, FAILED"
+        +BigDecimal amount
+        +String transactionId
+        +LocalDateTime approvedAt
+    }
+    Payment --|> BaseTimeEntity
+
+    class PaymentMethod {
+        <<enumeration>>
+        CARD
+        TRANSFER
+    }
+
+    class PaymentStatus {
+        <<enumeration>>
+        READY
+        APPROVED
+        FAILED
+    }
+
+    class PaymentGateway {
+        <<interface>>
+        +requestPayment(amount, method): PaymentResponse
+        +cancelPayment(transactionId): PaymentResponse
+    }
+
+    class MockPaymentGateway {
+        +requestPayment(amount, method): PaymentResponse
+        +cancelPayment(transactionId): PaymentResponse
+    }
+
+    class PaymentResponse {
+        +String transactionId
+        +boolean isSuccess
+        +LocalDateTime approvedAt
+    }
+
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains
     Product "1" -- "1" Stock : has
@@ -111,10 +154,16 @@ classDiagram
     Product "1" -- "*" ProductLike : liked by
     User "1" -- "*" CouponIssue : owns
     CouponTemplate "1" -- "*" CouponIssue : issues
+    CouponIssue "1" -- "0..1" Order : applied to
+    Order "1" ..> "0..1" Payment : reference (id)
+    PaymentGateway <|.. MockPaymentGateway : implements
 
     %% 파사드(Facade) 계층 (복합 트랜잭션 제어)
     class OrderFacade {
         +createOrder(userId, request)
+    }
+    class PaymentFacade {
+        +processPayment(orderId, method)
     }
     class BrandAdminFacade {
         +deleteBrand(brandId)
@@ -130,6 +179,12 @@ classDiagram
     %% 서비스(Service) 계층 (단일 도메인 로직 및 조회)
     class OrderService {
         +createOrder(userId, items, discountAmount)
+        +getOrder(orderId)
+        +completeOrder(orderId)
+        +cancelOrder(orderId)
+    }
+    class PaymentService {
+        +savePayment(orderId, amount, method, transactionId)
     }
     class ProductService {
         +getProducts(brandId, sort, pageable)
@@ -145,8 +200,10 @@ classDiagram
     }
     class StockService {
         +decreaseStocks(stockRequests)
+        +restoreStocks(stockRequests)
     }
     class LikeService {
+        +existsLikeRecord(userId, productId) boolean
         +addLikeRecord(userId, productId)
         +removeLikeRecord(userId, productId)
     }
@@ -154,6 +211,7 @@ classDiagram
         +issueCoupon(userId, templateId)
         +getUserCoupons(userId)
         +verifyAndUseCoupon(couponIssueId, orderAmount)
+        +completeCouponUse(couponIssueId)
     }
 
     %% 의존 방향
@@ -161,6 +219,11 @@ classDiagram
     OrderFacade ..> ProductService
     OrderFacade ..> StockService
     OrderFacade ..> CouponService
+    
+    PaymentFacade ..> OrderService
+    PaymentFacade ..> PaymentService
+    PaymentFacade ..> CouponService
+    PaymentFacade ..> PaymentGateway
     
     BrandAdminFacade ..> BrandService
     BrandAdminFacade ..> ProductService

@@ -71,7 +71,19 @@ erDiagram
         decimal_15_4 total_original_amount "할인 전 원가 총합"
         decimal_15_4 total_discount_amount "할인액"
         decimal_15_4 total_payment_amount "최종 결제액"
-        varchar status "COMPLETED, FAILED"
+        varchar status "PENDING, COMPLETED, CANCELED"
+        datetime created_at
+        datetime updated_at
+    }
+
+    PAYMENTS {
+        bigint id PK
+        bigint order_id FK "ORDERS 테이블의 ID 간접 참조"
+        varchar method "CARD, TRANSFER"
+        varchar status "READY, APPROVED, FAILED"
+        decimal_15_4 amount "실제 결제액"
+        varchar transaction_id "외부 결제사 거래 식별자"
+        datetime approved_at "결제 승인 시각"
         datetime created_at
         datetime updated_at
     }
@@ -96,4 +108,5 @@ erDiagram
     USERS ||--o{ COUPON_ISSUES : "owns"
     COUPON_TEMPLATES ||--o{ COUPON_ISSUES : "issues"
     COUPON_ISSUES ||--o| ORDERS : "applied to"
+    ORDERS ||--o| PAYMENTS : "has (1:1 간접 참조)"
 ```

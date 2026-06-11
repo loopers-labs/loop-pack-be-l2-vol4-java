@@ -1,6 +1,6 @@
 ```mermaid
 sequenceDiagram
-    title 주문 요청 API 시퀀스 다이어그램 (Week 4 수정)
+    title 주문 생성 API 시퀀스 다이어그램
     actor User
     participant Controller as OrderController
     participant Facade as OrderFacade
@@ -10,7 +10,7 @@ sequenceDiagram
     participant OrderSvc as OrderService
     participant Repo as Repositories (DB)
 
-    User->>Controller: POST /api/v1/orders (List<상품ID, 수량>, couponId?)
+    User->>Controller: POST /api/v1/orders (List<상품ID, 수량>, couponIssueId?)
     activate Controller
 
     Controller->>Facade: 주문 생성 요청
@@ -27,8 +27,8 @@ sequenceDiagram
     rect rgb(240, 240, 240)
         Note right of Facade: [@Transactional Begin]
         
-        alt couponId가 전달된 경우 (쿠폰 적용)
-            Facade->>CouponSvc: 쿠폰 검증 및 사용 처리 (couponId)
+        alt couponIssueId가 전달된 경우 (쿠폰 적용 검증)
+            Facade->>CouponSvc: 쿠폰 검증 및 적용 (couponIssueId, orderAmount)
             activate CouponSvc
             Note right of CouponSvc: [Optimistic Lock]<br/>낙관적 락 버전 필드 포함 조회
             CouponSvc->>Repo: SELECT * FROM coupon_issue WHERE id = ?
@@ -36,20 +36,22 @@ sequenceDiagram
             Repo-->>CouponSvc: CouponIssue 반환 (Version 정보 포함)
             deactivate Repo
             
-            Note right of CouponSvc: 유효 조건(만료일, 소유주, 최소주문금액) 검증
-            alt 검증 실패 (만료, 타인 소유, 최소금액 미달 등)
-                CouponSvc-->>Facade: Error (사용 불가 예외 발생)
+            Note over CouponSvc: [도메인 엔티티에 비즈니스 로직 위임]<br/>couponIssue.apply(orderAmount) 호출
+            
+            alt 검증 실패 (만료, 최소금액 미달 등)
+                Note over CouponSvc: 엔티티 내부 검증 예외 발생
+                CouponSvc-->>Facade: CoreException(ErrorType.BAD_REQUEST) 전파
                 Note right of Facade: 트랜잭션 롤백 처리
                 Facade-->>Controller: 예외 전파
             else 검증 통과
-                CouponSvc->>CouponSvc: 쿠폰 상태 변경 (status = 'USED')
-                CouponSvc-->>Facade: 적용 할인 금액 반환 (정액/정률 계산)
+                Note over CouponSvc: 할인금액 계산 및 유효성 확인
+                CouponSvc-->>Facade: 적용 할인 금액 반환
                 deactivate CouponSvc
             end
         end
 
         Note right of Facade: [데드락 방지]<br/>상품 ID(PK) 오름차순 정렬
-        Facade->>StockSvc: 재고 차감 요청 (정렬된 List)
+        Facade->>StockSvc: 재고 가선점 차감 (정렬된 List)
         activate StockSvc
         
         loop 각 상품마다 순차 처리
@@ -60,7 +62,7 @@ sequenceDiagram
             deactivate Repo
             
             alt 재고 부족
-                StockSvc-->>Facade: Error (재고 부족 예외 발생)
+                StockSvc-->>Facade: CoreException(ErrorType.BAD_REQUEST) 발생
                 Note right of Facade: 트랜잭션 롤백 처리
                 Facade-->>Controller: 예외 전파
             else 재고 충분
@@ -74,32 +76,117 @@ sequenceDiagram
         StockSvc-->>Facade: 차감 완료 반환
         deactivate StockSvc
 
-        Facade->>OrderSvc: 주문 생성 요청 (List<상품 스냅샷, 수량>, 할인금액 등)
+        Facade->>OrderSvc: 주문 생성 요청 (List<상품 스냅샷, 수량>, 할인금액 등, 상태: PENDING)
         activate OrderSvc
         Note right of OrderSvc: 주문 1건(Order) 및 여러 건의 상세(OrderItem) 생성<br/>원가, 할인액, 결제금액 스냅샷 생성
         
-        OrderSvc->>Repo: 주문 정보 저장 (INSERT INTO orders)
+        OrderSvc->>Repo: 주문 정보 저장 (INSERT INTO orders, status = 'PENDING')
         activate Repo
         Repo-->>OrderSvc: Order ID 반환
         deactivate Repo
         
-        OrderSvc->>Repo: 다건 스냅샷 저장 (Batch INSERT INTO order_item)
+        OrderSvc->>Repo: 다건 상세 저장 (saveAll)
         activate Repo
         Repo-->>OrderSvc: 저장 완료
         deactivate Repo
         OrderSvc-->>Facade: 생성된 Order ID 반환
         deactivate OrderSvc
 
+        Note right of Facade: [@Transactional Commit]
+    end
+
+    Facade-->>Controller: 주문 ID 및 최종 결제 금액 반환
+    deactivate Facade
+    Controller-->>User: 201 Created
+    deactivate Controller
+```
+
+```mermaid
+sequenceDiagram
+    title 결제 승인 API 시퀀스 다이어그램
+    actor User
+    participant Controller as PaymentController
+    participant Facade as PaymentFacade
+    participant OrderSvc as OrderService
+    participant PG as PaymentGateway (DIP Interface)
+    participant PaySvc as PaymentService
+    participant CouponSvc as CouponService
+    participant Repo as Repositories (DB)
+
+    User->>Controller: POST /api/v1/payments (orderId, paymentMethod)
+    activate Controller
+
+    Controller->>Facade: 결제 승인 요청
+    activate Facade
+
+    Facade->>OrderSvc: 주문 상세 정보 및 금액 조회
+    activate OrderSvc
+    OrderSvc->>Repo: 주문 조회 (WHERE id = orderId)
+    activate Repo
+    Repo-->>OrderSvc: Order 반환 (상태, 최종 금액 등)
+    deactivate Repo
+    OrderSvc-->>Facade: Order 반환
+    deactivate OrderSvc
+
+    alt 주문 상태가 PENDING이 아니거나 이미 취소됨
+        Facade-->>Controller: CoreException(ErrorType.BAD_REQUEST) 반환
+    end
+
+    %% 외부 PG API 호출 (트랜잭션 외부)
+    Facade->>PG: 결제 승인 요청 (amount, paymentMethod)
+    activate PG
+    Note over PG: MockPaymentGateway에서 가상 승인 수행
+    PG-->>Facade: PaymentResponse 반환 (transactionId, approvedAt, success)
+    deactivate PG
+
+    alt PG 승인 실패
+        Facade-->>Controller: CoreException(ErrorType.BAD_REQUEST) 반환
+    end
+
+    rect rgb(240, 240, 240)
+        Note right of Facade: [@Transactional Begin]
+        
+        Facade->>PaySvc: 결제 내역 저장
+        activate PaySvc
+        PaySvc->>Repo: INSERT INTO payments (status='APPROVED', transaction_id, method, amount)
+        activate Repo
+        Repo-->>PaySvc: 
+        deactivate Repo
+        PaySvc-->>Facade: 
+        deactivate PaySvc
+
+        Facade->>OrderSvc: 주문 완료 처리
+        activate OrderSvc
+        OrderSvc->>OrderSvc: order.complete() 호출 (status = 'COMPLETED')
+        OrderSvc->>Repo: UPDATE orders SET status = 'COMPLETED'
+        deactivate OrderSvc
+
+        alt 쿠폰이 적용되어 있는 경우
+            Facade->>CouponSvc: 쿠폰 사용 완료 확정
+            activate CouponSvc
+            Note right of CouponSvc: [Optimistic Lock]<br/>낙관적 락 버전 검증
+            CouponSvc->>Repo: SELECT * FROM coupon_issue WHERE id = ?
+            activate Repo
+            Repo-->>CouponSvc: 
+            deactivate Repo
+            CouponSvc->>CouponSvc: couponIssue.use() 호출 (status = 'USED')
+            CouponSvc->>Repo: UPDATE coupon_issue SET status = 'USED', version = version + 1
+            CouponSvc-->>Facade: 
+            deactivate CouponSvc
+        end
+
         Note right of Facade: [@Transactional Commit]<br/>(쿠폰 낙관적 락 Version 검증 동시 수행)
         alt 커밋 시점 쿠폰 버전 충돌 발생 (Double Spending 시도 시)
             Note right of Facade: OptimisticLockingFailureException 발생 및 롤백
+            Note over Facade: [보상 트랜잭션] 외부 PG사에 결제 취소 요청
+            Facade->>PG: 결제 취소 API 호출 (transactionId)
             Facade-->>Controller: 예외 전파
         else 정상 반영
             Note right of Facade: 트랜잭션 커밋 완료
         end
     end
 
-    Facade-->>Controller: 주문 ID 반환
+    Facade-->>Controller: 결제 완료 정보 반환
     deactivate Facade
     Controller-->>User: 200 OK
     deactivate Controller
@@ -121,43 +208,51 @@ sequenceDiagram
     Controller->>Facade: 좋아요 등록 요청
     activate Facade
 
-    Facade->>ProductSvc: 상품 유효성 검증
-    activate ProductSvc
-    ProductSvc->>Repo: 유효한 상품 조회
-    activate Repo
-    Repo-->>ProductSvc: 데이터 반환
-    deactivate Repo
-    ProductSvc-->>Facade: 정상 반환 (없으면 404 예외)
-    deactivate ProductSvc
-
     rect rgb(240, 240, 240)
         Note right of Facade: [@Transactional Begin]
 
-        Facade->>LikeSvc: 좋아요 이력 추가
-        activate LikeSvc
-        LikeSvc->>Repo: 좋아요 데이터 저장 (INSERT)
+        Facade->>ProductSvc: 상품 비관적 락 조회
+        activate ProductSvc
+        ProductSvc->>Repo: 상품 조회 (SELECT FOR UPDATE)
         activate Repo
-        Repo-->>LikeSvc: 저장 결과 (성공 또는 DuplicateKeyException)
+        Repo-->>ProductSvc: ProductModel 반환 (락 획득)
         deactivate Repo
-        LikeSvc-->>Facade: 등록 처리 결과 반환
+        ProductSvc-->>Facade: ProductModel 반환 (없으면 CoreException)
+        deactivate ProductSvc
+
+        Facade->>LikeSvc: 이미 좋아요를 눌렀는지 조회 (Exist Check)
+        activate LikeSvc
+        LikeSvc->>Repo: 좋아요 데이터 존재 여부 조회
+        activate Repo
+        Repo-->>LikeSvc: 존재 여부 반환 (boolean)
+        deactivate Repo
+        LikeSvc-->>Facade: 존재 여부 반환
         deactivate LikeSvc
 
-        alt 중복 등록 (Unique Constraint 예외 발생 시)
-            Note right of Facade: 멱등성 성공 처리 (예외 무시)<br/>좋아요 수가 증가하지 않고 트랜잭션 종료
-        else 신규 등록 정상
+        alt 이미 등록된 경우 (좋아요 존재함)
+            Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
+        else 신규 등록인 경우 (좋아요 존재하지 않음)
+            Facade->>LikeSvc: 좋아요 이력 추가
+            activate LikeSvc
+            LikeSvc->>Repo: 좋아요 데이터 저장 (INSERT)
+            activate Repo
+            Repo-->>LikeSvc: 
+            deactivate Repo
+            LikeSvc-->>Facade: 성공 반환
+            deactivate LikeSvc
+
             Facade->>ProductSvc: 상품 좋아요 수 증가
             activate ProductSvc
-            ProductSvc->>Repo: 해당 상품의 좋아요 수 1 증가
-            activate Repo
-            Repo-->>ProductSvc: 업데이트 성공
-            deactivate Repo
+            Note right of ProductSvc: [Pessimistic Lock]<br/>획득한 엔티티 필드 수정 (likeCount++)
+            ProductSvc->>ProductSvc: product.increaseLikeCount()
             ProductSvc-->>Facade: 성공
             deactivate ProductSvc
         end
+
         Note right of Facade: [@Transactional Commit]
     end
 
-    Facade-->>Controller: 성공
+    Facade-->>Controller: 성공 반환
     deactivate Facade
 
     Controller-->>User: 200 OK
@@ -170,8 +265,8 @@ sequenceDiagram
     actor User
     participant Controller as LikeController
     participant Facade as LikeFacade
-    participant LikeSvc as LikeService
     participant ProductSvc as ProductService
+    participant LikeSvc as LikeService
     participant Repo as Repositories (DB)
 
     User->>Controller: DELETE /api/v1/products/{productId}/likes
@@ -183,34 +278,48 @@ sequenceDiagram
     rect rgb(240, 240, 240)
         Note right of Facade: [@Transactional Begin]
 
-        Facade->>LikeSvc: 좋아요 이력 삭제
-        activate LikeSvc
-        LikeSvc->>Repo: 해당 유저/상품의 좋아요 데이터 삭제
+        Facade->>ProductSvc: 상품 비관적 락 조회
+        activate ProductSvc
+        ProductSvc->>Repo: 상품 조회 (SELECT FOR UPDATE)
         activate Repo
-        Repo-->>LikeSvc: 삭제된 Row 수 (Affected Rows) 반환
+        Repo-->>ProductSvc: ProductModel 반환 (락 획득)
         deactivate Repo
+        ProductSvc-->>Facade: ProductModel 반환 (없으면 CoreException)
+        deactivate ProductSvc
 
-        alt Affected Rows == 0 (이미 취소되었거나 누른 적 없음)
-            LikeSvc-->>Facade: 멱등성 성공 처리 (예외 없음)
-            Note right of Facade: 삭제된 데이터가 없으므로 like_count 감소 없이 종료
-        else Affected Rows > 0 (정상 삭제)
-            LikeSvc-->>Facade: 삭제 성공
-            
+        Facade->>LikeSvc: 좋아요 이력 조회 (존재 여부)
+        activate LikeSvc
+        LikeSvc->>Repo: 좋아요 데이터 조회
+        activate Repo
+        Repo-->>LikeSvc: 존재 여부 반환
+        deactivate Repo
+        LikeSvc-->>Facade: 존재 여부 반환
+        deactivate LikeSvc
+
+        alt 누른 적이 없는 경우 (좋아요 미존재)
+            Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
+        else 기존에 누른 경우 (좋아요 존재함)
+            Facade->>LikeSvc: 좋아요 이력 삭제
+            activate LikeSvc
+            LikeSvc->>Repo: 해당 유저/상품의 좋아요 데이터 삭제 (DELETE)
+            activate Repo
+            Repo-->>LikeSvc: 삭제 완료
+            deactivate Repo
+            LikeSvc-->>Facade: 삭제 성공 반환
+            deactivate LikeSvc
+
             Facade->>ProductSvc: 상품 좋아요 수 감소
             activate ProductSvc
-            ProductSvc->>Repo: 해당 상품의 좋아요 수 1 감소 (like_count - 1)
-            activate Repo
-            Repo-->>ProductSvc: 업데이트 성공
-            deactivate Repo
+            Note right of ProductSvc: [Pessimistic Lock]<br/>획득한 엔티티 필드 수정 (likeCount--)
+            ProductSvc->>ProductSvc: product.decreaseLikeCount()
             ProductSvc-->>Facade: 성공
             deactivate ProductSvc
         end
-        deactivate LikeSvc
-        
+
         Note right of Facade: [@Transactional Commit]
     end
 
-    Facade-->>Controller: 성공
+    Facade-->>Controller: 성공 반환
     deactivate Facade
 
     Controller-->>User: 200 OK
@@ -219,65 +328,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    title 브랜드 삭제 API 시퀀스 다이어그램
-
-    actor Admin
-    participant Controller as BrandAdminController
-    participant Facade as BrandAdminFacade
-    participant BrandSvc as BrandService
-    participant ProductSvc as ProductService
-    participant Repo as Repositories (DB)
-
-    Admin->>Controller: DELETE /api-admin/v1/brands/{brandId}
-    activate Controller
-
-    Controller->>Facade: 브랜드 삭제 요청
-    activate Facade
-
-    rect rgb(240, 240, 240)
-        Note right of Facade: [@Transactional Begin]
-
-        Facade->>BrandSvc: 브랜드 유효성 검증 및 삭제
-        activate BrandSvc
-        BrandSvc->>Repo: 해당 브랜드 조회 (이미 삭제되었는지 확인)
-        activate Repo
-        Repo-->>BrandSvc: 조회 결과
-        deactivate Repo
-
-        alt 브랜드 없음 or 이미 삭제됨
-            BrandSvc-->>Facade: Error (유효하지 않은 브랜드 예외)
-            Facade-->>Controller: 예외 전파 (404)
-        else 정상 브랜드
-            BrandSvc->>Repo: 브랜드 논리 삭제 (UPDATE is_deleted = true)
-            activate Repo
-            Repo-->>BrandSvc: 업데이트 성공
-            deactivate Repo
-            BrandSvc-->>Facade: 브랜드 삭제 완료 반환
-            deactivate BrandSvc
-
-            Facade->>ProductSvc: 해당 브랜드의 연관 상품 전체 삭제 요청
-            activate ProductSvc
-            Note right of ProductSvc: [Bulk Update 최적화]<br/>단일 쿼리로 한 번에 논리 삭제 처리
-            ProductSvc->>Repo: UPDATE product SET is_deleted = true WHERE brand_id = ?
-            activate Repo
-            Repo-->>ProductSvc: 업데이트된 상품 Row 수 반환
-            deactivate Repo
-            ProductSvc-->>Facade: 상품 연쇄 삭제 완료 반환
-            deactivate ProductSvc
-        end
-        Note right of Facade: [@Transactional Commit / Rollback]
-    end
-
-    Facade-->>Controller: 성공 응답
-    deactivate Facade
-
-    Controller-->>Admin: 200 OK
-    deactivate Controller
-```
-
-```mermaid
-sequenceDiagram
-    title 쿠폰 발급 API 시퀀스 다이어그램 (신규 추가)
+    title 쿠폰 발급 API 시퀀스 다이어그램
     actor User
     participant Controller as CouponController
     participant Facade as CouponFacade
@@ -298,7 +349,7 @@ sequenceDiagram
 
         CouponSvc->>Repo: 쿠폰 템플릿 조회 (SELECT)
         activate Repo
-        Repo-->>CouponSvc: CouponTemplate 반환 (만료일, 최대 발급 수량 등)
+        Repo-->>CouponSvc: CouponTemplate 반환 (만료일 등)
         deactivate Repo
 
         Note right of CouponSvc: 템플릿 유효성 및 만료일 검증
@@ -309,7 +360,7 @@ sequenceDiagram
         deactivate Repo
 
         alt 이미 발급 받았거나 템플릿 만료됨
-            CouponSvc-->>Facade: Error (발급 불가 예외 발생)
+            CouponSvc-->>Facade: CoreException(ErrorType.CONFLICT) 발생
             Facade-->>Controller: 예외 전파
         else 발급 가능
             CouponSvc->>Repo: 쿠폰 발급 내역 저장 (INSERT INTO coupon_issue)
