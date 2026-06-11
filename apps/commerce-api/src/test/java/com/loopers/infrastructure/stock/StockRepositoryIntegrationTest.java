@@ -4,6 +4,7 @@ import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,9 @@ class StockRepositoryIntegrationTest extends StockRepositoryContractTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private EntityManager em;
 
     @Override
     StockRepository repository() {
@@ -32,6 +36,7 @@ class StockRepositoryIntegrationTest extends StockRepositoryContractTest {
 
         // when
         int result = stockRepository.decreaseQuantity(productId, 3L);
+        em.clear();
 
         // then
         StockModel stock = stockRepository.findByProductId(productId).orElseThrow();
@@ -50,6 +55,7 @@ class StockRepositoryIntegrationTest extends StockRepositoryContractTest {
 
         // when
         int result = stockRepository.decreaseQuantity(productId, 5L);
+        em.clear();
 
         // then
         StockModel stock = stockRepository.findByProductId(productId).orElseThrow();
