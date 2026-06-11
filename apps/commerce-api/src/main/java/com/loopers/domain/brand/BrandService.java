@@ -3,6 +3,7 @@ package com.loopers.domain.brand;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -14,11 +15,13 @@ public class BrandService {
 
     private final BrandRepository brandRepository;
 
+    /** 브랜드 생성. 동시 중복 생성은 DB unique 충돌로 CONFLICT (삭제된 브랜드명도 재등록 차단). */
     public BrandModel create(String name, String description) {
-        if (brandRepository.existsByName(name)) {
+        try {
+            return brandRepository.save(new BrandModel(name, description));
+        } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 브랜드명입니다.");
         }
-        return brandRepository.save(new BrandModel(name, description));
     }
 
     /** 어드민용 — 삭제된 브랜드도 조회 */

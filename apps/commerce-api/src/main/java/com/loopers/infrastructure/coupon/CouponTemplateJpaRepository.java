@@ -8,6 +8,4 @@ import java.util.UUID;
 
 public interface CouponTemplateJpaRepository extends JpaRepository<CouponTemplateModel, UUID> {
     Optional<CouponTemplateModel> findByIdAndDeletedAtIsNull(UUID id);
-
-    boolean existsByName(String name);
 }

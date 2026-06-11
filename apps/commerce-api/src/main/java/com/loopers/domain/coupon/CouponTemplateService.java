@@ -3,6 +3,7 @@ package com.loopers.domain.coupon;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -16,11 +17,13 @@ public class CouponTemplateService {
 
     private final CouponTemplateRepository couponTemplateRepository;
 
+    /** 템플릿 생성. 동시 중복 생성은 DB unique 충돌로 CONFLICT. */
     public CouponTemplateModel create(String name, CouponType type, Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
-        if (couponTemplateRepository.existsByName(name)) {
+        try {
+            return couponTemplateRepository.save(new CouponTemplateModel(name, type, value, minOrderAmount, expiredAt));
+        } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 쿠폰명입니다.");
         }
-        return couponTemplateRepository.save(new CouponTemplateModel(name, type, value, minOrderAmount, expiredAt));
     }
 
     /** 어드민용 — 삭제된 템플릿도 조회 */

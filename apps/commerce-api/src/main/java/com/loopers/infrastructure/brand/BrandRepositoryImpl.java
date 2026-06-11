@@ -5,19 +5,19 @@ import com.loopers.domain.brand.BrandRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
-@Component
+@Repository
 public class BrandRepositoryImpl implements BrandRepository {
     private final BrandJpaRepository brandJpaRepository;
 
     @Override
     public BrandModel save(BrandModel brand) {
-        return brandJpaRepository.save(brand);
+        return brandJpaRepository.saveAndFlush(brand);
     }
 
     @Override
@@ -28,11 +28,6 @@ public class BrandRepositoryImpl implements BrandRepository {
     @Override
     public Optional<BrandModel> findActive(UUID id) {
         return brandJpaRepository.findByIdAndDeletedAtIsNull(id);
-    }
-
-    @Override
-    public boolean existsByName(String name) {
-        return brandJpaRepository.existsByName(name);
     }
 
     @Override
