@@ -33,10 +33,7 @@ classDiagram
         +Long brandId
         +String name
         +BigDecimal price
-        +int likeCount
         +Stock stock
-        +increaseLikeCount()
-        +decreaseLikeCount()
     }
     Product --|> BaseSoftDeleteEntity
     
@@ -160,10 +157,7 @@ classDiagram
 
     %% 파사드(Facade) 계층 (복합 트랜잭션 제어)
     class OrderFacade {
-        +createOrder(userId, request)
-    }
-    class PaymentFacade {
-        +processPayment(orderId, method)
+        +checkout(userId, request, method)
     }
     class BrandAdminFacade {
         +deleteBrand(brandId)
@@ -191,8 +185,6 @@ classDiagram
         +getProductDetail(productId)
         +getProductsByIds(ids)
         +deleteProductsByBrand(brandId)
-        +increaseLikeCount(productId)
-        +decreaseLikeCount(productId)
     }
     class BrandService {
         +getBrand(brandId)
@@ -219,11 +211,8 @@ classDiagram
     OrderFacade ..> ProductService
     OrderFacade ..> StockService
     OrderFacade ..> CouponService
-    
-    PaymentFacade ..> OrderService
-    PaymentFacade ..> PaymentService
-    PaymentFacade ..> CouponService
-    PaymentFacade ..> PaymentGateway
+    OrderFacade ..> PaymentService
+    OrderFacade ..> PaymentGateway
     
     BrandAdminFacade ..> BrandService
     BrandAdminFacade ..> ProductService

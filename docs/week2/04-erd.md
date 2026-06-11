@@ -22,7 +22,6 @@ erDiagram
         bigint brand_id FK
         varchar name
         decimal_15_4 price
-        int like_count "반정규화 컬럼"
         boolean is_deleted "논리 삭제 플래그"
         datetime created_at
         datetime updated_at
@@ -62,6 +61,7 @@ erDiagram
         bigint version "Optimistic Lock용 버전"
         datetime created_at
         datetime updated_at
+        %% Unique Index: (user_id, coupon_template_id)
     }
 
     ORDERS {
