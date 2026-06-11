@@ -70,14 +70,10 @@ sequenceDiagram
     participant DB as DB
 
     C->>+Ctl: 좋아요 등록 요청 (POST /products/{productId}/likes)
-    Note over Ctl: 사전 조건 — 사용자 인증 완료, 상품 존재
+    Note over Ctl: 사전 조건 — 사용자 인증 완료
     Ctl->>+F: like(userId, productId)
-    F->>+S: like(userId, productId) — 1:1 위임
-    S->>+PS: getById(productId)
-    PS-->>-S: 상품 / 없음
-    opt 상품 미존재 / 삭제됨
-        S-->>C: throw CoreException(NOT_FOUND) → 전역 핸들러 404
-    end
+    Note over F: @Transactional — LikeService + ProductService 합성
+    F->>+S: like(userId, productId)
     Note over S,LR: 불변식 — 좋아요는 사용자·상품당 최대 1개 (UNIQUE 제약)
     S->>+LR: 존재 확인 (existsByUserIdAndProductId)
     LR->>+DB: 조회
@@ -88,17 +84,24 @@ sequenceDiagram
         LR->>+DB: 저장
         DB-->>-LR: ok
         LR-->>-S: 저장 완료
-        S->>PS: incrementLikeCount(productId)
     else 이미 존재 — 멱등
-        Note over S: 상태 변화 없음 (카운터 불변)
+        Note over S: 상태 변화 없음
     end
-    S-->>-F: liked = true
-    F-->>-Ctl: liked = true
+    S-->>-F: created (true=신규 / false=기존)
+    alt created — 실제 반영
+        F->>+PS: incrementLikeCount(productId)
+        Note over PS: UPDATE like_count + 1 WHERE 미삭제 — 매칭 0건이면 NOT_FOUND
+        PS-->>-F: ok / throw CoreException(NOT_FOUND) → 404
+    else 멱등 — 카운터 불변
+        F->>+PS: requireExists(productId)
+        PS-->>-F: ok / throw CoreException(NOT_FOUND) → 404
+    end
+    F-->>-Ctl: 완료
     Note over Ctl: 사후 조건 — 사용자-상품 좋아요 관계 존재
     Ctl-->>-C: 200 OK
 ```
 
-> 카운터 증감을 **LikeService 안**에 둔 이유(D7) — 등록·취소가 *실제 반영될 때만* 카운터를 바꾸는 **멱등 분기**가 핵심 유스케이스 흐름이라, Facade 분기 금지 규약상 Service에 둔다. `like_count`는 약한 일관성(D3)이라 Service↔Service 쓰기를 *이 카운터에 한해* 좁게 허용한다.
+> 카운터 증감을 **LikeFacade 합성**에 둔 이유(D7) — `LikeService`는 like row 멱등 처리만 맡고(boolean 반환), `LikeFacade`가 그 결과로 *실제 반영될 때만* `ProductService`의 카운터를 증감한다. `Service↔Service 금지` 규약상 `LikeService`가 `ProductService`를 직접 부를 수 없어 합성 자리는 Facade뿐이고, 멱등 반영 여부에 따라 Facade에 분기가 생긴다(`Facade 분기 금지`와 충돌하나 두 규약 상충 시 `Service↔Service 금지`를 우선). `like_count`는 약한 일관성(D3).
 > 동시 등록 레이스(두 요청이 동시에 `existsBy`를 통과)는 `UNIQUE(user_id, product_id)` 위반으로 한쪽이 실패한다 — 위반 예외 처리는 동시성 라운드에서 합류(D6).
 
 ---
@@ -119,18 +122,21 @@ sequenceDiagram
     C->>+Ctl: 좋아요 취소 요청 (DELETE /products/{productId}/likes)
     Note over Ctl: 사전 조건 — 사용자 인증 완료
     Ctl->>+F: unlike(userId, productId)
-    F->>+S: unlike(userId, productId) — 1:1 위임
+    Note over F: @Transactional — LikeService + ProductService 합성
+    F->>+S: unlike(userId, productId)
     S->>+LR: 좋아요 삭제 (deleteByUserIdAndProductId)
     LR->>+DB: 삭제
     DB-->>-LR: 삭제 건수 (1 = 삭제 / 0 = 없음)
     LR-->>-S: 삭제 건수
-    alt 실제 삭제됨 (1)
-        S->>PS: decrementLikeCount(productId)
-    else 없음 (0 — 멱등)
-        Note over S: 상태 변화 없음
+    S-->>-F: deleted (true=삭제됨 / false=없음)
+    alt deleted — 실제 반영
+        F->>+PS: decrementLikeCount(productId)
+        PS-->>-F: ok
+    else 멱등 — 카운터 불변
+        F->>+PS: requireExists(productId)
+        PS-->>-F: ok / throw CoreException(NOT_FOUND) → 404
     end
-    S-->>-F: liked = false
-    F-->>-Ctl: liked = false
+    F-->>-Ctl: 완료
     Note over Ctl: 사후 조건 — 좋아요 관계 없음
     Ctl-->>-C: 200 OK
 ```
