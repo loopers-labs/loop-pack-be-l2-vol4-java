@@ -70,7 +70,6 @@ public class CouponService {
         couponRepository.saveIssue(issue);
     }
 
-    @Transactional(readOnly = true)
     public java.math.BigDecimal calculateDiscount(Long couponIssueId, java.math.BigDecimal orderAmount) {
         CouponIssue issue = couponRepository.findIssueById(couponIssueId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 발급 이력입니다."));

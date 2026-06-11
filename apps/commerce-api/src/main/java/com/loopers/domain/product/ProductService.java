@@ -17,28 +17,23 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final com.loopers.domain.like.LikeRepository likeRepository;
 
-    @Transactional(readOnly = true)
     public ProductModel getProduct(Long id) {
         return productRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
-    @Transactional(readOnly = true)
     public List<ProductModel> getAllProducts() {
         return productRepository.findAll();
     }
 
-    @Transactional(readOnly = true)
     public List<ProductModel> getProductsByIds(List<Long> ids) {
         return productRepository.findByIds(ids);
     }
 
-    @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<ProductModel> getProducts(Long brandId, String sort, org.springframework.data.domain.Pageable pageable) {
         return productRepository.findAll(brandId, sort, pageable);
     }
 
-    @Transactional(readOnly = true)
     public ProductDetail getProductDetail(Long productId) {
         ProductModel product = productRepository.findById(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));

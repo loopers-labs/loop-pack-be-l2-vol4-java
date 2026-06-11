@@ -24,12 +24,10 @@ public class LikeService {
         return false;
     }
 
-    @Transactional(readOnly = true)
     public java.util.List<ProductLikeModel> getMyLikes(Long userId) {
         return likeRepository.findAllByUserId(userId);
     }
 
-    @Transactional(readOnly = true)
     public boolean existsLikeRecord(Long userId, Long productId) {
         return likeRepository.findByUserIdAndProductId(userId, productId).isPresent();
     }

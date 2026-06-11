@@ -20,7 +20,6 @@ public class BrandAdminService {
         return brandRepository.save(brand).getId();
     }
 
-    @Transactional(readOnly = true)
     public List<BrandModel> getBrands() {
         return brandRepository.findAll();
     }

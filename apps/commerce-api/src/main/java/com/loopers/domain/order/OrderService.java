@@ -54,12 +54,10 @@ public class OrderService {
         orderRepository.save(order);
     }
 
-    @Transactional(readOnly = true)
     public List<OrderModel> getOrders(Long userId) {
         return orderRepository.findAllByUserId(userId);
     }
 
-    @Transactional(readOnly = true)
     public OrderModel getOrder(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND));

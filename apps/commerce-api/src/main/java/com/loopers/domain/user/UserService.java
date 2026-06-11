@@ -65,7 +65,6 @@ public class UserService {
         user.updatePassword(passwordEncoder.encode(newPassword), newPassword);
     }
 
-    @Transactional(readOnly = true)
     public UserInfo getUser(String loginId, String password) {
         UserModel.validateLoginId(loginId);
 
