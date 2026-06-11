@@ -11,10 +11,15 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import com.loopers.domain.BaseEntity;
+
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -98,6 +103,51 @@ class CouponTemplateServiceTest {
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("ID 목록으로 쿠폰 템플릿 Map을 조회할 때,")
+    @Nested
+    class GetMapByIds {
+
+        @DisplayName("ID 목록에 해당하는 템플릿이 존재하면 ID를 키로 하는 Map이 반환된다.")
+        @Test
+        void couponTemplateMapIsReturnedByIds_whenIdsExist() throws Exception {
+            // given
+            CouponTemplateModel template1 = new CouponTemplateModel(
+                    "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30));
+            CouponTemplateModel template2 = new CouponTemplateModel(
+                    "여름 시즌 5000원 할인", CouponType.FIXED, BigDecimal.valueOf(5000),
+                    BigDecimal.valueOf(20000), ZonedDateTime.now().plusDays(30));
+            setId(template1, 1L);
+            setId(template2, 2L);
+            Set<Long> ids = Set.of(1L, 2L);
+            when(couponTemplateRepository.findAllByIds(ids)).thenReturn(List.of(template1, template2));
+
+            // when
+            Map<Long, CouponTemplateModel> result = couponTemplateService.getMapByIds(ids);
+
+            // then
+            assertAll(
+                    () -> assertThat(result).hasSize(2),
+                    () -> assertThat(result.get(1L)).isEqualTo(template1),
+                    () -> assertThat(result.get(2L)).isEqualTo(template2)
+            );
+        }
+
+        @DisplayName("빈 ID 목록이 주어지면 빈 Map이 반환된다.")
+        @Test
+        void returnsEmptyMap_whenIdsIsEmpty() {
+            // given
+            Set<Long> ids = Set.of();
+            when(couponTemplateRepository.findAllByIds(ids)).thenReturn(List.of());
+
+            // when
+            Map<Long, CouponTemplateModel> result = couponTemplateService.getMapByIds(ids);
+
+            // then
+            assertThat(result).isEmpty();
         }
     }
 
@@ -215,5 +265,11 @@ class CouponTemplateServiceTest {
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
+    }
+
+    private void setId(CouponTemplateModel template, Long id) throws Exception {
+        Field idField = BaseEntity.class.getDeclaredField("id");
+        idField.setAccessible(true);
+        idField.set(template, id);
     }
 }

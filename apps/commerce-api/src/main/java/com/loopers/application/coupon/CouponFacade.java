@@ -14,6 +14,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -31,11 +34,14 @@ public class CouponFacade {
 
     public List<MyIssuedCouponInfo> getMyIssuedCoupons(String loginId, String loginPw) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
-        return issuedCouponService.getMyIssuedCoupons(user.getId()).stream()
-                .map(issued -> {
-                    CouponTemplateModel template = couponTemplateService.getById(issued.getCouponTemplateId());
-                    return MyIssuedCouponInfo.from(issued, template);
-                })
+        List<IssuedCouponModel> issued = issuedCouponService.getMyIssuedCoupons(user.getId());
+        Set<Long> templateIds = issued.stream()
+                .map(IssuedCouponModel::getCouponTemplateId)
+                .collect(Collectors.toSet());
+        Map<Long, CouponTemplateModel> templateMap = couponTemplateService.getMapByIds(templateIds);
+        return issued.stream()
+                .filter(i -> templateMap.containsKey(i.getCouponTemplateId()))
+                .map(i -> MyIssuedCouponInfo.from(i, templateMap.get(i.getCouponTemplateId())))
                 .toList();
     }
 
