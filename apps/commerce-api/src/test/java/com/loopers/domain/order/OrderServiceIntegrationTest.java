@@ -50,7 +50,7 @@ class OrderServiceIntegrationTest {
             ProductModel product = productService.createProduct(1L, "티셔츠", "면 100%", 10000L, 10);
 
             // when
-            OrderModel order = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 3)));
+            OrderModel order = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 3)), null);
 
             // then
             assertAll(
@@ -69,7 +69,7 @@ class OrderServiceIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 5))));
+                    () -> orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 5)), null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
@@ -79,7 +79,7 @@ class OrderServiceIntegrationTest {
         @Test
         void throwsNotFound_whenProductMissing() {
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderService.createPendingOrder(99L, List.of(OrderLine.of(99999L, 1))));
+                    () -> orderService.createPendingOrder(99L, List.of(OrderLine.of(99999L, 1)), null));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
@@ -94,7 +94,7 @@ class OrderServiceIntegrationTest {
         void transitionsToPaid() {
             // given
             ProductModel product = productService.createProduct(1L, "티셔츠", "면 100%", 10000L, 5);
-            OrderModel pending = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 1)));
+            OrderModel pending = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 1)), null);
 
             // when
             OrderModel result = orderService.confirm(pending.getId());
@@ -113,7 +113,7 @@ class OrderServiceIntegrationTest {
         void restoresStock_andMarksFailed() {
             // given
             ProductModel product = productService.createProduct(1L, "티셔츠", "면 100%", 10000L, 5);
-            OrderModel pending = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 3)));
+            OrderModel pending = orderService.createPendingOrder(99L, List.of(OrderLine.of(product.getId(), 3)), null);
 
             // when
             OrderModel result = orderService.fail(pending.getId());
