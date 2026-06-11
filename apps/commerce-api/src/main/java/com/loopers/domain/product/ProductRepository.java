@@ -11,4 +11,5 @@ public interface ProductRepository {
     org.springframework.data.domain.Page<ProductModel> findAll(Long brandId, String sort, org.springframework.data.domain.Pageable pageable);
     void delete(Long id);
     void deleteByBrandId(Long brandId);
+    Optional<ProductModel> findByIdWithLock(Long id);
 }

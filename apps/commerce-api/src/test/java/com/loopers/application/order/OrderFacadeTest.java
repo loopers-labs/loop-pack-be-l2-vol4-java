@@ -1,10 +1,10 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.StockService;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductDetail;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +35,9 @@ class OrderFacadeTest {
     @Mock
     private StockService stockService;
 
+    @Mock
+    private CouponService couponService;
+
     @Test
     @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다.")
     void createOrder_Success_ShouldCallServices() {
@@ -56,5 +59,33 @@ class OrderFacadeTest {
         assertThat(orderId).isEqualTo(100L);
         verify(stockService).decreaseStocks(anyList());
         verify(orderService).createOrder(eq(userId), anyList());
+    }
+
+    @Test
+    @DisplayName("주문 생성 및 재고 가선점 요청 시 비관적 락 재고 차감과 쿠폰 적용이 정상 처리된다.")
+    void createOrderAndPreoccupyStock_Success() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        Long couponIssueId = 42L;
+        int quantity = 2;
+        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)));
+
+        ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
+        ReflectionTestUtils.setField(product, "id", productId);
+        given(productService.getProductsByIds(List.of(productId))).willReturn(List.of(product));
+        
+        BigDecimal discount = new BigDecimal("40000");
+        given(couponService.calculateDiscount(couponIssueId, new BigDecimal("400000"))).willReturn(discount);
+
+        given(orderService.createPendingOrder(eq(userId), anyList(), eq(couponIssueId), any(), any(), any())).willReturn(100L);
+
+        // when
+        Long orderId = orderFacade.createOrderAndPreoccupyStock(userId, request, couponIssueId);
+
+        // then
+        assertThat(orderId).isEqualTo(100L);
+        verify(stockService).decreaseStocksWithLock(anyList());
+        verify(orderService).createPendingOrder(eq(userId), anyList(), eq(couponIssueId), any(), any(), any());
     }
 }

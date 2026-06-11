@@ -27,6 +27,19 @@ public class OrderService {
         return orderRepository.save(order).getId();
     }
 
+    @Transactional
+    public Long createPendingOrder(Long userId, List<OrderItemRequest> items, Long couponIssueId, java.math.BigDecimal totalOriginalAmount, java.math.BigDecimal totalDiscountAmount, java.math.BigDecimal totalPaymentAmount) {
+        OrderModel order = new OrderModel(userId, couponIssueId, totalOriginalAmount, totalDiscountAmount, totalPaymentAmount);
+
+        for (OrderItemRequest item : items) {
+            ProductSnapshot snapshot = new ProductSnapshot(item.name(), item.price(), item.brandName());
+            OrderItemModel orderItem = new OrderItemModel(order, item.productId(), snapshot, item.quantity());
+            order.addItem(orderItem);
+        }
+
+        return orderRepository.save(order).getId();
+    }
+
     @Transactional(readOnly = true)
     public List<OrderModel> getOrders(Long userId) {
         return orderRepository.findAllByUserId(userId);
