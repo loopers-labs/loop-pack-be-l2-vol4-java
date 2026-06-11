@@ -1,8 +1,10 @@
 package com.loopers.infrastructure.order;
 
+import com.loopers.domain.order.OrderSnapshot;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.infrastructure.BaseJpaEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -23,11 +25,16 @@ public class OrderJpaEntity extends BaseJpaEntity {
     @Column(name = "status", nullable = false)
     private OrderStatus status;
 
+    @Convert(converter = OrderSnapshotConverter.class)
+    @Column(name = "snapshot", columnDefinition = "TEXT", nullable = false)
+    private OrderSnapshot snapshot;
+
     protected OrderJpaEntity() {}
 
-    OrderJpaEntity(Long id, Long userId, OrderStatus status, ZonedDateTime deletedAt) {
+    OrderJpaEntity(Long id, Long userId, OrderStatus status, OrderSnapshot snapshot, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.userId = userId;
         this.status = status;
+        this.snapshot = snapshot;
     }
 }

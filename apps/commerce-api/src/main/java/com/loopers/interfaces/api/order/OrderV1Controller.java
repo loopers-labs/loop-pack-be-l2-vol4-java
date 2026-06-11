@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.order;
 
-import com.loopers.application.order.OrderFacade;
+import com.loopers.application.order.OrderApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.interfaces.auth.LoginUser;
@@ -21,7 +21,7 @@ import java.time.ZonedDateTime;
 @RequestMapping("/api/v1/orders")
 public class OrderV1Controller implements OrderV1ApiSpec {
 
-    private final OrderFacade orderFacade;
+    private final OrderApplicationService orderApplicationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -31,7 +31,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     ) {
         return ApiResponse.success(
                 OrderV1Dto.CreateOrderResponse.from(
-                        orderFacade.createOrder(userId, request.toCommands())
+                        orderApplicationService.createOrder(userId, request.toCommands(), request.couponId())
                 )
         );
     }
@@ -50,7 +50,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
         ZonedDateTime endDateTime = endAt != null ? endAt.atTime(LocalTime.MAX).atZone(KST) : null;
         return ApiResponse.success(
                 PageResult.from(
-                        orderFacade.getOrders(userId, startDateTime, endDateTime, PageRequest.of(page, size))
+                        orderApplicationService.getOrders(userId, startDateTime, endDateTime, PageRequest.of(page, size))
                                 .map(OrderV1Dto.OrderResponse::from)
                 )
         );
@@ -62,7 +62,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @LoginUser Long userId
     ) {
         return ApiResponse.success(
-                OrderV1Dto.OrderResponse.from(orderFacade.getOrder(userId, orderId))
+                OrderV1Dto.OrderResponse.from(orderApplicationService.getOrder(userId, orderId))
         );
     }
 }

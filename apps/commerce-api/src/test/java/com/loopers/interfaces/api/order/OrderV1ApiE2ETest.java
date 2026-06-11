@@ -1,12 +1,15 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.brand.BrandFacade;
-import com.loopers.application.brand.BrandInfo;
-import com.loopers.application.order.OrderFacade;
-import com.loopers.application.order.OrderItemCommand;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.order.OrderSnapshot;
+import com.loopers.domain.order.OrderSnapshotItem;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.user.UserService;
+import com.loopers.infrastructure.order.OrderJpaRepository;
+import com.loopers.infrastructure.order.OrderMapper;
+import com.loopers.domain.order.OrderEntity;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -36,7 +39,7 @@ class OrderV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandFacade brandFacade;
     private final ProductFacade productFacade;
-    private final OrderFacade orderFacade;
+    private final OrderJpaRepository orderJpaRepository;
     private final UserService userService;
     private final DatabaseCleanUp databaseCleanUp;
 
@@ -45,14 +48,14 @@ class OrderV1ApiE2ETest {
             TestRestTemplate testRestTemplate,
             BrandFacade brandFacade,
             ProductFacade productFacade,
-            OrderFacade orderFacade,
+            OrderJpaRepository orderJpaRepository,
             UserService userService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandFacade = brandFacade;
         this.productFacade = productFacade;
-        this.orderFacade = orderFacade;
+        this.orderJpaRepository = orderJpaRepository;
         this.userService = userService;
         this.databaseCleanUp = databaseCleanUp;
     }
@@ -68,8 +71,18 @@ class OrderV1ApiE2ETest {
     }
 
     private ProductInfo createProduct(int quantity) {
-        BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+        var brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
         return productFacade.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, quantity);
+    }
+
+    private Long createOrderDirectly(Long userId, ProductInfo product, int quantity) {
+        long subtotal = product.price() * quantity;
+        OrderSnapshot snapshot = new OrderSnapshot(
+                List.of(new OrderSnapshotItem(product.id(), product.name(), product.price(), quantity, subtotal)),
+                subtotal, 0L, subtotal, null
+        );
+        OrderEntity order = new OrderEntity(userId, snapshot);
+        return orderJpaRepository.save(OrderMapper.toJpaEntity(order)).getId();
     }
 
     private HttpHeaders userHeaders() {
@@ -97,7 +110,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsUnauthorized_whenAuthHeaderIsMissing() {
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(1L, 1))
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(1L, 1)), null
             );
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -116,7 +129,7 @@ class OrderV1ApiE2ETest {
             ProductInfo product = createProduct(10);
 
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(product.id(), 2))
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(product.id(), 2)), null
             );
 
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.CreateOrderResponse>> type =
@@ -135,7 +148,7 @@ class OrderV1ApiE2ETest {
         void returnsBadRequest_whenItemsIsEmpty() {
             createUser();
 
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of());
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(), null);
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -152,7 +165,7 @@ class OrderV1ApiE2ETest {
             createUser();
 
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(999L, 1))
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(999L, 1)), null
             );
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -171,7 +184,7 @@ class OrderV1ApiE2ETest {
             ProductInfo product = createProduct(1);
 
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(product.id(), 5))
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(product.id(), 5)), null
             );
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -197,7 +210,7 @@ class OrderV1ApiE2ETest {
         void returnsOrders_whenRequestIsValid() {
             Long userId = createUser();
             ProductInfo product = createProduct(10);
-            orderFacade.createOrder(userId, List.of(new OrderItemCommand(product.id(), 1)));
+            createOrderDirectly(userId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<PageResult<OrderV1Dto.OrderResponse>>> type =
                     new ParameterizedTypeReference<>() {};
@@ -211,7 +224,7 @@ class OrderV1ApiE2ETest {
             assertThat(response.getBody().data().totalElements()).isEqualTo(1);
             OrderV1Dto.OrderResponse item = response.getBody().data().content().get(0);
             assertThat(item.orderId()).isNotNull();
-            assertThat(item.totalAmount()).isEqualTo(100_000L);
+            assertThat(item.finalAmount()).isEqualTo(100_000L);
         }
 
         @DisplayName("startAt/endAt 날짜 필터로 내 주문 목록을 조회할 수 있다.")
@@ -219,7 +232,7 @@ class OrderV1ApiE2ETest {
         void returnsFilteredOrders_whenDateFilterApplied() {
             Long userId = createUser();
             ProductInfo product = createProduct(10);
-            orderFacade.createOrder(userId, List.of(new OrderItemCommand(product.id(), 1)));
+            createOrderDirectly(userId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<PageResult<OrderV1Dto.OrderResponse>>> type =
                     new ParameterizedTypeReference<>() {};
@@ -247,7 +260,7 @@ class OrderV1ApiE2ETest {
         void returnsOrder_whenRequestIsValid() {
             Long userId = createUser();
             ProductInfo product = createProduct(10);
-            Long orderId = orderFacade.createOrder(userId, List.of(new OrderItemCommand(product.id(), 2))).orderId();
+            Long orderId = createOrderDirectly(userId, product, 2);
 
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type =
                     new ParameterizedTypeReference<>() {};
@@ -259,7 +272,7 @@ class OrderV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().orderId()).isEqualTo(orderId);
-            assertThat(response.getBody().data().totalAmount()).isEqualTo(200_000L);
+            assertThat(response.getBody().data().finalAmount()).isEqualTo(200_000L);
             assertThat(response.getBody().data().items()).hasSize(1);
             assertThat(response.getBody().data().items().get(0).productName()).isEqualTo("에어맥스");
         }
@@ -271,7 +284,7 @@ class OrderV1ApiE2ETest {
             Long otherUserId = userService.signup("otheruser1", "Other1234!", "김철수",
                     LocalDate.of(1990, 5, 15), "other@test.com").getId();
             ProductInfo product = createProduct(10);
-            Long otherOrderId = orderFacade.createOrder(otherUserId, List.of(new OrderItemCommand(product.id(), 1))).orderId();
+            Long otherOrderId = createOrderDirectly(otherUserId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -296,7 +309,7 @@ class OrderV1ApiE2ETest {
         void returnsAllOrders_whenAdminRequestIsValid() {
             Long userId = createUser();
             ProductInfo product = createProduct(10);
-            orderFacade.createOrder(userId, List.of(new OrderItemCommand(product.id(), 1)));
+            createOrderDirectly(userId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<PageResult<OrderV1Dto.AdminOrderResponse>>> type =
                     new ParameterizedTypeReference<>() {};
@@ -326,7 +339,7 @@ class OrderV1ApiE2ETest {
         void returnsOrder_whenAdminRequestIsValid() {
             Long userId = createUser();
             ProductInfo product = createProduct(10);
-            Long orderId = orderFacade.createOrder(userId, List.of(new OrderItemCommand(product.id(), 1))).orderId();
+            Long orderId = createOrderDirectly(userId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.AdminOrderResponse>> type =
                     new ParameterizedTypeReference<>() {};

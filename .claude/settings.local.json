@@ -5,7 +5,13 @@
       "Bash(./gradlew :apps:commerce-api:compileJava)",
       "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.product.ProductFacadeIntegrationTest\")",
       "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.like.LikeFacadeIntegrationTest\")",
-      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.like.LikeV1ApiE2ETest\")"
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.like.LikeV1ApiE2ETest\")",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.coupon.*\")",
+      "Bash(xargs cat *)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.coupon.CouponAdminV1ApiE2ETest\" --info)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.order.OrderV1ApiE2ETest\")",
+      "Bash(xargs ls *)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.order.*\" --tests \"com.loopers.application.order.*\" --tests \"com.loopers.interfaces.api.order.*\" -x jacocoTestReport)"
     ]
   }
 }

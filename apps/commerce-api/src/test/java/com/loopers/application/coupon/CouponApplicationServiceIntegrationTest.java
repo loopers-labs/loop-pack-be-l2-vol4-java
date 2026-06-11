@@ -1,8 +1,6 @@
 package com.loopers.application.coupon;
 
-import com.loopers.application.order.OrderFacade;
 import com.loopers.domain.coupon.CouponStatus;
-import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.user.UserEntity;
 import com.loopers.domain.user.UserService;
@@ -15,7 +13,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
@@ -27,15 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class CouponApplicationServiceIntegrationTest {
-
-    // TODO: Order 도메인 OrderItemJpaVO @Entity 수정 후 제거
-    @MockBean
-    @SuppressWarnings("unused")
-    private OrderFacade orderFacade;
-
-    @MockBean
-    @SuppressWarnings("unused")
-    private OrderItemJpaRepository orderItemJpaRepository;
 
     @Autowired
     private CouponApplicationService couponApplicationService;
