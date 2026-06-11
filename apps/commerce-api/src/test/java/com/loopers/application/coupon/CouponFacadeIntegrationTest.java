@@ -227,5 +227,20 @@ class CouponFacadeIntegrationTest {
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("이미 발급받은 쿠폰을 다시 발급 요청하면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenSameUserIssuesSameCouponAgain() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+            couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
     }
 }
