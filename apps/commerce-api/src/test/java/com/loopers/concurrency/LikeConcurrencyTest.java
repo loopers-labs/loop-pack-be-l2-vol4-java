@@ -109,4 +109,39 @@ class LikeConcurrencyTest {
 
         assertThat(likeReader.countActive(productId)).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("여러 사용자가 좋아요한 상태에서 동시에 취소해도 좋아요 수가 정확히 0으로 반영된다")
+    void givenManyLikedUsers_whenConcurrentCancel_thenCountIsZero() throws InterruptedException {
+        List<Long> userIds = new ArrayList<>();
+        for (int i = 0; i < USERS; i++) {
+            Long userId = signUp(i);
+            likeService.register(userId, productId);
+            userIds.add(userId);
+        }
+        assertThat(likeReader.countActive(productId)).isEqualTo(USERS);
+
+        List<Runnable> tasks = new ArrayList<>();
+        for (Long userId : userIds) {
+            tasks.add(() -> likeService.cancel(userId, productId));
+        }
+        runConcurrently(tasks);
+
+        assertThat(likeReader.countActive(productId)).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("같은 사용자가 같은 상품에 동시에 여러 번 좋아요를 취소해도 좋아요 수는 0으로 안전하게 반영된다")
+    void givenSameUserLiked_whenConcurrentCancel_thenCountedZeroSafely() throws InterruptedException {
+        Long userId = signUp(0);
+        likeService.register(userId, productId);
+
+        List<Runnable> tasks = new ArrayList<>();
+        for (int i = 0; i < USERS; i++) {
+            tasks.add(() -> likeService.cancel(userId, productId));
+        }
+        runConcurrently(tasks);
+
+        assertThat(likeReader.countActive(productId)).isEqualTo(0);
+    }
 }
