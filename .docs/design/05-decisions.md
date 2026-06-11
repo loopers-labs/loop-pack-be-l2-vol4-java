@@ -193,6 +193,7 @@
 - **재고 예약 모델 흐름**: `total`/`reserved`/가용 재고의 관계와 동시성하 오버셀 방지(조건부 UPDATE)를 다시 정리. `release`와 `restore`의 차이("확정 전/후")가 특히 헷갈렸음.
 - **관리자 재고 수정 동시성**: 델타(+/-) 방식 대신 절대값 설정 + `WHERE :newTotal >= reserved` 가드로 불변식을 원자적으로 보장하는 방식 채택.
 - **결제 흐름의 정교화**: 한때 단순화(즉시 차감)했다가, 주문 상태 정교화 필요성을 깨닫고 PG/예약 흐름을 되살린 과정이 있었음.
+- **⑱ 쿠폰 발급 1회 — TOCTOU 레이스 컨디션**: 초기 구현은 `existsByUserIdAndTemplateId`로 중복 여부를 조회한 뒤 INSERT했으나, 동시 요청이 둘 다 `false`를 읽고 동시에 INSERT를 시도하면 DB unique 제약이 걸리기 전에 둘 다 통과 가능(TOCTOU). 애플리케이션 레벨 pre-check를 제거하고 `saveAndFlush` → `DataIntegrityViolationException` catch → 409로 전환해 DB unique constraint 자체를 원자적 방어로 삼음. (`@Repository` 선언이 필수 — JPA 프록시 경계에서 예외 변환이 일어남.)
 
 ---
 
