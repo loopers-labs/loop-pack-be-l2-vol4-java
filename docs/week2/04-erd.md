@@ -8,6 +8,7 @@ erDiagram
     users ||--o{ orders : "주문한다"
     users ||--o{ user_coupons : "발급받는다"
     brands ||--o{ products : "보유한다"
+    products ||--|| inventories : "재고를 가진다"
     products ||--o{ product_likes : "대상이 된다"
     products ||--o{ order_items : "담긴다"
     orders ||--|{ order_items : "포함한다"
@@ -40,9 +41,17 @@ erDiagram
         bigint brand_id FK "NOT NULL"
         varchar(200) name "NOT NULL"
         bigint price "NOT NULL / CHECK >= 0 / 원"
-        int stock_quantity "NOT NULL / CHECK >= 0"
         bigint like_count "NOT NULL / DEFAULT 0 / 좋아요 수 비정규화 카운터"
         timestamp deleted_at "NULL / soft delete"
+        timestamp created_at "NOT NULL"
+        timestamp updated_at "NOT NULL"
+    }
+
+    inventories {
+        bigint id PK
+        bigint product_id UK "NOT NULL / 1:1 상품 ID 참조"
+        int quantity "NOT NULL / CHECK >= 0 / 재고 수량"
+        timestamp deleted_at "NULL"
         timestamp created_at "NOT NULL"
         timestamp updated_at "NOT NULL"
     }
@@ -140,18 +149,33 @@ erDiagram
 | brand_id | BIGINT | FK→brands.id, NOT NULL | 소속 브랜드 |
 | name | VARCHAR(200) | NOT NULL | 상품명 |
 | price | BIGINT | NOT NULL, CHECK (price >= 0) | 판매가(원) |
-| stock_quantity | INTEGER | NOT NULL, CHECK (stock_quantity >= 0) | 재고 수량 |
 | like_count | BIGINT | NOT NULL, DEFAULT 0 | 좋아요 수 비정규화 카운터 (인덱스 `(like_count DESC, id DESC)`) |
 | deleted_at | TIMESTAMP | NULL | 삭제 시각 |
 | created_at | TIMESTAMP | NOT NULL | 생성 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
-**제약** — `stock_quantity`는 `CHECK (stock_quantity >= 0)`로 음수를 막는다. 동시 주문에서의 **초과 판매(oversell) 방지**는 주문 시 대상 상품 행을 **비관적 쓰기 락**(`@Lock(PESSIMISTIC_WRITE)` → `SELECT … FOR UPDATE`)으로 잠근 뒤 차감해 보장한다 — 주문 항목 스냅샷(상품명·단가) 때문에 어차피 상품을 조회하므로, 그 조회에 락을 얹어 `재고 ≥ 수량` 검증과 차감(`Product.decreaseStock` → `Stock.decrease`)을 **락 보유 구간 안에서** 수행한다. 동시 주문은 같은 행 락을 두고 직렬화되어 read-modify-write 간극이 사라지므로, **낙관적 락의 `version` 컬럼이 필요 없다**. 여러 상품을 한 번에 잠그는 `WHERE id IN (...)` FOR UPDATE는 InnoDB가 PK 순서로 행을 잠가 동시 주문들이 같은 순서로 락을 획득하므로, 순환 대기(데드락)가 생기지 않는다.
-> **기법 선택(재고 vs 좋아요)** — 좋아요 수(`like_count`)는 행을 따라가는 고경합 단순 카운터라 조건부/원자 UPDATE를 쓰지만, 재고는 ⓐ 주문 항목 스냅샷 때문에 엔티티를 **어차피 로드**하고 ⓑ 차감 규칙이 도메인(`Product.decreaseStock`)에 있어, 그 로드에 비관 락을 얹는 쪽을 택했다. 대가는 인기 상품 핫 로우에서의 **락 보유·직렬화 시간**이다(저경합이면 무는 비용이 작다).
+> **재고 분리** — 재고는 `products`에서 떼어 별도 애그리거트 `inventories`로 둔다(아래 표). `products` 행은 더 이상 `stock_quantity`를 갖지 않으며, 주문의 비관락은 `products`가 아니라 `inventories` 행을 잠근다.
+
+### 재고 — `inventories`
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| id | BIGINT | PK, IDENTITY | 대리키 |
+| product_id | BIGINT | UNIQUE, NOT NULL | 상품 ID 참조(1:1, 객체 그래프 없음) |
+| quantity | INTEGER | NOT NULL, CHECK (quantity >= 0) | 재고 수량 |
+| deleted_at | TIMESTAMP | NULL | 삭제 시각 |
+| created_at | TIMESTAMP | NOT NULL | 생성 시각 |
+| updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
+
+**제약/동시성** — `quantity`는 `CHECK (quantity >= 0)`로 음수를 막는다. 동시 주문의 **초과 판매(oversell) 방지**는 주문 시 대상 **`inventories` 행을 비관적 쓰기 락**(`@Lock(PESSIMISTIC_WRITE)` → `SELECT … FOR UPDATE`)으로 잠근 뒤 `재고 ≥ 수량` 검증·차감(`Inventory.decrease`)을 **락 보유 구간 안에서** 수행해 보장한다. 동시 주문은 같은 행 락에 직렬화되어 read-modify-write 간극이 사라지므로 **낙관적 락 `version`이 필요 없다**. 여러 상품을 한 번에 잠그는 조회는 `findAllByProductIdInAndDeletedAtIsNullOrderByProductIdAsc`로 **product_id 오름차순** 락을 획득해 순환 대기(데드락)를 피한다.
+> **삭제↔주문 경쟁 차단 (소프트 삭제 cascade)** — 상품 삭제는 `products`뿐 아니라 **그 `inventories` 행도 함께 소프트 삭제**한다(개별 삭제: `deleted_at` set, 브랜드 일괄 삭제: 대상 상품 id 들의 재고를 벌크 소프트 삭제). 삭제의 재고 UPDATE 는 그 행에 쓰기 락을 잡아 주문의 `FOR UPDATE` 와 **같은 행 락에 직렬화**되고, 주문의 락 조회는 `deleted_at IS NULL` 로 필터한다 — 그래서 삭제가 먼저 커밋되면 주문은 그 행을 잠그지 못하고 "재고 없음"으로 거부된다(주문이 먼저면 정상 차감 후 삭제). 재고를 `products`에서 떼어내며 "판매 가능성"의 권위를 `inventories` 행으로 모은 것이라, 주문·삭제가 한 락 도메인에서 만난다(좋아요 카운터는 여전히 `products`에 격리). `inventories` 도 `@DynamicUpdate` 라, 소프트 삭제 시 `deleted_at` 만 UPDATE 해 동시 주문의 `quantity` 차감을 덮어쓰지 않는다.
+> **왜 분리했나 (false sharing 제거)** — 재고(`inventories`)와 좋아요 카운터(`products.like_count`)를 한 행에 두면, 주문의 비관락(트랜잭션 내내 행 보유)과 좋아요의 원자 UPDATE가 **논리적으로 무관한데 같은 물리 행 락을 두고 싸운다**(= false sharing). 실측상 주문 락 보유가 길어질수록 같은 상품의 좋아요 p99가 수 배~수십 배 악화됐다. 재고를 별도 행으로 떼면 두 쓰기의 락 도메인이 분리돼 서로를 막지 않는다. 읽기(상품 상세/목록의 품절·재고)는 `inventories`를 배치 조인하지만 좁은 PK 조인이라 비용은 무시할 수준. 대가는 모델 복잡도(상품 생성 시 재고 행도 함께 생성)다.
+> **기법 선택(재고 vs 좋아요 vs 쿠폰)** — 재고는 ⓐ 차감 규칙이 도메인(`Inventory.decrease`)에 있고 ⓑ oversell이 돈/정합성에 직결돼 **비관 락**(행 직렬화)을, 좋아요 수는 고경합 단순 카운터라 **원자 UPDATE**를, 쿠폰은 저경합이라 **낙관 락(`@Version`)** 을 택했다 — 경합 정도와 연산 성격이 달라 기법을 달리한 것이다.
 
 **좋아요 수(`like_count`) — 비정규화 카운터** — 좋아요 수의 진실은 `product_likes` 행이지만, 좋아요순 정렬을 위해 매번 `COUNT` 조인/`GROUP BY`하면 비용이 **O(전체 좋아요 행)** 이라 데이터가 쌓일수록 선형으로 느려진다(측정: 좋아요 100만 행에서 첫 페이지 정렬 ~312ms vs 카운터 ~2ms). 그래서 `like_count`로 **비정규화**해 `(like_count DESC, id DESC)` 인덱스로 O(페이지) 정렬한다. 대가는 **쓰기 동시성 + 행/카운터 정합성** 책임이다:
 - **정합성(멱등)**: 카운터는 행을 따라가는 종속물이므로 행이 **실제로 INSERT/DELETE 됐을 때만**(영향 행 수 == 1) 증감한다 — 등록은 `INSERT IGNORE` affected==1, 취소는 `DELETE` affected==1일 때만. 중복 좋아요로 부풀거나 없는 좋아요 취소로 음수가 되는 것을 막는다.
 - **동시성**: 인기 상품에 다수가 몰리는 **고경합** 카운터라, 증감을 **원자적 UPDATE**(`SET like_count = like_count + 1`, 감소는 `- 1 WHERE like_count > 0`)로 수행해 lost update를 원천 차단한다. 행을 따라가는 고경합 단순 카운터라 낙관적 락은 재시도 폭증으로 부적합하고, 비관 락은 인기 상품에 락 보유가 길어 부적합하다 — 그래서 재고(비관 락)·쿠폰(낙관 락)과 또 다른 결인 원자 UPDATE를 택했다.
+- **원자 UPDATE 보호(`@DynamicUpdate`)**: 같은 행에 *전체 컬럼 UPDATE 대상*(상품 수정/삭제의 name·price·deleted_at)과 *원자 UPDATE 대상*(like_count)이 공존하므로, 상품 수정이 적재 시점의 stale `like_count`를 전체 UPDATE로 되써 동시 좋아요 증감을 덮어쓸 수 있다. `Product` 에 `@DynamicUpdate` 를 두어 변경된 컬럼만 UPDATE 하므로 `like_count` 는 dirty 가 아닌 한 UPDATE 에서 빠진다(재고가 `inventories` 로 분리됐어도 `like_count` 는 정렬 인덱스 때문에 `products` 에 남아야 해서, 분리가 아니라 부분 UPDATE 로 막는다).
 
 ### 좋아요 — `product_likes`
 
