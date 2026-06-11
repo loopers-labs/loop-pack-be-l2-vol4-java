@@ -1,0 +1,93 @@
+### ===== 사전 준비 =====
+### 관리자 API 는 X-Loopers-Ldap 헤더가 필요합니다 (ldap_required 대체).
+
+### ===== 정상 시나리오 =====
+
+### 쿠폰 템플릿 등록 (정률)
+POST {{commerce-api}}/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: admin.user
+
+{
+  "name": "신규가입 10% 할인",
+  "type": "RATE",
+  "value": 10,
+  "minOrderAmount": 10000,
+  "expiredAt": "2026-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 등록 (정액)
+POST {{commerce-api}}/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: admin.user
+
+{
+  "name": "5천원 할인",
+  "type": "FIXED",
+  "value": 5000,
+  "minOrderAmount": null,
+  "expiredAt": "2026-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 목록 조회
+GET {{commerce-api}}/api-admin/v1/coupons?page=0&size=20
+X-Loopers-Ldap: admin.user
+
+### 쿠폰 템플릿 상세 조회
+GET {{commerce-api}}/api-admin/v1/coupons/1
+X-Loopers-Ldap: admin.user
+
+### 쿠폰 템플릿 수정 (기발급 쿠폰에는 영향 없음 — 스냅샷)
+PUT {{commerce-api}}/api-admin/v1/coupons/1
+Content-Type: application/json
+X-Loopers-Ldap: admin.user
+
+{
+  "name": "신규가입 15% 할인",
+  "type": "RATE",
+  "value": 15,
+  "minOrderAmount": 10000,
+  "expiredAt": "2026-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 발급 내역 조회
+GET {{commerce-api}}/api-admin/v1/coupons/1/issues?page=0&size=20
+X-Loopers-Ldap: admin.user
+
+### 쿠폰 템플릿 삭제 (soft delete = 신규 발급 중단, 기발급 쿠폰은 계속 사용 가능)
+DELETE {{commerce-api}}/api-admin/v1/coupons/2
+X-Loopers-Ldap: admin.user
+
+
+### ===== 에러 시나리오 =====
+
+### [401 Unauthorized] 관리자 헤더 없이 호출
+GET {{commerce-api}}/api-admin/v1/coupons
+
+### [400 Bad Request] 지원하지 않는 쿠폰 타입
+POST {{commerce-api}}/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: admin.user
+
+{
+  "name": "이상한 쿠폰",
+  "type": "PERCENT",
+  "value": 10,
+  "expiredAt": "2026-12-31T23:59:59+09:00"
+}
+
+### [400 Bad Request] 정률 할인율 범위 초과 (1~100)
+POST {{commerce-api}}/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: admin.user
+
+{
+  "name": "101% 할인",
+  "type": "RATE",
+  "value": 101,
+  "expiredAt": "2026-12-31T23:59:59+09:00"
+}
+
+### [404 Not Found] 존재하지 않는 템플릿 상세 조회
+GET {{commerce-api}}/api-admin/v1/coupons/99999
+X-Loopers-Ldap: admin.user

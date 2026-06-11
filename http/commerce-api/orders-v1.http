@@ -1,0 +1,94 @@
+### ===== 사전 준비 =====
+### 1) users-v1.http 로 tester01 가입
+### 2) POST /api/v1/brands, POST /api/v1/products 로 상품 준비 (productId = 1 가정)
+### 3) 쿠폰 시나리오는 coupons-admin-v1.http 등록 + coupons-v1.http 발급 선행 (userCouponId = 1 가정)
+
+### ===== 정상 시나리오 =====
+
+### 주문 생성 (쿠폰 미적용 — couponId 생략)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ]
+}
+
+### 주문 생성 (쿠폰 적용 — 응답에 totalAmount/discountAmount/finalAmount 3종 포함)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ],
+  "couponId": 1
+}
+
+### 주문 단건 조회
+GET {{commerce-api}}/api/v1/orders/1
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+
+### ===== 에러 시나리오 =====
+
+### [400 Bad Request] 재고 부족 (수량을 재고보다 크게)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 99999 }
+  ]
+}
+
+### [404 Not Found] 존재하지 않는 상품 주문
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 99999, "quantity": 1 }
+  ]
+}
+
+### [400 Bad Request] 이미 사용된 쿠폰으로 재주문 (위 쿠폰 적용 주문 성공 후 재실행)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ],
+  "couponId": 1
+}
+
+### [404 Not Found] 존재하지 않는 쿠폰으로 주문
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ],
+  "couponId": 99999
+}
+
+### [404 Not Found] 타 유저의 주문 조회 (tester02 가입 후 실행)
+GET {{commerce-api}}/api/v1/orders/1
+X-Loopers-LoginId: tester02
+X-Loopers-LoginPw: Password1!
