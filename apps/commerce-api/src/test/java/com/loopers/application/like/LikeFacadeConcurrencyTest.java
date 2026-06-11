@@ -88,4 +88,78 @@ class LikeFacadeConcurrencyTest {
             () -> assertThat(productJpaRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(100L)
         );
     }
+
+    @DisplayName("이미 좋아요한 서로 다른 100 명이 동시에 좋아요를 취소하면, likes 행이 0 개이고 product 의 like_count 도 정확히 0 이다.")
+    @Test
+    void cancelsAllLikesAndCountsExactlyZero_whenManyUsersUnlikeConcurrently() throws InterruptedException {
+        // given
+        int userCount = 100;
+        for (long i = 1; i <= userCount; i++) {
+            likeFacade.like(i, productId);
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(userCount);
+        CountDownLatch done = new CountDownLatch(userCount);
+
+        // when
+        for (long i = 1; i <= userCount; i++) {
+            final long userId = i;
+            executor.submit(() -> {
+                try {
+                    likeFacade.unlike(userId, productId);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        done.await(30, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // then
+        assertAll(
+            () -> assertThat(likeJpaRepository.count()).isEqualTo(0L),
+            () -> assertThat(productJpaRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo(0L)
+        );
+    }
+
+    @DisplayName("새로운 k 명의 좋아요와 미리 좋아요한 k 명의 취소가 동시에 일어나도, 증감이 정확히 상쇄되어 likes 행과 like_count 가 정확히 k 이다.")
+    @Test
+    void keepsCountConsistent_whenLikesAndUnlikesRunConcurrently() throws InterruptedException {
+        // given
+        int k = 50;
+        // 1..k 는 미리 좋아요(동시 취소 대상), k+1..2k 는 새로 좋아요(동시 추가 대상)
+        for (long i = 1; i <= k; i++) {
+            likeFacade.like(i, productId);
+        }
+        int threadCount = 2 * k;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch done = new CountDownLatch(threadCount);
+
+        // when
+        for (long i = 1; i <= k; i++) {
+            final long unlikeUserId = i;
+            final long likeUserId = k + i;
+            executor.submit(() -> {
+                try {
+                    likeFacade.unlike(unlikeUserId, productId);
+                } finally {
+                    done.countDown();
+                }
+            });
+            executor.submit(() -> {
+                try {
+                    likeFacade.like(likeUserId, productId);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        done.await(30, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // then
+        assertAll(
+            () -> assertThat(likeJpaRepository.count()).isEqualTo((long) k),
+            () -> assertThat(productJpaRepository.findById(productId).orElseThrow().getLikeCount()).isEqualTo((long) k)
+        );
+    }
 }
