@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -65,7 +66,9 @@ public class OrderFacade {
             discountAmount = template.calculateDiscountAmount(originalPrice);
         }
 
-        orderItems.forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
+        orderItems.stream()
+                .sorted(Comparator.comparingLong(OrderItemDto::productId))
+                .forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
 
         OrderModel saved = orderService.create(user.getId(), itemDataList, discountAmount);
         return OrderInfo.from(saved);

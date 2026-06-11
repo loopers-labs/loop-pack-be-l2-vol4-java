@@ -157,6 +157,65 @@ class OrderConcurrencyIntegrationTest {
     @Nested
     class StockConcurrency {
 
+        @DisplayName("여러 상품 주문 순서가 요청마다 달라도, 데드락 없이 모든 주문이 처리된다.")
+        @Test
+        void doesNotDeadlock_whenConcurrentOrdersHaveReversedItemOrder() throws InterruptedException {
+            // given
+            BrandModel brand = brandRepository.save(new BrandModel("브랜드"));
+            ProductModel productA = productRepository.save(new ProductModel(brand.getId(), "상품A", BigDecimal.valueOf(10000)));
+            ProductModel productB = productRepository.save(new ProductModel(brand.getId(), "상품B", BigDecimal.valueOf(5000)));
+            saveStock(productA.getId(), (long) THREAD_COUNT);
+            saveStock(productB.getId(), (long) THREAD_COUNT);
+
+            Long idA = productA.getId();
+            Long idB = productB.getId();
+
+            List<String> loginIds = new ArrayList<>();
+            for (int i = 0; i < THREAD_COUNT; i++) {
+                String loginId = String.format("deadlock%02d", i);
+                userRepository.save(new UserModel(
+                        loginId, LOGIN_PW, "유저" + i, "1990-01-01",
+                        "deadlock" + i + "@example.com", Gender.MALE, passwordEncryptor));
+                loginIds.add(loginId);
+            }
+
+            // when - 절반은 A→B, 나머지 절반은 B→A 순서로 요청하여 락 순서 충돌 유발
+            CountDownLatch startGate = new CountDownLatch(1);
+            CountDownLatch done = new CountDownLatch(THREAD_COUNT);
+            ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            for (int i = 0; i < THREAD_COUNT; i++) {
+                final String loginId = loginIds.get(i);
+                final List<OrderFacade.OrderItemDto> items = (i % 2 == 0)
+                        ? List.of(new OrderFacade.OrderItemDto(idA, 1L), new OrderFacade.OrderItemDto(idB, 1L))
+                        : List.of(new OrderFacade.OrderItemDto(idB, 1L), new OrderFacade.OrderItemDto(idA, 1L));
+                executor.submit(() -> {
+                    try {
+                        startGate.await();
+                        orderFacade.createOrder(loginId, LOGIN_PW, items, null);
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            startGate.countDown();
+            done.await();
+            executor.shutdown();
+
+            // then - 데드락 없이 재고 수만큼 주문 성공, 재고는 0
+            StockModel stockA = stockRepository.findByProductId(idA).orElseThrow();
+            StockModel stockB = stockRepository.findByProductId(idB).orElseThrow();
+            assertAll(
+                    () -> assertThat(successCount.get()).isEqualTo(THREAD_COUNT),
+                    () -> assertThat(stockA.getQuantity()).isEqualTo(0L),
+                    () -> assertThat(stockB.getQuantity()).isEqualTo(0L)
+            );
+        }
+
         @DisplayName("동일한 상품에 동시 주문이 재고보다 많이 들어와도, 재고는 음수가 되지 않고 정상 차감된다.")
         @Test
         void doesNotOversellStock_whenConcurrentOrdersExceedStock() throws InterruptedException {
