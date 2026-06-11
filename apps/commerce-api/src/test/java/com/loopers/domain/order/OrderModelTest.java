@@ -85,6 +85,53 @@ class OrderModelTest {
         }
     }
 
+    @DisplayName("금액 스냅샷을 기록할 때, ")
+    @Nested
+    class Amounts {
+
+        @DisplayName("할인 금액을 받으면 총액/할인/최종 금액 3종이 기록된다.")
+        @Test
+        void recordsAmounts_withDiscount() {
+            // act
+            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2)), Money.of(500L), 42L);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getTotalAmount()).isEqualTo(2000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(500L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(1500L),
+                () -> assertThat(order.getUserCouponId()).isEqualTo(42L)
+            );
+        }
+
+        @DisplayName("할인이 총액을 초과하면, 할인은 총액을 상한으로 하고 최종 금액은 0 원이다.")
+        @Test
+        void capsDiscountAtTotal() {
+            // act
+            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 1)), Money.of(5000L), 42L);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(1000L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(0L)
+            );
+        }
+
+        @DisplayName("쿠폰 없이 생성하면, 할인 0 원에 최종 금액은 총액과 같다.")
+        @Test
+        void noCoupon_meansZeroDiscount() {
+            // act
+            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2)));
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(0L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(2000L),
+                () -> assertThat(order.getUserCouponId()).isNull()
+            );
+        }
+    }
+
     @DisplayName("주문 소유자를 확인할 때, ")
     @Nested
     class IsOwnedBy {

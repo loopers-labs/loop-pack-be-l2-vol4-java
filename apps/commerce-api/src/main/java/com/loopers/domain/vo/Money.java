@@ -43,6 +43,16 @@ public final class Money {
         return new Money(addExact(this.amount, other.amount));
     }
 
+    public Money minus(Money other) {
+        if (other == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "뺄 금액이 없습니다.");
+        }
+        if (this.amount < other.amount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "금액은 음수가 될 수 없습니다.");
+        }
+        return new Money(this.amount - other.amount);
+    }
+
     public Money times(Quantity quantity) {
         if (quantity == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "곱할 수량이 없습니다.");

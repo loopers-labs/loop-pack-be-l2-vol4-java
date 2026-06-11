@@ -1,5 +1,9 @@
 package com.loopers.domain.order;
 
+import com.loopers.domain.coupon.CouponSnapshot;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -7,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -119,6 +124,86 @@ class OrderServiceTest {
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("쿠폰과 함께 주문을 조립할 때, ")
+    @Nested
+    class PlaceWithCoupon {
+
+        private static final ZonedDateTime NOW = ZonedDateTime.now();
+
+        private UserCoupon fixedCoupon(long discountValue) {
+            CouponSnapshot snapshot = new CouponSnapshot("정액 할인", CouponType.FIXED, discountValue, null);
+            return new UserCoupon(USER_ID, 10L, snapshot, NOW, NOW.plusDays(30));
+        }
+
+        @DisplayName("쿠폰을 사용 처리하고 할인이 반영된 주문을 조립한다.")
+        @Test
+        void usesCouponAndAppliesDiscount() {
+            // arrange
+            ProductModel product = product("에어맥스", 10000L, 10);
+            UserCoupon userCoupon = fixedCoupon(5000L);
+
+            // act
+            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)), userCoupon, NOW);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getTotalAmount()).isEqualTo(20000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(5000L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(15000L),
+                () -> assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.USED),
+                () -> assertThat(product.getStock()).isEqualTo(8)
+            );
+        }
+
+        @DisplayName("이미 사용된 쿠폰이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throws_whenCouponAlreadyUsed() {
+            // arrange
+            ProductModel product = product("에어맥스", 10000L, 10);
+            UserCoupon userCoupon = fixedCoupon(5000L);
+            userCoupon.use(USER_ID, NOW);
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> orderService.place(USER_ID, List.of(new OrderLine(product, 2)), userCoupon, NOW));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("타 유저의 쿠폰이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throws_whenNotOwner() {
+            // arrange
+            ProductModel product = product("에어맥스", 10000L, 10);
+            CouponSnapshot snapshot = new CouponSnapshot("정액 할인", CouponType.FIXED, 5000L, null);
+            UserCoupon othersCoupon = new UserCoupon(999L, 10L, snapshot, NOW, NOW.plusDays(30));
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> orderService.place(USER_ID, List.of(new OrderLine(product, 2)), othersCoupon, NOW));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("쿠폰이 null 이면 할인 없이 조립한다.")
+        @Test
+        void assemblesWithoutDiscount_whenCouponNull() {
+            // arrange
+            ProductModel product = product("에어맥스", 10000L, 10);
+
+            // act
+            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 1)), null, NOW);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(0L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(10000L)
+            );
         }
     }
 }

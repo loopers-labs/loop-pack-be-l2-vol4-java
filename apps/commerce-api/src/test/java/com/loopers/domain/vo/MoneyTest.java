@@ -115,6 +115,52 @@ class MoneyTest {
         }
     }
 
+    @DisplayName("금액을 뺄 때, ")
+    @Nested
+    class Minus {
+
+        @DisplayName("두 금액의 차를 가진 새 Money 를 반환한다.")
+        @Test
+        void returnsDifference() {
+            // act
+            Money result = Money.of(5000L).minus(Money.of(2000L));
+
+            // assert
+            assertThat(result.getAmount()).isEqualTo(3000L);
+        }
+
+        @DisplayName("같은 금액을 빼면, ZERO 와 동치인 Money 를 반환한다. (경계값)")
+        @Test
+        void returnsZero_whenSameAmount() {
+            // act
+            Money result = Money.of(1000L).minus(Money.of(1000L));
+
+            // assert
+            assertThat(result).isEqualTo(Money.ZERO);
+        }
+
+        @DisplayName("결과가 음수면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenResultNegative() {
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> Money.of(1000L).minus(Money.of(2000L)));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("뺄 금액이 null 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenOtherIsNull() {
+            // act
+            CoreException ex = assertThrows(CoreException.class, () -> Money.of(1000L).minus(null));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
     @DisplayName("금액에 수량을 곱할 때, ")
     @Nested
     class Times {
