@@ -1,6 +1,7 @@
 package com.loopers.domain.coupon;
 
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
+import com.loopers.domain.coupon.policy.RateCouponDiscountPolicy;
 import com.loopers.domain.coupon.vo.CouponDiscount;
 import com.loopers.domain.coupon.vo.CouponMoney;
 import com.loopers.support.error.CoreException;
@@ -22,6 +23,7 @@ class UserCouponTest {
     private static final ZonedDateTime USED_AT = ZonedDateTime.parse("2026-05-31T12:00:00+09:00");
     private static final ZonedDateTime NOW = ZonedDateTime.parse("2026-06-01T12:00:00+09:00");
     private static final FixedCouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
+    private static final RateCouponDiscountPolicy RATE_POLICY = new RateCouponDiscountPolicy();
 
     @DisplayName("사용자 ID와 쿠폰 템플릿이 주어지면, 발급 당시 쿠폰 조건을 스냅샷으로 가진 유저 쿠폰을 발급한다.")
     @Test
@@ -198,6 +200,64 @@ class UserCouponTest {
 
         // assert
         assertThat(discount.amount().value()).isEqualTo(2_000L);
+    }
+
+    @DisplayName("정액 할인 금액이 주문 금액보다 크면, 할인 금액을 주문 금액으로 제한한다.")
+    @Test
+    void limitsDiscountToOrderAmount_whenFixedDiscountIsGreaterThanOrderAmount() {
+        // arrange
+        CouponTemplate couponTemplate = CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.FIXED,
+            2_000L,
+            null,
+            EXPIRED_AT,
+            FIXED_POLICY
+        );
+        UserCoupon userCoupon = UserCoupon.issue(1L, COUPON_TEMPLATE_ID, couponTemplate);
+        CouponMoney orderAmount = CouponMoney.of(1_000L);
+
+        // act
+        CouponDiscount discount = userCoupon.apply(orderAmount, NOW, FIXED_POLICY);
+
+        // assert
+        assertThat(discount.amount()).isEqualTo(orderAmount);
+    }
+
+    @DisplayName("정률 쿠폰을 적용하면, 원 단위 미만을 절사한 할인 금액을 계산한다.")
+    @Test
+    void appliesRateDiscountWithFlooring_whenOrderAmountIsEligible() {
+        // arrange
+        CouponTemplate couponTemplate = CouponTemplate.create(
+            COUPON_NAME,
+            CouponType.RATE,
+            10L,
+            10_000L,
+            EXPIRED_AT,
+            RATE_POLICY
+        );
+        UserCoupon userCoupon = UserCoupon.issue(1L, COUPON_TEMPLATE_ID, couponTemplate);
+        CouponMoney orderAmount = CouponMoney.of(12_345L);
+
+        // act
+        CouponDiscount discount = userCoupon.apply(orderAmount, NOW, RATE_POLICY);
+
+        // assert
+        assertThat(discount.amount().value()).isEqualTo(1_234L);
+    }
+
+    @DisplayName("주문 금액이 없으면, BAD_REQUEST 예외를 던진다.")
+    @Test
+    void throwsBadRequest_whenOrderAmountIsNull() {
+        // arrange
+        UserCoupon userCoupon = issueCoupon(1L);
+        CouponMoney orderAmount = null;
+
+        // act & assert
+        assertThatThrownBy(() -> userCoupon.apply(orderAmount, NOW, FIXED_POLICY))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
     }
 
     @DisplayName("주문 금액이 최소 주문 금액보다 작은 쿠폰을 적용하면, CONFLICT 예외를 던진다.")

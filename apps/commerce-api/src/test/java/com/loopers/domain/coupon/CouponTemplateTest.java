@@ -3,8 +3,6 @@ package com.loopers.domain.coupon;
 import com.loopers.domain.coupon.policy.CouponDiscountPolicy;
 import com.loopers.domain.coupon.policy.FixedCouponDiscountPolicy;
 import com.loopers.domain.coupon.policy.RateCouponDiscountPolicy;
-import com.loopers.domain.coupon.vo.CouponDiscount;
-import com.loopers.domain.coupon.vo.CouponMoney;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -20,115 +18,8 @@ class CouponTemplateTest {
 
     private static final String COUPON_NAME = "1주년 쿠폰";
     private static final ZonedDateTime EXPIRED_AT = ZonedDateTime.parse("2026-12-31T23:59:59+09:00");
-    private static final ZonedDateTime NOW = ZonedDateTime.parse("2026-05-31T12:00:00+09:00");
     private static final CouponDiscountPolicy FIXED_POLICY = new FixedCouponDiscountPolicy();
     private static final CouponDiscountPolicy RATE_POLICY = new RateCouponDiscountPolicy();
-
-    @DisplayName("정액 쿠폰을 적용하면, 주문 금액에서 정액 할인 금액을 차감한다.")
-    @Test
-    void appliesFixedDiscount_whenOrderAmountIsEligible() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.FIXED,
-            2_000L,
-            10_000L,
-            EXPIRED_AT,
-            FIXED_POLICY
-        );
-        CouponMoney orderAmount = CouponMoney.of(12_000L);
-
-        // act
-        CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, FIXED_POLICY);
-
-        // assert
-        assertThat(discount.amount().value()).isEqualTo(2_000L);
-    }
-
-    @DisplayName("정액 할인 금액이 주문 금액보다 크면, 최종 결제 금액을 0원으로 제한한다.")
-    @Test
-    void limitsFinalAmountToZero_whenFixedDiscountIsGreaterThanOrderAmount() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.FIXED,
-            2_000L,
-            null,
-            EXPIRED_AT,
-            FIXED_POLICY
-        );
-        CouponMoney orderAmount = CouponMoney.of(1_000L);
-
-        // act
-        CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, FIXED_POLICY);
-
-        // assert
-        assertThat(discount.amount()).isEqualTo(orderAmount);
-    }
-
-    @DisplayName("정률 쿠폰을 적용하면, 원 단위 미만을 절사한 할인 금액을 차감한다.")
-    @Test
-    void appliesRateDiscountWithFlooring_whenOrderAmountIsEligible() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.RATE,
-            10L,
-            10_000L,
-            EXPIRED_AT,
-            RATE_POLICY
-        );
-        CouponMoney orderAmount = CouponMoney.of(12_345L);
-
-        // act
-        CouponDiscount discount = couponTemplate.apply(orderAmount, NOW, RATE_POLICY);
-
-        // assert
-        assertThat(discount.amount().value()).isEqualTo(1_234L);
-    }
-
-    @DisplayName("주문 금액이 최소 주문 금액보다 작으면, CONFLICT 예외를 던진다.")
-    @Test
-    void throwsConflict_whenOrderAmountIsLessThanMinimum() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.FIXED,
-            2_000L,
-            10_000L,
-            EXPIRED_AT,
-            FIXED_POLICY
-        );
-        CouponMoney orderAmount = CouponMoney.of(9_999L);
-
-        // act & assert
-        assertThatThrownBy(() -> couponTemplate.apply(orderAmount, NOW, FIXED_POLICY))
-            .isInstanceOf(CoreException.class)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.CONFLICT);
-    }
-
-    @DisplayName("만료된 쿠폰을 적용하면, CONFLICT 예외를 던진다.")
-    @Test
-    void throwsConflict_whenCouponIsExpired() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.FIXED,
-            2_000L,
-            10_000L,
-            EXPIRED_AT,
-            FIXED_POLICY
-        );
-        ZonedDateTime now = ZonedDateTime.parse("2027-01-01T00:00:00+09:00");
-        CouponMoney orderAmount = CouponMoney.of(12_000L);
-
-        // act & assert
-        assertThatThrownBy(() -> couponTemplate.apply(orderAmount, now, FIXED_POLICY))
-            .isInstanceOf(CoreException.class)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.CONFLICT);
-    }
 
     @DisplayName("만료된 쿠폰은 발급할 수 없으므로, CONFLICT 예외를 던진다.")
     @Test
@@ -231,27 +122,6 @@ class CouponTemplateTest {
             EXPIRED_AT,
             FIXED_POLICY
         ))
-            .isInstanceOf(CoreException.class)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.BAD_REQUEST);
-    }
-
-    @DisplayName("주문 금액이 없으면, BAD_REQUEST 예외를 던진다.")
-    @Test
-    void throwsBadRequest_whenOrderAmountIsNull() {
-        // arrange
-        CouponTemplate couponTemplate = CouponTemplate.create(
-            COUPON_NAME,
-            CouponType.FIXED,
-            2_000L,
-            10_000L,
-            EXPIRED_AT,
-            FIXED_POLICY
-        );
-        CouponMoney orderAmount = null;
-
-        // act & assert
-        assertThatThrownBy(() -> couponTemplate.apply(orderAmount, NOW, FIXED_POLICY))
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);

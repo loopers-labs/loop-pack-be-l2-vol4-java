@@ -125,23 +125,6 @@ public class UserCoupon extends BaseEntity {
         return name.value();
     }
 
-    public boolean isIssuedTo(Long userId) {
-        return owner.isSameUser(userId);
-    }
-
-    public boolean isAvailable() {
-        return status == UserCouponStatus.AVAILABLE;
-    }
-
-    public boolean canBeUsedBy(Long userId) {
-        return isIssuedTo(userId) && isAvailable();
-    }
-
-    public boolean canApplyTo(CouponMoney orderAmount, ZonedDateTime now) {
-        validateOrderAmount(orderAmount);
-        return !isExpiredAt(now) && satisfiesMinimumOrderAmount(orderAmount);
-    }
-
     public void checkUsableBy(Long userId) {
         validateOwner(userId);
         validateAvailable();
