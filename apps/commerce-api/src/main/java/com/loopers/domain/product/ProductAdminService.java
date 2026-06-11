@@ -27,7 +27,6 @@ public class ProductAdminService {
         return productRepository.save(product).getId();
     }
 
-    @Transactional
     public void updateProduct(Long id, String name, BigDecimal price) {
         ProductModel product = productRepository.findById(id)
                 .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));
@@ -35,7 +34,6 @@ public class ProductAdminService {
         productRepository.save(product);
     }
 
-    @Transactional
     public void deleteProduct(Long id) {
         ProductModel product = productRepository.findById(id)
                 .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));

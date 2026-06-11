@@ -18,12 +18,10 @@ public class ProductAdminFacade {
         return productAdminService.registerProduct(brandId, name, price, initialStock);
     }
 
-    @Transactional
     public void updateProduct(Long id, String name, BigDecimal price) {
         productAdminService.updateProduct(id, name, price);
     }
 
-    @Transactional
     public void deleteProduct(Long id) {
         productAdminService.deleteProduct(id);
     }

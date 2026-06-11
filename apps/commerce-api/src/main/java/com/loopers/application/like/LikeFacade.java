@@ -5,7 +5,6 @@ import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -15,7 +14,6 @@ public class LikeFacade {
     private final LikeService likeService;
     private final ProductService productService;
 
-    @Transactional
     public void addLike(Long userId, Long productId) {
         // 1. 상품 존재 여부 조회 (일반 SELECT)
         productService.getProduct(productId);
@@ -29,7 +27,6 @@ public class LikeFacade {
         likeService.addLikeRecord(userId, productId);
     }
 
-    @Transactional
     public void removeLike(Long userId, Long productId) {
         // 1. 상품 존재 여부 조회 (일반 SELECT)
         productService.getProduct(productId);

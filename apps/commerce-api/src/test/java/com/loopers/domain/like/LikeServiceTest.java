@@ -50,7 +50,7 @@ class LikeServiceTest {
         likeService.removeLikeRecord(userId, productId);
 
         // then
-        verify(likeRepository).deleteByUserIdAndProductId(userId, productId);
+        verify(likeRepository).delete(any(ProductLikeModel.class));
     }
 
     @Test

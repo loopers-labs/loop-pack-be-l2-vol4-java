@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -16,7 +15,6 @@ public class CouponAdminFacade {
 
     private final CouponAdminService couponAdminService;
 
-    @Transactional
     public CouponAdminDto.TemplateResponse registerTemplate(CouponAdminDto.RegisterTemplateRequest request) {
         CouponTemplate template = new CouponTemplate(
                 request.name(),
@@ -40,7 +38,6 @@ public class CouponAdminFacade {
         return templates.map(this::convertToResponse);
     }
 
-    @Transactional
     public CouponAdminDto.TemplateResponse updateTemplate(Long id, CouponAdminDto.UpdateTemplateRequest request) {
         CouponTemplate template = new CouponTemplate(
                 request.name(),
@@ -54,7 +51,6 @@ public class CouponAdminFacade {
         return convertToResponse(updated);
     }
 
-    @Transactional
     public void deleteTemplate(Long id) {
         couponAdminService.deleteTemplate(id);
     }

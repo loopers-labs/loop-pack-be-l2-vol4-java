@@ -2,7 +2,6 @@ package com.loopers.domain.like;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -10,15 +9,14 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
 
-    @Transactional
     public void addLikeRecord(Long userId, Long productId) {
         likeRepository.save(new ProductLikeModel(userId, productId));
     }
 
-    @Transactional
     public boolean removeLikeRecord(Long userId, Long productId) {
-        if (likeRepository.findByUserIdAndProductId(userId, productId).isPresent()) {
-            likeRepository.deleteByUserIdAndProductId(userId, productId);
+        java.util.Optional<ProductLikeModel> like = likeRepository.findByUserIdAndProductId(userId, productId);
+        if (like.isPresent()) {
+            likeRepository.delete(like.get());
             return true;
         }
         return false;

@@ -6,7 +6,6 @@ import com.loopers.domain.coupon.UserCouponInfo;
 import com.loopers.interfaces.api.coupon.CouponV1Dto.UserCouponResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,7 +15,6 @@ public class CouponFacade {
 
     private final CouponService couponService;
 
-    @Transactional
     public CouponIssue issueCoupon(Long userId, Long couponTemplateId) {
         return couponService.issue(userId, couponTemplateId);
     }
