@@ -68,7 +68,7 @@ class OrderFacadeTest {
 
             // act
             OrderInfo result = orderFacade.createOrder("user1", "pw1",
-                List.of(new OrderFacade.OrderRequest(1L, 2)));
+                List.of(new OrderFacade.OrderRequest(1L, 2)), null);
 
             // assert
             assertAll(
@@ -89,7 +89,7 @@ class OrderFacadeTest {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 orderFacade.createOrder("unknown", "pw",
-                    List.of(new OrderFacade.OrderRequest(1L, 1)))
+                    List.of(new OrderFacade.OrderRequest(1L, 1)), null)
             );
 
             // assert
@@ -109,7 +109,7 @@ class OrderFacadeTest {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 orderFacade.createOrder("user1", "pw1",
-                    List.of(new OrderFacade.OrderRequest(999L, 1)))
+                    List.of(new OrderFacade.OrderRequest(999L, 1)), null)
             );
 
             // assert
@@ -131,7 +131,7 @@ class OrderFacadeTest {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
                 orderFacade.createOrder("user1", "pw1",
-                    List.of(new OrderFacade.OrderRequest(1L, 5)))
+                    List.of(new OrderFacade.OrderRequest(1L, 5)), null)
             );
 
             // assert
