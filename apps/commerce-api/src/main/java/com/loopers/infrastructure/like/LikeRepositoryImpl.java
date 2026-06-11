@@ -33,4 +33,9 @@ public class LikeRepositoryImpl implements LikeRepository {
     public Optional<ProductLikeModel> findByUserIdAndProductId(Long userId, Long productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId);
     }
+
+    @Override
+    public int countByProductId(Long productId) {
+        return (int) likeJpaRepository.countByProductId(productId);
+    }
 }

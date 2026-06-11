@@ -8,4 +8,5 @@ public interface LikeRepository {
     void deleteByUserIdAndProductId(Long userId, Long productId);
     List<ProductLikeModel> findAllByUserId(Long userId);
     Optional<ProductLikeModel> findByUserIdAndProductId(Long userId, Long productId);
+    int countByProductId(Long productId);
 }

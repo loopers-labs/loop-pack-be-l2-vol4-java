@@ -15,6 +15,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
+    private final com.loopers.domain.like.LikeRepository likeRepository;
 
     @Transactional(readOnly = true)
     public ProductModel getProduct(Long id) {
@@ -45,13 +46,15 @@ public class ProductService {
         com.loopers.domain.brand.BrandModel brand = brandRepository.findById(product.getBrandId())
                 .orElseThrow(() -> new CoreException(ErrorType.BRAND_NOT_FOUND));
 
+        int realTimeLikeCount = likeRepository.countByProductId(productId);
+
         return new ProductDetail(
                 product.getId(),
                 product.getName(),
                 product.getPrice(),
                 brand.getId(),
                 brand.getName(),
-                product.getLikeCount(),
+                realTimeLikeCount,
                 product.getStock() != null ? product.getStock().getQuantity() : 0
         );
     }
