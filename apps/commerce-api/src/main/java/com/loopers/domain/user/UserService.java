@@ -10,46 +10,67 @@ import java.time.LocalDate;
 
 @RequiredArgsConstructor
 @Component
-@Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordPolicy passwordPolicy;
     private final PasswordHasher passwordHasher;
 
+    public User register(String loginId, String password, String name, LocalDate birth, String email) {
+        boolean loginIdExists = userRepository.existsByLoginId(loginId);
+        User user = signup(loginId, password, name, birth, email, loginIdExists);
+        return userRepository.save(user);
+    }
+
+    public User getMyInfo(String loginId) {
+        return getUser(loginId);
+    }
+
     @Transactional
-    public UserModel signup(String loginId, String password, String name, LocalDate birth, String email) {
-        if (userRepository.existsByLoginId(loginId)) {
+    public void changePassword(String loginId, String oldPassword, String newPassword) {
+        User user = getUser(loginId);
+        changePassword(user, oldPassword, newPassword);
+        userRepository.save(user);
+    }
+
+    public User authenticate(String loginId, String password) {
+        validateCredential(loginId, password);
+        User user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다."));
+        authenticate(user, password);
+        return user;
+    }
+
+    public User signup(
+        String loginId,
+        String password,
+        String name,
+        LocalDate birth,
+        String email,
+        boolean loginIdExists
+    ) {
+        if (loginIdExists) {
             throw new CoreException(ErrorType.CONFLICT, "[loginId = " + loginId + "] 이미 가입된 로그인 ID입니다.");
         }
 
         passwordPolicy.validate(password, birth);
         String passwordHash = passwordHasher.encode(password);
-        UserModel user = new UserModel(loginId, passwordHash, name, birth, email);
-        return userRepository.save(user);
+        return new User(loginId, passwordHash, name, birth, email);
     }
 
-    public UserModel authenticate(String loginId, String password) {
+    public void validateCredential(String loginId, String password) {
         if (loginId == null || loginId.isBlank() || password == null || password.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증 헤더가 누락되었습니다.");
         }
+    }
 
-        UserModel user = userRepository.findByLoginId(loginId)
-            .orElseThrow(() -> new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다."));
+    public void authenticate(User user, String password) {
         if (!passwordHasher.matches(password, user.getPasswordHash())) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "인증에 실패했습니다.");
         }
-        return user;
     }
 
-    public UserModel getByLoginId(String loginId) {
-        return userRepository.findByLoginId(loginId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
-    }
-
-    @Transactional
-    public void changePassword(String loginId, String oldPassword, String newPassword) {
-        UserModel user = getByLoginId(loginId);
+    public void changePassword(User user, String oldPassword, String newPassword) {
         if (oldPassword == null || oldPassword.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "현재 비밀번호가 일치하지 않습니다.");
         }
@@ -62,6 +83,10 @@ public class UserService {
         }
 
         user.changePasswordHash(passwordHasher.encode(newPassword));
-        userRepository.save(user);
+    }
+
+    private User getUser(String loginId) {
+        return userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 회원을 찾을 수 없습니다."));
     }
 }

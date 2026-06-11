@@ -1,225 +1,312 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
+`AGENTS.md` is the primary source of truth. Keep this file aligned with `AGENTS.md`; if the two files conflict, follow `AGENTS.md`.
 
-이 문서는 두 영역으로 나뉜다:
+# Project Agent Instructions
 
-1. **사용자 정의 규칙 (User-Defined Rules)** — 사용자가 직접 작성한 프로젝트 컨벤션·작업 지침. **최우선 적용**한다.
-2. **자동 생성된 프로젝트 개요 (Auto-Generated Project Overview)** — Claude가 `/init`으로 코드베이스를 분석해 작성한 참고 자료. 사실 정보(빌드 명령, 모듈 구조 등)이며, 1번과 충돌 시 1번을 따른다.
+## 기본 작업 원칙
 
----
+이 저장소의 목적은 프로덕션 산출 자체보다 학습과 설계 고민의 기록에 있다.
+작업할 때는 빠르게 정답을 확정하기보다 선택지, 트레이드오프, 판단 근거가 드러나도록 진행한다.
 
-# 1. 사용자 정의 규칙 (User-Defined Rules)
+### 협업 방식
 
-> 이 영역은 사용자가 직접 관리한다. 아래 섹션에 규칙을 추가하라.
+- 구현이나 설계 방향이 열려 있으면 최소 2개 이상의 선택지와 트레이드오프를 먼저 제시한다.
+- 권장안을 제시할 수 있지만, 최종 결정은 사용자가 내린다.
+- 사용자의 명시적 선택 없이 중요한 설계 결정을 코드나 문서에 확정 반영하지 않는다.
+- 자명한 오타 수정, 단순 이동, 단순 포맷 변경은 바로 진행해도 된다.
+- 결과만 말하지 말고 왜 그렇게 판단했는지 함께 설명한다.
 
-<!-- USER_RULES_START -->
+## 핸드코딩 영역 규칙
 
-## 0. 대원칙 (Prime Directive)
+새 기능 구현 시 핵심 구현 1개는 사용자가 직접 작성할 수 있도록 비워두는 것을 기본으로 한다.
 
-**프로젝트 목적은 프로덕션 산출이 아니라 "학습과 고민"이다.** 현업에서 실제로 마주하는 문제를 간접 경험하며 사고력을 기르는 것이 본 저장소의 존재 이유다. Claude는 이 전제를 모든 응답에 반영해야 한다.
+- 구현 전 핸드코딩 후보를 먼저 제안하고 사용자와 합의한다.
+- 보통 도메인 `Service`의 핵심 비즈니스 메서드, 도메인 `Entity`의 상태 전이/불변식 처리, 알고리즘성 코드가 후보가 된다.
+- 합의된 영역에는 아래 표식을 남긴다.
 
-### 협업 모드
-
-1. **선택지 + 트레이드오프 우선** — 어떤 기능을 구현하든 코드부터 쏟아내지 말고, 가능한 접근법(최소 2개) · 각 접근의 장단점 · 학습 관점의 의미를 먼저 제시한다.
-2. **방향성은 제안, 결정은 사용자** — Claude는 추천(권장안) 의견을 명시할 수 있다. 그러나 **최종 결정은 항상 사용자가 내린다.** 사용자의 명시적 선택 없이 방향성 결정 사항을 코드로 옮기지 않는다.
-3. **"왜"를 함께 설명한다** — 결과물보다 그 결정에 이르는 사고 과정·근거가 더 중요하다. 단순 정답 제공이 아니라 사용자가 스스로 판단할 수 있는 재료를 제공한다.
-
-### Claude 행동 체크리스트
-
-- [ ] 구현 요청을 받으면 → **먼저 옵션 비교**, 그다음 사용자 결정 확인 → 그제서야 구현.
-- [ ] 자명한 trivial 작업(오타 수정, 단순 리네이밍 등)은 옵션 없이 바로 진행해도 무방.
-- [ ] 권장안을 낼 때는 "**권장: A** — 이유: …" 형태로 분명히 표기, 단 사용자에게 강요하지 않는다.
-- [ ] 사용자가 내린 결정은 따르되, 학습 관점에서 짚을 가치가 있으면 한 줄 코멘트를 붙인다.
-
-## 1. 핸드코딩 영역 보존 (Hand-Coding Zone)
-
-**기능별로 가장 핵심이 되는 구현 1개는 사용자가 직접 손으로 작성할 수 있도록 비워둔다.** 학습 목적상 직접 짜보는 경험이 가장 큰 이해를 만들기 때문이다.
-
-### 적용 규칙
-
-- 새 기능 구현 시 Claude는 **스캐폴드(주변부)만 작성**한다: 패키지/클래스 골격, 시그니처, DTO 매핑, 어노테이션, 의존성 주입.
-- **핵심 1개**는 비워두고 표식을 남긴다:
-  ```java
-  // TODO(hand-coded): 직접 구현할 영역
-  //   - 의도: <무엇을 해야 하는지 한 줄>
-  //   - 힌트: <필요시 1~2줄, 정답은 적지 말 것>
-  throw new UnsupportedOperationException("hand-coded zone");
-  ```
-- 어디를 비울지 **사용자에게 먼저 제안**하고 합의 후 진행. 보통 후보:
-  - 도메인 `Service`의 핵심 비즈니스 메서드 (계산/검증/상태 전이)
-  - 도메인 `Model`의 핵심 메서드 (불변식·invariant 처리)
-  - 알고리즘성 코드 (정렬·매칭·할인 계산 등)
-- 사용자가 "이번엔 다 채워줘"라고 명시하면 예외적으로 전체 구현 가능.
-
-### Claude 행동 체크리스트 (구현 시)
-
-- [ ] 구현 시작 전, "**핸드코딩 후보: X.Y() 메서드** — 이유: …" 한 줄 제안.
-- [ ] 사용자 합의 후, 해당 지점만 `TODO(hand-coded)` 표식으로 남기고 컴파일은 통과시킨다.
-- [ ] 테스트는 작성하되, 핸드코딩 영역의 테스트는 **빨간 상태(failing)**로 두어 사용자가 구현 후 통과시키도록 한다.
-- [ ] 사용자가 직접 채운 코드를 리뷰 요청하면, 단점 지적 전 **선택의 근거를 먼저 묻는다**.
-
-## 2. 개발 워크플로 — TDD (Red → Green → Refactor)
-
-**현 시점 워크플로는 TDD.** 추후 TLD(Test-Last Development)로 전환할 수 있으며, 그 결정은 사용자가 명시적으로 내린다. Claude는 사용자의 별도 지시가 없는 한 **항상 TDD 사이클로 진행**한다.
-
-### 사이클
-
-| Phase | 핵심 | 절대 규칙 |
-|---|---|---|
-| **🔴 Red** | 요구사항을 만족하는 **실패하는 테스트** 먼저 작성 | 테스트가 처음부터 통과하면 그 테스트가 잘못된 것 → 실패하도록 수정 |
-| **🟢 Green** | Red 테스트를 통과시키는 **최소 코드** 작성 | **오버엔지니어링 금지.** 처음부터 최적화하지 않는다 (모니터링 후 근거를 가지고 개선) |
-| **🔵 Refactor** | 가독성/구조 정리, unused import 제거, 객체지향성 개선 | 모든 테스트 그린 유지. 불필요한 private 함수 지양 |
-
-- **모든 테스트는 3A 패턴**: `// Arrange` → `// Act` → `// Assert` 구조 명시 (주석 또는 빈 줄로 구분).
-- **한 사이클 = 한 기능 단위.** 여러 기능을 한 사이클에 밀어 넣지 않는다.
-- 사이클마다 사용자에게 phase 진입을 보고하고 다음 phase로 넘어갈지 확인한다 (학습 의도상 흐름이 보여야 함).
-
-### 성능 최적화 원칙 — "왜를 겪고 나서 최적화"
-
-- Green phase에서는 **단순/직관적 구현**을 선호한다 (N+1, 단일 트랜잭션, 단일 인덱스 등 그대로).
-- 최적화는 **모니터링/측정으로 문제를 직접 관찰한 뒤** 진행한다 (Prometheus/Grafana, 로그, 부하 테스트 등).
-- Claude는 최적화 옵션과 트레이드오프를 제시할 수 있으나, **선제적으로 적용하지 않는다.**
-
-### Never Do (금지)
-
-- **동작하지 않는 코드**, 의미 없는 Mock 데이터로 채우는 더미 구현 금지. 항상 실제로 돌아가는 코드를 만든다.
-- **null-safety 누락 금지.** Java에서는 `Optional` 활용. 외부 경계값은 명시적 검증.
-- **`System.out.println`/디버그 print 잔존 금지.** 로깅이 필요하면 `log.*` 사용.
-
-### Recommendation (권장)
-
-- **E2E 테스트**: 실제 HTTP 호출로 API 검증 (`MockMvc`/`TestRestTemplate`/Testcontainers).
-- **재사용 가능한 객체 설계**: 도메인 객체는 다른 유스케이스에서도 재활용 가능한 형태로.
-- **성능 최적화 제안 명시**: 측정 기반 개선 시 "현 상태 → 가설 → 검증 → 적용" 순으로 기록.
-- **HTTP 요청 샘플 정리**: 신규 API는 `http/<app>/**.http`에 분류해 추가 (JetBrains HTTP Client 포맷).
-
-### Priority (우선순위)
-
-1. **실제로 동작하는 해결책**만 고려한다.
-2. **null-safety, thread-safety**를 고려한다.
-3. **테스트 가능한 구조**로 설계한다 (의존성 주입, 순수 함수 분리 등).
-4. **기존 코드 패턴**을 먼저 분석하고 일관성을 유지한다 (`product` 패키지가 레퍼런스).
-
-### Claude 행동 체크리스트 (TDD 진행 시)
-
-- [ ] 새 기능 시작 시 "🔴 Red 작성 시작합니다 — 대상 테스트: …" 한 줄 보고.
-- [ ] 테스트 작성 → 실행해서 **실제로 실패**하는지 확인하고 결과 공유.
-- [ ] 사용자 합의 후 🟢 Green 진입, 최소 구현. 다시 실행해서 그린 확인.
-- [ ] 핸드코딩 영역(섹션 1)이 그 사이클의 핵심이라면, Green을 사용자가 채우도록 비우고 테스트만 빨갛게 두기.
-- [ ] 🔵 Refactor 단계는 "리팩토링할 후보들" 목록 먼저 제시 → 사용자 선택 후 적용.
-- [ ] phase 전환 시 항상 테스트 결과(빨강/초록)를 evidence로 보여준다.
-
-<!-- USER_RULES_END -->
-
----
-
-# 2. 자동 생성된 프로젝트 개요 (Auto-Generated Project Overview)
-
-> 아래 내용은 Claude가 `/init` 명령으로 자동 생성했다 (2026-05-10).
-> 코드 변경 시 사실 관계가 어긋날 수 있으므로 주기적 갱신이 필요하다.
-> 사용자 정의 규칙(섹션 1)과 충돌하면 섹션 1을 우선한다.
-
-## Project
-
-Loopers commerce backend template — Spring Boot 3.4.4 / Java 21 / Gradle multi-module monorepo. Korean-language project; PR template, error messages, and inline comments are Korean.
-
-## Commands
-
-Use the wrapper (`./gradlew`). Tests run on JUnit Platform with `spring.profiles.active=test`, `user.timezone=Asia/Seoul`, and `maxParallelForks=1` (forced sequential — do not parallelize tests).
-
-```bash
-# Build everything (skip tests)
-./gradlew build -x test
-
-# Build & test all modules
-./gradlew build
-
-# Test a single module
-./gradlew :apps:commerce-api:test
-
-# Run a single test class / method
-./gradlew :apps:commerce-api:test --tests "com.loopers.interfaces.api.product.ProductV1ControllerTest"
-./gradlew :apps:commerce-api:test --tests "*ProductV1ControllerTest.createProduct_*"
-
-# Run an app locally (default profile is `local`)
-./gradlew :apps:commerce-api:bootRun
-./gradlew :apps:commerce-batch:bootRun
-./gradlew :apps:commerce-streamer:bootRun
-
-# Jacoco coverage report (per module, after test)
-./gradlew :apps:commerce-api:jacocoTestReport
+```java
+// TODO(hand-coded): 직접 구현할 영역
+//   - 의도: <무엇을 해야 하는지 한 줄>
+//   - 힌트: <필요시 1~2줄, 정답은 적지 말 것>
+throw new UnsupportedOperationException("hand-coded zone");
 ```
 
-Local infra is required before `local` profile boots — MySQL, Redis (master + read replica), Kafka, kafka-ui:
+- 사용자가 "이번엔 다 채워줘"라고 명시하면 전체 구현 가능하다.
+- 사용자가 직접 작성한 코드를 리뷰할 때는 단점 지적 전에 선택의 근거를 먼저 확인한다.
+
+## 개발 워크플로 규칙
+
+기능 구현은 별도 지시가 없는 한 TDD 흐름을 따른다.
+
+### TDD 사이클
+
+- 🔴 Red: 요구사항을 만족하는 실패 테스트를 먼저 작성하고 실제 실패를 확인한다.
+- 🟢 Green: 실패 테스트를 통과시키는 최소 구현만 작성한다.
+- 🔵 Refactor: 모든 테스트가 통과한 상태에서 구조와 가독성을 정리한다.
+- 한 사이클은 한 기능 단위로 제한한다.
+- 테스트는 `Arrange`, `Act`, `Assert` 흐름이 드러나도록 작성한다.
+- phase 전환 시 테스트 결과를 근거로 공유한다.
+
+### 구현 우선순위
+
+1. 실제로 동작하는 해결책을 우선한다.
+2. 외부 입력 경계에서는 null-safety와 유효성 검증을 명확히 한다.
+3. 테스트 가능한 구조로 설계한다.
+4. 기존 코드 패턴을 먼저 확인하고 일관성을 유지한다.
+5. 성능 최적화는 측정과 관찰 이후에 적용한다.
+
+### 금지/주의
+
+- 동작하지 않는 더미 구현이나 의미 없는 Mock 데이터로 기능을 채우지 않는다.
+- Java 외부 경계값은 명시적으로 검증하고, 필요한 경우 `Optional`을 활용한다.
+- `System.out.println`이나 디버그 print를 남기지 않는다. 필요하면 `log.*`를 사용한다.
+- 불필요한 private 함수, 과한 추상화, 선제 최적화를 피한다.
+
+## 프로젝트 구조 및 코드 컨벤션
+
+### 주요 명령
+
+항상 Gradle wrapper를 사용한다.
+
+```bash
+./gradlew build -x test
+./gradlew build
+./gradlew :apps:commerce-api:test
+./gradlew :apps:commerce-api:test --tests "com.loopers.xxx.SomeTest"
+./gradlew :apps:commerce-api:jacocoTestReport
+./gradlew :apps:commerce-api:bootRun
+```
+
+테스트는 순차 실행 설정을 유지한다. `maxParallelForks = 1`은 공유 Testcontainers 환경을 고려한 설정이므로 임의로 변경하지 않는다.
+
+### 로컬 인프라
+
+로컬 실행이나 통합 테스트에 외부 인프라가 필요하면 아래 compose를 사용한다.
 
 ```bash
 docker-compose -f ./docker/infra-compose.yml up -d
-docker-compose -f ./docker/monitoring-compose.yml up -d   # Prometheus + Grafana on :3000 (admin/admin)
+docker-compose -f ./docker/monitoring-compose.yml up -d
 ```
 
-MySQL is `loopers` / `application` / `application` on `:3306`. Redis master `:6379`, replica `:6380`. Kafka broker `localhost:19092` (host) / `kafka:9092` (in-network).
+- MySQL: `localhost:3306`, database/user/password는 `loopers` / `application` / `application`
+- Redis: master `localhost:6379`, replica `localhost:6380`
+- Kafka: host `localhost:19092`
+- Grafana: `localhost:3000`, `admin/admin`
 
-## Architecture
+### 모듈 구조
 
-### Module hierarchy (enforced by `build.gradle.kts:75-78,109-111`)
+- `apps/*`는 실행 가능한 Spring Boot 애플리케이션이다. BootJar는 app 모듈에서만 생성한다.
+- `modules/*`는 재사용 가능한 `java-library` 모듈이며 특정 도메인에 의존하지 않는다.
+- `supports/*`는 logging, monitoring, jackson 같은 보조 라이브러리 모듈이다.
+- module/support 설정은 각 모듈의 `*.yml`을 app의 `spring.config.import`로 로딩한다.
+- QueryDSL `Q*` 타입이 필요한 경우 annotation processor는 사용하는 app build file에 둔다.
 
-- `apps/*` — executable Spring Boot apps. **Only** apps produce `BootJar`; libraries produce plain `Jar`. The `apps`, `modules`, `supports` aggregator projects themselves are disabled (no tasks run on them).
-- `modules/*` — `java-library` + `java-test-fixtures`. Reusable Spring configuration; **must not** depend on a specific domain. Each module ships a `*.yml` (e.g. `jpa.yml`, `redis.yml`, `kafka.yml`) loaded via `spring.config.import` from the app's `application.yml`.
-- `supports/*` — add-ons (logging, monitoring, jackson). Same `java-library` shape, also imported via `spring.config.import`.
+### 레이어 구조
 
-App → modules/supports dependency directions:
-- `commerce-api`: jpa, redis, jackson, logging, monitoring (web + actuator + springdoc).
-- `commerce-batch`: jpa, redis, jackson, logging, monitoring (`spring-boot-starter-batch`).
-- `commerce-streamer`: jpa, redis, **kafka**, jackson, logging, monitoring (web + actuator).
+`commerce-api` 패키지는 아래 방향을 따른다.
 
-QueryDSL is wired only in apps (see `apps/*/build.gradle.kts` `annotationProcessor("com.querydsl:querydsl-apt::jakarta")`); modules expose `querydsl-jpa` as `api`. When adding QueryDSL `Q*` types, the annotation processor must be present in the app build file, not the module.
-
-### Layered package convention inside `commerce-api`
-
-Package root: `com.loopers`. Layers (do not cross-import upwards):
-
-```
-interfaces/api/<feature>     ← REST controllers, V1 DTOs, ApiSpec interfaces
-application/<feature>        ← Facades + *Info DTOs (use-case orchestration)
-domain/<feature>             ← *Service, *Model (entity), *Repository (interface)
-infrastructure/<feature>     ← *RepositoryImpl, *JpaRepository (Spring Data)
-support/error                ← CoreException, ErrorType
+```text
+interfaces/api/<feature>
+application/<feature>
+domain/<feature>
+infrastructure/<feature>
+support/error
 ```
 
-Conventions to follow when adding a feature (`product` is the canonical reference):
-- Controllers return `ApiResponse<T>` (`interfaces/api/ApiResponse.java`) — `ApiResponse.success(data)` / `ApiResponse.fail(code, msg)`. Do not return raw entities or `ResponseEntity` from controllers; the global advice handles failures.
-- DTOs live as nested records inside `<Feature>V1Dto` (request + response in one file). Map domain ↔ DTO via static `from(...)` factories.
-- Facades (`@Component`) are thin orchestrators — they call domain services and convert `*Model` → `*Info`. Don't put business rules here.
-- Domain services are `@Component` + `@Transactional(readOnly = true)` by default; use `@Transactional` on writes. Throw `new CoreException(ErrorType.X, "korean message")` for business failures — never throw raw `RuntimeException` from domain.
-- Repositories: define an interface in `domain/<feature>/<X>Repository`; implement in `infrastructure/<feature>/<X>RepositoryImpl` that delegates to a Spring Data `<X>JpaRepository`. The domain layer never imports `org.springframework.data.*`.
+- Controller는 요청/응답 변환과 인증 사용자 전달을 담당하고 `ApiResponse<T>`를 반환한다.
+- DTO는 `<Feature>Dto` 안에 API 행위와 버전 단위로 중첩한다. 예: `UserDto.Register.V1.Request`, `UserDto.Register.V1.Response`.
+- DTO의 응답 변환은 `from(...)` 팩토리로 처리한다.
+- Facade는 얇은 유스케이스 조율자이며 비즈니스 규칙을 직접 갖지 않는다.
+- Domain Service는 도메인의 외부 진입점으로 사용한다.
+- Domain Entity는 상태 변경과 도메인 규칙을 담당하며 JPA annotation을 갖지 않는다.
+- Domain layer는 Spring Data나 infrastructure 구현체에 의존하지 않는다.
+- 비즈니스 예외는 `CoreException(ErrorType.X, "한국어 메시지")`로 표현한다.
 
-### Error handling
+### Repository Adapter 규칙
 
-`ApiControllerAdvice` (`interfaces/api/ApiControllerAdvice.java`) is the **only** place that builds error responses. It maps:
-- `CoreException` → `errorType.status` + Korean `customMessage`.
-- `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, `HttpMessageNotReadableException` (incl. `InvalidFormatException` / `MismatchedInputException`), `ServerWebInputException` → `BAD_REQUEST` with field-aware Korean messages.
-- `NoResourceFoundException` → `NOT_FOUND`. Anything else → `INTERNAL_ERROR` with `log.error`.
+- `domain/<feature>/<X>Repository`는 도메인 포트/interface다.
+- `infrastructure/<feature>/<X>RepositoryImpl`은 도메인 포트 구현체이며 Spring Data Repository에 위임한다.
+- `infrastructure/<feature>/<X>JpaRepository`는 Spring Data JPA 전용 interface다.
+- Domain layer는 `org.springframework.data.*` 타입을 import하지 않는다.
 
-To add a new error class, add an enum constant to `ErrorType` (status + reason-phrase code + Korean default message). Do not invent ad-hoc HTTP responses elsewhere.
+### 레이어별 데이터 객체 네이밍
 
-### Cross-cutting
+상세 기준은 `docs/common/layered-naming-conventions.md`를 따른다.
 
-- Default JVM/app timezone is forced to `Asia/Seoul` in `CommerceApiApplication.@PostConstruct` and as a test JVM arg.
-- `@ConfigurationPropertiesScan` is on the main app class — `@ConfigurationProperties` records are picked up automatically.
-- Profiles: `local` (default), `test`, `dev`, `qa`, `prd`. `springdoc.api-docs.enabled=false` in `prd`. Swagger UI: `/swagger-ui.html`.
-- Logging module ships profile-specific Slack appender configs (`slack-log-{dev,qa,prd}.xml`) and JSON/plain console appenders selected by logback profile.
-- Version: when running outside CI, `version` is set to the short git hash via `getGitHash()` in the root `build.gradle.kts`; do not set `version` manually unless intentionally pinning.
+- `interfaces` 레이어의 API 요청/응답 객체는 `*Dto`를 사용한다.
+  - 예: `ProductDto`, `UserDto.Register.V1.Request`
+- `application` 레이어에서 외부 레이어로 전달하는 유스케이스 정보 객체는 `*Info`를 사용한다.
+  - 예: `ProductInfo`, `OrderInfo`, `AuthenticatedUserInfo`
+- `domain` 레이어에서는 무제한 자유 네이밍을 피하고, 역할이 드러나는 제한된 suffix를 사용한다.
+  - suffix 없음: JPA annotation을 갖지 않는 순수 도메인 엔티티. 예: `Product`, `Brand`, `User`, `Order`
+  - `*Command`: 도메인 동작 입력
+  - `*Criteria`: 조회/필터/페이징 조건
+  - `*Result`: 도메인 동작 결과
+  - `*View`: 조회용 조합 결과 또는 read-only data carrier
+  - `*Failure`: 실패 사유 항목
+  - `*Policy`: 순수 정책
+  - `*Processor`: 순수 처리/조합 로직
+  - `*Service`: 도메인 진입점
+  - `*Reader`: 조회 전용 Repository 접근
+  - `*Writer`: 생성/수정/삭제 Repository 접근
+- JPA 영속화 객체는 infrastructure layer에서 `*JpaEntity`로 둔다.
+  - 예: `ProductJpaEntity`, `BrandJpaEntity`, `UserJpaEntity`, `OrderJpaEntity`
+- 도메인 조회 조합 객체는 `*Dto` 대신 `*View`를 우선 고려한다.
+  - 예: `ProductDetail`보다 `ProductDetailView`
 
-### Tests
+### 도메인 서비스 책임 분리
 
-- Test fixtures published from `modules/jpa` and `modules/redis` (and `modules/kafka` when relevant): `DatabaseCleanUp`, `RedisCleanUp`, `MySqlTestContainersConfig`, `RedisTestContainersConfig`. Apps consume via `testImplementation(testFixtures(project(":modules:jpa")))`.
-- Testcontainers (`mysql`, `redis`, `kafka`) is the integration-test path — `org.testcontainers:junit-jupiter` is on the classpath. Tests assume Docker is running.
-- Stack: JUnit 5, Mockito 5, springmockk 4, instancio-junit 5. Spring Batch tests use `spring-batch-test`.
-- `maxParallelForks = 1` is intentional (shared MySQL/Redis containers). Don't change without coordinating cleanup strategy.
+- API의 진입점은 `*Controller`, Domain의 진입점은 `*Service`로 둔다.
+- `*Service`는 외부에서 도메인 기능에 접근하는 진입점 역할을 우선한다.
+- Repository 접근 책임은 아래 객체로 분리한다.
+  - `*Reader`: 조회 전용 Repository 접근
+  - `*Writer`: 생성/수정/삭제 Repository 접근
+  - `*Policy`, `*Processor`, `*ProcessService`: Repository 없이 순수 규칙 처리
+- 2개 이상의 도메인 객체를 조합하는 순수 객체는 `*CatalogService`처럼 범용적인 이름보다, 조합되는 도메인과 책임이 드러나는 이름을 사용한다.
+  - 예: `ProductBrandProcessService`
+- Facade에서 Repository를 직접 호출하지 않는다. Facade는 Transaction 경계와 유스케이스 호출에 집중한다.
 
-## Repo specifics worth knowing
+### get/find 네이밍 규칙
 
-- PR template (`.github/pull_request_template.md`) is in Korean and expects: 배경 / 목표 / 결과, decision log (alternatives + tradeoffs), and reflection. Fill those sections, not English equivalents.
-- HTTP samples in `http/commerce-api/` are JetBrains HTTP Client format; env vars in `http/http-client.env.json`.
-- `.omc/`, `.codeguide/`, `.claude/` are agent tooling state — generally do not commit changes to them as part of feature work.
+- `get*` 메서드는 결과가 반드시 있어야 하는 조회를 의미한다.
+- `get*` 메서드는 결과가 없으면 해당 메서드 내부에서 예외를 던진다.
+  - 예: `getProduct`, `getBrand`, `getOrder`
+- `find*` 메서드는 결과가 없을 수 있는 조회를 의미한다.
+- `find*` 메서드는 직접 Not Found 예외를 던지지 않고 `Optional`, `null`, 빈 컬렉션 등으로 부재를 표현한다.
+- Java 코드에서는 단건 부재 표현에 `null`보다 `Optional<T>`를 우선 사용한다.
+- 컬렉션 조회는 결과가 없으면 `null`이 아니라 빈 컬렉션을 반환한다.
+
+### 의존 방향 다이어그램 규칙
+
+- Mermaid 구조도의 화살표는 반환 흐름이 아니라 API 유스케이스 호출 흐름, 소스 import 의존, 또는 adapter binding 방향을 표현한다.
+- 양방향 화살표는 순환 참조 또는 다이어그램 표현 오류로 본다.
+- 현재 구조는 순수 4-tier layered architecture가 아니라 DDD + Ports & Adapters 기준으로 본다.
+- API 유스케이스 호출 흐름은 `interfaces -> application -> domain -> repository port -> infrastructure adapter`로 표현한다.
+- 소스 import 의존 방향은 `interfaces -> application -> domain`, `infrastructure -> domain`이다.
+- `domain`은 `infrastructure` 구현체, Spring Data JPA, `*JpaEntity`를 import하지 않는다.
+- `infrastructure`는 domain Repository port 구현과 domain 객체-`*JpaEntity` 매핑을 위해 `domain`을 import할 수 있다.
+- 다이어그램의 `*Repository -> *RepositoryImpl` 화살표는 소스 import가 아니라 port-adapter binding을 의미한다.
+- `interfaces -> domain` 직접 참조는 허용한다.
+
+### 에러 처리
+
+- Error response 생성은 `ApiControllerAdvice`에서만 담당한다.
+- 비즈니스 실패는 `CoreException(ErrorType.X, "한국어 메시지")`로 표현하고, 도메인에서 raw `RuntimeException`을 던지지 않는다.
+- 새 에러 유형이 필요하면 `ErrorType` enum에 status, code, 기본 메시지를 추가한다.
+- Controller나 Facade에서 임의의 `ResponseEntity` 에러 응답을 직접 만들지 않는다.
+
+### 공통 설정
+
+- 기본 timezone은 `Asia/Seoul` 기준으로 본다.
+- profile은 `local`, `test`, `dev`, `qa`, `prd`를 사용한다.
+- Swagger UI 경로는 `/swagger-ui.html`이다.
+- `prd` profile에서는 springdoc API docs가 비활성화된다.
+- CI 밖에서 빌드 version은 root Gradle 설정의 short git hash 기준으로 생성되므로, 의도 없이 수동 지정하지 않는다.
+
+### 테스트와 샘플
+
+- 가능하면 도메인 단위 테스트, 서비스/통합 테스트, API E2E 테스트의 역할을 구분한다.
+- 신규 API를 추가하면 `http/<app>/**.http`에 JetBrains HTTP Client 형식의 요청 샘플을 정리한다.
+- Testcontainers 기반 통합 테스트는 Docker 실행을 전제로 한다.
+- `modules/jpa`, `modules/redis`, 필요 시 `modules/kafka`의 test fixtures를 활용한다.
+- 공유 Testcontainers 환경을 고려해 테스트 병렬 실행 설정을 임의로 바꾸지 않는다.
+
+### 작업 제외 파일
+
+- `.omc/`, `.codeguide/`, `.claude/`는 agent tooling state이므로 일반 기능 작업 커밋에 섞지 않는다.
+- OS 생성 파일(`.DS_Store` 등)은 커밋하지 않는다.
+
+## 커밋 메시지 작성 규칙
+
+커밋 메시지는 Conventional Commit 접두어를 유지하고, 메시지 본문은 한국어로 명확하게 작성한다.
+
+### 형식
+
+```text
+type: 작업 대상 + 명확한 동사
+```
+
+### 원칙
+
+- `type`은 `feat`, `fix`, `docs`, `refactor`, `test`, `chore` 등 기존 커밋 컨벤션을 따른다.
+- 콜론 뒤 메시지는 한국어로 작성한다.
+- 메시지만 보고 어떤 작업인지 알 수 있어야 한다.
+- 단순 명사형보다 작업 대상과 동사가 드러나는 문장을 사용한다.
+- 여러 산출물을 나눠 커밋할 때는 각 커밋이 독립적으로 설명되도록 작성한다.
+
+### 예시
+
+```text
+feat: 주문 생성 기능 구현
+refactor: 장바구니 엔티티 리팩토링
+test: 주문 생성 테스트 코드 추가
+docs: 2주차 요구사항 문서 작성
+docs: 2주차 시퀀스 다이어그램 문서 작성
+docs: 관리자 및 비기능 요구사항 반영
+```
+
+## PR Note 작성 규칙
+
+PR 메시지나 PR 노트 작성을 요청받으면 `obsidian-notes/pr-notes` 하위에 문서로 정리한다.
+기본 포맷은 `obsidian-notes/pr-notes/volume-1-user-pr.md`를 기준으로 맞춘다.
+
+### 파일명
+
+- 형식: `volume-n-작업요약-pr.md`
+- 예시: `volume-2-design-pr.md`
+
+### 문서 구조
+
+```markdown
+---
+date: YYYY-MM-DD
+type: pr-note
+volume: volume-n
+title: 작업 내용 요약
+---
+
+# [volume-n] 작업 내용 요약
+
+## 📌 Summary
+
+- 배경:
+- 목표:
+- 결과:
+
+## 💬 리뷰 포인트
+
+- 과제를 수행하면서 실제로 고민한 방향성/설계/의사결정 수준의 질문을 작성한다.
+- 각 리뷰 포인트는 `- `로 시작하는 bullet 형식으로 작성한다.
+- 리뷰 포인트는 3개 이내로 작성한다.
+- 질문은 구체적으로 작성하고, AI가 자동 생성한 듯한 일반론은 피한다.
+
+## 🧭 Context & Decision
+
+### 문제 정의
+
+- 현재 동작/제약:
+- 문제(또는 리스크):
+- 성공 기준(완료 정의):
+
+### 선택지와 결정
+
+- 고려한 대안:
+  - A:
+  - B:
+- 최종 결정:
+- 트레이드오프:
+- 추후 개선 여지(있다면):
+
+## 🤔 고민한 점 / 막혔던 부분
+
+## 🙋 기타
+```
+
+### 작성 톤
+
+- 커밋/PR 제목은 `[volume-n] 작업 내용 요약` 형식을 따른다.
+- `💬 리뷰 포인트`는 반드시 채운다.
+- 단정적인 표현보다 과제를 수행하며 실제로 고민한 판단 근거와 트레이드오프를 중심으로 작성한다.
+- 부정적인 자기평가보다 설계상 고민과 선택 기준을 드러내는 표현을 사용한다.

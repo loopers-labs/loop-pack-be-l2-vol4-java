@@ -51,7 +51,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsCreatedUserInfo_whenSignupRequestIsValid() {
             // arrange
-            UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+            UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
                 "user1234",
                 "abc123!?",
                 "홍길동",
@@ -60,8 +60,8 @@ class UserV1ApiE2ETest {
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ParameterizedTypeReference<ApiResponse<UserDto.Register.V1.Response>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserDto.Register.V1.Response>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
             // assert
@@ -80,7 +80,7 @@ class UserV1ApiE2ETest {
         @Test
         void throwsConflict_whenLoginIdAlreadyExists() {
             // arrange
-            UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+            UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
                 "user1234",
                 "abc123!?",
                 "홍길동",
@@ -90,8 +90,8 @@ class UserV1ApiE2ETest {
             testRestTemplate.postForEntity(ENDPOINT_SIGNUP, request, String.class);
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ParameterizedTypeReference<ApiResponse<UserDto.Register.V1.Response>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<UserDto.Register.V1.Response>> response =
                 testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST, new HttpEntity<>(request), responseType);
 
             // assert
@@ -105,7 +105,7 @@ class UserV1ApiE2ETest {
         @Test
         void throwsBadRequest_whenSignupRequestIsInvalid() {
             // arrange
-            UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+            UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
                 "abc",
                 "short",
                 "",
@@ -132,7 +132,7 @@ class UserV1ApiE2ETest {
             signup("user1234", "abc123!?", "홍길동");
 
             // act
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ResponseEntity<ApiResponse<UserDto.GetMyInfo.V1.Response>> response =
                 testRestTemplate.exchange(
                     "/api/v1/users/me",
                     HttpMethod.GET,
@@ -188,7 +188,7 @@ class UserV1ApiE2ETest {
         void changesPassword_whenRequestIsValid() {
             // arrange
             signup("user1234", "abc123!?", "홍길동");
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("abc123!?", "new123!?");
+            UserDto.ChangePassword.V1.Request request = new UserDto.ChangePassword.V1.Request("abc123!?", "new123!?");
 
             // act
             ResponseEntity<ApiResponse<Void>> changePasswordResponse =
@@ -207,7 +207,7 @@ class UserV1ApiE2ETest {
                     voidResponseType()
                 );
 
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> newPasswordAuthResponse =
+            ResponseEntity<ApiResponse<UserDto.GetMyInfo.V1.Response>> newPasswordAuthResponse =
                 testRestTemplate.exchange(
                     "/api/v1/users/me",
                     HttpMethod.GET,
@@ -228,7 +228,7 @@ class UserV1ApiE2ETest {
         void throwsBadRequest_whenNewPasswordIsSameAsCurrentPassword() {
             // arrange
             signup("user1234", "abc123!?", "홍길동");
-            UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("abc123!?", "abc123!?");
+            UserDto.ChangePassword.V1.Request request = new UserDto.ChangePassword.V1.Request("abc123!?", "abc123!?");
 
             // act
             ResponseEntity<ApiResponse<Void>> response =
@@ -245,7 +245,7 @@ class UserV1ApiE2ETest {
     }
 
     private void signup(String loginId, String password, String name) {
-        UserV1Dto.SignupRequest request = new UserV1Dto.SignupRequest(
+        UserDto.Register.V1.Request request = new UserDto.Register.V1.Request(
             loginId,
             password,
             name,
@@ -262,7 +262,7 @@ class UserV1ApiE2ETest {
         return headers;
     }
 
-    private ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> userResponseType() {
+    private ParameterizedTypeReference<ApiResponse<UserDto.GetMyInfo.V1.Response>> userResponseType() {
         return new ParameterizedTypeReference<>() {};
     }
 

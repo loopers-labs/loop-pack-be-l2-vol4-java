@@ -1,0 +1,153 @@
+package com.loopers.domain.product;
+
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+
+public class Product {
+
+    private Long id;
+    private Long brandId;
+    private String name;
+    private String description;
+    private Long price;
+    private Integer stock;
+    private Integer likeCount;
+    private boolean deleted;
+
+    public Product(Long brandId, String name, String description, Long price, Integer stock) {
+        this(null, brandId, name, description, price, stock, 0, false);
+    }
+
+    private Product(
+        Long id,
+        Long brandId,
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Integer likeCount,
+        boolean deleted
+    ) {
+        if (brandId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 비어있을 수 없습니다.");
+        }
+        if (name == null || name.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+        }
+        if (description == null || description.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
+        }
+        if (price == null || price < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+        }
+        if (stock == null || stock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
+        if (likeCount == null || likeCount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "좋아요 수는 0 이상이어야 합니다.");
+        }
+
+        this.id = id;
+        this.brandId = brandId;
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.stock = stock;
+        this.likeCount = likeCount;
+        this.deleted = deleted;
+    }
+
+    public static Product reconstruct(
+        Long id,
+        Long brandId,
+        String name,
+        String description,
+        Long price,
+        Integer stock,
+        Integer likeCount,
+        boolean deleted
+    ) {
+        return new Product(id, brandId, name, description, price, stock, likeCount, deleted);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getBrandId() {
+        return brandId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Long getPrice() {
+        return price;
+    }
+
+    public Integer getStock() {
+        return stock;
+    }
+
+    public Integer getLikeCount() {
+        return likeCount;
+    }
+
+    public boolean isVisible() {
+        return !deleted;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void deductStock(Integer quantity) {
+        if (quantity == null || quantity < 1) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
+        }
+        if (stock < quantity) {
+            throw new CoreException(ErrorType.CONFLICT, "상품 재고가 부족합니다.");
+        }
+
+        this.stock -= quantity;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
+
+    public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
+        if (newName == null || newName.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+        }
+        if (newDescription == null || newDescription.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 설명은 비어있을 수 없습니다.");
+        }
+        if (newPrice == null || newPrice < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+        }
+        if (newStock == null || newStock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.");
+        }
+
+        this.name = newName;
+        this.description = newDescription;
+        this.price = newPrice;
+        this.stock = newStock;
+    }
+
+    public void delete() {
+        this.deleted = true;
+    }
+}

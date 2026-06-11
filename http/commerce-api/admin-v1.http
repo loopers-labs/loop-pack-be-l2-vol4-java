@@ -1,0 +1,80 @@
+### 관리자 브랜드 목록 조회
+GET {{commerce-api}}/api-admin/v1/brands
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 브랜드 상세 조회
+GET {{commerce-api}}/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 브랜드 생성
+POST {{commerce-api}}/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "Loopers",
+  "description": "감성 이커머스 브랜드"
+}
+
+### 관리자 브랜드 수정
+PUT {{commerce-api}}/api-admin/v1/brands/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "Loopers Updated",
+  "description": "수정된 브랜드 설명"
+}
+
+### 관리자 브랜드 삭제
+DELETE {{commerce-api}}/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 상품 목록 조회
+GET {{commerce-api}}/api-admin/v1/products?sort=latest
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 상품 상세 조회
+GET {{commerce-api}}/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 상품 생성
+POST {{commerce-api}}/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "니트",
+  "description": "부드러운 니트",
+  "price": 30000,
+  "stock": 10
+}
+
+### 관리자 상품 수정
+PUT {{commerce-api}}/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "니트 Updated",
+  "description": "수정된 니트 설명",
+  "price": 35000,
+  "stock": 7
+}
+
+### 관리자 상품 삭제
+DELETE {{commerce-api}}/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 주문 목록 조회
+GET {{commerce-api}}/api-admin/v1/orders
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 주문 상세 조회
+GET {{commerce-api}}/api-admin/v1/orders/1
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 LDAP 실패 케이스
+GET {{commerce-api}}/api-admin/v1/brands
+X-Loopers-Ldap: wrong.ldap

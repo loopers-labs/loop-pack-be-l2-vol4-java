@@ -23,7 +23,7 @@
 
 좋아요 등록/취소는 `Like` 관계와 `Product.likeCount`를 함께 다룬다.
 `Like` 도메인이 상품 저장소에 직접 의존하지 않도록, `LikeFacade`가 `LikeService`와 `ProductService`를 조율한다.
-좋아요 중복 여부 판단은 `LikeService`, 좋아요 수 변경은 `ProductModel`의 책임으로 둔다.
+좋아요 중복 여부 판단은 `LikeService`, 좋아요 수 변경은 `Product`의 책임으로 둔다.
 
 ### 시퀀스
 
@@ -34,9 +34,9 @@ sequenceDiagram
     participant Controller as LikeV1Controller
     participant Facade as LikeFacade
     participant ProductService as ProductService
-    participant Product as ProductModel
+    participant Product as Product
     participant LikeService as LikeService
-    participant Like as LikeModel
+    participant Like as ProductLike
     participant LikeRepository as LikeRepository
     participant ProductRepository as ProductRepository
 
@@ -45,7 +45,7 @@ sequenceDiagram
 
     Facade->>ProductService: getLikeableProduct(productId)
     ProductService->>ProductRepository: find(productId)
-    ProductRepository-->>ProductService: ProductModel
+    ProductRepository-->>ProductService: Product
     ProductService-->>Facade: product
 
     alt 좋아요 등록
@@ -53,7 +53,7 @@ sequenceDiagram
         LikeService->>LikeRepository: find(userId, productId)
         alt 기존 Like 없음
             LikeService->>Like: create(userId, productId)
-            Like-->>LikeService: LikeModel
+            Like-->>LikeService: ProductLike
             LikeService->>LikeRepository: save(like)
             LikeService-->>Facade: LikeChanged.CREATED
             Facade->>Product: increaseLikeCount()
@@ -85,7 +85,7 @@ sequenceDiagram
 ### 논의 포인트
 
 - `LikeFacade`가 상품 도메인과 좋아요 도메인의 협력을 조율한다. `LikeService`가 `ProductRepository`를 직접 알지 않도록 한다.
-- `Product.likeCount` 변경은 `ProductModel`의 행위로 표현한다. 단순 필드 대입으로 다루지 않는다.
+- `Product.likeCount` 변경은 `Product`의 행위로 표현한다. 단순 필드 대입으로 다루지 않는다.
 - `LikeRepository`에는 사용자-상품 유니크 제약이 필요하다. 동시 요청에서는 유니크 제약과 트랜잭션 처리가 멱등성의 마지막 방어선이 된다.
 - `LikeChanged` 같은 결과 타입이 있으면 Facade가 카운트 변경 여부를 명확히 판단할 수 있다.
 
@@ -96,7 +96,7 @@ sequenceDiagram
 ### 설계 의도
 
 주문 생성은 상품 재고 검증, 재고 차감, 주문 항목 스냅샷 생성, 실패 항목 분리를 함께 다룬다.
-`OrderFacade`가 상품 도메인과 주문 도메인을 조율하고, 실제 재고 차감은 `ProductModel`, 주문 구성은 `OrderModel`의 책임으로 둔다.
+`OrderFacade`가 상품 도메인과 주문 도메인을 조율하고, 실제 재고 차감은 `Product`, 주문 구성은 `Order`의 책임으로 둔다.
 주문 도메인이 상품 저장소를 직접 참조하지 않도록 상품 조회와 재고 차감은 상품 도메인에 맡긴다.
 
 ### 시퀀스
@@ -108,10 +108,10 @@ sequenceDiagram
     participant Controller as OrderV1Controller
     participant Facade as OrderFacade
     participant ProductService as ProductService
-    participant Product as ProductModel
+    participant Product as Product
     participant OrderService as OrderService
-    participant Order as OrderModel
-    participant OrderItem as OrderItemModel
+    participant Order as Order
+    participant OrderItem as OrderLine
     participant ProductRepository as ProductRepository
     participant OrderRepository as OrderRepository
 
@@ -121,7 +121,7 @@ sequenceDiagram
 
     Facade->>OrderService: createDraft(userId)
     OrderService->>Order: create(userId)
-    Order-->>OrderService: OrderModel(CREATED)
+    Order-->>OrderService: Order(CREATED)
     OrderService-->>Facade: order
 
     loop 주문 요청 항목별 처리
@@ -165,9 +165,9 @@ sequenceDiagram
 
 ### 논의 포인트
 
-- 재고 차감은 `ProductModel.deductStock(quantity)`에서 처리한다. 재고 규칙을 Facade나 Controller에 두지 않는다.
-- 주문 항목 스냅샷은 `OrderItemModel.snapshotFrom(product, quantity)`처럼 주문 도메인 객체로 분리한다.
-- `OrderModel`은 성공 항목과 실패 항목을 모두 결과로 표현해야 한다. 그래야 부분 주문 허용 정책이 응답에 드러난다.
+- 재고 차감은 `Product.deductStock(quantity)`에서 처리한다. 재고 규칙을 Facade나 Controller에 두지 않는다.
+- 주문 항목 스냅샷은 `OrderLine.snapshotFrom(product, quantity)`처럼 주문 도메인 객체로 분리한다.
+- `Order`은 성공 항목과 실패 항목을 모두 결과로 표현해야 한다. 그래야 부분 주문 허용 정책이 응답에 드러난다.
 - Facade가 여러 도메인을 조율하되, 각 도메인의 내부 Repository를 서로 직접 참조하지 않도록 한다.
 
 ---
@@ -178,7 +178,7 @@ sequenceDiagram
 
 주문 생성과 결제 승인은 분리한다.
 결제는 외부 시스템과의 통신이므로 주문 도메인 내부 규칙과 분리하고, `PaymentFacade`가 주문 상태 변경과 보상 요청을 조율한다.
-주문 상태 전이는 `OrderModel`, 재고 해제는 상품 도메인 책임으로 둔다.
+주문 상태 전이는 `Order`, 재고 해제는 상품 도메인 책임으로 둔다.
 
 ### 시퀀스
 
@@ -189,7 +189,7 @@ sequenceDiagram
     participant Controller as PaymentV1Controller
     participant Facade as PaymentFacade
     participant OrderService as OrderService
-    participant Order as OrderModel
+    participant Order as Order
     participant PaymentService as PaymentService
     participant PaymentGateway as PaymentGateway
     participant CompensationService as CompensationService
@@ -247,7 +247,7 @@ sequenceDiagram
 ### 논의 포인트
 
 - `PaymentService`는 외부 결제 시스템과의 통신을 캡슐화한다. 주문 상태를 직접 바꾸지 않는다.
-- 주문 상태 변경은 `OrderModel.markPaid`, `markPaymentFailed`, `markCanceledByPaymentTimeout` 같은 도메인 행위로 표현한다.
+- 주문 상태 변경은 `Order.markPaid`, `markPaymentFailed`, `markCanceledByPaymentTimeout` 같은 도메인 행위로 표현한다.
 - 보상 처리는 `CompensationService`가 조율하고, 실제 재고 해제는 `ProductService`를 통해 상품 도메인에 위임한다.
 - 결제 장애 시 `PENDING` 상태를 명시적으로 둘지, 곧바로 실패로 둘지는 후속 설계에서 더 구체화해야 한다.
 
@@ -258,7 +258,7 @@ sequenceDiagram
 ### 설계 의도
 
 관리자 상품 변경은 단순 CRUD처럼 보이지만, 사용자 상품 조회와 주문 가능 여부에 직접 영향을 준다.
-따라서 상품 상태, 노출 여부, 재고 변경은 `ProductModel`의 행위로 표현하고, 사용자 주문 생성과 같은 상품 애그리거트 경계를 공유한다.
+따라서 상품 상태, 노출 여부, 재고 변경은 `Product`의 행위로 표현하고, 사용자 주문 생성과 같은 상품 애그리거트 경계를 공유한다.
 관리자 유스케이스도 상품 저장소를 직접 다루지 않고 `AdminProductFacade`와 `ProductService`를 통해 조율한다.
 
 ### 시퀀스
@@ -270,14 +270,14 @@ sequenceDiagram
     participant Controller as AdminProductV1Controller
     participant Facade as AdminProductFacade
     participant ProductService as ProductService
-    participant Product as ProductModel
+    participant Product as Product
     participant ProductRepository as ProductRepository
 
     Admin->>Controller: PUT /api-admin/v1/products/{productId}
     Controller->>Facade: updateProduct(adminUser, productId, command)
     Facade->>ProductService: getEditableProduct(productId)
     ProductService->>ProductRepository: find(productId)
-    ProductRepository-->>ProductService: ProductModel
+    ProductRepository-->>ProductService: Product
     ProductService-->>Facade: product
 
     alt 상품 기본 정보 변경
@@ -300,7 +300,7 @@ sequenceDiagram
 
 ### 논의 포인트
 
-- 관리자 상품 변경과 사용자 주문 생성은 같은 `ProductModel`의 상태를 변경한다. 구현 단계에서는 재고 차감과 재고 변경의 동시성 제어가 필요하다.
+- 관리자 상품 변경과 사용자 주문 생성은 같은 `Product`의 상태를 변경한다. 구현 단계에서는 재고 차감과 재고 변경의 동시성 제어가 필요하다.
 - 상품 삭제와 숨김 처리는 사용자 조회와 주문 가능 여부 판단에서 항상 제외되어야 한다.
-- 상품명이나 가격이 변경되어도 기존 `OrderItemModel`의 스냅샷은 변경하지 않는다.
+- 상품명이나 가격이 변경되어도 기존 `OrderLine`의 스냅샷은 변경하지 않는다.
 - 관리자 권한 인증은 Controller/API 경계에서 처리하고, 상품 상태 변경 규칙은 도메인 모델에 둔다.

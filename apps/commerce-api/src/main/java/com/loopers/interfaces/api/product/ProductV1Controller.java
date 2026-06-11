@@ -2,7 +2,10 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.like.ProductLikeService;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.auth.AuthenticatedUser;
+import com.loopers.interfaces.auth.LoginUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,60 +17,46 @@ import java.util.List;
 public class ProductV1Controller {
 
     private final ProductFacade productFacade;
-
-    @PostMapping
-    public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
-        @RequestBody ProductV1Dto.CreateProductRequest request
-    ) {
-        ProductInfo info = productFacade.createProduct(
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
+    private final ProductLikeService productLikeService;
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
+    public ApiResponse<ProductDto.Get.V1.Response> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
+        ProductDto.Get.V1.Response response = ProductDto.Get.V1.Response.from(info);
         return ApiResponse.success(response);
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
+    public ApiResponse<List<ProductDto.List.V1.Response>> getAllProducts(
+        @RequestParam(value = "brandId", required = false) Long brandId,
+        @RequestParam(value = "sort", required = false) String sort,
+        @RequestParam(value = "page", required = false) Integer page,
+        @RequestParam(value = "size", required = false) Integer size
+    ) {
+        List<ProductInfo> infos = productFacade.getAllProducts(brandId, sort, page, size);
+        List<ProductDto.List.V1.Response> responses = infos.stream()
+            .map(ProductDto.List.V1.Response::from)
             .toList();
         return ApiResponse.success(responses);
     }
 
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
-    ) {
-        ProductInfo info = productFacade.updateProduct(
-            productId,
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
-    @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(
+    @PostMapping("/{productId}/likes")
+    public ApiResponse<Void> likeProduct(
+        @LoginUser AuthenticatedUser user,
         @PathVariable(value = "productId") Long productId
     ) {
-        productFacade.deleteProduct(productId);
+        productLikeService.likeProduct(user.loginId(), productId);
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/{productId}/likes")
+    public ApiResponse<Void> unlikeProduct(
+        @LoginUser AuthenticatedUser user,
+        @PathVariable(value = "productId") Long productId
+    ) {
+        productLikeService.unlikeProduct(user.loginId(), productId);
         return ApiResponse.success(null);
     }
 }

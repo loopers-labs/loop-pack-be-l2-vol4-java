@@ -1,0 +1,57 @@
+package com.loopers.domain.brand;
+
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+
+@ExtendWith(MockitoExtension.class)
+class BrandProductDeleteServiceTest {
+
+    @Mock
+    private BrandRepository brandRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    private BrandProductDeleteService brandProductDeleteService;
+
+    @BeforeEach
+    void setUp() {
+        brandProductDeleteService = new BrandProductDeleteService(brandRepository, productRepository);
+    }
+
+    @DisplayName("브랜드를 삭제할 때, ")
+    @Nested
+    class DeleteBrandWithProducts {
+
+        @DisplayName("브랜드와 해당 브랜드의 상품을 함께 삭제 처리한다.")
+        @Test
+        void deletesBrandAndProducts() {
+            // arrange
+            Brand brand = new Brand("Loopers", "감성 이커머스 브랜드");
+            Product firstProduct = new Product(10L, "니트", "부드러운 니트", 30_000L, 10);
+            Product secondProduct = new Product(10L, "셔츠", "가벼운 셔츠", 20_000L, 5);
+
+            // act
+            brandProductDeleteService.deleteBrandWithProducts(brand, List.of(firstProduct, secondProduct));
+
+            // assert
+            assertAll(
+                () -> assertThat(brand.isVisible()).isFalse(),
+                () -> assertThat(firstProduct.isVisible()).isFalse(),
+                () -> assertThat(secondProduct.isVisible()).isFalse()
+            );
+        }
+    }
+}

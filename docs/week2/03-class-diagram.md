@@ -21,7 +21,7 @@
 
 ```mermaid
 classDiagram
-    class BrandModel {
+    class Brand {
         <<Aggregate Root>>
         BrandStatus status
         changeInfo()
@@ -29,7 +29,7 @@ classDiagram
         isVisible()
     }
 
-    class ProductModel {
+    class Product {
         <<Aggregate Root>>
         Long brandId
         int stock
@@ -46,38 +46,38 @@ classDiagram
         softDelete()
     }
 
-    class LikeModel {
+    class ProductLike {
         <<Aggregate Root>>
         Long userId
         Long productId
         create(Long userId, Long productId)
     }
 
-    class OrderModel {
+    class Order {
         <<Aggregate Root>>
         Long userId
         OrderStatus status
         Long totalAmount
         LocalDateTime paymentExpiresAt
         create(Long userId)
-        addOrderItem(OrderItemModel item)
-        addFailedItem(OrderFailedItem item)
+        addOrderItem(OrderLine item)
+        addFailedItem(OrderFailure item)
         calculateTotalAmount()
         markPaid()
         markPaymentFailed(String reason)
         markCanceledByPaymentTimeout()
     }
 
-    class OrderItemModel {
+    class OrderLine {
         <<Entity>>
         Long productId
         int quantity
         Long amount
         ProductSnapshot snapshot
-        snapshotFrom(ProductModel product, int quantity)
+        snapshotFrom(Product product, int quantity)
     }
 
-    class OrderFailedItem {
+    class OrderFailure {
         <<Value Object>>
         Long productId
         int quantity
@@ -130,15 +130,15 @@ classDiagram
         CANCELED
     }
 
-    BrandModel "1" <-- "0..*" ProductModel : brandId
-    ProductModel "1" <-- "0..*" LikeModel : productId
-    OrderModel "1" *-- "1..*" OrderItemModel
-    OrderModel "1" o-- "0..*" OrderFailedItem
-    OrderItemModel "1" *-- "1" ProductSnapshot
-    OrderModel "1" <-- "0..1" PaymentModel : orderId
-    ProductModel --> ProductStatus
-    BrandModel --> BrandStatus
-    OrderModel --> OrderStatus
+    Brand "1" <-- "0..*" Product : brandId
+    Product "1" <-- "0..*" ProductLike : productId
+    Order "1" *-- "1..*" OrderLine
+    Order "1" o-- "0..*" OrderFailure
+    OrderLine "1" *-- "1" ProductSnapshot
+    Order "1" <-- "0..1" PaymentModel : orderId
+    Product --> ProductStatus
+    Brand --> BrandStatus
+    Order --> OrderStatus
     PaymentModel --> PaymentStatus
 ```
 
@@ -146,49 +146,49 @@ classDiagram
 
 | 객체 | 책임 |
 | --- | --- |
-| `BrandModel` | 브랜드 정보, 노출 가능 여부, 소프트 삭제 상태를 관리한다. |
-| `ProductModel` | 상품 정보, 판매 가능 여부, 재고 변경/차감/해제, 좋아요 수 변경, 소프트 삭제를 관리한다. |
-| `LikeModel` | 사용자와 상품의 좋아요 관계를 표현한다. 중복 방지는 Repository 유니크 제약과 함께 보장한다. |
-| `OrderModel` | 주문 상태, 주문 항목, 실패 항목, 총 결제 금액을 관리한다. |
-| `OrderItemModel` | 주문 당시 상품 정보를 스냅샷으로 보관한다. |
-| `OrderFailedItem` | 부분 주문 정책에서 실패한 요청 항목과 실패 사유를 표현한다. |
+| `Brand` | 브랜드 정보, 노출 가능 여부, 소프트 삭제 상태를 관리한다. |
+| `Product` | 상품 정보, 판매 가능 여부, 재고 변경/차감/해제, 좋아요 수 변경, 소프트 삭제를 관리한다. |
+| `ProductLike` | 사용자와 상품의 좋아요 관계를 표현한다. 중복 방지는 Repository 유니크 제약과 함께 보장한다. |
+| `Order` | 주문 상태, 주문 항목, 실패 항목, 총 결제 금액을 관리한다. |
+| `OrderLine` | 주문 당시 상품 정보를 스냅샷으로 보관한다. |
+| `OrderFailure` | 부분 주문 정책에서 실패한 요청 항목과 실패 사유를 표현한다. |
 | `PaymentModel` | 주문 결제 시도와 결제 상태를 표현한다. |
 
 ## 애그리거트 경계
 
 ### Brand
 
-- `BrandModel`은 독립 애그리거트다.
-- `ProductModel`은 `brandId`로 브랜드를 참조한다.
+- `Brand`은 독립 애그리거트다.
+- `Product`은 `brandId`로 브랜드를 참조한다.
 - 브랜드 삭제는 소프트 삭제이며, 사용자 조회에서는 제외된다.
 - 브랜드 정보 변경은 이후 상품 조회에는 반영될 수 있지만, 기존 주문 항목 스냅샷은 변경하지 않는다.
 
 ### Product
 
-- `ProductModel`은 상품 애그리거트 루트다.
-- 관리자 상품 정보, 판매 상태, 재고 변경은 `ProductModel`의 행위로 둔다.
-- 재고 차감과 재고 해제는 `ProductModel`의 행위로 둔다.
-- 좋아요 수는 `Product.likeCount`에 캐시하지만, 원본 데이터는 `LikeModel`이다.
+- `Product`은 상품 애그리거트 루트다.
+- 관리자 상품 정보, 판매 상태, 재고 변경은 `Product`의 행위로 둔다.
+- 재고 차감과 재고 해제는 `Product`의 행위로 둔다.
+- 좋아요 수는 `Product.likeCount`에 캐시하지만, 원본 데이터는 `ProductLike`이다.
 - 좋아요 수 변경은 좋아요 생성/삭제 결과에 따라 수행되어야 한다.
 - 삭제되거나 숨김 처리된 상품은 사용자 조회와 주문 가능 여부 판단에서 제외한다.
 
 ### Like
 
-- `LikeModel`은 사용자와 상품의 관계를 표현하는 애그리거트다.
+- `ProductLike`은 사용자와 상품의 관계를 표현하는 애그리거트다.
 - 같은 `userId`, `productId` 조합은 하나만 존재해야 한다.
-- `LikeModel`은 `ProductModel`을 직접 참조하지 않는다.
+- `ProductLike`은 `Product`을 직접 참조하지 않는다.
 
 ### Order
 
-- `OrderModel`은 주문 애그리거트 루트다.
-- `OrderItemModel`은 `OrderModel`에 포함된다.
-- `OrderItemModel`은 `ProductModel`을 직접 참조하지 않고 주문 당시의 상품명, 브랜드명, 가격을 스냅샷으로 가진다.
-- `OrderFailedItem`은 재고 부족 등으로 주문 대상에서 제외된 항목을 표현한다.
+- `Order`은 주문 애그리거트 루트다.
+- `OrderLine`은 `Order`에 포함된다.
+- `OrderLine`은 `Product`을 직접 참조하지 않고 주문 당시의 상품명, 브랜드명, 가격을 스냅샷으로 가진다.
+- `OrderFailure`은 재고 부족 등으로 주문 대상에서 제외된 항목을 표현한다.
 
 ### Payment
 
 - `PaymentModel`은 주문 결제 시도를 표현하는 애그리거트다.
-- 결제 승인/실패 결과는 `PaymentModel`에 기록하고, 주문 상태 변경은 `OrderModel`의 행위로 수행한다.
+- 결제 승인/실패 결과는 `PaymentModel`에 기록하고, 주문 상태 변경은 `Order`의 행위로 수행한다.
 - 외부 결제 시스템과의 통신은 도메인 모델이 아니라 `PaymentService`와 `PaymentGateway` 경계에서 처리한다.
 
 ---
@@ -225,14 +225,14 @@ classDiagram
     class BrandService {
         getVisibleBrand(brandId)
         getEditableBrand(brandId)
-        save(BrandModel brand)
+        save(Brand brand)
     }
 
     class ProductService {
         getLikeableProduct(productId)
         getOrderableProduct(productId)
         getEditableProduct(productId)
-        save(ProductModel product)
+        save(Product product)
     }
 
     class LikeService {
@@ -243,7 +243,7 @@ classDiagram
     class OrderService {
         createDraft(userId)
         getPayableOrder(userId, orderId)
-        save(OrderModel order)
+        save(Order order)
         findExpiredCreatedOrders()
     }
 
@@ -252,7 +252,7 @@ classDiagram
     }
 
     class CompensationService {
-        requestStockRelease(OrderModel order)
+        requestStockRelease(Order order)
     }
 
     class ProductRepository {
@@ -306,7 +306,7 @@ classDiagram
 
 ## 의존 방향
 
-- `LikeFacade`는 좋아요 생성/삭제 결과에 따라 `ProductModel.likeCount` 변경을 조율한다.
+- `LikeFacade`는 좋아요 생성/삭제 결과에 따라 `Product.likeCount` 변경을 조율한다.
 - `OrderFacade`는 상품 조회/재고 차감과 주문 생성의 순서를 조율한다.
 - `PaymentFacade`는 결제 결과에 따라 주문 상태 변경과 보상 요청을 조율한다.
 - `AdminBrandFacade`는 관리자 브랜드 생성, 수정, 삭제 유스케이스를 조율한다.
@@ -316,8 +316,8 @@ classDiagram
 
 ## 설계 리스크
 
-- `Product.likeCount`는 파생 값이므로 `LikeModel`과 정합성이 깨질 수 있다. 좋아요 등록/취소와 카운트 변경은 같은 유스케이스 경계에서 처리해야 한다.
-- 부분 주문을 허용하므로 `OrderModel`은 성공 항목과 실패 항목을 명확히 표현해야 한다.
+- `Product.likeCount`는 파생 값이므로 `ProductLike`과 정합성이 깨질 수 있다. 좋아요 등록/취소와 카운트 변경은 같은 유스케이스 경계에서 처리해야 한다.
+- 부분 주문을 허용하므로 `Order`은 성공 항목과 실패 항목을 명확히 표현해야 한다.
 - 결제 실패와 타임아웃 보상 처리는 비동기 재시도가 필요할 수 있다.
 - 외부 결제 장애를 별도 대기 상태로 둘지, 실패 상태로 기록할지는 결제 장애 처리 정책을 구체화하면서 결정한다.
 - 관리자 재고 변경과 사용자 주문 생성이 동시에 발생할 수 있다. 구현 단계에서는 상품 애그리거트 저장 시 동시성 제어가 필요하다.
