@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -18,8 +19,8 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    public OrderModel create(Long userId, List<OrderItemData> itemDataList) {
-        return orderRepository.save(OrderModel.create(userId, itemDataList));
+    public OrderModel create(Long userId, List<OrderItemData> itemDataList, BigDecimal discountAmount) {
+        return orderRepository.save(OrderModel.create(userId, itemDataList, discountAmount));
     }
 
     public OrderModel getById(Long orderId) {

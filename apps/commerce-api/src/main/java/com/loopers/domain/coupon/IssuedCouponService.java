@@ -1,5 +1,7 @@
 package com.loopers.domain.coupon;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,5 +25,22 @@ public class IssuedCouponService {
 
     public IssuedCouponModel issue(Long couponTemplateId, Long userId) {
         return issuedCouponRepository.save(new IssuedCouponModel(couponTemplateId, userId));
+    }
+
+    public IssuedCouponModel getById(Long issuedCouponId) {
+        return issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
+    }
+
+    public IssuedCouponModel getMyIssuedCoupon(Long issuedCouponId, Long userId) {
+        IssuedCouponModel issued = getById(issuedCouponId);
+        issued.validateOwner(userId);
+        return issued;
+    }
+
+    public void use(Long issuedCouponId) {
+        IssuedCouponModel issued = getById(issuedCouponId);
+        issued.use();
+        issuedCouponRepository.save(issued);
     }
 }

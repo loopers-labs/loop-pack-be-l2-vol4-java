@@ -32,16 +32,18 @@ class OrderModelTest {
         void createsOrderModel_withPlacedStatus() {
             // given
             Long userId = 1L;
-            BigDecimal totalPrice = BigDecimal.valueOf(10000);
+            BigDecimal originalPrice = BigDecimal.valueOf(10000);
             List<OrderItemModel> items = List.of(sampleItem());
 
             // when
-            OrderModel order = new OrderModel(userId, totalPrice, items);
+            OrderModel order = new OrderModel(userId, originalPrice, BigDecimal.ZERO, items);
 
             // then
             assertAll(
                     () -> assertThat(order.getUserId()).isEqualTo(userId),
-                    () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(totalPrice),
+                    () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(originalPrice),
+                    () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                    () -> assertThat(order.getFinalPrice()).isEqualByComparingTo(originalPrice),
                     () -> assertThat(order.getItems()).hasSize(1),
                     () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PLACED)
             );
@@ -53,31 +55,43 @@ class OrderModelTest {
         void throwsBadRequest_whenUserIdIsNull(Long userId) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new OrderModel(userId, BigDecimal.valueOf(10000), List.of(sampleItem())));
+                    () -> new OrderModel(userId, BigDecimal.valueOf(10000), BigDecimal.ZERO, List.of(sampleItem())));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("totalPrice가 null이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("originalPrice가 null이면 BAD_REQUEST 예외가 발생한다.")
         @NullSource
         @ParameterizedTest
-        void throwsBadRequest_whenTotalPriceIsNull(BigDecimal totalPrice) {
+        void throwsBadRequest_whenOriginalPriceIsNull(BigDecimal originalPrice) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new OrderModel(1L, totalPrice, List.of(sampleItem())));
+                    () -> new OrderModel(1L, originalPrice, BigDecimal.ZERO, List.of(sampleItem())));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("totalPrice가 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("originalPrice가 음수이면 BAD_REQUEST 예외가 발생한다.")
         @ValueSource(longs = {-1L, -10000L})
         @ParameterizedTest
-        void throwsBadRequest_whenTotalPriceIsNegative(long totalPrice) {
+        void throwsBadRequest_whenOriginalPriceIsNegative(long originalPrice) {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new OrderModel(1L, BigDecimal.valueOf(totalPrice), List.of(sampleItem())));
+                    () -> new OrderModel(1L, BigDecimal.valueOf(originalPrice), BigDecimal.ZERO, List.of(sampleItem())));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("discountAmount가 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @ValueSource(longs = {-1L, -1000L})
+        @ParameterizedTest
+        void throwsBadRequest_whenDiscountAmountIsNegative(long discountAmount) {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.valueOf(discountAmount), List.of(sampleItem())));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -88,7 +102,7 @@ class OrderModelTest {
         void throwsBadRequest_whenItemsIsNull() {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new OrderModel(1L, BigDecimal.valueOf(10000), null));
+                    () -> new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -99,7 +113,7 @@ class OrderModelTest {
         void throwsBadRequest_whenItemsIsEmpty() {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> new OrderModel(1L, BigDecimal.valueOf(10000), List.of()));
+                    () -> new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO, List.of()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -110,9 +124,9 @@ class OrderModelTest {
     @Nested
     class CreateFactory {
 
-        @DisplayName("여러 항목의 totalPrice가 각 항목의 가격 × 수량 합산으로 계산된다.")
+        @DisplayName("여러 항목의 originalPrice가 각 항목의 가격 × 수량 합산으로 계산된다.")
         @Test
-        void calculatesTotalPrice_fromItemDataList() {
+        void calculatesOriginalPrice_fromItemDataList() {
             // given
             Long userId = 1L;
             List<OrderItemData> itemDataList = List.of(
@@ -121,13 +135,35 @@ class OrderModelTest {
             );
 
             // when
-            OrderModel order = OrderModel.create(userId, itemDataList);
+            OrderModel order = OrderModel.create(userId, itemDataList, BigDecimal.ZERO);
 
             // then
             assertAll(
-                    () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000)),
+                    () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000)),
+                    () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                    () -> assertThat(order.getFinalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000)),
                     () -> assertThat(order.getItems()).hasSize(2),
                     () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PLACED)
+            );
+        }
+
+        @DisplayName("할인 금액이 있으면 finalPrice는 originalPrice에서 discountAmount를 뺀 값이다.")
+        @Test
+        void calculatesFinalPrice_withDiscountAmount() {
+            // given
+            Long userId = 1L;
+            List<OrderItemData> itemDataList = List.of(
+                    new OrderItemData(1L, "상품A", BigDecimal.valueOf(10000), 1L)
+            );
+
+            // when
+            OrderModel order = OrderModel.create(userId, itemDataList, BigDecimal.valueOf(2000));
+
+            // then
+            assertAll(
+                    () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
+                    () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(2000)),
+                    () -> assertThat(order.getFinalPrice()).isEqualByComparingTo(BigDecimal.valueOf(8000))
             );
         }
     }
@@ -141,7 +177,7 @@ class OrderModelTest {
         void doesNotThrow_whenOwnerIdMatches() {
             // given
             Long userId = 1L;
-            OrderModel order = new OrderModel(userId, BigDecimal.valueOf(10000), List.of(sampleItem()));
+            OrderModel order = new OrderModel(userId, BigDecimal.valueOf(10000), BigDecimal.ZERO, List.of(sampleItem()));
 
             // when & then
             assertDoesNotThrow(() -> order.validateOwner(userId));
@@ -151,7 +187,7 @@ class OrderModelTest {
         @Test
         void throwsForbidden_whenUserIdDoesNotMatch() {
             // given
-            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000), List.of(sampleItem()));
+            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO, List.of(sampleItem()));
 
             // when
             CoreException result = assertThrows(CoreException.class, () -> order.validateOwner(2L));

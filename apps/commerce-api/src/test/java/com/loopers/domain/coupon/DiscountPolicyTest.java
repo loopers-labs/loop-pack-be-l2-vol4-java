@@ -120,4 +120,48 @@ class DiscountPolicyTest {
         // then
         assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
     }
+
+    @DisplayName("할인 금액을 계산할 때,")
+    @Nested
+    class CalculateDiscountAmount {
+
+        @DisplayName("FIXED 타입이면 할인 금액을 반환한다.")
+        @Test
+        void returnsFixedDiscountAmount_whenTypeIsFixed() {
+            // given
+            DiscountPolicy policy = new DiscountPolicy(CouponType.FIXED, BigDecimal.valueOf(3000));
+
+            // when
+            BigDecimal result = policy.calculateDiscountAmount(BigDecimal.valueOf(10000));
+
+            // then
+            assertThat(result).isEqualByComparingTo(BigDecimal.valueOf(3000));
+        }
+
+        @DisplayName("FIXED 타입이고 할인 금액이 주문 금액을 초과하면 주문 금액을 반환한다.")
+        @Test
+        void returnsOriginalPrice_whenFixedDiscountExceedsOriginalPrice() {
+            // given
+            DiscountPolicy policy = new DiscountPolicy(CouponType.FIXED, BigDecimal.valueOf(15000));
+
+            // when
+            BigDecimal result = policy.calculateDiscountAmount(BigDecimal.valueOf(10000));
+
+            // then
+            assertThat(result).isEqualByComparingTo(BigDecimal.valueOf(10000));
+        }
+
+        @DisplayName("RATE 타입이면 비율 할인 금액을 반환하고 소수점은 버린다.")
+        @Test
+        void returnsRateDiscountAmount_withFloorRounding_whenTypeIsRate() {
+            // given
+            DiscountPolicy policy = new DiscountPolicy(CouponType.RATE, BigDecimal.valueOf(10));
+
+            // when
+            BigDecimal result = policy.calculateDiscountAmount(BigDecimal.valueOf(10001));
+
+            // then
+            assertThat(result).isEqualByComparingTo(BigDecimal.valueOf(1000));
+        }
+    }
 }

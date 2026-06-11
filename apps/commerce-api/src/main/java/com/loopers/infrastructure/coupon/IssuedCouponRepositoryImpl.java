@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
@@ -23,6 +24,11 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
     @Override
     public List<IssuedCouponModel> findAllByUserId(Long userId) {
         return issuedCouponJpaRepository.findAllByUserId(userId);
+    }
+
+    @Override
+    public Optional<IssuedCouponModel> findById(Long id) {
+        return issuedCouponJpaRepository.findById(id);
     }
 
     @Override

@@ -43,7 +43,7 @@ public class CouponFacade {
         UserModel user = userService.getLoginUser(loginId, loginPw);
         CouponTemplateModel template = couponTemplateService.getById(couponId);
         if (template.isExpired()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰 템플릿입니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
         }
         IssuedCouponModel issued = issuedCouponService.issue(template.getId(), user.getId());
         return IssuedCouponInfo.from(issued);
