@@ -32,7 +32,7 @@ import java.time.ZonedDateTime;
 @Entity
 @Table(
     name = "user_coupon",
-    indexes = @Index(name = "idx_user_coupon_status_template", columnList = "status, coupon_template_id"),
+    indexes = @Index(name = "idx_user_coupon_template_created_at_id", columnList = "coupon_template_id, created_at, id"),
     uniqueConstraints = @UniqueConstraint(
         name = "uk_user_coupon_user_template",
         columnNames = {"user_id", "coupon_template_id"}
