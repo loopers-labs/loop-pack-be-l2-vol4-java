@@ -163,20 +163,21 @@ class CouponFacadeIntegrationTest {
             assertThat(result).isEmpty();
         }
 
-        @DisplayName("발급된 쿠폰의 템플릿이 소프트 삭제된 경우 NOT_FOUND 예외가 발생한다.")
+        @DisplayName("발급된 쿠폰의 템플릿이 소프트 삭제된 경우 해당 쿠폰은 목록에서 제외된다.")
         @Test
-        void throwsNotFound_whenIssuedCouponTemplateIsDeleted() {
+        void excludesIssuedCoupon_whenTemplateIsSoftDeleted() {
             // given
-            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
-            issuedCouponRepository.save(new IssuedCouponModel(template.getId(), savedUser.getId()));
-            couponTemplateService.deleteTemplate(template.getId());
+            CouponTemplateModel activeTemplate = saveTemplate(ZonedDateTime.now().plusDays(30));
+            CouponTemplateModel deletedTemplate = saveTemplate(ZonedDateTime.now().plusDays(30));
+            issuedCouponRepository.save(new IssuedCouponModel(activeTemplate.getId(), savedUser.getId()));
+            issuedCouponRepository.save(new IssuedCouponModel(deletedTemplate.getId(), savedUser.getId()));
+            couponTemplateService.deleteTemplate(deletedTemplate.getId());
 
             // when
-            CoreException result = assertThrows(CoreException.class,
-                    () -> couponFacade.getMyIssuedCoupons(LOGIN_ID, LOGIN_PW));
+            List<MyIssuedCouponInfo> result = couponFacade.getMyIssuedCoupons(LOGIN_ID, LOGIN_PW);
 
             // then
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(result).hasSize(1);
         }
     }
 

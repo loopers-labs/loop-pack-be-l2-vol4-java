@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -23,6 +27,11 @@ public class CouponTemplateService {
     public CouponTemplateModel getById(Long couponTemplateId) {
         return couponTemplateRepository.findById(couponTemplateId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 템플릿이 존재하지 않습니다."));
+    }
+
+    public Map<Long, CouponTemplateModel> getMapByIds(Set<Long> ids) {
+        return couponTemplateRepository.findAllByIds(ids).stream()
+                .collect(Collectors.toMap(CouponTemplateModel::getId, Function.identity()));
     }
 
     public CouponTemplateModel createTemplate(String name, CouponType type, BigDecimal value,
