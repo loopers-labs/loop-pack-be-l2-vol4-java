@@ -3,6 +3,7 @@ package com.loopers.domain.coupon;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -18,15 +19,16 @@ public class UserCouponService {
 
     private final UserCouponRepository userCouponRepository;
 
-    /** 템플릿 스냅샷을 복사해 발급. 동일 템플릿 중복 발급 시 CONFLICT. */
+    /** 템플릿 스냅샷을 복사해 발급. 동시 중복 발급은 DB unique 충돌로 CONFLICT. */
     public UserCouponModel issue(UUID userId, CouponTemplateModel template) {
-        if (userCouponRepository.existsByUserIdAndTemplateId(userId, template.getId())) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
-        }
         UserCouponModel userCoupon = new UserCouponModel(
             userId, template.getId(), template.getType(), template.getValue(),
             template.getMinOrderAmount(), template.getExpiredAt());
-        return userCouponRepository.save(userCoupon);
+        try {
+            return userCouponRepository.save(userCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
+        }
     }
 
     public List<UserCouponModel> getMyCoupons(UUID userId) {

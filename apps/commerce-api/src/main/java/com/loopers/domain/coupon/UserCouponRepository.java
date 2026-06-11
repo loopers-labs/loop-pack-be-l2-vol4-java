@@ -16,9 +16,6 @@ public interface UserCouponRepository {
     /** 소유권 검증용 — id + userId 단건 조회 */
     Optional<UserCouponModel> findByIdAndUserId(UUID id, UUID userId);
 
-    /** 동일 템플릿 중복 발급 검사 */
-    boolean existsByUserIdAndTemplateId(UUID userId, UUID templateId);
-
     /** 내 쿠폰 목록 */
     List<UserCouponModel> findByUserId(UUID userId);
 
