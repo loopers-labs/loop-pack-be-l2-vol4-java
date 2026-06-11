@@ -1,6 +1,6 @@
 package com.loopers.support.auth;
 
-import com.loopers.application.user.UserService;
+import com.loopers.user.application.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
