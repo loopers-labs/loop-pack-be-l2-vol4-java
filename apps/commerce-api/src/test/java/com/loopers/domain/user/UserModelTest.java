@@ -7,8 +7,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UserModelTest {
@@ -79,6 +81,36 @@ class UserModelTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("본인 소유 여부를 검증할 때, ")
+    @Nested
+    class ValidateOwner {
+
+        @DisplayName("요청자 ID가 본인이면 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenUserIdMatches() {
+            // given
+            UserModel user = new UserModel("user01", "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor);
+            ReflectionTestUtils.setField(user, "id", 1L);
+
+            // when / then
+            assertDoesNotThrow(() -> user.validateOwner(1L));
+        }
+
+        @DisplayName("요청자 ID가 다른 사용자이면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenUserIdDoesNotMatch() {
+            // given
+            UserModel user = new UserModel("user01", "Password1!", "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor);
+            ReflectionTestUtils.setField(user, "id", 1L);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> user.validateOwner(2L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 

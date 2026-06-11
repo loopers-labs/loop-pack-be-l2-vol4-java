@@ -17,13 +17,13 @@ sequenceDiagram
     Note over OrderFacade,OrderService: [트랜잭션] 재고 차감 + 주문 저장 원자적 실행
     OrderFacade->>ProductService: decreaseStock
     ProductService->>ProductRepository: findAllByIdIn
-    Note over ProductService,ProductRepository: 락 없음 — 누락 검증 + stockId 추출
+    Note over ProductService,ProductRepository: 락 없음 — 누락 검증
     alt 누락된 상품이 있는 경우
         ProductService-->>OrderController: CoreException(NOT_FOUND)
         OrderController-->>User: 404 Not Found
     end
-    ProductService->>StockRepository: findAllByIdInWithLock
-    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE id IN (?) FOR UPDATE<br/>InnoDB가 PK 인덱스 오름차순으로 락 획득 → 데드락 방지<br/>Product에는 락 없음
+    ProductService->>StockRepository: findAllByProductIdInWithLock
+    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE product_id IN (?) FOR UPDATE<br/>InnoDB가 product_id 인덱스 오름차순으로 락 획득 → 데드락 방지<br/>Product에는 락 없음
     loop 재고 차감
         Note over ProductService: stock.decrease
     end
@@ -51,13 +51,13 @@ sequenceDiagram
     Note over UserA,ProductService: 각 요청은 독립 트랜잭션으로 처리
 
     OrderFacade->>ProductService: decreaseStock [UserA]
-    ProductService->>StockRepository: findAllByIdInWithLock
-    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE id IN (?) FOR UPDATE<br/>재고 = 5, 주문 수량 = 3 → 차감 가능
+    ProductService->>StockRepository: findAllByProductIdInWithLock
+    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE product_id IN (?) FOR UPDATE<br/>재고 = 5, 주문 수량 = 3 → 차감 가능
     ProductService-->>OrderFacade: 재고 차감 완료 (재고 = 2)
 
     OrderFacade->>ProductService: decreaseStock [UserB]
-    ProductService->>StockRepository: findAllByIdInWithLock
-    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE id IN (?) FOR UPDATE<br/>재고 = 2, 주문 수량 = 3 → 재고 부족
+    ProductService->>StockRepository: findAllByProductIdInWithLock
+    Note over ProductService,StockRepository: [비관적 락]<br/>SELECT * FROM stock WHERE product_id IN (?) FOR UPDATE<br/>재고 = 2, 주문 수량 = 3 → 재고 부족
     ProductService-->>OrderFacade: CoreException(BAD_REQUEST)
 
     OrderFacade-->>UserB: 400 Bad Request

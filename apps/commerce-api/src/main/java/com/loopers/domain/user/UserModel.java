@@ -5,10 +5,12 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
 import lombok.Getter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
 @Table(name = "users")
+@SQLRestriction("deleted_at IS NULL")
 public class UserModel extends BaseEntity {
 
     @Embedded
@@ -52,6 +54,12 @@ public class UserModel extends BaseEntity {
         this.email = new Email(email);
         this.name = name;
         this.gender = gender;
+    }
+
+    public void validateOwner(Long userId) {
+        if (!this.getId().equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인만 접근할 수 있습니다.");
+        }
     }
 
     public boolean matchesPassword(String password, PasswordEncryptor passwordEncryptor) {

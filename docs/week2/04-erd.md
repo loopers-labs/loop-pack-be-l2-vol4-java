@@ -35,7 +35,6 @@ erDiagram
     PRODUCT {
         BIGINT   id          PK
         BIGINT   brand_id
-        BIGINT   stock_id    UK
         VARCHAR  name
         VARCHAR  description
         DECIMAL  price
@@ -47,6 +46,7 @@ erDiagram
 
     STOCK {
         BIGINT   id          PK
+        BIGINT   product_id  UK
         BIGINT   quantity
         DATETIME created_at
         DATETIME updated_at

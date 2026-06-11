@@ -1,8 +1,11 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.application.product.ProductInfo;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.Gender;
 import jakarta.validation.constraints.NotNull;
+
+import java.math.BigDecimal;
 
 public class UserV1Dto {
 
@@ -33,6 +36,12 @@ public class UserV1Dto {
             @NotNull String oldPassword,
             @NotNull String newPassword
     ) {
+    }
+
+    public record LikedProductResponse(Long id, String brandName, String name, BigDecimal price, Long likeCount) {
+        public static LikedProductResponse from(ProductInfo info) {
+            return new LikedProductResponse(info.id(), info.brandName(), info.name(), info.price(), info.likeCount());
+        }
     }
 
 }

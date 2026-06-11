@@ -3,9 +3,12 @@ package com.loopers.domain.product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -14,33 +17,62 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-    @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
-        return productRepository.save(product);
-    }
-
-    @Transactional(readOnly = true)
-    public ProductModel getProduct(Long id) {
+    public ProductModel getById(Long id) {
         return productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }
 
-    @Transactional(readOnly = true)
-    public List<ProductModel> getAllProducts() {
-        return productRepository.findAll();
+    public List<ProductModel> findAllByIds(List<Long> ids) {
+        return productRepository.findAllByIds(ids);
     }
 
-    @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
+    public List<ProductModel> findAllByIdsOrThrow(List<Long> ids) {
+        List<ProductModel> found = productRepository.findAllByIds(ids);
+        if (found.size() != ids.size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품이 포함되어 있습니다.");
+        }
+        return found;
+    }
+
+    public List<ProductModel> findAllByBrandId(Long brandId) {
+        return productRepository.findAllByBrandId(brandId);
+    }
+
+    public Page<ProductModel> findAllByBrandId(Long brandId, Pageable pageable) {
+        return productRepository.findAllByBrandId(brandId, pageable);
+    }
+
+    public Page<ProductModel> findProducts(Long brandId, Pageable pageable) {
+        return productRepository.findProducts(brandId, pageable);
+    }
+
+    public ProductModel create(Long brandId, String name, BigDecimal price) {
+        return productRepository.save(new ProductModel(brandId, name, price));
+    }
+
+    public ProductModel update(Long id, String name, BigDecimal price) {
+        ProductModel product = getById(id);
+
+        product.update(name, price);
+
         return productRepository.save(product);
     }
 
+    public void delete(Long id) {
+        ProductModel product = getById(id);
+
+        product.delete();
+
+        productRepository.save(product);
+    }
+
     @Transactional
-    public void deleteProduct(Long id) {
-        getProduct(id); // 존재 여부 확인
-        productRepository.delete(id);
+    public void increaseLikeCount(Long id) {
+        productRepository.increaseLikeCount(id);
+    }
+
+    @Transactional
+    public void decreaseLikeCount(Long id) {
+        productRepository.decreaseLikeCount(id);
     }
 }
