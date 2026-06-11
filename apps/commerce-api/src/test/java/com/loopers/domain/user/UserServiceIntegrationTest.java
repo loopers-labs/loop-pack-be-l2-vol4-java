@@ -1,5 +1,6 @@
 package com.loopers.domain.user;
 
+import com.loopers.application.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -150,6 +151,29 @@ class UserServiceIntegrationTest {
             assertThat(unexpectedExceptions).isNotEmpty();
         }
 
+        @DisplayName("이미 존재하는 email로 가입하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsException_whenEmailAlreadyExists() {
+            // arrange
+            userService.signUp(new UserModel(
+                "user01", "Password1!", "홍길동",
+                LocalDate.of(1990, 1, 1), "user@example.com"
+            ));
+
+            UserModel duplicateEmailUser = new UserModel(
+                "user02", "Password2@", "김철수",
+                LocalDate.of(1995, 5, 5), "user@example.com"
+            );
+
+            // act & assert
+            assertThatThrownBy(() -> userService.signUp(duplicateEmailUser))
+                .isInstanceOf(CoreException.class)
+                .satisfies(e -> {
+                    CoreException ce = (CoreException) e;
+                    assertThat(ce.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+                });
+        }
+
         @DisplayName("이미 존재하는 loginId로 가입하면, CONFLICT 예외가 발생한다.")
         @Test
         void throwsException_whenLoginIdAlreadyExists() {
@@ -278,10 +302,10 @@ class UserServiceIntegrationTest {
         void password_isNotStoredAsPlainText_afterUpdate() {
             // arrange
             String newRawPassword = "NewPassword1!";
-            userService.signUp(new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com"));
+            UserModel saved = userService.signUp(new UserModel("user01", "Password1!", "홍길동", LocalDate.of(1990, 1, 1), "user@example.com"));
 
             // act
-            userService.updatePassword("user01", "Password1!", newRawPassword);
+            userService.updatePassword(saved.getId(), "Password1!", newRawPassword);
 
             // assert
             UserModel updated = userRepository.findByLoginId("user01").get();
@@ -292,13 +316,13 @@ class UserServiceIntegrationTest {
         @Test
         void updatesPassword_whenOldPasswordMatches() {
             // arrange
-            userService.signUp(new UserModel(
+            UserModel saved = userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
             // act
-            userService.updatePassword("user01", "Password1!", "NewPassword1!");
+            userService.updatePassword(saved.getId(), "Password1!", "NewPassword1!");
 
             // assert
             UserModel updated = userService.getUser("user01", "NewPassword1!");
@@ -309,14 +333,14 @@ class UserServiceIntegrationTest {
         @Test
         void throwsException_whenOldPasswordNotMatches() {
             // arrange
-            userService.signUp(new UserModel(
+            UserModel saved = userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
             // act & assert
             assertThatThrownBy(() ->
-                userService.updatePassword("user01", "WrongPassword!", "NewPassword1!")
+                userService.updatePassword(saved.getId(), "WrongPassword!", "NewPassword1!")
             )
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
@@ -327,14 +351,14 @@ class UserServiceIntegrationTest {
         @Test
         void throwsException_whenNewPasswordIsSameAsCurrent() {
             // arrange
-            userService.signUp(new UserModel(
+            UserModel saved = userService.signUp(new UserModel(
                 "user01", "Password1!", "홍길동",
                 LocalDate.of(1990, 1, 1), "user@example.com"
             ));
 
             // act & assert
             assertThatThrownBy(() ->
-                userService.updatePassword("user01", "Password1!", "Password1!")
+                userService.updatePassword(saved.getId(), "Password1!", "Password1!")
             )
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")

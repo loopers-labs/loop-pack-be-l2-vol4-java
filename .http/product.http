@@ -1,0 +1,62 @@
+### 상품 목록 조회 (PUBLIC) — 기본 최신순
+GET http://localhost:8080/api/v1/products
+
+### 상품 목록 조회 — 브랜드 필터 + 가격순
+GET http://localhost:8080/api/v1/products?brandId=1&sort=price_asc&page=0&size=20
+
+### 상품 목록 조회 — 좋아요 많은 순
+GET http://localhost:8080/api/v1/products?sort=likes_desc
+
+---
+
+### 상품 상세 조회 (PUBLIC)
+GET http://localhost:8080/api/v1/products/1
+
+---
+
+### 상품 목록 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/products
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 상품 등록 (ADMIN) — 재고 함께 생성
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "에어포스1",
+  "price": 139000,
+  "brandId": 1,
+  "stockQuantity": 100
+}
+
+---
+
+### 상품 수정 (ADMIN)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "에어포스1 화이트",
+  "price": 149000
+}
+
+---
+
+### 상품 삭제 (ADMIN)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 재고 수정 (ADMIN)
+PUT http://localhost:8080/api-admin/v1/products/1/stock
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "quantity": 50
+}

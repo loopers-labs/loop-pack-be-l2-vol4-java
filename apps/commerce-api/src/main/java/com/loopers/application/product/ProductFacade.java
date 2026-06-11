@@ -1,40 +1,59 @@
 package com.loopers.application.product;
 
+import com.loopers.application.brand.BrandService;
+import com.loopers.application.stock.StockService;
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSort;
+import com.loopers.domain.stock.StockModel;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
-    private final ProductService productService;
 
-    public ProductInfo createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(name, description, price, stock);
+    private final ProductService productService;
+    private final StockService stockService;
+    private final BrandService brandService;
+    private final ProductDomainService productDomainService;
+
+    @Transactional
+    public ProductInfo createProduct(String name, Long price, Long brandId, int stockQuantity) {
+        brandService.getById(brandId);
+        ProductModel product = productService.create(new ProductModel(name, price, brandId));
+        stockService.create(new StockModel(product.getId(), stockQuantity));
         return ProductInfo.from(product);
     }
 
     public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getProduct(id);
-        return ProductInfo.from(product);
+        ProductModel product = productService.getById(id);
+        BrandModel brand = brandService.getById(product.getBrandId());
+        return ProductInfo.from(productDomainService.combineWithBrand(product, brand));
     }
 
-    public List<ProductInfo> getAllProducts() {
-        List<ProductModel> products = productService.getAllProducts();
-        return products.stream()
-            .map(ProductInfo::from)
-            .toList();
+    public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, int page, int size) {
+        return productService.getAll(brandId, sort, PageRequest.of(page, size))
+            .map(ProductInfo::from);
     }
 
-    public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, name, description, price, stock);
-        return ProductInfo.from(product);
+    @Transactional
+    public ProductInfo updateProduct(Long id, String name, Long price) {
+        return ProductInfo.from(productService.update(id, name, price));
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
-        productService.deleteProduct(id);
+        productService.delete(id);
+    }
+
+    @Transactional
+    public void updateStock(Long productId, int quantity) {
+        productService.getById(productId);
+        stockService.update(productId, quantity);
     }
 }
