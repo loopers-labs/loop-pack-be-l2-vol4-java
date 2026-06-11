@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
@@ -35,6 +36,9 @@ class ProductFacadeIntegrationTest {
     private ProductFacade productFacade;
 
     @Autowired
+    private ProductService productService;
+
+    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -63,7 +67,7 @@ class ProductFacadeIntegrationTest {
         stockRepository.save(new StockModel(inStockProductId, 10));
         stockRepository.save(new StockModel(outOfStockProductId, 0));
 
-        productRepository.incrementLikeCount(inStockProductId);
+        productService.incrementLikeCount(inStockProductId);
     }
 
     @AfterEach

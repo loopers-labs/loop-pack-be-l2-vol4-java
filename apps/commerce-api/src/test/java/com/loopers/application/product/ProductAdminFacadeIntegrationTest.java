@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
@@ -33,6 +34,9 @@ class ProductAdminFacadeIntegrationTest {
     private ProductAdminFacade productAdminFacade;
 
     @Autowired
+    private ProductService productService;
+
+    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -59,8 +63,8 @@ class ProductAdminFacadeIntegrationTest {
         cheapId = cheap.getId();
 
         // 좋아요 수: 맨투맨 0, 후드 5, 패딩 2 — 원자 UPDATE로 시드
-        for (int i = 0; i < 5; i++) productRepository.incrementLikeCount(mid.getId());
-        for (int i = 0; i < 2; i++) productRepository.incrementLikeCount(expensive.getId());
+        for (int i = 0; i < 5; i++) productService.incrementLikeCount(mid.getId());
+        for (int i = 0; i < 2; i++) productService.incrementLikeCount(expensive.getId());
 
         // 재고: 맨투맨 10, 후드 0, 패딩 3
         stockRepository.save(new StockModel(cheap.getId(), 10));
