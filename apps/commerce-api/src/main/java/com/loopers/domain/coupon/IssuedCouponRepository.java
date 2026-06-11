@@ -15,4 +15,6 @@ public interface IssuedCouponRepository {
     Optional<IssuedCouponModel> findById(Long id);
 
     IssuedCouponModel save(IssuedCouponModel issuedCoupon);
+
+    boolean existsByCouponTemplateIdAndUserId(Long couponTemplateId, Long userId);
 }
