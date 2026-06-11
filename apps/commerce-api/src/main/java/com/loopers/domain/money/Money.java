@@ -38,4 +38,12 @@ public class Money {
     public Money plus(Money other) {
         return new Money(this.amount.add(other.amount));
     }
+
+    public Money minus(Money other) {
+        return new Money(this.amount.subtract(other.amount));
+    }
+
+    public boolean isLessThan(Money other) {
+        return this.amount.compareTo(other.amount) < 0;
+    }
 }
