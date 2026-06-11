@@ -15,6 +15,7 @@ import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CouponTemplateModelTest {
@@ -131,6 +132,67 @@ class CouponTemplateModelTest {
             CoreException result = assertThrows(CoreException.class,
                     () -> template.update("여름 시즌 5000원 할인", CouponType.FIXED, BigDecimal.valueOf(5000),
                             null, expiredAt));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("쿠폰 적용 가능 여부를 검증할 때,")
+    @Nested
+    class ValidateApplicability {
+
+        @DisplayName("만료되지 않고 최소 주문 금액 이상이면 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenNotExpiredAndMeetsMinOrderAmount() {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
+                    BigDecimal.valueOf(5000), ZonedDateTime.now().plusDays(1));
+
+            // when & then
+            assertDoesNotThrow(() -> template.validateApplicability(BigDecimal.valueOf(10000)));
+        }
+
+        @DisplayName("최소 주문 금액이 null이면 금액 조건 없이 검증을 통과한다.")
+        @Test
+        void doesNotThrow_whenMinOrderAmountIsNull() {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
+                    null, ZonedDateTime.now().plusDays(1));
+
+            // when & then
+            assertDoesNotThrow(() -> template.validateApplicability(BigDecimal.valueOf(1000)));
+        }
+
+        @DisplayName("만료된 쿠폰이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCouponIsExpired() {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "만료 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
+                    null, ZonedDateTime.now().minusDays(1));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> template.validateApplicability(BigDecimal.valueOf(10000)));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("최소 주문 금액을 충족하지 않으면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenOriginalPriceBelowMinOrderAmount() {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(1));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> template.validateApplicability(BigDecimal.valueOf(5000)));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

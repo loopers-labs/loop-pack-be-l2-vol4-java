@@ -59,4 +59,17 @@ public class CouponTemplateModel extends BaseEntity {
         return ZonedDateTime.now().isAfter(expiredAt);
     }
 
+    public void validateApplicability(BigDecimal originalPrice) {
+        if (isExpired()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
+        }
+        if (minOrderAmount != null && originalPrice.compareTo(minOrderAmount) < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 않습니다.");
+        }
+    }
+
+    public BigDecimal calculateDiscountAmount(BigDecimal originalPrice) {
+        return discountPolicy.calculateDiscountAmount(originalPrice);
+    }
+
 }

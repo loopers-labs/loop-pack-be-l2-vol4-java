@@ -2,6 +2,11 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.IssuedCouponModel;
+import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -31,6 +36,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,6 +69,12 @@ class OrderV1ApiE2ETest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private CouponTemplateRepository couponTemplateRepository;
+
+    @Autowired
+    private IssuedCouponRepository issuedCouponRepository;
+
+    @Autowired
     private PasswordEncryptor passwordEncryptor;
 
     @Autowired
@@ -84,6 +96,15 @@ class OrderV1ApiE2ETest {
 
     private void saveStock(Long productId, Long quantity) {
         stockRepository.save(new StockModel(productId, quantity));
+    }
+
+    private CouponTemplateModel saveTemplate(BigDecimal minOrderAmount, ZonedDateTime expiredAt) {
+        return couponTemplateRepository.save(
+                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt));
+    }
+
+    private IssuedCouponModel saveIssuedCoupon(Long couponTemplateId, Long userId) {
+        return issuedCouponRepository.save(new IssuedCouponModel(couponTemplateId, userId));
     }
 
     private HttpEntity<Void> authHeaderEntity(String loginId, String loginPw) {
@@ -113,7 +134,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2L))
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2L)), null
             );
 
             // when
@@ -127,7 +148,9 @@ class OrderV1ApiE2ETest {
             assertAll(
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                     () -> assertThat(response.getBody().data().status()).isEqualTo("PLACED"),
-                    () -> assertThat(response.getBody().data().totalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(response.getBody().data().originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(response.getBody().data().discountAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                    () -> assertThat(response.getBody().data().finalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
                     () -> assertThat(response.getBody().data().items()).hasSize(1),
                     () -> assertThat(response.getBody().data().items().get(0).productName()).isEqualTo("테스트 상품"),
                     () -> assertThat(response.getBody().data().items().get(0).subtotal()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
@@ -141,7 +164,7 @@ class OrderV1ApiE2ETest {
         void returnsBadRequest_whenItemsIsEmpty() {
             // given
             saveUser();
-            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(List.of());
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(List.of(), null);
 
             // when
             ResponseEntity<Void> response =
@@ -157,7 +180,7 @@ class OrderV1ApiE2ETest {
             // given
             saveUser();
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(999L, 1L))
+                    List.of(new OrderV1Dto.OrderItemRequest(999L, 1L)), null
             );
 
             // when
@@ -176,7 +199,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 1L);
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2L))
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2L)), null
             );
 
             // when
@@ -196,7 +219,7 @@ class OrderV1ApiE2ETest {
         void returnsBadRequest_whenLoginIdHeaderIsMissing() {
             // given
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(1L, 1L))
+                    List.of(new OrderV1Dto.OrderItemRequest(1L, 1L)), null
             );
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -215,7 +238,7 @@ class OrderV1ApiE2ETest {
         void returnsBadRequest_whenLoginPwHeaderIsMissing() {
             // given
             OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
-                    List.of(new OrderV1Dto.OrderItemRequest(1L, 1L))
+                    List.of(new OrderV1Dto.OrderItemRequest(1L, 1L)), null
             );
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -242,7 +265,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
             testRestTemplate.exchange(BASE_URL, HttpMethod.POST,
-                    authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L))), LOGIN_ID, LOGIN_PW),
+                    authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), null), LOGIN_ID, LOGIN_PW),
                     Void.class);
 
             String today = LocalDate.now().toString();
@@ -332,7 +355,7 @@ class OrderV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createResponse =
                     testRestTemplate.exchange(BASE_URL, HttpMethod.POST,
-                            authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L))), LOGIN_ID, LOGIN_PW),
+                            authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), null), LOGIN_ID, LOGIN_PW),
                             responseType);
             Long orderId = createResponse.getBody().data().id();
 
@@ -360,7 +383,7 @@ class OrderV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createResponse =
                     testRestTemplate.exchange(BASE_URL, HttpMethod.POST,
-                            authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L))), LOGIN_ID, LOGIN_PW),
+                            authJsonEntity(new OrderV1Dto.CreateRequest(List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), null), LOGIN_ID, LOGIN_PW),
                             responseType);
             Long orderId = createResponse.getBody().data().id();
 
@@ -405,6 +428,161 @@ class OrderV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("POST /api/v1/orders - 쿠폰 적용")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        @DisplayName("유효한 쿠폰을 적용하면 할인이 적용된 주문 응답을 반환하고 쿠폰이 USED로 변경된다.")
+        @Test
+        void returnsDiscountedOrderResponse_andCouponIsUsed_whenValidCouponApplied() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 2L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 2L)), issued.getId()
+            );
+
+            // when
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), responseType);
+
+            // then
+            IssuedCouponModel usedCoupon = issuedCouponRepository.findById(issued.getId()).orElseThrow();
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(response.getBody().data().discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000)),
+                    () -> assertThat(response.getBody().data().finalPrice()).isEqualByComparingTo(BigDecimal.valueOf(19000)),
+                    () -> assertThat(usedCoupon.getStatus()).isEqualTo(com.loopers.domain.coupon.CouponStatus.USED)
+            );
+        }
+
+        @DisplayName("만료된 쿠폰을 적용하면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenCouponIsExpired() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 1L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().minusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("최소 주문 금액을 충족하지 않으면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenMinOrderAmountNotMet() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(5000));
+            saveStock(product.getId(), 1L);
+
+            CouponTemplateModel template = saveTemplate(BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("다른 사용자의 쿠폰을 적용하면 403 Forbidden을 반환한다.")
+        @Test
+        void returnsForbidden_whenCouponOwnedByAnotherUser() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 1L);
+
+            String otherId = "other01";
+            UserModel otherUser = userRepository.save(new UserModel(otherId, LOGIN_PW, "다른유저", "1991-01-01", "other@example.com", Gender.FEMALE, passwordEncryptor));
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), otherUser.getId());
+
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+
+        @DisplayName("존재하지 않는 issuedCouponId로 주문하면 404 Not Found를 반환한다.")
+        @Test
+        void returnsNotFound_whenIssuedCouponDoesNotExist() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 1L);
+
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), 999L
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("이미 사용된 쿠폰을 적용하면 409 Conflict를 반환한다.")
+        @Test
+        void returnsConflict_whenCouponAlreadyUsed() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 10L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            OrderV1Dto.CreateRequest firstRequest = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
+            );
+            testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(firstRequest, LOGIN_ID, LOGIN_PW), Void.class);
+
+            OrderV1Dto.CreateRequest secondRequest = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(secondRequest, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
     }
 }

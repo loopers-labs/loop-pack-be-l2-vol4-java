@@ -34,7 +34,7 @@ public class OrderV1Controller {
     ) {
         OrderInfo info = orderFacade.createOrder(loginId, loginPw, request.items().stream()
                 .map(item -> new OrderFacade.OrderItemDto(item.productId(), item.quantity()))
-                .toList());
+                .toList(), request.couponId());
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 

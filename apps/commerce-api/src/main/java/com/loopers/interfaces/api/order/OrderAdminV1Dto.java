@@ -21,7 +21,7 @@ public class OrderAdminV1Dto {
                     order.getId(),
                     order.getUserId(),
                     order.getStatus().name(),
-                    order.getTotalPrice(),
+                    order.getOriginalPrice(),
                     order.getCreatedAt()
             );
         }
@@ -40,7 +40,7 @@ public class OrderAdminV1Dto {
                     order.getId(),
                     order.getUserId(),
                     order.getStatus().name(),
-                    order.getTotalPrice(),
+                    order.getOriginalPrice(),
                     order.getItems().stream().map(OrderItemResponse::from).toList(),
                     order.getCreatedAt()
             );

@@ -1,5 +1,7 @@
 package com.loopers.domain.coupon;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -10,9 +12,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
+
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -125,6 +132,106 @@ class IssuedCouponServiceTest {
                     () -> assertThat(result.getUserId()).isEqualTo(userId),
                     () -> assertThat(result.getStatus()).isEqualTo(CouponStatus.AVAILABLE)
             );
+        }
+    }
+
+    @DisplayName("발급 쿠폰을 ID와 유저 ID로 조회할 때,")
+    @Nested
+    class GetByIdForUser {
+
+        @DisplayName("존재하는 발급 쿠폰이고 소유자이면 IssuedCouponModel이 반환된다.")
+        @Test
+        void returnsIssuedCouponModel_whenExistsAndOwner() {
+            // given
+            Long issuedCouponId = 1L;
+            Long userId = 100L;
+            IssuedCouponModel issued = new IssuedCouponModel(1L, userId);
+            when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issued));
+
+            // when
+            IssuedCouponModel result = issuedCouponService.getMyIssuedCoupon(issuedCouponId, userId);
+
+            // then
+            assertThat(result.getUserId()).isEqualTo(userId);
+        }
+
+        @DisplayName("존재하지 않는 발급 쿠폰 ID이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenIssuedCouponDoesNotExist() {
+            // given
+            when(issuedCouponRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> issuedCouponService.getMyIssuedCoupon(999L, 100L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("쿠폰 소유자가 아니면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbiddenException_whenUserIsNotOwner() {
+            // given
+            Long issuedCouponId = 1L;
+            IssuedCouponModel issued = new IssuedCouponModel(1L, 100L);
+            when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issued));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> issuedCouponService.getMyIssuedCoupon(issuedCouponId, 999L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+    }
+
+    @DisplayName("발급 쿠폰을 사용할 때,")
+    @Nested
+    class Use {
+
+        @DisplayName("AVAILABLE 상태이면 사용 처리되어 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrow_whenStatusIsAvailable() {
+            // given
+            Long issuedCouponId = 1L;
+            IssuedCouponModel issued = new IssuedCouponModel(1L, 100L);
+            when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issued));
+            when(issuedCouponRepository.save(issued)).thenReturn(issued);
+
+            // when & then
+            assertDoesNotThrow(() -> issuedCouponService.use(issuedCouponId));
+        }
+
+        @DisplayName("존재하지 않는 발급 쿠폰 ID이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenIssuedCouponDoesNotExist() {
+            // given
+            when(issuedCouponRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> issuedCouponService.use(999L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("이미 사용된 쿠폰이면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflictException_whenCouponAlreadyUsed() {
+            // given
+            Long issuedCouponId = 1L;
+            IssuedCouponModel issued = new IssuedCouponModel(1L, 100L);
+            ReflectionTestUtils.setField(issued, "status", CouponStatus.USED);
+            when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issued));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> issuedCouponService.use(issuedCouponId));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 }

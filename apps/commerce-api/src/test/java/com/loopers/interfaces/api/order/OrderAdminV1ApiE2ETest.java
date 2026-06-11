@@ -106,8 +106,8 @@ class OrderAdminV1ApiE2ETest {
             saveUser();
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)));
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null);
 
             // when
             ParameterizedTypeReference<ApiResponse<PageResponse<OrderAdminV1Dto.OrderListResponse>>> responseType =
@@ -179,7 +179,7 @@ class OrderAdminV1ApiE2ETest {
             UserModel user = saveUser();
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
-            Long orderId = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L))).id();
+            Long orderId = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null).id();
 
             // when
             ParameterizedTypeReference<ApiResponse<OrderAdminV1Dto.OrderDetailResponse>> responseType =

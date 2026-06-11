@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Embeddable
 public record DiscountPolicy(
@@ -30,6 +31,13 @@ public record DiscountPolicy(
                 throw new CoreException(ErrorType.BAD_REQUEST, "할인율은 100을 초과할 수 없습니다.");
             }
         }
+    }
+
+    public BigDecimal calculateDiscountAmount(BigDecimal originalPrice) {
+        return switch (type) {
+            case FIXED -> value.min(originalPrice);
+            case RATE -> originalPrice.multiply(value).divide(new BigDecimal("100"), 0, RoundingMode.FLOOR);
+        };
     }
 
 }
