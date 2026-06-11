@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.DiscountResult;
+import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderLines;
 import com.loopers.domain.order.OrderPeriod;
@@ -53,7 +54,9 @@ public class OrderFacade {
 
         OrderResult result = orderService.create(userId, lines, discount.amount(), discount.usedCouponId());
 
-        result.items().forEach(item -> stockService.decrease(item.getProductId(), item.getQuantity()));
+        Map<Long, Integer> quantitiesByProductId = result.items().stream()
+            .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
+        stockService.decreaseAll(quantitiesByProductId);
 
         return OrderInfo.from(result.order(), result.items());
     }
