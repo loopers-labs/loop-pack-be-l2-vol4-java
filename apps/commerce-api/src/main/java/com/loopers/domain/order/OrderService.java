@@ -40,6 +40,13 @@ public class OrderService {
         return orderRepository.save(order).getId();
     }
 
+    public void completeOrder(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND));
+        order.complete();
+        orderRepository.save(order);
+    }
+
     @Transactional(readOnly = true)
     public List<OrderModel> getOrders(Long userId) {
         return orderRepository.findAllByUserId(userId);

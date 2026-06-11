@@ -59,6 +59,17 @@ public class CouponService {
                 .toList();
     }
 
+    public void completeCouponUse(Long couponIssueId, java.math.BigDecimal orderAmount) {
+        CouponIssue issue = couponRepository.findIssueById(couponIssueId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 발급 이력입니다."));
+
+        CouponTemplate template = couponRepository.findTemplateById(issue.getCouponTemplateId())
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
+
+        issue.use(template, orderAmount, java.time.LocalDateTime.now());
+        couponRepository.saveIssue(issue);
+    }
+
     @Transactional(readOnly = true)
     public java.math.BigDecimal calculateDiscount(Long couponIssueId, java.math.BigDecimal orderAmount) {
         CouponIssue issue = couponRepository.findIssueById(couponIssueId)

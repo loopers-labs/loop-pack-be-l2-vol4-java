@@ -38,6 +38,9 @@ class OrderFacadeTest {
     @Mock
     private CouponService couponService;
 
+    @Mock
+    private com.loopers.domain.payment.PaymentService paymentService;
+
     @Test
     @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다.")
     void createOrder_Success_ShouldCallServices() {
@@ -87,5 +90,30 @@ class OrderFacadeTest {
         assertThat(orderId).isEqualTo(100L);
         verify(stockService).decreaseStocksWithLock(anyList());
         verify(orderService).createPendingOrder(eq(userId), anyList(), eq(couponIssueId), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("결제 승인 완료 후처리 요청 시 결제 내역 저장, 주문 완료 처리, 쿠폰 사용 완료 처리가 순차적으로 수행된다.")
+    void approvePayment_Success() {
+        // given
+        Long orderId = 100L;
+        Long couponIssueId = 42L;
+        java.math.BigDecimal totalOriginalAmount = new java.math.BigDecimal("400000");
+        java.math.BigDecimal totalPaymentAmount = new java.math.BigDecimal("360000");
+        com.loopers.domain.payment.PaymentMethod method = com.loopers.domain.payment.PaymentMethod.CARD;
+        String transactionId = "tx_abc123";
+        java.time.LocalDateTime approvedAt = java.time.LocalDateTime.now();
+
+        com.loopers.domain.order.OrderModel order = new com.loopers.domain.order.OrderModel(1L, couponIssueId, totalOriginalAmount, new java.math.BigDecimal("40000"), totalPaymentAmount);
+        given(orderService.getOrder(orderId)).willReturn(order);
+
+        // when
+        orderFacade.approvePayment(orderId, method, transactionId, approvedAt);
+
+        // then
+        verify(orderService).getOrder(orderId);
+        verify(paymentService).savePayment(eq(orderId), eq(method), eq(totalPaymentAmount), eq(transactionId), eq(approvedAt));
+        verify(orderService).completeOrder(orderId);
+        verify(couponService).completeCouponUse(couponIssueId, totalOriginalAmount);
     }
 }

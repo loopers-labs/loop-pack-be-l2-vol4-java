@@ -1,6 +1,7 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.StockService;
@@ -22,6 +23,7 @@ public class OrderFacade {
     private final ProductService productService;
     private final StockService stockService;
     private final com.loopers.domain.coupon.CouponService couponService;
+    private final com.loopers.domain.payment.PaymentService paymentService;
 
     @Transactional
     public Long createOrder(Long userId, OrderCreateRequest request) {
@@ -107,5 +109,21 @@ public class OrderFacade {
                 }).toList();
 
         return orderService.createPendingOrder(userId, orderItemRequests, couponIssueId, totalOriginalAmount, discount, totalPaymentAmount);
+    }
+
+    @Transactional
+    public void approvePayment(Long orderId, com.loopers.domain.payment.PaymentMethod method, String transactionId, java.time.LocalDateTime approvedAt) {
+        OrderModel order = orderService.getOrder(orderId);
+        
+        // 1. 결제 내역 저장
+        paymentService.savePayment(orderId, method, order.getTotalPaymentAmount(), transactionId, approvedAt);
+
+        // 2. 주문 완료 처리
+        orderService.completeOrder(orderId);
+
+        // 3. 쿠폰 사용 완료 처리
+        if (order.getCouponIssueId() != null) {
+            couponService.completeCouponUse(order.getCouponIssueId(), order.getTotalOriginalAmount());
+        }
     }
 }
