@@ -3,11 +3,13 @@ package com.loopers.domain.stock;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class StockService {
@@ -65,7 +67,12 @@ public class StockService {
      * SELECT FOR UPDATE 없이 단일 UPDATE per unique product.
      */
     public void releaseAll(Map<UUID, Integer> productQtyMap) {
-        productQtyMap.forEach((productId, qty) -> stockRepository.releaseByProductId(productId, qty));
+        productQtyMap.forEach((productId, qty) -> {
+            int affected = stockRepository.releaseByProductId(productId, qty);
+            if (affected == 0) {
+                log.error("재고 해제 실패 — 데이터 불일치 [productId={}, qty={}]", productId, qty);
+            }
+        });
     }
 
     /**
