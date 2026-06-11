@@ -120,6 +120,13 @@ class OrderV1ApiE2ETest {
         return headers;
     }
 
+    /** 주문 생성용 — 매 호출마다 새 UUID를 Idempotency-Key로 설정 */
+    private HttpHeaders orderHeaders() {
+        HttpHeaders headers = authHeaders();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        return headers;
+    }
+
     /** PG 콜백용 — HMAC 서명 + JSON Content-Type 헤더 */
     private HttpHeaders pgHeaders(String rawBody) {
         HttpHeaders headers = new HttpHeaders();
@@ -204,7 +211,7 @@ class OrderV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -222,7 +229,7 @@ class OrderV1ApiE2ETest {
         void returnsNotFound_whenCouponNotExists() {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, UUID.randomUUID()), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, UUID.randomUUID()), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -235,12 +242,12 @@ class OrderV1ApiE2ETest {
             UUID templateId = createCouponTemplate(CouponType.FIXED, 3000L, null);
             UUID couponId = issueCoupon(templateId);
             testRestTemplate.exchange(ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<Void>() {});
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -256,7 +263,7 @@ class OrderV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -272,7 +279,7 @@ class OrderV1ApiE2ETest {
             // 1차 주문 — 쿠폰 사용
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -289,7 +296,7 @@ class OrderV1ApiE2ETest {
             // 같은 쿠폰으로 재주문 → 성공 (복구 확인)
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> reorder = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -305,7 +312,7 @@ class OrderV1ApiE2ETest {
             // 주문(쿠폰 사용) → 결제 확정(CONFIRMED)
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -324,7 +331,7 @@ class OrderV1ApiE2ETest {
             // 같은 쿠폰으로 재주문 → 성공 (복구 확인)
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> reorder = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(createRequestWithCoupon(2, couponId), authHeaders()),
+                new HttpEntity<>(createRequestWithCoupon(2, couponId), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             assertThat(reorder.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -355,7 +362,7 @@ class OrderV1ApiE2ETest {
                         start.await();
                         ResponseEntity<ApiResponse<Void>> r = testRestTemplate.exchange(
                             ORDERS_URL, HttpMethod.POST,
-                            new HttpEntity<>(createRequestWithCoupon(1, couponId), authHeaders()),
+                            new HttpEntity<>(createRequestWithCoupon(1, couponId), orderHeaders()),
                             new ParameterizedTypeReference<>() {}
                         );
                         if (r.getStatusCode() == HttpStatus.OK) success.incrementAndGet();
@@ -402,7 +409,7 @@ class OrderV1ApiE2ETest {
                         start.await();
                         ResponseEntity<ApiResponse<Void>> r = testRestTemplate.exchange(
                             ORDERS_URL, HttpMethod.POST,
-                            new HttpEntity<>(orderRequest(pid, 1), authHeaders()),
+                            new HttpEntity<>(orderRequest(pid, 1), orderHeaders()),
                             new ParameterizedTypeReference<>() {}
                         );
                         if (r.getStatusCode() == HttpStatus.OK) success.incrementAndGet();
@@ -434,7 +441,7 @@ class OrderV1ApiE2ETest {
         void stockConfirmedOnce_underDuplicateCallback() throws InterruptedException {
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -483,7 +490,7 @@ class OrderV1ApiE2ETest {
         void returnsOrder_whenValid() {
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -492,6 +499,28 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().status().name()).isEqualTo("PENDING"),
                 () -> assertThat(response.getBody().data().pgAmount()).isEqualTo(ProductFixture.PRICE * 2),
                 () -> assertThat(response.getBody().data().items()).hasSize(1)
+            );
+        }
+
+        @DisplayName("동일 멱등 키로 재요청 시, 새 주문 생성 없이 기존 주문을 반환한다.")
+        @Test
+        void returnsExistingOrder_whenSameIdempotencyKey() {
+            HttpHeaders headers = orderHeaders();
+
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> first = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(validCreateRequest(), headers),
+                new ParameterizedTypeReference<>() {}
+            );
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> second = testRestTemplate.exchange(
+                ORDERS_URL, HttpMethod.POST,
+                new HttpEntity<>(validCreateRequest(), headers),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertAll(
+                () -> assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(second.getBody().data().id()).isEqualTo(first.getBody().data().id())
             );
         }
 
@@ -552,7 +581,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -591,7 +620,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsList_whenOwnUser() {
             // arrange
-            testRestTemplate.exchange(ORDERS_URL, HttpMethod.POST, new HttpEntity<>(validCreateRequest(), authHeaders()), new ParameterizedTypeReference<>() {});
+            testRestTemplate.exchange(ORDERS_URL, HttpMethod.POST, new HttpEntity<>(validCreateRequest(), orderHeaders()), new ParameterizedTypeReference<>() {});
 
             String startAt = ZonedDateTime.now(ZoneOffset.UTC).minusDays(1).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
             String endAt   = ZonedDateTime.now(ZoneOffset.UTC).plusDays(1).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
@@ -637,7 +666,7 @@ class OrderV1ApiE2ETest {
             // arrange — 주문 생성 → 결제 확정
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -669,7 +698,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -695,7 +724,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -722,7 +751,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -748,7 +777,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();
@@ -775,7 +804,7 @@ class OrderV1ApiE2ETest {
             // arrange
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> created = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(validCreateRequest(), authHeaders()),
+                new HttpEntity<>(validCreateRequest(), orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
             UUID orderId = created.getBody().data().id();

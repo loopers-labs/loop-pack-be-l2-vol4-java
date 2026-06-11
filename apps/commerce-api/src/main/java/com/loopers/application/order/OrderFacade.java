@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,11 +37,16 @@ public class OrderFacade {
     private final StockService stockService;
     private final UserCouponService userCouponService;
 
-    /** 주문 생성 — 상품 유효성 검증 + 쿠폰 적용 + 재고 예약 + 주문 저장 (단일 트랜잭션) */
+    /** 주문 생성 — 멱등 키 pre-check 후 상품 유효성 검증 + 쿠폰 적용 + 재고 예약 + 주문 저장 (단일 트랜잭션) */
     @Transactional
     public OrderInfo create(UUID userId, List<OrderItemRequest> itemRequests, UUID couponId,
-                            String receiverName, String receiverPhone, String zipCode, String address, String detailAddress) {
-        OrderModel order = orderService.create(userId, receiverName, receiverPhone, zipCode, address, detailAddress);
+                            String receiverName, String receiverPhone, String zipCode, String address, String detailAddress,
+                            String idempotencyKey) {
+        Optional<OrderModel> existing = orderService.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            return OrderInfo.from(existing.get());
+        }
+        OrderModel order = orderService.create(userId, idempotencyKey, receiverName, receiverPhone, zipCode, address, detailAddress);
 
         // 1단계: 상품 검증 + 아이템 추가
         // (brand lazy load를 reserve() 전에 완료 — reserve의 clearAutomatically가 1LC 클리어하기 때문)

@@ -32,6 +32,9 @@ public interface OrderRepository {
     /** 어드민 전체 주문 목록 */
     Page<OrderModel> findAll(Pageable pageable);
 
+    /** 멱등 키 단건 조회 */
+    Optional<OrderModel> findByIdempotencyKey(String idempotencyKey);
+
     /** 스케줄러 배치 상태 변경 — 단일 UPDATE */
     int failAllByIds(List<UUID> orderIds, ZonedDateTime now);
 }

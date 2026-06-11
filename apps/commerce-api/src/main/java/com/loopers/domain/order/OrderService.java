@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -17,9 +18,14 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    public OrderModel create(UUID userId, String receiverName, String receiverPhone,
+    public OrderModel create(UUID userId, String idempotencyKey, String receiverName, String receiverPhone,
                              String zipCode, String address, String detailAddress) {
-        return orderRepository.save(new OrderModel(userId, receiverName, receiverPhone, zipCode, address, detailAddress));
+        return orderRepository.save(new OrderModel(userId, idempotencyKey, receiverName, receiverPhone,
+                                                   zipCode, address, detailAddress));
+    }
+
+    public Optional<OrderModel> findByIdempotencyKey(String idempotencyKey) {
+        return orderRepository.findByIdempotencyKey(idempotencyKey);
     }
 
     public void addItem(OrderModel order, OrderItemModel item) {

@@ -31,6 +31,9 @@ public class OrderModel extends BaseEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
+    @Column(name = "idempotency_key", unique = true, nullable = false, updatable = false)
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
@@ -54,9 +57,10 @@ public class OrderModel extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderItemModel> items = new ArrayList<>();
 
-    public OrderModel(UUID userId, String receiverName, String receiverPhone,
+    public OrderModel(UUID userId, String idempotencyKey, String receiverName, String receiverPhone,
                       String zipCode, String address, String detailAddress) {
         this.userId = userId;
+        this.idempotencyKey = idempotencyKey;
         this.shippingInfo = new ShippingInfo(receiverName, receiverPhone, zipCode, address, detailAddress);
         this.originalAmount = 0L;
         this.discountAmount = 0L;

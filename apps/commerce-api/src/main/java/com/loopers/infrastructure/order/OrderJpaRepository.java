@@ -40,6 +40,8 @@ public interface OrderJpaRepository extends JpaRepository<OrderModel, UUID> {
         Pageable pageable
     );
 
+    Optional<OrderModel> findByIdempotencyKey(String idempotencyKey);
+
     /** 배치 주문 만료 처리 — @PreUpdate 우회하므로 updatedAt 직접 설정 */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE OrderModel o SET o.status = 'FAILED', o.updatedAt = :now WHERE o.id IN :ids AND o.status = 'PENDING'")

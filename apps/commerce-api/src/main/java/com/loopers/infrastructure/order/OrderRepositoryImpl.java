@@ -59,6 +59,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdempotencyKey(String idempotencyKey) {
+        return orderJpaRepository.findByIdempotencyKey(idempotencyKey);
+    }
+
+    @Override
     public int failAllByIds(List<UUID> orderIds, ZonedDateTime now) {
         return orderJpaRepository.failAllByIds(orderIds, now);
     }
