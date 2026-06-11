@@ -4,6 +4,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,9 @@ class ProductRepositoryIntegrationTest extends ProductRepositoryContractTest {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private EntityManager em;
+
     @Override
     ProductRepository repository() {
         return productRepository;
@@ -32,6 +36,7 @@ class ProductRepositoryIntegrationTest extends ProductRepositoryContractTest {
 
         // when
         productRepository.increaseLikeCount(product.getId());
+        em.clear();
 
         // then
         ProductModel found = productRepository.find(product.getId()).orElseThrow();
@@ -47,6 +52,7 @@ class ProductRepositoryIntegrationTest extends ProductRepositoryContractTest {
 
         // when
         productRepository.decreaseLikeCount(product.getId());
+        em.clear();
 
         // then
         ProductModel found = productRepository.find(product.getId()).orElseThrow();
