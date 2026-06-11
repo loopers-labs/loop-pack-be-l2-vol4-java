@@ -1,7 +1,7 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.domain.order.vo.OrderPayment;
+import com.loopers.domain.order.vo.OrderAmountSnapshot;
 import com.loopers.domain.order.vo.Orderer;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -40,7 +40,7 @@ public class Order extends BaseEntity {
     private Orderer orderer;
 
     @Embedded
-    private OrderPayment payment;
+    private OrderAmountSnapshot amountSnapshot;
 
     @Column(name = "applied_user_coupon_id")
     private Long appliedUserCouponId;
@@ -55,23 +55,23 @@ public class Order extends BaseEntity {
     private List<OrderItem> items = new ArrayList<>();
 
     private Order(Long userId, OrderItems items) {
-        this(userId, items, null, OrderPayment.withoutDiscount(items.calculateTotalPrice()));
+        this(userId, items, null, OrderAmountSnapshot.withoutDiscount(items.calculateTotalPrice()));
     }
 
-    private Order(Long userId, OrderItems items, Long userCouponId, OrderPayment payment) {
+    private Order(Long userId, OrderItems items, Long userCouponId, OrderAmountSnapshot amountSnapshot) {
         this.orderer = Orderer.of(userId);
         this.items = new ArrayList<>(items.values());
         this.appliedUserCouponId = userCouponId;
-        this.payment = requirePayment(items.calculateTotalPrice(), payment);
+        this.amountSnapshot = requireAmountSnapshot(items.calculateTotalPrice(), amountSnapshot);
     }
 
     public static Order create(Long userId, OrderItems items) {
         return new Order(userId, items);
     }
 
-    public static Order create(Long userId, OrderItems items, Long userCouponId, OrderPayment payment) {
-        validateCouponPayment(userCouponId, payment);
-        return new Order(userId, items, userCouponId, payment);
+    public static Order create(Long userId, OrderItems items, Long userCouponId, OrderAmountSnapshot amountSnapshot) {
+        validateCouponDiscount(userCouponId, amountSnapshot);
+        return new Order(userId, items, userCouponId, amountSnapshot);
     }
 
     public List<OrderItem> getItems() {
@@ -87,7 +87,7 @@ public class Order extends BaseEntity {
     }
 
     public long getOrderTotalPrice() {
-        return payment.orderAmount();
+        return amountSnapshot.orderAmount();
     }
 
     public Long getAppliedUserCouponId() {
@@ -95,28 +95,28 @@ public class Order extends BaseEntity {
     }
 
     public long getDiscountAmount() {
-        return payment.discountAmount();
+        return amountSnapshot.discountAmount();
     }
 
     public long getPaymentAmount() {
-        return payment.paymentAmount();
+        return amountSnapshot.paymentAmount();
     }
 
-    private static OrderPayment requirePayment(long totalPrice, OrderPayment payment) {
-        if (payment == null) {
+    private static OrderAmountSnapshot requireAmountSnapshot(long totalPrice, OrderAmountSnapshot amountSnapshot) {
+        if (amountSnapshot == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 결제 금액은 비어있을 수 없습니다.");
         }
-        if (payment.orderAmount() != totalPrice) {
+        if (amountSnapshot.orderAmount() != totalPrice) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 상품 금액과 결제 스냅샷의 금액이 일치하지 않습니다.");
         }
-        return payment;
+        return amountSnapshot;
     }
 
-    private static void validateCouponPayment(Long userCouponId, OrderPayment payment) {
-        if (payment == null) {
+    private static void validateCouponDiscount(Long userCouponId, OrderAmountSnapshot amountSnapshot) {
+        if (amountSnapshot == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 결제 금액은 비어있을 수 없습니다.");
         }
-        if (userCouponId == null && payment.hasDiscount()) {
+        if (userCouponId == null && amountSnapshot.hasDiscount()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰이 없는 주문에는 할인 금액을 적용할 수 없습니다.");
         }
     }

@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Embeddable
-public class OrderPayment {
+public class OrderAmountSnapshot {
 
     @Column(name = "order_total_price", nullable = false)
     private long orderAmount;
@@ -24,7 +24,7 @@ public class OrderPayment {
     @Column(name = "payment_amount", nullable = false)
     private long paymentAmount;
 
-    private OrderPayment(long orderAmount, long discountAmount, long paymentAmount) {
+    private OrderAmountSnapshot(long orderAmount, long discountAmount, long paymentAmount) {
         if (orderAmount < 0 || discountAmount < 0 || paymentAmount < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 금액은 0 이상이어야 합니다.");
         }
@@ -37,12 +37,12 @@ public class OrderPayment {
         this.paymentAmount = paymentAmount;
     }
 
-    public static OrderPayment withoutDiscount(long orderAmount) {
-        return new OrderPayment(orderAmount, 0L, orderAmount);
+    public static OrderAmountSnapshot withoutDiscount(long orderAmount) {
+        return new OrderAmountSnapshot(orderAmount, 0L, orderAmount);
     }
 
-    public static OrderPayment withDiscount(long orderAmount, long discountAmount) {
-        return new OrderPayment(orderAmount, discountAmount, orderAmount - discountAmount);
+    public static OrderAmountSnapshot withDiscount(long orderAmount, long discountAmount) {
+        return new OrderAmountSnapshot(orderAmount, discountAmount, orderAmount - discountAmount);
     }
 
     public long orderAmount() {

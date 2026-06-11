@@ -1,6 +1,6 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.order.vo.OrderPayment;
+import com.loopers.domain.order.vo.OrderAmountSnapshot;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -16,15 +16,15 @@ class OrderTest {
 
     @DisplayName("쿠폰 할인 결과가 주어지면, 주문 금액 스냅샷을 저장한다.")
     @Test
-    void createsOrderWithCouponPaymentSnapshot_whenCouponDiscountIsProvided() {
+    void createsOrderWithAmountSnapshot_whenCouponDiscountIsProvided() {
         // arrange
         Long userId = 1L;
         Long userCouponId = 10L;
         OrderItem iphone = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 1);
-        OrderPayment payment = OrderPayment.withDiscount(1_550_000L, 2_000L);
+        OrderAmountSnapshot amountSnapshot = OrderAmountSnapshot.withDiscount(1_550_000L, 2_000L);
 
         // act
-        Order order = Order.create(userId, OrderItems.of(List.of(iphone)), userCouponId, payment);
+        Order order = Order.create(userId, OrderItems.of(List.of(iphone)), userCouponId, amountSnapshot);
 
         // assert
         assertAll(
@@ -40,10 +40,10 @@ class OrderTest {
     void paymentIsZero_whenDiscountEqualsOrderAmount() {
         // arrange
         OrderItem item = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 1);
-        OrderPayment payment = OrderPayment.withDiscount(1_550_000L, 1_550_000L);
+        OrderAmountSnapshot amountSnapshot = OrderAmountSnapshot.withDiscount(1_550_000L, 1_550_000L);
 
         // act
-        Order order = Order.create(1L, OrderItems.of(List.of(item)), 10L, payment);
+        Order order = Order.create(1L, OrderItems.of(List.of(item)), 10L, amountSnapshot);
 
         // assert
         assertThat(order.getPaymentAmount()).isZero();

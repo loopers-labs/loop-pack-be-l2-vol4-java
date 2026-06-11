@@ -7,7 +7,7 @@ import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItems;
 import com.loopers.domain.order.OrderSearchPeriod;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.order.vo.OrderPayment;
+import com.loopers.domain.order.vo.OrderAmountSnapshot;
 import com.loopers.domain.stock.ProductStockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -31,17 +31,17 @@ public class OrderFacade {
     @Transactional
     public OrderInfo createOrder(CreateOrderCommand command) {
         OrderItems orderItems = orderItemFactory.create(command.items());
-        OrderPayment payment = applyCoupon(command, orderItems);
+        OrderAmountSnapshot amountSnapshot = applyCoupon(command, orderItems);
         productStockService.deduct(orderItems.quantitiesByProductId());
-        Order order = Order.create(command.userId(), orderItems, command.userCouponId(), payment);
+        Order order = Order.create(command.userId(), orderItems, command.userCouponId(), amountSnapshot);
         return OrderInfo.from(orderService.saveOrder(order));
     }
 
-    private OrderPayment applyCoupon(CreateOrderCommand command, OrderItems orderItems) {
+    private OrderAmountSnapshot applyCoupon(CreateOrderCommand command, OrderItems orderItems) {
         long total = orderItems.calculateTotalPrice();
         CouponUse couponUse = CouponUse.create(command.userId(), command.userCouponId(), total, ZonedDateTime.now());
         CouponDiscount discount = couponService.use(couponUse);
-        return OrderPayment.withDiscount(total, discount.value());
+        return OrderAmountSnapshot.withDiscount(total, discount.value());
     }
 
     @Transactional(readOnly = true)
