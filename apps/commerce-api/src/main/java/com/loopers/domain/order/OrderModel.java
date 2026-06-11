@@ -66,6 +66,9 @@ public class OrderModel extends BaseEntity {
             .reduce(Money.ZERO, Money::add);
         this.issuedCouponId = issuedCouponId;
         this.discountAmount = discountAmount == null ? Money.ZERO : discountAmount;
+        if (issuedCouponId == null && this.discountAmount.value() > 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 없이는 할인을 적용할 수 없습니다.");
+        }
         this.finalAmount = this.totalAmount.subtract(this.discountAmount);
     }
 

@@ -125,6 +125,13 @@ class CouponTemplateTest {
             CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, 1_000L, null, FUTURE);
             assertThat(template.isExpired(FUTURE.minusSeconds(1))).isFalse();
         }
+
+        @DisplayName("기준 시각이 만료일시와 정확히 같으면 만료된 것으로 판정한다")
+        @Test
+        void expired_whenAtEqualsExpiredAt() {
+            CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, 1_000L, null, FUTURE);
+            assertThat(template.isExpired(FUTURE)).isTrue();
+        }
     }
 
     @DisplayName("할인액 계산은 타입에 위임된다")

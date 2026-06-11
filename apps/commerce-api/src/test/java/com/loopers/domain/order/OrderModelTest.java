@@ -109,6 +109,14 @@ class OrderModelTest {
                 () -> new OrderModel(USER_ID, List.of(item(101L, 10_000L, 1)), 1L, Money.of(10_001L)));
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("쿠폰 없이 할인액이 0보다 크면 BAD_REQUEST 예외가 발생한다")
+        @Test
+        void throwsBadRequest_whenDiscountWithoutCoupon() {
+            CoreException ex = assertThrows(CoreException.class,
+                () -> new OrderModel(USER_ID, List.of(item(101L, 10_000L, 1)), null, Money.of(1_000L)));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
     }
 
     @DisplayName("주문 항목 노출 시")

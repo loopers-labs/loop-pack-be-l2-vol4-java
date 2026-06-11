@@ -74,7 +74,7 @@ public class CouponTemplate extends BaseEntity {
     }
 
     public boolean isExpired(ZonedDateTime at) {
-        return at.isAfter(expiredAt);
+        return !at.isBefore(expiredAt);
     }
 
     /** 할인액을 계산한다. 최소 주문 금액·만료 검증은 호출 측 책임이다. */

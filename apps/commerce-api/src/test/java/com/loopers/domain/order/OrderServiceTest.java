@@ -52,6 +52,22 @@ class OrderServiceTest {
                 () -> assertThat(result.getItems()).hasSize(2)
             );
         }
+
+        @DisplayName("쿠폰과 할인액을 전달하면 issuedCouponId·discountAmount·finalAmount가 반영된 주문이 저장된다")
+        @Test
+        void appliesCouponAndDiscount() {
+            OrderItem a = item(1L, 10_000L, 2);   // 20_000
+            OrderItem b = item(2L, 15_000L, 1);   // 15_000
+            when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            OrderModel result = orderService.place(1L, List.of(a, b), 10L, Money.of(5_000L));
+
+            assertAll(
+                () -> assertThat(result.getIssuedCouponId()).isEqualTo(10L),
+                () -> assertThat(result.getDiscountAmount().value()).isEqualTo(5_000L),
+                () -> assertThat(result.getFinalAmount().value()).isEqualTo(30_000L)
+            );
+        }
     }
 
     @DisplayName("getById 시")
