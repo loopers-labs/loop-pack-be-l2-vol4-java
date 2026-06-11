@@ -9,7 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserCouponRepository {
-    UserCouponModel save(UserCouponModel userCoupon);
+    /** 저장 + 즉시 flush — unique 충돌을 호출 지점에서 DataIntegrityViolationException으로 감지 */
+    UserCouponModel saveAndFlush(UserCouponModel userCoupon);
 
     Optional<UserCouponModel> find(UUID id);
 

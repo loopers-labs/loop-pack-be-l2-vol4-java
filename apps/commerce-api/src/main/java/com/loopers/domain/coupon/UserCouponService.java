@@ -25,7 +25,7 @@ public class UserCouponService {
             userId, template.getId(), template.getType(), template.getValue(),
             template.getMinOrderAmount(), template.getExpiredAt());
         try {
-            return userCouponRepository.save(userCoupon);
+            return userCouponRepository.saveAndFlush(userCoupon);
         } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
         }

@@ -7,7 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CouponTemplateRepository {
-    CouponTemplateModel save(CouponTemplateModel template);
+    /** 저장 + 즉시 flush — unique 충돌을 호출 지점에서 DataIntegrityViolationException으로 감지 */
+    CouponTemplateModel saveAndFlush(CouponTemplateModel template);
 
     /** 어드민용 — 삭제된 템플릿 포함 단건 조회 */
     Optional<CouponTemplateModel> find(UUID id);

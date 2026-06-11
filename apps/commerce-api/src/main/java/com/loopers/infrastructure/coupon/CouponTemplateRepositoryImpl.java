@@ -16,7 +16,7 @@ public class CouponTemplateRepositoryImpl implements CouponTemplateRepository {
     private final CouponTemplateJpaRepository couponTemplateJpaRepository;
 
     @Override
-    public CouponTemplateModel save(CouponTemplateModel template) {
+    public CouponTemplateModel saveAndFlush(CouponTemplateModel template) {
         return couponTemplateJpaRepository.saveAndFlush(template);
     }
 

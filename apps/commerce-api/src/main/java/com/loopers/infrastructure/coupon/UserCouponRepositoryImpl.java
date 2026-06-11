@@ -18,7 +18,7 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     private final UserCouponJpaRepository userCouponJpaRepository;
 
     @Override
-    public UserCouponModel save(UserCouponModel userCoupon) {
+    public UserCouponModel saveAndFlush(UserCouponModel userCoupon) {
         return userCouponJpaRepository.saveAndFlush(userCoupon);
     }
 

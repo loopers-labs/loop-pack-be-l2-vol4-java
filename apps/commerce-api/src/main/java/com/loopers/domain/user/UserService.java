@@ -19,7 +19,7 @@ public class UserService {
     public UserModel register(UserModel user) {
         user.encodePassword(passwordEncoder);
         try {
-            return userRepository.save(user);
+            return userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT);
         }

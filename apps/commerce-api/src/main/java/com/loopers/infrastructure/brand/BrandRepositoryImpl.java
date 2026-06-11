@@ -16,7 +16,7 @@ public class BrandRepositoryImpl implements BrandRepository {
     private final BrandJpaRepository brandJpaRepository;
 
     @Override
-    public BrandModel save(BrandModel brand) {
+    public BrandModel saveAndFlush(BrandModel brand) {
         return brandJpaRepository.saveAndFlush(brand);
     }
 

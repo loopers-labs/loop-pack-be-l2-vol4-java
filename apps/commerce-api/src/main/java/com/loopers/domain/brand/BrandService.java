@@ -18,7 +18,7 @@ public class BrandService {
     /** 브랜드 생성. 동시 중복 생성은 DB unique 충돌로 CONFLICT (삭제된 브랜드명도 재등록 차단). */
     public BrandModel create(String name, String description) {
         try {
-            return brandRepository.save(new BrandModel(name, description));
+            return brandRepository.saveAndFlush(new BrandModel(name, description));
         } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 브랜드명입니다.");
         }
@@ -40,10 +40,15 @@ public class BrandService {
         return brandRepository.findAll(pageable);
     }
 
+    /** 브랜드 수정. 다른 브랜드명과 충돌 시 DB unique 충돌로 CONFLICT. */
     public BrandModel update(UUID id, String name, String description) {
         BrandModel brand = get(id);
         brand.update(name, description);
-        return brand;
+        try {
+            return brandRepository.saveAndFlush(brand);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 브랜드명입니다.");
+        }
     }
 
     public void delete(UUID id) {

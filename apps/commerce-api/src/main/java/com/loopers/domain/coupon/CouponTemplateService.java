@@ -20,7 +20,7 @@ public class CouponTemplateService {
     /** 템플릿 생성. 동시 중복 생성은 DB unique 충돌로 CONFLICT. */
     public CouponTemplateModel create(String name, CouponType type, Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
         try {
-            return couponTemplateRepository.save(new CouponTemplateModel(name, type, value, minOrderAmount, expiredAt));
+            return couponTemplateRepository.saveAndFlush(new CouponTemplateModel(name, type, value, minOrderAmount, expiredAt));
         } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 쿠폰명입니다.");
         }
@@ -42,10 +42,15 @@ public class CouponTemplateService {
         return couponTemplateRepository.findAll(pageable);
     }
 
+    /** 템플릿 수정. 다른 쿠폰명과 충돌 시 DB unique 충돌로 CONFLICT. */
     public CouponTemplateModel update(UUID id, String name, CouponType type, Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
         CouponTemplateModel template = get(id);
         template.update(name, type, value, minOrderAmount, expiredAt);
-        return template;
+        try {
+            return couponTemplateRepository.saveAndFlush(template);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "[name = " + name + "] 이미 존재하는 쿠폰명입니다.");
+        }
     }
 
     public void delete(UUID id) {

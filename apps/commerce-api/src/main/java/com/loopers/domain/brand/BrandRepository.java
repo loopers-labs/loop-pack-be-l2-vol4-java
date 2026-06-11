@@ -7,7 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface BrandRepository {
-    BrandModel save(BrandModel brand);
+    /** 저장 + 즉시 flush — unique 충돌을 호출 지점에서 DataIntegrityViolationException으로 감지 */
+    BrandModel saveAndFlush(BrandModel brand);
 
     /** 어드민용 — 삭제된 브랜드 포함 단건 조회 */
     Optional<BrandModel> find(UUID id);
