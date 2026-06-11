@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -39,6 +40,13 @@ public class ApiControllerAdvice {
         // 낙관적 락(@Version) 충돌 — 동시 요청 중 1건만 성공하고 나머지는 409 로 실패시킨다
         log.warn("OptimisticLockConflict : {}", e.getMessage());
         return failureResponse(ErrorType.CONFLICT, "동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(DataIntegrityViolationException e) {
+        // unique 제약 위반 — 멱등 체크를 비집고 들어온 동시 중복 요청(더블클릭 등)을 409 로 실패시킨다
+        log.warn("DataIntegrityViolation : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, "이미 처리되었거나 중복된 요청입니다.");
     }
 
     @ExceptionHandler

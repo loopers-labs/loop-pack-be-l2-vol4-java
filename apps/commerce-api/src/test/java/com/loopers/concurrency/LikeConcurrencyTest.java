@@ -137,6 +137,25 @@ class LikeConcurrencyTest {
         );
     }
 
+    @DisplayName("같은 유저가 동시에 20번 좋아요를 눌러도(더블클릭), 좋아요는 1개만 등록되고 카운트도 1이다.")
+    @Test
+    void likeCount_isOne_whenSameUserDoubleClicks() throws InterruptedException {
+        // arrange
+        AtomicInteger success = new AtomicInteger();
+        AtomicInteger fail = new AtomicInteger();
+        String loginId = loginIds.get(0);
+
+        // act — 멱등 체크를 비집고 들어온 중복은 unique 제약(409)으로 실패하지만, 정합성은 유지되어야 한다
+        runConcurrently(USER_COUNT, i -> likeFacade.like(loginId, productId), success, fail);
+
+        // assert
+        assertAll(
+            () -> assertThat(success.get() + fail.get()).isEqualTo(USER_COUNT),
+            () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
+            () -> assertThat(currentCount()).isEqualTo(1L)
+        );
+    }
+
     @DisplayName("전원이 좋아요한 상태에서 동시에 20명이 취소해도, 좋아요 수는 정확히 0이다.")
     @Test
     void likeCount_isExact_underConcurrentUnlikes() throws InterruptedException {
