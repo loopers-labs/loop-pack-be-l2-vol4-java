@@ -24,6 +24,9 @@ public class IssuedCouponService {
     }
 
     public IssuedCouponModel issue(Long couponTemplateId, Long userId) {
+        if (issuedCouponRepository.existsByCouponTemplateIdAndUserId(couponTemplateId, userId)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
+        }
         return issuedCouponRepository.save(new IssuedCouponModel(couponTemplateId, userId));
     }
 

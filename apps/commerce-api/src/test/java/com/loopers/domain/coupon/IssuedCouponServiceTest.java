@@ -120,6 +120,7 @@ class IssuedCouponServiceTest {
             // given
             Long couponTemplateId = 1L;
             Long userId = 10L;
+            when(issuedCouponRepository.existsByCouponTemplateIdAndUserId(couponTemplateId, userId)).thenReturn(false);
             when(issuedCouponRepository.save(any(IssuedCouponModel.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -132,6 +133,22 @@ class IssuedCouponServiceTest {
                     () -> assertThat(result.getUserId()).isEqualTo(userId),
                     () -> assertThat(result.getStatus()).isEqualTo(CouponStatus.AVAILABLE)
             );
+        }
+
+        @DisplayName("이미 발급받은 쿠폰이면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenCouponAlreadyIssued() {
+            // given
+            Long couponTemplateId = 1L;
+            Long userId = 10L;
+            when(issuedCouponRepository.existsByCouponTemplateIdAndUserId(couponTemplateId, userId)).thenReturn(true);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                    () -> issuedCouponService.issue(couponTemplateId, userId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 

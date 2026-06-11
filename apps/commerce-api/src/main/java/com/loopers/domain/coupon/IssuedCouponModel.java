@@ -8,7 +8,7 @@ import lombok.Getter;
 
 @Getter
 @Entity
-@Table(name = "issued_coupon")
+@Table(name = "issued_coupon", uniqueConstraints = @UniqueConstraint(columnNames = {"coupon_template_id", "user_id"}))
 public class IssuedCouponModel extends BaseEntity {
 
     private Long couponTemplateId;

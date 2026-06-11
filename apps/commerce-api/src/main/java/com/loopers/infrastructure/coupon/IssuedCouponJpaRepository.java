@@ -12,4 +12,6 @@ public interface IssuedCouponJpaRepository extends JpaRepository<IssuedCouponMod
     Page<IssuedCouponModel> findAllByCouponTemplateId(Long couponTemplateId, Pageable pageable);
 
     List<IssuedCouponModel> findAllByUserId(Long userId);
+
+    boolean existsByCouponTemplateIdAndUserId(Long couponTemplateId, Long userId);
 }
