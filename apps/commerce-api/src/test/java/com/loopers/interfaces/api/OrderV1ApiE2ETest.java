@@ -6,9 +6,9 @@ import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.DiscountPolicy;
 import com.loopers.domain.coupon.DiscountType;
 import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.domain.user.BirthDate;
 import com.loopers.domain.user.Email;
 import com.loopers.domain.user.EncodedPassword;
@@ -19,6 +19,7 @@ import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
@@ -53,6 +54,7 @@ class OrderV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final InventoryJpaRepository inventoryJpaRepository;
     private final UserJpaRepository userJpaRepository;
     private final CouponTemplateJpaRepository couponTemplateJpaRepository;
     private final UserCouponJpaRepository userCouponJpaRepository;
@@ -68,6 +70,7 @@ class OrderV1ApiE2ETest {
             TestRestTemplate testRestTemplate,
             BrandJpaRepository brandJpaRepository,
             ProductJpaRepository productJpaRepository,
+            InventoryJpaRepository inventoryJpaRepository,
             UserJpaRepository userJpaRepository,
             CouponTemplateJpaRepository couponTemplateJpaRepository,
             UserCouponJpaRepository userCouponJpaRepository,
@@ -77,6 +80,7 @@ class OrderV1ApiE2ETest {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.inventoryJpaRepository = inventoryJpaRepository;
         this.userJpaRepository = userJpaRepository;
         this.couponTemplateJpaRepository = couponTemplateJpaRepository;
         this.userCouponJpaRepository = userCouponJpaRepository;
@@ -93,8 +97,10 @@ class OrderV1ApiE2ETest {
     @BeforeEach
     void setUp() {
         Brand brand = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
-        productAId = productJpaRepository.save(Product.create(brand.getId(), "상품A", Money.of(1_000L), Stock.of(10))).getId();
-        productBId = productJpaRepository.save(Product.create(brand.getId(), "상품B", Money.of(2_000L), Stock.of(5))).getId();
+        productAId = productJpaRepository.save(Product.create(brand.getId(), "상품A", Money.of(1_000L))).getId();
+        productBId = productJpaRepository.save(Product.create(brand.getId(), "상품B", Money.of(2_000L))).getId();
+        inventoryJpaRepository.save(Inventory.create(productAId, 10));
+        inventoryJpaRepository.save(Inventory.create(productBId, 5));
         user1Id = createUser("user1");
     }
 
@@ -171,8 +177,8 @@ class OrderV1ApiE2ETest {
             assertThat(body.totalAmount()).isEqualTo(4_000L);
             assertThat(body.items()).hasSize(2);
 
-            assertThat(productJpaRepository.findById(productAId).orElseThrow().getStock().getQuantity()).isEqualTo(8);
-            assertThat(productJpaRepository.findById(productBId).orElseThrow().getStock().getQuantity()).isEqualTo(4);
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productAId).orElseThrow().getQuantity()).isEqualTo(8);
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productBId).orElseThrow().getQuantity()).isEqualTo(4);
         }
 
         @DisplayName("쿠폰을 지정하면 200 과 함께 할인 적용된 금액 3종을 반환하고 쿠폰이 사용 완료된다.")
@@ -205,7 +211,7 @@ class OrderV1ApiE2ETest {
             ResponseEntity<ApiResponse<OrderV1Dto.CreatedResponse>> response = place("user1", request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-            assertThat(productJpaRepository.findById(productAId).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productAId).orElseThrow().getQuantity()).isEqualTo(10);
         }
 
         @DisplayName("재고가 부족하면 400 을 반환하고 재고는 그대로 유지된다.")
@@ -214,7 +220,7 @@ class OrderV1ApiE2ETest {
             ResponseEntity<ApiResponse<OrderV1Dto.CreatedResponse>> response = place("user1", oneLine(productAId, 100));
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-            assertThat(productJpaRepository.findById(productAId).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productAId).orElseThrow().getQuantity()).isEqualTo(10);
         }
 
         @DisplayName("존재하지 않는 상품을 주문하면 404 를 반환한다.")

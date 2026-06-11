@@ -22,4 +22,6 @@ public interface ProductRepository {
     PageResult<Product> findAll(ProductCommand.Search search);
 
     int bulkSoftDeleteByBrandId(Long brandId);
+
+    List<Long> findIdsByBrandId(Long brandId);
 }

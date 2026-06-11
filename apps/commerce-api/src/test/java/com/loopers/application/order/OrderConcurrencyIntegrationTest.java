@@ -1,10 +1,11 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.utils.DatabaseCleanUp;
@@ -38,6 +39,9 @@ class OrderConcurrencyIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private InventoryJpaRepository inventoryJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     private Long brandId;
@@ -58,7 +62,8 @@ class OrderConcurrencyIntegrationTest {
         int stock = 100;
         int attempts = 150;
         Long productId = productJpaRepository.save(
-                Product.create(brandId, "한정수량상품", Money.of(1_000L), Stock.of(stock))).getId();
+                Product.create(brandId, "한정수량상품", Money.of(1_000L))).getId();
+        inventoryJpaRepository.save(Inventory.create(productId, stock));
 
         ExecutorService executor = Executors.newFixedThreadPool(32);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -90,7 +95,7 @@ class OrderConcurrencyIntegrationTest {
         executor.shutdownNow();
         assertThat(finished).as("모든 주문 시도가 30초 내에 끝나야 한다").isTrue();
 
-        int remaining = productJpaRepository.findById(productId).orElseThrow().getStock().getQuantity();
+        int remaining = inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId).orElseThrow().getQuantity();
 
         assertThat(successCount.get()).as("성공한 주문 수").isEqualTo(stock);
         assertThat(failureCount.get()).as("실패한 주문 수").isEqualTo(attempts - stock);

@@ -8,12 +8,13 @@ import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.DiscountPolicy;
 import com.loopers.domain.coupon.DiscountType;
 import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -48,6 +49,9 @@ class CouponConcurrencyIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private InventoryJpaRepository inventoryJpaRepository;
+
+    @Autowired
     private CouponTemplateJpaRepository couponTemplateJpaRepository;
 
     @Autowired
@@ -76,8 +80,10 @@ class CouponConcurrencyIntegrationTest {
         // 각 상품 재고는 1 — 성공한 주문 1건만 그 상품을 0으로 만들고, 실패 주문은 재고가 그대로 롤백돼야 한다.
         List<Long> productIds = new ArrayList<>();
         for (int i = 0; i < attempts; i++) {
-            productIds.add(productJpaRepository.save(
-                    Product.create(brandId, "상품" + i, Money.of(1_000L), Stock.of(1))).getId());
+            Long pid = productJpaRepository.save(
+                    Product.create(brandId, "상품" + i, Money.of(1_000L))).getId();
+            inventoryJpaRepository.save(Inventory.create(pid, 1));
+            productIds.add(pid);
         }
 
         CouponTemplate template = couponTemplateJpaRepository.save(
@@ -115,8 +121,8 @@ class CouponConcurrencyIntegrationTest {
 
         UserCoupon coupon = userCouponJpaRepository.findById(couponId).orElseThrow();
         long ordersCreated = orderJpaRepository.count();
-        long stockConsumed = productJpaRepository.findAllById(productIds).stream()
-                .mapToLong(p -> 1 - p.getStock().getQuantity())
+        long stockConsumed = productIds.stream()
+                .mapToLong(pid -> 1 - inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(pid).orElseThrow().getQuantity())
                 .sum();
 
         assertThat(successCount.get()).as("성공한 주문 수").isEqualTo(1);

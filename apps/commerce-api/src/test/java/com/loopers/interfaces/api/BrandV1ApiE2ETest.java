@@ -3,7 +3,6 @@ package com.loopers.interfaces.api;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
@@ -190,7 +189,7 @@ class BrandV1ApiE2ETest {
         void cascadesDelete_whenAdmin() {
             Brand brand = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
             Product product = productJpaRepository.save(
-                    Product.create(brand.getId(), "상품1", Money.of(1_000L), Stock.of(10)));
+                    Product.create(brand.getId(), "상품1", Money.of(1_000L)));
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(

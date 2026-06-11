@@ -4,7 +4,6 @@ import com.loopers.domain.brand.Brand;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -48,7 +47,7 @@ class LikeConcurrencyIntegrationTest {
     void setUp() {
         Long brandId = brandJpaRepository.save(Brand.create("브랜드A", "소개")).getId();
         productId = productJpaRepository.save(
-                Product.create(brandId, "상품1", Money.of(1_000L), Stock.of(10))).getId();
+                Product.create(brandId, "상품1", Money.of(1_000L))).getId();
     }
 
     @AfterEach

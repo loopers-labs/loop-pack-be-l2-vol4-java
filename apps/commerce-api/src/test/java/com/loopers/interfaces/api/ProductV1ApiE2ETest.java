@@ -1,10 +1,11 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -34,6 +35,7 @@ class ProductV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final InventoryJpaRepository inventoryJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     private Long brandId;
@@ -43,11 +45,13 @@ class ProductV1ApiE2ETest {
             TestRestTemplate testRestTemplate,
             BrandJpaRepository brandJpaRepository,
             ProductJpaRepository productJpaRepository,
+            InventoryJpaRepository inventoryJpaRepository,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.inventoryJpaRepository = inventoryJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -72,8 +76,10 @@ class ProductV1ApiE2ETest {
     }
 
     private Long saveProduct(String name, long price, int stock) {
-        return productJpaRepository.save(
-                Product.create(brandId, name, Money.of(price), Stock.of(stock))).getId();
+        Long productId = productJpaRepository.save(
+                Product.create(brandId, name, Money.of(price))).getId();
+        inventoryJpaRepository.save(Inventory.create(productId, stock));
+        return productId;
     }
 
     @DisplayName("대고객 GET /api/v1/products")
@@ -101,7 +107,8 @@ class ProductV1ApiE2ETest {
         void filtersByBrand() {
             Long otherBrandId = brandJpaRepository.save(Brand.create("브랜드B", "소개")).getId();
             saveProduct("A상품", 1_000L, 10);
-            productJpaRepository.save(Product.create(otherBrandId, "B상품", Money.of(1_000L), Stock.of(10)));
+            Long bId = productJpaRepository.save(Product.create(otherBrandId, "B상품", Money.of(1_000L))).getId();
+            inventoryJpaRepository.save(Inventory.create(bId, 10));
 
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.PageResponse>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<ProductV1Dto.PageResponse>> response = testRestTemplate.exchange(
@@ -214,7 +221,7 @@ class ProductV1ApiE2ETest {
             Product reloaded = productJpaRepository.findById(productId).orElseThrow();
             assertThat(reloaded.getName()).isEqualTo("변경");
             assertThat(reloaded.getPrice().getAmount()).isEqualTo(5_000L);
-            assertThat(reloaded.getStock().getQuantity()).isEqualTo(3);
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId).orElseThrow().getQuantity()).isEqualTo(3);
         }
     }
 

@@ -4,7 +4,6 @@ import com.loopers.domain.brand.Brand;
 import com.loopers.domain.common.PageResult;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
@@ -169,8 +168,8 @@ class BrandApplicationServiceIntegrationTest {
         @Test
         void cascadesToProducts() {
             Brand brand = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
-            Product p1 = productJpaRepository.save(Product.create(brand.getId(), "상품1", Money.of(1_000L), Stock.of(10)));
-            Product p2 = productJpaRepository.save(Product.create(brand.getId(), "상품2", Money.of(2_000L), Stock.of(5)));
+            Product p1 = productJpaRepository.save(Product.create(brand.getId(), "상품1", Money.of(1_000L)));
+            Product p2 = productJpaRepository.save(Product.create(brand.getId(), "상품2", Money.of(2_000L)));
 
             brandApplicationService.delete(brand.getId());
 
@@ -188,9 +187,9 @@ class BrandApplicationServiceIntegrationTest {
             Brand targetBrand = brandJpaRepository.save(Brand.create("타겟", "소개"));
             Brand otherBrand = brandJpaRepository.save(Brand.create("다른", "소개"));
             Product targetProduct = productJpaRepository.save(
-                    Product.create(targetBrand.getId(), "상품1", Money.of(1_000L), Stock.of(10)));
+                    Product.create(targetBrand.getId(), "상품1", Money.of(1_000L)));
             Product otherProduct = productJpaRepository.save(
-                    Product.create(otherBrand.getId(), "상품2", Money.of(2_000L), Stock.of(5)));
+                    Product.create(otherBrand.getId(), "상품2", Money.of(2_000L)));
 
             brandApplicationService.delete(targetBrand.getId());
 

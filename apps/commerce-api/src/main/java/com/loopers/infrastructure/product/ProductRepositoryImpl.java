@@ -75,6 +75,11 @@ public class ProductRepositoryImpl implements ProductRepository {
         return productJpaRepository.bulkSoftDeleteByBrandId(brandId);
     }
 
+    @Override
+    public List<Long> findIdsByBrandId(Long brandId) {
+        return productJpaRepository.findIdsByBrandIdAndDeletedAtIsNull(brandId);
+    }
+
     private Page<Product> findOrderByLatest(ProductCommand.Search s) {
         Pageable pageable = PageRequest.of(s.page(), s.size(),
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));

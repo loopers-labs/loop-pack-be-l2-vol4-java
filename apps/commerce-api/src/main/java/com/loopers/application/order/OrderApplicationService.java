@@ -3,10 +3,11 @@ package com.loopers.application.order;
 import com.loopers.domain.common.PageResult;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.inventory.Inventory;
+import com.loopers.domain.inventory.InventoryRepository;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderCommand;
 import com.loopers.domain.order.OrderDomainService;
-import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
@@ -28,6 +29,7 @@ public class OrderApplicationService {
     private final OrderDomainService orderDomainService;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
     private final UserCouponRepository userCouponRepository;
 
     @Transactional
@@ -40,14 +42,23 @@ public class OrderApplicationService {
         Set<Long> productIds = lines.stream()
                 .map(OrderCommand.OrderLine::productId)
                 .collect(Collectors.toSet());
+        ZonedDateTime now = ZonedDateTime.now();
+
+        // 상품은 스냅샷(이름·단가)용이라 비-락 조회.
         List<Product> products = productRepository.findAllByIds(productIds);
 
-        ZonedDateTime now = ZonedDateTime.now();
+        // 쿠폰 검증을 재고 비관락 '전에' 끝내, 타인/사용된 쿠폰 같은 흔한 실패가 핫 로우 락을 점유하지 않게 한다(fail-cheap-first).
         UserCoupon userCoupon = command.couponId() == null ? null
                 : userCouponRepository.find(command.couponId())
                         .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
+        if (userCoupon != null) {
+            userCoupon.assertUsableBy(command.userId(), now);
+        }
 
-        Order order = orderDomainService.create(command.userId(), products, lines, userCoupon, now);
+        // 재고 차감 대상인 inventory 만 비관락으로 잠근다(product_id 오름차순).
+        List<Inventory> inventories = inventoryRepository.findAllByProductIdsForUpdate(productIds);
+
+        Order order = orderDomainService.create(command.userId(), products, inventories, lines, userCoupon, now);
         Order saved = orderRepository.save(order);
 
         if (userCoupon != null) {

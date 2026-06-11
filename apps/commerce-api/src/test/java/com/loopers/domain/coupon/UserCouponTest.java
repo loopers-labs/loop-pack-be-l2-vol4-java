@@ -207,4 +207,44 @@ class UserCouponTest {
             assertThat(coupon.isOwnedBy(null)).isFalse();
         }
     }
+
+    @DisplayName("assertUsableBy 는 ")
+    @Nested
+    class AssertUsableBy {
+
+        @DisplayName("본인 소유이고 사용 가능하면 통과한다.")
+        @Test
+        void passes_whenOwnedAndUsable() {
+            UserCoupon coupon = UserCoupon.issue(USER_ID, template(DiscountType.FIXED, 1_000L, 30), BASE);
+            coupon.assertUsableBy(USER_ID, BASE); // 예외 없음
+        }
+
+        @DisplayName("본인 소유가 아니면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenNotOwned() {
+            UserCoupon coupon = UserCoupon.issue(USER_ID, template(DiscountType.FIXED, 1_000L, 30), BASE);
+            CoreException result = assertThrows(CoreException.class,
+                    () -> coupon.assertUsableBy(999L, BASE));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+
+        @DisplayName("이미 사용된 쿠폰이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenAlreadyUsed() {
+            UserCoupon coupon = UserCoupon.issue(USER_ID, template(DiscountType.FIXED, 1_000L, 30), BASE);
+            coupon.use(ORDER_ID, BASE);
+            CoreException result = assertThrows(CoreException.class,
+                    () -> coupon.assertUsableBy(USER_ID, BASE));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("만료된 쿠폰이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenExpired() {
+            UserCoupon coupon = UserCoupon.issue(USER_ID, template(DiscountType.FIXED, 1_000L, 30), BASE);
+            CoreException result = assertThrows(CoreException.class,
+                    () -> coupon.assertUsableBy(USER_ID, BASE.plusDays(31)));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

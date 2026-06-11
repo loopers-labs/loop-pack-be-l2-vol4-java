@@ -148,6 +148,19 @@ public class UserCoupon extends BaseEntity {
         return this.userId.equals(userId);
     }
 
+    /**
+     * 사용 가능 여부를 검증한다 — 본인 소유가 아니면 FORBIDDEN, 미사용·미만료가 아니면 BAD_REQUEST.
+     * 주문 흐름은 재고 비관락을 잡기 '전에' 이걸 먼저 호출해, 무효 쿠폰이 핫 로우 락을 점유하지 않게 한다(fail-cheap-first).
+     */
+    public void assertUsableBy(Long userId, ZonedDateTime now) {
+        if (!isOwnedBy(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "본인 소유의 쿠폰이 아닙니다.");
+        }
+        if (!isUsable(now)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "사용할 수 없는 쿠폰입니다.");
+        }
+    }
+
     private boolean isExpired(ZonedDateTime now) {
         if (now == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "기준 시각은 비어있을 수 없습니다.");

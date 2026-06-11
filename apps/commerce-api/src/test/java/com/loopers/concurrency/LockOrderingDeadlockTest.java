@@ -3,7 +3,6 @@ package com.loopers.concurrency;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -60,8 +59,8 @@ class LockOrderingDeadlockTest {
     @BeforeEach
     void setUp() {
         Long brandId = brandJpaRepository.save(Brand.create("브랜드A", "소개")).getId();
-        Long a = productJpaRepository.save(Product.create(brandId, "상품1", Money.of(1_000L), Stock.of(100))).getId();
-        Long b = productJpaRepository.save(Product.create(brandId, "상품2", Money.of(1_000L), Stock.of(100))).getId();
+        Long a = productJpaRepository.save(Product.create(brandId, "상품1", Money.of(1_000L))).getId();
+        Long b = productJpaRepository.save(Product.create(brandId, "상품2", Money.of(1_000L))).getId();
         lowId = Math.min(a, b);
         highId = Math.max(a, b);
     }

@@ -1,11 +1,9 @@
 package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.Product;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,7 +16,7 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    // 재고가 Inventory 로 분리되어 주문 경로가 products 행을 잠글 이유가 없다(비-락 조회).
     List<Product> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
 
     Page<Product> findAllByDeletedAtIsNull(Pageable pageable);
@@ -43,6 +41,10 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
         WHERE p.brandId = :brandId AND p.deletedAt IS NULL
     """)
     int bulkSoftDeleteByBrandId(Long brandId);
+
+    // 브랜드 삭제 cascade 시, 소프트 삭제 '전에' 대상 상품 id 를 모아 재고 cascade 에 넘긴다.
+    @Query("SELECT p.id FROM Product p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
+    List<Long> findIdsByBrandIdAndDeletedAtIsNull(@Param("brandId") Long brandId);
 
     @Query("""
         SELECT p

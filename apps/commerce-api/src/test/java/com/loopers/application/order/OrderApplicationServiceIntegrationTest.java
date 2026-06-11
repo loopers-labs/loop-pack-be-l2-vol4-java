@@ -7,13 +7,14 @@ import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.DiscountPolicy;
 import com.loopers.domain.coupon.DiscountType;
 import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.product.Money;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -49,6 +50,9 @@ class OrderApplicationServiceIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private InventoryJpaRepository inventoryJpaRepository;
+
+    @Autowired
     private CouponTemplateJpaRepository couponTemplateJpaRepository;
 
     @Autowired
@@ -70,7 +74,13 @@ class OrderApplicationServiceIntegrationTest {
     }
 
     private Long saveProduct(String name, long price, int stock) {
-        return productJpaRepository.save(Product.create(brandId, name, Money.of(price), Stock.of(stock))).getId();
+        Long productId = productJpaRepository.save(Product.create(brandId, name, Money.of(price))).getId();
+        inventoryJpaRepository.save(Inventory.create(productId, stock));
+        return productId;
+    }
+
+    private int stockOf(Long productId) {
+        return inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId).orElseThrow().getQuantity();
     }
 
     private Long issueCoupon(Long userId, DiscountType type, long value) {
@@ -101,8 +111,8 @@ class OrderApplicationServiceIntegrationTest {
             assertThat(result.status()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.items()).hasSize(2);
 
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(8);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock().getQuantity()).isEqualTo(4);
+            assertThat(stockOf(p1)).isEqualTo(8);
+            assertThat(stockOf(p2)).isEqualTo(4);
         }
 
         @DisplayName("존재하지 않는 상품이 포함되면 NOT_FOUND 를 던지고 재고는 변하지 않는다. (AC-07-1)")
@@ -117,7 +127,7 @@ class OrderApplicationServiceIntegrationTest {
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(stockOf(p1)).isEqualTo(10);
         }
 
         @DisplayName("재고가 하나라도 부족하면 BAD_REQUEST 를 던지고 모든 재고가 보존된다. (AC-07-3, AC-07-4)")
@@ -133,8 +143,8 @@ class OrderApplicationServiceIntegrationTest {
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock().getQuantity()).isEqualTo(1);
+            assertThat(stockOf(p1)).isEqualTo(10);
+            assertThat(stockOf(p2)).isEqualTo(1);
         }
 
         @DisplayName("주문 항목에는 주문 시점의 상품명·단가가 스냅샷으로 저장된다. (AC-07-5)")
@@ -186,7 +196,7 @@ class OrderApplicationServiceIntegrationTest {
                             new OrderCriteria.Place(USER_A, 99999L, List.of(new OrderCriteria.Line(p1, 2)))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(stockOf(p1)).isEqualTo(10);
         }
 
         @DisplayName("본인 소유가 아닌 쿠폰이면 FORBIDDEN 을 던지고 재고·쿠폰 모두 보존된다. (AC-07-7)")
@@ -200,7 +210,7 @@ class OrderApplicationServiceIntegrationTest {
                             new OrderCriteria.Place(USER_A, couponId, List.of(new OrderCriteria.Line(p1, 2)))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(10);
+            assertThat(stockOf(p1)).isEqualTo(10);
             assertThat(userCouponJpaRepository.findById(couponId).orElseThrow().getStatus())
                     .isEqualTo(CouponStatus.AVAILABLE);
         }
@@ -222,7 +232,7 @@ class OrderApplicationServiceIntegrationTest {
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             // 첫 주문 1개 차감분만 반영되고 두 번째 시도는 롤백
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock().getQuantity()).isEqualTo(9);
+            assertThat(stockOf(p1)).isEqualTo(9);
         }
     }
 

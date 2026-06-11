@@ -17,7 +17,6 @@ class ProductTest {
     private static final Long BRAND_ID = 1L;
     private static final String NAME = "에어맥스";
     private static final Money PRICE = Money.of(199_000L);
-    private static final Stock STOCK = Stock.of(10);
 
     @DisplayName("Product 를 create 로 생성할 때, ")
     @Nested
@@ -27,14 +26,13 @@ class ProductTest {
         @Test
         void createsNewProduct_whenValid() {
             // act
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
 
             // assert
             assertThat(product.getId()).isEqualTo(0L);
             assertThat(product.getBrandId()).isEqualTo(BRAND_ID);
             assertThat(product.getName()).isEqualTo(NAME);
             assertThat(product.getPrice()).isEqualTo(PRICE);
-            assertThat(product.getStock()).isEqualTo(STOCK);
             assertThat(product.isDeleted()).isFalse();
         }
 
@@ -43,7 +41,7 @@ class ProductTest {
         void throwsBadRequest_whenBrandIdIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class,
-                    () -> Product.create(null, NAME, PRICE, STOCK));
+                    () -> Product.create(null, NAME, PRICE));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -56,7 +54,7 @@ class ProductTest {
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // act
             CoreException result = assertThrows(CoreException.class,
-                    () -> Product.create(BRAND_ID, invalidName, PRICE, STOCK));
+                    () -> Product.create(BRAND_ID, invalidName, PRICE));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -67,18 +65,7 @@ class ProductTest {
         void throwsBadRequest_whenPriceIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class,
-                    () -> Product.create(BRAND_ID, NAME, null, STOCK));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("stock 이 null 이면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenStockIsNull() {
-            // act
-            CoreException result = assertThrows(CoreException.class,
-                    () -> Product.create(BRAND_ID, NAME, PRICE, null));
+                    () -> Product.create(BRAND_ID, NAME, null));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -93,7 +80,7 @@ class ProductTest {
         @Test
         void modifiesNameAndPrice() {
             // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
             Money newPrice = Money.of(150_000L);
 
             // act
@@ -111,7 +98,7 @@ class ProductTest {
         @ValueSource(strings = {"", " "})
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -127,7 +114,7 @@ class ProductTest {
         @Test
         void throwsBadRequest_whenPriceIsNull() {
             // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -135,24 +122,6 @@ class ProductTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("Product 의 재고 관련 행위 — ")
-    @Nested
-    class StockBehaviors {
-
-        @DisplayName("adjustStock 으로 재고가 절대값으로 설정된다.")
-        @Test
-        void adjustStockSetsAbsoluteQuantity() {
-            // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, Stock.of(5));
-
-            // act
-            product.adjustStock(100);
-
-            // assert
-            assertThat(product.getStock().getQuantity()).isEqualTo(100);
         }
     }
 
@@ -164,7 +133,7 @@ class ProductTest {
         @Test
         void marksAsDeleted() {
             // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
 
             // act
             product.delete();
@@ -177,7 +146,7 @@ class ProductTest {
         @Test
         void isIdempotent_whenCalledTwice() {
             // arrange
-            Product product = Product.create(BRAND_ID, NAME, PRICE, STOCK);
+            Product product = Product.create(BRAND_ID, NAME, PRICE);
             product.delete();
 
             // act
