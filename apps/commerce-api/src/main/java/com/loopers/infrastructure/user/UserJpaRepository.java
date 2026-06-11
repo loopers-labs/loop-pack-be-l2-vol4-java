@@ -7,6 +7,5 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserJpaRepository extends JpaRepository<UserModel, UUID> {
-    boolean existsByLoginIdValue(String value);
     Optional<UserModel> findByLoginIdValue(String value);
 }

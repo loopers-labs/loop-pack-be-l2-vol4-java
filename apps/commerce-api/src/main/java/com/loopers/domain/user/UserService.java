@@ -3,6 +3,7 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,13 +14,15 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /** 회원가입. 동시 중복 가입은 DB unique 충돌로 CONFLICT. */
     @Transactional
     public UserModel register(UserModel user) {
-        if (userRepository.existsByLoginId(user.getLoginId())) {
+        user.encodePassword(passwordEncoder);
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
             throw new CoreException(ErrorType.CONFLICT);
         }
-        user.encodePassword(passwordEncoder);
-        return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
