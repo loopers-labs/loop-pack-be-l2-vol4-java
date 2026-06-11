@@ -17,18 +17,29 @@ public class LikeFacade {
 
     @Transactional
     public void addLike(Long userId, Long productId) {
-        try {
-            likeService.addLikeRecord(userId, productId);
-            productService.increaseLikeCount(productId);
-        } catch (Exception e) {
-            log.warn("좋아요 등록 중 중복 요청 발생: userId={}, productId={}", userId, productId);
+        // 1. 상품 존재 여부 조회 (일반 SELECT)
+        productService.getProduct(productId);
+
+        // 2. 이미 좋아요를 눌렀는지 확인 (멱등성 보장)
+        if (likeService.existsLikeRecord(userId, productId)) {
+            return;
         }
+
+        // 3. 좋아요 추가
+        likeService.addLikeRecord(userId, productId);
     }
 
     @Transactional
     public void removeLike(Long userId, Long productId) {
-        if (likeService.removeLikeRecord(userId, productId)) {
-            productService.decreaseLikeCount(productId);
+        // 1. 상품 존재 여부 조회 (일반 SELECT)
+        productService.getProduct(productId);
+
+        // 2. 좋아요가 존재하는 경우에만 삭제 (멱등성 보장)
+        if (!likeService.existsLikeRecord(userId, productId)) {
+            return;
         }
+
+        // 3. 좋아요 삭제
+        likeService.removeLikeRecord(userId, productId);
     }
 }
