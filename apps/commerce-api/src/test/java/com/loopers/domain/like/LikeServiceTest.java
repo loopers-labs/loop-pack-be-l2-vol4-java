@@ -69,4 +69,38 @@ class LikeServiceTest {
         assertThat(result).hasSize(2);
         verify(likeRepository).findAllByUserId(userId);
     }
+
+    @Test
+    @DisplayName("좋아요 이력이 존재하면 true를 반환한다.")
+    void existsLikeRecord_WhenExists_ShouldReturnTrue() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        given(likeRepository.findByUserIdAndProductId(userId, productId))
+                .willReturn(Optional.of(new ProductLikeModel(userId, productId)));
+
+        // when
+        boolean result = likeService.existsLikeRecord(userId, productId);
+
+        // then
+        assertThat(result).isTrue();
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+    }
+
+    @Test
+    @DisplayName("좋아요 이력이 없으면 false를 반환한다.")
+    void existsLikeRecord_WhenNotExists_ShouldReturnFalse() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        given(likeRepository.findByUserIdAndProductId(userId, productId))
+                .willReturn(Optional.empty());
+
+        // when
+        boolean result = likeService.existsLikeRecord(userId, productId);
+
+        // then
+        assertThat(result).isFalse();
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+    }
 }
