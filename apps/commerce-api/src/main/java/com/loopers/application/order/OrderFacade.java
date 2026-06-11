@@ -1,11 +1,12 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -26,11 +27,11 @@ import java.util.stream.Collectors;
  * 이 클래스는 Repository 조회·영속화와 흐름 제어(orchestration)만 담당한다.
  *
  * createOrder 흐름:
- *   1. 활성 상품 배치 조회 + 존재 확인
- *   2. 재고 배치 조회
- *   3. [Domain] 재고 사전 검증 (전체 실패 원칙)
- *   4. 재고 차감 (StockModel.decrease → dirty checking으로 자동 반영)
- *   5. [Domain] 주문 엔티티 조립
+ *   1. 쿠폰 사전 조회 (존재·소유권 확인)
+ *   2. 활성 상품 배치 조회 + 존재 확인
+ *   3. 재고 원자적 차감 (UPDATE ... WHERE quantity >= qty, affected=0 → BAD_REQUEST)
+ *   4. [Domain] 주문 엔티티 조립
+ *   5. 쿠폰 적용 (@Version 낙관적 락)
  *   6. 영속화 (CascadeType.ALL로 주문항목 함께 저장)
  */
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final OrderDomainService orderDomainService;
+    private final UserCouponRepository userCouponRepository;
 
     /**
      * FR-O-01. 주문 생성
@@ -52,7 +54,17 @@ public class OrderFacade {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
 
-        // 1. 활성 상품 배치 조회
+        // 1. 쿠폰 사전 조회 — 존재·소유권 확인 (fail fast)
+        UserCouponModel userCoupon = null;
+        if (command.couponId() != null) {
+            userCoupon = userCouponRepository.findByIdWithCoupon(command.couponId())
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
+            if (!userCoupon.getUserId().equals(command.userId())) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "본인 소유의 쿠폰만 사용할 수 있습니다.");
+            }
+        }
+
+        // 2. 활성 상품 배치 조회
         List<Long> reqProductIds = itemCommands.stream().map(OrderItemCommand::productId).toList();
         Map<Long, ProductModel> existProductMap = productRepository.findAllActiveByIds(reqProductIds)
             .stream()
@@ -64,27 +76,29 @@ public class OrderFacade {
             }
         }
 
-        // 2. 재고 배치 조회
-        Map<Long, StockModel> stockMap = itemCommands.stream()
-            .collect(Collectors.toMap(
-                OrderItemCommand::productId,
-                cmd -> stockRepository.findByProductId(cmd.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
-                        "재고 정보를 찾을 수 없습니다. productId=" + cmd.productId()))
-            ));
-
         Map<Long, Integer> quantityMap = itemCommands.stream()
             .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
-        // 3. 재고 사전 검증 (Domain Service 위임 — 한 건이라도 부족하면 전체 실패)
-        orderDomainService.validateStocks(stockMap, quantityMap);
+        // 3. 재고 원자적 차감 (UPDATE ... WHERE quantity >= qty)
+        // affected = 0 → 재고 부족; 예외 발생 시 트랜잭션 전체 롤백
+        for (OrderItemCommand cmd : itemCommands) {
+            int affected = stockRepository.decreaseStock(cmd.productId(), cmd.quantity());
+            if (affected == 0) {
+                throw new CoreException(ErrorType.BAD_REQUEST,
+                    "재고가 부족합니다. productId=" + cmd.productId());
+            }
+        }
 
-        // 4. 재고 차감 (dirty checking으로 트랜잭션 커밋 시 자동 반영)
-        stockMap.forEach((productId, stock) -> stock.decrease(quantityMap.get(productId)));
-
-        // 5. 주문 엔티티 조립 (Domain Service 위임 — 스냅샷 포함 OrderModel 반환)
+        // 4. 주문 엔티티 조립 (쿠폰 미적용 상태로 먼저 금액 확정)
         List<ProductModel> products = List.copyOf(existProductMap.values());
         OrderModel order = orderDomainService.buildOrder(command.userId(), products, quantityMap);
+
+        // 5. 쿠폰 적용 — 사용 처리(@Version 낙관적 락) + 할인 금액 반영
+        if (userCoupon != null) {
+            userCoupon.use();
+            int discount = userCoupon.getCoupon().calculateDiscount(order.getOriginalAmount());
+            order.applyPricing(order.getOriginalAmount(), discount);
+        }
 
         // 6. 영속화 (CascadeType.ALL — 주문항목 한 번에 저장)
         return OrderInfo.from(orderRepository.save(order));
