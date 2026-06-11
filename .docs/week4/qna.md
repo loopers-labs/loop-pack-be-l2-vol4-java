@@ -458,3 +458,11 @@ quest의 시나리오 3개(① 여러 명 동시 좋아요 ② 동일 쿠폰 동
 - `OrderService.prepareItems`: 상품별 단건 조회 루프 → **한 방 락 조회**(distinct id → Map)로 재작성. 같은 상품 여러 line도 동일 관리 엔티티에 차감되어 정상.
 - **전체 테스트 스위트(단위+통합+E2E) green** — @Version·신규 금액 컬럼·새 주문 흐름·락 조회 포함. 남은 것: 6단계(좋아요 원자적 UPDATE), 7단계(동시성 테스트 3종 + 쿠폰 적용 주문 통합/E2E).
 
+## D9. 6·7단계 — 좋아요 원자적 UPDATE + 동시성 테스트 (완료, week4 구현 종료)
+- **좋아요(6단계)**: `ProductJpaRepository`에 `@Modifying UPDATE ... SET like_count = like_count ± 1` 추가(감소는 `WHERE like_count > 0` 가드). ProductService 경유로 `ProductLikeService`가 호출. read-modify-write가 한 문장으로 붕괴 → 충돌 창 0. 엔티티의 increase/decreaseLikeCount 메서드와 해당 단위 테스트는 죽은 코드가 되어 제거.
+- **동시성·통합 테스트(7단계)**: 
+  - `OrderFacadeIntegrationTest` — ① 쿠폰 적용 주문: 금액 3종 스냅샷+USED ② 만료 쿠폰: 주문 실패+재고 원복+쿠폰 AVAILABLE(원자성 증명) ③ 재고 10·20스레드: 성공 10/실패 10/재고 0 ④ 동일 쿠폰 5스레드(상품 분리로 쿠폰만 경쟁): 성공 1/실패 4/USED/주문 1건
+  - `LikeFacadeIntegrationTest` — 10명 동시 좋아요 → 10 / 동시 취소 → 0
+  - `OrderV1ApiE2ETest` — 쿠폰 적용 주문 응답(원금 3000/할인 1000/최종 2000) + USED
+- **전체 스위트 green.** Q15에서 정의한 통과 기준 숫자 그대로 단언. quest 체크리스트(쿠폰 도메인/주문 원자성/동시성 3종) 전 항목 구현·검증 완료.
+
