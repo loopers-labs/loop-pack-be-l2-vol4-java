@@ -26,10 +26,10 @@ public class OrderStockService {
         orderService.confirm(order, paymentAmount);
     }
 
-    /** 주문 취소 — 아이템별 재고 복구 + 주문 취소 (CONFIRMED 상태만) */
+    /** 주문 취소 — 상태 검증(CONFIRMED 아니면 BAD_REQUEST) 후 재고 복구. cancel() 선행으로 이중 복구 방지 */
     public void cancelOrder(OrderModel order) {
-        order.getItems().forEach(item -> stockService.restore(item.getProductId(), item.getQuantity()));
         orderService.cancel(order);
+        order.getItems().forEach(item -> stockService.restore(item.getProductId(), item.getQuantity()));
     }
 
     /** 결제 실패 — PENDING이면 아이템별 재고 해제 + 주문 실패 후 true, 아니면 false (멱등) */
