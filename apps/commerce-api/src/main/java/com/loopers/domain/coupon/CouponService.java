@@ -5,6 +5,9 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class CouponService {
@@ -25,5 +28,33 @@ public class CouponService {
         // 3. 쿠폰 발급 내역 저장
         CouponIssue newIssue = new CouponIssue(userId, couponTemplateId);
         return couponRepository.saveIssue(newIssue);
+    }
+
+    public List<UserCouponInfo> getUsersCoupons(Long userId) {
+        List<CouponIssue> issues = couponRepository.findAllIssuesByUserId(userId);
+        if (issues.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> templateIds = issues.stream()
+                .map(CouponIssue::getCouponTemplateId)
+                .distinct()
+                .toList();
+
+        List<CouponTemplate> templates = couponRepository.findTemplatesByIds(templateIds);
+        java.util.Map<Long, CouponTemplate> templateMap = templates.stream()
+                .collect(java.util.stream.Collectors.toMap(CouponTemplate::getId, t -> t));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        return issues.stream()
+                .map(issue -> {
+                    CouponTemplate template = templateMap.get(issue.getCouponTemplateId());
+                    if (template == null) {
+                        throw new CoreException(ErrorType.NOT_FOUND, "쿠폰 템플릿을 찾을 수 없습니다.");
+                    }
+                    return UserCouponInfo.of(issue, template, now);
+                })
+                .toList();
     }
 }

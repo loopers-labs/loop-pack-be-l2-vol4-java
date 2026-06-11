@@ -17,4 +17,5 @@ public interface CouponRepository {
     Optional<CouponIssue> findIssueByUserIdAndTemplateId(Long userId, Long templateId);
     List<CouponIssue> findAllIssuesByUserId(Long userId);
     Page<CouponIssue> findAllIssuesByTemplateId(Long templateId, Pageable pageable);
+    List<CouponTemplate> findTemplatesByIds(List<Long> ids);
 }

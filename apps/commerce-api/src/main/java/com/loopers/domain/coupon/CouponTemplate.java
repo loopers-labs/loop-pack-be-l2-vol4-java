@@ -50,4 +50,13 @@ public class CouponTemplate extends BaseSoftDeleteEntity {
     public boolean isExpired(LocalDateTime now) {
         return now.isAfter(expiredAt);
     }
+
+    public void update(String name, CouponType type, BigDecimal value, BigDecimal minOrderAmount, BigDecimal maxDiscountAmount, LocalDateTime expiredAt) {
+        this.name = name;
+        this.type = type;
+        this.value = value;
+        this.minOrderAmount = minOrderAmount != null ? minOrderAmount : BigDecimal.ZERO;
+        this.maxDiscountAmount = maxDiscountAmount;
+        this.expiredAt = expiredAt;
+    }
 }

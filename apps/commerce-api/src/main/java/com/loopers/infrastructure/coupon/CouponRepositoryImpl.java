@@ -62,4 +62,9 @@ public class CouponRepositoryImpl implements CouponRepository {
     public Page<CouponIssue> findAllIssuesByTemplateId(Long templateId, Pageable pageable) {
         return issueJpaRepository.findAllByCouponTemplateId(templateId, pageable);
     }
+
+    @Override
+    public List<CouponTemplate> findTemplatesByIds(List<Long> ids) {
+        return templateJpaRepository.findByIdIn(ids);
+    }
 }
