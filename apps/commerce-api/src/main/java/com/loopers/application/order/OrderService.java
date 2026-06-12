@@ -29,8 +29,21 @@ public class OrderService {
     private final StockRepository stockRepository;
     private final OrderDomainService orderDomainService;
 
+    @Transactional(readOnly = true)
+    public long calculateTotalPrice(List<OrderItemCommand> commands) {
+        Map<Long, ProductModel> productMap = commands.stream()
+            .collect(Collectors.toMap(
+                OrderItemCommand::productId,
+                cmd -> productRepository.findById(cmd.productId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 상품을 찾을 수 없습니다."))
+            ));
+        Map<Long, Integer> quantityMap = commands.stream()
+            .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
+        return orderDomainService.calculateTotalPrice(List.copyOf(productMap.values()), quantityMap);
+    }
+
     @Transactional
-    public OrderModel create(Long memberId, List<OrderItemCommand> commands) {
+    public OrderModel create(Long memberId, List<OrderItemCommand> commands, Long couponId, long originalAmount, long discountAmount) {
         // 1. 상품 존재 확인
         Map<Long, ProductModel> productMap = commands.stream()
             .collect(Collectors.toMap(
@@ -58,19 +71,16 @@ public class OrderService {
         // 4. 재고 검증 (도메인 서비스)
         orderDomainService.validateStockAvailability(List.copyOf(stockMap.values()), quantityMap);
 
-        // 5. 총 가격 계산 (도메인 서비스)
-        long totalPrice = orderDomainService.calculateTotalPrice(List.copyOf(productMap.values()), quantityMap);
+        // 5. 주문 저장
+        OrderModel order = orderRepository.save(new OrderModel(memberId, couponId, originalAmount, discountAmount));
 
-        // 6. 주문 저장
-        OrderModel order = orderRepository.save(new OrderModel(memberId, totalPrice));
-
-        // 7. OrderItem 저장 (스냅샷)
+        // 6. OrderItem 저장 (스냅샷)
         for (OrderItemCommand cmd : commands) {
             ProductModel product = productMap.get(cmd.productId());
             orderRepository.saveItem(new OrderItemModel(order.getId(), product.getId(), product.getName(), product.getPrice(), cmd.quantity()));
         }
 
-        // 8. 재고 차감 (이미 락된 StockModel 재사용)
+        // 7. 재고 차감 (이미 락된 StockModel 재사용)
         for (OrderItemCommand cmd : sorted) {
             stockMap.get(cmd.productId()).decrease(cmd.quantity());
         }

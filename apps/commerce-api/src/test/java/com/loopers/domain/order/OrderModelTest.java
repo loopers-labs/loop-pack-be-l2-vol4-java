@@ -46,6 +46,44 @@ class OrderModelTest {
         }
     }
 
+    @DisplayName("쿠폰을 적용해 주문을 생성할 때,")
+    @Nested
+    class CreateWithCoupon {
+
+        @DisplayName("쿠폰 없이 생성 시 discountAmount=0, totalPrice=originalAmount이다.")
+        @Test
+        void noCoupon_totalPriceEqualsOriginalAmount() {
+            // act
+            OrderModel order = new OrderModel(1L, null, 10000L, 0L);
+
+            // assert
+            assertThat(order.getOriginalAmount()).isEqualTo(10000L);
+            assertThat(order.getDiscountAmount()).isEqualTo(0L);
+            assertThat(order.getTotalPrice()).isEqualTo(10000L);
+        }
+
+        @DisplayName("할인 금액 적용 시 totalPrice = originalAmount - discountAmount이다.")
+        @Test
+        void withCoupon_totalPriceIsReduced() {
+            // act
+            OrderModel order = new OrderModel(1L, 1L, 10000L, 1000L);
+
+            // assert
+            assertThat(order.getOriginalAmount()).isEqualTo(10000L);
+            assertThat(order.getDiscountAmount()).isEqualTo(1000L);
+            assertThat(order.getTotalPrice()).isEqualTo(9000L);
+        }
+
+        @DisplayName("discountAmount가 음수이면 BAD_REQUEST가 발생한다.")
+        @Test
+        void negativeDiscount_throwsBadRequest() {
+            assertThatThrownBy(() -> new OrderModel(1L, null, 10000L, -1L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
     @DisplayName("주문을 취소할 때,")
     @Nested
     class Cancel {

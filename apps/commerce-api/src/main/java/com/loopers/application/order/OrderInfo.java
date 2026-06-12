@@ -8,6 +8,8 @@ import java.util.List;
 public record OrderInfo(
     Long orderId,
     String status,
+    Long originalAmount,
+    Long discountAmount,
     Long totalPrice,
     List<OrderItemInfo> items
 ) {
@@ -15,6 +17,8 @@ public record OrderInfo(
         return new OrderInfo(
             order.getId(),
             order.getStatus().name(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
             order.getTotalPrice(),
             items.stream().map(OrderItemInfo::from).toList()
         );
