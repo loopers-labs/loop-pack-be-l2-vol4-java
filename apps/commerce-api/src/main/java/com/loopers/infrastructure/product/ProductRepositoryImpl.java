@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     public List<ProductModel> findAll(Long brandId, Pageable pageable) {
         return productJpaRepository.findAllByBrandId(brandId, pageable)
             .map(ProductEntity::toDomain).toList();
+    }
+
+    @Override
+    public List<ProductModel> findAllByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return productJpaRepository.findAllById(ids).stream()
+            .map(ProductEntity::toDomain)
+            .toList();
     }
 
     @Override

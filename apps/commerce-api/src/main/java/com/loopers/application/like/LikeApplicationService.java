@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -38,13 +40,23 @@ public class LikeApplicationService {
 
     @Transactional(readOnly = true)
     public List<LikeInfo> getLikedProducts(Long userId) {
-        return likeRepository.findAllByUserId(userId).stream()
-            .map(like -> {
-                ProductModel product = productRepository.find(like.getProductId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + like.getProductId() + "] 상품을 찾을 수 없습니다."));
-                long likeCount = likeRepository.countByProductId(like.getProductId());
-                return LikeInfo.from(like, product, likeCount);
-            })
+        List<LikeModel> likes = likeRepository.findAllByUserId(userId);
+        if (likes.isEmpty()) return List.of();
+
+        List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
+
+        Map<Long, ProductModel> productsById = productRepository.findAllByIds(productIds).stream()
+            .collect(Collectors.toMap(ProductModel::getId, p -> p));
+
+        Map<Long, Long> likeCountById = likeRepository.countByProductIds(productIds);
+
+        return likes.stream()
+            .filter(like -> productsById.containsKey(like.getProductId()))
+            .map(like -> LikeInfo.from(
+                like,
+                productsById.get(like.getProductId()),
+                likeCountById.getOrDefault(like.getProductId(), 0L)
+            ))
             .toList();
     }
 }
