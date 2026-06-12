@@ -65,14 +65,41 @@ public class OrderFacade {
     }
 
     @Transactional
-    public Long createPendingOrderAndPreoccupyStockTx(Long userId, OrderCreateRequest request, Long couponIssueId, Map<Long, ProductModel> productMap, java.math.BigDecimal totalOriginalAmount, java.math.BigDecimal discount, java.math.BigDecimal totalPaymentAmount) {
-        // 재고 가선점 (비관적 락 사용)
+    public Long checkout(Long userId, OrderCheckoutRequest request) {
+        // 1. [단일 트랜잭션] 재고 차감 (비관적 락 사용) - 영속성 컨텍스트에 락과 함께 먼저 로드하기 위해 가장 먼저 실행
         List<StockService.StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
                 .toList();
         stockService.decreaseStocksWithLock(stockRequests);
 
-        // 주문 생성 요청 생성
+        // 2. 상품 조회 및 계산
+        List<Long> productIds = request.items().stream()
+                .map(OrderCheckoutRequest.Item::productId)
+                .toList();
+
+        List<ProductModel> products = productService.getProductsByIds(productIds);
+        if (products.size() != productIds.size()) {
+            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
+        }
+
+        Map<Long, ProductModel> productMap = products.stream()
+                .collect(Collectors.toMap(ProductModel::getId, p -> p));
+
+        java.math.BigDecimal totalOriginalAmount = request.items().stream()
+                .map(item -> {
+                    ProductModel product = productMap.get(item.productId());
+                    return product.getPrice().multiply(java.math.BigDecimal.valueOf(item.quantity()));
+                })
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
+        if (request.couponIssueId() != null) {
+            discount = couponService.calculateDiscount(request.couponIssueId(), totalOriginalAmount);
+        }
+
+        java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
+
+        // 3. 주문 생성 (PENDING)
         List<OrderService.OrderItemRequest> orderItemRequests = request.items().stream()
                 .map(item -> {
                     ProductModel product = productMap.get(item.productId());
@@ -85,105 +112,24 @@ public class OrderFacade {
                     );
                 }).toList();
 
-        return orderService.createPendingOrder(userId, orderItemRequests, couponIssueId, totalOriginalAmount, discount, totalPaymentAmount);
-    }
+        Long orderId = orderService.createPendingOrder(userId, orderItemRequests, request.couponIssueId(), totalOriginalAmount, discount, totalPaymentAmount);
 
-    @Transactional
-    public void approvePayment(Long orderId, com.loopers.domain.payment.PaymentMethod method, String transactionId, java.time.LocalDateTime approvedAt) {
-        OrderModel order = orderService.getOrder(orderId);
-        
-        // 1. 결제 내역 저장
-        paymentService.savePayment(orderId, method, order.getTotalPaymentAmount(), transactionId, approvedAt);
-
-        // 2. 주문 완료 처리
-        orderService.completeOrder(orderId);
-
-        // 3. 쿠폰 사용 완료 처리
-        if (order.getCouponIssueId() != null) {
-            couponService.completeCouponUse(order.getCouponIssueId(), order.getTotalOriginalAmount());
-        }
-    }
-
-    public Long checkout(Long userId, OrderCheckoutRequest request) {
-        Long orderId = null;
-        try {
-            // 1. [No Transaction] 상품 메타데이터 및 할인 계산 조회
-            List<Long> productIds = request.items().stream()
-                    .map(OrderCheckoutRequest.Item::productId)
-                    .toList();
-
-            List<ProductModel> products = productService.getProductsByIds(productIds);
-            if (products.size() != productIds.size()) {
-                throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
-            }
-
-            Map<Long, ProductModel> productMap = products.stream()
-                    .collect(Collectors.toMap(ProductModel::getId, p -> p));
-
-            java.math.BigDecimal totalOriginalAmount = request.items().stream()
-                    .map(item -> {
-                        ProductModel product = productMap.get(item.productId());
-                        return product.getPrice().multiply(java.math.BigDecimal.valueOf(item.quantity()));
-                    })
-                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-
-            java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
-            if (request.couponIssueId() != null) {
-                discount = couponService.calculateDiscount(request.couponIssueId(), totalOriginalAmount);
-            }
-
-            java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
-
-            // 2. [Transaction 1] 상태 변경 및 비관적 락 (재고 감소 & 주문 대기 생성)
-            OrderCreateRequest createRequest = new OrderCreateRequest(
-                    request.items().stream()
-                            .map(item -> new OrderCreateRequest.Item(item.productId(), item.quantity()))
-                            .toList()
-            );
-            orderId = createPendingOrderAndPreoccupyStockTx(userId, createRequest, request.couponIssueId(), productMap, totalOriginalAmount, discount, totalPaymentAmount);
-        } catch (Exception e) {
-            throw e;
-        }
-
-        // [트랜잭션 외부] PG사 결제 승인 요청
-        OrderModel order = orderService.getOrder(orderId);
+        // 4. PG사 결제 승인 요청 (트랜잭션 내부)
         com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult pgResult = null;
         try {
-            pgResult = paymentGateway.requestPayment(orderId, order.getTotalPaymentAmount(), request.paymentMethod());
+            pgResult = paymentGateway.requestPayment(orderId, totalPaymentAmount, request.paymentMethod());
         } catch (Exception e) {
-            // 결제 요청 실패 시 보상 트랜잭션 (주문 취소 및 재고 원복)
-            cancelOrderAndRestoreStock(orderId);
             throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인 요청 중 오류가 발생했습니다: " + e.getMessage());
         }
 
-        try {
-            // [트랜잭션 2] 결제 완료 처리 및 상태 업데이트
-            approvePayment(orderId, request.paymentMethod(), pgResult.transactionId(), pgResult.approvedAt());
-        } catch (Exception e) {
-            // 승인 완료 후처리 실패 시 보상 트랜잭션 (주문 취소, 재고 원복 및 외부 PG 결제 승인 취소)
-            cancelOrderAndRestoreStock(orderId);
-            try {
-                paymentGateway.cancelPayment(pgResult.transactionId(), order.getTotalPaymentAmount());
-            } catch (Exception cancelEx) {
-                log.error("PG 결제 취소 중 오류 발생. transactionId: {}, orderId: {}", pgResult.transactionId(), orderId, cancelEx);
-            }
-            throw e;
+        // 5. 결제 및 쿠폰 사용 완료 처리
+        paymentService.savePayment(orderId, request.paymentMethod(), totalPaymentAmount, pgResult.transactionId(), pgResult.approvedAt());
+        orderService.completeOrder(orderId);
+        
+        if (request.couponIssueId() != null) {
+            couponService.completeCouponUse(request.couponIssueId(), totalOriginalAmount);
         }
 
         return orderId;
-    }
-
-    @Transactional
-    public void cancelOrderAndRestoreStock(Long orderId) {
-        OrderModel order = orderService.getOrder(orderId);
-        
-        // 1. 주문 취소 상태 변경
-        orderService.cancelOrder(orderId);
-
-        // 2. 재고 원복
-        List<StockService.StockRequest> stockRequests = order.getItems().stream()
-                .map(item -> new StockService.StockRequest(item.getProductId(), item.getQuantity()))
-                .toList();
-        stockService.increaseStocks(stockRequests);
     }
 }
