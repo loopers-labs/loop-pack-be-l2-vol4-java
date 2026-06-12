@@ -7,6 +7,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,8 @@ class CouponServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private static final ZonedDateTime FUTURE = ZonedDateTime.now().plusDays(30);
+
     @DisplayName("쿠폰 발급 시,")
     @Nested
     class Issue {
@@ -47,7 +50,7 @@ class CouponServiceIntegrationTest {
         @Test
         void issuesCoupon_whenValidCouponIdIsProvided() {
             // arrange
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("신규 가입 10% 할인", CouponType.RATE, 10L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("신규 가입 10% 할인", CouponType.RATE, 10L, null, FUTURE));
             UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
 
             // act
@@ -76,11 +79,27 @@ class CouponServiceIntegrationTest {
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
+        @DisplayName("만료된 쿠폰을 발급 시도하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenCouponIsExpired() {
+            // arrange
+            CouponModel coupon = couponJpaRepository.save(
+                new CouponModel("만료된 쿠폰", CouponType.FIXED, 5000L, null, ZonedDateTime.now().minusDays(1))
+            );
+            UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class, () ->
+                couponService.issueCoupon(user.getId(), coupon.getId())
+            );
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("동일 쿠폰을 중복 발급 시도하면 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenCouponAlreadyIssued() {
             // arrange
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("5,000원 즉시 할인", CouponType.FIXED, 5000L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("5,000원 즉시 할인", CouponType.FIXED, 5000L, null, FUTURE));
             UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
             couponService.issueCoupon(user.getId(), coupon.getId());
 
@@ -100,8 +119,8 @@ class CouponServiceIntegrationTest {
         @Test
         void returnsAllCoupons_whenUserHasCoupons() {
             // arrange
-            CouponModel coupon1 = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L));
-            CouponModel coupon2 = couponJpaRepository.save(new CouponModel("5,000원 할인", CouponType.FIXED, 5000L));
+            CouponModel coupon1 = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L, null, FUTURE));
+            CouponModel coupon2 = couponJpaRepository.save(new CouponModel("5,000원 할인", CouponType.FIXED, 5000L, null, FUTURE));
             UserModel user = userJpaRepository.save(new UserModel("user1", "pw1"));
             couponService.issueCoupon(user.getId(), coupon1.getId());
             couponService.issueCoupon(user.getId(), coupon2.getId());
@@ -130,7 +149,7 @@ class CouponServiceIntegrationTest {
         @Test
         void returnsOnlyOwnCoupons() {
             // arrange
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L, null, FUTURE));
             UserModel user1 = userJpaRepository.save(new UserModel("user1", "pw1"));
             UserModel user2 = userJpaRepository.save(new UserModel("user2", "pw2"));
             couponService.issueCoupon(user1.getId(), coupon.getId());

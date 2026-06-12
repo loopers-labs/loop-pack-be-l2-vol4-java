@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,8 @@ class OrderFacadeIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private static final ZonedDateTime FUTURE = ZonedDateTime.now().plusDays(30);
+
     private UserModel savedUser(String loginId) {
         return userJpaRepository.save(new UserModel(loginId, "pw1"));
     }
@@ -76,7 +79,7 @@ class OrderFacadeIntegrationTest {
             // arrange
             UserModel user = savedUser("user1");
             ProductModel product = savedProduct(100_000L, 10);
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, null, FUTURE));
             UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
 
             // act
@@ -100,7 +103,7 @@ class OrderFacadeIntegrationTest {
             // arrange
             UserModel user = savedUser("user1");
             ProductModel product = savedProduct(100_000L, 10);
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10L, null, FUTURE));
             UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
 
             // act
@@ -137,6 +140,42 @@ class OrderFacadeIntegrationTest {
             );
         }
 
+        @DisplayName("주문 금액이 쿠폰의 최소 주문 금액 미만이면 BAD_REQUEST 예외가 발생하고 주문이 생성되지 않는다.")
+        @Test
+        void throwsBadRequest_whenOrderAmountIsBelowCouponMinimum() {
+            // arrange
+            UserModel user = savedUser("user1");
+            ProductModel product = savedProduct(5_000L, 5);
+            CouponModel coupon = couponJpaRepository.save(
+                new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, 10_000L, FUTURE));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder("user1", "pw1",
+                    List.of(new OrderFacade.OrderRequest(product.getId(), 1)), userCoupon.getId())
+            );
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("만료된 쿠폰 템플릿으로 주문 시 BAD_REQUEST 예외가 발생하고 주문이 생성되지 않는다.")
+        @Test
+        void throwsBadRequest_whenCouponTemplateIsExpired() {
+            // arrange
+            UserModel user = savedUser("user1");
+            ProductModel product = savedProduct(50_000L, 5);
+            CouponModel coupon = couponJpaRepository.save(
+                new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, null, ZonedDateTime.now().minusDays(1)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
+
+            // act & assert
+            CoreException exception = assertThrows(CoreException.class, () ->
+                orderFacade.createOrder("user1", "pw1",
+                    List.of(new OrderFacade.OrderRequest(product.getId(), 1)), userCoupon.getId())
+            );
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
         @DisplayName("시나리오 8 - 존재하지 않는 userCouponId로 주문 시 BAD_REQUEST 예외가 발생하고 주문이 생성되지 않는다.")
         @Test
         void throwsBadRequest_whenUserCouponDoesNotExist() {
@@ -160,7 +199,7 @@ class OrderFacadeIntegrationTest {
             UserModel owner = savedUser("owner");
             UserModel attacker = savedUser("attacker");
             ProductModel product = savedProduct(50_000L, 5);
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, null, FUTURE));
             UserCouponModel ownerCoupon = userCouponJpaRepository.save(new UserCouponModel(owner.getId(), coupon.getId()));
 
             // act & assert
@@ -177,7 +216,7 @@ class OrderFacadeIntegrationTest {
             // arrange
             UserModel user = savedUser("user1");
             ProductModel product = savedProduct(50_000L, 5);
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, null, FUTURE));
             UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
             userCoupon.use();
             userCouponJpaRepository.save(userCoupon);
@@ -196,7 +235,7 @@ class OrderFacadeIntegrationTest {
             // arrange
             UserModel user = savedUser("user1");
             ProductModel product = savedProduct(50_000L, 5);
-            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L));
+            CouponModel coupon = couponJpaRepository.save(new CouponModel("5천원 할인", CouponType.FIXED, 5_000L, null, FUTURE));
             UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(user.getId(), coupon.getId()));
             userCoupon.expire();
             userCouponJpaRepository.save(userCoupon);

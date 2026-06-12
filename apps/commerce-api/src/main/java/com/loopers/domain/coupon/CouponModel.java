@@ -9,6 +9,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
+import java.time.ZonedDateTime;
+
 @Entity
 @Table(name = "coupon")
 public class CouponModel extends BaseEntity {
@@ -23,12 +25,20 @@ public class CouponModel extends BaseEntity {
     @Column(name = "discount_value", nullable = false)
     private Long discountValue;
 
+    @Column(name = "min_order_amount")
+    private Long minOrderAmount;
+
+    @Column(name = "expired_at", nullable = false)
+    private ZonedDateTime expiredAt;
+
     protected CouponModel() {}
 
-    public CouponModel(String name, CouponType discountType, Long discountValue) {
+    public CouponModel(String name, CouponType discountType, Long discountValue, Long minOrderAmount, ZonedDateTime expiredAt) {
         this.name = name;
         this.discountType = discountType;
         this.discountValue = discountValue;
+        this.minOrderAmount = minOrderAmount;
+        this.expiredAt = expiredAt;
         guard();
     }
 
@@ -46,6 +56,29 @@ public class CouponModel extends BaseEntity {
         if (discountType == CouponType.RATE && (discountValue < 1 || discountValue > 100)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "정률 할인은 1 이상 100 이하여야 합니다.");
         }
+        if (minOrderAmount != null && minOrderAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액은 0 이상이어야 합니다.");
+        }
+        if (expiredAt == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료일은 필수입니다.");
+        }
+    }
+
+    public boolean isExpired() {
+        return expiredAt.isBefore(ZonedDateTime.now());
+    }
+
+    public long calculateDiscount(long orderAmount) {
+        if (isExpired()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
+        }
+        if (minOrderAmount != null && orderAmount < minOrderAmount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 않습니다.");
+        }
+        if (discountType == CouponType.FIXED) {
+            return discountValue;
+        }
+        return orderAmount * discountValue / 100;
     }
 
     public String getName() {
@@ -58,5 +91,13 @@ public class CouponModel extends BaseEntity {
 
     public Long getDiscountValue() {
         return discountValue;
+    }
+
+    public Long getMinOrderAmount() {
+        return minOrderAmount;
+    }
+
+    public ZonedDateTime getExpiredAt() {
+        return expiredAt;
     }
 }

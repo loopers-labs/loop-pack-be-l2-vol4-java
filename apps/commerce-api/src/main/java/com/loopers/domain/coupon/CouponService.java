@@ -39,8 +39,12 @@ public class CouponService {
 
     @Transactional
     public UserCouponModel issueCoupon(Long userId, Long couponId) {
-        couponRepository.find(couponId)
+        CouponModel coupon = couponRepository.find(couponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
+
+        if (coupon.isExpired()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
+        }
 
         if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
