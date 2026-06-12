@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -50,6 +51,10 @@ public class UserCoupon extends BaseEntity {
 
     @Column(name = "used_at")
     private ZonedDateTime usedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     private UserCoupon(Long couponId, Long userId, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
         this.couponId = couponId;

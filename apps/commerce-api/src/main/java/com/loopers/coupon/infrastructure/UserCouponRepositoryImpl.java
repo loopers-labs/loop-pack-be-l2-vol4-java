@@ -22,8 +22,13 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     }
 
     @Override
-    public Optional<UserCoupon> findByIdForUpdate(Long id) {
-        return userCouponJpaRepository.findByIdForUpdate(id);
+    public Optional<UserCoupon> findById(Long id) {
+        return userCouponJpaRepository.findByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
+    public void flush() {
+        userCouponJpaRepository.flush();
     }
 
     @Override
