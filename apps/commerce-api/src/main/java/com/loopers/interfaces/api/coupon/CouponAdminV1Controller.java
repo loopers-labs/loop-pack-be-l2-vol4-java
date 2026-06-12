@@ -63,9 +63,9 @@ public class CouponAdminV1Controller {
     }
 
     @DeleteMapping("/{couponTemplateId}")
-    public ApiResponse<Void> deleteTemplate(@PathVariable Long couponTemplateId) {
+    public ApiResponse<Object> deleteTemplate(@PathVariable Long couponTemplateId) {
         couponApplicationService.deleteTemplate(couponTemplateId);
-        return ApiResponse.success(null);
+        return ApiResponse.success();
     }
 
     @GetMapping("/{couponTemplateId}/issues")
