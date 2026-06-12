@@ -21,7 +21,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -65,7 +69,9 @@ class OrderServiceIntegrationTest {
         com.loopers.domain.order.vo.Money original = new com.loopers.domain.order.vo.Money(
                 lines.stream().mapToLong(OrderLine::amount).sum()
         );
-        return orderService.placeOrder(new OrderModel(TEST_USER_ID, null), lines, original, new com.loopers.domain.order.vo.Money(0L));
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        String orderNumber = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + suffix;
+        return orderService.placeOrder(new OrderModel(orderNumber, TEST_USER_ID, null), lines, original, new com.loopers.domain.order.vo.Money(0L));
     }
 
     @DisplayName("단건 주문 조회(getByUser) 시,")
