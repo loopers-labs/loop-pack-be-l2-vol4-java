@@ -8,15 +8,20 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    // ===== 요청 (모양 A) =====
-    public record OrderRequest(List<OrderItemRequest> items) {
+    // ===== 요청 =====
+    public record OrderRequest(List<OrderItemRequest> items, Long couponId) {   // couponId nullable
 
-        /** 헤더에서 온 userId + 바디의 items 를 합쳐 응용 입력(OrderCriteria, 모양 B)으로 변환 */
+        /** 쿠폰 미적용 주문 편의 생성자 */
+        public OrderRequest(List<OrderItemRequest> items) {
+            this(items, null);
+        }
+
+        /** 헤더 userId + 바디(items, couponId) 를 합쳐 응용 입력(OrderCriteria)으로 변환 */
         public OrderCriteria toCriteria(Long userId) {
             List<OrderCriteria.Line> lines = items.stream()
                     .map(i -> new OrderCriteria.Line(i.productId(), i.quantity()))
                     .toList();
-            return new OrderCriteria(userId, lines);
+            return new OrderCriteria(userId, couponId, lines);
         }
     }
 
@@ -26,16 +31,22 @@ public class OrderV1Dto {
     public record OrderResponse(
             Long id,
             Long userId,
-            String status,          // OrderStatus enum → String
-            long totalAmount,
+            String status,
+            long totalAmount,       // 할인 전
+            long discountAmount,    // 할인액
+            long finalAmount,       // 최종 결제액
+            Long couponId,          // 적용된 쿠폰 (없으면 null)
             List<OrderItemResponse> items
     ) {
         public static OrderResponse from(OrderInfo info) {
             return new OrderResponse(
                     info.id(),
                     info.userId(),
-                    info.status().name(),   // enum 을 문자열로 풀어 응답
+                    info.status().name(),
                     info.totalAmount(),
+                    info.discountAmount(),
+                    info.finalAmount(),
+                    info.userCouponId(),
                     info.items().stream().map(OrderItemResponse::from).toList()
             );
         }

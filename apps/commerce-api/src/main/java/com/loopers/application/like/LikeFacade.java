@@ -28,8 +28,7 @@ public class LikeFacade {
         }
 
         likeRepository.save(new LikeModel(userId, productId));
-        product.increaseLikeCount();
-        productRepository.save(product);
+        productRepository.increaseLikeCount(productId);   // 원자적 UPDATE
     }
 
     @Transactional
@@ -43,7 +42,6 @@ public class LikeFacade {
         }
 
         likeRepository.deleteByUserIdAndProductId(userId, productId);
-        product.decreaseLikeCount();
-        productRepository.save(product);
+        productRepository.decreaseLikeCount(productId);   // 원자적 UPDATE
     }
 }

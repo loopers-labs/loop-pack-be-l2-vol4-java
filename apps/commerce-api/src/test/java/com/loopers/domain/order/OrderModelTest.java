@@ -76,4 +76,28 @@ public class OrderModelTest {
         failed.fail();
         assertThat(failed.getStatus()).isEqualTo(OrderStatus.FAILED);
     }
+
+    @DisplayName("쿠폰 미적용 주문은 할인액 0, 최종금액 = 총액, 적용쿠폰 없음이다.")
+    @Test
+    void create_withoutCoupon_finalEqualsTotal() {
+        OrderModel order = OrderModel.create(USER_ID, List.of(item(1000L, 2)));   // total 2000
+
+        assertThat(order.getTotalAmount()).isEqualTo(Money.of(2000L));
+        assertThat(order.getDiscountAmount()).isEqualTo(Money.ZERO);
+        assertThat(order.getFinalAmount()).isEqualTo(Money.of(2000L));
+        assertThat(order.getUserCouponId()).isEmpty();
+    }
+
+    @DisplayName("쿠폰을 적용하면 최종금액 = 총액 - 할인액이고, 할인 스냅샷이 남는다.")
+    @Test
+    void applyCoupon_setsDiscountAndFinalAmount() {
+        OrderModel order = OrderModel.create(USER_ID, List.of(item(1000L, 2), item(3000L, 1)));  // total 5000
+
+        order.applyCoupon(42L, Money.of(500L));
+
+        assertThat(order.getTotalAmount()).isEqualTo(Money.of(5000L));   // 할인 전
+        assertThat(order.getDiscountAmount()).isEqualTo(Money.of(500L)); // 할인액
+        assertThat(order.getFinalAmount()).isEqualTo(Money.of(4500L));   // 최종
+        assertThat(order.getUserCouponId()).contains(42L);
+    }
 }

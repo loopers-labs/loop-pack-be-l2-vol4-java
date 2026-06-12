@@ -29,6 +29,21 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public Optional<ProductModel> findByIdForUpdate(Long id) {
+        return productJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
+    public void increaseLikeCount(Long id) {
+        productJpaRepository.increaseLikeCount(id);
+    }
+
+    @Override
+    public void decreaseLikeCount(Long id) {
+        productJpaRepository.decreaseLikeCount(id);
+    }
+
+    @Override
     public List<ProductModel> findAll(Long brandId, ProductSortOption sort, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, toJpaSort(sort));
         if (brandId == null) {

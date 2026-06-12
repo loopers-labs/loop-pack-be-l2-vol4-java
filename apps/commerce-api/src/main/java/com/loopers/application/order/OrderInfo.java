@@ -13,7 +13,10 @@ public record OrderInfo(
         Long id,
         Long userId,
         OrderStatus status,
-        long totalAmount,
+        long totalAmount,       // 할인 전
+        long discountAmount,    // 할인액
+        long finalAmount,       // 최종 결제액
+        Long userCouponId,      // 적용된 쿠폰 (없으면 null)
         List<OrderItemInfo> items
 ) {
     public static OrderInfo from(OrderModel order) {
@@ -26,6 +29,9 @@ public record OrderInfo(
                 order.getUserId(),
                 order.getStatus(),
                 order.getTotalAmount().amount(),
+                order.getDiscountAmount().amount(),
+                order.getFinalAmount().amount(),
+                order.getUserCouponId().orElse(null),
                 itemInfos
         );
     }
