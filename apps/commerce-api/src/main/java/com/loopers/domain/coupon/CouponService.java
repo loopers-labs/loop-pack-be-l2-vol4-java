@@ -28,7 +28,7 @@ public class CouponService {
 
     @Transactional
     public UserCouponModel useCoupon(Long userId, Long userCouponId) {
-        UserCouponModel userCoupon = userCouponRepository.findForUpdate(userCouponId)
+        UserCouponModel userCoupon = userCouponRepository.find(userCouponId)
             .orElseThrow(() -> new CoreException(ErrorType.BAD_REQUEST, "사용할 수 없는 쿠폰입니다."));
         if (!userCoupon.getUserId().equals(userId)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "사용할 수 없는 쿠폰입니다.");

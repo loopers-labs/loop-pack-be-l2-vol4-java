@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "user_coupon")
@@ -22,6 +23,10 @@ public class UserCouponModel extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private UserCouponStatus status;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     protected UserCouponModel() {}
 
