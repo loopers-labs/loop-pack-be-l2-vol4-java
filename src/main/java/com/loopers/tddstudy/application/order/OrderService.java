@@ -1,5 +1,9 @@
 package com.loopers.tddstudy.application.order;
 
+import com.loopers.tddstudy.domain.coupon.Coupon;
+import com.loopers.tddstudy.domain.coupon.CouponRepository;
+import com.loopers.tddstudy.domain.coupon.UserCoupon;
+import com.loopers.tddstudy.domain.coupon.UserCouponRepository;
 import com.loopers.tddstudy.domain.order.Order;
 import com.loopers.tddstudy.domain.order.OrderItem;
 import com.loopers.tddstudy.domain.order.OrderRepository;
@@ -22,15 +26,22 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final PaymentGateway paymentGateway;
 
+    private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
+
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
-                        PaymentGateway paymentGateway) {
+                        PaymentGateway paymentGateway,
+                        CouponRepository couponRepository,
+                        UserCouponRepository userCouponRepository) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.paymentGateway = paymentGateway;
+        this.couponRepository = couponRepository;
+        this.userCouponRepository = userCouponRepository;
     }
 
-    public Order createOrder(Long userId, List<OrderItemRequest> items) {
+    public Order createOrder(Long userId, List<OrderItemRequest> items,Long couponId) {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("주문 항목이 비어있습니다.");
         }
@@ -44,6 +55,43 @@ public class OrderService {
             }
             productMap.put(item.productId(), product);
         }
+        // 상품 조회 후, 쿠폰 처리 전
+        int originalAmount = items.stream()
+                .mapToInt(item -> productMap.get(item.productId()).getPrice() * item.quantity())
+                .sum();
+
+        int discountAmount = 0;
+        if (couponId != null) {
+            // UserCoupon 락 걸고 조회
+            UserCoupon userCoupon = userCouponRepository.findByIdWithLock(couponId)
+                    .orElseThrow(() -> new IllegalArgumentException("쿠폰을 찾을 수 없습니다."));
+
+            // 본인 소유 확인
+            if (!userCoupon.getUserId().equals(userId)) {
+                throw new IllegalArgumentException("본인 소유의 쿠폰이 아닙니다.");
+            }
+
+            // 사용 가능 여부 확인
+            if (!userCoupon.isAvailable()) {
+                throw new IllegalArgumentException("사용 불가능한 쿠폰입니다.");
+            }
+
+            // Coupon 템플릿 조회해서 할인 금액 계산
+            Coupon coupon = couponRepository.findById(userCoupon.getCouponId())
+                    .orElseThrow(() -> new IllegalArgumentException("쿠폰을 찾을 수 없습니다."));
+
+            // 만료 확인
+            if (coupon.isExpired()) {
+                throw new IllegalArgumentException("만료된 쿠폰입니다.");
+            }
+
+            discountAmount = coupon.discount(originalAmount);
+
+            // 쿠폰 사용 처리
+            userCoupon.use();
+            userCouponRepository.save(userCoupon);
+        }
+
 
         // 2. 재고 원자적 확인 (하나라도 부족하면 전체 실패)
         for (OrderItemRequest item : items) {
@@ -71,7 +119,9 @@ public class OrderService {
                     item.quantity()
             ));
         }
+        order.applyDiscount(originalAmount, discountAmount);
         orderRepository.save(order);
+
 
         // 5. 결제 요청
         String paymentResult = paymentGateway.requestPayment(order.getId(), order.getTotalAmount());

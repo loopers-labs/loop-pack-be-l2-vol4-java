@@ -18,6 +18,11 @@ public class Order {
     private int totalAmount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    //쿠폰관련
+    private int originalAmount;   // 할인 전 금액
+    private int discountAmount;   // 할인 금액
+    private Long userCouponId;    // 사용한 쿠폰 ID (nullable)
+
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "order_id")
@@ -34,6 +39,8 @@ public class Order {
         this.updatedAt = LocalDateTime.now();
     }
 
+
+
     public void addItem(OrderItem item) {
         this.items.add(item);
         this.totalAmount = calculateTotal();
@@ -43,6 +50,12 @@ public class Order {
     public void markPaid() {
         this.status = "PAID";
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void applyDiscount(int originalAmount, int discountAmount) {
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.totalAmount = originalAmount - discountAmount;
     }
 
     public void markFailed() {
@@ -60,6 +73,9 @@ public class Order {
         }
     }
 
+
+
+
     public Long getId() { return id; }
     public Long getUserId() { return userId; }
     public String getStatus() { return status; }
@@ -67,4 +83,7 @@ public class Order {
     public List<OrderItem> getItems() { return items; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public int getOriginalAmount() { return originalAmount; }
+    public int getDiscountAmount() { return discountAmount; }
+    public Long getUserCouponId() { return userCouponId; }
 }

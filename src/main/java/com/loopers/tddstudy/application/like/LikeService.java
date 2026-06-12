@@ -23,7 +23,7 @@ public class LikeService {
     }
 
     public void addLike(Long userId, Long productId) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByIdWithLock(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
 
         // 멱등: 이미 좋아요한 경우 아무 변경 없음

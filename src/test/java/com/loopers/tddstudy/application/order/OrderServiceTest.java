@@ -2,9 +2,8 @@ package com.loopers.tddstudy.application.order;
 
 import com.loopers.tddstudy.domain.order.Order;
 import com.loopers.tddstudy.domain.product.Product;
-import com.loopers.tddstudy.support.FakeOrderRepository;
-import com.loopers.tddstudy.support.FakePaymentGateway;
-import com.loopers.tddstudy.support.FakeProductRepository;
+import com.loopers.tddstudy.support.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +18,8 @@ class OrderServiceTest {
     private FakeProductRepository fakeProductRepository;
     private FakePaymentGateway fakePaymentGateway;
     private OrderService orderService;
+    private FakeCouponRepository fakeCouponRepository;
+    private FakeUserCouponRepository fakeUserCouponRepository;
 
     private Product product1;
     private Product product2;
@@ -28,7 +29,16 @@ class OrderServiceTest {
         fakeOrderRepository = new FakeOrderRepository();
         fakeProductRepository = new FakeProductRepository();
         fakePaymentGateway = new FakePaymentGateway();
-        orderService = new OrderService(fakeOrderRepository, fakeProductRepository, fakePaymentGateway);
+        fakeCouponRepository = new FakeCouponRepository();
+        fakeUserCouponRepository = new FakeUserCouponRepository();
+
+        orderService = new OrderService(
+                fakeOrderRepository,
+                fakeProductRepository,
+                fakePaymentGateway,
+                fakeCouponRepository,
+                fakeUserCouponRepository
+        );
 
         product1 = fakeProductRepository.save(new Product("나이키 운동화", 50000, 10, 1L));
         product1.publish();
@@ -47,7 +57,7 @@ class OrderServiceTest {
                 new OrderItemRequest(product2.getId(), 1)
         );
 
-        Order order = orderService.createOrder(1L, items);
+        Order order = orderService.createOrder(1L, items, null);
 
         assertThat(order.getStatus()).isEqualTo("PAID");
         assertThat(order.getTotalAmount()).isEqualTo(130000);
@@ -63,7 +73,7 @@ class OrderServiceTest {
                 new OrderItemRequest(product1.getId(), 2)
         );
 
-        Order order = orderService.createOrder(1L, items);
+        Order order = orderService.createOrder(1L, items,null);
 
         assertThat(order.getStatus()).isEqualTo("FAILED");
         assertThat(fakeProductRepository.findById(product1.getId()).get().getStock()).isEqualTo(10);
@@ -77,7 +87,7 @@ class OrderServiceTest {
                 new OrderItemRequest(product1.getId(), 2)
         );
 
-        Order order = orderService.createOrder(1L, items);
+        Order order = orderService.createOrder(1L, items, null);
 
         assertThat(order.getStatus()).isEqualTo("FAILED");
         assertThat(fakeProductRepository.findById(product1.getId()).get().getStock()).isEqualTo(10);
@@ -91,7 +101,7 @@ class OrderServiceTest {
                 new OrderItemRequest(product2.getId(), 99)
         );
 
-        assertThatThrownBy(() -> orderService.createOrder(1L, items))
+        assertThatThrownBy(() -> orderService.createOrder(1L, items,null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("재고가 부족합니다.");
 
@@ -106,7 +116,7 @@ class OrderServiceTest {
                 new OrderItemRequest(999L, 1)
         );
 
-        assertThatThrownBy(() -> orderService.createOrder(1L, items))
+        assertThatThrownBy(() -> orderService.createOrder(1L, items, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("상품을 찾을 수 없습니다.");
     }
@@ -115,7 +125,7 @@ class OrderServiceTest {
     @DisplayName("본인 주문을 조회할 수 있다")
     void get_order_by_owner_success() {
         List<OrderItemRequest> items = List.of(new OrderItemRequest(product1.getId(), 1));
-        Order saved = orderService.createOrder(1L, items);
+        Order saved = orderService.createOrder(1L, items,null);
 
         Order found = orderService.getOrder(1L, saved.getId());
 
@@ -126,7 +136,7 @@ class OrderServiceTest {
     @DisplayName("타인의 주문 조회 시 예외가 발생한다")
     void get_order_by_other_user_throws_exception() {
         List<OrderItemRequest> items = List.of(new OrderItemRequest(product1.getId(), 1));
-        Order saved = orderService.createOrder(1L, items);
+        Order saved = orderService.createOrder(1L, items,null);
 
         assertThatThrownBy(() -> orderService.getOrder(2L, saved.getId()))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -137,8 +147,8 @@ class OrderServiceTest {
     @DisplayName("내 주문 목록을 조회할 수 있다")
     void get_my_orders_success() {
         List<OrderItemRequest> items = List.of(new OrderItemRequest(product1.getId(), 1));
-        orderService.createOrder(1L, items);
-        orderService.createOrder(1L, items);
+        orderService.createOrder(1L, items,null);
+        orderService.createOrder(1L, items,null);
 
         List<Order> orders = orderService.getMyOrders(1L);
 
@@ -148,7 +158,7 @@ class OrderServiceTest {
     @Test
     @DisplayName("주문 항목이 비어있으면 예외가 발생한다")
     void create_order_empty_items_throws_exception() {
-        assertThatThrownBy(() -> orderService.createOrder(1L, List.of()))
+        assertThatThrownBy(() -> orderService.createOrder(1L, List.of(),null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("주문 항목이 비어있습니다.");
     }
