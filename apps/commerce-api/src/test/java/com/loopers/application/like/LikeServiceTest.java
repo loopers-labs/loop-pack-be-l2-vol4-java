@@ -211,6 +211,11 @@ class LikeServiceTest {
         }
 
         @Override
+        public Optional<ProductModel> findByIdForUpdate(Long id) {
+            return findById(id);
+        }
+
+        @Override
         public List<ProductModel> findAllByBrandId(Long brandId) {
             return store.values().stream().filter(p -> p.getBrandId().equals(brandId)).toList();
         }

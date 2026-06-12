@@ -79,19 +79,6 @@ class UserCouponModelTest {
                 .isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("차단된 쿠폰에 use()를 호출하면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void use_blocked_throwsBadRequest() {
-            // arrange
-            UserCouponModel userCoupon = new UserCouponModel(1L, 10L);
-            userCoupon.block();
-
-            // act & assert
-            assertThatThrownBy(userCoupon::use)
-                .isInstanceOf(CoreException.class)
-                .extracting("errorType")
-                .isEqualTo(ErrorType.BAD_REQUEST);
-        }
     }
 
     @DisplayName("쿠폰 상태를 조회할 때,")
@@ -106,7 +93,7 @@ class UserCouponModelTest {
             LocalDateTime futureExpiredAt = LocalDateTime.now().plusDays(7);
 
             // assert
-            assertThat(userCoupon.getStatus(futureExpiredAt)).isEqualTo(CouponStatus.AVAILABLE);
+            assertThat(userCoupon.getStatus(futureExpiredAt, false)).isEqualTo(CouponStatus.AVAILABLE);
         }
 
         @DisplayName("usedAt이 설정되어 있으면 getStatus()가 USED를 반환한다.")
@@ -118,7 +105,7 @@ class UserCouponModelTest {
             LocalDateTime futureExpiredAt = LocalDateTime.now().plusDays(7);
 
             // assert
-            assertThat(userCoupon.getStatus(futureExpiredAt)).isEqualTo(CouponStatus.USED);
+            assertThat(userCoupon.getStatus(futureExpiredAt, false)).isEqualTo(CouponStatus.USED);
         }
 
         @DisplayName("expiredAt이 과거이면 getStatus()가 EXPIRED를 반환한다.")
@@ -130,19 +117,18 @@ class UserCouponModelTest {
             LocalDateTime pastExpiredAt = LocalDateTime.now().minusDays(1);
 
             // assert — 만료가 사용보다 우선
-            assertThat(userCoupon.getStatus(pastExpiredAt)).isEqualTo(CouponStatus.EXPIRED);
+            assertThat(userCoupon.getStatus(pastExpiredAt, false)).isEqualTo(CouponStatus.EXPIRED);
         }
 
-        @DisplayName("차단된 쿠폰의 getStatus()는 BLOCKED를 반환한다.")
+        @DisplayName("템플릿이 차단되면 getStatus()가 BLOCKED를 반환한다.")
         @Test
         void getStatus_blocked() {
             // arrange
             UserCouponModel userCoupon = new UserCouponModel(1L, 10L);
-            userCoupon.block();
             LocalDateTime futureExpiredAt = LocalDateTime.now().plusDays(7);
 
             // assert
-            assertThat(userCoupon.getStatus(futureExpiredAt)).isEqualTo(CouponStatus.BLOCKED);
+            assertThat(userCoupon.getStatus(futureExpiredAt, true)).isEqualTo(CouponStatus.BLOCKED);
         }
     }
 }

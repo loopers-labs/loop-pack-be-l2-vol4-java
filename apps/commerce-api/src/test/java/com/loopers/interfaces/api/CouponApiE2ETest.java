@@ -1,6 +1,5 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.application.coupon.UserCouponInfo;
 import com.loopers.application.user.UserService;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
@@ -30,8 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CouponApiE2ETest {
 
     private static final String ISSUE_URL = "/api/v1/coupons/{templateId}/issue";
-    private static final String MY_COUPONS_URL = "/api/v1/coupons/me";
-    private static final String BLOCK_URL = "/api-admin/v1/user-coupons/{userCouponId}/block";
+    private static final String MY_COUPONS_URL = "/api/v1/users/me/coupons";
+    private static final String DELETE_TEMPLATE_URL = "/api-admin/v1/coupons/{templateId}";
 
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
@@ -55,7 +54,6 @@ class CouponApiE2ETest {
 
     private UserModel savedUser;
     private HttpHeaders userHeaders;
-    private HttpHeaders adminHeaders;
 
     @BeforeEach
     void setUp() {
@@ -66,9 +64,6 @@ class CouponApiE2ETest {
         userHeaders = new HttpHeaders();
         userHeaders.set(LOGIN_ID_HEADER, "user01");
         userHeaders.set(LOGIN_PW_HEADER, "Password1!");
-
-        adminHeaders = new HttpHeaders();
-        adminHeaders.set(ADMIN_HEADER, ADMIN_HEADER_VALUE);
     }
 
     @AfterEach
@@ -147,7 +142,7 @@ class CouponApiE2ETest {
         }
     }
 
-    @DisplayName("GET /api/v1/coupons/me")
+    @DisplayName("GET /api/v1/users/me/coupons")
     @Nested
     class GetMyCoupons {
 
@@ -172,33 +167,36 @@ class CouponApiE2ETest {
             assertThat(response.getBody().data().get(0).templateName()).isEqualTo("10% 할인");
             assertThat(response.getBody().data().get(0).status()).isEqualTo(CouponStatus.AVAILABLE);
         }
-    }
 
-    @DisplayName("PATCH /api-admin/v1/user-coupons/{userCouponId}/block")
-    @Nested
-    class BlockCoupon {
-
-        @DisplayName("ADMIN이 쿠폰을 차단하면 204가 반환되고 이후 상태가 BLOCKED가 된다.")
+        @DisplayName("E-5: ADMIN이 템플릿을 차단하면 204가 반환되고 이후 내 쿠폰 상태가 BLOCKED가 된다.")
         @Test
-        void returns204AndStatusBlocked_whenAdminBlocks() {
+        void returns204AndCouponIsBlocked_whenAdminDeletesTemplate() {
             // arrange
             var template = couponTemplateJpaRepository.save(
                 new com.loopers.domain.coupon.CouponTemplateModel("10% 할인", CouponType.RATE, 10L, null, LocalDateTime.now().plusDays(7)));
-            var userCoupon = userCouponJpaRepository.save(
-                new com.loopers.domain.coupon.UserCouponModel(savedUser.getId(), template.getId()));
+            userCouponJpaRepository.save(new com.loopers.domain.coupon.UserCouponModel(savedUser.getId(), template.getId()));
+
+            HttpHeaders adminHeaders = new HttpHeaders();
+            adminHeaders.set(ADMIN_HEADER, ADMIN_HEADER_VALUE);
 
             // act
-            var response = testRestTemplate.exchange(
-                BLOCK_URL, HttpMethod.PATCH,
+            var deleteResponse = testRestTemplate.exchange(
+                DELETE_TEMPLATE_URL, HttpMethod.DELETE,
                 new HttpEntity<>(adminHeaders),
-                Void.class,
-                userCoupon.getId()
+                new ParameterizedTypeReference<ApiResponse<Void>>() {},
+                template.getId()
             );
 
             // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-            var blocked = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
-            assertThat(blocked.isBlocked()).isTrue();
+            assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+            var myCoupons = testRestTemplate.exchange(
+                MY_COUPONS_URL, HttpMethod.GET,
+                new HttpEntity<>(userHeaders),
+                new ParameterizedTypeReference<ApiResponse<List<CouponDto.MyCouponResponse>>>() {}
+            );
+            assertThat(myCoupons.getBody().data().get(0).status()).isEqualTo(CouponStatus.BLOCKED);
         }
     }
+
 }

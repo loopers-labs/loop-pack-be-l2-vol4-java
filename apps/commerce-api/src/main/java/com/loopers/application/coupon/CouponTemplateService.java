@@ -39,4 +39,11 @@ public class CouponTemplateService {
         template.update(name, isActive);
         return template;
     }
+
+    @Transactional
+    public void delete(Long id) {
+        CouponTemplateModel template = couponTemplateRepository.findById(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[templateId = " + id + "] 쿠폰 템플릿을 찾을 수 없습니다."));
+        template.block();
+    }
 }

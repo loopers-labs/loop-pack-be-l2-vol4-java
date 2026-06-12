@@ -455,8 +455,8 @@ class OrderApiE2ETest {
                 new CouponTemplateModel("1000원 할인", CouponType.FIXED, 1000L, null, java.time.LocalDateTime.now().plusDays(7)));
             UserCouponModel userCoupon = userCouponJpaRepository.save(
                 new UserCouponModel(savedUser.getId(), template.getId()));
-            userCoupon.block();
-            userCouponJpaRepository.save(userCoupon);
+            template.block();
+            couponTemplateJpaRepository.save(template);
 
             OrderDto.CreateRequest request = new OrderDto.CreateRequest(
                 List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()

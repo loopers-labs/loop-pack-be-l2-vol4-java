@@ -11,7 +11,7 @@ public class OrderDto {
     public record CreateRequest(
         @NotEmpty(message = "주문 항목은 필수입니다.")
         List<OrderItemRequest> items,
-        Long userCouponId
+        Long couponId
     ) {
         public CreateRequest(List<OrderItemRequest> items) {
             this(items, null);

@@ -25,25 +25,25 @@ public class OrderFacade {
     private final CouponDomainService couponDomainService;
 
     @Transactional
-    public OrderInfo createOrder(Long memberId, List<OrderItemCommand> items, Long userCouponId) {
+    public OrderInfo createOrder(Long memberId, List<OrderItemCommand> items, Long couponId) {
         long originalAmount = orderService.calculateTotalPrice(items);
 
         CouponTemplateModel template = null;
-        if (userCouponId != null) {
-            UserCouponModel userCoupon = userCouponService.getById(userCouponId);
+        if (couponId != null) {
+            UserCouponModel userCoupon = userCouponService.getById(couponId);
             if (!userCoupon.getMemberId().equals(memberId)) {
                 throw new CoreException(ErrorType.FORBIDDEN, "본인의 쿠폰만 사용할 수 있습니다.");
             }
             template = couponTemplateService.getById(userCoupon.getTemplateId());
             couponDomainService.validateMinOrderAmount(template, originalAmount);
-            if (userCoupon.getStatus(template.getExpiredAt()) != CouponStatus.AVAILABLE) {
+            if (userCoupon.getStatus(template.getExpiredAt(), template.isBlocked()) != CouponStatus.AVAILABLE) {
                 throw new CoreException(ErrorType.BAD_REQUEST, "사용할 수 없는 쿠폰입니다.");
             }
             userCoupon.use();
         }
 
         long discountAmount = couponDomainService.calculateDiscount(template, originalAmount);
-        var order = orderService.create(memberId, items, userCouponId, originalAmount, discountAmount);
+        var order = orderService.create(memberId, items, couponId, originalAmount, discountAmount);
         var orderItems = orderService.getItemsByOrderId(order.getId());
         return OrderInfo.of(order, orderItems);
     }

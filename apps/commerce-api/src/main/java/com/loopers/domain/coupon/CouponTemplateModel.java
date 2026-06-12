@@ -34,6 +34,9 @@ public class CouponTemplateModel extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
+    @Column(name = "is_blocked", nullable = false)
+    private boolean isBlocked;
+
     protected CouponTemplateModel() {}
 
     public CouponTemplateModel(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt) {
@@ -68,12 +71,20 @@ public class CouponTemplateModel extends BaseEntity {
         this.isActive = isActive;
     }
 
+    public void block() {
+        this.isBlocked = true;
+    }
+
     public boolean isExpired() {
         return expiredAt.isBefore(LocalDateTime.now());
     }
 
     public boolean canIssue() {
-        return isActive && !isExpired();
+        return isActive && !isBlocked && !isExpired();
+    }
+
+    public boolean isBlocked() {
+        return isBlocked;
     }
 
     public String getName() {

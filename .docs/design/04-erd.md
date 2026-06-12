@@ -83,6 +83,7 @@ erDiagram
         bigint min_order_amount "nullable, 불변"
         datetime expired_at "NOT NULL, 불변"
         boolean is_active "NOT NULL, DEFAULT true"
+        boolean is_blocked "NOT NULL, DEFAULT false"
         datetime created_at "NOT NULL"
         datetime updated_at "NOT NULL"
     }
@@ -92,7 +93,6 @@ erDiagram
         bigint member_id "NOT NULL, 논리적 FK, UK(member_id, template_id)"
         bigint template_id "NOT NULL, 논리적 FK, UK(member_id, template_id)"
         datetime used_at "nullable"
-        boolean is_blocked "NOT NULL, DEFAULT false"
         int version "낙관적 락"
         datetime created_at "NOT NULL"
         datetime updated_at "NOT NULL"

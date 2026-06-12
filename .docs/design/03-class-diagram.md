@@ -125,7 +125,9 @@ classDiagram
         +minOrderAmount: Long
         +expiredAt: LocalDateTime
         +isActive: boolean
+        +isBlocked: boolean
         +update(name, isActive) void
+        +block() void
         +isExpired() boolean
         +canIssue() boolean
     }
@@ -134,11 +136,9 @@ classDiagram
         +memberId: Long
         +templateId: Long
         +usedAt: LocalDateTime
-        +isBlocked: boolean
         +version: int
         +use() void
-        +block() void
-        +getStatus(expiredAt) CouponStatus
+        +getStatus(expiredAt, templateBlocked) CouponStatus
     }
 
     class CouponDomainService {

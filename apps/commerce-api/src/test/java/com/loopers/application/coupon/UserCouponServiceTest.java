@@ -77,33 +77,6 @@ class UserCouponServiceTest {
         }
     }
 
-    @DisplayName("유저 쿠폰을 차단할 때,")
-    @Nested
-    class Block {
-
-        @DisplayName("block() 호출 시 isBlocked=true로 변경된다.")
-        @Test
-        void blocksUserCoupon_whenIdExists() {
-            // arrange
-            UserCouponModel saved = userCouponService.save(new UserCouponModel(1L, 10L));
-
-            // act
-            userCouponService.block(saved.getId());
-
-            // assert
-            assertThat(userCouponService.getById(saved.getId()).isBlocked()).isTrue();
-        }
-
-        @DisplayName("존재하지 않는 ID로 block() 호출 시 NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenIdDoesNotExist() {
-            assertThatThrownBy(() -> userCouponService.block(999L))
-                .isInstanceOf(CoreException.class)
-                .extracting("errorType")
-                .isEqualTo(ErrorType.NOT_FOUND);
-        }
-    }
-
     // ───────────────────────────────────────────────
     // Fake: DB 없이 비즈니스 로직만 격리 검증
     // JOIN이 필요한 조회(memberId, templateId 기반)는 통합 테스트에서 검증

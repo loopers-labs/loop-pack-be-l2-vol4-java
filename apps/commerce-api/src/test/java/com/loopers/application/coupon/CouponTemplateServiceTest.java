@@ -128,6 +128,33 @@ class CouponTemplateServiceTest {
         }
     }
 
+    @DisplayName("쿠폰 템플릿을 삭제할 때,")
+    @Nested
+    class Delete {
+
+        @DisplayName("38: delete() 호출 시 isBlocked=true로 변경된다.")
+        @Test
+        void blocksTemplate_whenIdExists() {
+            // arrange
+            CouponTemplateModel saved = couponTemplateService.create(fixture());
+
+            // act
+            couponTemplateService.delete(saved.getId());
+
+            // assert
+            assertThat(couponTemplateService.getById(saved.getId()).isBlocked()).isTrue();
+        }
+
+        @DisplayName("39: 존재하지 않는 ID로 delete() 호출 시 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenIdDoesNotExist() {
+            assertThatThrownBy(() -> couponTemplateService.delete(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     // ───────────────────────────────────────────────
     // Fake: DB 없이 비즈니스 로직만 격리 검증
     // findAll은 실제 Page 반환 — JOIN 없는 단순 목록이므로 Fake에서 검증 가능

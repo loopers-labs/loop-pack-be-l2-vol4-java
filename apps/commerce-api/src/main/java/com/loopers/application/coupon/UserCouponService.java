@@ -31,19 +31,12 @@ public class UserCouponService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userCouponId = " + id + "] 유저 쿠폰을 찾을 수 없습니다."));
     }
 
-    @Transactional
-    public void block(Long id) {
-        UserCouponModel userCoupon = userCouponRepository.findById(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userCouponId = " + id + "] 유저 쿠폰을 찾을 수 없습니다."));
-        userCoupon.block();
-    }
-
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getMyCoupons(Long memberId) {
         return userCouponRepository.findAllByMemberId(memberId).stream()
             .map(uc -> {
                 var template = couponTemplateRepository.findById(uc.getTemplateId()).orElseThrow();
-                return new UserCouponInfo(uc.getId(), template.getName(), template.getExpiredAt(), uc.getStatus(template.getExpiredAt()));
+                return new UserCouponInfo(uc.getId(), template.getName(), template.getExpiredAt(), uc.getStatus(template.getExpiredAt(), template.isBlocked()));
             })
             .toList();
     }

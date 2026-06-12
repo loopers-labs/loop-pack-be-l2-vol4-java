@@ -26,7 +26,7 @@ public class CouponController {
         return ApiResponse.success(CouponDto.IssueResponse.from(userCoupon.getId()));
     }
 
-    @GetMapping("/api/v1/coupons/me")
+    @GetMapping("/api/v1/users/me/coupons")
     public ApiResponse<List<CouponDto.MyCouponResponse>> getMyCoupons(
         @RequestAttribute("userId") Long userId
     ) {

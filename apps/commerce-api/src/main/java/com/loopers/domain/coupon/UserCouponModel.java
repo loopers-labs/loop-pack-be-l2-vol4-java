@@ -24,9 +24,6 @@ public class UserCouponModel extends BaseEntity {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
-    @Column(name = "is_blocked", nullable = false)
-    private boolean isBlocked;
-
     @Version
     @Column(name = "version")
     private int version;
@@ -45,21 +42,14 @@ public class UserCouponModel extends BaseEntity {
     }
 
     public void use() {
-        if (this.isBlocked) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "차단된 쿠폰은 사용할 수 없습니다.");
-        }
         if (this.usedAt != null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이미 사용된 쿠폰입니다.");
         }
         this.usedAt = LocalDateTime.now();
     }
 
-    public void block() {
-        this.isBlocked = true;
-    }
-
-    public CouponStatus getStatus(LocalDateTime expiredAt) {
-        if (this.isBlocked) {
+    public CouponStatus getStatus(LocalDateTime expiredAt, boolean templateBlocked) {
+        if (templateBlocked) {
             return CouponStatus.BLOCKED;
         }
         if (expiredAt.isBefore(LocalDateTime.now())) {
@@ -83,7 +73,4 @@ public class UserCouponModel extends BaseEntity {
         return usedAt;
     }
 
-    public boolean isBlocked() {
-        return isBlocked;
-    }
 }
