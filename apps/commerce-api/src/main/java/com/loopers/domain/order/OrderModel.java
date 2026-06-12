@@ -19,20 +19,35 @@ public class OrderModel extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
+    private Long originalAmount;
+
+    private Long discountAmount;
+
     private Long totalAmount;
+
+    private Long couponId;
 
     protected OrderModel() {}
 
-    public OrderModel(Long memberId, Long totalAmount) {
+    public OrderModel(Long memberId, Long originalAmount, Long discountAmount, Long couponId) {
         if (memberId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "회원 ID는 필수입니다.");
         }
-        if (totalAmount == null || totalAmount < 0) {
+        if (originalAmount == null || originalAmount < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "총금액은 0 이상이어야 합니다.");
+        }
+        if (discountAmount == null || discountAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인금액은 0 이상이어야 합니다.");
+        }
+        if (discountAmount > originalAmount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인금액이 총금액을 초과할 수 없습니다.");
         }
         this.memberId = memberId;
         this.status = OrderStatus.PENDING;
-        this.totalAmount = totalAmount;
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.totalAmount = originalAmount - discountAmount;
+        this.couponId = couponId;
     }
 
     public void confirm() {
