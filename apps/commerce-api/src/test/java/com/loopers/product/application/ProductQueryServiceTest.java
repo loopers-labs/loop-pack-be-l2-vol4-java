@@ -144,4 +144,25 @@ class ProductQueryServiceTest {
                 .extracting(ProductResult.Detail::name)
                 .containsExactly("인기", "비인기");
     }
+
+    @Test
+    @DisplayName("getAll 은 데이터 결함으로 브랜드·재고 행이 깨져 있어도 목록 전체를 실패시키지 않는다(정상 로직에선 생성·삭제가 원자적이라 발생 불가)")
+    void givenCorruptedAuxiliaryData_whenGetAll_thenListSurvivesWithDefaults() {
+        Product a = Product.create(1L, "A", "설명", 1000L, null);
+        Product b = Product.create(2L, "B", "설명", 2000L, null);
+        when(productRepository.findAllOnSale(ProductSortOption.LATEST)).thenReturn(List.of(a, b));
+        when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
+        when(brandReader.getNames(anyList())).thenReturn(Map.of(1L, "브랜드A")); // brandId=2 누락
+        when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
+
+        List<ProductResult.Detail> result = productQueryService.getProducts(ProductSortOption.LATEST);
+
+        assertAll(
+                () -> assertThat(result).hasSize(2),
+                () -> assertThat(result.get(0).brandName()).isEqualTo("브랜드A"),
+                () -> assertThat(result.get(1).brandName()).isNull(),
+                () -> assertThat(result).allSatisfy(detail ->
+                        assertThat(detail.displayStatus()).isEqualTo(ProductDisplayStatus.SOLD_OUT))
+        );
+    }
 }

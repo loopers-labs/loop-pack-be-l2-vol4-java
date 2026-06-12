@@ -1,7 +1,9 @@
 package com.loopers.brand.application;
 
 import com.loopers.brand.domain.Brand;
+import com.loopers.brand.domain.BrandErrorCode;
 import com.loopers.brand.domain.BrandRepository;
+import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,6 +34,16 @@ class BrandQueryServiceTest {
                 () -> assertThat(result.description()).isEqualTo("설명"),
                 () -> assertThat(result.logoUrl()).isEqualTo("https://cdn.loopers.com/l.png")
         );
+    }
+
+    @Test
+    @DisplayName("getBrand 는 브랜드가 없으면 NOT_FOUND 를 던진다")
+    void givenMissingBrandId_whenGetBrand_thenThrowsNotFound() {
+        when(brandRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> brandQueryService.getBrand(999L))
+                .isInstanceOf(CoreException.class)
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
     }
 
     @Test
