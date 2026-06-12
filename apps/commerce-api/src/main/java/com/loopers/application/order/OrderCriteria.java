@@ -8,5 +8,8 @@ public final class OrderCriteria {
 
     private OrderCriteria() {}
 
-    public record Create(Long userId, List<OrderLine> lines) {}
+    /**
+     * @param userCouponId nullable — null 이면 쿠폰 미적용
+     */
+    public record Create(Long userId, List<OrderLine> lines, Long userCouponId) {}
 }

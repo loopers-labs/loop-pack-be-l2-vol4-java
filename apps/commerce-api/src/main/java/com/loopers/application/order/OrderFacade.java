@@ -16,7 +16,11 @@ public class OrderFacade {
     private final OrderService orderService;
 
     public OrderInfo placeOrder(OrderCriteria.Create criteria) {
-        OrderModel order = orderCreationService.create(criteria.userId(), criteria.lines());
+        OrderModel order = orderCreationService.create(
+            criteria.userId(),
+            criteria.lines(),
+            criteria.userCouponId()
+        );
         return OrderInfo.from(order);
     }
 

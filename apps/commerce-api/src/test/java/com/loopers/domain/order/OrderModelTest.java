@@ -34,7 +34,9 @@ class OrderModelTest {
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(100L),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(order.getTotalPrice()).isEqualTo(1000L * 2 + 500L * 3),
+                () -> assertThat(order.getOriginalPrice()).isEqualTo(1000L * 2 + 500L * 3),
+                () -> assertThat(order.getDiscountAmount()).isZero(),
+                () -> assertThat(order.getFinalPrice()).isEqualTo(3500L),
                 () -> assertThat(order.totalAmount()).isEqualTo(3500L),
                 () -> assertThat(order.getItems()).hasSize(2)
             );

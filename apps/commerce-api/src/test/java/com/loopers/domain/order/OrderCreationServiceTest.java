@@ -3,7 +3,17 @@ package com.loopers.domain.order;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.brand.FakeBrandRepository;
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.CouponTemplateService;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.FakeCouponTemplateRepository;
+import com.loopers.domain.coupon.FakeUserCouponRepository;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponService;
+import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.product.FakeProductRepository;
+
+import java.time.LocalDateTime;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductStatus;
@@ -26,17 +36,23 @@ class OrderCreationServiceTest {
     private FakeProductRepository fakeProductRepository;
     private FakeBrandRepository fakeBrandRepository;
     private FakeOrderRepository fakeOrderRepository;
+    private FakeUserCouponRepository fakeUserCouponRepository;
     private ProductService productService;
     private BrandService brandService;
+    private CouponTemplateService couponTemplateService;
+    private UserCouponService userCouponService;
 
     @BeforeEach
     void setUp() {
         fakeProductRepository = new FakeProductRepository();
         fakeBrandRepository = new FakeBrandRepository();
         fakeOrderRepository = new FakeOrderRepository();
+        fakeUserCouponRepository = new FakeUserCouponRepository();
         productService = new ProductService(fakeProductRepository);
         brandService = new BrandService(fakeBrandRepository);
-        orderCreationService = new OrderCreationService(productService, brandService, fakeOrderRepository);
+        couponTemplateService = new CouponTemplateService(new FakeCouponTemplateRepository());
+        userCouponService = new UserCouponService(fakeUserCouponRepository, couponTemplateService);
+        orderCreationService = new OrderCreationService(productService, brandService, fakeOrderRepository, userCouponService);
     }
 
     private BrandModel newBrand() {
@@ -64,12 +80,13 @@ class OrderCreationServiceTest {
             );
 
             // act
-            OrderModel order = orderCreationService.create(100L, lines);
+            OrderModel order = orderCreationService.create(100L, lines, null);
 
             // assert
             assertAll(
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(order.getTotalPrice()).isEqualTo(1000L * 2 + 500L * 3),
+                () -> assertThat(order.getOriginalPrice()).isEqualTo(1000L * 2 + 500L * 3),
+                () -> assertThat(order.getFinalPrice()).isEqualTo(1000L * 2 + 500L * 3),
                 () -> assertThat(order.getItems()).hasSize(2),
                 () -> assertThat(fakeProductRepository.find(p1.getId()).orElseThrow().getStock()).isEqualTo(8),
                 () -> assertThat(fakeProductRepository.find(p2.getId()).orElseThrow().getStock()).isEqualTo(2)
@@ -84,7 +101,7 @@ class OrderCreationServiceTest {
             ProductModel p = newProduct(brand.getId(), "A", 1000L, 3);
 
             // act
-            orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 3)));
+            orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 3)), null);
 
             // assert
             assertThat(fakeProductRepository.find(p.getId()).orElseThrow().getStatus())
@@ -103,7 +120,7 @@ class OrderCreationServiceTest {
                 orderCreationService.create(100L, List.of(
                     new OrderLine(p.getId(), 1),
                     new OrderLine(999L, 1)
-                ))
+                ), null)
             );
 
             // assert
@@ -119,7 +136,7 @@ class OrderCreationServiceTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 3)))
+                orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 3)), null)
             );
 
             // assert
@@ -131,7 +148,7 @@ class OrderCreationServiceTest {
         void throwsBadRequest_whenLinesEmpty() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                orderCreationService.create(100L, List.of())
+                orderCreationService.create(100L, List.of(), null)
             );
 
             // assert
@@ -146,7 +163,7 @@ class OrderCreationServiceTest {
             ProductModel p = newProduct(brand.getId(), "에어맥스", 100_000L, 10);
 
             // act
-            OrderModel order = orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)));
+            OrderModel order = orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)), null);
 
             // assert
             OrderItemModel item = order.getItems().get(0);
@@ -156,6 +173,93 @@ class OrderCreationServiceTest {
                 () -> assertThat(item.getPriceSnapshot()).isEqualTo(100_000L),
                 () -> assertThat(item.getImageUrlSnapshot()).isEqualTo("https://img/에어맥스")
             );
+        }
+    }
+
+    @DisplayName("쿠폰을 적용한 주문은, ")
+    @Nested
+    class WithCoupon {
+        private CouponTemplate fixedTemplate;
+
+        @org.junit.jupiter.api.BeforeEach
+        void prepareTemplate() {
+            fixedTemplate = couponTemplateService.create(
+                "1000원 할인", CouponType.FIXED, 1000L, 0L,
+                LocalDateTime.of(2099, 12, 31, 23, 59));
+        }
+
+        @DisplayName("originalPrice/discountAmount/finalPrice 가 모두 보존되고, 쿠폰은 USED 로 전이된다.")
+        @Test
+        void appliesCoupon() {
+            // arrange
+            BrandModel brand = newBrand();
+            ProductModel p = newProduct(brand.getId(), "A", 5000L, 10);
+            UserCoupon issued = userCouponService.issue(100L, fixedTemplate.getId());
+
+            // act
+            OrderModel order = orderCreationService.create(
+                100L, List.of(new OrderLine(p.getId(), 1)), issued.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getOriginalPrice()).isEqualTo(5000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(1000L),
+                () -> assertThat(order.getFinalPrice()).isEqualTo(4000L),
+                () -> assertThat(order.getUserCouponId()).isEqualTo(issued.getId()),
+                () -> assertThat(fakeUserCouponRepository.find(issued.getId()).orElseThrow().getStatus())
+                    .isEqualTo(UserCouponStatus.USED)
+            );
+        }
+
+        @DisplayName("이미 사용된 쿠폰으로 주문하면 CONFLICT 예외가 발생한다 — 재사용 불가 보장.")
+        @Test
+        void rejectsAlreadyUsedCoupon() {
+            // arrange
+            BrandModel brand = newBrand();
+            ProductModel p = newProduct(brand.getId(), "A", 5000L, 10);
+            UserCoupon issued = userCouponService.issue(100L, fixedTemplate.getId());
+            orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)), issued.getId());
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)), issued.getId())
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("타 유저 소유 쿠폰으로 주문하면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void rejectsForeignCoupon() {
+            // arrange
+            BrandModel brand = newBrand();
+            ProductModel p = newProduct(brand.getId(), "A", 5000L, 10);
+            UserCoupon issued = userCouponService.issue(200L, fixedTemplate.getId());
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)), issued.getId())
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("존재하지 않는 쿠폰 ID 면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void rejectsNonexistentCoupon() {
+            // arrange
+            BrandModel brand = newBrand();
+            ProductModel p = newProduct(brand.getId(), "A", 5000L, 10);
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () ->
+                orderCreationService.create(100L, List.of(new OrderLine(p.getId(), 1)), 999L)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 }
