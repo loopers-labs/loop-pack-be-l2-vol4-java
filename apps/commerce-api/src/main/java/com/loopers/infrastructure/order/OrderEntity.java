@@ -29,13 +29,17 @@ public class OrderEntity extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderLineEntity> orderLines = new ArrayList<>();
 
+    private Long originalTotalPrice;
+    private Long discountPrice;
     private Long totalPrice;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
-    private OrderEntity(Long userId, Long totalPrice, OrderStatus status) {
+    private OrderEntity(Long userId, Long originalTotalPrice, Long discountPrice, Long totalPrice, OrderStatus status) {
         this.userId = userId;
+        this.originalTotalPrice = originalTotalPrice;
+        this.discountPrice = discountPrice;
         this.totalPrice = totalPrice;
         this.status = status;
     }
@@ -43,6 +47,8 @@ public class OrderEntity extends BaseEntity {
     public static OrderEntity from(OrderModel model) {
         OrderEntity entity = new OrderEntity(
             model.getUserId(),
+            model.getOriginalTotalPrice(),
+            model.getDiscountPrice(),
             model.getTotalPrice(),
             model.getStatus()
         );
@@ -61,6 +67,8 @@ public class OrderEntity extends BaseEntity {
             getId(),
             userId,
             orderLines.stream().map(OrderLineEntity::toDomain).toList(),
+            originalTotalPrice,
+            discountPrice,
             totalPrice,
             status,
             getCreatedAt(),

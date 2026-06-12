@@ -8,6 +8,8 @@ import java.util.List;
 public record OrderInfo(
     Long orderId,
     Long userId,
+    Long originalTotalPrice,
+    Long discountPrice,
     Long totalPrice,
     String status,
     ZonedDateTime createdAt,
@@ -34,6 +36,8 @@ public record OrderInfo(
         return new OrderInfo(
             order.getId(),
             order.getUserId(),
+            order.getOriginalTotalPrice(),
+            order.getDiscountPrice(),
             order.getTotalPrice(),
             order.getStatus().name(),
             order.getCreatedAt(),

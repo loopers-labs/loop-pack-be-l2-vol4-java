@@ -18,13 +18,15 @@ public class OrderV1Dto {
     ) {}
 
     public record CreateOrderRequest(
-        @NotEmpty @Valid List<OrderItemRequest> items
+        @NotEmpty @Valid List<OrderItemRequest> items,
+        Long couponId
     ) {
         public OrderCommand toCommand() {
             return new OrderCommand(
                 items.stream()
                     .map(item -> new OrderCommand.Item(item.productId(), item.quantity()))
-                    .toList()
+                    .toList(),
+                couponId
             );
         }
     }
@@ -50,6 +52,8 @@ public class OrderV1Dto {
     public record OrderResponse(
         Long orderId,
         Long userId,
+        Long originalTotalPrice,
+        Long discountPrice,
         Long totalPrice,
         String status,
         ZonedDateTime createdAt,
@@ -59,6 +63,8 @@ public class OrderV1Dto {
             return new OrderResponse(
                 info.orderId(),
                 info.userId(),
+                info.originalTotalPrice(),
+                info.discountPrice(),
                 info.totalPrice(),
                 info.status(),
                 info.createdAt(),

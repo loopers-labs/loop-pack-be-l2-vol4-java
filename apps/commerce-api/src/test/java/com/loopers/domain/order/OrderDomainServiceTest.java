@@ -36,7 +36,7 @@ class OrderDomainServiceTest {
         Map<Long, ProductModel> products = Map.of(1L, productA, 2L, productB);
 
         // act
-        OrderModel order = orderDomainService.place(100L, quantities, products);
+        OrderModel order = orderDomainService.place(100L, quantities, products, 0L);
 
         // assert
         assertAll(
@@ -59,7 +59,7 @@ class OrderDomainServiceTest {
 
         // act
         CoreException result = assertThrows(CoreException.class,
-            () -> orderDomainService.place(100L, quantities, products));
+            () -> orderDomainService.place(100L, quantities, products, 0L));
 
         // assert
         assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -76,7 +76,7 @@ class OrderDomainServiceTest {
 
         // act
         CoreException result = assertThrows(CoreException.class,
-            () -> orderDomainService.place(100L, quantities, products));
+            () -> orderDomainService.place(100L, quantities, products, 0L));
 
         // assert
         assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

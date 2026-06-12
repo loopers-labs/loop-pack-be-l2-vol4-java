@@ -1,5 +1,9 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponModel;
+import com.loopers.domain.coupon.CouponRepository;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -30,36 +34,58 @@ public class OrderApplicationService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderDomainService orderDomainService;
+    private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
     public OrderInfo createOrder(Long userId, OrderCommand command) {
-        if (command.items() == null || command.items().isEmpty()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "주문 상품은 1개 이상이어야 합니다.");
-        }
+        Map<Long, Integer> quantities = buildQuantities(command.items());
+        Map<Long, ProductModel> products = loadProductsWithLock(quantities);
+        long discountPrice = resolveDiscount(userId, command.couponId(), quantities, products);
 
+        OrderModel order = orderDomainService.place(userId, quantities, products, discountPrice);
+        products.values().forEach(productRepository::save);
+        return OrderInfo.from(orderRepository.save(order));
+    }
+
+    private Map<Long, Integer> buildQuantities(List<OrderCommand.Item> items) {
         Map<Long, Integer> quantities = new LinkedHashMap<>();
-        for (OrderCommand.Item item : command.items()) {
-            if (item.productId() == null) {
-                throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 null일 수 없습니다.");
-            }
-            if (item.quantity() == null || item.quantity() < 1) {
-                throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");
-            }
+        for (OrderCommand.Item item : items) {
             quantities.merge(item.productId(), item.quantity(), Integer::sum);
         }
+        return quantities;
+    }
 
+    private Map<Long, ProductModel> loadProductsWithLock(Map<Long, Integer> quantities) {
         Map<Long, ProductModel> products = new HashMap<>();
         for (Long productId : quantities.keySet().stream().sorted().toList()) {
             ProductModel product = productRepository.findWithLock(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
             products.put(productId, product);
         }
+        return products;
+    }
 
-        OrderModel order = orderDomainService.place(userId, quantities, products);
+    private long resolveDiscount(Long userId, Long couponId, Map<Long, Integer> quantities, Map<Long, ProductModel> products) {
+        if (couponId == null) return 0L;
 
-        products.values().forEach(productRepository::save);
-        OrderModel saved = orderRepository.save(order);
-        return OrderInfo.from(saved);
+        UserCouponModel userCoupon = userCouponRepository.findById(couponId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponId + "] 쿠폰을 찾을 수 없습니다."));
+        if (!userCoupon.getUserId().equals(userId)) {
+            throw new CoreException(ErrorType.FORBIDDEN);
+        }
+        CouponModel coupon = couponRepository.findById(userCoupon.getCouponId())
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 템플릿을 찾을 수 없습니다."));
+        if (!userCoupon.isUsable(coupon.getExpiredAt())) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "사용 가능한 쿠폰이 아닙니다.");
+        }
+        long orderSubtotal = quantities.entrySet().stream()
+            .mapToLong(e -> products.get(e.getKey()).getPrice() * e.getValue())
+            .sum();
+        long discountPrice = coupon.calculateDiscount(orderSubtotal);
+        userCoupon.use();
+        userCouponRepository.save(userCoupon);
+        return discountPrice;
     }
 
     @Transactional(readOnly = true)
