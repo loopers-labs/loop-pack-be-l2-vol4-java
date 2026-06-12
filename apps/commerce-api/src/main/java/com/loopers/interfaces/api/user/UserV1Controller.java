@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api.user;
 
 import com.loopers.application.coupon.CouponApplicationService;
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
@@ -23,14 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserV1Controller implements UserV1ApiSpec {
 
-    private final UserFacade userFacade;
+    private final UserApplicationService userApplicationService;
     private final CouponApplicationService couponApplicationService;
 
     @PostMapping
     public ApiResponse<Object> signup(
         @RequestBody UserV1Dto.SignupRequest request
     ) {
-        userFacade.signup(
+        userApplicationService.signup(
             request.userId(),
             request.password(),
             request.name(),
@@ -45,7 +45,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         @RequestHeader("X-Loopers-LoginId") String userId,
         @RequestHeader("X-Loopers-LoginPw") String password
     ) {
-        UserInfo user = userFacade.getUser(userId, password);
+        UserInfo user = userApplicationService.getUser(userId, password);
         return ApiResponse.success(UserV1Dto.UserResponse.from(user));
     }
 
@@ -67,7 +67,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         @RequestHeader("X-Loopers-LoginPw") String password, // 헤더 필수 검증용, 비즈니스 로직 미사용
         @RequestBody UserV1Dto.ChangePasswordRequest request
     ) {
-        userFacade.changePassword(
+        userApplicationService.changePassword(
             userId,
             request.currentPassword(),
             request.newPassword()

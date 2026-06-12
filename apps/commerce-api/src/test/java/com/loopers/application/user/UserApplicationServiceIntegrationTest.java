@@ -1,6 +1,5 @@
 package com.loopers.application.user;
 
-import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -16,13 +15,10 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-class UserFacadeIntegrationTest {
+class UserApplicationServiceIntegrationTest {
 
     @Autowired
-    private UserFacade userFacade;
-
-    @Autowired
-    private UserService userService;
+    private UserApplicationService userApplicationService;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -33,7 +29,7 @@ class UserFacadeIntegrationTest {
     }
 
     private void createUser(String loginId) {
-        userService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
+        userApplicationService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
     }
 
     @DisplayName("인증")
@@ -47,7 +43,7 @@ class UserFacadeIntegrationTest {
             createUser("testuser");
 
             // act
-            Long userId = userFacade.authenticate("testuser", "Password1!");
+            Long userId = userApplicationService.authenticate("testuser", "Password1!");
 
             // assert
             assertNotNull(userId);
@@ -58,7 +54,7 @@ class UserFacadeIntegrationTest {
         void throwsUnauthorized_whenLoginIdNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> userFacade.authenticate("notexist", "Password1!"));
+                    () -> userApplicationService.authenticate("notexist", "Password1!"));
             assertEquals(ErrorType.UNAUTHORIZED, exception.getErrorType());
         }
 
@@ -70,7 +66,7 @@ class UserFacadeIntegrationTest {
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> userFacade.authenticate("testuser", "WrongPass1!"));
+                    () -> userApplicationService.authenticate("testuser", "WrongPass1!"));
             assertEquals(ErrorType.UNAUTHORIZED, exception.getErrorType());
         }
     }

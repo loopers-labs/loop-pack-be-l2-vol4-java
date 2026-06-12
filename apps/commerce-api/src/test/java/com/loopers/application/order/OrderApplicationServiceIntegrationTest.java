@@ -1,16 +1,16 @@
 package com.loopers.application.order;
 
-import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.brand.BrandApplicationService;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.application.coupon.CouponApplicationService;
 import com.loopers.application.coupon.CouponInfo;
 import com.loopers.application.coupon.CouponTemplateInfo;
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.domain.user.UserEntity;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
+import com.loopers.application.user.UserInfo;
 import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -42,13 +42,13 @@ class OrderApplicationServiceIntegrationTest {
     private OrderApplicationService orderApplicationService;
 
     @Autowired
-    private BrandFacade brandFacade;
+    private BrandApplicationService brandApplicationService;
 
     @Autowired
-    private ProductFacade productFacade;
+    private ProductApplicationService productApplicationService;
 
     @Autowired
-    private UserService userService;
+    private UserApplicationService userApplicationService;
 
     @Autowired
     private CouponApplicationService couponApplicationService;
@@ -64,12 +64,12 @@ class OrderApplicationServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private UserEntity createUser(String loginId) {
-        return userService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
+    private UserInfo createUser(String loginId) {
+        return userApplicationService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
     }
 
     private ProductInfo createProduct(Long brandId, String name, Long price, int quantity) {
-        return productFacade.createProduct(brandId, name, "상품 설명", price, quantity);
+        return productApplicationService.createProduct(brandId, name, "상품 설명", price, quantity);
     }
 
     private CouponTemplateInfo createCouponTemplate(Long discountValue) {
@@ -91,13 +91,13 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void returnsOrderInfo_withPendingStatus_whenRequestIsValid() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
             List<OrderItemCommand> commands = List.of(new OrderItemCommand(product.id(), 2));
 
             // act
-            OrderInfo result = orderApplicationService.createOrder(user.getId(), commands, null);
+            OrderInfo result = orderApplicationService.createOrder(user.id(), commands, null);
 
             // assert
             assertAll(
@@ -116,12 +116,12 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void deductsInventory_afterOrderCreated() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
 
             // act
-            orderApplicationService.createOrder(user.getId(),
+            orderApplicationService.createOrder(user.id(),
                     List.of(new OrderItemCommand(product.id(), 3)), null);
 
             // assert
@@ -135,11 +135,11 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void throwsNotFound_whenProductNotExists() {
             // arrange
-            UserEntity user = createUser("testuser1");
+            UserInfo user = createUser("testuser1");
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.createOrder(user.getId(),
+                    () -> orderApplicationService.createOrder(user.id(),
                             List.of(new OrderItemCommand(999L, 1)), null));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
@@ -148,13 +148,13 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenQuantityExceedsInventory() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 3);
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.createOrder(user.getId(),
+                    () -> orderApplicationService.createOrder(user.id(),
                             List.of(new OrderItemCommand(product.id(), 5)), null));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
@@ -172,14 +172,14 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void returnsFinalAmount_equalToDiscountedAmount_whenCouponApplied() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
             CouponTemplateInfo template = createCouponTemplate(10_000L);
-            CouponInfo coupon = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo coupon = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // act
-            OrderInfo result = orderApplicationService.createOrder(user.getId(),
+            OrderInfo result = orderApplicationService.createOrder(user.id(),
                     List.of(new OrderItemCommand(product.id(), 1)), coupon.couponId());
 
             // assert
@@ -195,16 +195,16 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void throwsForbidden_whenCouponIsOwnedByOtherUser() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            UserEntity other = createUser("testuser2");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
+            UserInfo user = createUser("testuser1");
+            UserInfo other = createUser("testuser2");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
             CouponTemplateInfo template = createCouponTemplate(10_000L);
-            CouponInfo otherCoupon = couponApplicationService.issueCoupon(other.getId(), template.templateId());
+            CouponInfo otherCoupon = couponApplicationService.issueCoupon(other.id(), template.templateId());
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.createOrder(user.getId(),
+                    () -> orderApplicationService.createOrder(user.id(),
                             List.of(new OrderItemCommand(product.id(), 1)), otherCoupon.couponId()));
             assertEquals(ErrorType.FORBIDDEN, exception.getErrorType());
         }
@@ -213,19 +213,19 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequest_whenCouponAlreadyUsed() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
             CouponTemplateInfo template = createCouponTemplate(10_000L);
-            CouponInfo coupon = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo coupon = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // 첫 번째 주문으로 쿠폰 사용
-            orderApplicationService.createOrder(user.getId(),
+            orderApplicationService.createOrder(user.id(),
                     List.of(new OrderItemCommand(product.id(), 1)), coupon.couponId());
 
             // act & assert — 두 번째 주문에서 같은 쿠폰 사용 시도
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.createOrder(user.getId(),
+                    () -> orderApplicationService.createOrder(user.id(),
                             List.of(new OrderItemCommand(product.id(), 1)), coupon.couponId()));
             assertEquals(ErrorType.BAD_REQUEST, exception.getErrorType());
         }
@@ -243,14 +243,14 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void returnsOrderInfo_whenOrderIsOwnedByUser() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 10);
-            OrderInfo created = orderApplicationService.createOrder(user.getId(),
+            OrderInfo created = orderApplicationService.createOrder(user.id(),
                     List.of(new OrderItemCommand(product.id(), 1)), null);
 
             // act
-            OrderInfo result = orderApplicationService.getOrder(user.getId(), created.orderId());
+            OrderInfo result = orderApplicationService.getOrder(user.id(), created.orderId());
 
             // assert
             assertAll(
@@ -264,11 +264,11 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void throwsNotFound_whenOrderNotExists() {
             // arrange
-            UserEntity user = createUser("testuser1");
+            UserInfo user = createUser("testuser1");
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.getOrder(user.getId(), 999L));
+                    () -> orderApplicationService.getOrder(user.id(), 999L));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -285,14 +285,14 @@ class OrderApplicationServiceIntegrationTest {
         @Test
         void returnsAllOrders_whenNoDateFilter() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 100_000L, 20);
-            orderApplicationService.createOrder(user.getId(), List.of(new OrderItemCommand(product.id(), 1)), null);
-            orderApplicationService.createOrder(user.getId(), List.of(new OrderItemCommand(product.id(), 2)), null);
+            orderApplicationService.createOrder(user.id(), List.of(new OrderItemCommand(product.id(), 1)), null);
+            orderApplicationService.createOrder(user.id(), List.of(new OrderItemCommand(product.id(), 2)), null);
 
             // act
-            Page<OrderInfo> result = orderApplicationService.getOrders(user.getId(), null, null, PageRequest.of(0, 20));
+            Page<OrderInfo> result = orderApplicationService.getOrders(user.id(), null, null, PageRequest.of(0, 20));
 
             // assert
             assertEquals(2, result.getTotalElements());
@@ -312,11 +312,11 @@ class OrderApplicationServiceIntegrationTest {
         void onlyOneCouponUseSucceeds_whenConcurrentOrdersWithSameCoupon() throws InterruptedException {
             // arrange
             int threadCount = 5;
-            UserEntity user = createUser("couponconcurrent");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
+            UserInfo user = createUser("couponconcurrent");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 10_000L, 100);
             CouponTemplateInfo template = createCouponTemplate(1_000L);
-            CouponInfo coupon = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo coupon = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             CountDownLatch startLatch = new CountDownLatch(1);
             CountDownLatch doneLatch = new CountDownLatch(threadCount);
@@ -328,7 +328,7 @@ class OrderApplicationServiceIntegrationTest {
                 executor.submit(() -> {
                     try {
                         startLatch.await();
-                        orderApplicationService.createOrder(user.getId(),
+                        orderApplicationService.createOrder(user.id(),
                                 List.of(new OrderItemCommand(product.id(), 1)), coupon.couponId());
                         successCount.incrementAndGet();
                     } catch (Exception e) {
@@ -365,11 +365,11 @@ class OrderApplicationServiceIntegrationTest {
             int threadCount = 5;
             int initialStock = 1;
 
-            UserEntity[] users = new UserEntity[threadCount];
+            UserInfo[] users = new UserInfo[threadCount];
             for (int i = 0; i < threadCount; i++) {
                 users[i] = createUser("inventoryuser" + i);
             }
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠");
             ProductInfo product = createProduct(brand.id(), "에어맥스", 10_000L, initialStock);
 
             CountDownLatch startLatch = new CountDownLatch(1);
@@ -382,7 +382,7 @@ class OrderApplicationServiceIntegrationTest {
                 executor.submit(() -> {
                     try {
                         startLatch.await();
-                        orderApplicationService.createOrder(users[idx].getId(),
+                        orderApplicationService.createOrder(users[idx].id(),
                                 List.of(new OrderItemCommand(product.id(), 1)), null);
                         successCount.incrementAndGet();
                     } catch (Exception e) {

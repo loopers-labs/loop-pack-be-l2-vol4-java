@@ -1,6 +1,6 @@
 package com.loopers.interfaces.auth;
 
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,7 +24,7 @@ class UserAuthInterceptorTest {
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
 
     @Mock
-    private UserFacade userFacade;
+    private UserApplicationService userApplicationService;
 
     @Mock
     private HttpServletRequest request;
@@ -73,7 +73,7 @@ class UserAuthInterceptorTest {
             // arrange
             given(request.getHeader(LOGIN_ID_HEADER)).willReturn("testuser");
             given(request.getHeader(LOGIN_PW_HEADER)).willReturn("Password1!");
-            given(userFacade.authenticate("testuser", "Password1!")).willReturn(1L);
+            given(userApplicationService.authenticate("testuser", "Password1!")).willReturn(1L);
 
             // act
             boolean result = interceptor.preHandle(request, response, handler);
@@ -83,13 +83,13 @@ class UserAuthInterceptorTest {
             verify(request).setAttribute("userId", 1L);
         }
 
-        @DisplayName("[ECP] 인증 실패 시 UserFacade에서 발생한 UNAUTHORIZED 예외가 전파된다.")
+        @DisplayName("[ECP] 인증 실패 시 UserApplicationService에서 발생한 UNAUTHORIZED 예외가 전파된다.")
         @Test
         void propagatesException_whenAuthFails() {
             // arrange
             given(request.getHeader(LOGIN_ID_HEADER)).willReturn("testuser");
             given(request.getHeader(LOGIN_PW_HEADER)).willReturn("wrongpw");
-            given(userFacade.authenticate("testuser", "wrongpw"))
+            given(userApplicationService.authenticate("testuser", "wrongpw"))
                     .willThrow(new CoreException(ErrorType.UNAUTHORIZED, "인증 실패"));
 
             // act & assert

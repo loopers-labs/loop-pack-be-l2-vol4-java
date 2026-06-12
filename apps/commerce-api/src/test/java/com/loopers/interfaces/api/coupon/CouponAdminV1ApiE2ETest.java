@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.coupon;
 import com.loopers.application.coupon.CouponApplicationService;
 import com.loopers.application.coupon.CouponTemplateInfo;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -28,19 +28,19 @@ class CouponAdminV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final CouponApplicationService couponApplicationService;
-    private final UserService userService;
+    private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     CouponAdminV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
             CouponApplicationService couponApplicationService,
-            UserService userService,
+            UserApplicationService userApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.couponApplicationService = couponApplicationService;
-        this.userService = userService;
+        this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -281,8 +281,8 @@ class CouponAdminV1ApiE2ETest {
         void returnsIssueHistory_whenCouponsAreIssued() {
             // arrange
             CouponTemplateInfo template = createTemplate("발급 쿠폰");
-            Long userId = userService.signup("issueuser", "Test1234!", "홍길동",
-                    LocalDate.of(1995, 1, 1), "issue@test.com").getId();
+            Long userId = userApplicationService.signup("issueuser", "Test1234!", "홍길동",
+                    LocalDate.of(1995, 1, 1), "issue@test.com").id();
             couponApplicationService.issueCoupon(userId, template.templateId());
 
             // act

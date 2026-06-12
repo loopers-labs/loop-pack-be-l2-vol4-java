@@ -1,12 +1,12 @@
 package com.loopers.interfaces.api.order;
 
-import com.loopers.application.brand.BrandFacade;
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.brand.BrandApplicationService;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.order.OrderSnapshot;
 import com.loopers.domain.order.OrderSnapshotItem;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.order.OrderMapper;
 import com.loopers.domain.order.OrderEntity;
@@ -37,26 +37,26 @@ class OrderV1ApiE2ETest {
     private static final String DEFAULT_PASSWORD = "Test1234!";
 
     private final TestRestTemplate testRestTemplate;
-    private final BrandFacade brandFacade;
-    private final ProductFacade productFacade;
+    private final BrandApplicationService brandApplicationService;
+    private final ProductApplicationService productApplicationService;
     private final OrderJpaRepository orderJpaRepository;
-    private final UserService userService;
+    private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     OrderV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            BrandFacade brandFacade,
-            ProductFacade productFacade,
+            BrandApplicationService brandApplicationService,
+            ProductApplicationService productApplicationService,
             OrderJpaRepository orderJpaRepository,
-            UserService userService,
+            UserApplicationService userApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.brandFacade = brandFacade;
-        this.productFacade = productFacade;
+        this.brandApplicationService = brandApplicationService;
+        this.productApplicationService = productApplicationService;
         this.orderJpaRepository = orderJpaRepository;
-        this.userService = userService;
+        this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -66,13 +66,13 @@ class OrderV1ApiE2ETest {
     }
 
     private Long createUser() {
-        return userService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
-                LocalDate.of(1995, 1, 1), "test@test.com").getId();
+        return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
+                LocalDate.of(1995, 1, 1), "test@test.com").id();
     }
 
     private ProductInfo createProduct(int quantity) {
-        var brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-        return productFacade.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, quantity);
+        var brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+        return productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, quantity);
     }
 
     private Long createOrderDirectly(Long userId, ProductInfo product, int quantity) {
@@ -281,8 +281,8 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsNotFound_whenAccessingOtherUserOrder() {
             createUser();
-            Long otherUserId = userService.signup("otheruser1", "Other1234!", "김철수",
-                    LocalDate.of(1990, 5, 15), "other@test.com").getId();
+            Long otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
+                    LocalDate.of(1990, 5, 15), "other@test.com").id();
             ProductInfo product = createProduct(10);
             Long otherOrderId = createOrderDirectly(otherUserId, product, 1);
 

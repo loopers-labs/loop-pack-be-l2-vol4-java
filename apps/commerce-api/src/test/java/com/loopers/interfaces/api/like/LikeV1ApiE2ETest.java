@@ -1,11 +1,11 @@
 package com.loopers.interfaces.api.like;
 
-import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.brand.BrandApplicationService;
 import com.loopers.application.brand.BrandInfo;
-import com.loopers.application.like.LikeFacade;
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.like.LikeApplicationService;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -30,26 +30,26 @@ class LikeV1ApiE2ETest {
     private static final String DEFAULT_PASSWORD = "Test1234!";
 
     private final TestRestTemplate testRestTemplate;
-    private final BrandFacade brandFacade;
-    private final ProductFacade productFacade;
-    private final LikeFacade likeFacade;
-    private final UserService userService;
+    private final BrandApplicationService brandApplicationService;
+    private final ProductApplicationService productApplicationService;
+    private final LikeApplicationService likeApplicationService;
+    private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     LikeV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            BrandFacade brandFacade,
-            ProductFacade productFacade,
-            LikeFacade likeFacade,
-            UserService userService,
+            BrandApplicationService brandApplicationService,
+            ProductApplicationService productApplicationService,
+            LikeApplicationService likeApplicationService,
+            UserApplicationService userApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.brandFacade = brandFacade;
-        this.productFacade = productFacade;
-        this.likeFacade = likeFacade;
-        this.userService = userService;
+        this.brandApplicationService = brandApplicationService;
+        this.productApplicationService = productApplicationService;
+        this.likeApplicationService = likeApplicationService;
+        this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -59,13 +59,13 @@ class LikeV1ApiE2ETest {
     }
 
     private Long createUser() {
-        return userService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
-                LocalDate.of(1995, 1, 1), "test@test.com").getId();
+        return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
+                LocalDate.of(1995, 1, 1), "test@test.com").id();
     }
 
     private ProductInfo createProduct() {
-        BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-        return productFacade.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
+        BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+        return productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
     }
 
     private HttpHeaders userHeaders() {
@@ -117,7 +117,7 @@ class LikeV1ApiE2ETest {
         void returnsConflict_whenAlreadyLiked() {
             Long userId = createUser();
             ProductInfo product = createProduct();
-            likeFacade.addLike(userId, product.id());
+            likeApplicationService.addLike(userId, product.id());
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -133,8 +133,8 @@ class LikeV1ApiE2ETest {
         void returnsNoContent_whenRestored() {
             Long userId = createUser();
             ProductInfo product = createProduct();
-            likeFacade.addLike(userId, product.id());
-            likeFacade.removeLike(userId, product.id());
+            likeApplicationService.addLike(userId, product.id());
+            likeApplicationService.removeLike(userId, product.id());
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -159,7 +159,7 @@ class LikeV1ApiE2ETest {
         void returnsNoContent_whenLikeExists() {
             Long userId = createUser();
             ProductInfo product = createProduct();
-            likeFacade.addLike(userId, product.id());
+            likeApplicationService.addLike(userId, product.id());
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -199,7 +199,7 @@ class LikeV1ApiE2ETest {
         void returnsLikedProducts_whenRequestIsValid() {
             Long userId = createUser();
             ProductInfo product = createProduct();
-            likeFacade.addLike(userId, product.id());
+            likeApplicationService.addLike(userId, product.id());
 
             ParameterizedTypeReference<ApiResponse<PageResult<LikeV1Dto.LikeResponse>>> type =
                     new ParameterizedTypeReference<>() {};
@@ -223,8 +223,8 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsForbidden_whenAccessingOtherUserLikes() {
             createUser();
-            Long otherUserId = userService.signup("otheruser1", "Other1234!", "김철수",
-                    LocalDate.of(1990, 5, 15), "other@test.com").getId();
+            Long otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
+                    LocalDate.of(1990, 5, 15), "other@test.com").id();
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(

@@ -1,6 +1,6 @@
 package com.loopers.interfaces.auth;
 
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -13,11 +13,11 @@ import java.util.List;
 @Configuration
 public class AuthInterceptorConfig implements WebMvcConfigurer {
 
-    private final UserFacade userFacade;
+    private final UserApplicationService userApplicationService;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new UserAuthInterceptor(userFacade))
+        registry.addInterceptor(new UserAuthInterceptor(userApplicationService))
                 .addPathPatterns("/api/v1/**")
                 .excludePathPatterns(
                         "/api/v1/users",

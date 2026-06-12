@@ -1,6 +1,6 @@
 package com.loopers.interfaces.auth;
 
-import com.loopers.application.user.UserFacade;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +14,7 @@ public class UserAuthInterceptor implements HandlerInterceptor {
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
 
-    private final UserFacade userFacade;
+    private final UserApplicationService userApplicationService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -28,7 +28,7 @@ public class UserAuthInterceptor implements HandlerInterceptor {
             throw new CoreException(ErrorType.UNAUTHORIZED, "X-Loopers-LoginPw 헤더가 필요합니다.");
         }
 
-        Long userId = userFacade.authenticate(loginId, loginPw);
+        Long userId = userApplicationService.authenticate(loginId, loginPw);
         request.setAttribute(LoginUserArgumentResolver.USER_ID_ATTRIBUTE, userId);
         return true;
     }

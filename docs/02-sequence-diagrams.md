@@ -232,7 +232,7 @@ sequenceDiagram
 sequenceDiagram
     Note over OrderV1Controller: 🔐 X-Loopers-LoginId / X-Loopers-LoginPw
     participant OrderV1Controller
-    participant OrderFacade
+    participant OrderApplicationService
     participant ProductService
     participant CouponApplicationService
     participant InventoryService
@@ -242,23 +242,21 @@ sequenceDiagram
     participant InventoryRepository
     participant OrderRepository
 
-    OrderV1Controller->>OrderFacade: createOrder(userId, items, couponId?)
+    OrderV1Controller->>OrderApplicationService: createOrder(userId, items, couponId?)
 
-    Note over OrderFacade,ProductRepository: [ 트랜잭션 외부 — 읽기 전용 ]
+    Note over OrderApplicationService,OrderRepository: ── @Transactional 시작 ──
 
-    OrderFacade->>ProductService: getProducts(productIds)
-    ProductService->>ProductRepository: findAllByIds(productIds)
-    ProductRepository-->>ProductService: List~ProductEntity~ (없는 상품 있으면 404)
-    ProductService-->>OrderFacade: List~ProductEntity~
+    OrderApplicationService->>ProductService: getProduct(productId) (항목별 순차 조회)
+    ProductService->>ProductRepository: findById(productId)
+    ProductRepository-->>ProductService: ProductEntity (없는 상품 있으면 404)
+    ProductService-->>OrderApplicationService: ProductEntity
 
-    Note over OrderFacade: originalAmount = Σ(product.price × quantity)
-
-    Note over OrderFacade,OrderRepository: ── @Transactional 시작 ──
+    Note over OrderApplicationService: originalAmount = Σ(product.price × quantity)
 
     opt couponId 있음
-        Note over OrderFacade: ① 쿠폰 유효성 검증 + 사용 처리 (PESSIMISTIC_WRITE, ADR-031)
-        Note over OrderFacade: 검증은 락 획득 후 단일 지점에서만 수행 (이중 검증 없음)
-        OrderFacade->>CouponApplicationService: useCoupon(couponId, userId, originalAmount)
+        Note over OrderApplicationService: ① 쿠폰 유효성 검증 + 사용 처리 (PESSIMISTIC_WRITE, ADR-031)
+        Note over OrderApplicationService: 검증은 락 획득 후 단일 지점에서만 수행 (이중 검증 없음)
+        OrderApplicationService->>CouponApplicationService: useCoupon(couponId, userId, originalAmount)
         CouponApplicationService->>CouponRepository: findByIdWithLock(couponId)
         Note over CouponRepository: SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
         CouponRepository-->>CouponApplicationService: CouponEntity (없으면 404)
@@ -271,24 +269,24 @@ sequenceDiagram
         CouponApplicationService->>CouponApplicationService: discountAmount = template.calculateDiscount(originalAmount)
         CouponApplicationService->>CouponApplicationService: coupon.use() — AVAILABLE → USED (인메모리)
         CouponApplicationService->>CouponRepository: save(coupon)
-        CouponApplicationService-->>OrderFacade: discountAmount
+        CouponApplicationService-->>OrderApplicationService: discountAmount
     end
 
-    Note over OrderFacade: ② 재고 차감 (productId 오름차순 정렬, ADR-014)
-    OrderFacade->>InventoryService: deductAll(productId-quantity 쌍)
+    Note over OrderApplicationService: ② 재고 차감 (productId 오름차순 정렬, ADR-014)
+    OrderApplicationService->>InventoryService: deductAll(productId-quantity 쌍)
     InventoryService->>InventoryRepository: findAllByProductIds(productIds) FOR UPDATE
     Note over InventoryRepository: WHERE product_id IN (...) ORDER BY product_id FOR UPDATE
     InventoryService->>InventoryService: 각 inventory.deduct(quantity) — 재고 부족 시 400
 
-    Note over OrderFacade: ③ 주문 엔티티 생성 및 저장
-    OrderFacade->>OrderService: createOrder(userId, items, originalAmount, discountAmount, finalAmount, couponId?)
+    Note over OrderApplicationService: ③ 주문 엔티티 생성 및 저장
+    OrderApplicationService->>OrderService: createOrder(userId, snapshot)
     OrderService->>OrderRepository: save(OrderEntity + OrderSnapshot)
     OrderRepository-->>OrderService: OrderEntity
-    OrderService-->>OrderFacade: OrderEntity
+    OrderService-->>OrderApplicationService: OrderEntity
 
-    Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 실패 시 전체 Rollback ──
+    Note over OrderApplicationService,OrderRepository: ── 성공 시 Commit / 실패 시 전체 Rollback ──
 
-    OrderFacade-->>OrderV1Controller: OrderInfo
+    OrderApplicationService-->>OrderV1Controller: OrderInfo
 ```
 
 ---

@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/products")
 public class ProductV1Controller implements ProductV1ApiSpec {
 
-    private final ProductFacade productFacade;
+    private final ProductApplicationService productApplicationService;
 
     @GetMapping
     public ApiResponse<PageResult<ProductV1Dto.PlpResponse>> getAllProducts(
@@ -25,7 +25,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
         ProductSort productSort = ProductSort.from(sort);
         return ApiResponse.success(
                 PageResult.from(
-                        productFacade.getAllProducts(brandId, PageRequest.of(page, size, productSort.toSort()))
+                        productApplicationService.getAllProducts(brandId, PageRequest.of(page, size, productSort.toSort()))
                                 .map(ProductV1Dto.PlpResponse::from)
                 )
         );
@@ -35,6 +35,6 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     public ApiResponse<ProductV1Dto.PdpResponse> getProduct(
             @PathVariable Long productId
     ) {
-        return ApiResponse.success(ProductV1Dto.PdpResponse.from(productFacade.getProduct(productId)));
+        return ApiResponse.success(ProductV1Dto.PdpResponse.from(productApplicationService.getProduct(productId)));
     }
 }

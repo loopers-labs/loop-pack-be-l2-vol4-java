@@ -1,13 +1,12 @@
 package com.loopers.application.like;
 
-import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.brand.BrandApplicationService;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.application.product.ProductInfo;
-import com.loopers.application.product.ProductFacade;
-import com.loopers.domain.like.LikeService;
-import com.loopers.domain.product.ProductService;
-import com.loopers.domain.user.UserEntity;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.product.ProductApplicationService;
+import com.loopers.application.user.UserApplicationService;
+import com.loopers.application.user.UserInfo;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -29,37 +28,34 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
-class LikeFacadeIntegrationTest {
+class LikeApplicationServiceIntegrationTest {
 
     @Autowired
-    private LikeFacade likeFacade;
+    private LikeApplicationService likeApplicationService;
 
     @Autowired
-    private BrandFacade brandFacade;
+    private BrandApplicationService brandApplicationService;
 
     @Autowired
-    private ProductFacade productFacade;
+    private ProductApplicationService productApplicationService;
 
     @Autowired
-    private UserService userService;
-
-    @Autowired
-    private LikeService likeService;
+    private UserApplicationService userApplicationService;
 
     @SpyBean
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
     void tearDown() {
-        Mockito.reset(productService);
+        Mockito.reset(productRepository);
         databaseCleanUp.truncateAllTables();
     }
 
-    private UserEntity createUser(String userId) {
-        return userService.signup(userId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), userId + "@test.com");
+    private UserInfo createUser(String userId) {
+        return userApplicationService.signup(userId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), userId + "@test.com");
     }
 
     // ─────────────────────────────────────────────
@@ -74,15 +70,15 @@ class LikeFacadeIntegrationTest {
         @Test
         void incrementsLikeCount_whenLikeIsAdded() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
 
             // act
-            likeFacade.addLike(user.getId(), product.id());
+            likeApplicationService.addLike(user.id(), product.id());
 
             // assert
-            ProductInfo result = productFacade.getProduct(product.id());
+            ProductInfo result = productApplicationService.getProduct(product.id());
             assertEquals(1L, result.likeCount());
         }
 
@@ -90,17 +86,17 @@ class LikeFacadeIntegrationTest {
         @Test
         void restoresLike_andIncrementsLikeCount_whenSoftDeletedLikeExists() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeService.like(user.getId(), product.id());
-            likeService.unlike(user.getId(), product.id());
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            likeApplicationService.addLike(user.id(), product.id());
+            likeApplicationService.removeLike(user.id(), product.id());
 
             // act
-            likeFacade.addLike(user.getId(), product.id());
+            likeApplicationService.addLike(user.id(), product.id());
 
             // assert
-            ProductInfo result = productFacade.getProduct(product.id());
+            ProductInfo result = productApplicationService.getProduct(product.id());
             assertEquals(1L, result.likeCount());
         }
 
@@ -108,14 +104,14 @@ class LikeFacadeIntegrationTest {
         @Test
         void throwsConflict_whenAlreadyLiked() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeFacade.addLike(user.getId(), product.id());
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            likeApplicationService.addLike(user.id(), product.id());
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> likeFacade.addLike(user.getId(), product.id()));
+                    () -> likeApplicationService.addLike(user.id(), product.id()));
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
         }
     }
@@ -132,16 +128,16 @@ class LikeFacadeIntegrationTest {
         @Test
         void decrementsLikeCount_whenLikeIsRemoved() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeFacade.addLike(user.getId(), product.id());
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            likeApplicationService.addLike(user.id(), product.id());
 
             // act
-            likeFacade.removeLike(user.getId(), product.id());
+            likeApplicationService.removeLike(user.id(), product.id());
 
             // assert
-            ProductInfo result = productFacade.getProduct(product.id());
+            ProductInfo result = productApplicationService.getProduct(product.id());
             assertEquals(0L, result.likeCount());
         }
 
@@ -149,13 +145,13 @@ class LikeFacadeIntegrationTest {
         @Test
         void throwsNotFound_whenLikeNotExists() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> likeFacade.removeLike(user.getId(), product.id()));
+                    () -> likeApplicationService.removeLike(user.id(), product.id()));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -172,13 +168,13 @@ class LikeFacadeIntegrationTest {
         @Test
         void returnsLikedProducts_whenOwnerRequests() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeFacade.addLike(user.getId(), product.id());
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            likeApplicationService.addLike(user.id(), product.id());
 
             // act
-            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeApplicationService.getLikedProducts(user.id(), PageRequest.of(0, 20));
 
             // assert
             assertAll(
@@ -193,10 +189,10 @@ class LikeFacadeIntegrationTest {
         @Test
         void returnsEmptyPage_whenNoLikesExist() {
             // arrange
-            UserEntity user = createUser("testuser1");
+            UserInfo user = createUser("testuser1");
 
             // act
-            Page<LikeInfo> result = likeFacade.getLikedProducts(user.getId(), PageRequest.of(0, 20));
+            Page<LikeInfo> result = likeApplicationService.getLikedProducts(user.id(), PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent()).isEmpty();
@@ -215,45 +211,45 @@ class LikeFacadeIntegrationTest {
         @Test
         void rollsBackLikeRow_whenLikeCountIncrementFails() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
 
-            doThrow(new RuntimeException("강제 실패")).when(productService).incrementLikeCount(product.id());
+            doThrow(new RuntimeException("강제 실패")).when(productRepository).incrementLikeCount(product.id());
 
             // act
-            assertThrows(RuntimeException.class, () -> likeFacade.addLike(user.getId(), product.id()));
+            assertThrows(RuntimeException.class, () -> likeApplicationService.addLike(user.id(), product.id()));
 
             // assert: like row가 롤백되어 active like가 없음 → removeLike는 NOT_FOUND
             CoreException exception = assertThrows(CoreException.class,
-                    () -> likeFacade.removeLike(user.getId(), product.id()));
+                    () -> likeApplicationService.removeLike(user.id(), product.id()));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
 
             // assert: likeCount도 롤백되어 0 유지
-            assertEquals(0L, productFacade.getProduct(product.id()).likeCount());
+            assertEquals(0L, productApplicationService.getProduct(product.id()).likeCount());
         }
 
         @DisplayName("[Transactional] 좋아요 취소 중 likeCount 감소 실패 시 like soft-delete도 함께 롤백된다.")
         @Test
         void rollsBackLikeSoftDelete_whenLikeCountDecrementFails() {
             // arrange
-            UserEntity user = createUser("testuser1");
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            ProductInfo product = productFacade.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeFacade.addLike(user.getId(), product.id());
+            UserInfo user = createUser("testuser1");
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+            likeApplicationService.addLike(user.id(), product.id());
 
-            doThrow(new RuntimeException("강제 실패")).when(productService).decrementLikeCount(product.id());
+            doThrow(new RuntimeException("강제 실패")).when(productRepository).decrementLikeCount(product.id());
 
             // act
-            assertThrows(RuntimeException.class, () -> likeFacade.removeLike(user.getId(), product.id()));
+            assertThrows(RuntimeException.class, () -> likeApplicationService.removeLike(user.id(), product.id()));
 
             // assert: soft-delete가 롤백되어 like가 여전히 active → addLike는 CONFLICT
             CoreException exception = assertThrows(CoreException.class,
-                    () -> likeFacade.addLike(user.getId(), product.id()));
+                    () -> likeApplicationService.addLike(user.id(), product.id()));
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
 
             // assert: likeCount도 롤백되어 1 유지
-            assertEquals(1L, productFacade.getProduct(product.id()).likeCount());
+            assertEquals(1L, productApplicationService.getProduct(product.id()).likeCount());
         }
     }
 }

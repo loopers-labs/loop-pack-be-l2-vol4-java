@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.like;
 
-import com.loopers.application.like.LikeFacade;
+import com.loopers.application.like.LikeApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.interfaces.auth.LoginUser;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1")
 public class LikeV1Controller implements LikeV1ApiSpec {
 
-    private final LikeFacade likeFacade;
+    private final LikeApplicationService likeApplicationService;
 
     @PostMapping("/products/{productId}/likes")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -24,7 +24,7 @@ public class LikeV1Controller implements LikeV1ApiSpec {
             @PathVariable Long productId,
             @LoginUser Long userId
     ) {
-        likeFacade.addLike(userId, productId);
+        likeApplicationService.addLike(userId, productId);
     }
 
     @DeleteMapping("/products/{productId}/likes")
@@ -33,7 +33,7 @@ public class LikeV1Controller implements LikeV1ApiSpec {
             @PathVariable Long productId,
             @LoginUser Long userId
     ) {
-        likeFacade.removeLike(userId, productId);
+        likeApplicationService.removeLike(userId, productId);
     }
 
     @GetMapping("/users/{userId}/likes")
@@ -48,7 +48,7 @@ public class LikeV1Controller implements LikeV1ApiSpec {
         }
         return ApiResponse.success(
                 PageResult.from(
-                        likeFacade.getLikedProducts(userId, PageRequest.of(page, size))
+                        likeApplicationService.getLikedProducts(userId, PageRequest.of(page, size))
                                 .map(LikeV1Dto.LikeResponse::from)
                 )
         );

@@ -2,8 +2,8 @@ package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.user.UserEntity;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
+import com.loopers.application.user.UserInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -29,7 +29,7 @@ class CouponApplicationServiceIntegrationTest {
     private CouponApplicationService couponApplicationService;
 
     @Autowired
-    private UserService userService;
+    private UserApplicationService userApplicationService;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -42,8 +42,8 @@ class CouponApplicationServiceIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private UserEntity createUser(String loginId) {
-        return userService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
+    private UserInfo createUser(String loginId) {
+        return userApplicationService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
     }
 
     private CouponTemplateInfo createTemplate(String name, CouponType type, Long value, Long minOrderAmount) {
@@ -62,11 +62,11 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsCouponInfo_withAvailableStatus_whenTemplateIsValid() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("신규 가입 쿠폰", CouponType.FIXED, 3000L, null);
 
             // act
-            CouponInfo result = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo result = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // assert
             assertAll(
@@ -80,11 +80,11 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenTemplateNotFound() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.issueCoupon(user.getId(), 999L));
+                    () -> couponApplicationService.issueCoupon(user.id(), 999L));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
 
@@ -92,7 +92,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequestException_whenTemplateIsExpired() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("신규 가입 쿠폰", CouponType.FIXED, 3000L, null);
             // 만료 처리: expiredAt을 과거로 업데이트
             couponApplicationService.updateTemplate(template.templateId(), template.name(), null,
@@ -100,7 +100,7 @@ class CouponApplicationServiceIntegrationTest {
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.issueCoupon(user.getId(), template.templateId()));
+                    () -> couponApplicationService.issueCoupon(user.id(), template.templateId()));
             assertEquals(ErrorType.BAD_REQUEST, ex.getErrorType());
         }
 
@@ -108,12 +108,12 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void allowsDuplicateIssuance_whenSameUserRequestsMultipleTimes() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("중복 발급 쿠폰", CouponType.RATE, 10L, null);
 
             // act
-            CouponInfo first = couponApplicationService.issueCoupon(user.getId(), template.templateId());
-            CouponInfo second = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo first = couponApplicationService.issueCoupon(user.id(), template.templateId());
+            CouponInfo second = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // assert
             assertNotEquals(first.couponId(), second.couponId());
@@ -294,15 +294,15 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void softDeletesIssuedCoupons_whenTemplateIsDeleted() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("삭제 쿠폰", CouponType.FIXED, 1000L, null);
-            couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // act
             couponApplicationService.deleteTemplate(template.templateId());
 
             // assert: 발급된 쿠폰도 조회되지 않아야 함
-            Page<CouponInfo> myCoupons = couponApplicationService.getMyCoupons(user.getId(), PageRequest.of(0, 20));
+            Page<CouponInfo> myCoupons = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
             assertEquals(0, myCoupons.getTotalElements());
         }
 
@@ -327,11 +327,11 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsIssuedCoupons_forTemplate() {
             // arrange
-            UserEntity user1 = createUser("user1");
-            UserEntity user2 = createUser("user2");
+            UserInfo user1 = createUser("user1");
+            UserInfo user2 = createUser("user2");
             CouponTemplateInfo template = createTemplate("이벤트 쿠폰", CouponType.RATE, 20L, null);
-            couponApplicationService.issueCoupon(user1.getId(), template.templateId());
-            couponApplicationService.issueCoupon(user2.getId(), template.templateId());
+            couponApplicationService.issueCoupon(user1.id(), template.templateId());
+            couponApplicationService.issueCoupon(user2.id(), template.templateId());
 
             // act
             Page<CouponInfo> result = couponApplicationService.getTemplateIssues(
@@ -362,10 +362,10 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsEmptyPage_whenNoCouponsIssued() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
 
             // act
-            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.getId(), PageRequest.of(0, 20));
+            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
 
             // assert
             assertEquals(0, result.getTotalElements());
@@ -375,12 +375,12 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsMyCoupons_withTemplateInfo() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("내 쿠폰", CouponType.FIXED, 2000L, null);
-            couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // act
-            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.getId(), PageRequest.of(0, 20));
+            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
 
             // assert
             assertAll(
@@ -394,14 +394,14 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsExpiredStatus_whenCouponIsExpired() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("만료 쿠폰", CouponType.FIXED, 1000L, null);
-            couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            couponApplicationService.issueCoupon(user.id(), template.templateId());
             couponApplicationService.updateTemplate(template.templateId(), template.name(), null,
                     ZonedDateTime.now().minusSeconds(1));
 
             // act
-            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.getId(), PageRequest.of(0, 20));
+            Page<CouponInfo> result = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
 
             // assert
             assertEquals(CouponStatus.EXPIRED, result.getContent().get(0).status());
@@ -420,16 +420,16 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void returnsDiscountAmount_andStatusChangesToUsed_whenCouponIsValid() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("10% 할인", CouponType.RATE, 10L, null);
-            CouponInfo issued = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo issued = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // act
-            Long discount = couponApplicationService.useCoupon(issued.couponId(), user.getId(), 20000L);
+            Long discount = couponApplicationService.useCoupon(issued.couponId(), user.id(), 20000L);
 
             // assert
             assertEquals(2000L, discount);
-            Page<CouponInfo> myCoupons = couponApplicationService.getMyCoupons(user.getId(), PageRequest.of(0, 20));
+            Page<CouponInfo> myCoupons = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
             assertEquals(CouponStatus.USED, myCoupons.getContent().get(0).status());
         }
 
@@ -445,14 +445,14 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsForbiddenException_whenCouponIsNotOwned() {
             // arrange
-            UserEntity owner = createUser("owner");
-            UserEntity other = createUser("other");
+            UserInfo owner = createUser("owner");
+            UserInfo other = createUser("other");
             CouponTemplateInfo template = createTemplate("소유권 테스트", CouponType.FIXED, 1000L, null);
-            CouponInfo issued = couponApplicationService.issueCoupon(owner.getId(), template.templateId());
+            CouponInfo issued = couponApplicationService.issueCoupon(owner.id(), template.templateId());
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.useCoupon(issued.couponId(), other.getId(), 10000L));
+                    () -> couponApplicationService.useCoupon(issued.couponId(), other.id(), 10000L));
             assertEquals(ErrorType.FORBIDDEN, ex.getErrorType());
         }
 
@@ -460,14 +460,14 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequestException_whenCouponIsAlreadyUsed() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("정액 쿠폰", CouponType.FIXED, 1000L, null);
-            CouponInfo issued = couponApplicationService.issueCoupon(user.getId(), template.templateId());
-            couponApplicationService.useCoupon(issued.couponId(), user.getId(), 10000L);
+            CouponInfo issued = couponApplicationService.issueCoupon(user.id(), template.templateId());
+            couponApplicationService.useCoupon(issued.couponId(), user.id(), 10000L);
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.useCoupon(issued.couponId(), user.getId(), 10000L));
+                    () -> couponApplicationService.useCoupon(issued.couponId(), user.id(), 10000L));
             assertEquals(ErrorType.BAD_REQUEST, ex.getErrorType());
         }
 
@@ -475,15 +475,15 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequestException_whenCouponIsExpired() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("만료 쿠폰", CouponType.FIXED, 1000L, null);
-            CouponInfo issued = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo issued = couponApplicationService.issueCoupon(user.id(), template.templateId());
             couponApplicationService.updateTemplate(template.templateId(), template.name(), null,
                     ZonedDateTime.now().minusSeconds(1));
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.useCoupon(issued.couponId(), user.getId(), 10000L));
+                    () -> couponApplicationService.useCoupon(issued.couponId(), user.id(), 10000L));
             assertEquals(ErrorType.BAD_REQUEST, ex.getErrorType());
         }
 
@@ -491,13 +491,13 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsBadRequestException_whenOrderAmountIsBelowMinimum() {
             // arrange
-            UserEntity user = createUser("user1");
+            UserInfo user = createUser("user1");
             CouponTemplateInfo template = createTemplate("최소금액 쿠폰", CouponType.FIXED, 1000L, 10000L);
-            CouponInfo issued = couponApplicationService.issueCoupon(user.getId(), template.templateId());
+            CouponInfo issued = couponApplicationService.issueCoupon(user.id(), template.templateId());
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.useCoupon(issued.couponId(), user.getId(), 9999L));
+                    () -> couponApplicationService.useCoupon(issued.couponId(), user.id(), 9999L));
             assertEquals(ErrorType.BAD_REQUEST, ex.getErrorType());
         }
     }

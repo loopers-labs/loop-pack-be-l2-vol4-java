@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
@@ -14,14 +14,14 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api-admin/v1/products")
 public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
-    private final ProductFacade productFacade;
+    private final ProductApplicationService productApplicationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ProductV1Dto.CreateProductResponse> createProduct(
             @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
-        ProductInfo info = productFacade.createProduct(
+        ProductInfo info = productApplicationService.createProduct(
                 request.brandId(),
                 request.name(),
                 request.description(),
@@ -39,7 +39,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     ) {
         return ApiResponse.success(
                 PageResult.from(
-                        productFacade.getAllProducts(brandId, PageRequest.of(page, size))
+                        productApplicationService.getAllProducts(brandId, PageRequest.of(page, size))
                                 .map(ProductV1Dto.AdminPlpResponse::from)
                 )
         );
@@ -49,7 +49,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     public ApiResponse<ProductV1Dto.AdminPdpResponse> getProduct(
             @PathVariable Long productId
     ) {
-        return ApiResponse.success(ProductV1Dto.AdminPdpResponse.from(productFacade.getProduct(productId)));
+        return ApiResponse.success(ProductV1Dto.AdminPdpResponse.from(productApplicationService.getProduct(productId)));
     }
 
     @PutMapping("/{productId}")
@@ -58,7 +58,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
             @PathVariable Long productId,
             @RequestBody ProductV1Dto.UpdateProductRequest request
     ) {
-        productFacade.updateProduct(
+        productApplicationService.updateProduct(
                 productId,
                 request.name(),
                 request.description(),
@@ -72,6 +72,6 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     public void deleteProduct(
             @PathVariable Long productId
     ) {
-        productFacade.deleteProduct(productId);
+        productApplicationService.deleteProduct(productId);
     }
 }

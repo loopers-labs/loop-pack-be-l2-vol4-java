@@ -1,8 +1,11 @@
 package com.loopers.application.brand;
 
-import com.loopers.domain.inventory.InventoryService;
-import com.loopers.domain.like.LikeService;
-import com.loopers.domain.product.ProductService;
+import com.loopers.application.product.ProductApplicationService;
+import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.inventory.InventoryRepository;
+import com.loopers.domain.like.LikeEntity;
+import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.product.ProductRepository;
 import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -26,19 +29,22 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
-class BrandFacadeIntegrationTest {
+class BrandApplicationServiceIntegrationTest {
 
     @Autowired
-    private BrandFacade brandFacade;
+    private BrandApplicationService brandApplicationService;
+
+    @Autowired
+    private ProductApplicationService productApplicationService;
 
     @SpyBean
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     @SpyBean
-    private InventoryService inventoryService;
+    private InventoryRepository inventoryRepository;
 
     @SpyBean
-    private LikeService likeService;
+    private LikeRepository likeRepository;
 
     @Autowired
     private ProductJpaRepository productJpaRepository;
@@ -54,7 +60,7 @@ class BrandFacadeIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        Mockito.reset(productService, inventoryService, likeService);
+        Mockito.reset(productRepository, inventoryRepository, likeRepository);
         databaseCleanUp.truncateAllTables();
     }
 
@@ -70,10 +76,10 @@ class BrandFacadeIntegrationTest {
         @Test
         void returnsBrandInfo_whenBrandExists() {
             // arrange
-            BrandInfo created = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            BrandInfo created = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act
-            BrandInfo result = brandFacade.getBrand(created.id());
+            BrandInfo result = brandApplicationService.getBrand(created.id());
 
             // assert
             assertAll(
@@ -88,7 +94,7 @@ class BrandFacadeIntegrationTest {
         void throwsNotFound_whenBrandNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandFacade.getBrand(999L));
+                    () -> brandApplicationService.getBrand(999L));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -105,7 +111,7 @@ class BrandFacadeIntegrationTest {
         @Test
         void returnsBrandInfo_whenRequestIsValid() {
             // act
-            BrandInfo result = brandFacade.createBrand("아디다스", "독일 스포츠 브랜드");
+            BrandInfo result = brandApplicationService.createBrand("아디다스", "독일 스포츠 브랜드");
 
             // assert
             assertAll(
@@ -119,11 +125,11 @@ class BrandFacadeIntegrationTest {
         @Test
         void throwsConflict_whenNameAlreadyExists() {
             // arrange
-            brandFacade.createBrand("나이키", "스포츠 브랜드");
+            brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandFacade.createBrand("나이키", "다른 설명"));
+                    () -> brandApplicationService.createBrand("나이키", "다른 설명"));
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
         }
     }
@@ -140,11 +146,11 @@ class BrandFacadeIntegrationTest {
         @Test
         void returnsBrandPage_withAllBrands() {
             // arrange
-            brandFacade.createBrand("나이키", "스포츠 브랜드");
-            brandFacade.createBrand("아디다스", "독일 스포츠 브랜드");
+            brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            brandApplicationService.createBrand("아디다스", "독일 스포츠 브랜드");
 
             // act
-            Page<BrandInfo> result = brandFacade.getBrands(PageRequest.of(0, 20));
+            Page<BrandInfo> result = brandApplicationService.getBrands(PageRequest.of(0, 20));
 
             // assert
             assertEquals(2, result.getTotalElements());
@@ -154,11 +160,11 @@ class BrandFacadeIntegrationTest {
         @Test
         void returnsOnlyOneBrand_whenPageSizeIsOne() {
             // arrange
-            brandFacade.createBrand("나이키", "스포츠 브랜드");
-            brandFacade.createBrand("아디다스", "독일 스포츠 브랜드");
+            brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            brandApplicationService.createBrand("아디다스", "독일 스포츠 브랜드");
 
             // act
-            Page<BrandInfo> result = brandFacade.getBrands(PageRequest.of(0, 1));
+            Page<BrandInfo> result = brandApplicationService.getBrands(PageRequest.of(0, 1));
 
             // assert
             assertAll(
@@ -180,10 +186,10 @@ class BrandFacadeIntegrationTest {
         @Test
         void updatesBrand_whenBrandExistsAndNameIsUnique() {
             // arrange
-            BrandInfo created = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            BrandInfo created = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act
-            BrandInfo result = brandFacade.updateBrand(created.id(), "나이키 코리아", "한국 스포츠 브랜드");
+            BrandInfo result = brandApplicationService.updateBrand(created.id(), "나이키 코리아", "한국 스포츠 브랜드");
 
             // assert
             assertAll(
@@ -197,7 +203,7 @@ class BrandFacadeIntegrationTest {
         void throwsNotFound_whenBrandNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandFacade.updateBrand(999L, "나이키", "스포츠 브랜드"));
+                    () -> brandApplicationService.updateBrand(999L, "나이키", "스포츠 브랜드"));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
@@ -205,12 +211,12 @@ class BrandFacadeIntegrationTest {
         @Test
         void throwsConflict_whenNameBelongsToAnotherBrand() {
             // arrange
-            brandFacade.createBrand("아디다스", "독일 스포츠 브랜드");
-            BrandInfo target = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            brandApplicationService.createBrand("아디다스", "독일 스포츠 브랜드");
+            BrandInfo target = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandFacade.updateBrand(target.id(), "아디다스", "새 설명"));
+                    () -> brandApplicationService.updateBrand(target.id(), "아디다스", "새 설명"));
             assertEquals(ErrorType.CONFLICT, exception.getErrorType());
         }
 
@@ -218,10 +224,10 @@ class BrandFacadeIntegrationTest {
         @Test
         void updatesBrand_whenNameIsSameAsCurrentBrand() {
             // arrange
-            BrandInfo created = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            BrandInfo created = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act
-            BrandInfo result = brandFacade.updateBrand(created.id(), "나이키", "새로운 설명");
+            BrandInfo result = brandApplicationService.updateBrand(created.id(), "나이키", "새로운 설명");
 
             // assert
             assertAll(
@@ -243,14 +249,14 @@ class BrandFacadeIntegrationTest {
         @Test
         void throwsNotFound_afterBrandIsDeleted() {
             // arrange
-            BrandInfo created = brandFacade.createBrand("나이키", "스포츠 브랜드");
+            BrandInfo created = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
 
             // act
-            brandFacade.deleteBrand(created.id());
+            brandApplicationService.deleteBrand(created.id());
 
             // assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandFacade.getBrand(created.id()));
+                    () -> brandApplicationService.getBrand(created.id()));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
@@ -258,24 +264,23 @@ class BrandFacadeIntegrationTest {
         @Test
         void cascadeSoftDeletes_relatedProductsInventoriesAndLikes() {
             // arrange
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            Long productId = productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L).getId();
-            inventoryService.create(productId, 10);
-            likeService.like(1L, productId);
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
+            likeRepository.save(new LikeEntity(1L, product.id()));
 
             // act
-            brandFacade.deleteBrand(brand.id());
+            brandApplicationService.deleteBrand(brand.id());
 
             // assert — soft delete: deletedAt IS NOT NULL
-            assertThat(productJpaRepository.findById(productId))
+            assertThat(productJpaRepository.findById(product.id()))
                     .isPresent()
                     .get()
                     .satisfies(p -> assertNotNull(p.getDeletedAt()));
 
-            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId))
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(product.id()))
                     .isEmpty();
 
-            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(1L, productId))
+            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(1L, product.id()))
                     .isEmpty();
         }
     }
@@ -292,32 +297,31 @@ class BrandFacadeIntegrationTest {
         @Test
         void rollbacksBrandDelete_whenProductDeleteAllFails() {
             // arrange
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L);
-            doThrow(new RuntimeException("강제 실패")).when(productService).deleteAll(anyList());
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
+            doThrow(new RuntimeException("강제 실패")).when(productRepository).findAllByIds(anyList());
 
             // act
-            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+            assertThrows(RuntimeException.class, () -> brandApplicationService.deleteBrand(brand.id()));
 
             // assert: brand가 롤백되어 여전히 조회 가능
-            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
+            assertDoesNotThrow(() -> brandApplicationService.getBrand(brand.id()));
         }
 
         @DisplayName("[Transactional] deleteBrand 중 inventory deleteAllByProducts 실패 시 brand와 product 삭제가 롤백된다.")
         @Test
         void rollbacksBrandAndProductDelete_whenInventoryDeleteAllFails() {
             // arrange
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            Long productId = productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L).getId();
-            inventoryService.create(productId, 10);
-            doThrow(new RuntimeException("강제 실패")).when(inventoryService).deleteAllByProducts(anyList());
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
+            doThrow(new RuntimeException("강제 실패")).when(inventoryRepository).deleteAllByProductIds(anyList());
 
             // act
-            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+            assertThrows(RuntimeException.class, () -> brandApplicationService.deleteBrand(brand.id()));
 
             // assert: brand와 product 모두 롤백
-            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
-            assertThat(productJpaRepository.findById(productId))
+            assertDoesNotThrow(() -> brandApplicationService.getBrand(brand.id()));
+            assertThat(productJpaRepository.findById(product.id()))
                     .isPresent()
                     .get()
                     .satisfies(p -> assertNull(p.getDeletedAt()));
@@ -327,21 +331,20 @@ class BrandFacadeIntegrationTest {
         @Test
         void rollbacksBrandProductAndInventoryDelete_whenLikeDeleteAllFails() {
             // arrange
-            BrandInfo brand = brandFacade.createBrand("나이키", "스포츠 브랜드");
-            Long productId = productService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L).getId();
-            inventoryService.create(productId, 10);
-            doThrow(new RuntimeException("강제 실패")).when(likeService).deleteAllByProducts(anyList());
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
+            doThrow(new RuntimeException("강제 실패")).when(likeRepository).deleteAllByProductIds(anyList());
 
             // act
-            assertThrows(RuntimeException.class, () -> brandFacade.deleteBrand(brand.id()));
+            assertThrows(RuntimeException.class, () -> brandApplicationService.deleteBrand(brand.id()));
 
             // assert: brand, product, inventory 모두 롤백
-            assertDoesNotThrow(() -> brandFacade.getBrand(brand.id()));
-            assertThat(productJpaRepository.findById(productId))
+            assertDoesNotThrow(() -> brandApplicationService.getBrand(brand.id()));
+            assertThat(productJpaRepository.findById(product.id()))
                     .isPresent()
                     .get()
                     .satisfies(p -> assertNull(p.getDeletedAt()));
-            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId))
+            assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(product.id()))
                     .isPresent();
         }
     }

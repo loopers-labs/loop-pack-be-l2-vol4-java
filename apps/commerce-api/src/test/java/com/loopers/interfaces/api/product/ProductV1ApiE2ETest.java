@@ -1,11 +1,11 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.brand.BrandApplicationService;
 import com.loopers.application.brand.BrandInfo;
-import com.loopers.application.like.LikeFacade;
-import com.loopers.application.product.ProductFacade;
+import com.loopers.application.like.LikeApplicationService;
+import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -31,26 +31,26 @@ class ProductV1ApiE2ETest {
     private static final String ENDPOINT_ADMIN = "/api-admin/v1/products";
 
     private final TestRestTemplate testRestTemplate;
-    private final BrandFacade brandFacade;
-    private final ProductFacade productFacade;
-    private final LikeFacade likeFacade;
-    private final UserService userService;
+    private final BrandApplicationService brandApplicationService;
+    private final ProductApplicationService productApplicationService;
+    private final LikeApplicationService likeApplicationService;
+    private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     ProductV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            BrandFacade brandFacade,
-            ProductFacade productFacade,
-            LikeFacade likeFacade,
-            UserService userService,
+            BrandApplicationService brandApplicationService,
+            ProductApplicationService productApplicationService,
+            LikeApplicationService likeApplicationService,
+            UserApplicationService userApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.brandFacade = brandFacade;
-        this.productFacade = productFacade;
-        this.likeFacade = likeFacade;
-        this.userService = userService;
+        this.brandApplicationService = brandApplicationService;
+        this.productApplicationService = productApplicationService;
+        this.likeApplicationService = likeApplicationService;
+        this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -66,11 +66,11 @@ class ProductV1ApiE2ETest {
     }
 
     private BrandInfo createBrand(String name) {
-        return brandFacade.createBrand(name, name + " 설명");
+        return brandApplicationService.createBrand(name, name + " 설명");
     }
 
     private ProductInfo createProduct(Long brandId, String name, Long price, Integer quantity) {
-        return productFacade.createProduct(brandId, name, name + " 설명", price, quantity);
+        return productApplicationService.createProduct(brandId, name, name + " 설명", price, quantity);
     }
 
     // ─────────────────────────────────────────────
@@ -162,8 +162,8 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").getId();
-            likeFacade.addLike(userId, hasLike.id());
+            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            likeApplicationService.addLike(userId, hasLike.id());
 
             // act
             ParameterizedTypeReference<ApiResponse<PageResult<ProductV1Dto.PlpResponse>>> type =
@@ -189,8 +189,8 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").getId();
-            likeFacade.addLike(userId, hasLike.id());
+            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            likeApplicationService.addLike(userId, hasLike.id());
 
             // act
             ParameterizedTypeReference<ApiResponse<PageResult<ProductV1Dto.PlpResponse>>> type =

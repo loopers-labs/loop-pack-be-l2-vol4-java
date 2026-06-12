@@ -82,7 +82,7 @@ application/
 ├── brand/   BrandFacade, BrandInfo
 ├── product/ ProductFacade, ProductInfo
 ├── like/    LikeFacade, LikeInfo
-├── order/   OrderFacade, OrderInfo
+├── order/   OrderApplicationService, OrderInfo
 └── coupon/  CouponApplicationService, CouponInfo, CouponTemplateInfo
 
 domain/
@@ -583,11 +583,11 @@ Controller는 `@LoginUser` 어노테이션으로 `userId`를 주입받는다. `L
 
 트랜잭션 경계는 원칙적으로 **Service** 레이어에서 시작한다. Facade는 Service에 위임하며 트랜잭션에 관여하지 않는다.
 
-### 예외 — OrderFacade.createOrder()
+### 예외 — OrderApplicationService.createOrder()
 
-주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `InventoryService`)가 담당하므로, Facade에서 트랜잭션 경계를 감싼다.
+주문 생성과 재고 차감은 반드시 하나의 트랜잭션으로 묶여야 한다. 두 작업은 서로 다른 Service(`OrderService`, `InventoryService`, `CouponApplicationService`)가 담당하므로, `OrderApplicationService`에서 트랜잭션 경계를 감싼다.
 
-> Service 간 직접 의존성 주입은 DDD 원칙에 어긋나므로 최대한 지양한다. 여러 Service를 조합해야 하는 원자적 작업은 Facade가 트랜잭션 경계를 갖는 방식으로 처리한다.
+> Coupon 도메인은 별도의 DomainService 없이 `CouponApplicationService`가 Repository를 직접 사용하는 구조를 채택한다 ([ADR-030](./adr/030-coupon-application-service.md)). 여러 Service를 조합해야 하는 원자적 작업은 ApplicationService가 트랜잭션 경계를 갖는 방식으로 처리한다.
 
 ---
 

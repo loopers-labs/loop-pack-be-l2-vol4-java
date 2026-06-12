@@ -5,7 +5,7 @@ import com.loopers.application.coupon.CouponTemplateInfo;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponTemplateEntity;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.user.UserService;
+import com.loopers.application.user.UserApplicationService;
 import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
 import com.loopers.infrastructure.coupon.CouponTemplateMapper;
 import com.loopers.interfaces.api.ApiResponse;
@@ -38,7 +38,7 @@ class CouponV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final CouponApplicationService couponApplicationService;
     private final CouponTemplateJpaRepository couponTemplateJpaRepository;
-    private final UserService userService;
+    private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -46,13 +46,13 @@ class CouponV1ApiE2ETest {
             TestRestTemplate testRestTemplate,
             CouponApplicationService couponApplicationService,
             CouponTemplateJpaRepository couponTemplateJpaRepository,
-            UserService userService,
+            UserApplicationService userApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.couponApplicationService = couponApplicationService;
         this.couponTemplateJpaRepository = couponTemplateJpaRepository;
-        this.userService = userService;
+        this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -62,8 +62,8 @@ class CouponV1ApiE2ETest {
     }
 
     private Long createUser() {
-        return userService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
-                LocalDate.of(1995, 1, 1), "coupon@test.com").getId();
+        return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
+                LocalDate.of(1995, 1, 1), "coupon@test.com").id();
     }
 
     private CouponTemplateInfo createTemplate() {

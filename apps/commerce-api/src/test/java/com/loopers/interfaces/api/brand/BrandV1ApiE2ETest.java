@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.brand;
 
-import com.loopers.application.brand.BrandFacade;
+import com.loopers.application.brand.BrandApplicationService;
 import com.loopers.application.brand.BrandInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
@@ -24,17 +24,17 @@ class BrandV1ApiE2ETest {
     private static final String ENDPOINT_ADMIN = "/api-admin/v1/brands";
 
     private final TestRestTemplate testRestTemplate;
-    private final BrandFacade brandFacade;
+    private final BrandApplicationService brandApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     BrandV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            BrandFacade brandFacade,
+            BrandApplicationService brandApplicationService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.brandFacade = brandFacade;
+        this.brandApplicationService = brandApplicationService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -50,7 +50,7 @@ class BrandV1ApiE2ETest {
     }
 
     private BrandInfo createBrand(String name, String description) {
-        return brandFacade.createBrand(name, description);
+        return brandApplicationService.createBrand(name, description);
     }
 
     // ─────────────────────────────────────────────

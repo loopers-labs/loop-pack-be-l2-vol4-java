@@ -5,6 +5,7 @@ import com.loopers.domain.user.UserEntity;
 import java.time.LocalDate;
 
 public record UserInfo(
+    Long id,
     String userId,
     String name,
     LocalDate birthDate,
@@ -12,6 +13,7 @@ public record UserInfo(
 ) {
     public static UserInfo from(UserEntity user) {
         return new UserInfo(
+            user.getId(),
             user.getUserId(),
             user.getMaskedName(),
             user.getBirthDate(),
