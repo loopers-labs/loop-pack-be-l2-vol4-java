@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -32,7 +33,10 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
         try {
             return issuedCouponJpaRepository.saveAndFlush(issuedCouponJpaEntity).toDomain();
         } catch (DataIntegrityViolationException exception) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
+            if (isDuplicateIssuedCoupon(exception)) {
+                throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");
+            }
+            throw exception;
         }
     }
 
@@ -72,5 +76,12 @@ public class IssuedCouponRepositoryImpl implements IssuedCouponRepository {
         return issuedCouponJpaRepository.findAllByCouponIdAndDeletedAtIsNull(couponId, PageRequest.of(page, size)).stream()
             .map(IssuedCouponJpaEntity::toDomain)
             .toList();
+    }
+
+    private boolean isDuplicateIssuedCoupon(DataIntegrityViolationException exception) {
+        Throwable cause = exception.getMostSpecificCause();
+        String message = cause == null ? exception.getMessage() : cause.getMessage();
+        return message != null
+            && message.toLowerCase(Locale.ROOT).contains("uk_issued_coupon_coupon_user");
     }
 }

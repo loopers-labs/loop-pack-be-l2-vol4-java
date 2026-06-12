@@ -1,9 +1,12 @@
 package com.loopers;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.context.annotation.Bean;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.TimeZone;
 
 @ConfigurationPropertiesScan
@@ -14,6 +17,11 @@ public class CommerceApiApplication {
     public void started() {
         // set timezone
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.system(ZoneId.of("Asia/Seoul"));
     }
 
     public static void main(String[] args) {

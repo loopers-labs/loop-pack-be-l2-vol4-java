@@ -15,7 +15,10 @@ import java.time.ZonedDateTime;
 @Entity
 @Table(
     name = "issued_coupon",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"coupon_id", "user_login_id"})
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_issued_coupon_coupon_user",
+        columnNames = {"coupon_id", "user_login_id"}
+    )
 )
 public class IssuedCouponJpaEntity extends BaseEntity {
 

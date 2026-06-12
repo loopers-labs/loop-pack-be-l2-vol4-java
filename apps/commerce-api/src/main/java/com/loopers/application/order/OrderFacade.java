@@ -9,10 +9,13 @@ import com.loopers.domain.order.OrderResult;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -24,9 +27,11 @@ public class OrderFacade {
     private final ProductService productService;
     private final OrderProductProcessService orderProductProcessService;
     private final CouponService couponService;
+    private final Clock clock;
 
     @Transactional
     public OrderInfo createOrder(String userLoginId, List<OrderProductCommand> commands, Long couponId) {
+        validateCommands(commands);
         // Cross-domain writes acquire locks in Product -> IssuedCoupon order to reduce deadlock risk.
         List<Product> products = lockProductsForOrder(commands);
         OrderResult result = orderProductProcessService.createOrder(userLoginId, commands, products);
@@ -64,6 +69,15 @@ public class OrderFacade {
         return OrderInfo.from(orderService.getOrder(orderId));
     }
 
+    private void validateCommands(List<OrderProductCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청 상품은 1개 이상이어야 합니다.");
+        }
+        if (commands.stream().anyMatch(command -> command == null)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청 상품은 비어있을 수 없습니다.");
+        }
+    }
+
     private List<Product> lockProductsForOrder(List<OrderProductCommand> commands) {
         return productService.findProductsByIdsForUpdate(productIdsInLockOrder(commands));
     }
@@ -84,7 +98,7 @@ public class OrderFacade {
             userLoginId,
             couponId,
             order.getOriginalAmount(),
-            ZonedDateTime.now()
+            ZonedDateTime.now(clock)
         );
         order.applyDiscount(couponUseResult.discountAmount());
     }
