@@ -18,6 +18,10 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -499,6 +503,49 @@ class CouponApplicationServiceIntegrationTest {
             CoreException ex = assertThrows(CoreException.class,
                     () -> couponApplicationService.useCoupon(issued.couponId(), user.id(), 9999L));
             assertEquals(ErrorType.BAD_REQUEST, ex.getErrorType());
+        }
+
+        @DisplayName("[Concurrency] 동일한 쿠폰을 동시에 여러 번 사용 요청해도 정확히 1회만 사용된다.")
+        @Test
+        void couponIsUsedExactlyOnce_whenConcurrentUseRequested() throws InterruptedException {
+            // arrange
+            int threadCount = 5;
+            UserInfo user = createUser("concurrencyuser");
+            CouponTemplateInfo template = createTemplate("동시성 테스트 쿠폰", CouponType.FIXED, 1000L, null);
+            CouponInfo issued = couponApplicationService.issueCoupon(user.id(), template.templateId());
+
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+            AtomicInteger failCount = new AtomicInteger(0);
+
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        couponApplicationService.useCoupon(issued.couponId(), user.id(), 10000L);
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                        failCount.incrementAndGet();
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            // act
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            // assert: 동시 요청 중 정확히 1회만 성공
+            assertThat(successCount.get()).isEqualTo(1);
+            assertThat(failCount.get()).isEqualTo(threadCount - 1);
+
+            // assert: 쿠폰 상태가 USED로 변경됨
+            Page<CouponInfo> myCoupons = couponApplicationService.getMyCoupons(user.id(), PageRequest.of(0, 20));
+            assertThat(myCoupons.getContent().get(0).status()).isEqualTo(CouponStatus.USED);
         }
     }
 }
