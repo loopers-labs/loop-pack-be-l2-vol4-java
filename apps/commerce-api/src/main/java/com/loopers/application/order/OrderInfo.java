@@ -13,6 +13,9 @@ public record OrderInfo(
     String userLoginId,
     OrderStatus status,
     Long totalAmount,
+    Long originalAmount,
+    Long discountAmount,
+    Long finalAmount,
     List<OrderLineInfo> orderLines,
     List<OrderFailureInfo> failures
 ) {
@@ -23,6 +26,9 @@ public record OrderInfo(
             order.getUserLoginId(),
             order.getStatus(),
             order.getTotalAmount(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             order.getOrderLines().stream()
                 .map(OrderLineInfo::from)
                 .toList(),
@@ -38,6 +44,9 @@ public record OrderInfo(
             order.getUserLoginId(),
             order.getStatus(),
             order.getTotalAmount(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             order.getOrderLines().stream()
                 .map(OrderLineInfo::from)
                 .toList(),

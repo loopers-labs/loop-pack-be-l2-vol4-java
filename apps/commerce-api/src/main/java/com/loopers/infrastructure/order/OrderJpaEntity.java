@@ -26,6 +26,15 @@ public class OrderJpaEntity extends BaseEntity {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Column(nullable = false)
+    private Long originalAmount;
+
+    @Column(nullable = false)
+    private Long discountAmount;
+
+    @Column(nullable = false)
+    private Long finalAmount;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderLineJpaEntity> orderLines = new ArrayList<>();
@@ -33,9 +42,19 @@ public class OrderJpaEntity extends BaseEntity {
     protected OrderJpaEntity() {
     }
 
-    private OrderJpaEntity(String userLoginId, OrderStatus status, List<OrderLineJpaEntity> orderLines) {
+    private OrderJpaEntity(
+        String userLoginId,
+        OrderStatus status,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        List<OrderLineJpaEntity> orderLines
+    ) {
         this.userLoginId = userLoginId;
         this.status = status;
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.finalAmount = finalAmount;
         this.orderLines.addAll(orderLines);
     }
 
@@ -43,6 +62,9 @@ public class OrderJpaEntity extends BaseEntity {
         return new OrderJpaEntity(
             order.getUserLoginId(),
             order.getStatus(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             order.getOrderLines().stream()
                 .map(OrderLineJpaEntity::from)
                 .toList()
@@ -57,6 +79,7 @@ public class OrderJpaEntity extends BaseEntity {
             orderLines.stream()
                 .map(OrderLineJpaEntity::toDomain)
                 .toList(),
+            discountAmount,
             getCreatedAt()
         );
     }
@@ -64,6 +87,9 @@ public class OrderJpaEntity extends BaseEntity {
     public void update(Order order) {
         this.userLoginId = order.getUserLoginId();
         this.status = order.getStatus();
+        this.originalAmount = order.getOriginalAmount();
+        this.discountAmount = order.getDiscountAmount();
+        this.finalAmount = order.getFinalAmount();
         this.orderLines.clear();
         this.orderLines.addAll(order.getOrderLines().stream()
             .map(OrderLineJpaEntity::from)
@@ -76,6 +102,18 @@ public class OrderJpaEntity extends BaseEntity {
 
     public OrderStatus getStatus() {
         return status;
+    }
+
+    public Long getOriginalAmount() {
+        return originalAmount;
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getFinalAmount() {
+        return finalAmount;
     }
 
     public List<OrderLineJpaEntity> getOrderLines() {

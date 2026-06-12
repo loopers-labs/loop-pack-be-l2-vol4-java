@@ -22,8 +22,13 @@ public final class OrderDto {
 
             public record Request(
                 @NotEmpty
-                java.util.List<@Valid ProductRequest> items
+                java.util.List<@Valid ProductRequest> items,
+                Long couponId
             ) {
+                public Request(java.util.List<@Valid ProductRequest> items) {
+                    this(items, null);
+                }
+
                 public java.util.List<OrderProductCommand> toCommands() {
                     return items.stream()
                         .map(product -> new OrderProductCommand(product.productId(), product.quantity()))
@@ -44,6 +49,9 @@ public final class OrderDto {
                 String userLoginId,
                 OrderStatus status,
                 Long totalAmount,
+                Long originalAmount,
+                Long discountAmount,
+                Long finalAmount,
                 java.util.List<LineResponse> orderLines,
                 java.util.List<FailureResponse> failures
             ) {
@@ -53,6 +61,9 @@ public final class OrderDto {
                         info.userLoginId(),
                         info.status(),
                         info.totalAmount(),
+                        info.originalAmount(),
+                        info.discountAmount(),
+                        info.finalAmount(),
                         info.orderLines().stream()
                             .map(LineResponse::from)
                             .toList(),
@@ -110,6 +121,9 @@ public final class OrderDto {
                 String userLoginId,
                 OrderStatus status,
                 Long totalAmount,
+                Long originalAmount,
+                Long discountAmount,
+                Long finalAmount,
                 java.util.List<LineResponse> orderLines,
                 java.util.List<FailureResponse> failures
             ) {
@@ -119,6 +133,9 @@ public final class OrderDto {
                         info.userLoginId(),
                         info.status(),
                         info.totalAmount(),
+                        info.originalAmount(),
+                        info.discountAmount(),
+                        info.finalAmount(),
                         info.orderLines().stream()
                             .map(LineResponse::from)
                             .toList(),
@@ -176,6 +193,9 @@ public final class OrderDto {
                 String userLoginId,
                 OrderStatus status,
                 Long totalAmount,
+                Long originalAmount,
+                Long discountAmount,
+                Long finalAmount,
                 java.util.List<LineResponse> orderLines,
                 java.util.List<FailureResponse> failures
             ) {
@@ -185,6 +205,9 @@ public final class OrderDto {
                         info.userLoginId(),
                         info.status(),
                         info.totalAmount(),
+                        info.originalAmount(),
+                        info.discountAmount(),
+                        info.finalAmount(),
                         info.orderLines().stream()
                             .map(LineResponse::from)
                             .toList(),

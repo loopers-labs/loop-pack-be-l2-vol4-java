@@ -31,6 +31,9 @@ class OrderTest {
                 () -> assertThat(order.getUserLoginId()).isEqualTo("user1234"),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.CREATED),
                 () -> assertThat(order.getOrderLines()).containsExactly(orderLine),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(60_000L),
+                () -> assertThat(order.getDiscountAmount()).isZero(),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(60_000L),
                 () -> assertThat(order.getTotalAmount()).isEqualTo(60_000L)
             );
         }
@@ -57,6 +60,46 @@ class OrderTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("할인을 적용할 때, ")
+    @Nested
+    class ApplyDiscount {
+        @DisplayName("할인 금액만큼 최종 금액을 차감한다.")
+        @Test
+        void appliesDiscountAmount() {
+            // arrange
+            Order order = new Order("user1234", List.of(new OrderLine(1L, "니트", 30_000L, 2)));
+
+            // act
+            order.applyDiscount(5_000L);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(60_000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(5_000L),
+                () -> assertThat(order.getFinalAmount()).isEqualTo(55_000L),
+                () -> assertThat(order.getTotalAmount()).isEqualTo(55_000L)
+            );
+        }
+
+        @DisplayName("할인 금액이 주문 금액보다 크면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenDiscountAmountIsGreaterThanOriginalAmount() {
+            // arrange
+            Order order = new Order("user1234", List.of(new OrderLine(1L, "니트", 30_000L, 2)));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> {
+                order.applyDiscount(60_001L);
+            });
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(order.getDiscountAmount()).isZero()
+            );
         }
     }
 }

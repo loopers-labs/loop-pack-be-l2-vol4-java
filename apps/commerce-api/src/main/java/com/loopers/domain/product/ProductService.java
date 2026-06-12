@@ -25,6 +25,10 @@ public class ProductService {
         return productReader.findProductsByIds(ids);
     }
 
+    public List<Product> findProductsByIdsForUpdate(List<Long> ids) {
+        return productReader.findProductsByIdsForUpdate(ids);
+    }
+
     public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         return productReader.getAllProducts(brandId, sort, page, size);
     }
