@@ -22,6 +22,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -250,6 +254,103 @@ class LikeApplicationServiceIntegrationTest {
 
             // assert: likeCount도 롤백되어 1 유지
             assertEquals(1L, productApplicationService.getProduct(product.id()).likeCount());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // 동시성 — 좋아요 수 정합성
+    // ─────────────────────────────────────────────
+
+    @DisplayName("동시성 — 좋아요 수 정합성")
+    @Nested
+    class LikeConcurrency {
+
+        @DisplayName("동일한 상품에 여러 사용자가 동시에 좋아요를 요청해도 likeCount가 정확히 반영된다.")
+        @Test
+        void likeCountIsAccurate_whenConcurrentLikesRequested() throws InterruptedException {
+            // arrange
+            int threadCount = 5;
+            UserInfo[] users = new UserInfo[threadCount];
+            for (int i = 0; i < threadCount; i++) {
+                users[i] = createUser("likeuser" + i);
+            }
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            for (int i = 0; i < threadCount; i++) {
+                final int idx = i;
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        likeApplicationService.addLike(users[idx].id(), product.id());
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            // act
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            // assert: 모든 유저가 서로 다른 사용자이므로 threadCount개 모두 성공
+            assertThat(successCount.get()).isEqualTo(threadCount);
+            // assert: likeCount가 성공 횟수와 정확히 일치 (lost update 없음)
+            assertThat(productApplicationService.getProduct(product.id()).likeCount())
+                    .isEqualTo((long) successCount.get());
+        }
+
+        @DisplayName("동일한 상품에 여러 사용자가 동시에 좋아요 취소를 요청해도 likeCount가 정확히 반영된다.")
+        @Test
+        void likeCountIsAccurate_whenConcurrentUnlikesRequested() throws InterruptedException {
+            // arrange
+            int threadCount = 5;
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+
+            UserInfo[] users = new UserInfo[threadCount];
+            for (int i = 0; i < threadCount; i++) {
+                users[i] = createUser("unlikeuser" + i);
+                likeApplicationService.addLike(users[i].id(), product.id());
+            }
+
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            for (int i = 0; i < threadCount; i++) {
+                final int idx = i;
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        likeApplicationService.removeLike(users[idx].id(), product.id());
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            // act
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            // assert: 모든 유저가 서로 다른 사용자이므로 threadCount개 모두 성공
+            assertThat(successCount.get()).isEqualTo(threadCount);
+            // assert: likeCount = 초기값(threadCount) - 성공 횟수 (lost update 없음)
+            assertThat(productApplicationService.getProduct(product.id()).likeCount())
+                    .isEqualTo((long) threadCount - successCount.get());
         }
     }
 }
