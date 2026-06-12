@@ -23,16 +23,16 @@ public class ProductStockService {
 
     @Transactional
     public ProductStockModel decrease(Long stockId, int quantity) {
-        ProductStockModel stock = get(stockId);
-        stock.decrease(quantity);
-        return stock;
+        boolean decreased = productStockRepository.decreaseIfSufficient(stockId, quantity);
+        if (!decreased) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+        }
+        return get(stockId);
     }
 
     @Transactional
-    public ProductStockModel increase(Long stockId, int quantity) {
-        ProductStockModel stock = get(stockId);
-        stock.increase(quantity);
-        return stock;
+    public void increase(Long stockId, int quantity) {
+        productStockRepository.increaseStock(stockId, quantity);
     }
 
     @Transactional(readOnly = true)
@@ -47,10 +47,13 @@ public class ProductStockService {
 
     @Transactional
     public ProductStockModel updateStock(Long stockId, Long price, Integer stockQuantity) {
-        ProductStockModel stock = get(stockId);
-        if (price != null) stock.applyPriceTo(price);
-        if (stockQuantity != null) stock.applyQuantityDelta(stockQuantity);
-        return stock;
+        if (price != null || stockQuantity != null) {
+            boolean updated = productStockRepository.updateStockAttributes(stockId, price, stockQuantity);
+            if (!updated && stockQuantity != null) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+            }
+        }
+        return get(stockId);
     }
 
 }

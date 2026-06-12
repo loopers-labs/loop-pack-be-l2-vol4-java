@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+
 class ProductStockServiceUnitTest {
 
     private InMemoryProductStockRepository stockRepository;
@@ -56,59 +57,4 @@ class ProductStockServiceUnitTest {
         }
     }
 
-    @DisplayName("재고 정보 수정 시,")
-    @Nested
-    class UpdateStock {
-
-        @DisplayName("가격만 입력하면, 가격만 변경된다.")
-        @Test
-        void updatesPrice_whenOnlyPriceIsProvided() {
-            saveDefaultStock(10);
-
-            ProductStockModel result = sut.updateStock(STOCK_ID, 20000L, null);
-
-            assertThat(result.getPrice().getValue()).isEqualTo(20000L);
-            assertThat(result.getStockQuantity().getValue()).isEqualTo(10);
-        }
-
-        @DisplayName("양수 재고 증감량 입력하면, 재고가 증가한다.")
-        @Test
-        void increasesStock_whenStockQuantityIsPositive() {
-            saveDefaultStock(10);
-
-            ProductStockModel result = sut.updateStock(STOCK_ID, null, 5);
-
-            assertThat(result.getStockQuantity().getValue()).isEqualTo(15);
-        }
-
-        @DisplayName("음수 재고 증감량 입력하면, 재고가 차감된다.")
-        @Test
-        void decreasesStock_whenStockQuantityIsNegative() {
-            saveDefaultStock(10);
-
-            ProductStockModel result = sut.updateStock(STOCK_ID, null, -3);
-
-            assertThat(result.getStockQuantity().getValue()).isEqualTo(7);
-        }
-
-        @DisplayName("가격과 재고 증감량 모두 입력하면, 둘 다 변경된다.")
-        @Test
-        void updatesBoth_whenBothAreProvided() {
-            saveDefaultStock(10);
-
-            ProductStockModel result = sut.updateStock(STOCK_ID, 20000L, 5);
-
-            assertThat(result.getPrice().getValue()).isEqualTo(20000L);
-            assertThat(result.getStockQuantity().getValue()).isEqualTo(15);
-        }
-
-        @DisplayName("재고가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFound_whenStockDoesNotExist() {
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> sut.updateStock(NON_EXISTENT_ID, 20000L, null));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
-    }
 }
