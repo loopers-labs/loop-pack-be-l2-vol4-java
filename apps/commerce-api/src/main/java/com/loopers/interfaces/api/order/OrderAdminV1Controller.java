@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.order;
 
-import com.loopers.application.order.OrderFacade;
+import com.loopers.application.order.OrderApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api-admin/v1/orders")
 public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
 
-    private final OrderFacade orderFacade;
+    private final OrderApplicationService orderApplicationService;
 
     @GetMapping
     public ApiResponse<PageResult<OrderV1Dto.AdminOrderResponse>> getOrders(
@@ -21,7 +21,7 @@ public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
     ) {
         return ApiResponse.success(
                 PageResult.from(
-                        orderFacade.getAdminOrders(PageRequest.of(page, size))
+                        orderApplicationService.getAdminOrders(PageRequest.of(page, size))
                                 .map(OrderV1Dto.AdminOrderResponse::from)
                 )
         );
@@ -30,7 +30,7 @@ public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
     @GetMapping("/{orderId}")
     public ApiResponse<OrderV1Dto.AdminOrderResponse> getOrder(@PathVariable Long orderId) {
         return ApiResponse.success(
-                OrderV1Dto.AdminOrderResponse.from(orderFacade.getAdminOrder(orderId))
+                OrderV1Dto.AdminOrderResponse.from(orderApplicationService.getAdminOrder(orderId))
         );
     }
 }

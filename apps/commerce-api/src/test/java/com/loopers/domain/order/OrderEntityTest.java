@@ -13,38 +13,40 @@ public class OrderEntityTest {
 
     private static final Long VALID_USER_ID = 1L;
 
-    private OrderItemVO createItem(Long productId) {
-        return new OrderItemVO(productId, "상품명", 10000L, 1);
+    private OrderSnapshotItem item(Long productId) {
+        return new OrderSnapshotItem(productId, "상품명", 10000L, 1, 10000L);
+    }
+
+    private OrderSnapshot validSnapshot(Long productId) {
+        return new OrderSnapshot(List.of(item(productId)), 10000L, 0L, 10000L, null);
     }
 
     @DisplayName("주문 생성")
     @Nested
     class Create {
 
-        @DisplayName("유효한 userId와 items로 생성하면 성공한다.")
+        @DisplayName("유효한 userId와 snapshot으로 생성하면 성공한다.")
         @Test
         void createsOrderEntity_whenRequestIsValid() {
             // arrange
-            List<OrderItemVO> items = List.of(createItem(1L));
+            OrderSnapshot snapshot = validSnapshot(1L);
 
             // act
-            OrderEntity order = new OrderEntity(VALID_USER_ID, items);
+            OrderEntity order = new OrderEntity(VALID_USER_ID, snapshot);
 
             // assert
             assertAll(
                     () -> assertEquals(VALID_USER_ID, order.getUserId()),
-                    () -> assertEquals(1, order.getItems().size())
+                    () -> assertEquals(OrderStatus.PENDING, order.getStatus()),
+                    () -> assertEquals(snapshot, order.getSnapshot())
             );
         }
 
         @DisplayName("생성 시 status는 PENDING이다.")
         @Test
         void createsOrderEntity_withPendingStatus() {
-            // arrange
-            List<OrderItemVO> items = List.of(createItem(1L));
-
             // act
-            OrderEntity order = new OrderEntity(VALID_USER_ID, items);
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
 
             // assert
             assertEquals(OrderStatus.PENDING, order.getStatus());
@@ -53,63 +55,63 @@ public class OrderEntityTest {
         @DisplayName("userId가 null이면 예외가 발생한다.")
         @Test
         void throwsException_whenUserIdIsNull() {
-            // arrange
-            List<OrderItemVO> items = List.of(createItem(1L));
-
             // act & assert
-            assertThrows(CoreException.class, () -> new OrderEntity(null, items));
+            assertThrows(CoreException.class, () -> new OrderEntity(null, validSnapshot(1L)));
         }
 
-        @DisplayName("items가 null이면 예외가 발생한다.")
+        @DisplayName("snapshot이 null이면 예외가 발생한다.")
         @Test
-        void throwsException_whenItemsIsNull() {
+        void throwsException_whenSnapshotIsNull() {
             // act & assert
             assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, null));
         }
 
-        @DisplayName("items가 빈 배열이면 예외가 발생한다.")
+        @DisplayName("snapshot의 items가 빈 배열이면 예외가 발생한다.")
         @Test
-        void throwsException_whenItemsIsEmpty() {
+        void throwsException_whenSnapshotItemsIsEmpty() {
+            // arrange
+            OrderSnapshot emptySnapshot = new OrderSnapshot(List.of(), 0L, 0L, 0L, null);
+
             // act & assert
-            assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, List.of()));
+            assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, emptySnapshot));
         }
 
-        @DisplayName("items 내 중복 productId가 있으면 예외가 발생한다.")
+        @DisplayName("snapshot items 내 중복 productId가 있으면 예외가 발생한다.")
         @Test
-        void throwsException_whenItemsHasDuplicateProductId() {
+        void throwsException_whenSnapshotItemsHasDuplicateProductId() {
             // arrange
-            List<OrderItemVO> items = List.of(createItem(1L), createItem(1L));
+            OrderSnapshot duplicateSnapshot = new OrderSnapshot(
+                    List.of(item(1L), item(1L)), 20000L, 0L, 20000L, null);
 
             // act & assert
-            assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, items));
+            assertThrows(CoreException.class, () -> new OrderEntity(VALID_USER_ID, duplicateSnapshot));
         }
     }
 
-    @DisplayName("총 주문 금액 계산")
+    @DisplayName("finalAmount 조회")
     @Nested
-    class CalculateTotalAmount {
+    class FinalAmount {
 
-        @DisplayName("단일 아이템의 totalAmount는 해당 아이템의 subtotal과 같다.")
+        @DisplayName("쿠폰 없는 주문의 finalAmount는 originalAmount와 같다.")
         @Test
-        void returnsSingleItemSubtotal_whenOneItem() {
+        void returnsFinalAmount_equalToOriginalAmount_whenNoCoupon() {
             // arrange
-            OrderItemVO item = new OrderItemVO(1L, "상품A", 10000L, 2);
-            OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(item));
+            OrderSnapshot snapshot = new OrderSnapshot(List.of(item(1L)), 10000L, 0L, 10000L, null);
+            OrderEntity order = new OrderEntity(VALID_USER_ID, snapshot);
 
             // act & assert
-            assertEquals(item.subtotal(), order.calculateTotalAmount());
+            assertEquals(10000L, order.finalAmount());
         }
 
-        @DisplayName("복수 아이템의 totalAmount는 각 subtotal의 합산이다.")
+        @DisplayName("쿠폰 적용 주문의 finalAmount는 originalAmount - discountAmount이다.")
         @Test
-        void returnsSumOfSubtotals_whenMultipleItems() {
+        void returnsFinalAmount_equalToDiscountedAmount_whenCouponApplied() {
             // arrange
-            OrderItemVO item1 = new OrderItemVO(1L, "상품A", 10000L, 2);
-            OrderItemVO item2 = new OrderItemVO(2L, "상품B", 5000L, 3);
-            OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(item1, item2));
+            OrderSnapshot snapshot = new OrderSnapshot(List.of(item(1L)), 10000L, 1000L, 9000L, 42L);
+            OrderEntity order = new OrderEntity(VALID_USER_ID, snapshot);
 
             // act & assert
-            assertEquals(35000L, order.calculateTotalAmount());
+            assertEquals(9000L, order.finalAmount());
         }
     }
 
@@ -120,30 +122,21 @@ public class OrderEntityTest {
         @DisplayName("소유자 userId와 일치하면 true를 반환한다.")
         @Test
         void returnsTrue_whenUserIdMatches() {
-            // arrange
-            OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(createItem(1L)));
-
-            // act & assert
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
             assertTrue(order.isOwnedBy(VALID_USER_ID));
         }
 
         @DisplayName("다른 userId이면 false를 반환한다.")
         @Test
         void returnsFalse_whenUserIdDoesNotMatch() {
-            // arrange
-            OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(createItem(1L)));
-
-            // act & assert
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
             assertFalse(order.isOwnedBy(2L));
         }
 
         @DisplayName("null이면 false를 반환한다.")
         @Test
         void returnsFalse_whenUserIdIsNull() {
-            // arrange
-            OrderEntity order = new OrderEntity(VALID_USER_ID, List.of(createItem(1L)));
-
-            // act & assert
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
             assertFalse(order.isOwnedBy(null));
         }
     }
