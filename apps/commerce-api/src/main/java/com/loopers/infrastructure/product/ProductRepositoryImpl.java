@@ -36,6 +36,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int deductStock(Long id, int quantity) {
+        return productJpaRepository.deductStock(id, quantity);
+    }
+
+    @Override
     public List<ProductModel> findAll() {
         return queryFactory
             .selectFrom(product)

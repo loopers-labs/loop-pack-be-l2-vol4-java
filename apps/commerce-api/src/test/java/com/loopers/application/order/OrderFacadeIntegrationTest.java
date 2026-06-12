@@ -24,6 +24,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -246,6 +250,60 @@ class OrderFacadeIntegrationTest {
                     List.of(new OrderFacade.OrderRequest(product.getId(), 1)), userCoupon.getId())
             );
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("재고를 동시에 차감할 때,")
+    @Nested
+    class DeductStockConcurrently {
+
+        @DisplayName("같은 상품에 재고 수량을 초과하는 동시 주문이 들어와도, 원자적 차감으로 초과판매 없이 재고만큼만 성공한다.")
+        @Test
+        void deductsStockWithoutOversell_whenOrderedConcurrently() throws InterruptedException {
+            // arrange: 재고 10개 상품에 20개의 동시 주문(각 1개)
+            int stock = 10;
+            int threadCount = 20;
+            ProductModel product = savedProduct(10_000L, stock);
+            for (int i = 0; i < threadCount; i++) {
+                savedUser("user" + i);
+            }
+
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch readyLatch = new CountDownLatch(threadCount);
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger();
+            AtomicInteger failureCount = new AtomicInteger();
+
+            // act
+            for (int i = 0; i < threadCount; i++) {
+                String loginId = "user" + i;
+                executor.submit(() -> {
+                    readyLatch.countDown();
+                    try {
+                        startLatch.await();
+                        orderFacade.createOrder(loginId, "pw1",
+                            List.of(new OrderFacade.OrderRequest(product.getId(), 1)), null);
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        failureCount.incrementAndGet();
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+            readyLatch.await();
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            // assert: 정확히 재고만큼만 성공, 나머지는 재고 부족으로 실패, 최종 재고는 0 (초과판매 없음)
+            assertAll(
+                () -> assertThat(successCount.get()).isEqualTo(stock),
+                () -> assertThat(failureCount.get()).isEqualTo(threadCount - stock),
+                () -> assertThat(productJpaRepository.findById(product.getId()).orElseThrow().getStock())
+                    .isEqualTo(0)
+            );
         }
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -38,10 +39,16 @@ public class OrderFacade {
 
         UserModel user = userService.getUser(loginId, loginPw);
 
+        // 다중 상품 주문 시 데드락 방지: 모든 주문이 productId 오름차순으로 재고 락을 잡도록
+        // 차감 순서를 통일한다. (InnoDB 행 쓰기 락은 커밋까지 유지되므로 잠금 순서가 제각각이면 순환 대기 발생)
+        List<OrderRequest> orderedRequests = requests.stream()
+            .sorted(Comparator.comparing(OrderRequest::productId))
+            .toList();
+
         List<OrderItemCommand> itemCommands = new ArrayList<>();
         long originalPrice = 0L;
 
-        for (OrderRequest req : requests) {
+        for (OrderRequest req : orderedRequests) {
             ProductModel product = productService.getProduct(req.productId());
             productService.deductStock(req.productId(), req.quantity());
             itemCommands.add(new OrderItemCommand(

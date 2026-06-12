@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,7 +63,6 @@ class OrderFacadeTest {
 
             when(userService.getUser("user1", "pw1")).thenReturn(user);
             when(productService.getProduct(anyLong())).thenReturn(product);
-            when(productService.deductStock(anyLong(), anyInt())).thenReturn(product);
             when(orderService.createOrder(anyLong(), anyLong(), anyLong(), anyLong(), nullable(Long.class), any())).thenReturn(order);
             when(orderService.getOrderItems(anyLong())).thenReturn(List.of(item));
 
@@ -125,8 +125,8 @@ class OrderFacadeTest {
             ProductModel product = new ProductModel(1L, "에어맥스 90", "편한 신발", 159000L, 1);
             when(userService.getUser("user1", "pw1")).thenReturn(user);
             when(productService.getProduct(anyLong())).thenReturn(product);
-            when(productService.deductStock(anyLong(), anyInt()))
-                .thenThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다."));
+            doThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다."))
+                .when(productService).deductStock(anyLong(), anyInt());
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->
