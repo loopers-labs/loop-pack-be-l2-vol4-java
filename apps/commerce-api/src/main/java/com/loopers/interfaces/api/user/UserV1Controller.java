@@ -1,15 +1,21 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.application.coupon.CouponApplicationService;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResult;
+import com.loopers.interfaces.api.coupon.CouponV1Dto;
+import com.loopers.interfaces.auth.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
@@ -18,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserV1Controller implements UserV1ApiSpec {
 
     private final UserFacade userFacade;
+    private final CouponApplicationService couponApplicationService;
 
     @PostMapping
     public ApiResponse<Object> signup(
@@ -40,6 +47,18 @@ public class UserV1Controller implements UserV1ApiSpec {
     ) {
         UserInfo user = userFacade.getUser(userId, password);
         return ApiResponse.success(UserV1Dto.UserResponse.from(user));
+    }
+
+    @GetMapping("/me/coupons")
+    public ApiResponse<PageResult<CouponV1Dto.MyCouponResponse>> getMyCoupons(
+            @LoginUser Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(PageResult.from(
+                couponApplicationService.getMyCoupons(userId, PageRequest.of(page, size))
+                        .map(CouponV1Dto.MyCouponResponse::from)
+        ));
     }
 
     @PatchMapping("/me/password")
