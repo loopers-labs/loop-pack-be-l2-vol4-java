@@ -1,6 +1,7 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.common.Money;
+import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderItemCommand;
@@ -240,6 +241,10 @@ public class OrderTransactionService {
             throw new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다.");
         }
 
+        if (userCoupon.getStatus() == CouponStatus.USED) {
+            // 이미 사용된 쿠폰은 견적 단계에서 조기 차단 — 결제창까지 갔다가 confirm 에서 실패하는 UX 방지
+            throw new CoreException(ErrorType.BAD_REQUEST, "이미 사용된 쿠폰입니다.");
+        }
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         userCoupon.validateApplicable(Money.of(order.getOriginalAmount()), now);   // 만료 + 최소주문금액 (스냅샷 기준)
         Money discount = userCoupon.calculateDiscount(Money.of(order.getOriginalAmount()));
@@ -260,9 +265,14 @@ public class OrderTransactionService {
     }
 
     private ProductModel findProductOrThrow(Long productId) {
-        return productRepository.findById(productId)
+        ProductModel product = productRepository.findById(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        if (product.getDeletedAt() != null) {
+            throw new CoreException(ErrorType.NOT_FOUND,
+                "[id = " + productId + "] 상품을 찾을 수 없습니다.");
+        }
+        return product;
     }
 
     private StockModel findStockOrThrow(Long productId) {

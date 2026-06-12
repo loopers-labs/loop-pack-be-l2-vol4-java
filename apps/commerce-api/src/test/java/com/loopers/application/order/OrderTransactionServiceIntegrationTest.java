@@ -99,6 +99,45 @@ class OrderTransactionServiceIntegrationTest {
         assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
     }
 
+    @DisplayName("TX1(견적): 삭제된 상품은 주문할 수 없다.")
+    @Test
+    void createPendingOrder_rejectsDeletedProduct() {
+        // arrange
+        ProductModel product = givenProductWithStock(10);
+        product.delete();
+        productRepository.save(product);
+
+        // act
+        CoreException result = assertThrows(CoreException.class, () ->
+            orderTransactionService.createPendingOrder(
+                1L, List.of(new OrderItemCommand(product.getId(), 1)), null));
+
+        // assert
+        assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+    }
+
+    @DisplayName("TX1(견적): 이미 사용된 쿠폰은 견적 단계에서 차단된다 — 결제창까지 가기 전에 거부.")
+    @Test
+    void createPendingOrder_rejectsUsedCoupon() {
+        // arrange — 쿠폰을 사용 처리된 상태로 만든다
+        ProductModel product = givenProductWithStock(10);
+        CouponModel coupon = couponRepository.save(
+            new CouponModel("1만원 할인", CouponType.FIXED, 10_000, null, ZonedDateTime.now().plusDays(1)));
+        UserCouponModel userCoupon = UserCouponModel.issue(1L, coupon);
+        userCoupon.use(ZonedDateTime.now());
+        userCoupon = userCouponRepository.save(userCoupon);
+        Long usedCouponId = userCoupon.getId();
+
+        // act
+        CoreException result = assertThrows(CoreException.class, () ->
+            orderTransactionService.createPendingOrder(
+                1L, List.of(new OrderItemCommand(product.getId(), 1)), usedCouponId));
+
+        // assert
+        assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        assertThat(result.getMessage()).contains("이미 사용된 쿠폰");
+    }
+
     @DisplayName("TX2a(점유): 재고가 원자 차감되고, 쿠폰이 USED 가 되고, 주문은 PAYMENT_IN_PROGRESS 가 된다.")
     @Test
     void bindResources_deductsStockAndUsesCoupon() {
