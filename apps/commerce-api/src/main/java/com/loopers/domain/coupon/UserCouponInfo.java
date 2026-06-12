@@ -14,21 +14,21 @@ public record UserCouponInfo(
         String status, // AVAILABLE | USED | EXPIRED
         LocalDateTime expiredAt
 ) {
-    public static UserCouponInfo of(CouponIssue issue, CouponTemplate template, LocalDateTime now) {
+    public static UserCouponInfo of(CouponIssue issue, LocalDateTime now) {
         String status = issue.getStatus().name();
-        if (issue.getStatus() == CouponStatus.AVAILABLE && template.isExpired(now)) {
+        if (issue.getStatus() == CouponStatus.AVAILABLE && issue.isExpired(now)) {
             status = "EXPIRED";
         }
         return new UserCouponInfo(
                 issue.getId(),
-                template.getId(),
-                template.getName(),
-                template.getType(),
-                template.getValue(),
-                template.getMinOrderAmount(),
-                template.getMaxDiscountAmount(),
+                issue.getCouponTemplateId(),
+                issue.getCouponName(),
+                issue.getCouponType(),
+                issue.getDiscountValue(),
+                issue.getMinOrderAmount(),
+                issue.getMaxDiscountAmount(),
                 status,
-                template.getExpiredAt()
+                issue.getExpiredAt()
         );
     }
 }

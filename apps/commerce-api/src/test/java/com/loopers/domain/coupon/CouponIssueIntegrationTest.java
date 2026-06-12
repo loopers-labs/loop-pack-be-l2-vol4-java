@@ -29,13 +29,14 @@ class CouponIssueIntegrationTest {
     void saveIssue_DuplicateUserAndTemplate_ShouldThrowException() {
         // given
         Long userId = 1L;
-        Long couponTemplateId = 10L;
+        CouponTemplate template = new CouponTemplate("test", CouponType.FIXED, new java.math.BigDecimal("1000"), java.math.BigDecimal.ZERO, null, java.time.LocalDateTime.now().plusDays(1));
+        template = couponRepository.saveTemplate(template);
 
-        CouponIssue firstIssue = new CouponIssue(userId, couponTemplateId);
+        CouponIssue firstIssue = new CouponIssue(userId, template);
         couponRepository.saveIssue(firstIssue);
 
         // when & then
-        CouponIssue secondIssue = new CouponIssue(userId, couponTemplateId);
+        CouponIssue secondIssue = new CouponIssue(userId, template);
         assertThrows(DataIntegrityViolationException.class, () -> {
             couponRepository.saveIssue(secondIssue);
         });

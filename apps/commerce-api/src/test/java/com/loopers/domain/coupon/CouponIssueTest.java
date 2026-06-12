@@ -18,10 +18,12 @@ class CouponIssueTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
         CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, new BigDecimal("1000"), new BigDecimal("10000"), null, now.plusDays(1));
-        CouponIssue issue = new CouponIssue(1L, 10L);
+        // template에 id 세팅을 시뮬레이션하기 위해 reflection 사용 (JPA 의존성 없이)
+        org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
+        CouponIssue issue = new CouponIssue(1L, template);
 
         // when & then
-        assertThrows(CoreException.class, () -> issue.use(template, new BigDecimal("9999"), now));
+        assertThrows(CoreException.class, () -> issue.use(new BigDecimal("9999"), now));
     }
 
     @Test
@@ -30,13 +32,14 @@ class CouponIssueTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
         CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
-        CouponIssue issue = new CouponIssue(1L, 10L);
+        org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
+        CouponIssue issue = new CouponIssue(1L, template);
 
         // 첫 번째 사용으로 USED 상태가 됨
-        issue.use(template, new BigDecimal("5000"), now);
+        issue.use(new BigDecimal("5000"), now);
 
         // 두 번째 사용 시도 시 예외 발생
-        assertThrows(CoreException.class, () -> issue.use(template, new BigDecimal("5000"), now));
+        assertThrows(CoreException.class, () -> issue.use(new BigDecimal("5000"), now));
     }
 
     @Test
@@ -45,15 +48,16 @@ class CouponIssueTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
         CouponTemplate template = new CouponTemplate("천원할인", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
+        org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         
         // 1번 케이스: 5000원 주문에 1000원 할인
-        CouponIssue issue1 = new CouponIssue(1L, 10L);
-        BigDecimal discount = issue1.use(template, new BigDecimal("5000"), now);
+        CouponIssue issue1 = new CouponIssue(1L, template);
+        BigDecimal discount = issue1.use(new BigDecimal("5000"), now);
         assertThat(discount).isEqualByComparingTo("1000");
 
         // 2번 케이스: 500원 주문에 500원 할인 (주문 금액 초과 불가)
-        CouponIssue issue2 = new CouponIssue(1L, 10L);
-        BigDecimal discountExceed = issue2.use(template, new BigDecimal("500"), now);
+        CouponIssue issue2 = new CouponIssue(1L, template);
+        BigDecimal discountExceed = issue2.use(new BigDecimal("500"), now);
         assertThat(discountExceed).isEqualByComparingTo("500");
     }
 
@@ -63,13 +67,14 @@ class CouponIssueTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
         CouponTemplate template = new CouponTemplate("10%할인", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("2000"), now.plusDays(1));
+        org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         
-        CouponIssue issue1 = new CouponIssue(1L, 10L);
-        CouponIssue issue2 = new CouponIssue(1L, 10L);
+        CouponIssue issue1 = new CouponIssue(1L, template);
+        CouponIssue issue2 = new CouponIssue(1L, template);
 
         // when
-        BigDecimal discount1 = issue1.use(template, new BigDecimal("10000"), now);
-        BigDecimal discount2 = issue2.use(template, new BigDecimal("30000"), now);
+        BigDecimal discount1 = issue1.use(new BigDecimal("10000"), now);
+        BigDecimal discount2 = issue2.use(new BigDecimal("30000"), now);
 
         // then
         assertThat(discount1).isEqualByComparingTo("1000");

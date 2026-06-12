@@ -126,7 +126,7 @@ class OrderFacadeConcurrencyTest {
         );
         template = couponRepository.saveTemplate(template);
 
-        CouponIssue couponIssue = new CouponIssue(userId, template.getId());
+        CouponIssue couponIssue = new CouponIssue(userId, template);
         couponIssue = couponRepository.saveIssue(couponIssue);
         Long couponIssueId = couponIssue.getId();
 

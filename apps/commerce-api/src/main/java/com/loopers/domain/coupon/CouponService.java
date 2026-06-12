@@ -17,7 +17,7 @@ public class CouponService {
 
     public CouponIssue issue(Long userId, Long couponTemplateId) {
         // 1. 템플릿 존재 여부 검증
-        couponRepository.findTemplateById(couponTemplateId)
+        CouponTemplate template = couponRepository.findTemplateById(couponTemplateId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
 
         // 2. 이미 발급된 쿠폰인지 검증 (중복 발급 방지)
@@ -27,7 +27,7 @@ public class CouponService {
                 });
 
         // 3. 쿠폰 발급 내역 저장
-        CouponIssue newIssue = new CouponIssue(userId, couponTemplateId);
+        CouponIssue newIssue = new CouponIssue(userId, template);
         return couponRepository.saveIssue(newIssue);
     }
 
@@ -37,25 +37,10 @@ public class CouponService {
             return List.of();
         }
 
-        List<Long> templateIds = issues.stream()
-                .map(CouponIssue::getCouponTemplateId)
-                .distinct()
-                .toList();
-
-        List<CouponTemplate> templates = couponRepository.findTemplatesByIds(templateIds);
-        java.util.Map<Long, CouponTemplate> templateMap = templates.stream()
-                .collect(java.util.stream.Collectors.toMap(CouponTemplate::getId, t -> t));
-
         LocalDateTime now = LocalDateTime.now();
 
         return issues.stream()
-                .map(issue -> {
-                    CouponTemplate template = templateMap.get(issue.getCouponTemplateId());
-                    if (template == null) {
-                        throw new CoreException(ErrorType.NOT_FOUND, "쿠폰 템플릿을 찾을 수 없습니다.");
-                    }
-                    return UserCouponInfo.of(issue, template, now);
-                })
+                .map(issue -> UserCouponInfo.of(issue, now))
                 .toList();
     }
 
@@ -63,10 +48,7 @@ public class CouponService {
         CouponIssue issue = couponRepository.findIssueById(couponIssueId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 발급 이력입니다."));
 
-        CouponTemplate template = couponRepository.findTemplateById(issue.getCouponTemplateId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
-
-        issue.use(template, orderAmount, java.time.LocalDateTime.now());
+        issue.use(orderAmount, java.time.LocalDateTime.now());
         couponRepository.saveIssue(issue);
     }
 
@@ -78,28 +60,25 @@ public class CouponService {
             throw new CoreException(ErrorType.CONFLICT, "이미 사용 완료된 쿠폰입니다.");
         }
 
-        CouponTemplate template = couponRepository.findTemplateById(issue.getCouponTemplateId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
-
-        if (template.isExpired(java.time.LocalDateTime.now())) {
+        if (issue.isExpired(java.time.LocalDateTime.now())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
         }
-        if (orderAmount.compareTo(template.getMinOrderAmount()) < 0) {
+        if (orderAmount.compareTo(issue.getMinOrderAmount()) < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 못했습니다.");
         }
 
         java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
-        if (template.getType() == CouponType.FIXED) {
-            discount = template.getValue();
+        if (issue.getCouponType() == CouponType.FIXED) {
+            discount = issue.getDiscountValue();
             if (discount.compareTo(orderAmount) > 0) {
                 discount = orderAmount;
             }
-        } else if (template.getType() == CouponType.RATE) {
-            java.math.BigDecimal rate = template.getValue().divide(new java.math.BigDecimal("100"), 4, java.math.RoundingMode.HALF_UP);
+        } else if (issue.getCouponType() == CouponType.RATE) {
+            java.math.BigDecimal rate = issue.getDiscountValue().divide(new java.math.BigDecimal("100"), 4, java.math.RoundingMode.HALF_UP);
             discount = orderAmount.multiply(rate).setScale(0, java.math.RoundingMode.HALF_UP);
 
-            if (template.getMaxDiscountAmount() != null && discount.compareTo(template.getMaxDiscountAmount()) > 0) {
-                discount = template.getMaxDiscountAmount();
+            if (issue.getMaxDiscountAmount() != null && discount.compareTo(issue.getMaxDiscountAmount()) > 0) {
+                discount = issue.getMaxDiscountAmount();
             }
         }
         return discount;
