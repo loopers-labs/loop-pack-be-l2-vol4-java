@@ -2,7 +2,6 @@ package com.loopers.domain.like;
 
 import com.loopers.domain.EntityTestSupport;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,17 +22,11 @@ class ProductLikeServiceTest {
     @Mock
     private ProductLikeRepository productLikeRepository;
 
-    @Mock
-    private ProductRepository productRepository;
-
     private ProductLikeService productLikeService;
 
     @BeforeEach
     void setUp() {
-        productLikeService = new ProductLikeService(
-            productLikeRepository,
-            productRepository
-        );
+        productLikeService = new ProductLikeService(productLikeRepository);
     }
 
     @DisplayName("상품에 좋아요를 누를 때, ")
