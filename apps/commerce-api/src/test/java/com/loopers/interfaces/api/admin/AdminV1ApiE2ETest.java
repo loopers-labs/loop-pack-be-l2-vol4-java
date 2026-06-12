@@ -1,6 +1,10 @@
 package com.loopers.interfaces.api.admin;
 
+import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.CouponInfo;
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.product.Product;
@@ -12,6 +16,7 @@ import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.brand.BrandDto;
+import com.loopers.interfaces.api.coupon.CouponDto;
 import com.loopers.interfaces.api.order.OrderDto;
 import com.loopers.interfaces.api.product.ProductDto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -30,6 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -40,8 +46,10 @@ class AdminV1ApiE2ETest {
     private static final String ENDPOINT_ADMIN_BRANDS = "/api-admin/v1/brands";
     private static final String ENDPOINT_ADMIN_PRODUCTS = "/api-admin/v1/products";
     private static final String ENDPOINT_ADMIN_ORDERS = "/api-admin/v1/orders";
+    private static final String ENDPOINT_ADMIN_COUPONS = "/api-admin/v1/coupons";
 
     private final TestRestTemplate testRestTemplate;
+    private final CouponFacade couponFacade;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final OrderJpaRepository orderJpaRepository;
@@ -50,16 +58,141 @@ class AdminV1ApiE2ETest {
     @Autowired
     AdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
+        CouponFacade couponFacade,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
         OrderJpaRepository orderJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
+        this.couponFacade = couponFacade;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+    }
+
+    @DisplayName("Coupon Admin API")
+    @Nested
+    class CouponAdmin {
+
+        @DisplayName("쿠폰 템플릿을 생성, 조회, 수정, 삭제할 수 있다.")
+        @Test
+        void managesCouponTemplateCrud_whenAdminAuthenticated() {
+            // arrange
+            ZonedDateTime expiredAt = ZonedDateTime.now().plusDays(7);
+            CouponDto.Create.V1.Request createRequest = new CouponDto.Create.V1.Request(
+                "신규가입 10% 할인",
+                CouponType.RATE,
+                10L,
+                10_000L,
+                expiredAt
+            );
+
+            // act
+            ResponseEntity<ApiResponse<CouponDto.Create.V1.Response>> createResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(createRequest, adminHeaders()),
+                    couponCreateResponseType()
+                );
+            Long couponId = createResponse.getBody().data().id();
+
+            ResponseEntity<ApiResponse<CouponDto.Template.Response>> getResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS + "/" + couponId,
+                    HttpMethod.GET,
+                    new HttpEntity<>(adminHeaders()),
+                    couponGetResponseType()
+                );
+
+            CouponDto.Update.V1.Request updateRequest = new CouponDto.Update.V1.Request(
+                "신규가입 1000원 할인",
+                CouponType.FIXED,
+                1_000L,
+                5_000L,
+                expiredAt.plusDays(1)
+            );
+            ResponseEntity<ApiResponse<CouponDto.Update.V1.Response>> updateResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS + "/" + couponId,
+                    HttpMethod.PUT,
+                    new HttpEntity<>(updateRequest, adminHeaders()),
+                    couponUpdateResponseType()
+                );
+
+            ResponseEntity<ApiResponse<List<CouponDto.Template.Response>>> listResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS,
+                    HttpMethod.GET,
+                    new HttpEntity<>(adminHeaders()),
+                    couponListResponseType()
+                );
+
+            ResponseEntity<ApiResponse<Void>> deleteResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS + "/" + couponId,
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(adminHeaders()),
+                    voidResponseType()
+                );
+
+            ResponseEntity<ApiResponse<CouponDto.Template.Response>> getDeletedResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS + "/" + couponId,
+                    HttpMethod.GET,
+                    new HttpEntity<>(adminHeaders()),
+                    couponGetResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(createResponse.getBody().data().type()).isEqualTo(CouponType.RATE),
+                () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getResponse.getBody().data().name()).isEqualTo("신규가입 10% 할인"),
+                () -> assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(updateResponse.getBody().data().type()).isEqualTo(CouponType.FIXED),
+                () -> assertThat(updateResponse.getBody().data().value()).isEqualTo(1_000L),
+                () -> assertThat(listResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(listResponse.getBody().data()).extracting(CouponDto.Template.Response::id)
+                    .contains(couponId),
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(getDeletedResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
+            );
+        }
+
+        @DisplayName("특정 쿠폰의 발급 내역을 조회할 수 있다.")
+        @Test
+        void returnsIssuedCoupons_whenAdminAuthenticated() {
+            // arrange
+            CouponInfo.Template coupon = couponFacade.createCoupon(
+                "신규가입 10% 할인",
+                CouponType.RATE,
+                10L,
+                10_000L,
+                ZonedDateTime.now().plusDays(7)
+            );
+            couponFacade.issueCoupon(coupon.id(), "user1234", ZonedDateTime.now());
+
+            // act
+            ResponseEntity<ApiResponse<List<CouponDto.Issued.Response>>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_COUPONS + "/" + coupon.id() + "/issues",
+                    HttpMethod.GET,
+                    new HttpEntity<>(adminHeaders()),
+                    issuedCouponListResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data()).hasSize(1),
+                () -> assertThat(response.getBody().data().get(0).userLoginId()).isEqualTo("user1234"),
+                () -> assertThat(response.getBody().data().get(0).status()).isEqualTo(CouponStatus.AVAILABLE)
+            );
+        }
     }
 
     @AfterEach
@@ -354,6 +487,26 @@ class AdminV1ApiE2ETest {
     }
 
     private ParameterizedTypeReference<ApiResponse<List<OrderDto.List.V1.Response>>> orderListResponseType() {
+        return new ParameterizedTypeReference<>() {};
+    }
+
+    private ParameterizedTypeReference<ApiResponse<CouponDto.Create.V1.Response>> couponCreateResponseType() {
+        return new ParameterizedTypeReference<>() {};
+    }
+
+    private ParameterizedTypeReference<ApiResponse<CouponDto.Template.Response>> couponGetResponseType() {
+        return new ParameterizedTypeReference<>() {};
+    }
+
+    private ParameterizedTypeReference<ApiResponse<List<CouponDto.Template.Response>>> couponListResponseType() {
+        return new ParameterizedTypeReference<>() {};
+    }
+
+    private ParameterizedTypeReference<ApiResponse<CouponDto.Update.V1.Response>> couponUpdateResponseType() {
+        return new ParameterizedTypeReference<>() {};
+    }
+
+    private ParameterizedTypeReference<ApiResponse<List<CouponDto.Issued.Response>>> issuedCouponListResponseType() {
         return new ParameterizedTypeReference<>() {};
     }
 
