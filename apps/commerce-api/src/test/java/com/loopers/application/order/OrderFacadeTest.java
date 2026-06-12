@@ -71,7 +71,7 @@ class OrderFacadeTest {
 
     @Test
     @DisplayName("주문 생성 및 재고 가선점 요청 시 비관적 락 재고 차감과 쿠폰 적용이 정상 처리된다.")
-    void createOrderAndPreoccupyStock_Success() {
+    void createPendingOrderAndPreoccupyStockTx_Success() {
         // given
         Long userId = 1L;
         Long productId = 10L;
@@ -81,20 +81,21 @@ class OrderFacadeTest {
 
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
-        given(productService.getProductsByIds(List.of(productId))).willReturn(List.of(product));
         
+        java.util.Map<Long, ProductModel> productMap = java.util.Map.of(productId, product);
+        BigDecimal totalOriginalAmount = new BigDecimal("400000");
         BigDecimal discount = new BigDecimal("40000");
-        given(couponService.calculateDiscount(couponIssueId, new BigDecimal("400000"))).willReturn(discount);
+        BigDecimal totalPaymentAmount = new BigDecimal("360000");
 
-        given(orderService.createPendingOrder(eq(userId), anyList(), eq(couponIssueId), any(), any(), any())).willReturn(100L);
+        given(orderService.createPendingOrder(eq(userId), anyList(), eq(couponIssueId), eq(totalOriginalAmount), eq(discount), eq(totalPaymentAmount))).willReturn(100L);
 
         // when
-        Long orderId = orderFacade.createOrderAndPreoccupyStock(userId, request, couponIssueId);
+        Long orderId = orderFacade.createPendingOrderAndPreoccupyStockTx(userId, request, couponIssueId, productMap, totalOriginalAmount, discount, totalPaymentAmount);
 
         // then
         assertThat(orderId).isEqualTo(100L);
         verify(stockService).decreaseStocksWithLock(anyList());
-        verify(orderService).createPendingOrder(eq(userId), anyList(), eq(couponIssueId), any(), any(), any());
+        verify(orderService).createPendingOrder(eq(userId), anyList(), eq(couponIssueId), eq(totalOriginalAmount), eq(discount), eq(totalPaymentAmount));
     }
 
     @Test
@@ -138,7 +139,7 @@ class OrderFacadeTest {
         );
 
         Long orderId = 100L;
-        // Mocking createOrderAndPreoccupyStock (Facade 내부 다른 메서드 호출을 모킹하려 하면 스파이가 필요하므로, Facade가 호출하는 서비스를 직접 모킹)
+        // Mocking createPendingOrderAndPreoccupyStockTx (Facade 내부 다른 메서드 호출을 모킹하려 하면 스파이가 필요하므로, Facade가 호출하는 서비스를 직접 모킹)
         ProductModel product = new ProductModel(100L, "Air Jordan", new java.math.BigDecimal("200000"));
         org.springframework.test.util.ReflectionTestUtils.setField(product, "id", productId);
         given(productService.getProductsByIds(anyList())).willReturn(List.of(product));

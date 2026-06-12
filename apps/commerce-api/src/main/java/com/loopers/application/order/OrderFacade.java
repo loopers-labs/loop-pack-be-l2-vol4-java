@@ -65,33 +65,7 @@ public class OrderFacade {
     }
 
     @Transactional
-    public Long createOrderAndPreoccupyStock(Long userId, OrderCreateRequest request, Long couponIssueId) {
-        List<Long> productIds = request.items().stream()
-                .map(OrderCreateRequest.Item::productId)
-                .toList();
-
-        List<ProductModel> products = productService.getProductsByIds(productIds);
-        if (products.size() != productIds.size()) {
-            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
-        }
-
-        Map<Long, ProductModel> productMap = products.stream()
-                .collect(Collectors.toMap(ProductModel::getId, p -> p));
-
-        java.math.BigDecimal totalOriginalAmount = request.items().stream()
-                .map(item -> {
-                    ProductModel product = productMap.get(item.productId());
-                    return product.getPrice().multiply(java.math.BigDecimal.valueOf(item.quantity()));
-                })
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-
-        java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
-        if (couponIssueId != null) {
-            discount = couponService.calculateDiscount(couponIssueId, totalOriginalAmount);
-        }
-
-        java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
-
+    public Long createPendingOrderAndPreoccupyStockTx(Long userId, OrderCreateRequest request, Long couponIssueId, Map<Long, ProductModel> productMap, java.math.BigDecimal totalOriginalAmount, java.math.BigDecimal discount, java.math.BigDecimal totalPaymentAmount) {
         // 재고 가선점 (비관적 락 사용)
         List<StockService.StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
@@ -133,13 +107,40 @@ public class OrderFacade {
     public Long checkout(Long userId, OrderCheckoutRequest request) {
         Long orderId = null;
         try {
-            // [트랜잭션 1] 주문 생성 및 재고 가선점
+            // 1. [No Transaction] 상품 메타데이터 및 할인 계산 조회
+            List<Long> productIds = request.items().stream()
+                    .map(OrderCheckoutRequest.Item::productId)
+                    .toList();
+
+            List<ProductModel> products = productService.getProductsByIds(productIds);
+            if (products.size() != productIds.size()) {
+                throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
+            }
+
+            Map<Long, ProductModel> productMap = products.stream()
+                    .collect(Collectors.toMap(ProductModel::getId, p -> p));
+
+            java.math.BigDecimal totalOriginalAmount = request.items().stream()
+                    .map(item -> {
+                        ProductModel product = productMap.get(item.productId());
+                        return product.getPrice().multiply(java.math.BigDecimal.valueOf(item.quantity()));
+                    })
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+            java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
+            if (request.couponIssueId() != null) {
+                discount = couponService.calculateDiscount(request.couponIssueId(), totalOriginalAmount);
+            }
+
+            java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
+
+            // 2. [Transaction 1] 상태 변경 및 비관적 락 (재고 감소 & 주문 대기 생성)
             OrderCreateRequest createRequest = new OrderCreateRequest(
                     request.items().stream()
                             .map(item -> new OrderCreateRequest.Item(item.productId(), item.quantity()))
                             .toList()
             );
-            orderId = createOrderAndPreoccupyStock(userId, createRequest, request.couponIssueId());
+            orderId = createPendingOrderAndPreoccupyStockTx(userId, createRequest, request.couponIssueId(), productMap, totalOriginalAmount, discount, totalPaymentAmount);
         } catch (Exception e) {
             throw e;
         }
