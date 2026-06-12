@@ -4,13 +4,15 @@ import com.loopers.domain.coupon.QCouponModel;
 import com.loopers.domain.coupon.QUserCouponModel;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.enums.UserCouponStatus;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +46,17 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     }
 
     @Override
+    public boolean useIfIssued(Long id, ZonedDateTime usedAt) {
+        QUserCouponModel userCoupon = QUserCouponModel.userCouponModel;
+        return queryFactory
+                .update(userCoupon)
+                .set(userCoupon.status, UserCouponStatus.USED)
+                .set(userCoupon.usedAt, usedAt)
+                .where(userCoupon.id.eq(id).and(userCoupon.status.eq(UserCouponStatus.ISSUED)))
+                .execute() > 0;
+    }
+
+    @Override
     public Page<UserCouponModel> findAllByCouponId(Long couponId, Pageable pageable) {
         QUserCouponModel userCoupon = QUserCouponModel.userCouponModel;
         QCouponModel coupon = QCouponModel.couponModel;
@@ -56,12 +69,11 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        Long total = queryFactory
-                .select(userCoupon.count())
-                .from(userCoupon)
-                .where(userCoupon.coupon.id.eq(couponId))
-                .fetchOne();
-
-        return new PageImpl<>(content, pageable, total == null ? 0 : total);
+        return PageableExecutionUtils.getPage(content, pageable, () ->
+                queryFactory
+                        .select(userCoupon.count())
+                        .from(userCoupon)
+                        .where(userCoupon.coupon.id.eq(couponId))
+                        .fetchOne());
     }
 }

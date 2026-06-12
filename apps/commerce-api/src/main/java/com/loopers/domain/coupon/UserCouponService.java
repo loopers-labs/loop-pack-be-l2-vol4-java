@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -55,9 +56,10 @@ public class UserCouponService {
     public UseResult use(Long userCouponId, Long userId, long originalTotal) {
         if (userCouponId == null) return new UseResult(originalTotal, 0L);
         UserCouponModel userCoupon = get(userCouponId);
-        couponUsePolicy.validate(userCoupon, userId);
         long discount = userCoupon.getCoupon().calculateDiscount(originalTotal);
-        userCoupon.use();
+        couponUsePolicy.validate(userCoupon, userId);
+        boolean used = userCouponRepository.useIfIssued(userCouponId, ZonedDateTime.now());
+        if (!used) throw new CoreException(ErrorType.CONFLICT, "이미 사용된 쿠폰입니다.");
         return new UseResult(originalTotal, discount);
     }
 
