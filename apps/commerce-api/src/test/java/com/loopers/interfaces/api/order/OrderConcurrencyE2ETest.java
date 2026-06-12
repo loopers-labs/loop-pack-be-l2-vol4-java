@@ -2,6 +2,13 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.CouponDiscount;
+import com.loopers.domain.coupon.CouponExpiry;
+import com.loopers.domain.coupon.CouponModel;
+import com.loopers.domain.coupon.CouponRepository;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
+import com.loopers.domain.coupon.enums.CouponType;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStockModel;
@@ -37,6 +44,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +65,8 @@ class OrderConcurrencyE2ETest {
     @Autowired private BrandRepository brandRepository;
     @Autowired private ProductRepository productRepository;
     @Autowired private ProductStockRepository productStockRepository;
+    @Autowired private CouponRepository couponRepository;
+    @Autowired private UserCouponRepository userCouponRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
@@ -64,11 +74,12 @@ class OrderConcurrencyE2ETest {
     private static final String DEFAULT_PASSWORD = "Dlaxodid1!";
     private static final DateTimeFormatter ORDER_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
+    private UserModel savedUser;
     private ProductStockModel savedStock;
 
     @BeforeEach
     void setUp() {
-        userRepository.save(new UserModel(
+        savedUser = userRepository.save(new UserModel(
                 new UserId(DEFAULT_USERID),
                 new Password(passwordEncoder.encode(DEFAULT_PASSWORD)),
                 new Name("동시성유저"),
@@ -99,11 +110,30 @@ class OrderConcurrencyE2ETest {
         return LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(ORDER_DATE_FORMATTER) + suffix;
     }
 
+    private UserCouponModel saveFixedCoupon(long discountAmount) {
+        CouponModel coupon = couponRepository.save(new CouponModel(
+                "동시성테스트쿠폰",
+                new CouponDiscount(CouponType.FIXED, discountAmount, null),
+                new CouponExpiry(ZonedDateTime.now().plusDays(7))
+        ));
+        return userCouponRepository.save(new UserCouponModel(savedUser.getId(), coupon));
+    }
+
     private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> requestCreateOrder(int quantity) {
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
                 generateOrderNumber(),
                 List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity)),
                 null
+        );
+        ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
+    }
+
+    private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> requestCreateOrderWithCoupon(int quantity, Long couponId) {
+        OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
+                generateOrderNumber(),
+                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity)),
+                couponId
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
@@ -148,6 +178,43 @@ class OrderConcurrencyE2ETest {
 
             assertThat(successCount).isEqualTo(5);
             assertThat(finalStock).isEqualTo(0);
+        }
+    }
+
+    @DisplayName("POST /api/v1/orders - 쿠폰 동시 사용")
+    @Nested
+    class ConcurrentCouponOrder {
+
+        @DisplayName("동일한 쿠폰으로 2건이 동시에 주문하면, 1건만 성공한다.")
+        @Test
+        void onlyOneOrderSucceeds_whenSameCouponUsedConcurrently() throws Exception {
+            UserCouponModel userCoupon = saveFixedCoupon(1000L);
+
+            int threadCount = 2;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch ready = new CountDownLatch(threadCount);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>>>> futures = new ArrayList<>();
+
+            for (int i = 0; i < threadCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return requestCreateOrderWithCoupon(1, userCoupon.getId());
+                }));
+            }
+
+            ready.await();
+            start.countDown();
+            executor.shutdown();
+            executor.awaitTermination(30, TimeUnit.SECONDS);
+
+            long successCount = futures.stream()
+                    .map(f -> { try { return f.get(); } catch (Exception e) { throw new RuntimeException(e); } })
+                    .filter(r -> r.getStatusCode() == HttpStatus.CREATED)
+                    .count();
+
+            assertThat(successCount).isEqualTo(1);
         }
     }
 
