@@ -19,4 +19,7 @@ dependencies {
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
+
+    // H2 — testcontainers 회피용 동시성 통합 테스트에서 사용
+    testRuntimeOnly("com.h2database:h2")
 }
