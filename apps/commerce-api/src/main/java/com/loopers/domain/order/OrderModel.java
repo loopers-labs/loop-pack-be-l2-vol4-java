@@ -21,7 +21,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "orders", uniqueConstraints = {
@@ -58,9 +57,10 @@ public class OrderModel extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItemModel> items = new ArrayList<>();
 
-    public OrderModel(Long userId, Long userCouponId) {
+    public OrderModel(String orderNumber, Long userId, Long userCouponId) {
+        Guard.notNull(orderNumber, "주문 번호는 필수입니다.");
         Guard.notNull(userId, "사용자 ID는 필수입니다.");
-        this.orderNumber = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        this.orderNumber = orderNumber;
         this.userId = userId;
         this.userCouponId = userCouponId;
         this.originalAmount = new Money(0L);

@@ -8,7 +8,10 @@ import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.vo.Money;
 import com.loopers.domain.product.ProductStockModel;
 import com.loopers.domain.product.ProductStockService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -32,7 +35,7 @@ public class OrderFacade {
     private final UserCouponService userCouponService;
 
     @Transactional
-    public OrderInfo createOrder(Long userId, List<OrderItemInput> items, Long userCouponId) {
+    public OrderInfo createOrder(String orderNumber, Long userId, List<OrderItemInput> items, Long userCouponId) {
         List<OrderLine> lines = new ArrayList<>();
         for (OrderItemInput input : OrderItemInput.merge(items)) {
             ProductStockModel stock = productStockService.decrease(input.stockId(), input.quantity());
@@ -41,8 +44,12 @@ public class OrderFacade {
         }
         long originalTotal = lines.stream().mapToLong(OrderLine::amount).sum();
         UserCouponService.UseResult amounts = userCouponService.use(userCouponId, userId, originalTotal);
-        return OrderInfo.from(orderService.placeOrder(new OrderModel(userId, userCouponId), lines,
-                new Money(amounts.originalAmount()), new Money(amounts.discountAmount())));
+        try {
+            return OrderInfo.from(orderService.placeOrder(new OrderModel(orderNumber, userId, userCouponId), lines,
+                    new Money(amounts.originalAmount()), new Money(amounts.discountAmount())));
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 처리된 주문입니다.");
+        }
     }
 
     @Transactional

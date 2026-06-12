@@ -74,9 +74,12 @@ public class OrderService {
 
     @Transactional
     public OrderModel cancel(Long id, Long userId) {
-        OrderModel order = getByUser(id, userId);
-        order.cancel();
-        return order;
+        boolean cancelled = orderRepository.cancelIfRequested(id, userId);
+        if (!cancelled) {
+            getByUser(id, userId);
+            throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청 상태에서만 취소할 수 있습니다.");
+        }
+        return get(id);
     }
 
 }

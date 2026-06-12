@@ -26,7 +26,7 @@ class PaymentPolicyTest {
     }
 
     private OrderModel requestedOrder(ZonedDateTime createdAt) {
-        OrderModel order = new OrderModel(1L, null);
+        OrderModel order = new OrderModel("20260101000000TEST01", 1L, null);
         setCreatedAt(order, createdAt);
         return order;
     }
@@ -48,7 +48,7 @@ class PaymentPolicyTest {
         @DisplayName("주문 상태가 REQUESTED가 아니면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenOrderStatusIsNotRequested() {
-            OrderModel order = new OrderModel(1L, null);
+            OrderModel order = new OrderModel("20260101000000TEST01", 1L, null);
             order.complete();
             ZonedDateTime now = ZonedDateTime.now();
 

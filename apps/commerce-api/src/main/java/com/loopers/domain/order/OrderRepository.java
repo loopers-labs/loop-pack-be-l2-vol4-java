@@ -15,4 +15,5 @@ public interface OrderRepository {
     List<OrderModel> findAllByUserId(Long userId);
     List<OrderModel> findAllByUserIdWithDateRange(Long userId, ZonedDateTime startAt, ZonedDateTime endAt);
     Page<OrderModel> findAll(Pageable pageable);
+    boolean cancelIfRequested(Long id, Long userId);
 }

@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
 
@@ -17,6 +18,7 @@ public class OrderV1Dto {
     ) {}
 
     public record OrderRequest(
+            @NotNull(message = "주문 번호는 필수입니다.") @Pattern(regexp = "\\d{14}[A-Za-z0-9]{6}", message = "주문 번호는 14자리 날짜(yyyyMMddHHmmss) + 6자리 랜덤 영숫자여야 합니다.") String orderNumber,
             @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.") @Valid List<OrderItemRequest> items,
             Long userCouponId
     ) {
