@@ -9,6 +9,12 @@ public interface ProductRepository {
     boolean existsById(Long id);
 
     /**
+     * 비관적 락(PESSIMISTIC_WRITE) 으로 상품을 조회한다 — 재고 차감 시 동시성 차단.
+     * 같은 상품을 노리는 다른 트랜잭션은 SELECT 단계에서 대기한다.
+     */
+    Optional<ProductModel> findForUpdate(Long id);
+
+    /**
      * 정렬 조건과 (옵션) 브랜드 필터로 상품 목록을 반환한다.
      * @param brandId null 이면 전체 브랜드
      */

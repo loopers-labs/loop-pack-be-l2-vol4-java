@@ -41,10 +41,12 @@ public class ProductService {
 
     /**
      * 단일 상품의 재고를 차감한다. 도메인 메서드가 음수 방지/상태 전이를 담당한다.
+     * 동시성 차단을 위해 비관적 락으로 조회한다.
      */
     @Transactional
     public ProductModel decreaseStock(Long productId, int quantity) {
-        ProductModel product = getProduct(productId);
+        ProductModel product = productRepository.findForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
         product.decreaseStock(quantity);
         return productRepository.save(product);
     }
