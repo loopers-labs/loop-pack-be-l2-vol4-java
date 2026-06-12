@@ -1,6 +1,6 @@
 package com.loopers.tddstudy.service;
 
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 import com.loopers.tddstudy.dto.LoginRequest;
 import com.loopers.tddstudy.dto.SignUpRequest;
 import com.loopers.tddstudy.repository.UserRepository;

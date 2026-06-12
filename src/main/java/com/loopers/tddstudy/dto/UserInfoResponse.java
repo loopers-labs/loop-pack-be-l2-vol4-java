@@ -1,6 +1,6 @@
 package com.loopers.tddstudy.dto;
 
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 
 public record UserInfoResponse (String loginId ,String name ,String birthDate,String email) {
 

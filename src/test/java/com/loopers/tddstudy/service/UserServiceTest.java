@@ -1,6 +1,6 @@
 package com.loopers.tddstudy.service;
 
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 import com.loopers.tddstudy.dto.LoginRequest;
 import com.loopers.tddstudy.dto.SignUpRequest;
 import com.loopers.tddstudy.repository.UserRepository;
@@ -30,7 +30,7 @@ class UserServiceTest {
     @Test
     @DisplayName("회원가입에 성공한다")
     void signUp_success() {
-        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userRepository.existsByLoginId("lilpa123")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
@@ -44,7 +44,7 @@ class UserServiceTest {
     @Test
     @DisplayName("중복된 loginId로 가입하면 예외가 발생한다")
     void signUp_duplicateLoginId_throwsException() {
-        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userRepository.existsByLoginId("lilpa123")).thenReturn(true);
 
@@ -57,7 +57,7 @@ class UserServiceTest {
     @DisplayName("로그인에 성공한다")
     void login_success() {
         LoginRequest request = new LoginRequest("lilpa123", "Pass1234!");
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userRepository.findByLoginId("lilpa123")).thenReturn(Optional.of(user));
 
@@ -82,7 +82,7 @@ class UserServiceTest {
     @DisplayName("비밀번호가 틀리면 예외가 발생한다")
     void login_wrongPassword_throwsException() {
         LoginRequest request = new LoginRequest("lilpa123", "Wrong1234!");
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userRepository.findByLoginId("lilpa123")).thenReturn(Optional.of(user));
 

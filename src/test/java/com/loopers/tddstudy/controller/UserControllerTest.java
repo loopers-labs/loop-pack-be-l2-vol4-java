@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.tddstudy.dto.LoginRequest;
 import com.loopers.tddstudy.dto.SignUpRequest;
 import com.loopers.tddstudy.service.UserService;
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,8 +34,8 @@ public class UserControllerTest {
     @Test
     @DisplayName("회원가입 성공 시 200")
     void signUp_success() throws Exception {
-        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userService.signUp(any(SignUpRequest.class))).thenReturn(user);
 
@@ -49,7 +49,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("회원정보 조회 성공 시 200")
     void getUser_success() throws Exception {
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userService.login(any(LoginRequest.class))).thenReturn(user);
 
@@ -107,8 +107,8 @@ public class UserControllerTest {
     @Test
     @DisplayName("회우너가입 성공 시 비밀번호가 반한되지않음")
     void signUp_doesNotReturnPassword() throws  Exception{
-        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userService.signUp(any(SignUpRequest.class))).thenReturn(user);
 
@@ -124,7 +124,7 @@ public class UserControllerTest {
     @DisplayName("로그인 성공시 비밀번호가 반환되지않음")
     void login_doesNotReturnPassword() throws  Exception{
         LoginRequest request = new LoginRequest("lilpa123", "Pass1234!");
-        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+        User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
         when(userService.login(any(LoginRequest.class))).thenReturn(user);
 

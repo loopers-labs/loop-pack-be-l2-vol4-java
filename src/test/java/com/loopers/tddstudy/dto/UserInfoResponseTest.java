@@ -1,6 +1,6 @@
 package com.loopers.tddstudy.dto;
 
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

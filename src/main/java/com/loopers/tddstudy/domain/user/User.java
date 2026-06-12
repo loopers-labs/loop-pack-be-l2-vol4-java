@@ -1,4 +1,4 @@
-package com.loopers.tddstudy.domain;
+package com.loopers.tddstudy.domain.user;
 
 import jakarta.persistence.*;
 
@@ -15,10 +15,15 @@ public class User {
     private String name;
     private String birthDate;
     private String email;
+    private String role;
 
     protected  User(){}
 
-    public  User (String loginId, String loginPw, String name, String birthDate, String email){
+    public User(String loginId, String loginPw, String name, String birthDate, String email) {
+        this(loginId, loginPw, name, birthDate, email, "USER");
+    }
+
+    public  User (String loginId, String loginPw, String name, String birthDate, String email,String role){
         validateLoginId(loginId);
         validatePassword(loginPw, birthDate);
         validateEmail(email);
@@ -28,6 +33,7 @@ public class User {
         this.name = name;
         this.birthDate = birthDate;
         this.email = email;
+        this.role = role;
 
     }
 
@@ -86,5 +92,6 @@ public class User {
     public String getName() { return name; }
     public String getBirthDate() { return birthDate; }
     public String getEmail() { return email; }
+    public String getRole() { return role; }
 
 }

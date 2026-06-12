@@ -5,17 +5,22 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "example")
-public class ExampleModel extends BaseEntity {
+public class Example extends BaseEntity {
 
     private String name;
     private String description;
 
-    protected ExampleModel() {}
-
-    public ExampleModel(String name, String description) {
+    @Builder
+    public Example(String name, String description) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }
@@ -25,14 +30,6 @@ public class ExampleModel extends BaseEntity {
 
         this.name = name;
         this.description = description;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     public void update(String newDescription) {

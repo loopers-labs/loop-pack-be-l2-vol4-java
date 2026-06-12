@@ -40,7 +40,7 @@ public class UserIntegrationTest {
         @DisplayName("회원가입 후 로그인성공")
         void signUpAndLogin_success() throws Exception{
             //회원가입
-            SignUpRequest signUpRequest = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+            SignUpRequest signUpRequest = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
             mockMvc.perform(post("/api/users/sign-up")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -64,7 +64,7 @@ public class UserIntegrationTest {
         @DisplayName("회원가입 후 회원 조회")
         void signUpAndGetUser_success() throws Exception {
             // 회원가입
-            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
             mockMvc.perform(post("/api/users/sign-up")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ public class UserIntegrationTest {
         @DisplayName("회원가입 후 패스워드 변경")
         void signUpAndChangePassword_success() throws Exception {
             // 회원가입
-            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
             mockMvc.perform(post("/api/users/sign-up")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +116,7 @@ public class UserIntegrationTest {
         @Test
         @DisplayName("중복 loginId 로 회원가입 시 400을 반환")
         void signUp_duplicateLoginId_returns400() throws Exception {
-            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
+            SignUpRequest request = new SignUpRequest("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com", "USER");
 
             mockMvc.perform(post("/api/users/sign-up")
                             .contentType(MediaType.APPLICATION_JSON)

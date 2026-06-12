@@ -1,5 +1,6 @@
 package com.loopers.tddstudy.domain;
 
+import com.loopers.tddstudy.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +75,23 @@ class UserTest {
         User user = new User("lilpa123", "Pass1234!", "김릴파", "19901225", "lilpa@email.com");
 
         assertThat(user.matchesPassword("Wrong1234!")).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("유저 생성 시 기본 역할은 USER 이다")
+    void 유저_생성_시_기본_역할_USER() {
+        User user = new User("abc123", "password1!", "이름", "19900101", "test@test.com");
+
+        assertThat(user.getRole()).isEqualTo("USER");
+    }
+
+    @Test
+    @DisplayName("운영자 역할로 유저를 생성할 수 있다")
+    void 운영자_역할_유저_생성() {
+        User user = new User("abc123", "password1!", "이름", "19900101", "test@test.com", "OPERATOR");
+
+        assertThat(user.getRole()).isEqualTo("OPERATOR");
     }
 
 

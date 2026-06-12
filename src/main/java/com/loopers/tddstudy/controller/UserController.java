@@ -1,6 +1,6 @@
 package com.loopers.tddstudy.controller;
 
-import com.loopers.tddstudy.domain.User;
+import com.loopers.tddstudy.domain.user.User;
 import com.loopers.tddstudy.dto.ChangePasswordRequest;
 import com.loopers.tddstudy.dto.LoginRequest;
 import com.loopers.tddstudy.dto.SignUpRequest;
