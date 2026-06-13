@@ -1,0 +1,27 @@
+### 회원 가입
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "testuser",
+  "loginPassword": "pAssWord1!",
+  "name": "테스트유저",
+  "birthday": "2000-01-01",
+  "email": "test@loopers.com"
+}
+
+### 내 정보 조회
+GET http://localhost:8080/api/v1/users/me
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 비밀번호 변경
+PUT http://localhost:8080/api/v1/users/password
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+{
+  "currentPassword": "pAssWord1!",
+  "newPassword": "newPAssWord1!"
+}

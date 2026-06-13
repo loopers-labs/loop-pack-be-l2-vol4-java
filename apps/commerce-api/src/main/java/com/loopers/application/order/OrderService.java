@@ -24,8 +24,9 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
 
     @Transactional
-    public Order createOrder(Long userId, BigDecimal totalPrice, List<OrderItem> items) {
-        Order order = orderRepository.save(new Order(userId, totalPrice));
+    public Order createOrder(Long userId, Long issuedCouponId, BigDecimal originalPrice, BigDecimal discountAmount,
+                             List<OrderItem> items) {
+        Order order = orderRepository.save(new Order(userId, issuedCouponId, originalPrice, discountAmount));
 
         List<OrderItem> itemsWithOrderId = items.stream()
             .map(item -> item.withOrderId(order.getId()))

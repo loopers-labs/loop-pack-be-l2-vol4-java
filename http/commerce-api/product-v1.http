@@ -1,0 +1,44 @@
+### 상품 목록 조회 (유저)
+GET http://localhost:8080/api/v1/products?page=0&size=20
+
+### 상품 목록 조회 - 브랜드 필터 + 정렬 (유저)
+GET http://localhost:8080/api/v1/products?brandId=1&sort=PRICE_ASC&page=0&size=20
+
+### 상품 상세 조회 (유저)
+GET http://localhost:8080/api/v1/products/1
+
+### 상품 목록 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/products?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 상품 상세 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin
+
+### 상품 등록 (어드민)
+POST http://localhost:8080/api-admin/v1/products
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "루퍼스 청바지",
+  "price": 59000,
+  "stock": 100
+}
+
+### 상품 수정 (어드민)
+PUT http://localhost:8080/api-admin/v1/products/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "brandId": 1,
+  "name": "루퍼스 청바지 (수정)",
+  "price": 49000,
+  "stock": 80
+}
+
+### 상품 삭제 (어드민)
+DELETE http://localhost:8080/api-admin/v1/products/1
+X-Loopers-Ldap: loopers.admin

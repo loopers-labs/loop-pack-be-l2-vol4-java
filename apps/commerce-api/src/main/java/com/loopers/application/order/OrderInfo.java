@@ -18,6 +18,8 @@ public class OrderInfo {
     public record Detail(
             Long orderId,
             String status,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
             BigDecimal totalPrice,
             ZonedDateTime createdAt,
             List<Item> items
@@ -32,6 +34,8 @@ public class OrderInfo {
             return new Detail(
                 order.getId(),
                 order.getStatus().name(),
+                order.getOriginalPrice(),
+                order.getDiscountAmount(),
                 order.getTotalPrice(),
                 order.getCreatedAt(),
                 items.stream().map(Item::from).toList()

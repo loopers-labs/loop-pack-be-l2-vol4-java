@@ -43,12 +43,14 @@ class OrderServiceIntegrationTest {
                 new OrderItem(1L, "청바지", BigDecimal.valueOf(50000), 2)
             );
 
-            Order order = orderService.createOrder(1L, BigDecimal.valueOf(100000), items);
+            Order order = orderService.createOrder(1L, null, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000), items);
 
             List<OrderItem> savedItems = orderService.getOrderItems(order.getId());
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(1L),
-                () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(100000)),
+                () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(100000)),
+                () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
+                () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(90000)),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(savedItems).hasSize(1),
                 () -> assertThat(savedItems.get(0).getOrderId()).isEqualTo(order.getId()),
@@ -64,7 +66,7 @@ class OrderServiceIntegrationTest {
         @DisplayName("존재하는 주문 ID를 주면, 주문 정보를 반환한다.")
         @Test
         void returnsOrder_whenValidIdIsProvided() {
-            Order created = orderService.createOrder(1L, BigDecimal.valueOf(50000),
+            Order created = orderService.createOrder(1L, null, BigDecimal.valueOf(50000), BigDecimal.ZERO,
                 List.of(new OrderItem(1L, "청바지", BigDecimal.valueOf(50000), 1)));
 
             Order result = orderService.getOrder(created.getId());
@@ -92,7 +94,7 @@ class OrderServiceIntegrationTest {
                 new OrderItem(1L, "청바지", BigDecimal.valueOf(50000), 2),
                 new OrderItem(2L, "티셔츠", BigDecimal.valueOf(15000), 1)
             );
-            Order order = orderService.createOrder(1L, BigDecimal.valueOf(115000), items);
+            Order order = orderService.createOrder(1L, null, BigDecimal.valueOf(115000), BigDecimal.ZERO, items);
 
             List<OrderItem> result = orderService.getOrderItems(order.getId());
 

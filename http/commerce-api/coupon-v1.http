@@ -1,0 +1,57 @@
+### 쿠폰 목록 조회 (유저)
+GET http://localhost:8080/api/v1/coupons?page=0&size=20
+
+### 쿠폰 단건 조회 (유저)
+GET http://localhost:8080/api/v1/coupons/1
+
+### 쿠폰 발급 (유저)
+POST http://localhost:8080/api/v1/coupons/1/issue
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 내 쿠폰 목록 조회 (유저)
+GET http://localhost:8080/api/v1/users/me/coupons
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 쿠폰 목록 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/coupons?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 단건 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+### 쿠폰 생성 (어드민)
+POST http://localhost:8080/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "웰컴 쿠폰",
+  "type": "FIXED",
+  "value": 2000,
+  "minOrderAmount": 10000,
+  "expiredAt": "2030-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 수정 (어드민)
+PUT http://localhost:8080/api-admin/v1/coupons/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "여름 할인 쿠폰",
+  "type": "RATE",
+  "value": 10,
+  "minOrderAmount": 20000,
+  "expiredAt": "2030-06-30T23:59:59+09:00"
+}
+
+### 쿠폰 삭제 (어드민)
+DELETE http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+### 발급 쿠폰 목록 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/coupons/1/issues?page=0&size=20
+X-Loopers-Ldap: loopers.admin

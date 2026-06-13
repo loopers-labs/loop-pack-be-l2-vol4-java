@@ -10,11 +10,11 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    public record OrderCreateRequest(List<Item> items) {
+    public record OrderCreateRequest(List<Item> items, Long couponId) {
         public record Item(Long productId, int quantity) {}
 
         public OrderCommand.Create toCommand(Long userId) {
-            return new OrderCommand.Create(userId, items.stream()
+            return new OrderCommand.Create(userId, couponId, items.stream()
                 .map(item -> new OrderCommand.Create.Item(item.productId(), item.quantity()))
                 .toList());
         }
@@ -29,6 +29,8 @@ public class OrderV1Dto {
     public record OrderSummary(
             Long orderId,
             String status,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
             BigDecimal totalPrice,
             ZonedDateTime createdAt
     ) {
@@ -36,6 +38,8 @@ public class OrderV1Dto {
             return new OrderSummary(
                 order.getId(),
                 order.getStatus().name(),
+                order.getOriginalPrice(),
+                order.getDiscountAmount(),
                 order.getTotalPrice(),
                 order.getCreatedAt()
             );
@@ -45,6 +49,8 @@ public class OrderV1Dto {
     public record OrderResponse(
             Long orderId,
             String status,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
             BigDecimal totalPrice,
             ZonedDateTime createdAt,
             List<OrderItemSummary> items
@@ -53,6 +59,8 @@ public class OrderV1Dto {
             return new OrderResponse(
                 detail.orderId(),
                 detail.status(),
+                detail.originalPrice(),
+                detail.discountAmount(),
                 detail.totalPrice(),
                 detail.createdAt(),
                 detail.items().stream().map(item ->

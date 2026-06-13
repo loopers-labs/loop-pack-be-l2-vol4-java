@@ -83,7 +83,7 @@ class OrderFacadeIntegrationTest {
                 new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
             productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 3)
             ));
 
@@ -105,7 +105,7 @@ class OrderFacadeIntegrationTest {
                 new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
             productStockJpaRepository.save(new ProductStockEntity(product.getId(), 2L));
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 5)
             ));
 
@@ -116,7 +116,7 @@ class OrderFacadeIntegrationTest {
         @DisplayName("존재하지 않는 상품을 주문하면, NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenProductDoesNotExist() {
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(9999L, 1)
             ));
 
@@ -135,7 +135,7 @@ class OrderFacadeIntegrationTest {
 
             doThrow(new RuntimeException("OrderItem 저장 실패")).when(orderItemRepositoryImpl).saveAll(anyList());
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 3)
             ));
 
@@ -156,7 +156,7 @@ class OrderFacadeIntegrationTest {
                 new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
             productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 3),
                 new OrderCommand.Create.Item(9999L, 1)
             ));
@@ -178,7 +178,7 @@ class OrderFacadeIntegrationTest {
                 new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
             productStockJpaRepository.save(new ProductStockEntity(product.getId(), 10L));
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 2)
             ));
 
@@ -202,7 +202,7 @@ class OrderFacadeIntegrationTest {
 
             doThrow(new RuntimeException("Outbox 저장 실패")).when(outboxRepositoryImpl).save(any());
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 3)
             ));
 
@@ -226,7 +226,7 @@ class OrderFacadeIntegrationTest {
 
             doThrow(new RuntimeException("OrderItem 저장 실패")).when(orderItemRepositoryImpl).saveAll(anyList());
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(product.getId(), 3)
             ));
 
@@ -245,7 +245,7 @@ class OrderFacadeIntegrationTest {
             productStockJpaRepository.save(new ProductStockEntity(productA.getId(), 10L));
             productStockJpaRepository.save(new ProductStockEntity(productB.getId(), 2L));
 
-            OrderCommand.Create command = new OrderCommand.Create(1L, List.of(
+            OrderCommand.Create command = new OrderCommand.Create(1L, null, List.of(
                 new OrderCommand.Create.Item(productA.getId(), 3),
                 new OrderCommand.Create.Item(productB.getId(), 5)
             ));

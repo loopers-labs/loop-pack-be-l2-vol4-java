@@ -1,8 +1,8 @@
 package com.loopers.application.order;
 
+import com.loopers.application.coupon.CouponService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
-import com.loopers.application.order.OrderService;
 import com.loopers.application.product.ProductService;
 import com.loopers.domain.outbox.OutboxService;
 import com.loopers.domain.product.Product;
@@ -23,6 +23,7 @@ public class OrderFacade {
 
     private final ProductService productService;
     private final OrderService orderService;
+    private final CouponService couponService;
     private final OutboxService outboxService;
 
     @Transactional
@@ -33,16 +34,22 @@ public class OrderFacade {
             .toList();
 
         List<OrderItem> items = new ArrayList<>();
-        BigDecimal totalPrice = BigDecimal.ZERO;
+        BigDecimal originalPrice = BigDecimal.ZERO;
 
         for (OrderCommand.Create.Item item : sortedItems) {
             Product product = productService.getProduct(item.productId());
             productService.deductStock(item.productId(), item.quantity());
             items.add(new OrderItem(product.getId(), product.getName(), product.getPrice(), item.quantity()));
-            totalPrice = totalPrice.add(product.getPrice().multiply(BigDecimal.valueOf(item.quantity())));
+            originalPrice = originalPrice.add(product.getPrice().multiply(BigDecimal.valueOf(item.quantity())));
         }
 
-        Order order = orderService.createOrder(command.userId(), totalPrice, items);
+        // 총 주문 금액이 확정된 후에 최소 주문 금액 검증과 할인 계산이 가능하다.
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (command.issuedCouponId() != null) {
+            discountAmount = couponService.use(command.issuedCouponId(), command.userId(), originalPrice);
+        }
+
+        Order order = orderService.createOrder(command.userId(), command.issuedCouponId(), originalPrice, discountAmount, items);
         outboxService.publishOrderCreatedEvent(order);
         return OrderInfo.Create.from(order);
     }

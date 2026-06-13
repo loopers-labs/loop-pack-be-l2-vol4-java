@@ -47,6 +47,7 @@ public class ProductService {
         };
     }
 
+    @Transactional
     public Product createProduct(Long brandId, String name, BigDecimal price, long stock) {
         Product product = new Product(brandId, name, price);
         Product saved = productRepository.save(product);
@@ -54,6 +55,7 @@ public class ProductService {
         return saved;
     }
 
+    @Transactional
     public Product updateProduct(Long id, Long brandId, String name, BigDecimal price, long stock) {
         Product product = getProduct(id);
         product.update(brandId, name, price);

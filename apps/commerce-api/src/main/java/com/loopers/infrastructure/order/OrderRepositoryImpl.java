@@ -22,7 +22,9 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public Order save(Order order) {
         if (order.getId() == null) {
-            return orderJpaRepository.save(new OrderEntity(order.getUserId(), order.getTotalPrice())).toDomain();
+            return orderJpaRepository.save(
+                new OrderEntity(order.getUserId(), order.getIssuedCouponId(), order.getOriginalPrice(), order.getDiscountAmount())
+            ).toDomain();
         }
         OrderEntity entity = orderJpaRepository.findById(order.getId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 주문입니다."));

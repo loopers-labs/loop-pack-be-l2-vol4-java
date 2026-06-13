@@ -48,10 +48,32 @@ classDiagram
 
   class Order {
     +Long userId
+    +Long issuedCouponId
     +OrderStatus status
-    +int totalPrice
+    +BigDecimal originalPrice
+    +BigDecimal discountAmount
+    +BigDecimal totalPrice
     +confirm()
     +cancel()
+  }
+
+  class Coupon {
+    +String name
+    +CouponType type
+    +BigDecimal value
+    +BigDecimal minOrderAmount
+    +LocalDateTime expiredAt
+    +calculateDiscount(BigDecimal orderAmount)
+  }
+
+  class IssuedCoupon {
+    +Long couponId
+    +Long userId
+    +CouponStatus status
+    +LocalDateTime usedAt
+    +LocalDateTime expiredAt
+    +use()
+    +isAvailable()
   }
 
   class OrderItem {
@@ -67,6 +89,8 @@ classDiagram
   BaseEntity <|-- Product
   BaseEntity <|-- Order
   BaseEntity <|-- OrderItem
+  BaseEntity <|-- Coupon
+  BaseEntity <|-- IssuedCoupon
 
   Brand "1" --> "N" Product : 소속
   Product "1" *-- "1" ProductStock : 재고
@@ -74,7 +98,9 @@ classDiagram
   Product "1" --> "N" ProductLike : 좋아요
   User "1" --> "N" Order : 주문
   Order "1" *-- "N" OrderItem : 주문 상품
-    end
+  User "1" --> "N" IssuedCoupon : 보유
+  Coupon "1" --> "N" IssuedCoupon : 발급
+  Order "0..1" --> "1" IssuedCoupon : 쿠폰 적용
 ```
 
 ---
@@ -116,3 +142,14 @@ classDiagram
 주문 완료 후 외부 시스템 연동을 위한 트랜잭션 아웃박스. 주문 생성 트랜잭션 내에서 함께 저장되어 이벤트 유실을 방지.
 
 - `PENDING` 상태의 이벤트를 폴링해 처리 후 상태를 `PROCESSED`로 전환.
+
+---
+
+### Coupon & IssuedCoupon
+
+- `Coupon`은 어드민이 정의하는 쿠폰 마스터. `FIXED`(정액) / `RATE`(정률) 두 가지 타입 존재.
+  - `calculateDiscount(orderAmount)` — 타입에 따라 할인 금액 계산. 최소 주문 금액 조건 미충족 시 예외 발생.
+- `IssuedCoupon`은 `Coupon`을 기반으로 유저에게 발급된 인스턴스. 1회 사용 후 재사용 불가.
+  - `use()` — 상태를 `USED`로 변경. 이미 사용되었거나 만료된 경우 `CoreException` 발생.
+  - `isAvailable()` — `AVAILABLE`이고 `expiredAt`이 현재 시각 이후인지 확인.
+- `Order`는 `issuedCouponId`를 통해 사용된 쿠폰을 참조하며, 쿠폰 적용 전 금액(`originalPrice`), 할인 금액(`discountAmount`), 최종 결제 금액(`totalPrice`)을 스냅샷으로 보유.

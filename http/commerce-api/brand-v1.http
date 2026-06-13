@@ -1,0 +1,34 @@
+### 브랜드 상세 조회 (유저)
+GET http://localhost:8080/api/v1/brands/1
+
+### 브랜드 목록 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/brands?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 상세 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+### 브랜드 등록 (어드민)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "루퍼스 브랜드",
+  "description": "감성 이커머스 대표 브랜드"
+}
+
+### 브랜드 수정 (어드민)
+PUT http://localhost:8080/api-admin/v1/brands/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "루퍼스 브랜드 (수정)",
+  "description": "수정된 브랜드 설명"
+}
+
+### 브랜드 삭제 (어드민)
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin

@@ -76,7 +76,7 @@ class OrderV1ApiE2ETest {
 
     private Long createOrder(int quantity) {
         OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-            List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, quantity))
+            List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, quantity)), null
         );
         ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(
             ORDERS_URL, HttpMethod.POST,
@@ -94,7 +94,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsCreatedWithOrderId_whenValidRequestProvided() {
             OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 2))
+                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 2)), null
             );
 
             ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(
@@ -113,7 +113,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsUnauthorized_whenAuthHeaderIsMissing() {
             OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 1))
+                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 1)), null
             );
 
             ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(
@@ -129,7 +129,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsNotFound_whenProductDoesNotExist() {
             OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-                List.of(new OrderV1Dto.OrderCreateRequest.Item(9999L, 1))
+                List.of(new OrderV1Dto.OrderCreateRequest.Item(9999L, 1)), null
             );
 
             ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(
@@ -145,7 +145,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsConflict_whenStockIsInsufficient() {
             OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 999))
+                List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 999)), null
             );
 
             ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(

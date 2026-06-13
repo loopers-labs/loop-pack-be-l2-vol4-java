@@ -34,7 +34,7 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo createProduct(ProductCommand.Create command) {
-        brandService.getBrand(command.brandId());
+        brandService.getBrandForUpdate(command.brandId());
         Product product = productService.createProduct(
             command.brandId(), command.name(), command.price(), command.stock());
         ProductStock stock = productService.getProductStock(product.getId());

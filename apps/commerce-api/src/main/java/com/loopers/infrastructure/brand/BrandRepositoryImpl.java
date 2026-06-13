@@ -36,6 +36,12 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
+    public Optional<Brand> findByIdForUpdate(Long id) {
+        return brandJpaRepository.findByIdAndDeletedAtIsNullForUpdate(id)
+            .map(BrandEntity::toDomain);
+    }
+
+    @Override
     public Page<Brand> findAll(Pageable pageable) {
         return brandJpaRepository.findAllByDeletedAtIsNull(pageable)
             .map(BrandEntity::toDomain);

@@ -1,0 +1,43 @@
+### 주문 생성 (쿠폰 미적용)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 },
+    { "productId": 3, "quantity": 1 }
+  ]
+}
+
+### 주문 생성 (쿠폰 적용)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ],
+  "couponId": 42
+}
+
+### 주문 목록 조회
+GET http://localhost:8080/api/v1/orders?startAt=2026-01-01&endAt=2026-12-31
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 주문 상세 조회
+GET http://localhost:8080/api/v1/orders/1
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 주문 목록 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/orders?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+### 주문 상세 조회 (어드민)
+GET http://localhost:8080/api-admin/v1/orders/1
+X-Loopers-Ldap: loopers.admin

@@ -85,7 +85,7 @@ class OrderAdminV1ApiE2ETest {
 
     private Long createOrder() {
         OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-            List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 2))
+            List.of(new OrderV1Dto.OrderCreateRequest.Item(productId, 2)), null
         );
         ResponseEntity<ApiResponse<OrderV1Dto.OrderCreateResponse>> response = testRestTemplate.exchange(
             ORDERS_URL, HttpMethod.POST,

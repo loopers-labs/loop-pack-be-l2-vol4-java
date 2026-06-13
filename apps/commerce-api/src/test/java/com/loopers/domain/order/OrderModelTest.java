@@ -19,15 +19,29 @@ class OrderModelTest {
     @Nested
     class CreateOrder {
 
-        @DisplayName("유효한 정보를 주면, 상태가 PENDING으로 생성된다.")
+        @DisplayName("유효한 정보를 주면, 상태가 PENDING으로 생성되고 totalPrice는 originalPrice - discountAmount이다.")
         @Test
         void createsOrder_withPendingStatus_whenValidInfoIsProvided() {
-            Order order = new Order(1L, BigDecimal.valueOf(50000));
+            Order order = new Order(1L, null, BigDecimal.valueOf(50000), BigDecimal.valueOf(5000));
 
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(1L),
-                () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000)),
+                () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000)),
+                () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000)),
+                () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(45000)),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING)
+            );
+        }
+
+        @DisplayName("할인 금액이 0이면, totalPrice는 originalPrice와 동일하다.")
+        @Test
+        void createsOrder_withNoDiscount_whenDiscountAmountIsZero() {
+            Order order = new Order(1L, null, BigDecimal.valueOf(50000), BigDecimal.ZERO);
+
+            assertAll(
+                () -> assertThat(order.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000)),
+                () -> assertThat(order.getDiscountAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                () -> assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(50000))
             );
         }
 
@@ -35,33 +49,42 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenUserIdIsNull() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new Order(null, BigDecimal.valueOf(50000)));
+                () -> new Order(null, null, BigDecimal.valueOf(50000), BigDecimal.ZERO));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("총 주문 금액이 null이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("주문 금액이 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenTotalPriceIsNull() {
+        void throwsBadRequest_whenOriginalPriceIsNull() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new Order(1L, null));
+                () -> new Order(1L, null, null, BigDecimal.ZERO));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("총 주문 금액이 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("주문 금액이 음수이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenTotalPriceIsNegative() {
+        void throwsBadRequest_whenOriginalPriceIsNegative() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new Order(1L, BigDecimal.valueOf(-1)));
+                () -> new Order(1L, null, BigDecimal.valueOf(-1), BigDecimal.ZERO));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("총 주문 금액이 0이면, 정상적으로 생성된다.")
+        @DisplayName("할인 금액이 주문 금액을 초과하면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void createsOrder_whenTotalPriceIsZero() {
-            Order order = new Order(1L, BigDecimal.ZERO);
+        void throwsBadRequest_whenDiscountAmountExceedsOriginalPrice() {
+            CoreException ex = assertThrows(CoreException.class,
+                () -> new Order(1L, null, BigDecimal.valueOf(1000), BigDecimal.valueOf(1001)));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("주문 금액이 0이면, 정상적으로 생성된다.")
+        @Test
+        void createsOrder_whenOriginalPriceIsZero() {
+            Order order = new Order(1L, null, BigDecimal.ZERO, BigDecimal.ZERO);
 
             assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
         }
@@ -74,7 +97,7 @@ class OrderModelTest {
         @DisplayName("confirm() 하면, 상태가 CONFIRMED가 된다.")
         @Test
         void confirmsOrder_whenConfirmIsCalled() {
-            Order order = new Order(1L, BigDecimal.valueOf(50000));
+            Order order = new Order(1L, null, BigDecimal.valueOf(50000), BigDecimal.ZERO);
 
             order.confirm();
 
@@ -84,7 +107,7 @@ class OrderModelTest {
         @DisplayName("cancel() 하면, 상태가 CANCELED가 된다.")
         @Test
         void cancelsOrder_whenCancelIsCalled() {
-            Order order = new Order(1L, BigDecimal.valueOf(50000));
+            Order order = new Order(1L, null, BigDecimal.valueOf(50000), BigDecimal.ZERO);
 
             order.cancel();
 

@@ -1,0 +1,14 @@
+### 상품 좋아요 등록
+POST http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 상품 좋아요 취소
+DELETE http://localhost:8080/api/v1/products/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+### 좋아요한 상품 목록 조회
+GET http://localhost:8080/api/v1/users/1/likes
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!

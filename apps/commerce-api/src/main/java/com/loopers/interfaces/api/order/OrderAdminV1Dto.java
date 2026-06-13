@@ -13,6 +13,8 @@ public class OrderAdminV1Dto {
             Long orderId,
             Long userId,
             String status,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
             BigDecimal totalPrice,
             ZonedDateTime createdAt
     ) {
@@ -21,6 +23,8 @@ public class OrderAdminV1Dto {
                 order.getId(),
                 order.getUserId(),
                 order.getStatus().name(),
+                order.getOriginalPrice(),
+                order.getDiscountAmount(),
                 order.getTotalPrice(),
                 order.getCreatedAt()
             );
@@ -31,6 +35,8 @@ public class OrderAdminV1Dto {
             Long orderId,
             Long userId,
             String status,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
             BigDecimal totalPrice,
             ZonedDateTime createdAt,
             List<OrderItemSummary> items
@@ -40,6 +46,8 @@ public class OrderAdminV1Dto {
                 order.getId(),
                 order.getUserId(),
                 order.getStatus().name(),
+                order.getOriginalPrice(),
+                order.getDiscountAmount(),
                 order.getTotalPrice(),
                 order.getCreatedAt(),
                 items.stream().map(OrderItemSummary::from).toList()

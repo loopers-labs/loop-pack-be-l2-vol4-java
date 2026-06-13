@@ -21,6 +21,11 @@ public class BrandService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드 입니다."));
     }
 
+    public Brand getBrandForUpdate(Long id) {
+        return brandRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드 입니다."));
+    }
+
     public Page<Brand> getAllBrands(Pageable pageable) {
         return brandRepository.findAll(pageable);
     }
@@ -38,8 +43,9 @@ public class BrandService {
         return brandRepository.save(brand);
     }
 
+    @Transactional
     public void deleteBrand(Long id) {
-        Brand brand = getBrand(id);
+        Brand brand = getBrandForUpdate(id);
         brand.delete();
         brandRepository.save(brand);
     }

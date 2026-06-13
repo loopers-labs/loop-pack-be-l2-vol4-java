@@ -20,23 +20,35 @@ public class OrderEntity extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "issued_coupon_id")
+    private Long issuedCouponId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
+
+    @Column(name = "original_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal originalPrice;
+
+    @Column(name = "discount_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal discountAmount;
 
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
     protected OrderEntity() {}
 
-    public OrderEntity(Long userId, BigDecimal totalPrice) {
+    public OrderEntity(Long userId, Long issuedCouponId, BigDecimal originalPrice, BigDecimal discountAmount) {
         this.userId = userId;
+        this.issuedCouponId = issuedCouponId;
         this.status = OrderStatus.PENDING;
-        this.totalPrice = totalPrice;
+        this.originalPrice = originalPrice;
+        this.discountAmount = discountAmount;
+        this.totalPrice = originalPrice.subtract(discountAmount);
     }
 
     public Order toDomain() {
-        return new Order(getId(), userId, status, totalPrice,
+        return new Order(getId(), userId, issuedCouponId, status, originalPrice, discountAmount, totalPrice,
             getCreatedAt(), getUpdatedAt(), getDeletedAt());
     }
 
