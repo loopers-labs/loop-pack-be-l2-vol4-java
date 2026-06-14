@@ -1,0 +1,46 @@
+package com.loopers.user.domain;
+
+import com.loopers.user.domain.command.SignUpUserCommand;
+import com.loopers.user.domain.vo.EncodedPassword;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@RequiredArgsConstructor
+@Component
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordHasher passwordHasher;
+
+    @Transactional
+    public User signUp(SignUpUserCommand signUpUserCommand) {
+        if (userRepository.findByLoginId(signUpUserCommand.loginId()).isPresent()) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 가입된 로그인 ID 입니다.");
+        }
+
+        EncodedPassword encodedPassword = passwordHasher.hash(signUpUserCommand.plainPassword());
+        User user = User.signUp(
+            signUpUserCommand.loginId(),
+            encodedPassword,
+            signUpUserCommand.name(),
+            signUpUserCommand.birthDate(),
+            signUpUserCommand.email()
+        );
+        return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public User getUser(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 회원입니다."));
+    }
+
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = getUser(userId);
+        user.changePassword(currentPassword, newPassword, passwordHasher);
+    }
+}

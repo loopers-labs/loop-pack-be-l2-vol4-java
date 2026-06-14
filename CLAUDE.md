@@ -8,7 +8,7 @@
 2. **단순함 우선** — 요청된 범위만. 1 회용 추상화·미사용 유연성·발생 불가 시나리오의 에러 처리 추가 금지. "시니어가 보면 과하다고 할까?" 가 판단 기준.
 3. **필요한 부분만 수정** — 무관한 코드/주석/포맷 "개선" 금지. 본인 변경으로 죽은 코드만 정리, 기존 dead code 는 언급만. 변경된 모든 라인은 사용자 요청과 직접 연결돼야 함.
 4. **목표 중심 실행** — 작업을 검증 가능한 형태로 변환 (예: "버그 수정" → "버그 재현 테스트 작성 → 통과"). 다단계 작업은 `단계 → 검증` 형식의 짧은 계획부터.
-5. **TDD (엄격한 Red-Green-Refactor)** — 모든 기능 구현은 실패하는 테스트부터. 한 사이클에 테스트 1 개.
+5. **TDD 우선** — 핵심 비즈니스 규칙, 상태 변경, 버그 수정, 복잡한 분기는 실패하는 테스트부터 시작한다. 단순 DTO/설정/문서/얇은 위임 코드는 변경 위험도에 따라 테스트 보강 여부를 판단한다.
 
 ### 영역별 상세 룰 (skill 로 분리)
 
@@ -17,7 +17,8 @@
 | 새 코드 / 네이밍 / 메서드 분리 / Java 21·Lombok 사용 | `/coding-style` | 가독성, 이름, 단일책임, early return, null 처리, record/switch/var/text block, Lombok 범위 |
 | 기존 코드 정리 / 추출 / 중복 제거 | `/refactor` | 동작 보존, 변경 범위 제한, 추출 기준, 레거시 점진 개선, 테스트 안전망 |
 | 새 기능 구조 / 책임 분배 / 인터페이스·패턴 도입 | `/design` | 단순 설계 우선, SOLID 적용 기준, Strategy/Factory/Template Method 사용 시점, **Repository port-adapter 예외** |
-| 테스트 작성 / TDD 사이클 | `/tdd` | Red-Green-Refactor 사이클 + 일반 테스트 룰 (AAA, 명명, 한 상황만, mock 남용 금지, 단위/통합/E2E 구분) |
+| 테스트 작성 / TDD 사이클 | `/tdd` | 실전형 Red-Green-Refactor 기준 + 일반 테스트 룰 (AAA, 명명, 한 상황만, mock 남용 금지, 단위/통합/E2E 구분) |
+| 트랜잭션 / JPA / QueryDSL 흐름 분석 | `/analyze-query` | 사용자 관점의 일관성, 트랜잭션 범위, readOnly, 영속성 컨텍스트, flush/지연 로딩, 조회/쓰기 혼합 리스크 |
 
 ## Stack & Tooling
 
@@ -40,7 +41,7 @@ docker-compose -f .\docker\monitoring-compose.yml up
 .\gradlew build -x test
 .\gradlew test
 .\gradlew :apps:commerce-api:test
-.\gradlew :apps:commerce-api:test --tests com.loopers.domain.example.ExampleModelTest
+.\gradlew :apps:commerce-api:test --tests com.loopers.domain.example.ExampleTest
 .\gradlew :apps:commerce-api:jacocoTestReport
 
 # 앱 실행 (기본 프로필 local)
@@ -106,17 +107,28 @@ supports/    add-on (java-library)
 
 ## App Architecture (commerce-api)
 
-`com.loopers` 하위 레이어별 패키지:
+본 프로젝트는 레이어드 아키텍처를 따르며, 도메인이 구현 기술에 직접 의존하지 않도록 Repository port-adapter 방식으로 DIP 를 지킨다. 패키지 기본 구조는 `<feature>/<layer>` 이다.
 
-- `interfaces/api/<feature>` — REST 컨트롤러 + `*V1Dto` (record). 파싱 → facade → `ApiResponse` 래핑만.
-- `application/<feature>` — `*Facade` (오케스트레이션) + `*Info` (응답 DTO) + `*RequestCommand` (Facade 입력, raw 타입). 컨트롤러는 facade 만 호출.
-- `domain/<feature>` — 도메인 엔티티 (예: `User`, `Product` — JPA 엔티티 + 생성/변경 메서드에서 invariant 검증, **`Model` 같은 접미사 금지**), `*Service` (트랜잭션), `*Repository` (인터페이스, Spring Data 직접 사용 금지), `*Command` (도메인 서비스 입력, VO 기반). 도메인 Command 에는 `Request` 접미사를 붙이지 않는다.
-- `infrastructure/<feature>` — `*JpaRepository` (Spring Data) + 도메인 포트를 구현하는 `*RepositoryImpl`.
-- `support/error` — `CoreException(ErrorType, msg)` 를 throw 하면 `ApiControllerAdvice` 가 `ApiResponse.fail(...)` 로 매핑.
+- `<feature>/interfaces/api` — HTTP request/response DTO, Controller.
+- `<feature>/application` — `*Facade`, `*Command`, `*Info`, 유스케이스 조합과 도메인 결과 변환.
+- `<feature>/domain` — 도메인 객체/엔티티, 도메인 서비스, `*Repository` 인터페이스.
+- `<feature>/infrastructure` — JPA/Redis/Kafka/외부 API 구현체와 `*RepositoryImpl`.
+- `interfaces/api` — 여러 feature 에서 공유하는 `ApiResponse`, `PageResponse`, controller advice.
+- `support/<concern>` — 여러 feature 에 걸친 공통 관심사. 예: `support/error`.
 
-응답은 모두 `ApiResponse<T>` (`Metadata{result, errorCode, message}` + `data`). `ApiControllerAdvice` 가 `CoreException` 외 검증/파싱/Not Found/Throwable fallback 까지 처리하므로 컨트롤러에서 catch 하지 말고 advice 를 확장.
+`Request`/`Response` 명명은 HTTP 입출력을 표현하는 `interfaces/api` 에만 사용한다. `application` 입력은 `SignUpCommand`, `CreateOrderCommand` 처럼 `Request` 를 빼고 유스케이스 의미로 이름 짓는다.
 
-엔티티는 `modules/jpa` 의 `BaseEntity` 를 상속: IDENTITY id, `createdAt`/`updatedAt`/`deletedAt` (soft delete), `@PrePersist`/`@PreUpdate` 에서 호출되는 `protected guard()` 훅. `delete()`/`restore()` 는 멱등.
+입력 검증은 가장 가까운 진입 경계에서 처리한다. HTTP request shape 검증은 `interfaces/api` 의 DTO/Controller 에서 `@Valid` 와 Bean Validation 으로 처리하고, 인증 사용자 식별은 인증 필터/시큐리티 경계가 책임진다. `application` 의 `Facade` 는 adapter 가 만든 유효한 `Command` 를 받아 도메인 서비스와 도메인 객체를 조합하는 흐름에 집중하며, 이미 위 레이어에서 보장한 `command == null`, `productId == null`, `quantity <= 0`, 인증 사용자 null 같은 검증을 중복 작성하지 않는다. 단, Entity/VO/Domain Service 의 핵심 invariant 는 항상 도메인 레이어에 남긴다.
+
+HTTP 외에 Batch/Kafka/internal job 이 같은 유스케이스를 직접 호출한다면, 그 adapter 경계에서 별도로 검증하거나 Command 생성 경로를 안전하게 만든다. "언젠가 다른 호출자가 생길 수 있다"는 이유만으로 Facade 에 광범위한 방어 검증을 추가하지 않는다.
+
+응답은 모두 `ApiResponse<T>` (`Metadata{result, errorCode, message}` + `data`). `CoreException(ErrorType, msg)` 는 `ApiControllerAdvice` 가 `ApiResponse.fail(...)` 로 매핑하므로 컨트롤러에서 catch 하지 말고 advice 를 확장한다.
+
+엔티티는 `modules/jpa` 의 `BaseEntity` 를 상속한다: IDENTITY id, `createdAt`/`updatedAt`/`deletedAt` (soft delete), `@PrePersist`/`@PreUpdate` 에서 호출되는 `protected guard()` 훅. `delete()`/`restore()` 는 멱등.
+
+Aggregate 내부의 생명주기가 함께 움직이는 구성요소는 객체 연관관계로 표현한다. 예: `Order -> OrderItem`. 다른 Aggregate 를 참조할 때는 JPA 연관관계 대신 ID 또는 주문 스냅샷 같은 값으로 연결해 결합을 낮춘다. 예: `Product.brandId`, `ProductStock.productId`, `Like.productId`, `OrderItemSnapshot.productId`. 단순 조회 조인은 Repository/Query 단계에서 처리하고, 도메인 모델에 다른 Aggregate 객체 참조를 편의상 추가하지 않는다.
+
+도메인 책임, 패키지 경계, Facade/Service 트랜잭션 위치 판단은 `/design` 을 따른다.
 
 ## Test Conventions
 
@@ -124,7 +136,8 @@ supports/    add-on (java-library)
 - Testcontainers (MySQL/Redis) 사용 → Docker 필수. `test` 프로필도 `ddl-auto=create`.
 - E2E: `*ApiE2ETest` + `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate`, `@AfterEach` 에서 `databaseCleanUp.truncateAllTables()` (JPA 메타모델 기반, FK 체크 끄고 truncate).
 - 앱은 `testImplementation(testFixtures(project(":modules:jpa")))` 로 fixtures 사용.
-- 네이밍: `*Test` (도메인 엔티티 단위 — 예: `UserTest`), `*ServiceIntegrationTest`, `*ApiE2ETest`. DisplayName 한국어, HTTP 엔드포인트별 `@Nested`.
+- 테스트 `arrange` 에 들어가는 이름, 브랜드명, 상품명, 설명처럼 도메인 의미가 있는 예시 값은 작성 전에 사용자에게 확인한다. 단순 경계값(`null`, blank, `0`, `-1`) 은 바로 사용 가능.
+- 네이밍: 도메인 단위 테스트는 도메인 클래스명 + `Test` (예: `ProductTest`), 통합 테스트는 `*ServiceIntegrationTest`, E2E 는 `*ApiE2ETest`. DisplayName 한국어, HTTP 엔드포인트별 `@Nested`.
 
 ## Local Profiles
 

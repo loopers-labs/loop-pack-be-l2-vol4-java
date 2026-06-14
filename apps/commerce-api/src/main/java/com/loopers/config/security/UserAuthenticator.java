@@ -1,8 +1,8 @@
 package com.loopers.config.security;
 
-import com.loopers.domain.user.User;
-import com.loopers.domain.user.UserRepository;
-import com.loopers.domain.user.vo.LoginId;
+import com.loopers.user.domain.User;
+import com.loopers.user.domain.UserRepository;
+import com.loopers.user.domain.vo.LoginId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;

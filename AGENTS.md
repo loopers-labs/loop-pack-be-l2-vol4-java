@@ -107,12 +107,13 @@ supports/    add-on (java-library)
 
 ## App Architecture (commerce-api)
 
-본 프로젝트는 레이어드 아키텍처를 따르며, 도메인이 구현 기술에 직접 의존하지 않도록 Repository port-adapter 방식으로 DIP 를 지킨다. 패키지 기본 구조는 `<layer>/<feature>` 이다.
+본 프로젝트는 레이어드 아키텍처를 따르며, 도메인이 구현 기술에 직접 의존하지 않도록 Repository port-adapter 방식으로 DIP 를 지킨다. 패키지 기본 구조는 `<feature>/<layer>` 이다.
 
-- `interfaces/api/<feature>` — HTTP request/response DTO, Controller, `ApiResponse` 래핑.
-- `application/<feature>` — `*Facade`, `*Command`, `*Info`, 유스케이스 조합과 도메인 결과 변환.
-- `domain/<feature>` — 도메인 객체/엔티티, 도메인 서비스, `*Repository` 인터페이스.
-- `infrastructure/<feature>` — JPA/Redis/Kafka/외부 API 구현체와 `*RepositoryImpl`.
+- `<feature>/interfaces/api` — HTTP request/response DTO, Controller.
+- `<feature>/application` — `*Facade`, `*Command`, `*Info`, 유스케이스 조합과 도메인 결과 변환.
+- `<feature>/domain` — 도메인 객체/엔티티, 도메인 서비스, `*Repository` 인터페이스.
+- `<feature>/infrastructure` — JPA/Redis/Kafka/외부 API 구현체와 `*RepositoryImpl`.
+- `interfaces/api` — 여러 feature 에서 공유하는 `ApiResponse`, `PageResponse`, controller advice.
 - `support/<concern>` — 여러 feature 에 걸친 공통 관심사. 예: `support/error`.
 
 `Request`/`Response` 명명은 HTTP 입출력을 표현하는 `interfaces/api` 에만 사용한다. `application` 입력은 `SignUpCommand`, `CreateOrderCommand` 처럼 `Request` 를 빼고 유스케이스 의미로 이름 짓는다.
