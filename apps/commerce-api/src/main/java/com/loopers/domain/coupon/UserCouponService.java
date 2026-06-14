@@ -59,13 +59,16 @@ public class UserCouponService {
 
     /**
      * 주문 적용 (UC-17) — 사용 가능 발급분 선택 → 템플릿 검증·할인 계산 → use() 사용 처리.
-     * 낙관적 락(@Version) 경로: 동시 사용 시 save에서 version 충돌 → 주문 트랜잭션 롤백(UC-20 §5-A).
+     * 비관적 락(SELECT ... FOR UPDATE) 기본 경로: 발급분 행을 잠그고 읽어, 동시 사용 시 경합
+     * 트랜잭션이 선행 커밋까지 대기 → 이중 사용을 차단한다(UC-20 §5-B). 핫스팟 주문 경로인 만큼
+     * 처리량보다 정합성·예측가능성을 택한 정책으로, 재고 차감(StockService)과 동일하다.
+     * 낙관적 락(@Version) 경로(findFirstAvailable)는 비교·학습용으로 인프라에 남겨 둔다(§5-A).
      * - 사용 가능 발급분 없음(미보유/전부 USED/EXPIRED/타유저) → NOT_FOUND (§2 격리, §7.2)
      * - 만료/최소 주문 금액 미달 → BAD_REQUEST (CouponModel.ensureUsableAt)
      */
     @Transactional
     public AppliedCoupon useForOrder(Long userId, Long couponId, long originalAmount) {
-        UserCouponModel userCoupon = userCouponRepository.findFirstAvailable(userId, couponId)
+        UserCouponModel userCoupon = userCouponRepository.findFirstAvailableForUpdate(userId, couponId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용 가능한 쿠폰이 없습니다."));
         ZonedDateTime now = ZonedDateTime.now();
         CouponModel coupon = couponService.getActiveTemplate(couponId);
