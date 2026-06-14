@@ -36,11 +36,10 @@ public class PlaceOrderService {
     private final BrandReader brandReader;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final OrderNumberGenerator orderNumberGenerator;
     private final CouponUsageService couponUsageService;
 
     @Transactional
-    public OrderResult.Detail createPendingOrder(OrderCommand.Create command) {
+    public OrderResult.Detail createPendingOrder(OrderCommand.Create command, String orderNumber) {
         log.info("주문 생성 시작 userId={} itemCount={} userCouponId={}",
                 command.userId(), command.items().size(), command.userCouponId());
         // 주문자가 존재하지 않으면 재고 차감 전에 NOT_FOUND 로 종료한다.
@@ -66,7 +65,6 @@ public class PlaceOrderService {
             ));
         }
 
-        String orderNumber = orderNumberGenerator.generate();
         ShippingDestination shipping = ShippingDestination.create(
                 command.recipientName(), command.recipientPhone(), command.zipcode(),
                 command.address1(), command.address2()

@@ -14,9 +14,11 @@ public class PlaceOrderFacade {
     private final PlaceOrderService placeOrderService;
     private final PaymentService paymentService;
     private final OrderCompensationService orderCompensationService;
+    private final OrderNumberGenerator orderNumberGenerator;
 
     public OrderResult.Detail place(OrderCommand.Create command) {
-        OrderResult.Detail order = placeOrderService.createPendingOrder(command);
+        String orderNumber = orderNumberGenerator.generate();
+        OrderResult.Detail order = placeOrderService.createPendingOrder(command, orderNumber);
         try {
             paymentService.pay(order.orderId(), Money.of(order.finalAmount()));
             log.info("결제 완료 orderId={} finalAmount={}", order.orderId(), order.finalAmount());
