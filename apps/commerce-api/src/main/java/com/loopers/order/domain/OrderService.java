@@ -1,9 +1,9 @@
 package com.loopers.order.domain;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

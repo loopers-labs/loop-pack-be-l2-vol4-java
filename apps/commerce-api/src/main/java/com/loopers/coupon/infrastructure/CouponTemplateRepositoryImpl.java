@@ -2,8 +2,8 @@ package com.loopers.coupon.infrastructure;
 
 import com.loopers.coupon.domain.CouponTemplate;
 import com.loopers.coupon.domain.CouponTemplateRepository;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

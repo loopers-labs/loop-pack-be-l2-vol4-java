@@ -109,16 +109,16 @@ supports/    add-on (java-library)
 
 본 프로젝트는 레이어드 아키텍처를 따르며, 도메인이 구현 기술에 직접 의존하지 않도록 Repository port-adapter 방식으로 DIP 를 지킨다. 패키지 기본 구조는 `<feature>/<layer>` 이다.
 
-- `<feature>/interfaces/api` — HTTP request/response DTO, Controller.
+- `<feature>/interfaces/api` — feature별 HTTP request/response DTO, Controller.
 - `<feature>/application` — `*Facade`, `*Command`, `*Info`, 유스케이스 조합과 도메인 결과 변환.
 - `<feature>/domain` — 도메인 객체/엔티티, 도메인 서비스, `*Repository` 인터페이스.
 - `<feature>/infrastructure` — JPA/Redis/Kafka/외부 API 구현체와 `*RepositoryImpl`.
-- `interfaces/api` — 여러 feature 에서 공유하는 `ApiResponse`, `PageResponse`, controller advice.
-- `support/<concern>` — 여러 feature 에 걸친 공통 관심사. 예: `support/error`.
+- `shared/presentation` — 여러 feature 에서 공유하는 HTTP 응답 envelope(`ApiResponse`, `PageResponse`)과 controller advice.
+- `shared/<concern>` — 여러 feature 에 걸친 공통 관심사. 예: `shared/error`, `shared/pagination`.
 
-`Request`/`Response` 명명은 HTTP 입출력을 표현하는 `interfaces/api` 에만 사용한다. `application` 입력은 `SignUpCommand`, `CreateOrderCommand` 처럼 `Request` 를 빼고 유스케이스 의미로 이름 짓는다.
+`Request`/`Response` 명명은 HTTP 입출력을 표현하는 `<feature>/interfaces/api` 에만 사용한다. 여러 feature 에서 공유하는 HTTP 응답 envelope/advice 는 `shared/presentation` 에 둔다. `application` 입력은 `SignUpCommand`, `CreateOrderCommand` 처럼 `Request` 를 빼고 유스케이스 의미로 이름 짓는다.
 
-입력 검증은 가장 가까운 진입 경계에서 처리한다. HTTP request shape 검증은 `interfaces/api` 의 DTO/Controller 에서 `@Valid` 와 Bean Validation 으로 처리하고, 인증 사용자 식별은 인증 필터/시큐리티 경계가 책임진다. `application` 의 `Facade` 는 adapter 가 만든 유효한 `Command` 를 받아 도메인 서비스와 도메인 객체를 조합하는 흐름에 집중하며, 이미 위 레이어에서 보장한 `command == null`, `productId == null`, `quantity <= 0`, 인증 사용자 null 같은 검증을 중복 작성하지 않는다. 단, Entity/VO/Domain Service 의 핵심 invariant 는 항상 도메인 레이어에 남긴다.
+입력 검증은 가장 가까운 진입 경계에서 처리한다. HTTP request shape 검증은 `<feature>/interfaces/api` 의 DTO/Controller 에서 `@Valid` 와 Bean Validation 으로 처리하고, 인증 사용자 식별은 인증 필터/시큐리티 경계가 책임진다. `application` 의 `Facade` 는 adapter 가 만든 유효한 `Command` 를 받아 도메인 서비스와 도메인 객체를 조합하는 흐름에 집중하며, 이미 위 레이어에서 보장한 `command == null`, `productId == null`, `quantity <= 0`, 인증 사용자 null 같은 검증을 중복 작성하지 않는다. 단, Entity/VO/Domain Service 의 핵심 invariant 는 항상 도메인 레이어에 남긴다.
 
 HTTP 외에 Batch/Kafka/internal job 이 같은 유스케이스를 직접 호출한다면, 그 adapter 경계에서 별도로 검증하거나 Command 생성 경로를 안전하게 만든다. "언젠가 다른 호출자가 생길 수 있다"는 이유만으로 Facade 에 광범위한 방어 검증을 추가하지 않는다.
 

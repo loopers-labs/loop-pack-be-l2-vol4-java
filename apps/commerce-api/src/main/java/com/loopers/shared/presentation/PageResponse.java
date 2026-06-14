@@ -1,6 +1,6 @@
-package com.loopers.interfaces.api;
+package com.loopers.shared.presentation;
 
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.pagination.PageResult;
 
 import java.util.List;
 

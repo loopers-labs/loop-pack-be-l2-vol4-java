@@ -1,8 +1,8 @@
 package com.loopers.order.domain;
 
 import com.loopers.order.domain.vo.OrderAmountSnapshot;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

@@ -9,7 +9,7 @@ import com.loopers.user.domain.vo.LoginId;
 import com.loopers.user.domain.vo.PlainPassword;
 import com.loopers.user.domain.vo.UserName;
 import com.loopers.example.infrastructure.ExampleJpaRepository;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

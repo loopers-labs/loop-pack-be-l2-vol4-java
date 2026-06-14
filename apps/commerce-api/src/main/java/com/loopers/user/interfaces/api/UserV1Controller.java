@@ -2,7 +2,7 @@ package com.loopers.user.interfaces.api;
 
 import com.loopers.user.application.UserFacade;
 import com.loopers.user.application.UserInfo;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

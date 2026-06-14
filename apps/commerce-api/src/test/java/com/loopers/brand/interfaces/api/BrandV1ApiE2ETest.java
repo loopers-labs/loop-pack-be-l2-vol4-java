@@ -2,7 +2,7 @@ package com.loopers.brand.interfaces.api;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

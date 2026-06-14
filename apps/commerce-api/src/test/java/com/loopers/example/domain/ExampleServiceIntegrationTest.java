@@ -1,8 +1,8 @@
 package com.loopers.example.domain;
 
 import com.loopers.example.infrastructure.ExampleJpaRepository;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

@@ -2,9 +2,9 @@ package com.loopers.brand.interfaces.api;
 
 import com.loopers.brand.application.BrandAdminFacade;
 import com.loopers.brand.application.BrandInfo;
-import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.PageResponse;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.presentation.ApiResponse;
+import com.loopers.shared.presentation.PageResponse;
+import com.loopers.shared.pagination.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -1,8 +1,8 @@
 package com.loopers.config.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.presentation.ApiResponse;
+import com.loopers.shared.error.ErrorType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

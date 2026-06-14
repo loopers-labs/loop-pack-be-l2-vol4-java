@@ -1,7 +1,7 @@
 package com.loopers.product.domain;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 
 import java.util.Arrays;
 

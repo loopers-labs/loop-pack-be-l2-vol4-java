@@ -2,8 +2,8 @@ package com.loopers.order.infrastructure;
 
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderRepository;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

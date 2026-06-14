@@ -1,8 +1,8 @@
 package com.loopers.coupon.domain.policy;
 
 import com.loopers.coupon.domain.CouponType;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;

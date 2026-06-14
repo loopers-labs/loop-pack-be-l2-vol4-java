@@ -1,7 +1,7 @@
 package com.loopers.like.interfaces.api;
 
 import com.loopers.like.application.LikeFacade;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;

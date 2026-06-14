@@ -1,7 +1,7 @@
 package com.loopers.brand.domain;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

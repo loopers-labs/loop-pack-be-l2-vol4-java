@@ -1,7 +1,7 @@
 package com.loopers.coupon.domain;
 
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 
 import java.util.Optional;
 

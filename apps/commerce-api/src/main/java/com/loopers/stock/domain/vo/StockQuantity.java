@@ -1,7 +1,7 @@
 package com.loopers.stock.domain.vo;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;

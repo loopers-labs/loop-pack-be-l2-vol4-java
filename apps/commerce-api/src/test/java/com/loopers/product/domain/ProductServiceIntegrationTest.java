@@ -2,10 +2,10 @@ package com.loopers.product.domain;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

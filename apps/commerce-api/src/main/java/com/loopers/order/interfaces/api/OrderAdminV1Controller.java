@@ -2,9 +2,9 @@ package com.loopers.order.interfaces.api;
 
 import com.loopers.order.application.OrderAdminFacade;
 import com.loopers.order.application.OrderInfo;
-import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.PageResponse;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.presentation.ApiResponse;
+import com.loopers.shared.presentation.PageResponse;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

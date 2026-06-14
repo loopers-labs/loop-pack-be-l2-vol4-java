@@ -4,8 +4,8 @@ import com.loopers.coupon.domain.policy.FixedCouponDiscountPolicy;
 import com.loopers.coupon.domain.policy.RateCouponDiscountPolicy;
 import com.loopers.coupon.domain.vo.CouponDiscount;
 import com.loopers.coupon.domain.vo.CouponMoney;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

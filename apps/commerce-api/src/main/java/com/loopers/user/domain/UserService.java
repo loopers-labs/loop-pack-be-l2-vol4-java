@@ -2,8 +2,8 @@ package com.loopers.user.domain;
 
 import com.loopers.user.domain.command.SignUpUserCommand;
 import com.loopers.user.domain.vo.EncodedPassword;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

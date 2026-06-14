@@ -1,4 +1,4 @@
-package com.loopers.support.pagination;
+package com.loopers.shared.pagination;
 
 import org.springframework.data.domain.Page;
 

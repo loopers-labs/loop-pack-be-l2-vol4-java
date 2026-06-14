@@ -7,7 +7,7 @@ import com.loopers.coupon.domain.UserCoupon;
 import com.loopers.coupon.domain.UserCouponRepository;
 import com.loopers.coupon.domain.UserCouponStatus;
 import com.loopers.coupon.domain.policy.FixedCouponDiscountPolicy;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.user.interfaces.api.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;

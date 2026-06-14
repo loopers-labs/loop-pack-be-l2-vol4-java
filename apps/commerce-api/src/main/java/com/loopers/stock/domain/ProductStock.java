@@ -2,8 +2,8 @@ package com.loopers.stock.domain;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.stock.domain.vo.StockQuantity;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;

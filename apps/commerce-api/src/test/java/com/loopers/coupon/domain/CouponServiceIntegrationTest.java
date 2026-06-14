@@ -1,7 +1,7 @@
 package com.loopers.coupon.domain;
 
 import com.loopers.coupon.domain.policy.FixedCouponDiscountPolicy;
-import com.loopers.support.error.CoreException;
+import com.loopers.shared.error.CoreException;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

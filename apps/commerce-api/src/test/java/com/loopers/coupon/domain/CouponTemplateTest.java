@@ -3,8 +3,8 @@ package com.loopers.coupon.domain;
 import com.loopers.coupon.domain.policy.CouponDiscountPolicy;
 import com.loopers.coupon.domain.policy.FixedCouponDiscountPolicy;
 import com.loopers.coupon.domain.policy.RateCouponDiscountPolicy;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

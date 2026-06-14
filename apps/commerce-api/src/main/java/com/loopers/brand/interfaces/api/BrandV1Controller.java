@@ -2,7 +2,7 @@ package com.loopers.brand.interfaces.api;
 
 import com.loopers.brand.application.BrandFacade;
 import com.loopers.brand.application.BrandInfo;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

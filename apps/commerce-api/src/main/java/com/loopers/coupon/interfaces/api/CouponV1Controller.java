@@ -4,7 +4,7 @@ import com.loopers.coupon.application.CouponFacade;
 import com.loopers.coupon.application.IssuedCouponInfo;
 import com.loopers.coupon.application.IssueCouponCommand;
 import com.loopers.coupon.domain.CouponIssueStatus;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

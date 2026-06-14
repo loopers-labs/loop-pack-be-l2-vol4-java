@@ -2,10 +2,10 @@ package com.loopers.coupon.infrastructure;
 
 import com.loopers.coupon.domain.UserCoupon;
 import com.loopers.coupon.domain.UserCouponRepository;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;

@@ -1,4 +1,4 @@
-package com.loopers.support.error;
+package com.loopers.shared.error;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

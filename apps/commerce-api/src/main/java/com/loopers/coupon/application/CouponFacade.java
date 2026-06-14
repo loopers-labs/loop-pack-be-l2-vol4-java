@@ -1,7 +1,7 @@
 package com.loopers.coupon.application;
 
 import com.loopers.coupon.domain.CouponService;
-import com.loopers.support.error.CoreException;
+import com.loopers.shared.error.CoreException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

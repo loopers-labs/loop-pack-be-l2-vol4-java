@@ -2,7 +2,7 @@ package com.loopers.coupon.interfaces.api;
 
 import com.loopers.coupon.application.CouponFacade;
 import com.loopers.coupon.application.UserCouponInfo;
-import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.shared.presentation.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;

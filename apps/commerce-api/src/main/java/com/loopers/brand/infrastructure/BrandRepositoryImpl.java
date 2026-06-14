@@ -2,8 +2,8 @@ package com.loopers.brand.infrastructure;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
-import com.loopers.support.pagination.PageQuery;
-import com.loopers.support.pagination.PageResult;
+import com.loopers.shared.pagination.PageQuery;
+import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
