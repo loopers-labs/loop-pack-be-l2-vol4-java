@@ -17,7 +17,6 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
@@ -32,7 +31,6 @@ import java.time.ZonedDateTime;
 @Entity
 @Table(
     name = "user_coupon",
-    indexes = @Index(name = "idx_user_coupon_template_created_at_id", columnList = "coupon_template_id, created_at, id"),
     uniqueConstraints = @UniqueConstraint(
         name = "uk_user_coupon_user_template",
         columnNames = {"user_id", "coupon_template_id"}

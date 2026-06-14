@@ -11,7 +11,6 @@ import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
@@ -27,13 +26,7 @@ import java.util.List;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(
-    name = "orders",
-    indexes = {
-        @Index(name = "idx_orders_user_created_at_id", columnList = "user_id, created_at, id"),
-        @Index(name = "idx_orders_created_at_id", columnList = "created_at, id")
-    }
-)
+@Table(name = "orders")
 public class Order extends BaseEntity {
 
     @Embedded

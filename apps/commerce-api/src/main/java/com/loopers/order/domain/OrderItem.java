@@ -8,7 +8,6 @@ import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,10 +16,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(
-    name = "order_items",
-    indexes = @Index(name = "idx_order_items_order_id", columnList = "order_id")
-)
+@Table(name = "order_items")
 public class OrderItem extends BaseEntity {
 
     @Embedded
