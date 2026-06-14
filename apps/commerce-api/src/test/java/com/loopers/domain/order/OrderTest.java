@@ -36,7 +36,30 @@ class OrderTest {
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(userId),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED),
-                () -> assertThat(order.getTotalAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500))
+                () -> assertThat(order.getTotalAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500)),
+                () -> assertThat(order.getDiscountAmount().getAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                () -> assertThat(order.getPaymentAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500))
+            );
+        }
+
+        @DisplayName("할인 금액이 주어지면, 원금·할인 금액·최종 결제 금액이 모두 스냅샷된다.")
+        @Test
+        void snapshotsDiscountAndPaymentAmount_whenDiscountGiven() {
+            // arrange
+            Long userId = 1L;
+            List<OrderItem> items = List.of(
+                new OrderItem(10L, "에어맥스", new Money(BigDecimal.valueOf(1000)), new Quantity(2))
+            );
+            Money discountAmount = new Money(BigDecimal.valueOf(500));
+
+            // act
+            Order order = Order.place(userId, items, discountAmount);
+
+            // assert
+            assertAll(
+                () -> assertThat(order.getTotalAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2000)),
+                () -> assertThat(order.getDiscountAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(500)),
+                () -> assertThat(order.getPaymentAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(1500))
             );
         }
 

@@ -90,4 +90,52 @@ class MoneyTest {
             assertThat(result.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(1500));
         }
     }
+
+    @DisplayName("금액을 뺄 때, ")
+    @Nested
+    class Minus {
+        @DisplayName("두 Money의 차를 담은 새 Money를 반환한다.")
+        @Test
+        void returnsDifferenceOfMoney() {
+            // arrange
+            Money a = new Money(BigDecimal.valueOf(1000));
+            Money b = new Money(BigDecimal.valueOf(400));
+
+            // act
+            Money result = a.minus(b);
+
+            // assert
+            assertThat(result.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(600));
+        }
+
+        @DisplayName("결과가 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenResultIsNegative() {
+            // arrange
+            Money a = new Money(BigDecimal.valueOf(400));
+            Money b = new Money(BigDecimal.valueOf(1000));
+
+            // act
+            CoreException result = assertThrows(CoreException.class, () -> a.minus(b));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("금액을 비교할 때, ")
+    @Nested
+    class IsLessThan {
+        @DisplayName("작은 금액에서 큰 금액을 비교하면 true, 반대는 false 를 반환한다.")
+        @Test
+        void comparesAmounts() {
+            // arrange
+            Money small = new Money(BigDecimal.valueOf(500));
+            Money large = new Money(BigDecimal.valueOf(1000));
+
+            // assert
+            assertThat(small.isLessThan(large)).isTrue();
+            assertThat(large.isLessThan(small)).isFalse();
+        }
+    }
 }

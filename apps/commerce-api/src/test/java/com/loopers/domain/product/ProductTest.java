@@ -58,53 +58,6 @@ class ProductTest {
         }
     }
 
-    @DisplayName("좋아요 수를 변경할 때, ")
-    @Nested
-    class LikeCount {
-        @DisplayName("increaseLikeCount를 호출하면, likeCount가 1 증가한다.")
-        @Test
-        void increasesLikeCount_byOne() {
-            // arrange
-            Product product = new Product("에어맥스", "편한 러닝화",
-                new Money(BigDecimal.valueOf(100000)), new Stock(10), 1L);
-
-            // act
-            product.increaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(1L);
-        }
-
-        @DisplayName("decreaseLikeCount를 호출하면, likeCount가 1 감소한다.")
-        @Test
-        void decreasesLikeCount_byOne() {
-            // arrange
-            Product product = new Product("에어맥스", "편한 러닝화",
-                new Money(BigDecimal.valueOf(100000)), new Stock(10), 1L);
-            product.increaseLikeCount();
-
-            // act
-            product.decreaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(0L);
-        }
-
-        @DisplayName("likeCount가 0일 때 decreaseLikeCount를 호출해도, 음수가 되지 않는다.")
-        @Test
-        void doesNotGoNegative_whenLikeCountIsZero() {
-            // arrange
-            Product product = new Product("에어맥스", "편한 러닝화",
-                new Money(BigDecimal.valueOf(100000)), new Stock(10), 1L);
-
-            // act
-            product.decreaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(0L);
-        }
-    }
-
     @DisplayName("재고를 차감할 때, ")
     @Nested
     class DecreaseStock {

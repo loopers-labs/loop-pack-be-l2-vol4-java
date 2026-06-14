@@ -9,7 +9,7 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    public record PlaceOrderRequest(List<OrderLineRequest> items) {
+    public record PlaceOrderRequest(List<OrderLineRequest> items, Long couponId) {
         public List<OrderLineCommand> toCommands() {
             return items.stream()
                 .map(line -> new OrderLineCommand(line.productId(), line.quantity()))
@@ -24,6 +24,8 @@ public class OrderV1Dto {
         Long userId,
         OrderStatus status,
         BigDecimal totalAmount,
+        BigDecimal discountAmount,
+        BigDecimal paymentAmount,
         List<OrderItemResponse> items
     ) {
         public static OrderResponse from(OrderInfo info) {
@@ -32,6 +34,8 @@ public class OrderV1Dto {
                 info.userId(),
                 info.status(),
                 info.totalAmount(),
+                info.discountAmount(),
+                info.paymentAmount(),
                 info.items().stream().map(OrderItemResponse::from).toList()
             );
         }

@@ -12,6 +12,8 @@ public record OrderInfo(
     Long userId,
     OrderStatus status,
     BigDecimal totalAmount,
+    BigDecimal discountAmount,
+    BigDecimal paymentAmount,
     List<OrderItemInfo> items
 ) {
     public static OrderInfo from(Order order) {
@@ -20,6 +22,8 @@ public record OrderInfo(
             order.getUserId(),
             order.getStatus(),
             order.getTotalAmount().getAmount(),
+            order.getDiscountAmount().getAmount(),
+            order.getPaymentAmount().getAmount(),
             order.getItems().stream().map(OrderItemInfo::from).toList()
         );
     }

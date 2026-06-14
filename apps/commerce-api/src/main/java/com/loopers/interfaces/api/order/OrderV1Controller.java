@@ -23,6 +23,6 @@ public class OrderV1Controller implements OrderV1ApiSpec {
         @LoginUser User user,
         @RequestBody OrderV1Dto.PlaceOrderRequest request
     ) {
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.place(user.getId(), request.toCommands())));
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.place(user.getId(), request.toCommands(), request.couponId())));
     }
 }

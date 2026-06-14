@@ -16,7 +16,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Entity
@@ -37,22 +36,43 @@ public class Order extends BaseEntity {
         column = @Column(name = "total_amount", nullable = false))
     private Money totalAmount;
 
+    @Embedded
+    @AttributeOverride(name = "amount",
+        column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
+    @AttributeOverride(name = "amount",
+        column = @Column(name = "payment_amount", nullable = false))
+    private Money paymentAmount;
+
     @Transient
     private List<OrderItem> items;
 
-    public Order(Long userId, OrderStatus status, Money totalAmount, List<OrderItem> items) {
+    public Order(Long userId, OrderStatus status, Money totalAmount, Money discountAmount, Money paymentAmount, List<OrderItem> items) {
         this.userId = userId;
         this.status = status;
         this.totalAmount = totalAmount;
+        this.discountAmount = discountAmount;
+        this.paymentAmount = paymentAmount;
         this.items = items;
     }
 
     public static Order place(Long userId, List<OrderItem> items) {
+        return place(userId, items, Money.ZERO);
+    }
+
+    public static Order place(Long userId, List<OrderItem> items, Money discountAmount) {
         validate(items);
-        Money totalAmount = items.stream()
+        Money totalAmount = totalOf(items);
+        Money paymentAmount = totalAmount.minus(discountAmount);
+        return new Order(userId, OrderStatus.COMPLETED, totalAmount, discountAmount, paymentAmount, items);
+    }
+
+    public static Money totalOf(List<OrderItem> items) {
+        return items.stream()
             .map(OrderItem::lineAmount)
-            .reduce(new Money(BigDecimal.ZERO), Money::plus);
-        return new Order(userId, OrderStatus.COMPLETED, totalAmount, items);
+            .reduce(Money.ZERO, Money::plus);
     }
 
     private static void validate(List<OrderItem> items) {

@@ -1,6 +1,5 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,16 +11,16 @@ public class ProductLikeService {
     private final ProductService productService;
 
     public void like(Long userId, Long productId) {
-        Product product = productService.getProduct(productId);
+        productService.getProduct(productId);
         if (likeService.like(userId, productId)) {
-            product.increaseLikeCount();
+            productService.increaseLikeCount(productId);
         }
     }
 
     public void unlike(Long userId, Long productId) {
-        Product product = productService.getProduct(productId);
+        productService.getProduct(productId);
         if (likeService.unlike(userId, productId)) {
-            product.decreaseLikeCount();
+            productService.decreaseLikeCount(productId);
         }
     }
 }

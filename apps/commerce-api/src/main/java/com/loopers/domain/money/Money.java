@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Money {
 
+    public static final Money ZERO = new Money(BigDecimal.ZERO);
+
     private BigDecimal amount;
 
     public Money(BigDecimal amount) {
@@ -35,5 +37,13 @@ public class Money {
 
     public Money plus(Money other) {
         return new Money(this.amount.add(other.amount));
+    }
+
+    public Money minus(Money other) {
+        return new Money(this.amount.subtract(other.amount));
+    }
+
+    public boolean isLessThan(Money other) {
+        return this.amount.compareTo(other.amount) < 0;
     }
 }

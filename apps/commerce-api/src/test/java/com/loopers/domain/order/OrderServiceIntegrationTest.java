@@ -68,7 +68,8 @@ class OrderServiceIntegrationTest {
             );
 
             // act
-            Order saved = orderService.place(userId, lines);
+            List<OrderItem> items = orderService.prepareItems(lines);
+            Order saved = orderService.complete(userId, items, Money.ZERO);
 
             // assert
             List<OrderItem> persistedItems = orderItemJpaRepository.findAll();

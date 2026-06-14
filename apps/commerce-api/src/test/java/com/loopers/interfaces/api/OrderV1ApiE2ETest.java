@@ -1,14 +1,23 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.coupon.Coupon;
+import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.Discount;
+import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.money.Money;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
+import com.loopers.domain.user.LoginId;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.coupon.CouponJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -28,6 +37,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +55,9 @@ class OrderV1ApiE2ETest {
     private final ProductJpaRepository productJpaRepository;
     private final OrderJpaRepository orderJpaRepository;
     private final OrderItemJpaRepository orderItemJpaRepository;
+    private final UserJpaRepository userJpaRepository;
+    private final CouponJpaRepository couponJpaRepository;
+    private final UserCouponJpaRepository userCouponJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -54,6 +67,9 @@ class OrderV1ApiE2ETest {
         ProductJpaRepository productJpaRepository,
         OrderJpaRepository orderJpaRepository,
         OrderItemJpaRepository orderItemJpaRepository,
+        UserJpaRepository userJpaRepository,
+        CouponJpaRepository couponJpaRepository,
+        UserCouponJpaRepository userCouponJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
@@ -61,6 +77,9 @@ class OrderV1ApiE2ETest {
         this.productJpaRepository = productJpaRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.orderItemJpaRepository = orderItemJpaRepository;
+        this.userJpaRepository = userJpaRepository;
+        this.couponJpaRepository = couponJpaRepository;
+        this.userCouponJpaRepository = userCouponJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -105,7 +124,7 @@ class OrderV1ApiE2ETest {
             Product product = saveProduct(10);
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3))
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), null
             );
 
             // act
@@ -128,6 +147,39 @@ class OrderV1ApiE2ETest {
             );
         }
 
+        @DisplayName("쿠폰을 적용해 주문하면, 원금·할인·최종 결제 금액이 응답되고 쿠폰은 USED 가 된다.")
+        @Test
+        void appliesCoupon_whenCouponIdIsGiven() {
+            // arrange
+            signup("minwoo01", "Passw0rd!");
+            Long userId = userJpaRepository.findByLoginId(new LoginId("minwoo01")).orElseThrow().getId();
+            Product product = saveProduct(10);
+            Coupon coupon = couponJpaRepository.save(new Coupon("천원 할인",
+                new Discount(CouponType.FIXED, 1000L), null, LocalDateTime.of(2099, 12, 31, 23, 59, 59)));
+            UserCoupon userCoupon = userCouponJpaRepository.save(new UserCoupon(userId, coupon.getId()));
+            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), userCoupon.getId()
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_ORDER, HttpMethod.POST,
+                    new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            UserCoupon reloadedCoupon = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(3000)),
+                () -> assertThat(response.getBody().data().discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000)),
+                () -> assertThat(response.getBody().data().paymentAmount()).isEqualByComparingTo(BigDecimal.valueOf(2000)),
+                () -> assertThat(reloadedCoupon.getStatus()).isEqualTo(CouponStatus.USED)
+            );
+        }
+
         @DisplayName("재고보다 많은 수량을 주문하면, 400 BAD_REQUEST 응답을 받고 주문이 저장되지 않는다.")
         @Test
         void throwsBadRequest_whenStockIsInsufficient() {
@@ -136,7 +188,7 @@ class OrderV1ApiE2ETest {
             Product product = saveProduct(5);
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 10))
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 10)), null
             );
 
             // act
@@ -161,7 +213,7 @@ class OrderV1ApiE2ETest {
             signup("minwoo01", "Passw0rd!");
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(999L, 1))
+                List.of(new OrderV1Dto.OrderLineRequest(999L, 1)), null
             );
 
             // act
@@ -181,7 +233,7 @@ class OrderV1ApiE2ETest {
             // arrange
             Product product = saveProduct(10);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1))
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1)), null
             );
 
             // act
