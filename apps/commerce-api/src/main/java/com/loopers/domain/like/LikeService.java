@@ -10,7 +10,11 @@ public class LikeService {
     private final LikeRepository likeRepository;
 
     public void addLikeRecord(Long userId, Long productId) {
-        likeRepository.save(new ProductLikeModel(userId, productId));
+        try {
+            likeRepository.save(new ProductLikeModel(userId, productId));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // 동시 요청으로 인해 유니크 제약 조건 위반 발생 시, 이미 좋아요가 추가된 상태이므로 예외를 무시하여 멱등성 보장
+        }
     }
 
     public boolean removeLikeRecord(Long userId, Long productId) {

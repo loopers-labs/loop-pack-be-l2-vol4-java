@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,41 +67,46 @@ class OrderFacadeConcurrencyTest {
         Long productId = product.getId();
 
         int threadCount = 10;
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
 
         AtomicInteger successCount = new AtomicInteger();
         AtomicInteger failCount = new AtomicInteger();
 
-        // when
-        for (int i = 0; i < threadCount; i++) {
-            long userId = i + 1;
-            executorService.submit(() -> {
-                try {
-                    OrderCheckoutRequest request = new OrderCheckoutRequest(
-                            List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                            null,
-                            PaymentMethod.CARD
-                    );
-                    orderFacade.checkout(userId, request);
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
-                    failCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
-                }
-            });
+        try {
+            // when
+            for (int i = 0; i < threadCount; i++) {
+                long userId = i + 1;
+                executorService.submit(() -> {
+                    try {
+                        barrier.await();
+                        OrderCheckoutRequest request = new OrderCheckoutRequest(
+                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
+                                null,
+                                PaymentMethod.CARD
+                        );
+                        orderFacade.checkout(userId, request);
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        failCount.incrementAndGet();
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+            doneLatch.await();
+
+            // then
+            assertThat(successCount.get()).isEqualTo(5);
+            assertThat(failCount.get()).isEqualTo(5);
+
+            // 남은 재고 확인
+            ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
+            assertThat(updatedProduct.getStock().getQuantity()).isEqualTo(0);
+        } finally {
+            executorService.shutdown();
         }
-        latch.await();
-        executorService.shutdown();
-
-        // then
-        assertThat(successCount.get()).isEqualTo(5);
-        assertThat(failCount.get()).isEqualTo(5);
-
-        // 남은 재고 확인
-        ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
-        assertThat(updatedProduct.getStock().getQuantity()).isEqualTo(0);
     }
 
     @Test
@@ -131,40 +137,45 @@ class OrderFacadeConcurrencyTest {
         Long couponIssueId = couponIssue.getId();
 
         int threadCount = 10;
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
 
         AtomicInteger successCount = new AtomicInteger();
         AtomicInteger failCount = new AtomicInteger();
 
-        // when
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                try {
-                    OrderCheckoutRequest request = new OrderCheckoutRequest(
-                            List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                            couponIssueId,
-                            PaymentMethod.CARD
-                    );
-                    orderFacade.checkout(userId, request);
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
-                    failCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
-                }
-            });
+        try {
+            // when
+            for (int i = 0; i < threadCount; i++) {
+                executorService.submit(() -> {
+                    try {
+                        barrier.await();
+                        OrderCheckoutRequest request = new OrderCheckoutRequest(
+                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
+                                couponIssueId,
+                                PaymentMethod.CARD
+                        );
+                        orderFacade.checkout(userId, request);
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        failCount.incrementAndGet();
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+            doneLatch.await();
+
+            // then
+            assertThat(successCount.get()).isEqualTo(1);
+            assertThat(failCount.get()).isEqualTo(9);
+
+            // 쿠폰 상태 USED 및 낙관적 락 버전 갱신 확인
+            CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
+            assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
+            assertThat(updatedIssue.getVersion()).isGreaterThan(0L);
+        } finally {
+            executorService.shutdown();
         }
-        latch.await();
-        executorService.shutdown();
-
-        // then
-        assertThat(successCount.get()).isEqualTo(1);
-        assertThat(failCount.get()).isEqualTo(9);
-
-        // 쿠폰 상태 USED 및 낙관적 락 버전 갱신 확인
-        CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
-        assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
-        assertThat(updatedIssue.getVersion()).isGreaterThan(0L);
     }
 }
