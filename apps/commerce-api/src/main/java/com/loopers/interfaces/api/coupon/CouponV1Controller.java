@@ -4,16 +4,19 @@ import com.loopers.application.coupon.UserCouponService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.CurrentUser;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Validated
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1")
@@ -25,7 +28,7 @@ public class CouponV1Controller {
     @PostMapping("/coupons/{couponId}/issue")
     public ApiResponse<CouponV1Dto.UserCouponResponse> issueCoupon(
         @CurrentUser UserModel currentUser,
-        @PathVariable Long couponId
+        @Positive @PathVariable Long couponId
     ) {
         return ApiResponse.success(
             CouponV1Dto.UserCouponResponse.from(

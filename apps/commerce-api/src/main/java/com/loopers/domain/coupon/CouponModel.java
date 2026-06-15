@@ -38,6 +38,7 @@ public class CouponModel extends BaseEntity {
 
     public CouponModel(String name, CouponType type, int value, Integer minOrderAmount, ZonedDateTime expiredAt) {
         validate(name, type, value, expiredAt);
+        validateMinOrderAmount(minOrderAmount);
         this.name = name;
         this.type = type;
         this.value = value;
@@ -47,6 +48,7 @@ public class CouponModel extends BaseEntity {
 
     public void update(String name, CouponType type, int value, Integer minOrderAmount, ZonedDateTime expiredAt) {
         validate(name, type, value, expiredAt);
+        validateMinOrderAmount(minOrderAmount);
         this.name = name;
         this.type = type;
         this.value = value;
@@ -76,6 +78,12 @@ public class CouponModel extends BaseEntity {
             case FIXED -> Math.min(value, orderAmount);
             case RATE -> orderAmount * value / 100;
         };
+    }
+
+    private static void validateMinOrderAmount(Integer minOrderAmount) {
+        if (minOrderAmount != null && minOrderAmount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액은 0보다 커야 합니다.");
+        }
     }
 
     private static void validate(String name, CouponType type, int value, ZonedDateTime expiredAt) {

@@ -62,6 +62,15 @@ public class OrderModel extends BaseEntity {
      * 금액 스냅샷을 확정한다. 쿠폰 없을 때는 discountAmount=0으로 호출한다.
      */
     public void applyPricing(int originalAmount, int discountAmount) {
+        if (originalAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "원래 금액은 0 이상이어야 합니다.");
+        }
+        if (discountAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 0 이상이어야 합니다.");
+        }
+        if (discountAmount > originalAmount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액이 원래 금액을 초과할 수 없습니다.");
+        }
         this.originalAmount = originalAmount;
         this.discountAmount = discountAmount;
         this.totalAmount = originalAmount - discountAmount;

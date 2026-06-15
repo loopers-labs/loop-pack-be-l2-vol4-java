@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.loopers.domain.coupon.UserCouponRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +44,7 @@ class OrderFacadeTest {
     @Mock private ProductRepository productRepository;
     @Mock private StockRepository stockRepository;
     @Mock private OrderDomainService orderDomainService;
+    @Mock private UserCouponRepository userCouponRepository;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
@@ -149,6 +151,42 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("중복된 productId가 포함된 주문 시 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenDuplicateProductIdProvided() {
+            // arrange
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID,
+                List.of(new OrderItemCommand(PRODUCT_ID, 1), new OrderItemCommand(PRODUCT_ID, 2)), null);
+            given(productRepository.findAllActiveByIds(any())).willReturn(List.of(product));
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> orderFacade.createOrder(command)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            then(stockRepository).should(never()).decreaseStock(any(), anyInt());
+        }
+
+        @DisplayName("수량이 0인 주문 항목이 있으면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQuantityIsZero() {
+            // arrange
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID,
+                List.of(new OrderItemCommand(PRODUCT_ID, 0)), null);
+            given(productRepository.findAllActiveByIds(any())).willReturn(List.of(product));
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> orderFacade.createOrder(command)
+            );
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            then(stockRepository).should(never()).decreaseStock(any(), anyInt());
         }
     }
 

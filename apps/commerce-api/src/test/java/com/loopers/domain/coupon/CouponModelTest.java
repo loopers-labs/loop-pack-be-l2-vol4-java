@@ -73,6 +73,40 @@ class CouponModelTest {
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("minOrderAmount가 0이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenMinOrderAmountIsZero() {
+            CoreException result = assertThrows(CoreException.class,
+                () -> new CouponModel("할인쿠폰", CouponType.FIXED, 1000, 0, FUTURE));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("minOrderAmount가 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenMinOrderAmountIsNegative() {
+            CoreException result = assertThrows(CoreException.class,
+                () -> new CouponModel("할인쿠폰", CouponType.FIXED, 1000, -1, FUTURE));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("minOrderAmount가 null이면 최소 주문 금액 없이 정상 생성된다.")
+        @Test
+        void createsCoupon_whenMinOrderAmountIsNull() {
+            CouponModel coupon = new CouponModel("할인쿠폰", CouponType.FIXED, 1000, null, FUTURE);
+
+            assertThat(coupon).isNotNull();
+        }
+
+        @DisplayName("minOrderAmount가 양수이면 정상 생성된다.")
+        @Test
+        void createsCoupon_whenMinOrderAmountIsPositive() {
+            CouponModel coupon = new CouponModel("할인쿠폰", CouponType.FIXED, 1000, 5000, FUTURE);
+
+            assertThat(coupon).isNotNull();
+        }
     }
 
     @DisplayName("calculateDiscount()를 호출할 때,")

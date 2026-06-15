@@ -76,12 +76,19 @@ public class OrderFacade {
             }
         }
 
+        if (reqProductIds.stream().distinct().count() != reqProductIds.size()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "중복된 상품이 포함된 주문입니다.");
+        }
+
         Map<Long, Integer> quantityMap = itemCommands.stream()
             .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
         // 3. 재고 원자적 차감 (UPDATE ... WHERE quantity >= qty)
         // affected = 0 → 재고 부족; 예외 발생 시 트랜잭션 전체 롤백
         for (OrderItemCommand cmd : itemCommands) {
+            if (cmd.quantity() <= 0) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1 이상이어야 합니다.");
+            }
             int affected = stockRepository.decreaseStock(cmd.productId(), cmd.quantity());
             if (affected == 0) {
                 throw new CoreException(ErrorType.BAD_REQUEST,

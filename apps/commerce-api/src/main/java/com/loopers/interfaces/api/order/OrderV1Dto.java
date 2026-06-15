@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -26,7 +27,7 @@ public class OrderV1Dto {
 
     public record CreateOrderRequest(
         @NotEmpty @Valid List<OrderItemRequest> items,
-        Long couponId
+        @Positive Long couponId
     ) {
         public OrderCreateCommand toCommand(Long userId) {
             return new OrderCreateCommand(

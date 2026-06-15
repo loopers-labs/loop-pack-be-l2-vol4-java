@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -144,6 +145,46 @@ class OrderFacadeIntegrationTest {
             );
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("중복된 productId가 포함된 주문 시 BAD_REQUEST 예외가 발생하고 재고가 변하지 않는다.")
+        @Test
+        void throwsBadRequest_andStockUnchanged_whenDuplicateProductIdProvided() {
+            OrderCreateCommand command = new OrderCreateCommand(USER_ID,
+                List.of(
+                    new OrderItemCommand(savedProduct.getId(), 1),
+                    new OrderItemCommand(savedProduct.getId(), 2)
+                ), null);
+
+            CoreException result = assertThrows(CoreException.class,
+                () -> orderFacade.createOrder(command)
+            );
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            assertThat(stockJpaRepository.findByProduct_Id(savedProduct.getId())
+                .orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @Transactional
+        @DisplayName("재고 차감 JPQL에 qty=0을 넘기면 차감되지 않고 재고가 유지된다.")
+        @Test
+        void stockUnchanged_whenDecreaseQuantityCalledWithZero() {
+            int affected = stockJpaRepository.decreaseQuantity(savedProduct.getId(), 0);
+
+            assertThat(affected).isEqualTo(0);
+            assertThat(stockJpaRepository.findByProduct_Id(savedProduct.getId())
+                .orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @Transactional
+        @DisplayName("재고 차감 JPQL에 qty=-1을 넘기면 차감되지 않고 재고가 유지된다.")
+        @Test
+        void stockUnchanged_whenDecreaseQuantityCalledWithNegative() {
+            int affected = stockJpaRepository.decreaseQuantity(savedProduct.getId(), -1);
+
+            assertThat(affected).isEqualTo(0);
+            assertThat(stockJpaRepository.findByProduct_Id(savedProduct.getId())
+                .orElseThrow().getQuantity()).isEqualTo(10);
         }
 
         @DisplayName("정액 쿠폰 적용 시 할인 금액만큼 차감된 totalAmount가 반환된다.")
