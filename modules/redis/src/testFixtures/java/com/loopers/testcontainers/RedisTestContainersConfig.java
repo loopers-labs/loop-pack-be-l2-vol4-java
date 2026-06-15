@@ -1,10 +1,12 @@
 package com.loopers.testcontainers;
 
 import com.redis.testcontainers.RedisContainer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.testcontainers.utility.DockerImageName;
 
 @Configuration
+@ConditionalOnProperty(name = "loopers.testcontainers.enabled", havingValue = "true", matchIfMissing = true)
 public class RedisTestContainersConfig {
     private static final RedisContainer redisContainer = new RedisContainer(DockerImageName.parse("redis:latest"));
 

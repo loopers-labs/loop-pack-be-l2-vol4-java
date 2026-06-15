@@ -34,4 +34,19 @@ public record ProductResult(
             liked
         );
     }
+
+    public ProductResult withLiked(boolean liked) {
+        return new ProductResult(
+            id,
+            brandId,
+            brandName,
+            name,
+            description,
+            price,
+            stockQuantity,
+            likeCount,
+            status,
+            liked
+        );
+    }
 }

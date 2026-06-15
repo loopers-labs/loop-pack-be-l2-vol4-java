@@ -16,6 +16,7 @@ public class ProductCommandService {
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional
     public ProductResult create(ProductCommand.Create command) {
@@ -29,7 +30,9 @@ public class ProductCommandService {
             command.status()
         );
 
-        return ProductResult.from(productRepository.save(product), brand);
+        ProductResult result = ProductResult.from(productRepository.save(product), brand);
+        productCacheRepository.evictLists();
+        return result;
     }
 
     @Transactional
@@ -45,7 +48,10 @@ public class ProductCommandService {
             command.status()
         );
 
-        return ProductResult.from(productRepository.save(product), brand);
+        ProductResult result = ProductResult.from(productRepository.save(product), brand);
+        productCacheRepository.evictDetail(productId);
+        productCacheRepository.evictLists();
+        return result;
     }
 
     @Transactional
@@ -53,6 +59,8 @@ public class ProductCommandService {
         Product product = getProduct(productId);
         product.stopSelling();
         productRepository.save(product);
+        productCacheRepository.evictDetail(productId);
+        productCacheRepository.evictLists();
     }
 
     private Product getProduct(Long productId) {

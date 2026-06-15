@@ -2,14 +2,18 @@ package com.loopers.application.catalog.brand;
 
 import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
+import com.loopers.application.catalog.product.ProductCacheRepository;
+import com.loopers.application.catalog.product.ProductResult;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.domain.catalog.product.ProductSearchCondition;
 import com.loopers.domain.catalog.product.ProductStatus;
+import com.loopers.support.pagination.PageResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +35,8 @@ class BrandCommandServiceTest {
             // arrange
             FakeBrandRepository brandRepository = new FakeBrandRepository();
             FakeProductRepository productRepository = new FakeProductRepository();
-            BrandCommandService service = new BrandCommandService(brandRepository, productRepository);
+            FakeProductCacheRepository productCacheRepository = new FakeProductCacheRepository();
+            BrandCommandService service = new BrandCommandService(brandRepository, productRepository, productCacheRepository);
 
             Long brandId = 1L;
             Brand brand = new Brand("Loopers", "테스트 브랜드");
@@ -47,7 +52,9 @@ class BrandCommandServiceTest {
             assertAll(
                 () -> assertThat(brand.isActive()).isFalse(),
                 () -> assertThat(product.getStatus()).isEqualTo(ProductStatus.STOPPED),
-                () -> assertThat(product.getDeletedAt()).isNotNull()
+                () -> assertThat(product.getDeletedAt()).isNotNull(),
+                () -> assertThat(productCacheRepository.evictedDetailProductIds).containsExactly(product.getId()),
+                () -> assertThat(productCacheRepository.evictListsCallCount).isEqualTo(1)
             );
         }
     }
@@ -149,6 +156,39 @@ class BrandCommandServiceTest {
         public int decreaseLikeCount(Long productId) {
             products.get(productId).decreaseLikeCount();
             return 1;
+        }
+    }
+
+    private static class FakeProductCacheRepository implements ProductCacheRepository {
+        private final List<Long> evictedDetailProductIds = new ArrayList<>();
+        private int evictListsCallCount = 0;
+
+        @Override
+        public Optional<ProductResult> getDetail(Long productId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void putDetail(Long productId, ProductResult product) {
+        }
+
+        @Override
+        public Optional<PageResult<ProductResult>> getList(ProductSearchCondition condition) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void putList(ProductSearchCondition condition, PageResult<ProductResult> products) {
+        }
+
+        @Override
+        public void evictDetail(Long productId) {
+            evictedDetailProductIds.add(productId);
+        }
+
+        @Override
+        public void evictLists() {
+            evictListsCallCount++;
         }
     }
 }

@@ -66,7 +66,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public List<Product> search(ProductSearchCondition condition) {
         PageRequest pageRequest = PageRequest.of(condition.page(), condition.size(), toSort(condition.sort()));
-        return productJpaRepository.findByOptionalStatusAndBrandId(condition.status(), condition.brandId(), pageRequest)
+        return searchEntities(condition, pageRequest)
             .stream()
             .map(ProductJpaEntity::toDomain)
             .toList();
@@ -74,6 +74,12 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public long count(ProductSearchCondition condition) {
+        if (condition.status() != null && condition.brandId() != null) {
+            return productJpaRepository.countByStatusAndBrandId(condition.status(), condition.brandId());
+        }
+        if (condition.status() != null) {
+            return productJpaRepository.countByStatus(condition.status());
+        }
         return productJpaRepository.countByOptionalStatusAndBrandId(condition.status(), condition.brandId());
     }
 
@@ -93,5 +99,15 @@ public class ProductRepositoryImpl implements ProductRepository {
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
             case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount");
         };
+    }
+
+    private List<ProductJpaEntity> searchEntities(ProductSearchCondition condition, PageRequest pageRequest) {
+        if (condition.status() != null && condition.brandId() != null) {
+            return productJpaRepository.findByStatusAndBrandId(condition.status(), condition.brandId(), pageRequest);
+        }
+        if (condition.status() != null) {
+            return productJpaRepository.findByStatus(condition.status(), pageRequest);
+        }
+        return productJpaRepository.findByOptionalStatusAndBrandId(condition.status(), condition.brandId(), pageRequest);
     }
 }
