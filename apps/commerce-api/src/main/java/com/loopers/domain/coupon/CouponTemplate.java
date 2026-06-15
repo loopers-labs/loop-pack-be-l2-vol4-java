@@ -9,9 +9,14 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLDelete(sql = "UPDATE coupon_templates SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 @Table(name = "coupon_templates")
 public class CouponTemplate extends BaseSoftDeleteEntity {
 
