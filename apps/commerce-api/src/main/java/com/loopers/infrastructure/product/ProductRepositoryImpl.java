@@ -83,12 +83,12 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     /**
      * SortOption(도메인) → Spring Data Sort(인프라) 매핑.
-     * id desc tiebreak으로 페이지 사이 중복/누락을 방지한다.
+     * id 컬럼 tiebreak으로 페이지 사이 중복/누락을 방지한다.
      */
     private Sort toSort(SortOption option) {
         return switch (option) {
             case LATEST -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
-            case PRICE_ASC -> Sort.by(Sort.Order.asc("price"), Sort.Order.desc("id"));
+            case PRICE_ASC -> Sort.by(Sort.Order.asc("price"), Sort.Order.asc("id"));
             case LIKES_DESC -> Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("id"));
         };
     }

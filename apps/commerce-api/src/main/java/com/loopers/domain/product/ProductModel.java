@@ -8,12 +8,18 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
 @Getter
 @Entity
-@Table(name = "product")
+@Table(name = "product", indexes = {
+    @Index(name = "idx_product_brand_like", columnList = "brand_id, like_count"),
+    @Index(name = "idx_product_brand_price", columnList = "brand_id, price"),
+    @Index(name = "idx_product_brand_created", columnList = "brand_id, created_at"),
+    @Index(name = "idx_product_like", columnList = "like_count")
+})
 public class ProductModel extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)
