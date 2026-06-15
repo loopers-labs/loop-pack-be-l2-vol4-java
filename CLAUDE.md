@@ -78,8 +78,8 @@ Root
 com.loopers
 ├── interfaces       — Controller, DTO, API spec, ControllerAdvice
 ├── application      — Facade (Use case 조합), Info(출력 DTO)
-├── domain           — 도메인 엔티티(POJO), Value Object, Service, Repository(interface)
-├── infrastructure   — JpaEntity, JpaRepository, RepositoryImpl, Mapper, 외부 시스템 어댑터
+├── domain           — 도메인 엔티티(= JPA 엔티티, @Entity), Value Object(@Embeddable), Service, Repository(interface)
+├── infrastructure   — JpaRepository, RepositoryImpl(얇은 위임), 외부 시스템 어댑터
 └── support          — 공통(ErrorType, CoreException 등)
 ```
 
@@ -87,16 +87,14 @@ com.loopers
 
 ```
 domain/product/
-  Product.java              — 순수 도메인 엔티티 (POJO, JPA 의존 없음)
+  Product.java              — 도메인 엔티티 = JPA 엔티티 (@Entity, BaseEntity 상속, 도메인 행위 보유)
   ProductService.java       — 도메인 서비스
   ProductRepository.java    — Repository 인터페이스 (도메인 타입 in/out)
-  Money.java / Stock.java   — Value Object
+  Money.java / Stock.java   — Value Object (@Embeddable)
 
 infrastructure/product/
-  ProductJpaEntity.java     — @Entity, BaseEntity 상속, JPA 매핑 전용
-  ProductJpaRepository.java — Spring Data JPA 인터페이스
-  ProductMapper.java        — Product ↔ ProductJpaEntity 양방향 변환
-  ProductRepositoryImpl.java — domain Repository 구현 (JpaRepository + Mapper 조합)
+  ProductJpaRepository.java — Spring Data JPA 인터페이스 (JpaRepository<Product, Long>)
+  ProductRepositoryImpl.java — domain Repository 구현 (JpaRepository 위임 + 커스텀 쿼리 오케스트레이션)
 
 ```
 
@@ -104,14 +102,15 @@ infrastructure/product/
 
 ### 도메인 설계 원칙
 
-- **DIP 준수**: `domain` 패키지는 `infrastructure` / `interfaces` / `application` / Spring / JPA 어느 것에도 의존하지 않는다. 도메인은 순수 Java 만으로 컴파일 가능해야 한다.
 - **의존 방향**: `interfaces → application → domain ← infrastructure`. `infrastructure` 는 `domain` 의 추상(Repository 인터페이스 등)을 구현해 런타임에 주입된다.
-- **JPA 엔티티 ↔ 도메인 엔티티 분리**:
-    - 도메인 엔티티(`Product`)는 POJO 로 작성하고 JPA / Jakarta Persistence 어노테이션을 절대 부착하지 않는다.
-    - JPA 엔티티(`ProductJpaEntity`)는 `infrastructure` 패키지에 두고 `modules:jpa` 의 `BaseEntity` 를 상속한다. 도메인 엔티티는 `BaseEntity` 를 상속하지 않으며 필요한 메타 필드(id, createdAt 등)는 자체적으로 보유한다.
-    - 변환은 도메인/JPA 엔티티에 직접 작성하지 않고 **별도 Mapper 클래스**(`ProductMapper`)에서 담당한다. Mapper 는 `infrastructure` 에 위치하며 `toJpaEntity(Product)` / `toDomain(ProductJpaEntity)` 양방향 메서드를 제공한다.
-    - `RepositoryImpl` 은 `JpaRepository` 호출 결과를 Mapper 로 변환해 도메인 타입만 노출한다. 컨트롤러/서비스/Facade 는 JPA 엔티티를 절대 참조하지 않는다.
-- **Aggregate 참조**: 다른 애그리거트는 객체 참조 대신 ID(`brandId` 등)로 참조한다. `@ManyToOne`/`@OneToMany` 객체 그래프 의존은 지양한다.
+- **도메인 엔티티 = JPA 엔티티 (통합)**: (Round 4 에서 분리 구조를 병합) 도메인 엔티티(`Product`)에 직접 `@Entity`/`@Table` 을 부착하고 `modules:jpa` 의 `BaseEntity` 를 상속한다. 별도 `XxxJpaEntity` / `XxxMapper` 는 두지 않는다.
+    - **트레이드오프**: 도메인이 JPA 에 의존(DIP 순수성 포기)하는 대신, 영속성 컨텍스트가 도메인 객체에 그대로 살아 있어 변경 감지·`@Version`(낙관적 락)·비관적 락이 자연스럽다. 학습 프로젝트 범위에서 의식적으로 택한 선택. 기준 예시는 `UserModel`.
+    - `XxxRepositoryImpl` 은 `XxxJpaRepository`(=`JpaRepository<도메인타입, …>`) 에 얇게 위임하고, 페이징/일괄/insertIgnore/COUNT 같은 커스텀 쿼리만 오케스트레이션한다. 매핑 변환은 없다.
+- **Value Object 는 `@Embeddable`**: `Money`/`Stock` 등은 `@Embeddable` 로 매핑하고, 한 VO 가 여러 컬럼명으로 쓰일 때(예: `Money` → `price`/`unit_price`/`total_amount`)는 사용처에서 `@AttributeOverride` 로 컬럼명을 지정한다. `UserModel` 의 `Email`/`Name` 등과 동일한 패턴.
+- **Aggregate 참조 (cross-aggregate) = ID 참조**: 다른 애그리거트는 객체 참조 대신 ID(`brandId`, `userId`, `templateId` 등)로 참조한다. `@ManyToOne`/`@OneToMany` 객체 그래프 의존은 금지.
+- **애그리거트 내부 합성 = 값 컬렉션**: 같은 애그리거트에 속하고 독립 정체성이 없는 구성요소(예: `Order` ↔ `OrderItem` 스냅샷)는 `@ElementCollection` + `@Embeddable` 값 컬렉션으로 매핑한다(`@CollectionTable` 로 테이블 지정). 별도 엔티티/FK 객체 그래프로 만들지 않는다.
+- **Soft delete**: `BaseEntity.deletedAt` 와 `delete()` 를 사용하고, 도메인에서 필요하면 `isDeleted()` 헬퍼(`getDeletedAt() != null`)를 둔다. 별도 `boolean deleted` 필드는 두지 않는다.
+- **엔티티명 예약어 주의**: HQL 예약어와 겹치는 엔티티(`Order`, `Like`)는 `@Entity(name = "Orders")`, `@Entity(name = "ProductLike")` 처럼 이름을 지정하고 JPQL 에서 그 이름을 쓴다.
 - **불변/검증 위치**: 도메인 엔티티 생성자/팩토리에서 불변식과 필드 검증을 수행하고, 위반 시 `CoreException(ErrorType.BAD_REQUEST, ...)` 으로 통일한다. Value Object(`Price`, `Stock`, `Email` 등)도 같은 규칙을 따른다.
 - **레이어 간 타입 컨벤션**:
     - 인터페이스 요청/응답: `XxxV{n}Dto.Request / Response`
@@ -150,8 +149,8 @@ Spring 프로필: `local`, `test`, `dev`, `qa`, `prd`. `application.yml` 에서 
 
 - **설계 근거 문서**: 모든 설계는 `docs/week2/` (요구사항 명세, 시퀀스 다이어그램, 클래스 다이어그램, ERD) 를 기반으로 한다. 구현이 문서와 다르거나 문서가 애매한 부분이 발견되면 스스로 판단해서 보완/수정하지 말고 개발자에게 먼저 질문한다.
 - 새로운 도메인을 추가할 때는 `commerce-api` 의 4-layer 컨벤션(`interfaces` / `application` / `domain` / `infrastructure`)과 위 "도메인 설계 원칙" 을 따릅니다.
-- 도메인 패키지에는 JPA / Spring 의존을 도입하지 않습니다. JPA 매핑은 `infrastructure/<도메인>/XxxJpaEntity` 에 격리하고 `XxxMapper` 로 변환합니다.
-- JPA 엔티티의 공통 베이스는 `modules:jpa` 의 `com.loopers.domain.BaseEntity` 입니다. 도메인 엔티티는 이를 상속하지 않습니다.
+- 도메인 엔티티는 곧 JPA 엔티티입니다(`domain/<도메인>/Xxx` 에 `@Entity` 부착). 별도 `XxxJpaEntity`/`XxxMapper` 는 만들지 않고, `infrastructure/<도메인>` 에는 `XxxJpaRepository`(Spring Data) 와 얇은 `XxxRepositoryImpl` 만 둡니다.
+- 모든 엔티티의 공통 베이스는 `modules:jpa` 의 `com.loopers.domain.BaseEntity` 입니다(복합키 등 특수 케이스 제외 — 예: `Like`).
 - 통합 테스트는 Testcontainers 기반 픽스처(`MySqlTestContainersConfig`, `RedisTestContainersConfig`) 를 활용합니다.
 - 컨트롤러 응답 포맷은 `interfaces.api.ApiResponse`, 예외는 `support.error.CoreException` + `ErrorType` 으로 통일되어 있습니다.
 - 빌드 결과의 `version` 은 git short hash 로 자동 셋업됩니다(`getGitHash()`), 별도 지정이 없으면 `init`.

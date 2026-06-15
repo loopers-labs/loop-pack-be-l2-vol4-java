@@ -29,7 +29,7 @@ class UserV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
     private static final String ENDPOINT_ME = "/api/v1/users/me";
-    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/me/password";
+    private static final String ENDPOINT_CHANGE_PASSWORD = "/api/v1/users/password";
 
     private final TestRestTemplate testRestTemplate;
     private final UserJpaRepository userJpaRepository;
@@ -78,7 +78,7 @@ class UserV1ApiE2ETest {
         return testRestTemplate.exchange(ENDPOINT_ME, HttpMethod.GET, new HttpEntity<>(headers), responseType);
     }
 
-    private ResponseEntity<ApiResponse<Void>> patchPassword(String loginId, String password, UserV1Dto.ChangePasswordRequest request) {
+    private ResponseEntity<ApiResponse<Void>> putPassword(String loginId, String password, UserV1Dto.ChangePasswordRequest request) {
         ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
         HttpHeaders headers = new HttpHeaders();
         if (loginId != null) {
@@ -87,7 +87,7 @@ class UserV1ApiE2ETest {
         if (password != null) {
             headers.add("X-Loopers-LoginPw", password);
         }
-        return testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PATCH, new HttpEntity<>(request, headers), responseType);
+        return testRestTemplate.exchange(ENDPOINT_CHANGE_PASSWORD, HttpMethod.PUT, new HttpEntity<>(request, headers), responseType);
     }
 
     @DisplayName("POST /api/v1/users")
@@ -306,7 +306,7 @@ class UserV1ApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /api/v1/users/me/password")
+    @DisplayName("PUT /api/v1/users/password")
     @Nested
     class ChangePassword {
 
@@ -320,7 +320,7 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", NEW_PASSWORD);
 
             // act
-            ResponseEntity<ApiResponse<Void>> changeResponse = patchPassword("kim99", "Abcd123!", request);
+            ResponseEntity<ApiResponse<Void>> changeResponse = putPassword("kim99", "Abcd123!", request);
 
             // assert
             assertAll(
@@ -338,7 +338,7 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", NEW_PASSWORD);
 
             // act
-            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "WrongPass1!", request);
+            ResponseEntity<ApiResponse<Void>> response = putPassword("kim99", "WrongPass1!", request);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -352,7 +352,7 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("WrongCurrent1!", NEW_PASSWORD);
 
             // act
-            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+            ResponseEntity<ApiResponse<Void>> response = putPassword("kim99", "Abcd123!", request);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -366,7 +366,7 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", "short");
 
             // act
-            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+            ResponseEntity<ApiResponse<Void>> response = putPassword("kim99", "Abcd123!", request);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -380,7 +380,7 @@ class UserV1ApiE2ETest {
             UserV1Dto.ChangePasswordRequest request = new UserV1Dto.ChangePasswordRequest("Abcd123!", "Abcd123!");
 
             // act
-            ResponseEntity<ApiResponse<Void>> response = patchPassword("kim99", "Abcd123!", request);
+            ResponseEntity<ApiResponse<Void>> response = putPassword("kim99", "Abcd123!", request);
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);

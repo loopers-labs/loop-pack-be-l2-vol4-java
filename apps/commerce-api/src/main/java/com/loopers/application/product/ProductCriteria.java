@@ -10,10 +10,7 @@ public final class ProductCriteria {
     public record Register(Long brandId, String name, long price, int stock) {
     }
 
-    public record Modify(Long id, String name, long price) {
-    }
-
-    public record AdjustStock(Long id, int newQuantity) {
+    public record Modify(Long id, String name, long price, int stock) {
     }
 
     public record GetAll(int page, int size, Long brandId, String sort) {

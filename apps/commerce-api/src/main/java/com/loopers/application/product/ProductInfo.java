@@ -27,9 +27,9 @@ public final class ProductInfo {
                     detail.brandName(),
                     product.getName(),
                     product.getPrice().getAmount(),
-                    product.getStock().getQuantity(),
+                    detail.stockQuantity(),
                     detail.likeCount(),
-                    detail.isSoldOut()
+                    detail.soldOut()
             );
         }
     }
@@ -53,7 +53,7 @@ public final class ProductInfo {
                     product.getName(),
                     product.getPrice().getAmount(),
                     detail.likeCount(),
-                    detail.isSoldOut()
+                    detail.soldOut()
             );
         }
     }
@@ -66,13 +66,13 @@ public final class ProductInfo {
             int stock
     ) {
 
-        public static Created from(Product product) {
+        public static Created from(Product product, int stock) {
             return new Created(
                     product.getId(),
                     product.getBrandId(),
                     product.getName(),
                     product.getPrice().getAmount(),
-                    product.getStock().getQuantity()
+                    stock
             );
         }
     }

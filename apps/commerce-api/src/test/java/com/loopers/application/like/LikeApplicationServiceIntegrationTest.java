@@ -1,10 +1,11 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.common.PageResult;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.like.LikeRepository;
-import com.loopers.infrastructure.brand.BrandJpaEntity;
+import com.loopers.domain.product.Money;
+import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
-import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -53,9 +54,9 @@ class LikeApplicationServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        Long brandId = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개")).getId();
+        Long brandId = brandJpaRepository.save(Brand.create("브랜드A", "소개")).getId();
         productId = productJpaRepository.save(
-                ProductJpaEntity.of(brandId, "상품1", 1_000L, 10)).getId();
+                Product.create(brandId, "상품1", Money.of(1_000L))).getId();
     }
 
     @AfterEach
@@ -97,8 +98,8 @@ class LikeApplicationServiceIntegrationTest {
         @DisplayName("논리 삭제된 상품에 좋아요를 누르면 NOT_FOUND.")
         @Test
         void throwsNotFound_whenProductDeleted() {
-            ProductJpaEntity deleted = productJpaRepository.save(
-                    ProductJpaEntity.of(brandJpaRepository.findAll().get(0).getId(), "삭제상품", 1_000L, 10));
+            Product deleted = productJpaRepository.save(
+                    Product.create(brandJpaRepository.findAll().get(0).getId(), "삭제상품", Money.of(1_000L)));
             deleted.delete();
             productJpaRepository.save(deleted);
 
@@ -202,8 +203,8 @@ class LikeApplicationServiceIntegrationTest {
         @Test
         void returnsOwnersLikes() {
             Long brandId = brandJpaRepository.findAll().get(0).getId();
-            Long p2 = productJpaRepository.save(ProductJpaEntity.of(brandId, "상품2", 1_000L, 10)).getId();
-            Long p3 = productJpaRepository.save(ProductJpaEntity.of(brandId, "상품3", 1_000L, 10)).getId();
+            Long p2 = productJpaRepository.save(Product.create(brandId, "상품2", Money.of(1_000L))).getId();
+            Long p3 = productJpaRepository.save(Product.create(brandId, "상품3", Money.of(1_000L))).getId();
 
             likeApplicationService.register(USER_A, productId);
             likeApplicationService.register(USER_A, p2);
@@ -234,7 +235,7 @@ class LikeApplicationServiceIntegrationTest {
             Long brandId = brandJpaRepository.findAll().get(0).getId();
             for (int i = 0; i < 5; i++) {
                 Long pid = productJpaRepository.save(
-                        ProductJpaEntity.of(brandId, "상품" + i, 1_000L, 10)).getId();
+                        Product.create(brandId, "상품" + i, Money.of(1_000L))).getId();
                 likeApplicationService.register(USER_A, pid);
             }
 

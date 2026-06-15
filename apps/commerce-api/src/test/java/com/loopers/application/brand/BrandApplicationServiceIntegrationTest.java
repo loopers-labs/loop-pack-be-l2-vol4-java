@@ -1,8 +1,10 @@
 package com.loopers.application.brand;
 
-import com.loopers.infrastructure.brand.BrandJpaEntity;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.common.PageResult;
+import com.loopers.domain.product.Money;
+import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
-import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -13,8 +15,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,7 +62,7 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("존재하는 브랜드를 BrandInfo 로 돌려준다.")
         @Test
         void returnsInfo_whenBrandExists() {
-            BrandJpaEntity saved = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
+            Brand saved = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
 
             BrandInfo result = brandApplicationService.getBrand(saved.getId());
 
@@ -81,7 +81,7 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("논리 삭제된 브랜드를 조회하면 NOT_FOUND 를 던진다. (AC-01-2)")
         @Test
         void throwsNotFound_whenDeleted() {
-            BrandJpaEntity saved = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
+            Brand saved = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
             brandApplicationService.delete(saved.getId());
 
             CoreException result = assertThrows(CoreException.class,
@@ -90,33 +90,48 @@ class BrandApplicationServiceIntegrationTest {
         }
     }
 
-    @DisplayName("getBrandList 는 ")
+    @DisplayName("getBrandPage 는 ")
     @Nested
-    class GetBrandList {
+    class GetBrandPage {
 
-        @DisplayName("등록된 브랜드를 전부 돌려준다.")
+        @DisplayName("등록된 브랜드를 페이징하여 돌려준다.")
         @Test
-        void returnsAll() {
-            brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
-            brandJpaRepository.save(BrandJpaEntity.of("브랜드B", "소개"));
+        void returnsPaged() {
+            brandJpaRepository.save(Brand.create("브랜드A", "소개"));
+            brandJpaRepository.save(Brand.create("브랜드B", "소개"));
 
-            List<BrandInfo> result = brandApplicationService.getBrandList();
+            PageResult<BrandInfo> result = brandApplicationService.getBrandPage(0, 20);
 
-            assertThat(result).hasSize(2);
-            assertThat(result).extracting(BrandInfo::name).containsExactlyInAnyOrder("브랜드A", "브랜드B");
+            assertThat(result.content()).hasSize(2);
+            assertThat(result.totalElements()).isEqualTo(2L);
+            assertThat(result.content()).extracting(BrandInfo::name).containsExactlyInAnyOrder("브랜드A", "브랜드B");
+        }
+
+        @DisplayName("페이지 사이즈에 맞춰 잘리고 hasNext 와 totalElements 를 노출한다.")
+        @Test
+        void paginates() {
+            for (int i = 0; i < 5; i++) {
+                brandJpaRepository.save(Brand.create("브랜드" + i, "소개"));
+            }
+
+            PageResult<BrandInfo> result = brandApplicationService.getBrandPage(0, 2);
+
+            assertThat(result.content()).hasSize(2);
+            assertThat(result.hasNext()).isTrue();
+            assertThat(result.totalElements()).isEqualTo(5L);
         }
 
         @DisplayName("논리 삭제된 브랜드는 제외한다.")
         @Test
         void excludesDeleted() {
-            BrandJpaEntity a = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
-            brandJpaRepository.save(BrandJpaEntity.of("브랜드B", "소개"));
+            Brand a = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
+            brandJpaRepository.save(Brand.create("브랜드B", "소개"));
             brandApplicationService.delete(a.getId());
 
-            List<BrandInfo> result = brandApplicationService.getBrandList();
+            PageResult<BrandInfo> result = brandApplicationService.getBrandPage(0, 20);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).name()).isEqualTo("브랜드B");
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.content().get(0).name()).isEqualTo("브랜드B");
         }
     }
 
@@ -127,11 +142,11 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("이름과 설명을 갱신한다 (dirty checking).")
         @Test
         void updatesNameAndDescription() {
-            BrandJpaEntity saved = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "원본 설명"));
+            Brand saved = brandJpaRepository.save(Brand.create("브랜드A", "원본 설명"));
 
             brandApplicationService.modify(new BrandCriteria.Modify(saved.getId(), "브랜드A2", "갱신 설명"));
 
-            BrandJpaEntity reloaded = brandJpaRepository.findById(saved.getId()).orElseThrow();
+            Brand reloaded = brandJpaRepository.findById(saved.getId()).orElseThrow();
             assertThat(reloaded.getName()).isEqualTo("브랜드A2");
             assertThat(reloaded.getDescription()).isEqualTo("갱신 설명");
         }
@@ -152,16 +167,16 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("브랜드를 논리 삭제하고 소속 상품도 함께 논리 삭제한다. (AC-12-1)")
         @Test
         void cascadesToProducts() {
-            BrandJpaEntity brand = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
-            ProductJpaEntity p1 = productJpaRepository.save(ProductJpaEntity.of(brand.getId(), "상품1", 1_000L, 10));
-            ProductJpaEntity p2 = productJpaRepository.save(ProductJpaEntity.of(brand.getId(), "상품2", 2_000L, 5));
+            Brand brand = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
+            Product p1 = productJpaRepository.save(Product.create(brand.getId(), "상품1", Money.of(1_000L)));
+            Product p2 = productJpaRepository.save(Product.create(brand.getId(), "상품2", Money.of(2_000L)));
 
             brandApplicationService.delete(brand.getId());
 
-            BrandJpaEntity reloadedBrand = brandJpaRepository.findById(brand.getId()).orElseThrow();
+            Brand reloadedBrand = brandJpaRepository.findById(brand.getId()).orElseThrow();
             assertThat(reloadedBrand.getDeletedAt()).isNotNull();
-            ProductJpaEntity rp1 = productJpaRepository.findById(p1.getId()).orElseThrow();
-            ProductJpaEntity rp2 = productJpaRepository.findById(p2.getId()).orElseThrow();
+            Product rp1 = productJpaRepository.findById(p1.getId()).orElseThrow();
+            Product rp2 = productJpaRepository.findById(p2.getId()).orElseThrow();
             assertThat(rp1.getDeletedAt()).isNotNull();
             assertThat(rp2.getDeletedAt()).isNotNull();
         }
@@ -169,12 +184,12 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("다른 브랜드의 상품은 cascade 영향을 받지 않는다.")
         @Test
         void doesNotAffectOtherBrandsProducts() {
-            BrandJpaEntity targetBrand = brandJpaRepository.save(BrandJpaEntity.of("타겟", "소개"));
-            BrandJpaEntity otherBrand = brandJpaRepository.save(BrandJpaEntity.of("다른", "소개"));
-            ProductJpaEntity targetProduct = productJpaRepository.save(
-                    ProductJpaEntity.of(targetBrand.getId(), "상품1", 1_000L, 10));
-            ProductJpaEntity otherProduct = productJpaRepository.save(
-                    ProductJpaEntity.of(otherBrand.getId(), "상품2", 2_000L, 5));
+            Brand targetBrand = brandJpaRepository.save(Brand.create("타겟", "소개"));
+            Brand otherBrand = brandJpaRepository.save(Brand.create("다른", "소개"));
+            Product targetProduct = productJpaRepository.save(
+                    Product.create(targetBrand.getId(), "상품1", Money.of(1_000L)));
+            Product otherProduct = productJpaRepository.save(
+                    Product.create(otherBrand.getId(), "상품2", Money.of(2_000L)));
 
             brandApplicationService.delete(targetBrand.getId());
 
@@ -193,7 +208,7 @@ class BrandApplicationServiceIntegrationTest {
         @DisplayName("이미 삭제된 브랜드를 다시 삭제하면 같은 시점이 유지된다 (도메인 delete 는 멱등).")
         @Test
         void deleteIsIdempotent() {
-            BrandJpaEntity brand = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개"));
+            Brand brand = brandJpaRepository.save(Brand.create("브랜드A", "소개"));
             brandApplicationService.delete(brand.getId());
 
             CoreException result = assertThrows(CoreException.class,

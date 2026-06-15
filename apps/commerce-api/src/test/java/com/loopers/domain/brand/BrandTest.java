@@ -21,14 +21,14 @@ class BrandTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 값이면 id 는 null, deleted 는 false 인 신규 Brand 가 생성된다.")
+        @DisplayName("정상 값이면 id 는 미할당(0), deleted 는 false 인 신규 Brand 가 생성된다.")
         @Test
         void createsNewBrand_whenValid() {
             // act
             Brand brand = Brand.create(NAME, DESCRIPTION);
 
             // assert
-            assertThat(brand.getId()).isNull();
+            assertThat(brand.getId()).isEqualTo(0L);
             assertThat(brand.getName()).isEqualTo(NAME);
             assertThat(brand.getDescription()).isEqualTo(DESCRIPTION);
             assertThat(brand.isDeleted()).isFalse();
@@ -52,58 +52,6 @@ class BrandTest {
             // act
             CoreException result = assertThrows(CoreException.class,
                 () -> Brand.create(invalidName, DESCRIPTION));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("Brand 를 restore 로 복원할 때, ")
-    @Nested
-    class Restore {
-
-        @DisplayName("정상 값이면 살아있는 상태(deleted=false)로 복원된다.")
-        @Test
-        void restoresBrand_whenValid() {
-            // act
-            Brand brand = Brand.restore(1L, NAME, DESCRIPTION);
-
-            // assert
-            assertThat(brand.getId()).isEqualTo(1L);
-            assertThat(brand.getName()).isEqualTo(NAME);
-            assertThat(brand.getDescription()).isEqualTo(DESCRIPTION);
-            assertThat(brand.isDeleted()).isFalse();
-        }
-
-        @DisplayName("description 이 null 이어도 복원된다.")
-        @Test
-        void restoresBrand_whenDescriptionIsNull() {
-            // act
-            Brand brand = Brand.restore(1L, NAME, null);
-
-            // assert
-            assertThat(brand.getDescription()).isNull();
-        }
-
-        @DisplayName("id 가 null 이면 BAD_REQUEST 예외가 발생한다.")
-        @Test
-        void throwsBadRequest_whenIdIsNull() {
-            // act
-            CoreException result = assertThrows(CoreException.class,
-                () -> Brand.restore(null, NAME, DESCRIPTION));
-
-            // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-
-        @DisplayName("name 이 null 이거나 공백이면 BAD_REQUEST 예외가 발생한다.")
-        @ParameterizedTest
-        @NullSource
-        @ValueSource(strings = {"", " ", "\t"})
-        void throwsBadRequest_whenNameIsBlank(String invalidName) {
-            // act
-            CoreException result = assertThrows(CoreException.class,
-                () -> Brand.restore(1L, invalidName, DESCRIPTION));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

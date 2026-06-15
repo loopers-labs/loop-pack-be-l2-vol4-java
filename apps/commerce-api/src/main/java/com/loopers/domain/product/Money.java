@@ -2,14 +2,21 @@ package com.loopers.domain.product;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @EqualsAndHashCode
-public final class Money {
+@Embeddable
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Money {
 
-    private final long amount;
+    @Column(name = "amount", nullable = false)
+    private long amount;
 
     private Money(long amount) {
         if (amount < 0) {
@@ -30,6 +37,17 @@ public final class Money {
             return new Money(Math.addExact(this.amount, other.amount));
         } catch (ArithmeticException e) {
             throw new CoreException(ErrorType.BAD_REQUEST, "금액 합산 중 오버플로우가 발생했습니다.");
+        }
+    }
+
+    public Money subtract(Money other) {
+        if (other == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "뺄 금액은 필수입니다.");
+        }
+        try {
+            return new Money(Math.subtractExact(this.amount, other.amount));
+        } catch (ArithmeticException e) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "금액 차감 중 오버플로우가 발생했습니다.");
         }
     }
 

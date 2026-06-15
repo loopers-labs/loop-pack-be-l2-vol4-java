@@ -1,46 +1,52 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Getter
-public class Product {
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+// 변경된 컬럼만 UPDATE — modify/delete 의 전체 컬럼 UPDATE 가 동시 좋아요 원자 UPDATE 의
+// like_count 증감을 stale 값으로 덮어쓰는 lost update 를 막는다(like_count 는 dirty 가 아니므로 UPDATE 에서 빠진다).
+@DynamicUpdate
+@Table(name = "products", indexes = @Index(name = "idx_products_like_count", columnList = "like_count desc, id desc"))
+public class Product extends BaseEntity {
 
-    private final Long id;
+    @Column(name = "brand_id", nullable = false)
+    private Long brandId;
 
-    private final Long brandId;
-
+    @Column(name = "name", nullable = false)
     private String name;
 
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "price", nullable = false))
     private Money price;
 
-    private Stock stock;
+    @Column(name = "like_count", nullable = false)
+    private long likeCount;
 
-    private boolean deleted;
-
-    private Product(Long id, Long brandId, String name, Money price, Stock stock, boolean deleted) {
+    private Product(Long brandId, String name, Money price) {
         validateBrandId(brandId);
         validateName(name);
         validatePrice(price);
-        validateStock(stock);
-        this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.stock = stock;
-        this.deleted = deleted;
     }
 
-    public static Product create(Long brandId, String name, Money price, Stock stock) {
-        return new Product(null, brandId, name, price, stock, false);
-    }
-
-    public static Product restore(Long id, Long brandId, String name, Money price, Stock stock) {
-        if (id == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 비어있을 수 없습니다.");
-        }
-        return new Product(id, brandId, name, price, stock, false);
+    public static Product create(Long brandId, String name, Money price) {
+        return new Product(brandId, name, price);
     }
 
     public void modify(String name, Money price) {
@@ -50,24 +56,8 @@ public class Product {
         this.price = price;
     }
 
-    public boolean hasEnoughStock(int qty) {
-        return this.stock.hasAtLeast(qty);
-    }
-
-    public boolean isSoldOut() {
-        return this.stock.isSoldOut();
-    }
-
-    public void adjustStock(int newQuantity) {
-        this.stock = this.stock.adjust(newQuantity);
-    }
-
-    public void decreaseStock(int qty) {
-        this.stock = this.stock.decrease(qty);
-    }
-
-    public void delete() {
-        this.deleted = true;
+    public boolean isDeleted() {
+        return getDeletedAt() != null;
     }
 
     private void validateBrandId(Long brandId) {
@@ -85,12 +75,6 @@ public class Product {
     private void validatePrice(Money price) {
         if (price == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "가격은 비어있을 수 없습니다.");
-        }
-    }
-
-    private void validateStock(Stock stock) {
-        if (stock == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고는 비어있을 수 없습니다.");
         }
     }
 }

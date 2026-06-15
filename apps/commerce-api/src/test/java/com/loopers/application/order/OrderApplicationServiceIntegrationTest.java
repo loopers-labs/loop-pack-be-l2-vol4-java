@@ -1,10 +1,20 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.common.PageResult;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.DiscountPolicy;
+import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.inventory.Inventory;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.infrastructure.brand.BrandJpaEntity;
+import com.loopers.domain.product.Money;
+import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
-import com.loopers.infrastructure.product.ProductJpaEntity;
+import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
+import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -18,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,13 +50,22 @@ class OrderApplicationServiceIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private InventoryJpaRepository inventoryJpaRepository;
+
+    @Autowired
+    private CouponTemplateJpaRepository couponTemplateJpaRepository;
+
+    @Autowired
+    private UserCouponJpaRepository userCouponJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     private Long brandId;
 
     @BeforeEach
     void setUp() {
-        brandId = brandJpaRepository.save(BrandJpaEntity.of("브랜드A", "소개")).getId();
+        brandId = brandJpaRepository.save(Brand.create("브랜드A", "소개")).getId();
     }
 
     @AfterEach
@@ -54,7 +74,19 @@ class OrderApplicationServiceIntegrationTest {
     }
 
     private Long saveProduct(String name, long price, int stock) {
-        return productJpaRepository.save(ProductJpaEntity.of(brandId, name, price, stock)).getId();
+        Long productId = productJpaRepository.save(Product.create(brandId, name, Money.of(price))).getId();
+        inventoryJpaRepository.save(Inventory.create(productId, stock));
+        return productId;
+    }
+
+    private int stockOf(Long productId) {
+        return inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId).orElseThrow().getQuantity();
+    }
+
+    private Long issueCoupon(Long userId, DiscountType type, long value) {
+        CouponTemplate template = couponTemplateJpaRepository.save(
+                CouponTemplate.create("쿠폰", DiscountPolicy.of(type, value), 30));
+        return userCouponJpaRepository.save(UserCoupon.issue(userId, template, ZonedDateTime.now())).getId();
     }
 
     @DisplayName("place 는 ")
@@ -68,7 +100,7 @@ class OrderApplicationServiceIntegrationTest {
             Long p2 = saveProduct("상품2", 2_000L, 5);
 
             OrderInfo.Created result = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(
+                    new OrderCriteria.Place(USER_A, null, List.of(
                             new OrderCriteria.Line(p1, 2),
                             new OrderCriteria.Line(p2, 1)
                     )));
@@ -79,8 +111,8 @@ class OrderApplicationServiceIntegrationTest {
             assertThat(result.status()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.items()).hasSize(2);
 
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(8);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock()).isEqualTo(4);
+            assertThat(stockOf(p1)).isEqualTo(8);
+            assertThat(stockOf(p2)).isEqualTo(4);
         }
 
         @DisplayName("존재하지 않는 상품이 포함되면 NOT_FOUND 를 던지고 재고는 변하지 않는다. (AC-07-1)")
@@ -89,13 +121,13 @@ class OrderApplicationServiceIntegrationTest {
             Long p1 = saveProduct("상품1", 1_000L, 10);
 
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderApplicationService.place(new OrderCriteria.Place(USER_A, List.of(
+                    () -> orderApplicationService.place(new OrderCriteria.Place(USER_A, null, List.of(
                             new OrderCriteria.Line(p1, 1),
                             new OrderCriteria.Line(99999L, 1)
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(10);
+            assertThat(stockOf(p1)).isEqualTo(10);
         }
 
         @DisplayName("재고가 하나라도 부족하면 BAD_REQUEST 를 던지고 모든 재고가 보존된다. (AC-07-3, AC-07-4)")
@@ -105,14 +137,14 @@ class OrderApplicationServiceIntegrationTest {
             Long p2 = saveProduct("상품2", 2_000L, 1);
 
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderApplicationService.place(new OrderCriteria.Place(USER_A, List.of(
+                    () -> orderApplicationService.place(new OrderCriteria.Place(USER_A, null, List.of(
                             new OrderCriteria.Line(p1, 2),
                             new OrderCriteria.Line(p2, 5)
                     ))));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-            assertThat(productJpaRepository.findById(p1).orElseThrow().getStock()).isEqualTo(10);
-            assertThat(productJpaRepository.findById(p2).orElseThrow().getStock()).isEqualTo(1);
+            assertThat(stockOf(p1)).isEqualTo(10);
+            assertThat(stockOf(p2)).isEqualTo(1);
         }
 
         @DisplayName("주문 항목에는 주문 시점의 상품명·단가가 스냅샷으로 저장된다. (AC-07-5)")
@@ -121,7 +153,7 @@ class OrderApplicationServiceIntegrationTest {
             Long p1 = saveProduct("상품1", 1_000L, 10);
 
             OrderInfo.Created result = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 2))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 2))));
 
             OrderInfo.Item item = result.items().get(0);
             assertThat(item.productId()).isEqualTo(p1);
@@ -129,6 +161,78 @@ class OrderApplicationServiceIntegrationTest {
             assertThat(item.unitPrice()).isEqualTo(1_000L);
             assertThat(item.quantity()).isEqualTo(2);
             assertThat(item.subtotal()).isEqualTo(2_000L);
+        }
+    }
+
+    @DisplayName("place 에 쿠폰을 지정하면 ")
+    @Nested
+    class PlaceWithCoupon {
+
+        @DisplayName("할인액·최종 금액이 이력으로 저장되고 쿠폰은 사용 완료(USED)가 된다. (AC-07-6, AC-07-8)")
+        @Test
+        void appliesDiscount_andMarksCouponUsed() {
+            Long p1 = saveProduct("상품1", 1_000L, 10);
+            Long couponId = issueCoupon(USER_A, DiscountType.FIXED, 500L);
+
+            OrderInfo.Created result = orderApplicationService.place(
+                    new OrderCriteria.Place(USER_A, couponId, List.of(new OrderCriteria.Line(p1, 2)))); // 2_000
+
+            assertThat(result.originalAmount()).isEqualTo(2_000L);
+            assertThat(result.discountAmount()).isEqualTo(500L);
+            assertThat(result.totalAmount()).isEqualTo(1_500L);
+
+            UserCoupon coupon = userCouponJpaRepository.findById(couponId).orElseThrow();
+            assertThat(coupon.getStatus()).isEqualTo(CouponStatus.USED);
+            assertThat(coupon.getOrderId()).isEqualTo(result.id());
+        }
+
+        @DisplayName("존재하지 않는 쿠폰이면 NOT_FOUND 를 던지고 재고는 변하지 않는다.")
+        @Test
+        void throwsNotFound_whenCouponMissing() {
+            Long p1 = saveProduct("상품1", 1_000L, 10);
+
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderApplicationService.place(
+                            new OrderCriteria.Place(USER_A, 99999L, List.of(new OrderCriteria.Line(p1, 2)))));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(stockOf(p1)).isEqualTo(10);
+        }
+
+        @DisplayName("본인 소유가 아닌 쿠폰이면 FORBIDDEN 을 던지고 재고·쿠폰 모두 보존된다. (AC-07-7)")
+        @Test
+        void throwsForbidden_whenCouponNotOwned_andPreservesAll() {
+            Long p1 = saveProduct("상품1", 1_000L, 10);
+            Long couponId = issueCoupon(USER_B, DiscountType.FIXED, 500L); // USER_B 소유
+
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderApplicationService.place(
+                            new OrderCriteria.Place(USER_A, couponId, List.of(new OrderCriteria.Line(p1, 2)))));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+            assertThat(stockOf(p1)).isEqualTo(10);
+            assertThat(userCouponJpaRepository.findById(couponId).orElseThrow().getStatus())
+                    .isEqualTo(CouponStatus.AVAILABLE);
+        }
+
+        @DisplayName("이미 사용된 쿠폰을 다시 쓰면 BAD_REQUEST 를 던지고 재고는 보존된다 (재사용 불가). (AC-07-7, AC-07-8)")
+        @Test
+        void throwsBadRequest_whenCouponAlreadyUsed() {
+            Long p1 = saveProduct("상품1", 1_000L, 10);
+            Long couponId = issueCoupon(USER_A, DiscountType.FIXED, 500L);
+
+            // 첫 주문에서 쿠폰 사용 완료
+            orderApplicationService.place(
+                    new OrderCriteria.Place(USER_A, couponId, List.of(new OrderCriteria.Line(p1, 1))));
+
+            // 같은 쿠폰으로 두 번째 주문 시도
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderApplicationService.place(
+                            new OrderCriteria.Place(USER_A, couponId, List.of(new OrderCriteria.Line(p1, 1)))));
+
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            // 첫 주문 1개 차감분만 반영되고 두 번째 시도는 롤백
+            assertThat(stockOf(p1)).isEqualTo(9);
         }
     }
 
@@ -141,7 +245,7 @@ class OrderApplicationServiceIntegrationTest {
         void returnsDetail_whenOwner() {
             Long p1 = saveProduct("상품1", 1_000L, 10);
             OrderInfo.Created created = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 2))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 2))));
 
             OrderInfo.Detail result = orderApplicationService.getMyOrder(USER_A, created.id());
 
@@ -156,7 +260,7 @@ class OrderApplicationServiceIntegrationTest {
         void throwsForbidden_whenNotOwner() {
             Long p1 = saveProduct("상품1", 1_000L, 10);
             OrderInfo.Created created = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 1))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 1))));
 
             CoreException result = assertThrows(CoreException.class,
                     () -> orderApplicationService.getMyOrder(USER_B, created.id()));
@@ -186,11 +290,11 @@ class OrderApplicationServiceIntegrationTest {
             Long p3 = saveProduct("상품3", 1_000L, 10);
 
             OrderInfo.Created o1 = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 1))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 1))));
             OrderInfo.Created o2 = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p2, 1))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p2, 1))));
             orderApplicationService.place(
-                    new OrderCriteria.Place(USER_B, List.of(new OrderCriteria.Line(p3, 1))));
+                    new OrderCriteria.Place(USER_B, null, List.of(new OrderCriteria.Line(p3, 1))));
 
             PageResult<OrderInfo.ListItem> result = orderApplicationService.getMyOrders(
                     new OrderCriteria.MySearch(USER_A, null, null, 0, 20));
@@ -208,7 +312,7 @@ class OrderApplicationServiceIntegrationTest {
             Long p1 = saveProduct("상품1", 1_000L, 10);
             for (int i = 0; i < 3; i++) {
                 orderApplicationService.place(
-                        new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 1))));
+                        new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 1))));
             }
 
             PageResult<OrderInfo.ListItem> page0 = orderApplicationService.getMyOrders(
@@ -228,7 +332,7 @@ class OrderApplicationServiceIntegrationTest {
         void excludesOrders_outsideDateRange() {
             Long p1 = saveProduct("상품1", 1_000L, 10);
             orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 1))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 1))));
 
             LocalDate yesterday = LocalDate.now().minusDays(1);
             PageResult<OrderInfo.ListItem> result = orderApplicationService.getMyOrders(
@@ -247,7 +351,7 @@ class OrderApplicationServiceIntegrationTest {
         void returnsDetail_regardlessOfOwner() {
             Long p1 = saveProduct("상품1", 1_000L, 10);
             OrderInfo.Created created = orderApplicationService.place(
-                    new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 2))));
+                    new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 2))));
 
             OrderInfo.Detail result = orderApplicationService.getOrder(created.id());
 
@@ -272,9 +376,9 @@ class OrderApplicationServiceIntegrationTest {
         Long p1 = saveProduct("상품1", 1_000L, 10);
         Long p2 = saveProduct("상품2", 1_000L, 10);
         orderApplicationService.place(
-                new OrderCriteria.Place(USER_A, List.of(new OrderCriteria.Line(p1, 1))));
+                new OrderCriteria.Place(USER_A, null, List.of(new OrderCriteria.Line(p1, 1))));
         orderApplicationService.place(
-                new OrderCriteria.Place(USER_B, List.of(new OrderCriteria.Line(p2, 1))));
+                new OrderCriteria.Place(USER_B, null, List.of(new OrderCriteria.Line(p2, 1))));
 
         PageResult<OrderInfo.ListItem> result = orderApplicationService.getAllOrders(
                 new OrderCriteria.AdminSearch(0, 20));
