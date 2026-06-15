@@ -33,7 +33,7 @@ public class OrderCreationService {
         List<OrderItemModel> items = new ArrayList<>();
         for (OrderLine line : lines) {
             // ① 상품 존재 확인 (없으면 NOT_FOUND → 트랜잭션 롤백)
-            ProductModel product = productRepository.findById(line.productId())
+            ProductModel product = productRepository.findByIdForUpdate(line.productId())
                     .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                             "[id = " + line.productId() + "] 상품을 찾을 수 없습니다."));
 
@@ -45,7 +45,8 @@ public class OrderCreationService {
             // ③ 재고 차감 (부족하면 BAD_REQUEST → 트랜잭션 롤백 = All-or-Nothing)
             Quantity orderQty = Quantity.of(line.quantity());
             product.decreaseStock(orderQty);
-            productRepository.save(product);
+            // save() 불필요: product 는 findById 로 조회한 영속 상태라
+            // dirty checking 이 트랜잭션 커밋 시점에 UPDATE 를 자동 생성한다.
 
             // ④ 스냅샷으로 OrderItem 생성 (주문 시점 값 박제)
             items.add(OrderItemModel.of(
