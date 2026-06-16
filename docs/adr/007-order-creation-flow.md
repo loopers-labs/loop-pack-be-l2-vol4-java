@@ -8,9 +8,9 @@
 주문 생성 흐름을 아래 순서로 한다.
 
 ```
-1. 상품 조회   — 존재 확인 + 스냅샷 데이터 수집 (BRAND, PRODUCT_INVENTORY JOIN 포함)
+1. 상품 조회   — 존재 확인 + 스냅샷 데이터 수집 (BRAND, INVENTORY JOIN 포함)
 2. 재고 확인   — fast fail (락 없음, product.quantity 직접 비교)
-3. 주문 생성   — OrderModel + OrderItemModel INSERT (@Transactional 시작)
+3. 주문 생성   — OrderEntity + OrderItemEntity INSERT (@Transactional 시작)
 4. 재고 차감   — SELECT ... FOR UPDATE → productInventory.deduct(quantity)
                — 실패 시 @Transactional 전체 롤백 (주문 생성 포함)
 ```

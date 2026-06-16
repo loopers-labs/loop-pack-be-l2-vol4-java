@@ -1,35 +1,61 @@
 package com.loopers.infrastructure.product;
 
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductEntity;
 import com.loopers.domain.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
+
     private final ProductJpaRepository productJpaRepository;
 
     @Override
-    public ProductModel save(ProductModel product) {
-        return productJpaRepository.save(product);
+    public ProductEntity save(ProductEntity product) {
+        return ProductMapper.toDomain(productJpaRepository.save(ProductMapper.toJpaEntity(product)));
     }
 
     @Override
-    public Optional<ProductModel> find(Long id) {
-        return productJpaRepository.findById(id);
+    public Optional<ProductEntity> find(Long id) {
+        return productJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .map(ProductMapper::toDomain);
     }
 
     @Override
-    public List<ProductModel> findAll() {
-        return productJpaRepository.findAll();
+    public Page<ProductEntity> findAll(Long brandId, Pageable pageable) {
+        if (brandId != null) {
+            return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, pageable)
+                    .map(ProductMapper::toDomain);
+        }
+        return productJpaRepository.findAllByDeletedAtIsNull(pageable)
+                .map(ProductMapper::toDomain);
     }
 
     @Override
-    public void delete(Long id) {
-        productJpaRepository.deleteById(id);
+    public List<Long> findIdsByBrandId(Long brandId) {
+        return productJpaRepository.findIdsByBrandId(brandId);
+    }
+
+    @Override
+    public List<ProductEntity> findAllByIds(List<Long> ids) {
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids).stream()
+                .map(ProductMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void incrementLikeCount(Long id) {
+        productJpaRepository.incrementLikeCount(id);
+    }
+
+    @Override
+    public void decrementLikeCount(Long id) {
+        productJpaRepository.decrementLikeCount(id);
     }
 }

@@ -24,12 +24,12 @@
 DB 레벨의 동작에만 의존하지 않고, Service 레이어에서도 명시적으로 `productId` 오름차순 정렬 후 IN 쿼리를 실행한다. 모든 트랜잭션이 가능한 한 동일한 lock ordering을 따르도록 유도한다.
 
 ```java
-// ProductInventoryService
+// InventoryService
 public void deductInventories(Map<Long, Integer> productQuantityMap) {
     List<Long> sortedProductIds = productQuantityMap.keySet()
         .stream().sorted().toList(); // productId 오름차순 정렬
 
-    List<ProductInventoryModel> inventories =
+    List<InventoryEntity> inventories =
         inventoryRepository.findAllByProductIdsForUpdate(sortedProductIds);
     // SELECT * FROM product_inventory
     // WHERE product_id IN (...)

@@ -56,7 +56,7 @@ UNIQUE 제약을 `(user_id, product_id, deleted_at)` 3컬럼 복합으로 변경
   findByUserIdAndProductId (deleted_at 포함 전체 조회)
   → active(deleted_at=null) 존재: 409 Conflict
   → soft-deleted 존재: restore() [deleted_at = null]
-  → 없음: save(new LikeModel)
+  → 없음: save(new LikeEntity)
 ```
 
 - **장점**: `UNIQUE(user_id, product_id)` 제약을 그대로 유지할 수 있다. DB 레벨 중복 방지도 보장되므로 동시성 결함이 없다. Soft Delete 원칙을 지키면서 단순성과 DB 무결성을 모두 확보한다.
@@ -89,7 +89,7 @@ CREATE UNIQUE INDEX uq_likes_active ON likes(unique_key);
   findByUserIdAndProductId (deleted_at 포함 전체 조회)
   → active(deleted_at=null) 존재: 409 Conflict
   → soft-deleted 존재: restore() [deleted_at = null]
-  → 없음: save(new LikeModel)
+  → 없음: save(new LikeEntity)
 
 좋아요 취소 시:
   findByUserIdAndProductId (active만 조회, deleted_at IS NULL)

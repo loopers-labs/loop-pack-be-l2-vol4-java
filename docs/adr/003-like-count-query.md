@@ -9,7 +9,7 @@
 
 - **좋아요 등록**: `UPDATE product SET like_count = like_count + 1 WHERE id = ?`
 - **좋아요 취소**: `UPDATE product SET like_count = like_count - 1 WHERE id = ?`
-- **조회**: `ProductModel.likeCount` 필드를 그대로 반환 (별도 COUNT 쿼리 없음)
+- **조회**: `ProductEntity.likeCount` 필드를 그대로 반환 (별도 COUNT 쿼리 없음)
 
 ## 근거
 

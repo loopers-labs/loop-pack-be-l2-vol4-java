@@ -5,14 +5,14 @@
 
 ## 결정
 
-Brand/Product 삭제 시 연관 엔티티(ProductInventory, Like)를 Facade 오케스트레이션으로 연쇄 Soft Delete한다. JPA Cascade는 사용하지 않는다.
+Brand/Product 삭제 시 연관 엔티티(Inventory, Like)를 Facade 오케스트레이션으로 연쇄 Soft Delete한다. JPA Cascade는 사용하지 않는다.
 
 ```
 Brand 삭제
-  └── Product 연쇄 soft delete → ProductInventory soft delete + Like soft delete
+  └── Product 연쇄 soft delete → Inventory soft delete + Like soft delete
 
 Product 삭제
-  └── ProductInventory soft delete + Like soft delete
+  └── Inventory soft delete + Like soft delete
 
 Like 삭제 (좋아요 취소)
   └── 단독 삭제, 연쇄 없음
@@ -22,7 +22,7 @@ Like 삭제 (좋아요 취소)
 
 ### JPA Cascade를 사용하지 않는 이유
 
-Like는 `productId`(Long) ID 참조 방식으로 설계되어 있어 `ProductModel`과 JPA 관계가 없다. Like와 Product는 서로 다른 Aggregate이며, 다대다 관계이므로 ID 참조를 유지하는 것이 DDD 원칙에 부합한다. JPA Cascade를 적용하려면 JPA 관계를 추가해야 하는데, 이는 Aggregate 경계를 위반하고 N+1 문제 위험을 초래한다.
+Like는 `productId`(Long) ID 참조 방식으로 설계되어 있어 `ProductEntity`와 JPA 관계가 없다. Like와 Product는 서로 다른 Aggregate이며, 다대다 관계이므로 ID 참조를 유지하는 것이 DDD 원칙에 부합한다. JPA Cascade를 적용하려면 JPA 관계를 추가해야 하는데, 이는 Aggregate 경계를 위반하고 N+1 문제 위험을 초래한다.
 
 ### Like 연쇄 Soft Delete를 선택한 이유
 

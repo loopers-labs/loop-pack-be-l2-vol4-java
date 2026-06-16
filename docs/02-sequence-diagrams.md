@@ -23,7 +23,7 @@ sequenceDiagram
     participant BrandFacade
     participant BrandService
     participant ProductService
-    participant ProductInventoryService
+    participant InventoryService
     participant LikeService
 
     BrandAdminV1Controller->>BrandFacade: deleteBrand(brandId)
@@ -34,7 +34,7 @@ sequenceDiagram
     ProductService-->>BrandFacade: List~productId~
 
     BrandFacade->>ProductService: deleteAll(productIds)
-    BrandFacade->>ProductInventoryService: deleteAllByProducts(productIds)
+    BrandFacade->>InventoryService: deleteAllByProducts(productIds)
     BrandFacade->>LikeService: deleteAllByProducts(productIds)
 
     BrandFacade-->>BrandAdminV1Controller: void
@@ -54,17 +54,17 @@ sequenceDiagram
     participant ProductService
     participant BrandRepository
     participant ProductRepository
-    participant ProductInventoryRepository
+    participant InventoryRepository
 
     ProductAdminV1Controller->>ProductFacade: createProduct(brandId, name, description, price, quantity)
     ProductFacade->>ProductService: create(brandId, name, description, price, quantity)
     ProductService->>BrandRepository: findById(brandId)
-    BrandRepository-->>ProductService: BrandModel (없으면 404)
-    ProductService->>ProductRepository: save(new ProductModel)
-    ProductRepository-->>ProductService: ProductModel
-    ProductService->>ProductInventoryRepository: save(new ProductInventoryModel(productId, quantity))
-    ProductInventoryRepository-->>ProductService: ProductInventoryModel
-    ProductService-->>ProductFacade: ProductModel
+    BrandRepository-->>ProductService: BrandEntity (없으면 404)
+    ProductService->>ProductRepository: save(new ProductEntity)
+    ProductRepository-->>ProductService: ProductEntity
+    ProductService->>InventoryRepository: save(new InventoryEntity(productId, quantity))
+    InventoryRepository-->>ProductService: InventoryEntity
+    ProductService-->>ProductFacade: ProductEntity
     ProductFacade-->>ProductAdminV1Controller: ProductInfo
 ```
 
@@ -78,23 +78,23 @@ sequenceDiagram
     participant ProductAdminV1Controller
     participant ProductFacade
     participant ProductService
-    participant ProductInventoryService
+    participant InventoryService
     participant ProductRepository
-    participant ProductInventoryRepository
+    participant InventoryRepository
 
     ProductAdminV1Controller->>ProductFacade: updateProduct(productId, name, description, price, quantity)
     ProductFacade->>ProductService: update(productId, name, description, price)
     ProductService->>ProductRepository: findById(productId)
-    ProductRepository-->>ProductService: ProductModel (없으면 404)
+    ProductRepository-->>ProductService: ProductEntity (없으면 404)
     Note over ProductService: brand 필드는 수정 대상에서 제외
     ProductService->>ProductService: product.update(name, description, price)
-    ProductService-->>ProductFacade: ProductModel
+    ProductService-->>ProductFacade: ProductEntity
 
-    ProductFacade->>ProductInventoryService: updateQuantity(productId, quantity)
-    ProductInventoryService->>ProductInventoryRepository: findByProductId(productId)
-    ProductInventoryRepository-->>ProductInventoryService: ProductInventoryModel
-    ProductInventoryService->>ProductInventoryService: inventory.updateQuantity(quantity)
-    ProductInventoryService-->>ProductFacade: void
+    ProductFacade->>InventoryService: updateQuantity(productId, quantity)
+    InventoryService->>InventoryRepository: findByProductId(productId)
+    InventoryRepository-->>InventoryService: InventoryEntity
+    InventoryService->>InventoryService: inventory.updateQuantity(quantity)
+    InventoryService-->>ProductFacade: void
 
     ProductFacade-->>ProductAdminV1Controller: ProductInfo
 ```
@@ -109,13 +109,13 @@ sequenceDiagram
     participant ProductAdminV1Controller
     participant ProductFacade
     participant ProductService
-    participant ProductInventoryService
+    participant InventoryService
     participant LikeService
 
     ProductAdminV1Controller->>ProductFacade: deleteProduct(productId)
     ProductFacade->>ProductService: delete(productId)
     ProductService-->>ProductFacade: (없으면 404)
-    ProductFacade->>ProductInventoryService: deleteByProduct(productId)
+    ProductFacade->>InventoryService: deleteByProduct(productId)
     ProductFacade->>LikeService: deleteAllByProduct(productId)
     ProductFacade-->>ProductAdminV1Controller: void
 ```
@@ -139,19 +139,19 @@ sequenceDiagram
     LikeV1Controller->>LikeFacade: addLike(userId, productId)
     LikeFacade->>ProductService: getProduct(productId)
     ProductService->>ProductRepository: findById(productId)
-    ProductRepository-->>ProductService: ProductModel (없으면 404)
-    ProductService-->>LikeFacade: ProductModel
+    ProductRepository-->>ProductService: ProductEntity (없으면 404)
+    ProductService-->>LikeFacade: ProductEntity
 
     LikeFacade->>LikeService: addLike(userId, productId)
     LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
     Note over LikeRepository: deleted_at 포함 전체 조회
-    LikeRepository-->>LikeService: Optional~LikeModel~ (active 존재 시 409 Conflict)
+    LikeRepository-->>LikeService: Optional~LikeEntity~ (active 존재 시 409 Conflict)
 
     alt soft-deleted 존재
         LikeService->>LikeService: like.restore() [deleted_at=null]
     else 없음 (신규)
-        LikeService->>LikeRepository: save(new LikeModel)
-        LikeRepository-->>LikeService: LikeModel
+        LikeService->>LikeRepository: save(new LikeEntity)
+        LikeRepository-->>LikeService: LikeEntity
     end
     LikeService-->>LikeFacade: void
 
@@ -179,7 +179,7 @@ sequenceDiagram
     LikeV1Controller->>LikeFacade: removeLike(userId, productId)
     LikeFacade->>LikeService: removeLike(userId, productId)
     LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
-    LikeRepository-->>LikeService: LikeModel (없으면 404)
+    LikeRepository-->>LikeService: LikeEntity (없으면 404)
     LikeService->>LikeService: like.delete()
 
     LikeFacade->>ProductService: decrementLikeCount(productId)
@@ -207,13 +207,13 @@ sequenceDiagram
     Note over LikeFacade: path userId ≠ 인증된 userId 이면 403 Forbidden
     LikeFacade->>LikeService: findByUserId(userId, pageable)
     LikeService->>LikeRepository: findByUserId(userId, pageable)
-    LikeRepository-->>LikeService: Page~LikeModel~
+    LikeRepository-->>LikeService: Page~LikeEntity~
     LikeService-->>LikeFacade: productIds (+ totalElements)
 
     LikeFacade->>ProductService: findAllByIds(productIds)
     ProductService->>ProductRepository: findAllById(productIds)
-    ProductRepository-->>ProductService: List~ProductModel~
-    ProductService-->>LikeFacade: List~ProductModel~
+    ProductRepository-->>ProductService: List~ProductEntity~
+    ProductService-->>LikeFacade: List~ProductEntity~
 
     LikeFacade-->>LikeV1Controller: List~ProductInfo~
 ```
@@ -234,9 +234,10 @@ sequenceDiagram
     participant OrderV1Controller
     participant OrderFacade
     participant ProductService
+    participant InventoryService
     participant OrderService
     participant ProductRepository
-    participant ProductInventoryRepository
+    participant InventoryRepository
     participant OrderRepository
 
     OrderV1Controller->>OrderFacade: createOrder(userId, items)
@@ -245,23 +246,23 @@ sequenceDiagram
 
     OrderFacade->>ProductService: getProducts(productIds)
     ProductService->>ProductRepository: findAllByIds(productIds)
-    ProductRepository-->>ProductService: List~ProductModel~ (없는 상품 있으면 404)
-    ProductService-->>OrderFacade: List~ProductModel~
+    ProductRepository-->>ProductService: List~ProductEntity~ (없는 상품 있으면 404)
+    ProductService-->>OrderFacade: List~ProductEntity~
 
     Note over OrderFacade: 재고 확인 (fast fail, 락 없음) — product.quantity < 요청수량이면 400 Bad Request
 
     Note over OrderFacade,OrderRepository: ── @Transactional 시작 ──
 
     OrderFacade->>OrderService: createOrder(userId, items + snapshot)
-    OrderService->>OrderRepository: save(OrderModel + OrderItemModel)
-    OrderRepository-->>OrderService: OrderModel
-    OrderService-->>OrderFacade: OrderModel
+    OrderService->>OrderRepository: save(OrderEntity + OrderItemEntity)
+    OrderRepository-->>OrderService: OrderEntity
+    OrderService-->>OrderFacade: OrderEntity
 
-    OrderFacade->>ProductService: deductInventories(productId-quantity 쌍)
-    Note over ProductService: productId 오름차순 정렬 (데드락 방어)
-    ProductService->>ProductInventoryRepository: findAllByProductIds(productIds) FOR UPDATE
-    Note over ProductInventoryRepository: WHERE product_id IN (...) FOR UPDATE
-    ProductService->>ProductService: 각 inventory.deduct(quantity)
+    OrderFacade->>InventoryService: deductAll(productId-quantity 쌍)
+    Note over InventoryService: productId 오름차순 정렬 (데드락 방어, ADR-014)
+    InventoryService->>InventoryRepository: findAllByProductIds(productIds) FOR UPDATE
+    Note over InventoryRepository: WHERE product_id IN (...) ORDER BY product_id FOR UPDATE
+    InventoryService->>InventoryService: 각 inventory.deduct(quantity)
 
     Note over OrderFacade,OrderRepository: ── 성공 시 Commit / 재고 부족 시 전체 Rollback ──
 
