@@ -13,7 +13,7 @@
 |---|------|------|
 | ① | 상품 목록 조회 — 브랜드 필터 + 좋아요순 정렬 인덱스 최적화 | ✅ 완료 |
 | ② | 좋아요 수 정렬 구조 개선 — 비정규화(`like_count`) 또는 Materialized View | ✅ 완료 |
-| ③ | 상품 목록·상세 API Redis 캐시 적용 | ⬜ |
+| ③ | 상품 목록·상세 API Redis 캐시 적용 | ✅ 완료 |
 
 ### Nice-To-Have
 
@@ -276,31 +276,93 @@ productRepository.decrementLikeCount(productId);  // like_count -1 (원자 UPDAT
 
 ## ③ Redis 캐시 적용
 
-### 대상 API
+### 배경
 
-| API | 캐시 키 설계 (예시) | TTL |
-|-----|-------------------|-----|
-| `GET /api/v1/products/{id}` (상품 상세) | `product:{id}` | 10분 |
-| `GET /api/v1/products` (상품 목록) | `products:sort={sort}&brandId={brandId}&page={page}&size={size}` | 5분 |
+EXISTS 서브쿼리와 인덱스로 쿼리 자체를 최적화했지만, 동일한 조건의 요청이 반복되면 매번 DB를 조회한다.
+Redis 캐시는 쿼리 실행 자체를 생략해 DB 부하를 줄인다. 쿼리를 빠르게 하는 게 아니라, 실행 횟수를 줄이는 것.
 
-### 무효화 전략
+### 대상 API 및 TTL 선택 이유
 
-| 이벤트 | 무효화 대상 |
-|--------|------------|
-| 상품 수정 (`PUT /products/{id}`) | `product:{id}` 단건 삭제 |
-| 좋아요 등록/취소 | `product:{id}` 단건 삭제 + 목록 캐시 전체 삭제 |
-| 상품 삭제 | `product:{id}` 단건 삭제 + 목록 캐시 전체 삭제 |
+| API | 캐시 이름 | 캐시 키 | TTL | 이유 |
+|-----|---------|---------|-----|------|
+| `GET /api/v1/products/{id}` | `product` | `{productId}` | 10분 | 단건 조회는 키 충돌 없음, 상품 정보 변경 빈도 낮음 |
+| `GET /api/v1/products` | `products` | `{sort}:{brandId}:{inStock}:{page}:{size}` | 5분 | 좋아요 변동이 잦아 stale 데이터 노출 시간을 짧게 유지 |
 
-> 목록 캐시는 파라미터 조합이 많아 전체 삭제(`products:*` 패턴 삭제) 방식 사용.
+### 목록 캐시 hit rate 트레이드오프
+
+목록 캐시는 sort × brandId × inStock × page × size 조합 수만큼 캐시 엔트리가 생긴다.
+파라미터 조합이 다양할수록 동일한 키로 재요청이 들어올 확률(hit rate)이 낮아진다.
+hit rate가 낮으면 메모리만 차지하고 DB 부하 감소 효과는 작다.
+
+**그럼에도 적용하는 이유:**
+메인 페이지처럼 `sort=latest&page=0` 같은 특정 조합에 트래픽이 집중되는 경우, 해당 조합의 hit rate가 높아진다.
+실무에서는 모니터링으로 hit rate를 확인한 뒤 낮은 캐시는 걷어내는 방식으로 조정한다.
+
+### 캐시 무효화(Evict) 전략
+
+| 이벤트 | 무효화 대상 | 이유 |
+|--------|-----------|------|
+| 상품 수정 | `product:{id}` 단건 + `products` 전체 | 수정된 상품이 어느 페이지에 있는지 모름 |
+| 상품 삭제 | `product:{id}` 단건 + `products` 전체 | 목록에서 제외되어야 함 |
+| 좋아요 등록/취소 | `product:{id}` 단건 + `products` 전체 | `like_count`가 바뀌어 정렬 순서가 달라질 수 있음 |
+
+목록 캐시는 어떤 파라미터 조합에 삭제 대상 상품이 포함되어 있는지 알 수 없으므로 `allEntries = true`로 전체 삭제한다.
+
+### evict 타이밍
+
+`@CacheEvict(beforeInvocation = false)` 기본값 사용 → 트랜잭션이 커밋된 후에 캐시를 삭제한다.
+트랜잭션이 롤백되면 evict도 일어나지 않아, DB와 캐시 불일치를 방지한다.
+
+### 구현 내용
+
+**CacheConfig** (`config/CacheConfig.java`):
+- `@EnableCaching`으로 Spring Cache 활성화
+- `RedisCacheManager`에 캐시별 TTL 설정
+- 키: `StringRedisSerializer`, 값: `GenericJackson2JsonRedisSerializer`
+
+**ProductFacade:**
+```java
+@Cacheable(cacheNames = "product", key = "#productId")
+public ProductInfo getProduct(Long productId) { ... }
+
+@Cacheable(cacheNames = "products", key = "#sort.name() + ':' + #brandId + ':' + #inStock + ':' + #page + ':' + #size")
+public List<ProductInfo> getProducts(...) { ... }
+
+@Caching(evict = {
+    @CacheEvict(cacheNames = "product", key = "#productId"),
+    @CacheEvict(cacheNames = "products", allEntries = true)
+})
+public ProductInfo updateProduct(Long productId, ...) { ... }
+
+@Caching(evict = {
+    @CacheEvict(cacheNames = "product", key = "#productId"),
+    @CacheEvict(cacheNames = "products", allEntries = true)
+})
+public void deleteProduct(Long productId) { ... }
+```
+
+**LikeFacade:**
+```java
+@Caching(evict = {
+    @CacheEvict(cacheNames = "product", key = "#productId"),
+    @CacheEvict(cacheNames = "products", allEntries = true)
+})
+public LikeInfo addLike(Long userId, Long productId) { ... }
+
+@Caching(evict = {
+    @CacheEvict(cacheNames = "product", key = "#productId"),
+    @CacheEvict(cacheNames = "products", allEntries = true)
+})
+public void cancelLike(Long userId, Long productId) { ... }
+```
 
 ### 체크리스트
 
-- [ ] `ProductFacade.getProduct()` 캐시 적용
-- [ ] `ProductFacade.getProducts()` 캐시 적용
-- [ ] 상품 수정/삭제 시 캐시 무효화
-- [ ] 좋아요 등록/취소 시 캐시 무효화
-- [ ] 캐시 미스 시 정상 동작 확인 (fallback)
-- [ ] TTL 설정 확인
+- [x] `CacheConfig` — `@EnableCaching`, `RedisCacheManager`, TTL 설정
+- [x] `ProductFacade.getProduct()` — `@Cacheable` 적용 (TTL 10분)
+- [x] `ProductFacade.getProducts()` — `@Cacheable` 적용 (TTL 5분)
+- [x] `ProductFacade.updateProduct()` / `deleteProduct()` — `@CacheEvict` 적용
+- [x] `LikeFacade.addLike()` / `cancelLike()` — `@CacheEvict` 적용
 
 ---
 
@@ -339,5 +401,5 @@ productRepository.decrementLikeCount(productId);  // like_count -1 (원자 UPDAT
 ✅ AS-IS EXPLAIN 분석 확인 (풀스캔 + filesort)
 ✅ 인덱스 추가 → TO-BE EXPLAIN 비교 완료 (rows: 99,516 → 20 / filesort 제거)
 ✅ OR 조건 제거 → 쿼리 분리 (findAllActive / findAllActiveByBrandId)
-⬜ Redis 캐시 적용
+✅ Redis 캐시 적용
 ```

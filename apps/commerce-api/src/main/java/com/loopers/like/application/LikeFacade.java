@@ -10,6 +10,8 @@ import com.loopers.product.domain.ProductRepository;
 import com.loopers.stock.domain.StockModel;
 import com.loopers.stock.domain.StockRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,10 @@ public class LikeFacade {
     private final StockRepository stockRepository;
     private final LikeRegistrationPolicy likeRegistrationPolicy;
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "product", key = "#productId"),
+        @CacheEvict(cacheNames = "products", allEntries = true)
+    })
     @Transactional
     public LikeInfo addLike(Long userId, Long productId) {
         Optional<LikeModel> existing = likeRepository.findByUserIdAndProductId(userId, productId);
@@ -39,6 +45,10 @@ public class LikeFacade {
         return saved;
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "product", key = "#productId"),
+        @CacheEvict(cacheNames = "products", allEntries = true)
+    })
     @Transactional
     public void cancelLike(Long userId, Long productId) {
         LikeModel like = likeService.cancelLike(likeRepository.findByUserIdAndProductId(userId, productId));
