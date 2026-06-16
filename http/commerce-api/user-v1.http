@@ -1,0 +1,27 @@
+### 회원가입
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "userId": "usertest123",
+  "password": "abc123!@#",
+  "name": "홍길동",
+  "birthDate": "1995-06-10",
+  "email": "test@naver.com"
+}
+
+### 내 정보 조회
+GET {{commerce-api}}/api/v1/users/me
+X-Loopers-LoginId: usertest123
+X-Loopers-LoginPw: abc123!@#
+
+### 비밀번호 수정
+PATCH {{commerce-api}}/api/v1/users/me/password
+Content-Type: application/json
+X-Loopers-LoginId: usertest123
+X-Loopers-LoginPw: abc123!@#
+
+{
+  "currentPassword": "abc123!@#",
+  "newPassword": "newPass99@"
+}
