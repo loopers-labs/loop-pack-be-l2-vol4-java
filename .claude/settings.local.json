@@ -11,7 +11,13 @@
       "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.coupon.CouponAdminV1ApiE2ETest\" --info)",
       "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.interfaces.api.order.OrderV1ApiE2ETest\")",
       "Bash(xargs ls *)",
-      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.order.*\" --tests \"com.loopers.application.order.*\" --tests \"com.loopers.interfaces.api.order.*\" -x jacocoTestReport)"
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.order.*\" --tests \"com.loopers.application.order.*\" --tests \"com.loopers.interfaces.api.order.*\" -x jacocoTestReport)",
+      "Bash(./gradlew :apps:commerce-api:compileJava compileTestJava)",
+      "Bash(./gradlew :apps:commerce-api:test)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.like.LikeApplicationServiceIntegrationTest\")",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.like.LikeApplicationServiceIntegrationTest.LikeConcurrency\")",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.like.LikeApplicationServiceIntegrationTest\" --info)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.application.coupon.CouponApplicationServiceIntegrationTest\")"
     ]
   }
 }
