@@ -16,7 +16,6 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional
     public void signUp(
             String loginId,
             String password,
@@ -65,7 +64,6 @@ public class UserService {
         user.updatePassword(passwordEncoder.encode(newPassword), newPassword);
     }
 
-    @Transactional(readOnly = true)
     public UserInfo getUser(String loginId, String password) {
         UserModel.validateLoginId(loginId);
 

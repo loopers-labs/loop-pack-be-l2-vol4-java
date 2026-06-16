@@ -2,6 +2,7 @@ package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.like.LikeRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,9 @@ class ProductServiceTest {
     @Mock
     private BrandRepository brandRepository;
 
+    @Mock
+    private LikeRepository likeRepository;
+
     @Test
     @DisplayName("상품 목록 조회를 요청하면 필터와 정렬이 적용된 목록이 반환된다.")
     void getProducts_ShouldReturnFilteredAndSortedPage() {
@@ -47,7 +51,7 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("상품 상세 조회를 요청하면 상품 정보와 브랜드 정보가 함께 반환된다.")
+    @DisplayName("상품 상세 조회를 요청하면 상품 정보와 브랜드 정보, 그리고 실시간 좋아요 수가 함께 반환된다.")
     void getProductDetail_ShouldReturnProductWithBrand() {
         // given
         Long productId = 1L;
@@ -60,6 +64,7 @@ class ProductServiceTest {
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(brandRepository.findById(brandId)).willReturn(Optional.of(brand));
+        given(likeRepository.countByProductId(productId)).willReturn(5);
 
         // when
         ProductDetail detail = productService.getProductDetail(productId);
@@ -68,6 +73,7 @@ class ProductServiceTest {
         assertThat(detail.productId()).isEqualTo(productId);
         assertThat(detail.name()).isEqualTo("Air Jordan");
         assertThat(detail.brandName()).isEqualTo("Nike");
+        assertThat(detail.likeCount()).isEqualTo(5);
     }
 
     @Test

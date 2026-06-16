@@ -14,13 +14,11 @@ public class BrandAdminService {
 
     private final BrandRepository brandRepository;
 
-    @Transactional
     public Long registerBrand(String name) {
         BrandModel brand = new BrandModel(name);
         return brandRepository.save(brand).getId();
     }
 
-    @Transactional(readOnly = true)
     public List<BrandModel> getBrands() {
         return brandRepository.findAll();
     }

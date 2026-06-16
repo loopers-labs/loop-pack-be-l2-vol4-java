@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "product_likes", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "product_id"})
+    @UniqueConstraint(name = "uk_product_likes_user_product", columnNames = {"user_id", "product_id"})
 })
 public class ProductLikeModel extends BaseTimeEntity {
 

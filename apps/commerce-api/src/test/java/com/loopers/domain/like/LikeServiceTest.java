@@ -36,6 +36,44 @@ class LikeServiceTest {
         // then
         verify(likeRepository).save(any(ProductLikeModel.class));
     }
+    @Test
+    @DisplayName("유니크 제약조건(uk_product_likes_user_product) 예외 발생 시 무시하고 정상 종료된다.")
+    void addLikeRecord_WhenUniqueConstraintViolation_ShouldIgnore() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        org.springframework.dao.DataIntegrityViolationException exception = 
+            new org.springframework.dao.DataIntegrityViolationException("uk_product_likes_user_product violation");
+        given(likeRepository.save(any(ProductLikeModel.class))).willThrow(exception);
+
+        // when & then
+        org.assertj.core.api.Assertions.assertThatCode(() -> {
+            likeService.addLikeRecord(userId, productId);
+        }).doesNotThrowAnyException();
+        
+        verify(likeRepository).save(any(ProductLikeModel.class));
+    }
+
+    @Test
+    @DisplayName("유니크 제약조건 외의 무결성 예외 발생 시 CoreException으로 전파된다.")
+    void addLikeRecord_WhenOtherIntegrityViolation_ShouldThrowCoreException() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        org.springframework.dao.DataIntegrityViolationException exception = 
+            new org.springframework.dao.DataIntegrityViolationException("data too long for column");
+        given(likeRepository.save(any(ProductLikeModel.class))).willThrow(exception);
+
+        // when & then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
+            likeService.addLikeRecord(userId, productId);
+        })
+        .isInstanceOf(com.loopers.support.error.CoreException.class)
+        .hasMessageContaining("좋아요 등록 중 무결성 예외가 발생했습니다.")
+        .hasCause(exception);
+        
+        verify(likeRepository).save(any(ProductLikeModel.class));
+    }
 
     @Test
     @DisplayName("좋아요 이력 삭제를 요청하면 리포지토리의 삭제 메서드가 호출된다.")
@@ -50,7 +88,7 @@ class LikeServiceTest {
         likeService.removeLikeRecord(userId, productId);
 
         // then
-        verify(likeRepository).deleteByUserIdAndProductId(userId, productId);
+        verify(likeRepository).delete(any(ProductLikeModel.class));
     }
 
     @Test
@@ -68,5 +106,39 @@ class LikeServiceTest {
         // then
         assertThat(result).hasSize(2);
         verify(likeRepository).findAllByUserId(userId);
+    }
+
+    @Test
+    @DisplayName("좋아요 이력이 존재하면 true를 반환한다.")
+    void existsLikeRecord_WhenExists_ShouldReturnTrue() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        given(likeRepository.findByUserIdAndProductId(userId, productId))
+                .willReturn(Optional.of(new ProductLikeModel(userId, productId)));
+
+        // when
+        boolean result = likeService.existsLikeRecord(userId, productId);
+
+        // then
+        assertThat(result).isTrue();
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+    }
+
+    @Test
+    @DisplayName("좋아요 이력이 없으면 false를 반환한다.")
+    void existsLikeRecord_WhenNotExists_ShouldReturnFalse() {
+        // given
+        Long userId = 1L;
+        Long productId = 10L;
+        given(likeRepository.findByUserIdAndProductId(userId, productId))
+                .willReturn(Optional.empty());
+
+        // when
+        boolean result = likeService.existsLikeRecord(userId, productId);
+
+        // then
+        assertThat(result).isFalse();
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
     }
 }
