@@ -70,8 +70,10 @@
 | GET | `/api/v1/products/{productId}` | X | 상품 상세 정보 조회 |
 
 *   **상품 목록 조회 파라미터:**
-    *   `brandId`: 특정 브랜드 필터링
+    *   `brandId`: 특정 브랜드 필터링 (다중 선택은 제외하고 단일 ID 매칭 원칙 유지)
     *   `sort`: `latest` (기본), `price_asc`, `likes_desc`
+        *   `likes_desc` 정렬 시, 좋아요 개수가 0개인 상품도 포함(Left Join)하여 노출한다.
+        *   `likes_desc` 정렬 시, 좋아요 개수가 동일한 상품은 최신 등록 순(`latest`)으로 2차 정렬한다.
     *   `page`, `size`: 페이징 지원 (기본 0, 20)
 
 #### 어드민 기능
