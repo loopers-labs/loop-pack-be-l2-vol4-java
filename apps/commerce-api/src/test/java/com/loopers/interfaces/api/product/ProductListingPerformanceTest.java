@@ -27,52 +27,104 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductListingPerformanceTest {
 
     private static final String BASE_URL = "http://localhost:8080";
-    private static final String ENDPOINT_WITH_BRAND = BASE_URL + "/api/v1/products?brandId=15&sort=price_desc&page=0&size=20";
-    private static final String ENDPOINT_ALL = BASE_URL + "/api/v1/products?sort=price_desc&page=0&size=20";
+    private static final String BASE_ENDPOINT = BASE_URL + "/api/v1/products?page=0&size=20";
+    private static final String BRAND_ID = "15";
 
     private static final int WARMUP_COUNT = 3;
     private static final int MEASURE_COUNT = 20;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @DisplayName("[성능] brandId 필터 조건 상품 목록 가격 내림차순 조회 응답 시간 측정")
+    // ===================== brandId 없음 (전체 조회) =====================
+
+    @DisplayName("[성능] 전체 상품 목록 최신순 조회")
     @Test
-    void measureProductListingResponseTime_byBrandId_sortByPriceDesc() {
-        for (int i = 0; i < WARMUP_COUNT; i++) {
-            call(ENDPOINT_WITH_BRAND);
-        }
-
-        List<Long> durations = new ArrayList<>();
-        for (int i = 0; i < MEASURE_COUNT; i++) {
-            long start = System.nanoTime();
-            ResponseEntity<String> response = call(ENDPOINT_WITH_BRAND);
-            long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            durations.add(elapsedMs);
-        }
-
-        printReport("brandId=15, sort=price_desc, page=0, size=20", durations);
+    void allBrands_latest() {
+        measure(endpoint(null, "latest"), "brandId=없음, sort=latest");
     }
 
-    @DisplayName("[성능] brandId 없이 전체 상품 목록 가격 내림차순 조회 응답 시간 측정")
+    @DisplayName("[성능] 전체 상품 목록 가격 오름차순 조회")
     @Test
-    void measureProductListingResponseTime_allBrands_sortByPriceDesc() {
+    void allBrands_priceAsc() {
+        measure(endpoint(null, "price_asc"), "brandId=없음, sort=price_asc");
+    }
+
+    @DisplayName("[성능] 전체 상품 목록 가격 내림차순 조회")
+    @Test
+    void allBrands_priceDesc() {
+        measure(endpoint(null, "price_desc"), "brandId=없음, sort=price_desc");
+    }
+
+    @DisplayName("[성능] 전체 상품 목록 좋아요 오름차순 조회")
+    @Test
+    void allBrands_likeAsc() {
+        measure(endpoint(null, "like_asc"), "brandId=없음, sort=like_asc");
+    }
+
+    @DisplayName("[성능] 전체 상품 목록 좋아요 내림차순 조회")
+    @Test
+    void allBrands_likeDesc() {
+        measure(endpoint(null, "like_desc"), "brandId=없음, sort=like_desc");
+    }
+
+    // ===================== brandId=15 =====================
+
+    @DisplayName("[성능] brandId=15 상품 목록 최신순 조회")
+    @Test
+    void byBrandId_latest() {
+        measure(endpoint(BRAND_ID, "latest"), "brandId=15, sort=latest");
+    }
+
+    @DisplayName("[성능] brandId=15 상품 목록 가격 오름차순 조회")
+    @Test
+    void byBrandId_priceAsc() {
+        measure(endpoint(BRAND_ID, "price_asc"), "brandId=15, sort=price_asc");
+    }
+
+    @DisplayName("[성능] brandId=15 상품 목록 가격 내림차순 조회")
+    @Test
+    void byBrandId_priceDesc() {
+        measure(endpoint(BRAND_ID, "price_desc"), "brandId=15, sort=price_desc");
+    }
+
+    @DisplayName("[성능] brandId=15 상품 목록 좋아요 오름차순 조회")
+    @Test
+    void byBrandId_likeAsc() {
+        measure(endpoint(BRAND_ID, "like_asc"), "brandId=15, sort=like_asc");
+    }
+
+    @DisplayName("[성능] brandId=15 상품 목록 좋아요 내림차순 조회")
+    @Test
+    void byBrandId_likeDesc() {
+        measure(endpoint(BRAND_ID, "like_desc"), "brandId=15, sort=like_desc");
+    }
+
+    // ===================== 공통 =====================
+
+    private String endpoint(String brandId, String sort) {
+        String url = BASE_ENDPOINT + "&sort=" + sort;
+        if (brandId != null) {
+            url += "&brandId=" + brandId;
+        }
+        return url;
+    }
+
+    private void measure(String endpoint, String condition) {
         for (int i = 0; i < WARMUP_COUNT; i++) {
-            call(ENDPOINT_ALL);
+            call(endpoint);
         }
 
         List<Long> durations = new ArrayList<>();
         for (int i = 0; i < MEASURE_COUNT; i++) {
             long start = System.nanoTime();
-            ResponseEntity<String> response = call(ENDPOINT_ALL);
+            ResponseEntity<String> response = call(endpoint);
             long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             durations.add(elapsedMs);
         }
 
-        printReport("brandId=없음(전체), sort=price_desc, page=0, size=20", durations);
+        printReport(condition, durations);
     }
 
     private ResponseEntity<String> call(String endpoint) {
@@ -91,7 +143,7 @@ class ProductListingPerformanceTest {
         System.out.printf("""
                 %n========================================
                 [Performance] 상품 목록 조회
-                  조건  : %s
+                  조건  : %s, page=0, size=20
                   측정  : %d회 (워밍업 %d회 제외)
                 ----------------------------------------
                   min   : %dms
