@@ -1,5 +1,6 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.UserCouponIssue;
 import com.loopers.domain.coupon.UserCouponModel;
 
 import java.time.ZonedDateTime;
@@ -19,6 +20,16 @@ public record UserCouponInfo(
                 CouponInfo.from(userCoupon.getCoupon()),
                 userCoupon.getStatus().getDescription(),
                 userCoupon.getUsedAt()
+        );
+    }
+
+    public static UserCouponInfo from(UserCouponIssue issue) {
+        return new UserCouponInfo(
+                issue.id(),
+                issue.userId(),
+                new CouponInfo(issue.couponId(), null, null, null, null, null),
+                issue.status().getDescription(),
+                issue.usedAt()
         );
     }
 

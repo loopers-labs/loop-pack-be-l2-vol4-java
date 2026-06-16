@@ -46,7 +46,7 @@ public class UserCouponService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserCouponModel> getListByCouponId(Long couponId, Pageable pageable) {
+    public Page<UserCouponIssue> getListByCouponId(Long couponId, Pageable pageable) {
         return userCouponRepository.findAllByCouponId(couponId, pageable);
     }
 

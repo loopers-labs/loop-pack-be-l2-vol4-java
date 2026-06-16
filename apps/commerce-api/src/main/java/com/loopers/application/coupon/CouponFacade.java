@@ -47,6 +47,7 @@ public class CouponFacade {
     }
 
     public Page<UserCouponInfo> getIssues(Long couponId, Pageable pageable) {
-        return userCouponService.getListByCouponId(couponId, pageable).map(UserCouponInfo::from);
+        return userCouponService.getListByCouponId(couponId, pageable)
+                .map(UserCouponInfo::from);
     }
 }

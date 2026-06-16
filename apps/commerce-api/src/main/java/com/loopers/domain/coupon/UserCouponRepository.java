@@ -11,6 +11,6 @@ public interface UserCouponRepository {
     UserCouponModel save(UserCouponModel userCoupon);
     Optional<UserCouponModel> findById(Long id);
     List<UserCouponModel> findAllByUserId(Long userId);
-    Page<UserCouponModel> findAllByCouponId(Long couponId, Pageable pageable);
+    Page<UserCouponIssue> findAllByCouponId(Long couponId, Pageable pageable);
     boolean useIfIssued(Long id, ZonedDateTime usedAt);
 }
