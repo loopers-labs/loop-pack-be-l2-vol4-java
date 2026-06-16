@@ -2,7 +2,7 @@ package com.loopers.infrastructure.cache;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.application.support.cache.CacheStore;
+import com.loopers.support.cache.CacheStore;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,6 +1,6 @@
 package com.loopers.application.product;
 
-import com.loopers.application.support.cache.CacheStore;
+import com.loopers.support.cache.CacheStore;
 import com.loopers.domain.product.SortOption;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
