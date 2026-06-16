@@ -24,11 +24,12 @@ public class ProductV1Controller {
     public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
         @RequestParam(defaultValue = "latest") String sortBy,
         @RequestParam(required = false) Long brandId,
+        @RequestParam(defaultValue = "false") boolean inStock,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
         SortCondition sort = SortCondition.from(sortBy);
-        List<ProductInfo> products = productFacade.getProducts(sort, brandId, page, size);
+        List<ProductInfo> products = productFacade.getProducts(sort, brandId, inStock, page, size);
         return ApiResponse.success(products.stream().map(ProductV1Dto.ProductResponse::from).toList());
     }
 

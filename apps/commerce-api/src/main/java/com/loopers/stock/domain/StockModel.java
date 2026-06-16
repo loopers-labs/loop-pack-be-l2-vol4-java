@@ -4,10 +4,16 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "stocks")
+@Table(
+    name = "stocks",
+    indexes = {
+        @Index(name = "idx_stocks_product_id", columnList = "product_id", unique = true)
+    }
+)
 public class StockModel extends BaseEntity {
 
     private Long productId;

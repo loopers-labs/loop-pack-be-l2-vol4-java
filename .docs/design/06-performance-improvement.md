@@ -74,9 +74,23 @@ WHERE deleted_at IS NULL AND (:brandId IS NULL OR brand_id = :brandId)
 
 `like_count`는 좋아요 등록/취소마다 UPDATE되는 컬럼이다.
 인덱스가 있으면 매 UPDATE 시 인덱스도 갱신되므로 쓰기 비용이 증가한다.
-ㅍ
-**판단:** 좋아요순 조회가 핵심 기능이고 읽기 비용(풀스캔)이 훨씬 크기 때문에 인덱스 추가가 합리적.
-쓰기 비용 증가는 감수할 만한 수준.
+
+"업데이트가 잦은 컬럼은 인덱스에 포함하지 않는다"는 원칙이 있지만, 이는 절대 법칙이 아니라 트레이드오프의 문제다.
+
+**읽기 비용 vs 쓰기 비용 비교:**
+- 상품 목록 조회: 매 페이지뷰마다 발생 → 매우 빈번
+- 좋아요 등록/취소: 사용자가 의도적으로 누를 때만 → 조회 대비 훨씬 적음
+
+조회 빈도 >> 쓰기 빈도인 일반적인 커머스 상황에서는 읽기를 빠르게 하기 위해 쓰기 비용을 감수하는 것이 합리적이다.
+
+**언제 문제가 되는가:**
+한정 세일·신상품 출시처럼 특정 상품에 좋아요가 폭발적으로 몰릴 때. 같은 row에 UPDATE가 집중되면서 row lock 경합이 발생하고, 인덱스 갱신까지 더해지면 쓰기 성능이 급격히 저하된다.
+
+**그때의 개선 방향:**
+- Redis에 like_count 카운터를 별도로 두고 배치로 MySQL 동기화 → 쓰기 경합 해소
+- 조회는 Redis 캐시가 커버하므로 like_count 인덱스 의존도 낮아짐
+
+**현재 판단:** 지금 트래픽 수준에서는 인덱스 포함이 적절. 좋아요 폭주 상황이 실제 문제가 될 때 배치 동기화로 전환한다.
 
 #### like_count 정합성 — Eventual Consistency 허용
 
@@ -146,12 +160,89 @@ type: ref  /  key: idx_products_brand_likes  /  rows: 9,116  /  Extra: Using whe
 | 전체 좋아요순 | `ALL` | `index` | 99,516 | **20** | ❌ 제거 |
 | 브랜드 + 좋아요순 | `ALL` | `ref` | 99,516 | **9,116** | ❌ 제거 |
 
+### 확장 시나리오 — 재고 필터 추가 시
+
+#### stocks.product_id 인덱스 누락
+
+상품 목록 조회 시 `stocks` IN 쿼리(`WHERE product_id IN (...)`)가 실행되는데,
+`product_id`에 인덱스가 없어 매번 10만 건 풀스캔이 발생하고 있었다.
+→ `StockModel`에 `idx_stocks_product_id` unique 인덱스 추가로 해결.
+
+#### "재고 있는 상품만 보기" 필터를 JOIN으로 추가하면 안 되는 이유
+
+```sql
+-- 단순 JOIN 추가 시
+SELECT p.* FROM products p
+JOIN stocks s ON s.product_id = p.id
+WHERE p.deleted_at IS NULL
+  AND (s.total_stock - s.reserved_stock) > 0
+ORDER BY p.like_count DESC, p.created_at DESC
+LIMIT 20
+```
+
+옵티마이저가 재고 필터의 selectivity를 보고 `stocks`를 드라이빙 테이블로 선택할 수 있다.
+그러면 `products`의 `idx_products_likes_desc` 인덱스가 무력화되고 filesort 재발.
+
+좋아요순 인덱스(products 드라이빙)와 재고 필터(stocks 드라이빙)가 충돌하는 구조.
+
+#### 선택지 비교
+
+| 방법 | 설명 | 판단 |
+|------|------|------|
+| JOIN | 옵티마이저 재량에 따라 인덱스 무력화 가능 | ❌ |
+| 비정규화 (`available_stock`) | JOIN 불필요, 빠름. 단, 재고는 정합성이 중요한 데이터 → 쓰기마다 동기화 부담 | ❌ 정합성 리스크 |
+| EXISTS 서브쿼리 | products 인덱스 드라이빙 유지. 재고 소진 상품이 많을수록 느려짐 | ✅ 기능 정확성 보장 |
+| Redis 캐시 | EXISTS의 실행 빈도를 줄임. 캐시 히트 시 쿼리 자체 미실행 | ✅ EXISTS와 함께 적용 |
+
+**결론:** EXISTS 쿼리로 기능을 정확하게 구현하고, Redis 캐시로 실행 빈도를 줄인다.
+Redis 캐시는 느린 쿼리의 실행 횟수를 줄이는 것이지, 쿼리 자체를 빠르게 하는 게 아님.
+캐시 미스 시 EXISTS가 실행되므로 둘은 택일이 아닌 조합이다.
+
+#### EXISTS 쿼리 구조
+
+```sql
+SELECT p.* FROM products p
+WHERE p.deleted_at IS NULL
+  AND EXISTS (
+      SELECT 1 FROM stocks s
+      WHERE s.product_id = p.id
+        AND s.total_stock - s.reserved_stock > 0
+  )
+ORDER BY p.like_count DESC, p.created_at DESC
+LIMIT 20
+```
+
+products 인덱스 순서대로 읽으면서 재고 조건 확인 → LIMIT 채우면 즉시 멈춤.
+재고 소진 상품이 폭발적으로 많아지면 EXISTS도 한계에 도달하지만,
+그 시점에는 Redis 캐시 히트율이 충분히 커버한다.
+
+#### 실제 구현 내용
+
+**API 변경:**
+```
+GET /api/v1/products?sortBy=likes_desc&inStock=true
+```
+`inStock` 쿼리 파라미터 추가 (기본값 `false` → 기존 동작 유지).
+
+**쿼리 분기 구조 (`ProductRepositoryImpl.findAll`):**
+
+| brandId | inStock | 실행 쿼리 |
+|---------|---------|---------|
+| null | false | `findAllActive` |
+| 있음 | false | `findAllActiveByBrandId` |
+| null | true | `findAllActiveInStock` (EXISTS) |
+| 있음 | true | `findAllActiveByBrandIdInStock` (EXISTS + brandId) |
+
+총 4개 쿼리 메서드로 분기. 각 쿼리가 독립적으로 최적 인덱스를 활용한다.
+
 ### 체크리스트
 
 - [x] `ProductModel`에 `@Table(indexes = ...)` 추가
 - [x] OR 조건 제거 → `findAllActive` / `findAllActiveByBrandId` 쿼리 분리
 - [x] 앱 재시작 후 데이터 재생성 확인 (brands 20 / products 10만 / stocks 10만)
 - [x] TO-BE EXPLAIN 분석 → AS-IS 비교 완료
+- [x] `StockModel`에 `idx_stocks_product_id` 인덱스 추가 (product_id 풀스캔 → 인덱스)
+- [x] 재고 필터(`inStock`) EXISTS 쿼리 구현
 - [ ] 블로그용 AS-IS / TO-BE 비교 기록
 
 ---

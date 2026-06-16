@@ -19,6 +19,18 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId")
     List<ProductModel> findAllActiveByBrandId(@Param("brandId") Long brandId, Pageable pageable);
 
+    @Query("""
+        SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL
+        AND EXISTS (SELECT 1 FROM StockModel s WHERE s.productId = p.id AND (s.totalStock - s.reservedStock) > 0)
+        """)
+    List<ProductModel> findAllActiveInStock(Pageable pageable);
+
+    @Query("""
+        SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId
+        AND EXISTS (SELECT 1 FROM StockModel s WHERE s.productId = p.id AND (s.totalStock - s.reservedStock) > 0)
+        """)
+    List<ProductModel> findAllActiveByBrandIdInStock(@Param("brandId") Long brandId, Pageable pageable);
+
     @Query("SELECT p FROM ProductModel p WHERE p.id IN :ids AND p.deletedAt IS NULL")
     List<ProductModel> findAllByIds(@Param("ids") List<Long> ids);
 

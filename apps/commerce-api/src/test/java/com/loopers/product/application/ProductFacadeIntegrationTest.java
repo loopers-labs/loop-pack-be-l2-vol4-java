@@ -189,7 +189,7 @@ class ProductFacadeIntegrationTest {
             savedProduct("조던1", 50);
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, 0, 20);
+            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, false, 0, 20);
 
             // assert
             assertThat(result).hasSize(2);
@@ -205,7 +205,7 @@ class ProductFacadeIntegrationTest {
             productJpaRepository.save(deleted);
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, 0, 20);
+            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, false, 0, 20);
 
             // assert
             assertThat(result).hasSize(1);
@@ -220,7 +220,7 @@ class ProductFacadeIntegrationTest {
             likeFacade.addLike(1L, popular.getId());
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LIKES_DESC, null, 0, 20);
+            List<ProductInfo> result = productFacade.getProducts(SortCondition.LIKES_DESC, null, false, 0, 20);
 
             // assert
             assertThat(result.get(0).id()).isEqualTo(popular.getId());

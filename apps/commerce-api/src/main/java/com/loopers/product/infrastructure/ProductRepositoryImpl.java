@@ -28,7 +28,7 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductModel> findAll(SortCondition sort, Long brandId, int page, int size) {
+    public List<ProductModel> findAll(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
         Sort springSort = switch (sort) {
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
             case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount")
@@ -36,10 +36,14 @@ public class ProductRepositoryImpl implements ProductRepository {
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
         PageRequest pageRequest = PageRequest.of(page, size, springSort);
-        if (brandId == null) {
-            return productJpaRepository.findAllActive(pageRequest);
+        if (inStock) {
+            return brandId == null
+                ? productJpaRepository.findAllActiveInStock(pageRequest)
+                : productJpaRepository.findAllActiveByBrandIdInStock(brandId, pageRequest);
         }
-        return productJpaRepository.findAllActiveByBrandId(brandId, pageRequest);
+        return brandId == null
+            ? productJpaRepository.findAllActive(pageRequest)
+            : productJpaRepository.findAllActiveByBrandId(brandId, pageRequest);
     }
 
     @Override

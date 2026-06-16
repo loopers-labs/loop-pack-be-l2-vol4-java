@@ -53,8 +53,8 @@ public class ProductFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductInfo> getProducts(SortCondition sort, Long brandId, int page, int size) {
-        List<ProductModel> products = productRepository.findAll(sort, brandId, page, size);
+    public List<ProductInfo> getProducts(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
+        List<ProductModel> products = productRepository.findAll(sort, brandId, inStock, page, size);
 
         List<Long> productIds = products.stream()
             .map(ProductModel::getId)
