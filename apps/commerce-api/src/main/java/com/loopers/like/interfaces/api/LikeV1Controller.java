@@ -1,6 +1,7 @@
 package com.loopers.like.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.like.application.LikeQueryService;
 import com.loopers.like.application.LikeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +20,7 @@ import java.util.List;
 public class LikeV1Controller implements LikeV1ApiSpec {
 
     private final LikeService likeService;
+    private final LikeQueryService likeQueryService;
 
     @PostMapping("/products/{productId}")
     @Override
@@ -45,7 +47,7 @@ public class LikeV1Controller implements LikeV1ApiSpec {
     public ApiResponse<List<LikeV1Response.LikedProduct>> getMyLikes(
         @AuthenticationPrincipal Long userId
     ) {
-        List<LikeV1Response.LikedProduct> responses = likeService.getMyLikes(userId).stream()
+        List<LikeV1Response.LikedProduct> responses = likeQueryService.getMyLikes(userId).stream()
                 .map(LikeV1Response.LikedProduct::from)
                 .toList();
         return ApiResponse.success(responses);

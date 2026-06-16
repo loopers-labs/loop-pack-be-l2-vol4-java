@@ -11,7 +11,8 @@ public class OrderCommand {
         String recipientPhone,
         String zipcode,
         String address1,
-        String address2
+        String address2,
+        Long userCouponId
     ) {
     }
 

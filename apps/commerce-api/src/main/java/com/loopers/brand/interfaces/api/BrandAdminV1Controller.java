@@ -35,13 +35,13 @@ public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
     @GetMapping("/{brandId}")
     @Override
     public ApiResponse<BrandV1Response.Detail> get(@PathVariable Long brandId) {
-        return ApiResponse.success(BrandV1Response.Detail.from(brandAdminService.get(brandId)));
+        return ApiResponse.success(BrandV1Response.Detail.from(brandAdminService.getBrand(brandId)));
     }
 
     @GetMapping
     @Override
     public ApiResponse<List<BrandV1Response.Detail>> getAll() {
-        List<BrandV1Response.Detail> responses = brandAdminService.getAll().stream()
+        List<BrandV1Response.Detail> responses = brandAdminService.getBrands().stream()
                 .map(BrandV1Response.Detail::from)
                 .toList();
         return ApiResponse.success(responses);

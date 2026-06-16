@@ -1,6 +1,6 @@
 package com.loopers.support.auth;
 
-import com.loopers.user.application.UserService;
+import com.loopers.user.application.UserAccountService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +25,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
     public static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     public static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
 
-    private final UserService userService;
+    private final UserAccountService userAccountService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -34,7 +34,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
         String loginPw = request.getHeader(HEADER_LOGIN_PW);
 
         if (loginId != null && loginPw != null) {
-            userService.authenticate(loginId, loginPw).ifPresent(userId -> {
+            userAccountService.authenticate(loginId, loginPw).ifPresent(userId -> {
                 UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 SecurityContext context = SecurityContextHolder.createEmptyContext();

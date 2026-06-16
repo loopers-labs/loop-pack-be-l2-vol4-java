@@ -7,6 +7,8 @@ import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
+import com.loopers.product.domain.ProductErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,12 +24,11 @@ public class ProductAdminService {
     private final ProductRepository productRepository;
     private final ProductStockRepository productStockRepository;
     private final BrandRepository brandRepository;
-    private final ProductReader productReader;
 
     @Transactional
     public ProductResult.AdminDetail create(ProductCommand.Create command) {
         if (!brandRepository.existsById(command.brandId())) {
-            throw new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다.");
+            throw new CoreException(ErrorType.NOT_FOUND, BrandErrorCode.BRAND_NOT_FOUND);
         }
         Product product = Product.create(
                 command.brandId(), command.name(), command.description(), command.price(), command.thumbnailUrl()
@@ -39,39 +40,39 @@ public class ProductAdminService {
 
     @Transactional
     public ProductResult.AdminDetail update(ProductCommand.Update command) {
-        Product product = productReader.get(command.productId());
+        Product product = get(command.productId());
         product.update(command.name(), command.description(), command.price(), command.thumbnailUrl());
-        int stockQuantity = productReader.getStock(command.productId()).getQuantity();
+        int stockQuantity = getStock(command.productId()).getQuantity();
         return ProductResult.AdminDetail.from(product, stockQuantity);
     }
 
     @Transactional
     public void delete(Long productId) {
-        Product product = productReader.get(productId);
-        ProductStock stock = productReader.getStock(productId);
+        Product product = get(productId);
+        ProductStock stock = getStock(productId);
         product.delete();
         stock.delete();
     }
 
     @Transactional
     public void suspend(Long productId) {
-        productReader.get(productId).suspend();
+        get(productId).suspend();
     }
 
     @Transactional
     public void resume(Long productId) {
-        productReader.get(productId).resume();
+        get(productId).resume();
     }
 
     @Transactional(readOnly = true)
-    public ProductResult.AdminDetail get(Long productId) {
-        Product product = productReader.get(productId);
-        int stockQuantity = productReader.getStock(productId).getQuantity();
+    public ProductResult.AdminDetail getProduct(Long productId) {
+        Product product = get(productId);
+        int stockQuantity = getStock(productId).getQuantity();
         return ProductResult.AdminDetail.from(product, stockQuantity);
     }
 
     @Transactional(readOnly = true)
-    public List<ProductResult.AdminDetail> getAll() {
+    public List<ProductResult.AdminDetail> getProducts() {
         List<Product> products = productRepository.findAllOrderByLatest();
         Map<Long, Integer> stockByProductId = productStockRepository
                 .findAllByProductIdIn(products.stream().map(Product::getId).toList())
@@ -80,5 +81,15 @@ public class ProductAdminService {
         return products.stream()
                 .map(product -> ProductResult.AdminDetail.from(product, stockByProductId.getOrDefault(product.getId(), 0)))
                 .toList();
+    }
+
+    private Product get(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private ProductStock getStock(Long productId) {
+        return productStockRepository.findByProductId(productId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.STOCK_NOT_FOUND));
     }
 }

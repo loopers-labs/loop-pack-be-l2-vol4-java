@@ -28,7 +28,7 @@ class OrderItemTest {
                 () -> assertThat(item.getProductName()).isEqualTo("셔츠"),
                 () -> assertThat(item.getBrandId()).isEqualTo(1L),
                 () -> assertThat(item.getBrandName()).isEqualTo("루퍼스"),
-                () -> assertThat(item.getPrice()).isEqualTo(29_000L),
+                () -> assertThat(item.getPrice().value()).isEqualTo(29_000L),
                 () -> assertThat(item.getQuantity()).isEqualTo(2)
         );
     }
@@ -38,7 +38,7 @@ class OrderItemTest {
     void givenPriceAndQuantity_whenSubtotal_thenReturnsProduct() {
         OrderItem item = OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 3);
 
-        assertThat(item.subtotal()).isEqualTo(87_000L);
+        assertThat(item.subtotal().value()).isEqualTo(87_000L);
     }
 
     @Test
@@ -93,7 +93,7 @@ class OrderItemTest {
     void givenNegativePrice_whenCreate_thenThrowsCoreException(long invalid) {
         assertThatThrownBy(() -> OrderItem.create(10L, "셔츠", 1L, "루퍼스", invalid, 2))
                 .isInstanceOf(CoreException.class)
-                .hasMessageContaining("가격은 0 이상이어야 합니다.");
+                .hasMessageContaining("금액은 0 이상이어야 합니다.");
     }
 
     @ParameterizedTest

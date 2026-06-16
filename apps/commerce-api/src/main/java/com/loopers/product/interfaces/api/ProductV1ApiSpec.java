@@ -1,7 +1,7 @@
 package com.loopers.product.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.product.application.ProductSortOption;
+import com.loopers.product.domain.ProductSortOption;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 

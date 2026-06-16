@@ -23,7 +23,7 @@ public class ProductResult {
                 brandName,
                 product.getName(),
                 product.getDescription(),
-                product.getPrice(),
+                product.getPrice().value(),
                 product.displayStatus(stockQuantity),
                 product.getThumbnailUrl(),
                 likeCount
@@ -47,7 +47,7 @@ public class ProductResult {
                 product.getBrandId(),
                 product.getName(),
                 product.getDescription(),
-                product.getPrice(),
+                product.getPrice().value(),
                 product.getStatus(),
                 product.getThumbnailUrl(),
                 stockQuantity

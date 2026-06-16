@@ -2,7 +2,7 @@ package com.loopers.product.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductQueryService;
-import com.loopers.product.application.ProductSortOption;
+import com.loopers.product.domain.ProductSortOption;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,7 +22,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductV1Response.Detail> get(@PathVariable Long productId) {
-        return ApiResponse.success(ProductV1Response.Detail.from(productQueryService.get(productId)));
+        return ApiResponse.success(ProductV1Response.Detail.from(productQueryService.getProduct(productId)));
     }
 
     @GetMapping
@@ -30,7 +30,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     public ApiResponse<List<ProductV1Response.Detail>> getAll(
         @RequestParam(defaultValue = "LATEST") ProductSortOption sort
     ) {
-        List<ProductV1Response.Detail> responses = productQueryService.getAll(sort).stream()
+        List<ProductV1Response.Detail> responses = productQueryService.getProducts(sort).stream()
                 .map(ProductV1Response.Detail::from)
                 .toList();
         return ApiResponse.success(responses);

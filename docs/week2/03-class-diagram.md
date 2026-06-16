@@ -20,7 +20,7 @@
 
 ### 클래스 다이어그램
 
-이 다이어그램은 User 도메인의 핵심 개념과 책임 경계를 확인하기 위한 것이다. 실제 구현 클래스의 모든 필드와 메서드를 표현하지 않고, 도메인 설계에 필요한 수준의 책임만 표현한다.
+이 다이어그램은 User 도메인의 핵심 개념과 책임 경계를 보여준다. 실제 구현 클래스의 모든 필드와 메서드를 표현하지 않고, 도메인 설계에 필요한 수준의 책임만 표현한다.
 
 ```mermaid
 classDiagram
@@ -58,7 +58,7 @@ classDiagram
     UserService --> User
 ```
 
-이 구조에서 봐야 할 포인트는 `User`가 일반 고객 회원을 표현하는 aggregate root라는 점이다. 관리자 권한은 `User`의 속성으로 두지 않고, 인증 시스템의 권한으로 분리한다.
+여기서 봐야 할 점은 `User`가 일반 고객 회원을 표현하는 aggregate root라는 것이다. 관리자 권한은 `User`의 속성으로 두지 않고, 인증 시스템의 권한으로 분리한다.
 
 `UserService`는 도메인 객체 자체라기보다 유스케이스 흐름을 조율하는 application service로 본다. 비밀번호 정책은 `UserPasswordPolicy`로 분리하지만, 비밀번호 인코딩 검증처럼 기술 컴포넌트가 필요한 부분은 application service 흐름에서 처리한다.
 
@@ -84,7 +84,7 @@ classDiagram
 
 ### 클래스 다이어그램
 
-이 다이어그램은 `Brand`와 `Product`를 같은 Aggregate로 묶지 않고, 브랜드 삭제 유스케이스에서 관련 상품 삭제를 조율하는 구조를 확인하기 위한 것이다.
+이 다이어그램은 `Brand`와 `Product`를 같은 Aggregate로 묶지 않고, 브랜드 삭제 유스케이스에서 관련 상품 삭제를 조율하는 구조를 보여준다.
 
 ```mermaid
 classDiagram
@@ -128,7 +128,7 @@ classDiagram
     BrandAdminService --> Brand
 ```
 
-이 구조에서 봐야 할 포인트는 `Brand`가 상품 목록을 내부 컬렉션으로 소유하지 않는다는 점이다. 브랜드 삭제 시 상품 삭제가 필요하지만, 이는 같은 Aggregate 내부의 불변식이 아니라 application service가 여러 Aggregate를 조율하는 정책으로 본다.
+여기서 봐야 할 점은 `Brand`가 상품 목록을 내부 컬렉션으로 소유하지 않는다는 것이다. 브랜드 삭제 시 상품 삭제가 필요하지만, 이는 같은 Aggregate 내부의 불변식이 아니라 application service가 여러 Aggregate를 조율하는 정책으로 본다.
 
 사용자 조회와 관리자 관리(등록/수정/삭제)는 액터와 관심사가 다르므로 application service를 `BrandService`(조회)와 `BrandAdminService`(관리)로 분리한다. 두 서비스는 `Brand` 도메인 모델과 `BrandRepository`를 공유하며, 도메인 로직이나 port를 중복하지 않는다. soft delete(`delete()`/`restore()`)는 `BaseEntity` 공통 기능이므로 Aggregate 다이어그램에는 `Brand` 고유 행위인 `update()`만 표시한다.
 
@@ -156,7 +156,7 @@ classDiagram
 
 ### 클래스 다이어그램
 
-이 다이어그램은 `Product`가 브랜드와 주문에 연결되지만, 각각을 직접 소유하지 않는 별도 Aggregate라는 점을 확인하기 위한 것이다.
+이 다이어그램은 `Product`가 브랜드와 주문에 연결되지만, 각각을 직접 소유하지 않는 별도 Aggregate라는 점을 보여준다.
 
 ```mermaid
 classDiagram
@@ -215,7 +215,7 @@ classDiagram
     ProductAdminService --> Product
 ```
 
-이 구조에서 봐야 할 포인트는 `Product`가 `Brand` 객체를 소유하지 않고 `brandId`로 참조한다는 점이다. 재고는 `ProductStock`으로 분리하지만 Product Aggregate 안의 구성요소로 본다.
+여기서 봐야 할 점은 `Product`가 `Brand` 객체를 소유하지 않고 `brandId`로 참조한다는 것이다. 재고는 `ProductStock`으로 분리하지만 Product Aggregate 안의 구성요소로 본다.
 
 관리자 상품 조회는 상품 기본 정보와 함께 `ProductStock`의 재고 정보를 포함한다. 고객 상품 조회는 상품 탐색에 필요한 기본 상품 정보를 중심으로 제공한다.
 
@@ -246,7 +246,7 @@ classDiagram
 
 ### 클래스 다이어그램
 
-이 다이어그램은 `Like`가 `User`나 `Product` 내부 컬렉션이 아니라 별도 관계 Aggregate라는 점을 확인하기 위한 것이다.
+이 다이어그램은 `Like`가 `User`나 `Product` 내부 컬렉션이 아니라 별도 관계 Aggregate라는 점을 보여준다.
 
 ```mermaid
 classDiagram
@@ -282,7 +282,7 @@ classDiagram
     LikeService --> Like
 ```
 
-이 구조에서 봐야 할 포인트는 `Like`가 `userId`, `productId`를 통해 `User`, `Product`를 참조한다는 점이다. `Product`가 좋아요 목록을 직접 소유하지 않으므로 상품 Aggregate가 과도하게 커지지 않는다.
+여기서 봐야 할 점은 `Like`가 `userId`, `productId`를 통해 `User`, `Product`를 참조한다는 것이다. `Product`가 좋아요 목록을 직접 소유하지 않으므로 상품 Aggregate가 과도하게 커지지 않는다.
 
 ### 설계 리스크
 
@@ -310,7 +310,7 @@ classDiagram
 
 ### 클래스 다이어그램
 
-이 다이어그램은 `Order`가 주문 당시 상품 정보를 스냅샷으로 보관하고, `Product`를 직접 소유하지 않는다는 점을 확인하기 위한 것이다.
+이 다이어그램은 `Order`가 주문 당시 상품 정보를 스냅샷으로 보관하고, `Product`를 직접 소유하지 않는다는 점을 보여준다.
 
 ```mermaid
 classDiagram
@@ -385,7 +385,7 @@ classDiagram
     OrderAdminService --> OrderRepository
 ```
 
-이 구조에서 봐야 할 포인트는 `OrderItem`이 `Product`가 아니라 주문 당시 상품 스냅샷이라는 점이다. 상품명, 브랜드명, 가격이 이후 변경되어도 기존 주문 정보는 바뀌지 않는다.
+여기서 봐야 할 점은 `OrderItem`이 `Product`가 아니라 주문 당시 상품 스냅샷이라는 것이다. 상품명, 브랜드명, 가격이 이후 변경되어도 기존 주문 정보는 바뀌지 않는다.
 
 `OrderStatus`는 `PENDING`(생성·결제대기) → `PAID`(결제 완료) / `FAILED`(결제 실패, 재고 복구·종료)로 전이한다. 상태 전이 권한은 `Order`에 두고(`markPaid()`/`markFailed()`), 결제 결과는 별도 Payment 도메인이 알려준다(아래 Payments 참고). 주문 생성은 `PENDING`까지만 책임지고 결제를 직접 호출하지 않는다.
 
@@ -417,7 +417,7 @@ classDiagram
 
 ### 클래스 다이어그램
 
-이 다이어그램은 `Payment`가 `Order`와 별도 Aggregate이며, PG 연동·결과 확정을 책임지고 결과만 `Order`에 반영한다는 점을 확인하기 위한 것이다.
+이 다이어그램은 `Payment`가 `Order`와 별도 Aggregate이며, PG 연동·결과 확정을 책임지고 결과만 `Order`에 반영한다는 점을 보여준다.
 
 ```mermaid
 classDiagram
@@ -477,7 +477,7 @@ classDiagram
     PaymentService --> Order
 ```
 
-이 구조에서 봐야 할 포인트는 `Payment`가 `orderNumber`로만 `Order`를 참조하고 `Order`는 `Payment`를 모른다는 점이다(의존 단방향). 결제 요청 시 `Payment`를 `REQUESTED`로 만들고 `PaymentGateway`(stub)를 호출하며, PG webhook 콜백으로 `PAID`/`FAILED`를 확정한다. 결제 금액은 클라이언트 값을 믿지 않고 `orderNumber`로 조회한 주문의 `totalAmount`를 쓴다. 결과 확정 시 `Order`의 `markPaid()`/`markFailed()`(+재고 복구)를 호출해 반영하며, 상태 전이·재고 권한은 `Order`에 둔다.
+여기서 봐야 할 점은 `Payment`가 `orderNumber`로만 `Order`를 참조하고 `Order`는 `Payment`를 모른다는 것이다(의존 단방향). 결제 요청 시 `Payment`를 `REQUESTED`로 만들고 `PaymentGateway`(stub)를 호출하며, PG webhook 콜백으로 `PAID`/`FAILED`를 확정한다. 결제 금액은 클라이언트 값을 믿지 않고 `orderNumber`로 조회한 주문의 `totalAmount`를 쓴다. 결과 확정 시 `Order`의 `markPaid()`/`markFailed()`(+재고 복구)를 호출해 반영하며, 상태 전이·재고 권한은 `Order`에 둔다.
 
 ### 설계 리스크
 

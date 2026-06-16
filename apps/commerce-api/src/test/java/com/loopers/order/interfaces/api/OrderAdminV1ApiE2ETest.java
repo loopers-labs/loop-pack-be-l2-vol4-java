@@ -5,8 +5,8 @@ import com.loopers.brand.application.BrandCommand;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
+import com.loopers.user.application.UserAccountService;
 import com.loopers.user.application.UserCommand;
-import com.loopers.user.application.UserService;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,7 @@ class OrderAdminV1ApiE2ETest {
     private static final String RAW_PASSWORD = "Passw0rd!";
 
     private final TestRestTemplate testRestTemplate;
-    private final UserService userService;
+    private final UserAccountService userAccountService;
     private final BrandAdminService brandAdminService;
     private final ProductAdminService productAdminService;
     private final DatabaseCleanUp databaseCleanUp;
@@ -47,13 +47,13 @@ class OrderAdminV1ApiE2ETest {
     @Autowired
     public OrderAdminV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
-            UserService userService,
+            UserAccountService userAccountService,
             BrandAdminService brandAdminService,
             ProductAdminService productAdminService,
             DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
-        this.userService = userService;
+        this.userAccountService = userAccountService;
         this.brandAdminService = brandAdminService;
         this.productAdminService = productAdminService;
         this.databaseCleanUp = databaseCleanUp;
@@ -61,10 +61,10 @@ class OrderAdminV1ApiE2ETest {
 
     @BeforeEach
     void setUp() {
-        userService.signUp(new UserCommand.SignUp(
+        userAccountService.signUp(new UserCommand.SignUp(
                 USER1, RAW_PASSWORD, "김루퍼", LocalDate.of(1995, 3, 21), "looper1@example.com"
         ));
-        userService.signUp(new UserCommand.SignUp(
+        userAccountService.signUp(new UserCommand.SignUp(
                 USER2, RAW_PASSWORD, "이루퍼", LocalDate.of(1996, 4, 22), "looper2@example.com"
         ));
         Long brandId = brandAdminService.create(new BrandCommand.Create("루퍼스", "설명", null)).id();
@@ -93,7 +93,8 @@ class OrderAdminV1ApiE2ETest {
     private void placeOrder(String loginId) {
         OrderV1Request.Create body = new OrderV1Request.Create(
                 List.of(new OrderV1Request.Create.Line(productId, 1)),
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
+                null
         );
         testRestTemplate.exchange(
                 "/api/v1/orders", HttpMethod.POST, new HttpEntity<>(body, userHeaders(loginId)),

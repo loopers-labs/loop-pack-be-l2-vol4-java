@@ -28,7 +28,7 @@ class ProductTest {
                 () -> assertThat(product.getBrandId()).isEqualTo(BRAND_ID),
                 () -> assertThat(product.getName()).isEqualTo(NAME),
                 () -> assertThat(product.getDescription()).isEqualTo(DESCRIPTION),
-                () -> assertThat(product.getPrice()).isEqualTo(PRICE),
+                () -> assertThat(product.getPrice().value()).isEqualTo(PRICE),
                 () -> assertThat(product.getThumbnailUrl()).isEqualTo(THUMBNAIL),
                 () -> assertThat(product.getStatus()).isEqualTo(ProductStatus.ON_SALE)
         );
@@ -50,7 +50,7 @@ class ProductTest {
     void givenZeroPrice_whenCreate_thenStoresZero() {
         Product product = Product.create(BRAND_ID, NAME, DESCRIPTION, 0L, THUMBNAIL);
 
-        assertThat(product.getPrice()).isZero();
+        assertThat(product.getPrice().value()).isZero();
     }
 
     @Test
@@ -77,7 +77,7 @@ class ProductTest {
     void givenNegativePrice_whenCreate_thenThrowsCoreException(long invalid) {
         assertThatThrownBy(() -> Product.create(BRAND_ID, NAME, DESCRIPTION, invalid, THUMBNAIL))
                 .isInstanceOf(CoreException.class)
-                .hasMessageContaining("가격은 0 이상이어야 합니다.");
+                .hasMessageContaining("금액은 0 이상이어야 합니다.");
     }
 
     @Test
@@ -90,7 +90,7 @@ class ProductTest {
         assertAll(
                 () -> assertThat(product.getName()).isEqualTo("프린트 셔츠"),
                 () -> assertThat(product.getDescription()).isEqualTo("프린트 패턴 셔츠"),
-                () -> assertThat(product.getPrice()).isEqualTo(35_000L),
+                () -> assertThat(product.getPrice().value()).isEqualTo(35_000L),
                 () -> assertThat(product.getThumbnailUrl()).isEqualTo("https://cdn.loopers.com/products/print.png")
         );
     }

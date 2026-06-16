@@ -3,7 +3,7 @@ package com.loopers.brand.application;
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.brand.domain.BrandErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,23 +20,22 @@ class BrandReaderTest {
     private final BrandReader brandReader = new BrandReader(brandRepository);
 
     @Test
-    @DisplayName("존재하는 brandId 로 조회하면 해당 브랜드를 반환한다")
-    void givenExistingBrandId_whenGet_thenReturnsBrand() {
-        Brand brand = Brand.create("루퍼스", "설명", null);
-        when(brandRepository.findById(1L)).thenReturn(Optional.of(brand));
+    @DisplayName("getName 은 존재하는 brandId 의 브랜드명을 반환한다")
+    void givenExistingBrandId_whenGetName_thenReturnsName() {
+        when(brandRepository.findById(1L)).thenReturn(Optional.of(Brand.create("루퍼스", "설명", null)));
 
-        Brand result = brandReader.get(1L);
+        String result = brandReader.getName(1L);
 
-        assertThat(result).isSameAs(brand);
+        assertThat(result).isEqualTo("루퍼스");
     }
 
     @Test
-    @DisplayName("존재하지 않는 brandId 로 조회하면 NOT_FOUND 예외가 발생한다")
-    void givenNonExistingBrandId_whenGet_thenThrowsNotFound() {
+    @DisplayName("getName 은 존재하지 않는 brandId 면 NOT_FOUND 예외가 발생한다")
+    void givenNonExistingBrandId_whenGetName_thenThrowsNotFound() {
         when(brandRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> brandReader.get(999L))
+        assertThatThrownBy(() -> brandReader.getName(999L))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
     }
 }

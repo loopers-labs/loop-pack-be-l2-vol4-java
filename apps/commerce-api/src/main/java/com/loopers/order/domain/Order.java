@@ -1,8 +1,10 @@
 package com.loopers.order.domain;
 
+import com.loopers.common.domain.Money;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -41,8 +43,20 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false)
     private OrderStatus status;
 
-    @Column(name = "total_amount", nullable = false)
-    private long totalAmount;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "total_amount", nullable = false))
+    private Money totalAmount;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "final_amount", nullable = false))
+    private Money finalAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
 
     @Embedded
     private ShippingDestination shippingDestination;
@@ -60,7 +74,9 @@ public class Order extends BaseEntity {
         this.orderNumber = orderNumber;
         this.shippingDestination = shippingDestination;
         validate(items);
-        this.totalAmount = items.stream().mapToLong(OrderItem::subtotal).sum();
+        this.totalAmount = items.stream().map(OrderItem::subtotal).reduce(Money.ZERO, Money::plus);
+        this.discountAmount = Money.ZERO;
+        this.finalAmount = this.totalAmount;
         this.status = OrderStatus.PENDING;
         this.orderedAt = ZonedDateTime.now();
     }
@@ -72,6 +88,17 @@ public class Order extends BaseEntity {
             List<OrderItem> items
     ) {
         return new Order(userId, orderNumber, shippingDestination, items);
+    }
+
+    public void applyDiscount(Long userCouponId, Money discountAmount) {
+        Money effectiveDiscount = discountAmount.value() > totalAmount.value() ? totalAmount : discountAmount;
+        this.userCouponId = userCouponId;
+        this.discountAmount = effectiveDiscount;
+        this.finalAmount = Money.of(totalAmount.value() - effectiveDiscount.value());
+    }
+
+    public void markFailed() {
+        this.status = OrderStatus.FAILED;
     }
 
     private void validate(List<OrderItem> items) {

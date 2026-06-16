@@ -18,6 +18,9 @@ public class OrderResult {
         String orderNumber,
         OrderStatus status,
         long totalAmount,
+        long discountAmount,
+        long finalAmount,
+        Long userCouponId,
         ZonedDateTime orderedAt,
         Recipient recipient,
         List<Item> items
@@ -27,7 +30,10 @@ public class OrderResult {
                 order.getId(),
                 order.getOrderNumber(),
                 order.getStatus(),
-                order.getTotalAmount(),
+                order.getTotalAmount().value(),
+                order.getDiscountAmount().value(),
+                order.getFinalAmount().value(),
+                order.getUserCouponId(),
                 order.getOrderedAt(),
                 Recipient.from(order.getShippingDestination()),
                 items.stream().map(Item::from).toList()
@@ -52,7 +58,7 @@ public class OrderResult {
                 order.getUserId(),
                 order.getOrderNumber(),
                 order.getStatus(),
-                order.getTotalAmount(),
+                order.getTotalAmount().value(),
                 order.getOrderedAt()
             );
         }
@@ -73,9 +79,9 @@ public class OrderResult {
                 item.getProductName(),
                 item.getBrandId(),
                 item.getBrandName(),
-                item.getPrice(),
+                item.getPrice().value(),
                 item.getQuantity(),
-                item.subtotal()
+                item.subtotal().value()
             );
         }
     }

@@ -1,9 +1,9 @@
 package com.loopers.user.application;
 
 import com.loopers.user.domain.User;
+import com.loopers.user.domain.UserErrorCode;
 import com.loopers.user.domain.UserRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,14 +21,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class UserServiceTest {
+class UserAccountServiceTest {
 
     private static final String RAW_PASSWORD = "Passw0rd!";
 
     private final UserRepository userRepository = mock(UserRepository.class);
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    private final UserReader userReader = mock(UserReader.class);
-    private final UserService userService = new UserService(userRepository, passwordEncoder, userReader);
+    private final UserAccountService userAccountService = new UserAccountService(userRepository, passwordEncoder);
 
     private UserCommand.SignUp signUpCommand() {
         return new UserCommand.SignUp(
@@ -39,7 +38,7 @@ class UserServiceTest {
     private User savedUser() {
         when(userRepository.save(any(User.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        userService.signUp(signUpCommand());
+        userAccountService.signUp(signUpCommand());
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
@@ -71,9 +70,9 @@ class UserServiceTest {
     void givenDuplicateLoginId_whenSignUp_thenThrowsConflictAndDoesNotSave() {
         when(userRepository.existsByLoginId("loopers01")).thenReturn(true);
 
-        assertThatThrownBy(() -> userService.signUp(signUpCommand()))
+        assertThatThrownBy(() -> userAccountService.signUp(signUpCommand()))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.LOGIN_ID_DUPLICATED);
 
         verify(userRepository, never()).save(any());
     }
@@ -83,9 +82,9 @@ class UserServiceTest {
     void givenDuplicateEmail_whenSignUp_thenThrowsConflictAndDoesNotSave() {
         when(userRepository.existsByEmail("looper@example.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> userService.signUp(signUpCommand()))
+        assertThatThrownBy(() -> userAccountService.signUp(signUpCommand()))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.EMAIL_DUPLICATED);
 
         verify(userRepository, never()).save(any());
     }
@@ -97,9 +96,9 @@ class UserServiceTest {
             "loopers01", "19950321aA", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
         );
 
-        assertThatThrownBy(() -> userService.signUp(command))
+        assertThatThrownBy(() -> userAccountService.signUp(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
 
         verify(userRepository, never()).save(any());
     }
@@ -116,7 +115,7 @@ class UserServiceTest {
         User user = existingUser();
         when(userRepository.findByLoginId("loopers01")).thenReturn(Optional.of(user));
 
-        Optional<Long> result = userService.authenticate("loopers01", RAW_PASSWORD);
+        Optional<Long> result = userAccountService.authenticate("loopers01", RAW_PASSWORD);
 
         assertThat(result).contains(user.getId());
     }
@@ -126,7 +125,7 @@ class UserServiceTest {
     void givenWrongPassword_whenAuthenticate_thenReturnsEmpty() {
         when(userRepository.findByLoginId("loopers01")).thenReturn(Optional.of(existingUser()));
 
-        Optional<Long> result = userService.authenticate("loopers01", "WrongPass1!");
+        Optional<Long> result = userAccountService.authenticate("loopers01", "WrongPass1!");
 
         assertThat(result).isEmpty();
     }
@@ -136,7 +135,7 @@ class UserServiceTest {
     void givenUnknownLoginId_whenAuthenticate_thenReturnsEmpty() {
         when(userRepository.findByLoginId("unknown01")).thenReturn(Optional.empty());
 
-        Optional<Long> result = userService.authenticate("unknown01", RAW_PASSWORD);
+        Optional<Long> result = userAccountService.authenticate("unknown01", RAW_PASSWORD);
 
         assertThat(result).isEmpty();
     }
@@ -145,11 +144,11 @@ class UserServiceTest {
     @DisplayName("비밀번호 수정 시 새 비밀번호가 인코딩되어 갱신된다")
     void givenValidCommand_whenChangePassword_thenUpdatesPasswordToEncoded() {
         User user = existingUser();
-        when(userReader.get(1L)).thenReturn(user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         String newRawPassword = "NewPass1!";
         UserCommand.ChangePassword command = new UserCommand.ChangePassword(1L, RAW_PASSWORD, newRawPassword);
 
-        userService.changePassword(command);
+        userAccountService.changePassword(command);
 
         assertThat(user.getPassword()).isNotEqualTo(newRawPassword);
         assertThat(passwordEncoder.matches(newRawPassword, user.getPassword())).isTrue();
@@ -158,35 +157,35 @@ class UserServiceTest {
     @Test
     @DisplayName("비밀번호 수정 시 사용자가 존재하지 않으면 NOT_FOUND 예외가 발생한다")
     void givenNonExistingUser_whenChangePassword_thenThrowsNotFound() {
-        when(userReader.get(999L)).thenThrow(new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
         UserCommand.ChangePassword command = new UserCommand.ChangePassword(999L, RAW_PASSWORD, "NewPass1!");
 
-        assertThatThrownBy(() -> userService.changePassword(command))
+        assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
     }
 
     @Test
     @DisplayName("비밀번호 수정 시 현재 비밀번호가 일치하지 않으면 BAD_REQUEST 예외가 발생한다")
     void givenMismatchingCurrentPassword_whenChangePassword_thenThrowsBadRequest() {
         User user = existingUser();
-        when(userReader.get(1L)).thenReturn(user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         UserCommand.ChangePassword command = new UserCommand.ChangePassword(1L, "WrongPass1!", "NewPass1!");
 
-        assertThatThrownBy(() -> userService.changePassword(command))
+        assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.CURRENT_PASSWORD_MISMATCH);
     }
 
     @Test
     @DisplayName("비밀번호 수정 시 새 비밀번호에 생년월일이 포함되면 BAD_REQUEST 예외가 발생한다")
     void givenNewPasswordContainingBirthDate_whenChangePassword_thenThrowsBadRequest() {
         User user = existingUser();
-        when(userReader.get(1L)).thenReturn(user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         UserCommand.ChangePassword command = new UserCommand.ChangePassword(1L, RAW_PASSWORD, "19950321aA");
 
-        assertThatThrownBy(() -> userService.changePassword(command))
+        assertThatThrownBy(() -> userAccountService.changePassword(command))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.BAD_REQUEST);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.PASSWORD_CONTAINS_BIRTHDATE);
     }
 }

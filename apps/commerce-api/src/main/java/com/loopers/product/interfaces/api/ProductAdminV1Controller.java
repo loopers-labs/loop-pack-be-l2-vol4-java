@@ -35,13 +35,13 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductAdminV1Response.AdminDetail> get(@PathVariable Long productId) {
-        return ApiResponse.success(ProductAdminV1Response.AdminDetail.from(productAdminService.get(productId)));
+        return ApiResponse.success(ProductAdminV1Response.AdminDetail.from(productAdminService.getProduct(productId)));
     }
 
     @GetMapping
     @Override
     public ApiResponse<List<ProductAdminV1Response.AdminDetail>> getAll() {
-        List<ProductAdminV1Response.AdminDetail> responses = productAdminService.getAll().stream()
+        List<ProductAdminV1Response.AdminDetail> responses = productAdminService.getProducts().stream()
                 .map(ProductAdminV1Response.AdminDetail::from)
                 .toList();
         return ApiResponse.success(responses);

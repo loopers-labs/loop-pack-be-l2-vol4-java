@@ -94,7 +94,7 @@ docker-compose -f ./docker/monitoring-compose.yml up   # Prometheus + Grafana (h
 | Domain | `<domain>/domain` | `XxxModel`(`@Entity`), 정적 정책·규칙 클래스(예: `XxxPasswordPolicy`), `XxxRepository`(port 인터페이스) | **순수 인메모리만, I/O 없음** |
 | Infrastructure | `<domain>/infrastructure` | `XxxRepositoryImpl`(port 구현), `XxxJpaRepository`(Spring Data 인터페이스) | — |
 
-**도메인/애플리케이션 분기 기준**: Repository나 외부 시스템을 호출하면 application, 순수 인메모리 로직(엔티티 불변식·정적 규칙)만 있으면 domain.
+**도메인/애플리케이션 분기 기준**: 도메인 결정(검증·계산·불변식·상태 전이)을 품으면 domain — 단일 애그리거트 규칙은 엔티티/VO에, 여러 애그리거트에 걸친 순수 규칙만 도메인 서비스에 둔다. 스스로 결정하지 않고 로드·위임·트랜잭션을 조율만 하면 application이다. Repository 호출 여부는 보조 신호일 뿐 기준이 아니다(도메인 서비스도 Repository port를 호출할 수 있다). 실전 판별: 인프라 목 없이 테스트되면 domain, 리포지토리를 목해야 테스트되면 application.
 
 호출 흐름: Controller가 `V1Dto` → application `Command`로 변환 → application `Service`가 도메인 객체와 Repository를 조율 → 결과를 `V1Dto.Response`로 매핑해 `ApiResponse`로 반환. 다중 도메인을 엮어야 할 때만 Facade를 application에 추가한다(단일 도메인 유스케이스면 Facade 불필요).
 

@@ -1,6 +1,6 @@
 package com.loopers.config;
 
-import com.loopers.user.application.UserService;
+import com.loopers.user.application.UserAccountService;
 import com.loopers.support.auth.AdminAuthenticationFilter;
 import com.loopers.support.auth.HeaderAuthenticationFilter;
 import com.loopers.support.auth.UnauthorizedEntryPoint;
@@ -32,7 +32,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http,
-        UserService userService,
+        UserAccountService userAccountService,
         UnauthorizedEntryPoint unauthorizedEntryPoint
     ) throws Exception {
         http
@@ -43,13 +43,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/users/me/coupons").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/password").authenticated()
                 .requestMatchers("/api/v1/likes/**").authenticated()
                 .requestMatchers("/api/v1/orders/**").authenticated()
+                .requestMatchers("/api/v1/coupons/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint))
             .addFilterBefore(new AdminAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new HeaderAuthenticationFilter(userService), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new HeaderAuthenticationFilter(userAccountService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

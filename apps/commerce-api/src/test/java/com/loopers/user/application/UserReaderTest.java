@@ -1,16 +1,12 @@
 package com.loopers.user.application;
 
-import com.loopers.user.domain.User;
 import com.loopers.user.domain.UserRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.user.domain.UserErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDate;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -20,30 +16,21 @@ class UserReaderTest {
     private final UserRepository userRepository = mock(UserRepository.class);
     private final UserReader userReader = new UserReader(userRepository);
 
-    private User existingUser() {
-        return User.create(
-            "loopers01", "encoded-pw", "김루퍼", LocalDate.of(1995, 3, 21), "looper@example.com"
-        );
+    @Test
+    @DisplayName("ensureExists 는 존재하는 userId 면 예외 없이 통과한다")
+    void givenExistingUserId_whenEnsureExists_thenDoesNotThrow() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+
+        assertThatCode(() -> userReader.ensureExists(1L)).doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("userId로 조회하면 해당 사용자를 반환한다")
-    void givenExistingUserId_whenGet_thenReturnsUser() {
-        User user = existingUser();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    @DisplayName("ensureExists 는 존재하지 않는 userId 면 NOT_FOUND 예외가 발생한다")
+    void givenNonExistingUserId_whenEnsureExists_thenThrowsNotFound() {
+        when(userRepository.existsById(999L)).thenReturn(false);
 
-        User result = userReader.get(1L);
-
-        assertThat(result).isSameAs(user);
-    }
-
-    @Test
-    @DisplayName("사용자가 존재하지 않으면 NOT_FOUND 예외가 발생한다")
-    void givenNonExistingUserId_whenGet_thenThrowsNotFound() {
-        when(userRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> userReader.get(999L))
+        assertThatThrownBy(() -> userReader.ensureExists(999L))
             .isInstanceOf(CoreException.class)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+            .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
     }
 }

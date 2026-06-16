@@ -2,6 +2,7 @@ package com.loopers.product.infrastructure;
 
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductSortOption;
 import com.loopers.product.domain.ProductStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -31,18 +32,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Product> findAllOnSaleOrderByLatest() {
-        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(ProductStatus.ON_SALE);
+    public boolean existsActiveById(Long id) {
+        return productJpaRepository.existsByIdAndStatusAndDeletedAtIsNull(id, ProductStatus.ON_SALE);
     }
 
     @Override
-    public List<Product> findAllOnSaleOrderByPriceAsc() {
-        return productJpaRepository.findAllByStatusAndDeletedAtIsNullOrderByPriceAsc(ProductStatus.ON_SALE);
-    }
-
-    @Override
-    public List<Product> findAllOnSaleOrderByLikeCountDesc() {
-        return productJpaRepository.findOnSaleOrderByLikeCountDesc();
+    public List<Product> findAllOnSale(ProductSortOption sort) {
+        return productJpaRepository.findAllOnSale(sort);
     }
 
     @Override

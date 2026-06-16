@@ -1,16 +1,19 @@
 package com.loopers.product.application;
 
+import com.loopers.brand.domain.BrandErrorCode;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.product.domain.Product;
+import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductStatus;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,9 +31,8 @@ class ProductAdminServiceTest {
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final ProductStockRepository productStockRepository = mock(ProductStockRepository.class);
     private final BrandRepository brandRepository = mock(BrandRepository.class);
-    private final ProductReader productReader = mock(ProductReader.class);
     private final ProductAdminService productAdminService =
-            new ProductAdminService(productRepository, productStockRepository, brandRepository, productReader);
+            new ProductAdminService(productRepository, productStockRepository, brandRepository);
 
     private ProductCommand.Create createCommand() {
         return new ProductCommand.Create(BRAND_ID, "셔츠", "설명", 29_000L, "https://cdn/shirt.png", 50);
@@ -61,7 +63,7 @@ class ProductAdminServiceTest {
 
         assertThatThrownBy(() -> productAdminService.create(createCommand()))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", BrandErrorCode.BRAND_NOT_FOUND);
 
         verify(productRepository, never()).save(any());
         verify(productStockRepository, never()).save(any());
@@ -71,8 +73,8 @@ class ProductAdminServiceTest {
     @DisplayName("update 커맨드로 기존 상품의 이름·설명·가격·썸네일이 변경되고 재고 포함 AdminDetail 을 반환한다")
     void givenUpdateCommand_whenUpdate_thenChangesFields() {
         Product product = Product.create(BRAND_ID, "원래", "원래설명", 10_000L, "old.png");
-        when(productReader.get(1L)).thenReturn(product);
-        when(productReader.getStock(1L)).thenReturn(ProductStock.create(1L, 30));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productStockRepository.findByProductId(1L)).thenReturn(Optional.of(ProductStock.create(1L, 30)));
 
         ProductResult.AdminDetail result =
                 productAdminService.update(new ProductCommand.Update(1L, "새이름", "새설명", 20_000L, "new.png"));
@@ -88,11 +90,11 @@ class ProductAdminServiceTest {
     @Test
     @DisplayName("update 시 존재하지 않는 productId 이면 NOT_FOUND 가 전파된다")
     void givenNonExistingId_whenUpdate_thenPropagatesNotFound() {
-        when(productReader.get(999L)).thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        when(productRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productAdminService.update(new ProductCommand.Update(999L, "이름", "설명", 1000L, null)))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.PRODUCT_NOT_FOUND);
     }
 
     @Test
@@ -100,8 +102,8 @@ class ProductAdminServiceTest {
     void givenExistingProduct_whenDelete_thenSoftDeletesBoth() {
         Product product = Product.create(BRAND_ID, "셔츠", "설명", 29_000L, null);
         ProductStock stock = ProductStock.create(1L, 50);
-        when(productReader.get(1L)).thenReturn(product);
-        when(productReader.getStock(1L)).thenReturn(stock);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productStockRepository.findByProductId(1L)).thenReturn(Optional.of(stock));
 
         productAdminService.delete(1L);
 
@@ -115,7 +117,7 @@ class ProductAdminServiceTest {
     @DisplayName("suspend 는 상품을 SUSPENDED 로 전환한다")
     void givenProduct_whenSuspend_thenStatusSuspended() {
         Product product = Product.create(BRAND_ID, "셔츠", "설명", 29_000L, null);
-        when(productReader.get(1L)).thenReturn(product);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         productAdminService.suspend(1L);
 
@@ -127,7 +129,7 @@ class ProductAdminServiceTest {
     void givenSuspendedProduct_whenResume_thenStatusOnSale() {
         Product product = Product.create(BRAND_ID, "셔츠", "설명", 29_000L, null);
         product.suspend();
-        when(productReader.get(1L)).thenReturn(product);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         productAdminService.resume(1L);
 
@@ -139,10 +141,10 @@ class ProductAdminServiceTest {
     void givenProduct_whenGet_thenReturnsAdminDetailWithStock() {
         Product product = Product.create(BRAND_ID, "셔츠", "설명", 29_000L, null);
         product.suspend();
-        when(productReader.get(1L)).thenReturn(product);
-        when(productReader.getStock(1L)).thenReturn(ProductStock.create(1L, 7));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productStockRepository.findByProductId(1L)).thenReturn(Optional.of(ProductStock.create(1L, 7)));
 
-        ProductResult.AdminDetail result = productAdminService.get(1L);
+        ProductResult.AdminDetail result = productAdminService.getProduct(1L);
 
         assertAll(
                 () -> assertThat(result.status()).isEqualTo(ProductStatus.SUSPENDED),

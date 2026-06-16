@@ -12,6 +12,9 @@ public class OrderV1Response {
         String orderNumber,
         String status,
         long totalAmount,
+        long discountAmount,
+        long finalAmount,
+        Long userCouponId,
         ZonedDateTime orderedAt,
         Recipient recipient,
         List<Item> items
@@ -22,6 +25,9 @@ public class OrderV1Response {
                 result.orderNumber(),
                 result.status().name(),
                 result.totalAmount(),
+                result.discountAmount(),
+                result.finalAmount(),
+                result.userCouponId(),
                 result.orderedAt(),
                 Recipient.from(result.recipient()),
                 result.items().stream().map(Item::from).toList()

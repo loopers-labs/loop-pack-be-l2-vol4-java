@@ -1,0 +1,88 @@
+### 쿠폰 템플릿 등록 - 정액(FIXED)
+POST {{commerce-api}}/api/v1/admin/coupons
+Content-Type: application/json
+X-Loopers-Admin-Id: admin-1
+
+{
+  "name": "신규가입 3천원",
+  "type": "FIXED",
+  "value": 3000,
+  "minOrderAmount": 10000,
+  "expiredAt": "2030-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 등록 - 정률(RATE)
+POST {{commerce-api}}/api/v1/admin/coupons
+Content-Type: application/json
+X-Loopers-Admin-Id: admin-1
+
+{
+  "name": "정률 10%",
+  "type": "RATE",
+  "value": 10,
+  "expiredAt": "2030-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 등록 - 검증 실패 (정률 > 100, 400)
+POST {{commerce-api}}/api/v1/admin/coupons
+Content-Type: application/json
+X-Loopers-Admin-Id: admin-1
+
+{
+  "name": "잘못된 정률",
+  "type": "RATE",
+  "value": 150,
+  "expiredAt": "2030-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 등록 - admin 헤더 없음 (401)
+POST {{commerce-api}}/api/v1/admin/coupons
+Content-Type: application/json
+
+{
+  "name": "권한 없음",
+  "type": "FIXED",
+  "value": 1000,
+  "expiredAt": "2030-12-31T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 단건 조회
+GET {{commerce-api}}/api/v1/admin/coupons/1
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 템플릿 단건 조회 - 존재하지 않는 id (404)
+GET {{commerce-api}}/api/v1/admin/coupons/9999
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 템플릿 목록 조회 (페이지)
+GET {{commerce-api}}/api/v1/admin/coupons?page=0&size=20
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 템플릿 수정
+PUT {{commerce-api}}/api/v1/admin/coupons/1
+Content-Type: application/json
+X-Loopers-Admin-Id: admin-1
+
+{
+  "name": "정률 15%",
+  "type": "RATE",
+  "value": 15,
+  "minOrderAmount": 20000,
+  "expiredAt": "2031-06-30T23:59:59+09:00"
+}
+
+### 쿠폰 템플릿 삭제 (soft delete)
+DELETE {{commerce-api}}/api/v1/admin/coupons/1
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 템플릿 삭제 - 존재하지 않는 id (404)
+DELETE {{commerce-api}}/api/v1/admin/coupons/9999
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 발급 내역 조회 (페이지)
+GET {{commerce-api}}/api/v1/admin/coupons/1/issues?page=0&size=20
+X-Loopers-Admin-Id: admin-1
+
+### 쿠폰 발급 내역 조회 - 존재하지 않는 템플릿 (404)
+GET {{commerce-api}}/api/v1/admin/coupons/9999/issues
+X-Loopers-Admin-Id: admin-1

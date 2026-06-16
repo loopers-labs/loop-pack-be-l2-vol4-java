@@ -1,16 +1,19 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandReader;
-import com.loopers.brand.domain.Brand;
+import com.loopers.common.domain.Money;
+import com.loopers.coupon.application.CouponUsageService;
+import com.loopers.coupon.domain.CouponErrorCode;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.OrderStatus;
+import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
-import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
+import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.user.application.UserReader;
@@ -26,15 +29,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class OrderServiceTest {
+class PlaceOrderServiceTest {
 
     private static final Long USER_ID = 1L;
+    private static final String ORDER_NUMBER = "20260528-000001";
 
     private final UserReader userReader = mock(UserReader.class);
     private final ProductReader productReader = mock(ProductReader.class);
@@ -42,37 +48,39 @@ class OrderServiceTest {
     private final BrandReader brandReader = mock(BrandReader.class);
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
-    private final OrderNumberGenerator orderNumberGenerator = mock(OrderNumberGenerator.class);
-    private final PaymentService paymentService = mock(PaymentService.class);
+    private final CouponUsageService couponUsageService = mock(CouponUsageService.class);
 
-    private final OrderService orderService = new OrderService(
+    private final PlaceOrderService placeOrderService = new PlaceOrderService(
             userReader, productReader, productStockRepository, brandReader,
-            orderRepository, orderItemRepository, orderNumberGenerator, paymentService
+            orderRepository, orderItemRepository, couponUsageService
     );
 
     private OrderCommand.Create command(List<OrderCommand.Line> lines) {
+        return command(lines, null);
+    }
+
+    private OrderCommand.Create command(List<OrderCommand.Line> lines, Long userCouponId) {
         return new OrderCommand.Create(
                 USER_ID, lines,
-                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"
+                "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
+                userCouponId
         );
     }
 
     private void stubProduct(Long productId, Long brandId, String name, long price, int stockQty) {
-        Product product = Product.create(brandId, name, "설명", price, "thumb.jpg");
-        when(productReader.getActive(productId)).thenReturn(product);
-        when(brandReader.get(brandId)).thenReturn(Brand.create("브랜드" + brandId, "설명", null));
+        when(productReader.getInfo(productId)).thenReturn(new ProductInfo(name, brandId, price));
+        when(brandReader.getName(brandId)).thenReturn("브랜드" + brandId);
         when(productStockRepository.findByProductIdForUpdate(productId))
                 .thenReturn(Optional.of(ProductStock.create(productId, stockQty)));
     }
 
     @Test
     @DisplayName("주문 생성: 상품 조회 후 재고를 차감하고 PENDING 주문과 스냅샷 항목을 저장한다")
-    void givenAvailableProducts_whenCreate_thenDecreasesStockAndSavesPendingOrder() {
+    void givenAvailableProducts_whenPlace_thenDecreasesStockAndSavesPendingOrder() {
         stubProduct(10L, 1L, "셔츠", 29_000L, 50);
-        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        OrderResult.Detail result = orderService.create(command(List.of(new OrderCommand.Line(10L, 2))));
+        OrderResult.Detail result = placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 2))), ORDER_NUMBER);
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(orderCaptor.capture());
@@ -80,7 +88,7 @@ class OrderServiceTest {
         assertAll(
                 () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(savedOrder.getOrderNumber()).isEqualTo("20260528-000001"),
-                () -> assertThat(savedOrder.getTotalAmount()).isEqualTo(58_000L),
+                () -> assertThat(savedOrder.getTotalAmount().value()).isEqualTo(58_000L),
                 () -> assertThat(result.totalAmount()).isEqualTo(58_000L),
                 () -> assertThat(result.items()).hasSize(1),
                 () -> assertThat(result.items().get(0).productName()).isEqualTo("셔츠"),
@@ -90,16 +98,15 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("주문 생성: 재고는 productId 오름차순으로 잠금을 획득한다 (deadlock 방지)")
-    void givenItemsInDescendingProductId_whenCreate_thenLocksStockInAscendingOrder() {
+    void givenItemsInDescendingProductId_whenPlace_thenLocksStockInAscendingOrder() {
         stubProduct(10L, 1L, "셔츠", 29_000L, 50);
         stubProduct(20L, 1L, "바지", 15_000L, 50);
-        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        orderService.create(command(List.of(
+        placeOrderService.createPendingOrder(command(List.of(
                 new OrderCommand.Line(20L, 1),
                 new OrderCommand.Line(10L, 1)
-        )));
+        )), ORDER_NUMBER);
 
         InOrder inOrder = inOrder(productStockRepository);
         inOrder.verify(productStockRepository).findByProductIdForUpdate(10L);
@@ -108,13 +115,12 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("주문 생성: 재고가 부족하면 CONFLICT 가 전파되고 주문을 저장하지 않는다")
-    void givenInsufficientStock_whenCreate_thenThrowsConflictAndSavesNothing() {
+    void givenInsufficientStock_whenPlace_thenThrowsConflictAndSavesNothing() {
         stubProduct(10L, 1L, "셔츠", 29_000L, 1);
-        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
 
-        assertThatThrownBy(() -> orderService.create(command(List.of(new OrderCommand.Line(10L, 5)))))
+        assertThatThrownBy(() -> placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 5))), ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.CONFLICT);
+                .hasFieldOrPropertyWithValue("errorCode", ProductErrorCode.OUT_OF_STOCK);
 
         verify(orderRepository, never()).save(any());
         verify(orderItemRepository, never()).save(any());
@@ -122,53 +128,38 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("주문 생성: 삭제/판매중지/존재하지 않는 상품이면 NOT_FOUND 가 전파되고 주문을 저장하지 않는다")
-    void givenInactiveProduct_whenCreate_thenThrowsNotFoundAndSavesNothing() {
-        when(productReader.getActive(99L))
+    void givenInactiveProduct_whenPlace_thenThrowsNotFoundAndSavesNothing() {
+        when(productReader.getInfo(99L))
                 .thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
 
-        assertThatThrownBy(() -> orderService.create(command(List.of(new OrderCommand.Line(99L, 1)))))
+        assertThatThrownBy(() -> placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(99L, 1))), ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(orderRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("주문 생성: 존재하지 않는 사용자면 NOT_FOUND 가 전파되고 재고·주문을 건드리지 않는다")
-    void givenNonExistingUser_whenCreate_thenThrowsNotFoundAndTouchesNothing() {
-        when(userReader.get(USER_ID))
-                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    void givenNonExistingUser_whenPlace_thenThrowsNotFoundAndTouchesNothing() {
+        doThrow(new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."))
+                .when(userReader).ensureExists(USER_ID);
 
-        assertThatThrownBy(() -> orderService.create(command(List.of(new OrderCommand.Line(10L, 1)))))
+        assertThatThrownBy(() -> placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 1))), ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
         verify(productStockRepository, never()).findByProductIdForUpdate(any());
         verify(orderRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("주문 생성: 주문 저장 후 결제 통합 지점(PaymentService.pay)을 호출한다")
-    void givenAvailableProducts_whenCreate_thenInvokesPaymentStubAfterSave() {
-        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
-        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
-        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        orderService.create(command(List.of(new OrderCommand.Line(10L, 1))));
-
-        InOrder inOrder = inOrder(orderRepository, paymentService);
-        inOrder.verify(orderRepository).save(any());
-        inOrder.verify(paymentService).pay(any());
-    }
-
-    @Test
     @DisplayName("주문 생성: 저장된 주문 항목에 주문 id 가 채워진다")
-    void givenAvailableProducts_whenCreate_thenAssignsOrderIdToItems() {
+    void givenAvailableProducts_whenPlace_thenAssignsOrderIdToItems() {
         stubProduct(10L, 1L, "셔츠", 29_000L, 50);
-        when(orderNumberGenerator.generate()).thenReturn("20260528-000001");
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        orderService.create(command(List.of(new OrderCommand.Line(10L, 1))));
+        placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 1))), ORDER_NUMBER);
 
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemRepository).save(itemCaptor.capture());
@@ -176,30 +167,35 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("내 주문 조회: 사용자의 주문을 주문 단위 요약으로 반환한다")
-    void givenUserOrders_whenGetMyOrders_thenReturnsOrderSummaries() {
-        Order order = Order.create(USER_ID, "20260528-000001",
-                com.loopers.order.domain.ShippingDestination.create("김루퍼", "010-1234-5678", "12345", "서울", "101"),
-                List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 1)));
-        when(orderRepository.findByUserId(USER_ID)).thenReturn(List.of(order));
+    @DisplayName("쿠폰 적용: 쿠폰 사용 유스케이스가 돌려준 할인을 주문에 반영해 저장한다")
+    void givenCoupon_whenPlace_thenAppliesDiscountToSavedOrder() {
+        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(couponUsageService.use(50L, USER_ID, 58_000L)).thenReturn(Money.of(3_000L));
 
-        List<OrderResult.Summary> result = orderService.getMyOrders(USER_ID);
+        placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 2)), 50L), ORDER_NUMBER);
 
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
         assertAll(
-                () -> assertThat(result).hasSize(1),
-                () -> assertThat(result.get(0).orderNumber()).isEqualTo("20260528-000001"),
-                () -> assertThat(result.get(0).status()).isEqualTo(OrderStatus.PENDING),
-                () -> assertThat(result.get(0).totalAmount()).isEqualTo(29_000L)
+                () -> assertThat(savedOrder.getUserCouponId()).isEqualTo(50L),
+                () -> assertThat(savedOrder.getDiscountAmount().value()).isEqualTo(3_000L),
+                () -> assertThat(savedOrder.getFinalAmount().value()).isEqualTo(55_000L)
         );
     }
 
     @Test
-    @DisplayName("내 주문 조회: 주문이 없으면 빈 리스트를 반환한다")
-    void givenNoOrders_whenGetMyOrders_thenReturnsEmpty() {
-        when(orderRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    @DisplayName("쿠폰 적용: 쿠폰 사용이 실패하면 예외가 전파되고 주문을 저장하지 않는다")
+    void givenCouponUseFails_whenPlace_thenPropagatesAndSavesNothing() {
+        stubProduct(10L, 1L, "셔츠", 29_000L, 50);
+        when(couponUsageService.use(anyLong(), anyLong(), anyLong()))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, CouponErrorCode.COUPON_NOT_FOUND));
 
-        List<OrderResult.Summary> result = orderService.getMyOrders(USER_ID);
+        assertThatThrownBy(() -> placeOrderService.createPendingOrder(command(List.of(new OrderCommand.Line(10L, 1)), 50L), ORDER_NUMBER))
+                .isInstanceOf(CoreException.class)
+                .hasFieldOrPropertyWithValue("errorCode", CouponErrorCode.COUPON_NOT_FOUND);
 
-        assertThat(result).isEmpty();
+        verify(orderRepository, never()).save(any());
     }
 }

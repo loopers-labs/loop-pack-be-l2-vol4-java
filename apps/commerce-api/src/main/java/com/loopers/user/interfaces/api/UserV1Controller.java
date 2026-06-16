@@ -1,7 +1,8 @@
 package com.loopers.user.interfaces.api;
 
+import com.loopers.user.application.UserAccountService;
+import com.loopers.user.application.UserQueryService;
 import com.loopers.user.application.UserResult;
-import com.loopers.user.application.UserService;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,21 +19,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserV1Controller implements UserV1ApiSpec {
 
-    private final UserService userService;
+    private final UserAccountService userAccountService;
+    private final UserQueryService userQueryService;
 
     @PostMapping
     @Override
     public ApiResponse<UserV1Response.Detail> signUp(
         @Valid @RequestBody UserV1Request.SignUp request
     ) {
-        UserResult.Detail result = userService.signUp(request.toCommand());
+        UserResult.Detail result = userAccountService.signUp(request.toCommand());
         return ApiResponse.success(UserV1Response.Detail.from(result));
     }
 
     @GetMapping("/me")
     @Override
     public ApiResponse<UserV1Response.Masked> getMyInfo(@AuthenticationPrincipal Long userId) {
-        UserResult.Detail result = userService.get(userId);
+        UserResult.Detail result = userQueryService.getUser(userId);
         return ApiResponse.success(UserV1Response.Masked.from(result));
     }
 
@@ -42,7 +44,7 @@ public class UserV1Controller implements UserV1ApiSpec {
         @AuthenticationPrincipal Long userId,
         @Valid @RequestBody UserV1Request.UpdatePassword request
     ) {
-        userService.changePassword(request.toCommand(userId));
+        userAccountService.changePassword(request.toCommand(userId));
         return ApiResponse.success(null);
     }
 }
