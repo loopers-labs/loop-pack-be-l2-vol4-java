@@ -15,6 +15,8 @@ public interface InventoryJpaRepository extends JpaRepository<InventoryJpaEntity
 
     Optional<InventoryJpaEntity> findByProductIdAndDeletedAtIsNull(Long productId);
 
+    List<InventoryJpaEntity> findAllByProductIdInAndDeletedAtIsNull(List<Long> productIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM InventoryJpaEntity i WHERE i.productId IN :productIds AND i.deletedAt IS NULL ORDER BY i.productId ASC")
     List<InventoryJpaEntity> findAllByProductIdsWithLock(@Param("productIds") List<Long> productIds);

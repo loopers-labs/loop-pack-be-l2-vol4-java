@@ -27,6 +27,13 @@ public class InventoryRepositoryImpl implements InventoryRepository {
     }
 
     @Override
+    public List<InventoryEntity> findAllByProductIds(List<Long> productIds) {
+        return inventoryJpaRepository.findAllByProductIdInAndDeletedAtIsNull(productIds).stream()
+                .map(InventoryMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<InventoryEntity> findAllByProductIdsWithLock(List<Long> productIds) {
         return inventoryJpaRepository.findAllByProductIdsWithLock(productIds).stream()
                 .map(InventoryMapper::toDomain)

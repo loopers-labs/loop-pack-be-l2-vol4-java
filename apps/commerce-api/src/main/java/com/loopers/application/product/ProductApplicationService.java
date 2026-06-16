@@ -15,6 +15,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 @RequiredArgsConstructor
 @Service
 public class ProductApplicationService {
@@ -38,7 +44,23 @@ public class ProductApplicationService {
     }
 
     public Page<ProductInfo> getAllProducts(Long brandId, Pageable pageable) {
-        return productRepository.findAll(brandId, pageable).map(this::assembleProductInfo);
+        Page<ProductEntity> products = productRepository.findAll(brandId, pageable);
+
+        List<Long> brandIds = products.stream().map(ProductEntity::getBrandId).distinct().toList();
+        List<Long> productIds = products.stream().map(ProductEntity::getId).toList();
+
+        Map<Long, BrandEntity> brandMap = brandRepository.findAllByIds(brandIds).stream()
+                .collect(Collectors.toMap(BrandEntity::getId, Function.identity()));
+        Map<Long, InventoryEntity> inventoryMap = inventoryRepository.findAllByProductIds(productIds).stream()
+                .collect(Collectors.toMap(InventoryEntity::getProductId, Function.identity()));
+
+        return products.map(product -> {
+            BrandEntity brand = Optional.ofNullable(brandMap.get(product.getBrandId()))
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
+            InventoryEntity inventory = Optional.ofNullable(inventoryMap.get(product.getId()))
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + product.getId() + "] 재고를 찾을 수 없습니다."));
+            return ProductInfo.from(product, brand, inventory);
+        });
     }
 
     @Transactional
