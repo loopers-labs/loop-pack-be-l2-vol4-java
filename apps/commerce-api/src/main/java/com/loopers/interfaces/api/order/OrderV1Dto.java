@@ -19,7 +19,9 @@ public class OrderV1Dto {
     public record CreateRequest(
         @NotEmpty(message = "주문 항목은 비어 있을 수 없습니다.")
         @Valid
-        List<OrderItemRequest> items
+        List<OrderItemRequest> items,
+
+        Long userCouponId
     ) {
 
         public List<OrderItemCommand> toCommandItems() {
@@ -43,7 +45,10 @@ public class OrderV1Dto {
         Long orderId,
         String status,
         ZonedDateTime orderedAt,
-        Integer totalPrice,
+        Integer originalAmount,
+        Integer discountAmount,
+        Integer finalAmount,
+        Long userCouponId,
         List<OrderItemResponse> items
     ) {
 
@@ -52,7 +57,10 @@ public class OrderV1Dto {
                 orderInfo.orderId(),
                 orderInfo.status().name(),
                 orderInfo.orderedAt(),
-                orderInfo.totalPrice(),
+                orderInfo.originalAmount(),
+                orderInfo.discountAmount(),
+                orderInfo.finalAmount(),
+                orderInfo.userCouponId(),
                 orderInfo.items()
                     .stream()
                     .map(OrderItemResponse::from)

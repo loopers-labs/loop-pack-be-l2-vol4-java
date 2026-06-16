@@ -7,12 +7,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -35,17 +38,25 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final OrderRepository orderRepository;
+    private final UserCouponRepository userCouponRepository;
 
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands) {
+    public OrderInfo createOrder(Long userId, List<OrderItemCommand> itemCommands, Long userCouponId, ZonedDateTime now) {
         UserModel user = userRepository.getActiveById(userId);
 
         validateNoDuplicateProduct(itemCommands);
         List<OrderItemModel> orderItems = createOrderItems(itemCommands);
 
+        int originalAmount = calculateOriginalAmount(orderItems);
+        int discountAmount = applyCoupon(user.getId(), userCouponId, originalAmount, now);
+        int finalAmount = originalAmount - discountAmount;
+
         OrderModel order = OrderModel.builder()
             .userId(user.getId())
-            .orderedAt(ZonedDateTime.now())
-            .totalPrice(calculateTotalPrice(orderItems))
+            .orderedAt(now)
+            .originalAmount(originalAmount)
+            .discountAmount(discountAmount)
+            .finalAmount(finalAmount)
+            .userCouponId(userCouponId)
             .build();
 
         OrderModel savedOrder = orderRepository.save(order, orderItems);
@@ -73,10 +84,10 @@ public class OrderFacade {
 
         for (OrderItemCommand itemCommand : sortedItemCommands) {
             Quantity quantity = Quantity.from(itemCommand.quantity());
-            ProductModel product = productRepository.getActiveById(itemCommand.productId());
+            ProductModel product = productRepository.getActiveByIdForUpdate(itemCommand.productId());
             BrandModel brand = brandRepository.getActiveById(product.getBrandId());
 
-            decreaseStock(product, quantity);
+            product.decreaseStock(quantity.value());
 
             OrderItemModel orderItem = OrderItemModel.builder()
                 .productId(product.getId())
@@ -91,18 +102,27 @@ public class OrderFacade {
         return List.copyOf(orderItems);
     }
 
-    private void decreaseStock(ProductModel product, Quantity quantity) {
-        int decreasedCount = productRepository.decreaseStock(product.getId(), quantity.value());
-
-        if (decreasedCount == 0) {
-            throw new CoreException(ErrorType.CONFLICT, "상품 재고가 부족합니다.");
-        }
-    }
-
-    private int calculateTotalPrice(List<OrderItemModel> orderItems) {
+    private int calculateOriginalAmount(List<OrderItemModel> orderItems) {
         return orderItems.stream()
             .mapToInt(OrderItemModel::totalPrice)
             .sum();
+    }
+
+    private int applyCoupon(Long userId, Long userCouponId, int originalAmount, ZonedDateTime now) {
+        if (userCouponId == null) {
+            return 0;
+        }
+
+        UserCouponModel userCoupon = userCouponRepository.getActiveByIdAndUserId(userCouponId, userId);
+        int discountAmount = userCoupon.apply(originalAmount, now);
+
+        try {
+            userCouponRepository.saveAndFlush(userCoupon);
+        } catch (OptimisticLockingFailureException e) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용된 쿠폰입니다.");
+        }
+
+        return discountAmount;
     }
 
     @Transactional(readOnly = true)

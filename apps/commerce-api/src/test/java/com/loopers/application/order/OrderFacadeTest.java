@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -26,9 +25,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.CouponModel;
+import com.loopers.domain.coupon.DiscountType;
+import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -54,16 +58,23 @@ class OrderFacadeTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private UserCouponRepository userCouponRepository;
+
     @InjectMocks
     private OrderFacade orderFacade;
 
     private ProductModel product(int price) {
+        return product(price, 50);
+    }
+
+    private ProductModel product(int price, int stock) {
         return ProductModel.builder()
             .brandId(1L)
             .rawName("감성 가디건")
             .rawDescription("포근한 감성 가디건")
             .rawPrice(price)
-            .rawStock(50)
+            .rawStock(stock)
             .build();
     }
 
@@ -84,11 +95,13 @@ class OrderFacadeTest {
             .build();
     }
 
-    private OrderModel order(Long userId, int totalPrice) {
+    private OrderModel order(Long userId, int originalAmount) {
         return OrderModel.builder()
             .userId(userId)
             .orderedAt(ZonedDateTime.now())
-            .totalPrice(totalPrice)
+            .originalAmount(originalAmount)
+            .discountAmount(0)
+            .finalAmount(originalAmount)
             .build();
     }
 
@@ -106,13 +119,12 @@ class OrderFacadeTest {
             ProductModel product = product(39_000);
             List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
             given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
-            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(productRepository.getActiveByIdForUpdate(productId)).willReturn(product);
             given(brandRepository.getActiveById(product.getBrandId())).willReturn(brand());
-            given(productRepository.decreaseStock(product.getId(), 2)).willReturn(1);
             given(orderRepository.save(any(OrderModel.class), anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
-            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands);
+            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now());
 
             // assert
             assertAll(
@@ -121,8 +133,11 @@ class OrderFacadeTest {
                 () -> assertThat(orderInfo.items().get(0).brandName()).isEqualTo("감성 브랜드"),
                 () -> assertThat(orderInfo.items().get(0).unitPrice()).isEqualTo(39_000),
                 () -> assertThat(orderInfo.items().get(0).quantity()).isEqualTo(2),
-                () -> assertThat(orderInfo.totalPrice()).isEqualTo(78_000),
-                () -> then(productRepository).should().decreaseStock(product.getId(), 2),
+                () -> assertThat(orderInfo.originalAmount()).isEqualTo(78_000),
+                () -> assertThat(orderInfo.discountAmount()).isZero(),
+                () -> assertThat(orderInfo.finalAmount()).isEqualTo(78_000),
+                () -> assertThat(orderInfo.userCouponId()).isNull(),
+                () -> assertThat(product.getStock().value()).isEqualTo(48),
                 () -> then(orderRepository).should().save(any(OrderModel.class), anyList())
             );
         }
@@ -137,12 +152,11 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
-                () -> then(productRepository).should(never()).getActiveById(anyLong()),
-                () -> then(productRepository).should(never()).decreaseStock(anyLong(), anyInt()),
+                () -> then(productRepository).should(never()).getActiveByIdForUpdate(anyLong()),
                 () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
             );
         }
@@ -152,16 +166,15 @@ class OrderFacadeTest {
         void throwsNotFound_whenProductIsAbsent() {
             // arrange
             List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
-            given(productRepository.getActiveById(productId))
+            given(productRepository.getActiveByIdForUpdate(productId))
                 .willThrow(new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
-                () -> then(productRepository).should(never()).decreaseStock(anyLong(), anyInt()),
                 () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
             );
         }
@@ -172,13 +185,12 @@ class OrderFacadeTest {
             // arrange
             ProductModel product = product(39_000);
             List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 100));
-            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(productRepository.getActiveByIdForUpdate(productId)).willReturn(product);
             given(brandRepository.getActiveById(product.getBrandId())).willReturn(brand());
-            given(productRepository.decreaseStock(product.getId(), 100)).willReturn(0);
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
@@ -194,11 +206,11 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.BAD_REQUEST),
-                () -> then(productRepository).should(never()).getActiveById(anyLong()),
+                () -> then(productRepository).should(never()).getActiveByIdForUpdate(anyLong()),
                 () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
             );
         }
@@ -221,20 +233,18 @@ class OrderFacadeTest {
             List<OrderItemCommand> itemCommands =
                 List.of(new OrderItemCommand(firstProductId, 1), new OrderItemCommand(secondProductId, 2));
             given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
-            given(productRepository.getActiveById(firstProductId)).willReturn(firstProduct);
-            given(productRepository.getActiveById(secondProductId)).willReturn(secondProduct);
+            given(productRepository.getActiveByIdForUpdate(firstProductId)).willReturn(firstProduct);
+            given(productRepository.getActiveByIdForUpdate(secondProductId)).willReturn(secondProduct);
             given(brandRepository.getActiveById(firstProduct.getBrandId())).willReturn(brand());
-            given(productRepository.decreaseStock(firstProduct.getId(), 1)).willReturn(1);
-            given(productRepository.decreaseStock(secondProduct.getId(), 2)).willReturn(1);
             given(orderRepository.save(any(OrderModel.class), anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // act
-            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands);
+            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now());
 
             // assert
             assertAll(
                 () -> assertThat(orderInfo.items()).hasSize(2),
-                () -> assertThat(orderInfo.totalPrice()).isEqualTo(20_000),
+                () -> assertThat(orderInfo.originalAmount()).isEqualTo(20_000),
                 () -> then(orderRepository).should().save(any(OrderModel.class), anyList())
             );
         }
@@ -248,7 +258,7 @@ class OrderFacadeTest {
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.BAD_REQUEST),
@@ -263,15 +273,14 @@ class OrderFacadeTest {
             ProductModel firstProduct = product(10_000);
             List<OrderItemCommand> itemCommands =
                 List.of(new OrderItemCommand(firstProductId, 1), new OrderItemCommand(secondProductId, 2));
-            given(productRepository.getActiveById(firstProductId)).willReturn(firstProduct);
+            given(productRepository.getActiveByIdForUpdate(firstProductId)).willReturn(firstProduct);
             given(brandRepository.getActiveById(firstProduct.getBrandId())).willReturn(brand());
-            given(productRepository.decreaseStock(firstProduct.getId(), 1)).willReturn(1);
-            given(productRepository.getActiveById(secondProductId))
+            given(productRepository.getActiveByIdForUpdate(secondProductId))
                 .willThrow(new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
@@ -284,22 +293,197 @@ class OrderFacadeTest {
         void throwsConflict_whenAnyItemStockIsInsufficient() {
             // arrange
             ProductModel firstProduct = product(10_000);
-            ProductModel secondProduct = product(5_000);
+            ProductModel secondProduct = product(5_000, 3);
             List<OrderItemCommand> itemCommands =
                 List.of(new OrderItemCommand(firstProductId, 1), new OrderItemCommand(secondProductId, 5));
-            given(productRepository.getActiveById(firstProductId)).willReturn(firstProduct);
-            given(productRepository.getActiveById(secondProductId)).willReturn(secondProduct);
+            given(productRepository.getActiveByIdForUpdate(firstProductId)).willReturn(firstProduct);
+            given(productRepository.getActiveByIdForUpdate(secondProductId)).willReturn(secondProduct);
             given(brandRepository.getActiveById(firstProduct.getBrandId())).willReturn(brand());
-            given(productRepository.decreaseStock(firstProduct.getId(), 1)).willReturn(1);
-            given(productRepository.decreaseStock(secondProduct.getId(), 5)).willReturn(0);
 
             // act & assert
             assertAll(
-                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands))
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, null, ZonedDateTime.now()))
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.CONFLICT),
                 () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
+            );
+        }
+    }
+
+    @DisplayName("쿠폰을 적용해 주문을 생성할 때,")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        private final Long userId = 1L;
+        private final Long productId = 10L;
+        private final Long userCouponId = 50L;
+        private final ZonedDateTime now = ZonedDateTime.now();
+
+        private UserCouponModel userCoupon(DiscountType type, int value, Integer minOrderAmount) {
+            CouponModel coupon = CouponModel.builder()
+                .rawName("할인 쿠폰")
+                .type(type)
+                .rawValue(value)
+                .rawMinOrderAmount(minOrderAmount)
+                .rawExpiredAt(now.plusDays(7))
+                .now(now)
+                .build();
+            ReflectionTestUtils.setField(coupon, "id", 1L);
+
+            return UserCouponModel.issue(userId, coupon);
+        }
+
+        private UserCouponModel usedCoupon() {
+            return UserCouponModel.builder()
+                .userId(userId)
+                .couponId(1L)
+                .name("할인 쿠폰")
+                .discountType(DiscountType.FIXED)
+                .discountValue(5_000)
+                .minOrderAmount(10_000)
+                .expiredAt(now.plusDays(7))
+                .usedAt(now.minusDays(1))
+                .build();
+        }
+
+        private void givenSufficientStock(int price) {
+            ProductModel product = product(price);
+            UserModel user = mock(UserModel.class);
+            given(user.getId()).willReturn(userId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(productRepository.getActiveByIdForUpdate(productId)).willReturn(product);
+            given(brandRepository.getActiveById(product.getBrandId())).willReturn(brand());
+        }
+
+        @DisplayName("본인 소유·사용 가능 쿠폰이면 할인 금액을 계산하고 쿠폰을 사용 완료로 전이한 뒤 세 금액을 기록한다.")
+        @Test
+        void appliesCoupon_andTransitionsToUsed() {
+            // arrange (78,000원 주문 + 정액 5,000원 쿠폰)
+            givenSufficientStock(39_000);
+            UserCouponModel userCoupon = userCoupon(DiscountType.FIXED, 5_000, 10_000);
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userCouponRepository.getActiveByIdAndUserId(userCouponId, userId)).willReturn(userCoupon);
+            given(orderRepository.save(any(OrderModel.class), anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+            // act
+            OrderInfo orderInfo = orderFacade.createOrder(userId, itemCommands, userCouponId, now);
+
+            // assert
+            assertAll(
+                () -> assertThat(orderInfo.originalAmount()).isEqualTo(78_000),
+                () -> assertThat(orderInfo.discountAmount()).isEqualTo(5_000),
+                () -> assertThat(orderInfo.finalAmount()).isEqualTo(73_000),
+                () -> assertThat(orderInfo.userCouponId()).isEqualTo(userCouponId),
+                () -> assertThat(userCoupon.getUsedAt()).isEqualTo(now),
+                () -> then(orderRepository).should().save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("쿠폰이 없거나 타인 소유면 NOT_FOUND 예외가 전파되고 주문은 저장되지 않는다.")
+        @Test
+        void throwsNotFound_whenCouponIsAbsentOrNotOwned() {
+            // arrange
+            givenSufficientStock(39_000);
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userCouponRepository.getActiveByIdAndUserId(userCouponId, userId))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "발급 쿠폰이 존재하지 않습니다."));
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, userCouponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.NOT_FOUND),
+                () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("이미 사용한 쿠폰이면 CONFLICT 예외가 발생하고 주문은 저장되지 않는다.")
+        @Test
+        void throwsConflict_whenCouponIsAlreadyUsed() {
+            // arrange
+            givenSufficientStock(39_000);
+            UserCouponModel usedCoupon = usedCoupon();
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userCouponRepository.getActiveByIdAndUserId(userCouponId, userId)).willReturn(usedCoupon);
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, userCouponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("만료된 쿠폰이면 CONFLICT 예외가 발생하고 주문은 저장되지 않는다.")
+        @Test
+        void throwsConflict_whenCouponIsExpired() {
+            // arrange (과거 기준 시각으로 만들어 실제로는 만료된 쿠폰)
+            givenSufficientStock(39_000);
+            ZonedDateTime pastExpiredAt = now.minusDays(1);
+            CouponModel expiredTemplate = CouponModel.builder()
+                .rawName("만료 쿠폰")
+                .type(DiscountType.FIXED)
+                .rawValue(5_000)
+                .rawMinOrderAmount(10_000)
+                .rawExpiredAt(pastExpiredAt)
+                .now(pastExpiredAt.minusDays(1))
+                .build();
+            ReflectionTestUtils.setField(expiredTemplate, "id", 1L);
+            UserCouponModel expiredCoupon = UserCouponModel.issue(userId, expiredTemplate);
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userCouponRepository.getActiveByIdAndUserId(userCouponId, userId)).willReturn(expiredCoupon);
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, userCouponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("할인 전 주문 금액이 최소 주문 금액에 미치지 못하면 CONFLICT 예외가 발생하고 쿠폰은 사용되지 않는다.")
+        @Test
+        void throwsConflict_whenOrderAmountIsBelowMinimum() {
+            // arrange (78,000원 주문 + 최소 100,000원 쿠폰)
+            givenSufficientStock(39_000);
+            UserCouponModel userCoupon = userCoupon(DiscountType.FIXED, 5_000, 100_000);
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userCouponRepository.getActiveByIdAndUserId(userCouponId, userId)).willReturn(userCoupon);
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, userCouponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> assertThat(userCoupon.getUsedAt()).isNull(),
+                () -> then(orderRepository).should(never()).save(any(OrderModel.class), anyList())
+            );
+        }
+
+        @DisplayName("재고 차감에 실패하면 쿠폰 검증·사용에 도달하지 않는다.")
+        @Test
+        void doesNotTouchCoupon_whenStockIsInsufficient() {
+            // arrange
+            ProductModel product = product(39_000, 1);
+            List<OrderItemCommand> itemCommands = List.of(new OrderItemCommand(productId, 2));
+            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
+            given(productRepository.getActiveByIdForUpdate(productId)).willReturn(product);
+            given(brandRepository.getActiveById(product.getBrandId())).willReturn(brand());
+
+            // act & assert
+            assertAll(
+                () -> assertThatThrownBy(() -> orderFacade.createOrder(userId, itemCommands, userCouponId, now))
+                    .isInstanceOf(CoreException.class)
+                    .extracting("errorType")
+                    .isEqualTo(ErrorType.CONFLICT),
+                () -> then(userCouponRepository).should(never()).getActiveByIdAndUserId(anyLong(), anyLong())
             );
         }
     }
@@ -325,7 +509,7 @@ class OrderFacadeTest {
             // assert
             assertAll(
                 () -> assertThat(orderInfo.items()).hasSize(1),
-                () -> assertThat(orderInfo.totalPrice()).isEqualTo(78_000)
+                () -> assertThat(orderInfo.finalAmount()).isEqualTo(78_000)
             );
         }
 
@@ -414,7 +598,7 @@ class OrderFacadeTest {
             assertAll(
                 () -> assertThat(result.getContent()).hasSize(1),
                 () -> assertThat(result.getContent().get(0).userId()).isEqualTo(7L),
-                () -> assertThat(result.getContent().get(0).totalPrice()).isEqualTo(78_000)
+                () -> assertThat(result.getContent().get(0).finalAmount()).isEqualTo(78_000)
             );
         }
     }

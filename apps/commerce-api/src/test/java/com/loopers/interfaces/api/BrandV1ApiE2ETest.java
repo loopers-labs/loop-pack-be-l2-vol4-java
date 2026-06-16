@@ -26,6 +26,7 @@ import com.loopers.utils.DatabaseCleanUp;
 class BrandV1ApiE2ETest {
 
     private static final String ENDPOINT_BRANDS = "/api/v1/brands";
+    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -58,10 +59,6 @@ class BrandV1ApiE2ETest {
 
         return brandJpaRepository.save(brand);
     }
-
-    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE =
-        new ParameterizedTypeReference<>() {
-        };
 
     @DisplayName("브랜드 조회 - GET /api/v1/brands/{brandId}")
     @Nested

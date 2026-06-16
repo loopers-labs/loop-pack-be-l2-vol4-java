@@ -57,26 +57,20 @@ class OrderRepositoryIntegrationTest {
     }
 
     private OrderModel orderOf(Long userId, List<OrderItemModel> orderItems) {
-        int totalPrice = orderItems.stream()
-            .mapToInt(OrderItemModel::totalPrice)
-            .sum();
-
-        return OrderModel.builder()
-            .userId(userId)
-            .orderedAt(ZonedDateTime.now())
-            .totalPrice(totalPrice)
-            .build();
+        return orderOf(userId, ZonedDateTime.now(), orderItems);
     }
 
     private OrderModel orderOf(Long userId, ZonedDateTime orderedAt, List<OrderItemModel> orderItems) {
-        int totalPrice = orderItems.stream()
+        int originalAmount = orderItems.stream()
             .mapToInt(OrderItemModel::totalPrice)
             .sum();
 
         return OrderModel.builder()
             .userId(userId)
             .orderedAt(orderedAt)
-            .totalPrice(totalPrice)
+            .originalAmount(originalAmount)
+            .discountAmount(0)
+            .finalAmount(originalAmount)
             .build();
     }
 
@@ -121,7 +115,8 @@ class OrderRepositoryIntegrationTest {
                 () -> assertThat(savedOrder.getId()).isNotNull(),
                 () -> assertThat(reloadedOrder.getUserId()).isEqualTo(1L),
                 () -> assertThat(reloadedOrder.getStatus()).isEqualTo(OrderStatus.CREATED),
-                () -> assertThat(reloadedOrder.getTotalPrice()).isEqualTo(35_000),
+                () -> assertThat(reloadedOrder.getOriginalAmount()).isEqualTo(35_000),
+                () -> assertThat(reloadedOrder.getFinalAmount()).isEqualTo(35_000),
                 () -> assertThat(reloadedItems).hasSize(2),
                 () -> assertThat(reloadedItems).allSatisfy(item -> assertThat(item.getOrderId()).isEqualTo(savedOrder.getId()))
             );
@@ -361,7 +356,7 @@ class OrderRepositoryIntegrationTest {
                 .containsExactly(secondSaved.getId(), firstSaved.getId());
         }
 
-        @DisplayName("조회된 주문의 헤더 레벨 필드(userId·status·totalPrice)가 저장한 값과 일치한다.")
+        @DisplayName("조회된 주문의 헤더 레벨 필드(userId·status·세 금액)가 저장한 값과 일치한다.")
         @Test
         void returnsCorrectHeaderFields() {
             // arrange
@@ -375,7 +370,36 @@ class OrderRepositoryIntegrationTest {
             assertAll(
                 () -> assertThat(found.getUserId()).isEqualTo(5L),
                 () -> assertThat(found.getStatus()).isEqualTo(OrderStatus.CREATED),
-                () -> assertThat(found.getTotalPrice()).isEqualTo(10_000)
+                () -> assertThat(found.getOriginalAmount()).isEqualTo(10_000),
+                () -> assertThat(found.getDiscountAmount()).isZero(),
+                () -> assertThat(found.getFinalAmount()).isEqualTo(10_000)
+            );
+        }
+
+        @DisplayName("쿠폰을 적용한 주문은 세 금액과 적용 쿠폰 식별자가 그대로 보존된다.")
+        @Test
+        void preservesAmountsAndUserCouponId_whenCouponApplied() {
+            // arrange
+            List<OrderItemModel> orderItems = new ArrayList<>(List.of(orderItem(10L, 10_000, 1)));
+            OrderModel order = OrderModel.builder()
+                .userId(1L)
+                .orderedAt(ZonedDateTime.now())
+                .originalAmount(10_000)
+                .discountAmount(3_000)
+                .finalAmount(7_000)
+                .userCouponId(50L)
+                .build();
+            OrderModel savedOrder = orderRepository.save(order, orderItems);
+
+            // act
+            OrderModel reloadedOrder = orderJpaRepository.findById(savedOrder.getId()).orElseThrow();
+
+            // assert
+            assertAll(
+                () -> assertThat(reloadedOrder.getOriginalAmount()).isEqualTo(10_000),
+                () -> assertThat(reloadedOrder.getDiscountAmount()).isEqualTo(3_000),
+                () -> assertThat(reloadedOrder.getFinalAmount()).isEqualTo(7_000),
+                () -> assertThat(reloadedOrder.getUserCouponId()).isEqualTo(50L)
             );
         }
     }

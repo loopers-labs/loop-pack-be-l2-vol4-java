@@ -206,4 +206,45 @@ class ProductModelTest {
                 .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("ProductModel의 재고를 차감할 때,")
+    @Nested
+    class DecreaseStock {
+
+        private ProductModel sampleProduct(int stock) {
+            return ProductModel.builder()
+                .brandId(1L)
+                .rawName("감성 가디건")
+                .rawDescription("포근한 감성 가디건")
+                .rawPrice(39_000)
+                .rawStock(stock)
+                .build();
+        }
+
+        @DisplayName("재고가 충분하면 그만큼 차감된다.")
+        @Test
+        void decreasesStock_whenStockIsSufficient() {
+            // arrange
+            ProductModel productModel = sampleProduct(50);
+
+            // act
+            productModel.decreaseStock(20);
+
+            // assert
+            assertThat(productModel.getStock()).isEqualTo(Stock.from(30));
+        }
+
+        @DisplayName("재고가 부족하면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenStockIsInsufficient() {
+            // arrange
+            ProductModel productModel = sampleProduct(3);
+
+            // act & assert
+            assertThatThrownBy(() -> productModel.decreaseStock(5))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
+        }
+    }
 }

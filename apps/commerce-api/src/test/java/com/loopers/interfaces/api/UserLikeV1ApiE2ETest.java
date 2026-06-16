@@ -43,16 +43,22 @@ class UserLikeV1ApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
     @Autowired
     private UserJpaRepository userJpaRepository;
+
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
     @Autowired
     private LikeJpaRepository likeJpaRepository;
+
     @Autowired
     private PasswordEncrypter passwordEncrypter;
+
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
