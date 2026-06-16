@@ -18,7 +18,7 @@ sequenceDiagram
     Controller->>Facade: 주문 및 결제 요청
     activate Facade
 
-    rect rgb(240, 240, 240)
+    rect rgba(128, 128, 128, 0.2)
         Note right of Facade: [@Transactional Begin] 단일 트랜잭션 시작
 
         Note right of Facade: 1. 동시성 제어 및 영속성 컨텍스트 최적화
@@ -141,8 +141,6 @@ sequenceDiagram
     Controller->>Facade: 좋아요 등록 요청
     activate Facade
 
-    rect rgb(240, 240, 240)
-        Note right of Facade: [@Transactional Begin]
 
         Facade->>ProductSvc: 상품 존재 여부 확인
         activate ProductSvc
@@ -175,8 +173,7 @@ sequenceDiagram
             deactivate LikeSvc
         end
 
-        Note right of Facade: [@Transactional Commit]
-    end
+
 
     Facade-->>Controller: 성공 반환
     deactivate Facade
@@ -201,8 +198,6 @@ sequenceDiagram
     Controller->>Facade: 좋아요 취소 요청
     activate Facade
 
-    rect rgb(240, 240, 240)
-        Note right of Facade: [@Transactional Begin]
 
         Facade->>ProductSvc: 상품 존재 여부 확인
         activate ProductSvc
@@ -235,8 +230,7 @@ sequenceDiagram
             deactivate LikeSvc
         end
 
-        Note right of Facade: [@Transactional Commit]
-    end
+
 
     Facade-->>Controller: 성공 반환
     deactivate Facade
@@ -260,8 +254,6 @@ sequenceDiagram
     Controller->>Facade: 쿠폰 발급 요청 (userId, couponTemplateId)
     activate Facade
 
-    rect rgb(240, 240, 240)
-        Note right of Facade: [@Transactional Begin]
 
         Facade->>CouponSvc: 쿠폰 발급 처리
         activate CouponSvc
@@ -290,11 +282,52 @@ sequenceDiagram
         end
         deactivate CouponSvc
 
-        Note right of Facade: [@Transactional Commit]
-    end
+
 
     Facade-->>Controller: 성공 반환
     deactivate Facade
     Controller-->>User: 200 OK
+    deactivate Controller
+```
+
+```mermaid
+sequenceDiagram
+    title 상품 목록 조회 API 시퀀스 다이어그램
+    actor User
+    participant Controller as ProductController
+    participant Facade as ProductFacade
+    participant ProductSvc as ProductService
+    participant Repo as ProductQueryRepository (QueryDSL)
+    participant DB as Database
+
+    User->>Controller: GET /api/v1/products?brandId={id}&sort={sort}&page={page}
+    activate Controller
+
+    Controller->>Facade: retrieveProducts(condition, pageable)
+    activate Facade
+
+
+    Facade->>ProductSvc: getProductsByCondition(condition, pageable)
+    activate ProductSvc
+
+    ProductSvc->>Repo: findProductsByCondition(condition, pageable)
+    activate Repo
+    
+    Note over Repo: 동적 쿼리 및 정렬 실행
+    Repo->>DB: QueryDSL LEFT JOIN product_likes<br/>WHERE brand_id = {id}<br/>GROUP BY product.id<br/>ORDER BY COUNT(likes) DESC, created_at DESC
+    activate DB
+    DB-->>Repo: List<ProductResponseDto> & TotalCount
+    deactivate DB
+
+    Repo-->>ProductSvc: Page<ProductResponseDto> 반환
+    deactivate Repo
+
+    ProductSvc-->>Facade: Page<ProductResponseDto> 반환
+    deactivate ProductSvc
+
+    Facade-->>Controller: 200 OK (JSON Response)
+    deactivate Facade
+
+    Controller-->>User: 상품 목록 반환 (좋아요 수 포함)
     deactivate Controller
 ```
