@@ -27,4 +27,18 @@ class InMemoryProductStockRepository implements ProductStockRepository {
                 .filter(s -> s.getProduct().getId().equals(productId))
                 .toList();
     }
+
+    @Override
+    public boolean decreaseIfSufficient(Long stockId, int quantity) {
+        return false;
+    }
+
+    @Override
+    public void increaseStock(Long stockId, int quantity) {
+    }
+
+    @Override
+    public boolean updateStockAttributes(Long stockId, Long price, Integer delta) {
+        return false;
+    }
 }

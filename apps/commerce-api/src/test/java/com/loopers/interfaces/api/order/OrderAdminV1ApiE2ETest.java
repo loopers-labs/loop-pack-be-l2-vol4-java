@@ -38,7 +38,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,6 +61,11 @@ class OrderAdminV1ApiE2ETest {
     private static final String ADMIN_PW = "Admin1234!";
     private static final String USER_ID  = "orderUser1";
     private static final String USER_PW  = "Dlaxodid1!";
+
+    private String orderNumber() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + suffix;
+    }
 
     private ProductStockModel savedStock;
 
@@ -107,7 +116,9 @@ class OrderAdminV1ApiE2ETest {
 
     private Long createOrder(int quantity) {
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity))
+                orderNumber(),
+                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), quantity)),
+                null
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, userHeaders()), responseType)

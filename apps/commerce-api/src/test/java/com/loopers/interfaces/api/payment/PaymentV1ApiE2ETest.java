@@ -36,7 +36,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -84,9 +88,16 @@ class PaymentV1ApiE2ETest {
         return headers;
     }
 
+    private String orderNumber() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + suffix;
+    }
+
     private Long createOrder() {
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), 1))
+                orderNumber(),
+                List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), 1)),
+                null
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST,
@@ -97,7 +108,7 @@ class PaymentV1ApiE2ETest {
         PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(orderId);
         ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange("/api/v1/payments", HttpMethod.POST,
-                new HttpEntity<>(request), type).getBody().data().id();
+                new HttpEntity<>(request, authHeaders()), type).getBody().data().id();
     }
 
     @DisplayName("POST /api/v1/payments")
@@ -112,7 +123,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request), type);
+                    "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody().data().orderId()).isEqualTo(orderId);
@@ -132,7 +143,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, null, type);
+                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 승인");
@@ -150,7 +161,7 @@ class PaymentV1ApiE2ETest {
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, null, type);
+                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("결제 실패");

@@ -1,18 +1,10 @@
 package com.loopers.domain.order;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.loopers.domain.product.vo.Price;
 
-public record OrderLine(Long stockId, int quantity) {
+public record OrderLine(Long stockId, Long productId, String productName, Price price, int quantity) {
 
-    public static List<OrderLine> from(List<OrderItemInput> inputs) {
-        return inputs.stream()
-                .collect(Collectors.groupingBy(
-                        OrderItemInput::stockId,
-                        Collectors.summingInt(OrderItemInput::quantity)
-                ))
-                .entrySet().stream()
-                .map(e -> new OrderLine(e.getKey(), e.getValue()))
-                .toList();
+    public long amount() {
+        return price.getValue() * quantity;
     }
 }

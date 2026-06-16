@@ -26,7 +26,9 @@ import org.springframework.util.AntPathMatcher;
 public class AuthFilter extends OncePerRequestFilter {
 
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/v1/products/**",
+            "/api/v1/users",
+            "/api/v1/products",
+            "/api/v1/products/*",
             "/api/v1/brands/**"
     );
     private static final AntPathMatcher MATCHER = new AntPathMatcher();

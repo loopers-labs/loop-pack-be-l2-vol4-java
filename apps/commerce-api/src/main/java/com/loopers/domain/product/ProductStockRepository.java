@@ -7,4 +7,7 @@ public interface ProductStockRepository {
     ProductStockModel save(ProductStockModel stock);
     Optional<ProductStockModel> findById(Long id);
     List<ProductStockModel> findAllByProductId(Long productId);
+    boolean decreaseIfSufficient(Long stockId, int quantity);
+    void increaseStock(Long stockId, int quantity);
+    boolean updateStockAttributes(Long stockId, Long price, Integer delta);
 }

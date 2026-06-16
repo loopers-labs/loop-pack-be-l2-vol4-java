@@ -33,7 +33,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @Valid @RequestBody OrderV1Dto.OrderRequest request,
             @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.createOrder(userId, request.toInputs())));
+        return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderFacade.createOrder(request.orderNumber(), userId, request.toInputs(), request.userCouponId())));
     }
 
     @GetMapping

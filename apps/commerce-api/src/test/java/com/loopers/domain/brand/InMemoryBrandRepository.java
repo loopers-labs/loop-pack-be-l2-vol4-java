@@ -31,6 +31,11 @@ class InMemoryBrandRepository implements BrandRepository {
     }
 
     @Override
+    public boolean existsByNameAndIdNot(String name, Long id) {
+        return store.stream().anyMatch(b -> b.getName().equals(name));
+    }
+
+    @Override
     public Page<BrandModel> findAll(Pageable pageable) {
         return new PageImpl<>(store, pageable, store.size());
     }

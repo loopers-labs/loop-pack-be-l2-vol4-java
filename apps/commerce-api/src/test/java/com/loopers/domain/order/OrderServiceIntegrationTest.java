@@ -10,7 +10,6 @@ import com.loopers.domain.product.ProductStockService;
 import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.order.enums.OrderStatus;
-import com.loopers.domain.order.OrderLine;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -22,7 +21,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,11 +58,20 @@ class OrderServiceIntegrationTest {
     private static final Long TEST_USER_ID = 1L;
 
     private OrderModel placeOrder(int quantity) {
-        List<OrderLine> lines = OrderLine.from(List.of(new OrderItemInput(stock.getId(), quantity)));
-        List<ProductStockModel> stocks = lines.stream()
-                .map(line -> productStockService.decrease(line.stockId(), line.quantity()))
-                .toList();
-        return orderService.placeOrder(new OrderModel(TEST_USER_ID), stocks, lines);
+        ProductStockModel decreased = productStockService.decrease(stock.getId(), quantity);
+        List<OrderLine> lines = List.of(new OrderLine(
+                decreased.getId(),
+                decreased.getProduct().getId(),
+                decreased.getProduct().getName(),
+                decreased.getPrice(),
+                quantity
+        ));
+        com.loopers.domain.order.vo.Money original = new com.loopers.domain.order.vo.Money(
+                lines.stream().mapToLong(OrderLine::amount).sum()
+        );
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        String orderNumber = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + suffix;
+        return orderService.placeOrder(new OrderModel(orderNumber, TEST_USER_ID, null), lines, original, new com.loopers.domain.order.vo.Money(0L));
     }
 
     @DisplayName("단건 주문 조회(getByUser) 시,")

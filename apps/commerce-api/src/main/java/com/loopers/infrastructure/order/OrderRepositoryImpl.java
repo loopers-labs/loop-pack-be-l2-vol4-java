@@ -3,6 +3,7 @@ package com.loopers.infrastructure.order;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.QOrderModel;
+import com.loopers.domain.order.enums.OrderStatus;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,18 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public Page<OrderModel> findAll(Pageable pageable) {
         return orderJpaRepository.findAll(pageable);
+    }
+
+    @Override
+    public boolean cancelIfRequested(Long id, Long userId) {
+        QOrderModel order = QOrderModel.orderModel;
+        return queryFactory
+                .update(order)
+                .set(order.status, OrderStatus.CANCELLED)
+                .where(order.id.eq(id)
+                        .and(order.userId.eq(userId))
+                        .and(order.status.eq(OrderStatus.REQUESTED)))
+                .execute() > 0;
     }
 
     @Override
