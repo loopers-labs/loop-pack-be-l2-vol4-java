@@ -29,6 +29,7 @@ public class ProductApplicationService {
     private final BrandRepository brandRepository;
     private final InventoryRepository inventoryRepository;
     private final LikeRepository likeRepository;
+    private final ProductQueryRepository productQueryRepository;
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer quantity) {
@@ -44,23 +45,27 @@ public class ProductApplicationService {
     }
 
     public Page<ProductInfo> getAllProducts(Long brandId, Pageable pageable) {
-        Page<ProductEntity> products = productRepository.findAll(brandId, pageable);
+        // // [JOIN] QueryDSL 단일 쿼리 방식
+        return productQueryRepository.findAllWithDetails(brandId, pageable);
 
-        List<Long> brandIds = products.stream().map(ProductEntity::getBrandId).distinct().toList();
-        List<Long> productIds = products.stream().map(ProductEntity::getId).toList();
-
-        Map<Long, BrandEntity> brandMap = brandRepository.findAllByIds(brandIds).stream()
-                .collect(Collectors.toMap(BrandEntity::getId, Function.identity()));
-        Map<Long, InventoryEntity> inventoryMap = inventoryRepository.findAllByProductIds(productIds).stream()
-                .collect(Collectors.toMap(InventoryEntity::getProductId, Function.identity()));
-
-        return products.map(product -> {
-            BrandEntity brand = Optional.ofNullable(brandMap.get(product.getBrandId()))
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
-            InventoryEntity inventory = Optional.ofNullable(inventoryMap.get(product.getId()))
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + product.getId() + "] 재고를 찾을 수 없습니다."));
-            return ProductInfo.from(product, brand, inventory);
-        });
+        // [Batch] IN 쿼리 배치 조회 방식 (3 쿼리)
+       // Page<ProductEntity> products = productRepository.findAll(brandId, pageable);
+       //
+       // List<Long> brandIds = products.stream().map(ProductEntity::getBrandId).distinct().toList();
+       // List<Long> productIds = products.stream().map(ProductEntity::getId).toList();
+       //
+       // Map<Long, BrandEntity> brandMap = brandRepository.findAllByIds(brandIds).stream()
+       //         .collect(Collectors.toMap(BrandEntity::getId, Function.identity()));
+       // Map<Long, InventoryEntity> inventoryMap = inventoryRepository.findAllByProductIds(productIds).stream()
+       //         .collect(Collectors.toMap(InventoryEntity::getProductId, Function.identity()));
+       //
+       // return products.map(product -> {
+       //     BrandEntity brand = Optional.ofNullable(brandMap.get(product.getBrandId()))
+       //             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
+       //     InventoryEntity inventory = Optional.ofNullable(inventoryMap.get(product.getId()))
+       //             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + product.getId() + "] 재고를 찾을 수 없습니다."));
+       //     return ProductInfo.from(product, brand, inventory);
+       // });
     }
 
     @Transactional

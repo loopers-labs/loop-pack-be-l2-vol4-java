@@ -27,40 +27,59 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductListingPerformanceTest {
 
     private static final String BASE_URL = "http://localhost:8080";
-    private static final String ENDPOINT = BASE_URL + "/api/v1/products?brandId=15&sort=price_desc&page=0&size=20";
+    private static final String ENDPOINT_WITH_BRAND = BASE_URL + "/api/v1/products?brandId=15&sort=price_desc&page=0&size=20";
+    private static final String ENDPOINT_ALL = BASE_URL + "/api/v1/products?sort=price_desc&page=0&size=20";
 
     private static final int WARMUP_COUNT = 3;
     private static final int MEASURE_COUNT = 20;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @DisplayName("[성능] brand_id=1 상품 목록 가격 오름차순 조회 응답 시간 측정")
+    @DisplayName("[성능] brandId 필터 조건 상품 목록 가격 내림차순 조회 응답 시간 측정")
     @Test
-    void measureProductListingResponseTime_byBrandId_sortByPriceAsc() {
-        // Warmup — JIT 컴파일 및 커넥션 풀 초기화 영향 제거
+    void measureProductListingResponseTime_byBrandId_sortByPriceDesc() {
         for (int i = 0; i < WARMUP_COUNT; i++) {
-            call();
+            call(ENDPOINT_WITH_BRAND);
         }
 
-        // Measure
         List<Long> durations = new ArrayList<>();
         for (int i = 0; i < MEASURE_COUNT; i++) {
             long start = System.nanoTime();
-            ResponseEntity<String> response = call();
+            ResponseEntity<String> response = call(ENDPOINT_WITH_BRAND);
             long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             durations.add(elapsedMs);
         }
 
-        printReport(durations);
+        printReport("brandId=15, sort=price_desc, page=0, size=20", durations);
     }
 
-    private ResponseEntity<String> call() {
-        return restTemplate.exchange(ENDPOINT, HttpMethod.GET, HttpEntity.EMPTY, String.class);
+    @DisplayName("[성능] brandId 없이 전체 상품 목록 가격 내림차순 조회 응답 시간 측정")
+    @Test
+    void measureProductListingResponseTime_allBrands_sortByPriceDesc() {
+        for (int i = 0; i < WARMUP_COUNT; i++) {
+            call(ENDPOINT_ALL);
+        }
+
+        List<Long> durations = new ArrayList<>();
+        for (int i = 0; i < MEASURE_COUNT; i++) {
+            long start = System.nanoTime();
+            ResponseEntity<String> response = call(ENDPOINT_ALL);
+            long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            durations.add(elapsedMs);
+        }
+
+        printReport("brandId=없음(전체), sort=price_desc, page=0, size=20", durations);
     }
 
-    private void printReport(List<Long> durations) {
+    private ResponseEntity<String> call(String endpoint) {
+        return restTemplate.exchange(endpoint, HttpMethod.GET, HttpEntity.EMPTY, String.class);
+    }
+
+    private void printReport(String condition, List<Long> durations) {
         Collections.sort(durations);
 
         long min = durations.get(0);
@@ -72,7 +91,7 @@ class ProductListingPerformanceTest {
         System.out.printf("""
                 %n========================================
                 [Performance] 상품 목록 조회
-                  조건  : brand_id=1, sort=price_asc, page=0, size=20
+                  조건  : %s
                   측정  : %d회 (워밍업 %d회 제외)
                 ----------------------------------------
                   min   : %dms
@@ -81,6 +100,6 @@ class ProductListingPerformanceTest {
                   p95   : %dms
                   max   : %dms
                 ========================================%n
-                """, MEASURE_COUNT, WARMUP_COUNT, min, avg, p50, p95, max);
+                """, condition, MEASURE_COUNT, WARMUP_COUNT, min, avg, p50, p95, max);
     }
 }
