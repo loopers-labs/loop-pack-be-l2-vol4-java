@@ -7,10 +7,27 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
+/**
+ * 인덱스 설계 (5주차 읽기 최적화):
+ * - idx_product_brand_likes: (brand_id, like_count DESC) — "브랜드 필터 + 좋아요순" 핵심 유스케이스 커버.
+ *   B+Tree 좌측 일치(brand_id) 후 정렬(like_count) 까지 인덱스로 해결 → Using index condition + Using filesort 제거.
+ * - idx_product_likes: (like_count DESC) — 전체 브랜드 인기순 (브랜드 필터 X) 케이스.
+ * - idx_product_created: (created_at DESC) — 최신순 정렬.
+ * - idx_product_price: (price) — 가격순 정렬 / 가격 범위 필터.
+ * <p>
+ * 트레이드오프: write 비용 증가 (특히 like_count 증감 시 idx 페이지 갱신). like 토글은 인덱스 한 컬럼 갱신이라
+ * 감수 가능 수준으로 판단. 분포가 편향(예: brand_id 한 개에 80%)일 경우 옵티마이저가 인덱스 회피할 수 있음 → docs/week5/index-analysis.md 참조.
+ */
 @Entity
-@Table(name = "product")
+@Table(name = "product", indexes = {
+    @Index(name = "idx_product_brand_likes", columnList = "brand_id, like_count DESC"),
+    @Index(name = "idx_product_likes", columnList = "like_count DESC"),
+    @Index(name = "idx_product_created", columnList = "created_at DESC"),
+    @Index(name = "idx_product_price", columnList = "price")
+})
 public class ProductModel extends BaseEntity {
 
     private static final int MAX_NAME_LENGTH = 100;
