@@ -35,6 +35,14 @@ spring:
     activate:
       on-profile: local, test
 
+datasource:
+  mysql-jpa:
+    main:
+      driver-class-name: org.h2.Driver
+      jdbc-url: jdbc:h2:mem:loopersDB;MODE=MySQL;DB_CLOSE_DELAY=-1
+      username: sa
+      password: ""
+
 ---
 spring:
   config:

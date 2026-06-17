@@ -19,4 +19,7 @@ dependencies {
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
+
+    // h2
+    runtimeOnly("com.h2database:h2")
 }

@@ -3,11 +3,13 @@ package com.loopers.domain.like;
 import com.loopers.domain.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 
 @Entity
 @Getter
-@Table(name = "product_like")
+@Table(name = "product_like",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"member_id", "product_id"}))
 public class LikeModel extends BaseEntity {
 
     private Long memberId;

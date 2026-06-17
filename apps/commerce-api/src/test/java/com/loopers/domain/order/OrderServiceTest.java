@@ -46,12 +46,12 @@ class OrderServiceTest {
                 new OrderItemCommand(1L, "상품A", 10000L, 2),  // 20000
                 new OrderItemCommand(2L, "상품B", 5000L, 1)    // 5000
             );
-            OrderModel savedOrder = new OrderModel(1L, 25000L);
+            OrderModel savedOrder = new OrderModel(1L, 25000L, 0L, null);
             when(orderRepository.save(any(OrderModel.class))).thenReturn(savedOrder);
             when(orderItemRepository.saveAll(anyList())).thenReturn(List.of());
 
             // act
-            OrderModel result = orderService.createOrder(1L, items);
+            OrderModel result = orderService.createOrder(1L, items, null, 0L);
 
             // assert
             ArgumentCaptor<OrderModel> captor = ArgumentCaptor.forClass(OrderModel.class);
@@ -67,11 +67,11 @@ class OrderServiceTest {
                 new OrderItemCommand(1L, "상품A", 10000L, 1),
                 new OrderItemCommand(2L, "상품B", 3000L, 2)
             );
-            when(orderRepository.save(any(OrderModel.class))).thenReturn(new OrderModel(1L, 16000L));
+            when(orderRepository.save(any(OrderModel.class))).thenReturn(new OrderModel(1L, 16000L, 0L, null));
             when(orderItemRepository.saveAll(anyList())).thenReturn(List.of());
 
             // act
-            orderService.createOrder(1L, items);
+            orderService.createOrder(1L, items, null, 0L);
 
             // assert
             ArgumentCaptor<List<OrderItemModel>> itemsCaptor = ArgumentCaptor.forClass(List.class);
@@ -90,7 +90,7 @@ class OrderServiceTest {
             when(orderItemRepository.saveAll(anyList())).thenReturn(List.of());
 
             // act
-            OrderModel result = orderService.createOrder(1L, items);
+            OrderModel result = orderService.createOrder(1L, items, null, 0L);
 
             // assert
             assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING);
@@ -105,7 +105,7 @@ class OrderServiceTest {
         @Test
         void returns_order_when_id_exists() {
             // arrange
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
             when(orderRepository.find(0L)).thenReturn(Optional.of(order));
 
             // act
@@ -140,7 +140,7 @@ class OrderServiceTest {
         @Test
         void returns_all_orders_when_no_date_range() {
             // arrange
-            List<OrderModel> orders = List.of(new OrderModel(1L, 10000L), new OrderModel(1L, 20000L));
+            List<OrderModel> orders = List.of(new OrderModel(1L, 10000L, 0L, null), new OrderModel(1L, 20000L, 0L, null));
             when(orderRepository.findAllByMemberId(1L)).thenReturn(orders);
 
             // act
@@ -157,7 +157,7 @@ class OrderServiceTest {
             // arrange
             ZonedDateTime start = ZonedDateTime.now().minusDays(7);
             ZonedDateTime end = ZonedDateTime.now();
-            List<OrderModel> orders = List.of(new OrderModel(1L, 10000L));
+            List<OrderModel> orders = List.of(new OrderModel(1L, 10000L, 0L, null));
             when(orderRepository.findAllByMemberIdAndCreatedAtBetween(1L, start, end)).thenReturn(orders);
 
             // act
@@ -199,7 +199,7 @@ class OrderServiceTest {
         @Test
         void cancels_pending_order() {
             // arrange
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
             when(orderRepository.find(0L)).thenReturn(Optional.of(order));
 
             // act
@@ -226,7 +226,7 @@ class OrderServiceTest {
         @Test
         void throws_when_cancelling_confirmed_order() {
             // arrange
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
             order.confirm();
             when(orderRepository.find(0L)).thenReturn(Optional.of(order));
 
