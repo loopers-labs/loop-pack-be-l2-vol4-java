@@ -2,11 +2,12 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -23,10 +24,10 @@ public class ProductV1Controller {
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.stock(),
+            request.brandId()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @GetMapping("/{productId}")
@@ -34,17 +35,17 @@ public class ProductV1Controller {
         @PathVariable(value = "productId") Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
-            .toList();
-        return ApiResponse.success(responses);
+    public ApiResponse<Page<ProductV1Dto.ProductResponse>> getProducts(
+        @RequestParam(required = false) Long brandId,
+        @RequestParam(required = false, defaultValue = "LATEST") ProductSortType sort,
+        Pageable pageable
+    ) {
+        Page<ProductInfo> infos = productFacade.getProducts(brandId, sort, pageable);
+        return ApiResponse.success(infos.map(ProductV1Dto.ProductResponse::from));
     }
 
     @PutMapping("/{productId}")
@@ -59,8 +60,7 @@ public class ProductV1Controller {
             request.price(),
             request.stock()
         );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @DeleteMapping("/{productId}")
