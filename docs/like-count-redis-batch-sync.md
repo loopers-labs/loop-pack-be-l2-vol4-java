@@ -35,7 +35,7 @@ ProductService.incrementLikeCount()
     │  Redis: INCR product:like:pending:{productId}
     │
     ▼ (5분마다)
-LikeCountSyncScheduler.sync()
+LikeCountSyncScheduler.productLikeSync()
     │  keys("product:like:pending:*") 조회
     │  getAndDelete(key) → delta 획득 (원자적)
     │  adjustLikeCount(productId, delta) → DB: UPDATE product SET like_count = GREATEST(0, like_count + :amount)

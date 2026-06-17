@@ -1,6 +1,6 @@
-package com.loopers.domain.brand;
+package com.loopers.application.brand;
 
-import com.loopers.application.brand.BrandService;
+import com.loopers.domain.brand.Brand;
 import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.support.error.CoreException;

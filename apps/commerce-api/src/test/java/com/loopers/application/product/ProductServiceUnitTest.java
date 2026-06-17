@@ -1,6 +1,11 @@
-package com.loopers.domain.product;
+package com.loopers.application.product;
 
-import com.loopers.application.product.ProductService;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductLikeCountRepository;
+import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSort;
+import com.loopers.domain.product.ProductStock;
+import com.loopers.domain.product.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -23,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 class ProductServiceUnitTest {
 
@@ -31,7 +34,17 @@ class ProductServiceUnitTest {
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(new FakeProductRepository(), new FakeProductStockRepository(), mock(RedisTemplate.class));
+        productService = new ProductService(new FakeProductRepository(), new FakeProductStockRepository(), new FakeProductLikeCountRepository());
+    }
+
+    static class FakeProductLikeCountRepository implements ProductLikeCountRepository {
+        @Override
+        public void increment(Long productId) {
+        }
+
+        @Override
+        public void decrement(Long productId) {
+        }
     }
 
     static class FakeProductRepository implements ProductRepository {

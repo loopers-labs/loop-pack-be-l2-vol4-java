@@ -1,6 +1,7 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductLikeCountRepository;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.product.ProductStock;
@@ -8,27 +9,22 @@ import com.loopers.domain.product.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
-@Slf4j
 @RequiredArgsConstructor
 @Component
 public class ProductService {
 
-    static final String LIKE_PENDING_KEY_PREFIX = "product:like:pending:";
-
     private final ProductRepository productRepository;
     private final ProductStockRepository productStockRepository;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final ProductLikeCountRepository productLikeCountRepository;
 
     public Product getProduct(Long id) {
         return productRepository.find(id)
@@ -86,19 +82,11 @@ public class ProductService {
     }
 
     public void incrementLikeCount(Long productId) {
-        try {
-            redisTemplate.opsForValue().increment(LIKE_PENDING_KEY_PREFIX + productId);
-        } catch (Exception e) {
-            log.warn("Redis likeCount increment 실패, productId={}", productId, e);
-        }
+        productLikeCountRepository.increment(productId);
     }
 
     public void decrementLikeCount(Long productId) {
-        try {
-            redisTemplate.opsForValue().decrement(LIKE_PENDING_KEY_PREFIX + productId);
-        } catch (Exception e) {
-            log.warn("Redis likeCount decrement 실패, productId={}", productId, e);
-        }
+        productLikeCountRepository.decrement(productId);
     }
 
     public void deleteAllByBrandId(Long brandId) {

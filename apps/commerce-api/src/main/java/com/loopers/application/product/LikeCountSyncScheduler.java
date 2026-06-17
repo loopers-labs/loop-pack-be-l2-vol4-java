@@ -34,7 +34,7 @@ public class LikeCountSyncScheduler {
                 if (pending == 0) {
                     continue;
                 }
-                Long productId = Long.parseLong(key.replace(PENDING_KEY_PREFIX, ""));
+                Long productId = Long.parseLong(key.substring(PENDING_KEY_PREFIX.length()));
                 applyToDatabase(productId, pending);
             }
         }

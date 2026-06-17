@@ -1,6 +1,7 @@
-package com.loopers.domain.product;
+package com.loopers.application.product;
 
-import com.loopers.application.product.ProductService;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductSort;
 import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductEntity;

@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.application.product.LikeCountSyncScheduler;
 import com.loopers.infrastructure.brand.BrandEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.like.ProductLikeJpaRepository;
@@ -27,6 +28,9 @@ class LikeFacadeConcurrencyTest {
 
     @Autowired
     private LikeFacade likeFacade;
+
+    @Autowired
+    private LikeCountSyncScheduler likeCountSyncScheduler;
 
     @Autowired
     private BrandJpaRepository brandJpaRepository;
@@ -138,6 +142,85 @@ class LikeFacadeConcurrencyTest {
         assertAll(
             () -> assertThat(delta).isEqualTo(String.valueOf(actualLikeRecords)),
             () -> assertThat(actualLikeRecords).isEqualTo(userCount)
+        );
+    }
+
+    @DisplayName("좋아요/취소가 여러 sync 사이클에 걸쳐 발생해도, 최종 likeCount가 정확히 반영된다.")
+    @Test
+    void likeCountIsAccurate_acrossMultipleSyncCycles() throws InterruptedException {
+        // Arrange
+        BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+        ProductEntity product = productJpaRepository.save(
+            new ProductEntity(brand.getId(), "청바지", BigDecimal.valueOf(50000)));
+
+        // Phase 1: 유저 1~30 동시 좋아요
+        int phase1Count = 30;
+        ExecutorService executor1 = Executors.newFixedThreadPool(phase1Count);
+        CountDownLatch ready1 = new CountDownLatch(phase1Count);
+        CountDownLatch start1 = new CountDownLatch(1);
+        for (int i = 0; i < phase1Count; i++) {
+            final long userId = i + 1L;
+            executor1.submit(() -> {
+                ready1.countDown();
+                try {
+                    start1.await();
+                    likeFacade.like(new LikeCommand.Like(userId, product.getId()));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+        ready1.await();
+        start1.countDown();
+        executor1.shutdown();
+        executor1.awaitTermination(10, TimeUnit.SECONDS);
+
+        likeCountSyncScheduler.productLikeSync();
+
+        // Phase 2: 유저 1~10 취소 + 유저 31~50 좋아요 동시에
+        int unlikeCount = 10;
+        int newLikeCount = 20;
+        CountDownLatch ready = new CountDownLatch(unlikeCount + newLikeCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(unlikeCount + newLikeCount);
+
+        for (int i = 0; i < unlikeCount; i++) {
+            final long userId = i + 1L;
+            executor.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    likeFacade.unlike(new LikeCommand.Unlike(userId, product.getId()));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+        for (int i = 0; i < newLikeCount; i++) {
+            final long userId = phase1Count + i + 1L;
+            executor.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    likeFacade.like(new LikeCommand.Like(userId, product.getId()));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+        ready.await();
+        start.countDown();
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        likeCountSyncScheduler.productLikeSync();
+
+        // Assert: 30 - 10 + 20 = 40
+        ProductEntity result = productJpaRepository.findById(product.getId()).orElseThrow();
+        long actualLikeRecords = productLikeJpaRepository.count();
+        assertAll(
+            () -> assertThat(result.getLikeCount()).isEqualTo(40),
+            () -> assertThat(actualLikeRecords).isEqualTo(40)
         );
     }
 
