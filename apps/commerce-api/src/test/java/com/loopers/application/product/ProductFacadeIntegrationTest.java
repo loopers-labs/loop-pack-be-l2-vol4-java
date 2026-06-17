@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,10 +30,12 @@ public class ProductFacadeIntegrationTest {
     @Autowired ProductRepository productRepository;
     @Autowired LikeService likeService;
     @Autowired DatabaseCleanUp databaseCleanUp;
+    @Autowired RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();   // 상품 조회 캐시 — 테스트 간 id 재사용으로 인한 캐시 오염 방지
     }
 
     @Nested

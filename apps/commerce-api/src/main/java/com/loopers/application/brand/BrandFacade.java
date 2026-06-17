@@ -1,5 +1,6 @@
 package com.loopers.application.brand;
 
+import com.loopers.application.product.ProductReadCache;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductModel;
@@ -15,6 +16,7 @@ public class BrandFacade {
     private final BrandService brandService;
     private final ProductService productService;
     private final LikeService likeService;
+    private final ProductReadCache productReadCache;
 
     public BrandInfo register(String name, String description) {
         return BrandInfo.from(brandService.register(name, description));
@@ -40,6 +42,7 @@ public class BrandFacade {
         for (ProductModel product : productService.getActiveProductsByBrand(brandId)) {
             productService.deleteProduct(product.getId());
             likeService.deactivateByProduct(product.getId());
+            productReadCache.evictForProductChange(product.getId());  // 비활성된 상품이 캐시로 노출되지 않도록 무효화
         }
     }
 }
