@@ -5,11 +5,22 @@ import com.loopers.domain.product.ProductDetailService;
 import com.loopers.domain.product.ProductDetailService.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
+/**
+ * 상품 조회는 Look-aside 캐시(Redis) 를 거친다.
+ * <p>
+ * 정책:
+ * - 상세/목록 GET: 캐시 HIT 시 즉시 반환, MISS 시 DB → 캐시 적재
+ * - 상품 생성: 동일 브랜드의 목록 캐시 무효화 (정렬 조합 + 전체("all") 스코프)
+ * <p>
+ * 좋아요/재고 변경에 따른 상세 캐시 무효화는 각 Facade(LikeFacade, OrderFacade) 가 직접 책임진다.
+ */
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
@@ -17,6 +28,7 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final ProductDetailService productDetailService;
+    private final ProductCachePort productCache;
 
     public ProductInfo createProduct(ProductCriteria.Create criteria) {
         brandService.requireExists(criteria.brandId());
@@ -28,6 +40,9 @@ public class ProductFacade {
             criteria.stock(),
             criteria.imageUrl()
         );
+        // 새 상품 등장 → 해당 브랜드 + 전체 목록 캐시 무효화 (다음 조회에서 갱신)
+        productCache.evictListsByBrand(criteria.brandId());
+        productCache.evictListsByBrand(null);
         return ProductInfo.from(product);
     }
 
@@ -37,17 +52,30 @@ public class ProductFacade {
     }
 
     /**
-     * 상품 상세: Product + Brand + likeCount 를 도메인 서비스에서 조합.
+     * 상품 상세: 캐시 우선 조회 → 미스 시 도메인 조합 → 캐시 적재.
      */
     public ProductDetailInfo getProductDetail(Long id) {
+        Optional<ProductDetailInfo> cached = productCache.getDetail(id);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
         ProductDetail detail = productDetailService.getDetail(id);
-        return ProductDetailInfo.from(detail);
+        ProductDetailInfo info = ProductDetailInfo.from(detail);
+        productCache.putDetail(info);
+        return info;
     }
 
     public List<ProductInfo> listProducts(ProductCriteria.List criteria) {
-        List<ProductModel> products = productService.listProducts(criteria.sortType(), criteria.brandId());
-        return products.stream()
+        ProductSortType effectiveSort = criteria.sortType() == null ? ProductSortType.LATEST : criteria.sortType();
+        Optional<List<ProductInfo>> cached = productCache.getList(criteria.brandId(), effectiveSort);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+        List<ProductModel> products = productService.listProducts(effectiveSort, criteria.brandId());
+        List<ProductInfo> infos = products.stream()
             .map(ProductInfo::from)
             .toList();
+        productCache.putList(criteria.brandId(), effectiveSort, infos);
+        return infos;
     }
 }
