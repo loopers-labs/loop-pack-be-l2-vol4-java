@@ -2,7 +2,6 @@ package com.loopers.application.order;
 
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponService;
-import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.order.OrderItemCommand;
 import com.loopers.domain.order.OrderItemModel;
@@ -66,7 +65,7 @@ public class OrderFacade {
         if (userCouponId != null) {
             UserCouponModel userCoupon = couponService.useCoupon(user.getId(), userCouponId);
             CouponModel coupon = couponService.getCoupon(userCoupon.getCouponId());
-            discountAmount = calculateDiscount(originalPrice, coupon);
+            discountAmount = coupon.calculateDiscount(originalPrice);
             finalPrice = Math.max(0L, originalPrice - discountAmount);
         }
 
@@ -76,13 +75,6 @@ public class OrderFacade {
         List<OrderItemModel> savedItems = orderService.getOrderItems(order.getId());
 
         return OrderInfo.of(order, savedItems.stream().map(OrderItemInfo::from).toList());
-    }
-
-    private long calculateDiscount(long originalPrice, CouponModel coupon) {
-        if (coupon.getDiscountType() == CouponType.FIXED) {
-            return coupon.getDiscountValue();
-        }
-        return originalPrice * coupon.getDiscountValue() / 100;
     }
 
     public record OrderRequest(Long productId, int quantity) {}
