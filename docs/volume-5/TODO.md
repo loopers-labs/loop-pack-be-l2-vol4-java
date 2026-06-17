@@ -76,7 +76,7 @@ flowchart TD
 - [x] **측정 전용 프로파일 정리** — `local,seed`(스키마 create + 비웹 적재 후 종료) / `perf`(`ddl-auto:none`, 데이터 보존).
 - [x] **Java 일회성 데이터 로더** — `com.loopers.support.seed.MeasurementDataSeeder` (products 100,000 / likes 2,905,713 / brands 1,000 / users 5,000, 고정 시드). **데이터는 DB에 적재 완료 — 재적재 불필요.**
 - [x] **데이터 분포 sanity 체크** — `measurement/sql/00-sanity.sql`. 인기 브랜드 `847`, 핫 상품 `45577` 확정.
-- [x] **측정 규약 재정비(50VU)** — k6 `products.js`(S1~S4, `constant-vus` 50/30s), `explain-baseline.sql`(S1~S4), `reports/00-setup.md` 재작성.
+- [x] **측정 규약 재정비(50VU)** — k6 `products.js`(S1~S4, `constant-vus` 50/30s), `01-explain-baseline.sql`(S1~S4), `reports/00-setup.md` 재작성.
 - [x] **`perf`/`seed` 로깅 블록 추가** — `supports/logging/.../logback.xml` 에 `perf,seed` springProfile 부재로 배너 이후 로그가 침묵 → 콘솔 appender 추가(기동 진단 가능).
 - [x] **50VU 하니스 스모크 재검증** — EXPLAIN S1~S4 계획 정상. k6 S4 1133건 100% 200(p50 343ms·p95 871ms). S3 단건 200(7.05s) 정상, 동시 50명은 커넥션 풀 고갈로 ~3s 500(`connection-timeout`).
 
@@ -103,13 +103,13 @@ flowchart TD
 
 **목표:** 매 조회 집계(COUNT 서브쿼리)를 제거한다.
 
-- [ ] `products`에 `like_count INT NOT NULL DEFAULT 0` 컬럼 추가 (ALTER) + 기존 likes 기준 **초기 백필**
-- [ ] **좋아요 동기화 (원자적 갱신 고정)** — 기존 좋아요 등록/취소 로직에 같은 트랜잭션으로
-  - 등록: `UPDATE products SET like_count = like_count + 1 WHERE id = ?`
-  - 취소: `UPDATE products SET like_count = like_count - 1 WHERE id = ?`
-  - 등록/취소의 멱등 의미(중복 등록·미존재 취소)를 기존 동작과 정확히 일치시킴
-- [ ] 동기화 단위 테스트 — 등록/취소 후 like_count가 실제 likes 수와 일치
-- [ ] 목록 쿼리에서 **서브쿼리 제거** → `like_count` 컬럼 직접 정렬/조회
+- [x] `products`에 `like_count INT NOT NULL DEFAULT 0` 컬럼 추가(엔티티 매핑) + 백필 SQL 작성 — `measurement/sql/02-denormalize-backfill.sql`(ALTER + GROUP BY 조인 백필 + 일치 검증). 측정 DB(perf) 실제 실행은 측정 단계에서.
+- [x] **좋아요 동기화 (원자적 갱신 고정)** — LikeFacade 등록/취소에 같은 트랜잭션으로
+  - 등록: 실제 INSERT 시 `incrementLikeCount` (`UPDATE … SET like_count = like_count + 1 WHERE id = ?`)
+  - 취소: 실제 삭제 시(`deletedCount > 0`) `decrementLikeCount` (`… - 1`). 미존재 취소는 미감소
+  - 등록/취소의 멱등 의미(중복 등록·미존재 취소)를 기존 동작과 정확히 일치 (`existsBy` early-return / 삭제 행 수 0 분기)
+- [x] 동기화 테스트 — LikeFacade 통합 테스트로 등록/취소 후 `like_count == COUNT(likes)`(멱등 포함) 검증 + 단위 테스트로 증감 호출 검증
+- [x] **서브쿼리 제거** → `like_count` 컬럼 직접 정렬/조회 — 목록(LATEST/PRICE_ASC/LIKES_DESC)·상세·좋아요한 상품 목록 전부
 - [ ] S1~S4 EXPLAIN + k6 재측정
   - 예상: 서브쿼리는 사라지지만 **인덱스가 아직 없어 정렬은 filesort** → 다음 단계 동기
 - [ ] **`reports/02-denormalization.md` 작성** + `SUMMARY.md` 갱신
