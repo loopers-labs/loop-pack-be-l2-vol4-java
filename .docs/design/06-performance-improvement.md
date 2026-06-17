@@ -301,6 +301,54 @@ GET /api/v1/products?sortBy=likes_desc&inStock=true
 
 총 4개 쿼리 메서드로 분기. 각 쿼리가 독립적으로 최적 인덱스를 활용한다.
 
+### 데이터 분포와 옵티마이저 선택
+
+테스트 데이터 분포를 달리하면서 EXPLAIN 결과를 비교했다.
+
+| 케이스 | 20브랜드 균등 1M | 100브랜드 비균등 1M |
+|--------|:---------------:|:------------------:|
+| 전체 좋아요순 | index / 20 | index / 20 |
+| 전체 최신순 | index / 20 | index / 20 |
+| 전체 가격순 | index / 20 | index / 20 |
+| 브랜드 + 좋아요순 | ref / 93,736 | ref / 18,916 |
+| 브랜드 + 최신순 | index / 211 | index / 1,050 |
+| 브랜드 + 가격순 | ref / 93,736 | ref / 18,916 |
+
+**브랜드 + 최신순만 다른 이유:**
+
+20브랜드 균등 분포에서는 created_at 단일 인덱스 스캔 시 brand_id=1이 1/20 확률로 고르게 분포해 rows=211로 추정. 옵티마이저가 composite ref (93K)보다 저렴하다고 판단.
+
+100브랜드 비균등 분포에서는 brand_id=1이 가장 오래된 브랜드로 최근 구간에서 희박 (filtered=0.19%). rows=1,050으로 증가. 그러나 여전히 composite ref (18,916)보다 낮아 index 스캔 선택.
+
+**결론:** 테스트 데이터의 인위적 균등 분포가 만든 이상 현상. 실 운영에서 brand_id와 created_at 간 상관관계가 강해질수록 rows 추정이 높아지고, composite ref로 전환되는 임계점에 가까워진다. `idx_products_brand_created_at`이 필요한 이유.
+
+### OFFSET 페이지네이션 한계 — 딥 페이지 문제
+
+지금까지 EXPLAIN은 OFFSET 없는 1페이지 기준이었다. 실제 Pageable은 `LIMIT 20 OFFSET (page * 20)`을 생성한다.
+
+**전체 최신순 — OFFSET에 정비례**
+
+| OFFSET | rows |
+|--------|------|
+| 0 | 20 |
+| 1,000 | 1,020 |
+| 10,000 | 10,020 |
+| 50,000 | 50,020 |
+
+rows = OFFSET + LIMIT. 인덱스 스캔이 OFFSET만큼 더 내려가야 하므로 선형 증가.
+
+**브랜드 + 최신순 — OFFSET에 따라 전략이 바뀜**
+
+| OFFSET | type | key | rows | Extra |
+|--------|------|-----|------|-------|
+| 0 | index | idx_products_created_at | 1,050 | Using where |
+| 100 | index | idx_products_created_at | 6,304 | Using where |
+| 1,000 | ref | idx_products_brand_likes | 18,916 | Using where; **Using filesort** |
+
+OFFSET 1,000에서 created_at 스캔을 포기하고 brand ref + filesort로 전환. brand_id=1을 1,020개 찾으려면 created_at 인덱스를 ~10만 행 스캔해야 하는데, 그것보다 brand ref로 18,916행을 가져와 정렬하는 쪽을 선택. filesort 재등장.
+
+**핵심:** OFFSET이 커질수록 rows는 선형 증가, 깊은 페이지에서는 인덱스 전략 자체가 뒤집혀 filesort까지 부활한다. 이것이 offset 기반 페이지네이션의 구조적 한계다.
+
 ### 체크리스트
 
 - [x] `ProductModel`에 `@Table(indexes = ...)` 추가
@@ -310,6 +358,7 @@ GET /api/v1/products?sortBy=likes_desc&inStock=true
 - [x] 재고 필터(`inStock`) EXISTS 쿼리 구현
 - [x] 최신순·가격순 EXPLAIN 분석 → 인덱스 추가 후 비교 완료 (rows: 99,449 → 20 / filesort 제거)
 - [x] like_count 인덱스 유지 결정 — 서비스 크리티컬도 낮음 + Redis 캐시 조합으로 쓰기 비용 허용
+- [x] 1M건 EXPLAIN 비교 — 데이터 분포·OFFSET에 따른 옵티마이저 동작 차이 분석 완료
 - [ ] 블로그용 AS-IS / TO-BE 비교 기록
 
 ---
@@ -474,11 +523,25 @@ public void cancelLike(Long userId, Long productId) { ... }
 
 ### 테스트 데이터 현황
 
+두 가지 구성으로 나눠 테스트했다.
+
+**소규모 (기본 개발·기능 검증용)**
+
 | 테이블 | 건수 | 특이사항 |
 |--------|------|---------|
 | `brands` | 20개 | 브랜드-01 ~ 브랜드-20 |
-| `products` | 100,000개 | brand_id 균등 분포 (브랜드당 약 5,000건), like_count 제곱 분포 (0~9,999), price 1,000~1,000,000원, created_at 최근 2년 랜덤 |
+| `products` | 100,000개 | brand_id 균등 분포 (브랜드당 약 5,000건), like_count 제곱 분포 (0~9,999), price 1,000~1,000,000원, created_at 최근 2년 균등 랜덤 |
 | `stocks` | 100,000개 | product 1:1, total_stock 0~500 균등 분포 |
+
+**대규모 (인덱스 성능·분포 영향 검증용)**
+
+| 테이블 | 건수 | 특이사항 |
+|--------|------|---------|
+| `brands` | 100개 | 브랜드-01 ~ 브랜드-100 |
+| `products` | 1,000,000개 | brand_id 균등 분포 (브랜드당 약 10,000건), like_count 제곱 분포 (0~9,999), price 1,000~1,000,000원, created_at 브랜드별 입점 시기 이후 비균등(최신 집중) 분포 |
+| `stocks` | 1,000,000개 | product 1:1, total_stock 0~500 균등 분포 |
+
+현재 로컬 기본값은 소규모(20브랜드 / 10만 건)다. 대규모 검증 시 `ProductDataInitializer` 상수를 변경해 재기동한다.
 
 ### 데이터 생성 방식
 
