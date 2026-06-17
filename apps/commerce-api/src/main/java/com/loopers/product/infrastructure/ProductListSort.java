@@ -14,8 +14,15 @@ final class ProductListSort {
     static OrderSpecifier<?>[] from(ProductSort sort, QProduct product, Expression<Long> likeCount) {
         return switch (sort) {
             case PRICE_ASC -> withLatest(product.price.value.asc(), product);
-            case LIKES_DESC -> withLatest(new OrderSpecifier<>(Order.DESC, likeCount), product);
+            case LIKES_DESC -> likesDesc(likeCount);
             case LATEST -> latest(product);
+        };
+    }
+
+    private static OrderSpecifier<?>[] likesDesc(Expression<Long> likeCount) {
+        return new OrderSpecifier<?>[] {
+            new OrderSpecifier<>(Order.DESC, likeCount),
+            QProductLikeSummary.productLikeSummary.productId.asc()
         };
     }
 
