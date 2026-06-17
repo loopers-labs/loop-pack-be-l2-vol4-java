@@ -74,7 +74,7 @@ class UserCouponServiceTest {
         @Test
         void given_available_when_use_then_appliedDiscount() {
             UserCouponModel uc = availableUserCoupon(7L);
-            when(userCouponRepository.findFirstAvailable(USER_ID, COUPON_ID)).thenReturn(Optional.of(uc));
+            when(userCouponRepository.findFirstAvailableForUpdate(USER_ID, COUPON_ID)).thenReturn(Optional.of(uc));
             when(couponService.getActiveTemplate(COUPON_ID)).thenReturn(rateCoupon(null));
             when(userCouponRepository.save(any(UserCouponModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -89,7 +89,7 @@ class UserCouponServiceTest {
         @DisplayName("사용 가능 발급분이 없으면 NOT_FOUND, 저장하지 않는다 (§2 격리)")
         @Test
         void given_noneAvailable_when_use_then_notFound() {
-            when(userCouponRepository.findFirstAvailable(USER_ID, COUPON_ID)).thenReturn(Optional.empty());
+            when(userCouponRepository.findFirstAvailableForUpdate(USER_ID, COUPON_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> userCouponService.useForOrder(USER_ID, COUPON_ID, 10000L))
                     .isInstanceOf(CoreException.class)
@@ -102,7 +102,7 @@ class UserCouponServiceTest {
         @Test
         void given_belowMinOrderAmount_when_use_then_badRequest() {
             UserCouponModel uc = availableUserCoupon(7L);
-            when(userCouponRepository.findFirstAvailable(USER_ID, COUPON_ID)).thenReturn(Optional.of(uc));
+            when(userCouponRepository.findFirstAvailableForUpdate(USER_ID, COUPON_ID)).thenReturn(Optional.of(uc));
             when(couponService.getActiveTemplate(COUPON_ID)).thenReturn(rateCoupon(10000L));
 
             assertThatThrownBy(() -> userCouponService.useForOrder(USER_ID, COUPON_ID, 9999L))
