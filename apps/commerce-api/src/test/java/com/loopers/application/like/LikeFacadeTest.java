@@ -56,35 +56,48 @@ class LikeFacadeTest {
         private final Long userId = 1L;
         private final Long productId = 1L;
 
-        @DisplayName("회원과 상품이 활성 상태이고 좋아요가 없으면 저장한다.")
+        @DisplayName("회원과 상품이 활성 상태이고 좋아요가 없으면 저장하고 좋아요 수를 1 증가시킨다.")
         @Test
-        void savesLike_whenBothActiveAndNotYetLiked() {
+        void savesLike_andIncrementsLikeCount_whenBothActiveAndNotYetLiked() {
             // arrange
-            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
-            given(productRepository.getActiveById(productId)).willReturn(mock(ProductModel.class));
-            given(likeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).willReturn(false);
-            given(likeRepository.save(any(LikeModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+            UserModel user = mock(UserModel.class);
+            ProductModel product = mock(ProductModel.class);
+            given(user.getId()).willReturn(userId);
+            given(product.getId()).willReturn(productId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(likeRepository.existsByUserIdAndProductId(userId, productId)).willReturn(false);
 
             // act
             likeFacade.createLike(userId, productId);
 
             // assert
-            then(likeRepository).should().save(any(LikeModel.class));
+            assertAll(
+                () -> then(likeRepository).should().save(any(LikeModel.class)),
+                () -> then(productRepository).should().incrementLikeCount(productId)
+            );
         }
 
-        @DisplayName("이미 좋아요한 상품이면 저장하지 않는다(멱등).")
+        @DisplayName("이미 좋아요한 상품이면 저장하지 않고 좋아요 수도 증가시키지 않는다(멱등).")
         @Test
-        void doesNotSave_whenAlreadyLiked() {
+        void doesNotSaveNorIncrement_whenAlreadyLiked() {
             // arrange
-            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
-            given(productRepository.getActiveById(productId)).willReturn(mock(ProductModel.class));
-            given(likeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).willReturn(true);
+            UserModel user = mock(UserModel.class);
+            ProductModel product = mock(ProductModel.class);
+            given(user.getId()).willReturn(userId);
+            given(product.getId()).willReturn(productId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(likeRepository.existsByUserIdAndProductId(userId, productId)).willReturn(true);
 
             // act
             likeFacade.createLike(userId, productId);
 
             // assert
-            then(likeRepository).should(never()).save(any(LikeModel.class));
+            assertAll(
+                () -> then(likeRepository).should(never()).save(any(LikeModel.class)),
+                () -> then(productRepository).should(never()).incrementLikeCount(anyLong())
+            );
         }
 
         @DisplayName("상품이 없거나 삭제된 경우 NOT_FOUND 예외가 발생한다.")
@@ -101,7 +114,8 @@ class LikeFacadeTest {
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
-                () -> then(likeRepository).should(never()).save(any(LikeModel.class))
+                () -> then(likeRepository).should(never()).save(any(LikeModel.class)),
+                () -> then(productRepository).should(never()).incrementLikeCount(anyLong())
             );
         }
     }
@@ -113,18 +127,48 @@ class LikeFacadeTest {
         private final Long userId = 1L;
         private final Long productId = 1L;
 
-        @DisplayName("회원과 상품이 활성 상태이면 deleteByUserIdAndProductId를 호출한다.")
+        @DisplayName("좋아요가 실제로 삭제되면 좋아요 수를 1 감소시킨다.")
         @Test
-        void callsDelete_whenBothActive() {
+        void decrementsLikeCount_whenLikeIsRemoved() {
             // arrange
-            given(userRepository.getActiveById(userId)).willReturn(mock(UserModel.class));
-            given(productRepository.getActiveById(productId)).willReturn(mock(ProductModel.class));
+            UserModel user = mock(UserModel.class);
+            ProductModel product = mock(ProductModel.class);
+            given(user.getId()).willReturn(userId);
+            given(product.getId()).willReturn(productId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(likeRepository.deleteByUserIdAndProductId(userId, productId)).willReturn(1);
 
             // act
             likeFacade.deleteLike(userId, productId);
 
             // assert
-            then(likeRepository).should().deleteByUserIdAndProductId(anyLong(), anyLong());
+            assertAll(
+                () -> then(likeRepository).should().deleteByUserIdAndProductId(userId, productId),
+                () -> then(productRepository).should().decrementLikeCount(productId)
+            );
+        }
+
+        @DisplayName("삭제할 좋아요가 없으면 좋아요 수를 감소시키지 않는다(멱등).")
+        @Test
+        void doesNotDecrement_whenNothingDeleted() {
+            // arrange
+            UserModel user = mock(UserModel.class);
+            ProductModel product = mock(ProductModel.class);
+            given(user.getId()).willReturn(userId);
+            given(product.getId()).willReturn(productId);
+            given(userRepository.getActiveById(userId)).willReturn(user);
+            given(productRepository.getActiveById(productId)).willReturn(product);
+            given(likeRepository.deleteByUserIdAndProductId(userId, productId)).willReturn(0);
+
+            // act
+            likeFacade.deleteLike(userId, productId);
+
+            // assert
+            assertAll(
+                () -> then(likeRepository).should().deleteByUserIdAndProductId(userId, productId),
+                () -> then(productRepository).should(never()).decrementLikeCount(anyLong())
+            );
         }
 
         @DisplayName("상품이 없거나 삭제된 경우 NOT_FOUND 예외가 발생한다.")
@@ -141,7 +185,8 @@ class LikeFacadeTest {
                     .isInstanceOf(CoreException.class)
                     .extracting("errorType")
                     .isEqualTo(ErrorType.NOT_FOUND),
-                () -> then(likeRepository).should(never()).deleteByUserIdAndProductId(any(), any())
+                () -> then(likeRepository).should(never()).deleteByUserIdAndProductId(any(), any()),
+                () -> then(productRepository).should(never()).decrementLikeCount(anyLong())
             );
         }
     }

@@ -83,6 +83,7 @@ class ProductRepositoryIntegrationTest {
             .userId(userId)
             .productId(productId)
             .build());
+        productJpaRepository.incrementLikeCount(productId);
     }
 
     @DisplayName("상품을 저장할 때,")

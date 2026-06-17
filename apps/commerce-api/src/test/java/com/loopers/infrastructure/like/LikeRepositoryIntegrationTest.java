@@ -188,6 +188,9 @@ class LikeRepositoryIntegrationTest {
             likeRepository.save(createLike(USER_ID, myProduct.getId()));
             likeRepository.save(createLike(2L, myProduct.getId()));
             likeRepository.save(createLike(2L, othersProduct.getId()));
+            productJpaRepository.incrementLikeCount(myProduct.getId());
+            productJpaRepository.incrementLikeCount(myProduct.getId());
+            productJpaRepository.incrementLikeCount(othersProduct.getId());
 
             // act
             Page<ProductSummary> summaries = likeRepository.findLikedProductSummaries(USER_ID, 0, 10);
