@@ -41,6 +41,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int increaseLikeCount(Long id) {
+        return productJpaRepository.increaseLikeCount(id);
+    }
+
+    @Override
+    public int decreaseLikeCount(Long id) {
+        return productJpaRepository.decreaseLikeCount(id);
+    }
+
+    @Override
     public List<ProductModel> findAll() {
         return queryFactory
             .selectFrom(product)

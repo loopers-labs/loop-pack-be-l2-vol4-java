@@ -55,6 +55,18 @@ public class ProductService {
     }
 
     @Transactional
+    public void increaseLikeCount(Long id) {
+        // 비정규화된 like_count를 원자적 UPDATE로 증가. 좋아요 insert가 실제로 일어난 경우에만 호출된다.
+        productRepository.increaseLikeCount(id);
+    }
+
+    @Transactional
+    public void decreaseLikeCount(Long id) {
+        // like_count > 0 가드가 쿼리에 포함돼 음수로 내려가지 않는다. 좋아요 delete가 실제로 일어난 경우에만 호출된다.
+        productRepository.decreaseLikeCount(id);
+    }
+
+    @Transactional
     public void deleteProduct(Long id) {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);

@@ -18,6 +18,9 @@ public class ProductModel extends BaseEntity {
     private Long price;
     private Integer stock;
 
+    @Column(name = "like_count", nullable = false)
+    private Long likeCount;
+
     protected ProductModel() {}
 
     public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
@@ -42,6 +45,7 @@ public class ProductModel extends BaseEntity {
         this.description = description;
         this.price = price;
         this.stock = stock;
+        this.likeCount = 0L;
     }
 
     public Long getBrandId() {
@@ -65,7 +69,7 @@ public class ProductModel extends BaseEntity {
     }
 
     public Long getLikeCount() {
-        return 0L;
+        return likeCount;
     }
 
     public void deductStock(int quantity) {

@@ -22,4 +22,26 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     @Query("UPDATE ProductModel p SET p.stock = p.stock - :quantity " +
            "WHERE p.id = :id AND p.deletedAt IS NULL AND p.stock >= :quantity")
     int deductStock(@Param("id") Long id, @Param("quantity") int quantity);
+
+    /**
+     * 원자적 좋아요 수 증가.
+     * 비정규화된 {@code like_count}를 단일 UPDATE 문으로 증감해, 동시 좋아요 간 lost update를 차단한다.
+     *
+     * @return 갱신된 행 수 (1이면 성공, 0이면 미존재)
+     */
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 " +
+           "WHERE p.id = :id AND p.deletedAt IS NULL")
+    int increaseLikeCount(@Param("id") Long id);
+
+    /**
+     * 원자적 좋아요 수 감소.
+     * {@code like_count > 0} 가드로 음수 방지. 좋아요가 0인 상태에서 호출돼도 0 미만으로 내려가지 않는다.
+     *
+     * @return 갱신된 행 수 (1이면 감소 성공, 0이면 미존재 또는 이미 0)
+     */
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount - 1 " +
+           "WHERE p.id = :id AND p.deletedAt IS NULL AND p.likeCount > 0")
+    int decreaseLikeCount(@Param("id") Long id);
 }
