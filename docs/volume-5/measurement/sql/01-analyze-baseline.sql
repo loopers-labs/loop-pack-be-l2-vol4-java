@@ -1,5 +1,5 @@
 -- Stage 1 베이스라인 실측: EXPLAIN ANALYZE(S3·S4) + S1·S2 DNF 확인(>30s 캡).
--- 실행: docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < analyze-baseline.sql
+-- 실행: docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < 01-analyze-baseline.sql
 SET @brand_id := 847;
 SET @hot_product_id := 45577;
 

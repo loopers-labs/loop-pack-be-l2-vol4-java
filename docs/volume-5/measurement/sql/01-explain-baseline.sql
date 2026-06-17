@@ -3,7 +3,7 @@
 --   EXPLAIN          : 옵티마이저 추정(비실행) — 모든 시나리오에서 항상 가능.
 --   EXPLAIN ANALYZE  : 실제 실행 후 실측 — 단건 30초 초과면 DNF 처리(돌리지 않음).
 -- S1·S2(LIKES_DESC)는 ORDER BY 상관 서브쿼리 탓에 실행 시 DNF(>30s) → EXPLAIN(추정)만.
--- 실행: docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < explain-baseline.sql
+-- 실행: docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < 01-explain-baseline.sql
 SET @brand_id := 847;          -- 인기 브랜드 (1,134개 상품, sanity 3)
 SET @hot_product_id := 45577;  -- 좋아요 Top 상품 (5,000 likes, sanity 7)
 

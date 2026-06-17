@@ -93,8 +93,8 @@ SPRING_PROFILES_ACTIVE=perf ./gradlew :apps:commerce-api:bootRun
 
 **EXPLAIN** (`measurement/sql/`):
 ```bash
-# 추정(계획): explain-baseline.sql 그대로. 실측: 같은 쿼리를 EXPLAIN ANALYZE FORMAT=TREE 로 (S3·S4)
-docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < measurement/sql/explain-baseline.sql
+# 추정(계획): 01-explain-baseline.sql 그대로. 실측: 같은 쿼리를 EXPLAIN ANALYZE FORMAT=TREE 로 (S3·S4)
+docker exec -i docker-mysql-1 mysql -uapplication -papplication loopers < measurement/sql/01-explain-baseline.sql
 ```
 
 **k6** (`measurement/k6/products.js`):
