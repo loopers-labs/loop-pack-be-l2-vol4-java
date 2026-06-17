@@ -8,6 +8,13 @@
         </root>
     </springProfile>
 
+    <springProfile name="perf,seed">
+        <include resource="appenders/plain-console-appender.xml"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
     <springProfile name="dev">
         <include resource="appenders/json-console-appender.xml"/>
         <include resource="appenders/slack-appender.xml"/>
