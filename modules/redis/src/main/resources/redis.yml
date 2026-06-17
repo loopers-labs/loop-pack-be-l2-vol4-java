@@ -30,6 +30,18 @@ datasource:
 spring.config.activate.on-profile: dev
 
 ---
+spring.config.activate.on-profile: perf
+
+datasource:
+  redis:
+    master:
+      host: localhost
+      port: 6379
+    replicas:
+      - host: localhost
+        port: 6380
+
+---
 spring.config.activate.on-profile: qa
 
 ---
