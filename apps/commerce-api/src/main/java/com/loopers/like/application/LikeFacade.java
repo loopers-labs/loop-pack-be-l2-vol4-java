@@ -1,5 +1,7 @@
 package com.loopers.like.application;
 
+import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.BrandRepository;
 import com.loopers.like.domain.LikeModel;
 import com.loopers.like.domain.LikeRegistrationPolicy;
 import com.loopers.like.domain.LikeRepository;
@@ -17,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -28,6 +32,7 @@ public class LikeFacade {
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
+    private final BrandRepository brandRepository;
     private final LikeRegistrationPolicy likeRegistrationPolicy;
 
     @Caching(evict = {
@@ -62,10 +67,25 @@ public class LikeFacade {
         List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
         // [fix] N+1 문제 → productId 목록으로 IN 쿼리 일괄 조회 (결정 10)
         List<ProductModel> products = productRepository.findAllByIds(productIds);
+
         Map<Long, Integer> stockMap = stockRepository.findAllByProductIds(productIds).stream()
             .collect(Collectors.toMap(StockModel::getProductId, StockModel::availableStock));
+
+        List<Long> brandIds = products.stream()
+            .map(ProductModel::getBrandId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+        Map<Long, BrandModel> brandMap = brandRepository.findAllByIds(brandIds).stream()
+            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
+
         return products.stream()
-            .map(p -> ProductInfo.from(p, stockMap.getOrDefault(p.getId(), 0)))
+            .map(p -> ProductInfo.from(
+                p,
+                Optional.ofNullable(brandMap.get(p.getBrandId())).map(BrandModel::getName).orElse(null),
+                stockMap.getOrDefault(p.getId(), 0)
+            ))
             .toList();
     }
 }
