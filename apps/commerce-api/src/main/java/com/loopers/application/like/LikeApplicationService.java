@@ -1,7 +1,6 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.like.service.LikeDomainService;
-import com.loopers.domain.product.model.Product;
 import com.loopers.domain.product.repository.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -18,23 +17,25 @@ public class LikeApplicationService {
 
     @Transactional
     public void addLike(Long memberId, Long productId) {
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        if (!productRepository.findById(productId).isPresent()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.");
+        }
 
         boolean added = likeDomainService.addLike(memberId, productId);
         if (added) {
-            product.incrementLikeCount();
+            productRepository.incrementLikeCount(productId);
         }
     }
 
     @Transactional
     public void removeLike(Long memberId, Long productId) {
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        if (!productRepository.findById(productId).isPresent()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.");
+        }
 
         boolean removed = likeDomainService.removeLike(memberId, productId);
         if (removed) {
-            product.decrementLikeCount();
+            productRepository.decrementLikeCount(productId);
         }
     }
 }

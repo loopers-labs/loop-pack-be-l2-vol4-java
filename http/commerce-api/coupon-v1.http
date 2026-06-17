@@ -1,0 +1,7 @@
+### 쿠폰 발급 요청
+POST {{commerce-api}}/api/v1/coupons/1/issue
+X-Loopers-LoginId: user1
+
+### 내 쿠폰 목록 조회
+GET {{commerce-api}}/api/v1/users/me/coupons
+X-Loopers-LoginId: user1

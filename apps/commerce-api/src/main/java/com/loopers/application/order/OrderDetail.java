@@ -7,6 +7,8 @@ import java.util.List;
 
 public record OrderDetail(
     Long orderId,
+    Long originalAmount,
+    Long discountAmount,
     Long totalAmount,
     ZonedDateTime orderedAt,
     List<OrderItemInfo> items

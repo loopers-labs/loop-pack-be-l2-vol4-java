@@ -16,47 +16,52 @@ class OrderTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 입력이면, 주문이 생성된다.")
+        @DisplayName("쿠폰 없이 정상 입력이면, 주문이 생성되고 totalAmount = originalAmount다.")
         @Test
-        void createsOrder_whenInputIsValid() {
-            // Arrange & Act
-            Order order = Order.create(1L, 100_000L);
+        void createsOrder_withoutCoupon() {
+            Order order = Order.create(1L, 100_000L, 0L, null);
 
-            // Assert
             assertThat(order.getMemberId()).isEqualTo(1L);
+            assertThat(order.getOriginalAmount()).isEqualTo(100_000L);
+            assertThat(order.getDiscountAmount()).isEqualTo(0L);
             assertThat(order.getTotalAmount()).isEqualTo(100_000L);
+            assertThat(order.getIssuedCouponId()).isNull();
+        }
+
+        @DisplayName("쿠폰을 적용하면, totalAmount = originalAmount - discountAmount다.")
+        @Test
+        void createsOrder_withCoupon() {
+            Order order = Order.create(1L, 100_000L, 10_000L, 42L);
+
+            assertThat(order.getTotalAmount()).isEqualTo(90_000L);
+            assertThat(order.getDiscountAmount()).isEqualTo(10_000L);
+            assertThat(order.getIssuedCouponId()).isEqualTo(42L);
         }
 
         @DisplayName("memberId가 null이면, BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenMemberIdIsNull() {
-            // Act
             CoreException ex = assertThrows(CoreException.class,
-                () -> Order.create(null, 100_000L));
+                () -> Order.create(null, 100_000L, 0L, null));
 
-            // Assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("totalAmount가 0이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("originalAmount가 0이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenTotalAmountIsZero() {
-            // Act
+        void throwsBadRequest_whenOriginalAmountIsZero() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> Order.create(1L, 0L));
+                () -> Order.create(1L, 0L, 0L, null));
 
-            // Assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("totalAmount가 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("discountAmount가 음수이면, BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsBadRequest_whenTotalAmountIsNegative() {
-            // Act
+        void throwsBadRequest_whenDiscountAmountIsNegative() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> Order.create(1L, -1L));
+                () -> Order.create(1L, 100_000L, -1L, null));
 
-            // Assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }

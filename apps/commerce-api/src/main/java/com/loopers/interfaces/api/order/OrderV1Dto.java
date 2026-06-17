@@ -9,20 +9,34 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    public record CreateRequest(List<OrderItemDto> items) {
+    public record CreateRequest(List<OrderItemDto> items, Long couponId) {
         public record OrderItemDto(Long productId, int quantity) {}
     }
 
     public record CreateResponse(Long orderId) {}
 
-    public record OrderSummaryResponse(Long orderId, Long totalAmount, ZonedDateTime orderedAt) {
+    public record OrderSummaryResponse(
+        Long orderId,
+        Long originalAmount,
+        Long discountAmount,
+        Long totalAmount,
+        ZonedDateTime orderedAt
+    ) {
         public static OrderSummaryResponse from(OrderSummary summary) {
-            return new OrderSummaryResponse(summary.orderId(), summary.totalAmount(), summary.orderedAt());
+            return new OrderSummaryResponse(
+                summary.orderId(),
+                summary.originalAmount(),
+                summary.discountAmount(),
+                summary.totalAmount(),
+                summary.orderedAt()
+            );
         }
     }
 
     public record OrderDetailResponse(
         Long orderId,
+        Long originalAmount,
+        Long discountAmount,
         Long totalAmount,
         ZonedDateTime orderedAt,
         List<OrderItemResponse> items
@@ -41,7 +55,14 @@ public class OrderV1Dto {
                     item.productName(), item.brandName(), item.price(), item.quantity(), item.status()
                 ))
                 .toList();
-            return new OrderDetailResponse(detail.orderId(), detail.totalAmount(), detail.orderedAt(), items);
+            return new OrderDetailResponse(
+                detail.orderId(),
+                detail.originalAmount(),
+                detail.discountAmount(),
+                detail.totalAmount(),
+                detail.orderedAt(),
+                items
+            );
         }
     }
 }

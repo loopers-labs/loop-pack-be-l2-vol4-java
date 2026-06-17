@@ -38,7 +38,7 @@ public class OrderV1Controller {
         List<OrderItemRequest> items = request.items().stream()
             .map(item -> new OrderItemRequest(item.productId(), item.quantity()))
             .toList();
-        Long orderId = orderFacade.createOrder(loginId, items);
+        Long orderId = orderFacade.createOrder(loginId, items, request.couponId());
         return ApiResponse.success(new OrderV1Dto.CreateResponse(orderId));
     }
 
