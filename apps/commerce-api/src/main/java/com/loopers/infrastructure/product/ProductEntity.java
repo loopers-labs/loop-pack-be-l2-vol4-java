@@ -10,6 +10,22 @@ import jakarta.persistence.Table;
  * 재고는 독립 Aggregate(stock 테이블)로 분리되어 이 엔티티에는 없다.
  * soft delete는 BaseEntity의 deletedAt/delete()/restore()를 그대로 사용한다.
  * 도메인 ↔ 엔티티 변환은 ProductEntityMapper가 담당.
+ *
+ * <p>인덱스 (week5 — 상품 목록 조회 최적화)는 <b>JPA {@code @Index} 로 선언하지 않는다.</b>
+ * 목록 정렬이 {@code ORDER BY likes_count DESC, id DESC} 라, 정렬 컬럼에 <b>방향(DESC)을 지정한
+ * 내림차순 인덱스</b>(forward index scan)가 backward scan 보다 딥 페이지에서 유리하고, 향후
+ * mixed-direction 정렬(예: {@code likes_count DESC, id ASC})은 방향 지정 인덱스가 아니면 filesort 를
+ * 피할 수 없기 때문이다. 그런데 Hibernate {@code @Index} 는 컬럼 방향을 표현하지 못한다.
+ * 따라서 인덱스는 DDL 로 직접 정의한다:
+ * <ul>
+ *   <li>local/test ({@code ddl-auto: create}) — {@code resources/import.sql} 가 스키마 생성 직후 실행</li>
+ *   <li>prd ({@code ddl-auto: none}) — {@code docs/week5/migration_product_indexes.sql} 를 운영 DDL 로 적용</li>
+ * </ul>
+ * <pre>
+ *   idx_brand_active_likes_desc (brand_id, deleted_at, likes_count DESC, id DESC)  -- 브랜드 필터 + 좋아요순
+ *   idx_active_likes_desc       (deleted_at, likes_count DESC, id DESC)            -- 전체 + 좋아요순
+ * </pre>
+ * 설계·측정 근거: docs/week5/05-index-optimization.md, benchmark/
  */
 @Entity
 @Table(name = "product")
