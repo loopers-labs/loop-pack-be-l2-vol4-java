@@ -62,6 +62,16 @@ public class ProductService {
     }
 
     @Transactional
+    public void increaseLikeCount(Long productId) {
+        productRepository.increaseLikeCount(productId);
+    }
+
+    @Transactional
+    public void decreaseLikeCount(Long productId) {
+        productRepository.decreaseLikeCount(productId);
+    }
+
+    @Transactional
     public void deleteProduct(Long id) {
         ProductModel product = getProduct(id);
         product.delete();

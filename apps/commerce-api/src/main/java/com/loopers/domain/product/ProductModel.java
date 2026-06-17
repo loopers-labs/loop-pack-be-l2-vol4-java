@@ -41,12 +41,16 @@ public class ProductModel extends BaseEntity {
     @Column(name = "status", nullable = false)
     private ProductStatus status;
 
+    @Column(name = "like_count", nullable = false)
+    private Long likeCount;
+
     private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
         this.status = status;
+        this.likeCount = 0L;
     }
 
     public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {

@@ -10,10 +10,11 @@ public class ProductV1Dto {
             Long id,
             Long brandId,
             String name,
-            Long price
+            Long price,
+            Long likeCount
     ) {
         public static ProductSummaryResponse from(ProductSummaryInfo info) {
-            return new ProductSummaryResponse(info.id(), info.brandId(), info.name(), info.price());
+            return new ProductSummaryResponse(info.id(), info.brandId(), info.name(), info.price(), info.likeCount());
         }
     }
 
@@ -22,6 +23,7 @@ public class ProductV1Dto {
             String name,
             String description,
             Long price,
+            Long likeCount,
             BrandV1Dto.BrandResponse brand
     ) {
         public static ProductDetailResponse from(ProductDetailInfo info) {
@@ -30,6 +32,7 @@ public class ProductV1Dto {
                     info.name(),
                     info.description(),
                     info.price(),
+                    info.likeCount(),
                     BrandV1Dto.BrandResponse.from(info.brand())
             );
         }

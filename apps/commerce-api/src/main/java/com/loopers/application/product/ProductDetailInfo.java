@@ -9,6 +9,7 @@ public record ProductDetailInfo(
         String name,
         String description,
         Long price,
+        Long likeCount,
         BrandInfo brand
 ) {
     public static ProductDetailInfo from(ProductModel product, BrandModel brand) {
@@ -17,6 +18,7 @@ public record ProductDetailInfo(
                 product.getName().value(),
                 product.getDescription().value(),
                 product.getPrice().value(),
+                product.getLikeCount(),
                 BrandInfo.from(brand)
         );
     }

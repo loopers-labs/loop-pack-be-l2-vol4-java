@@ -5,8 +5,6 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.product.ProductStatus;
 import com.loopers.domain.product.QProductModel;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -35,6 +33,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public Optional<ProductModel> find(final Long id) {
         return productJpaRepository.findByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
+    public void increaseLikeCount(final Long productId) {
+        productJpaRepository.increaseLikeCount(productId);
+    }
+
+    @Override
+    public void decreaseLikeCount(final Long productId) {
+        productJpaRepository.decreaseLikeCount(productId);
     }
 
     @Override
@@ -79,7 +87,7 @@ public class ProductRepositoryImpl implements ProductRepository {
         return switch (sort) {
             case PRICE_ASC -> QProductModel.productModel.price.value.asc();
             case PRICE_DESC -> QProductModel.productModel.price.value.desc();
-            case LIKES_DESC -> throw new CoreException(ErrorType.BAD_REQUEST, "좋아요순 정렬은 아직 지원하지 않습니다.");
+            case LIKES_DESC -> QProductModel.productModel.likeCount.desc();
         };
     }
 }

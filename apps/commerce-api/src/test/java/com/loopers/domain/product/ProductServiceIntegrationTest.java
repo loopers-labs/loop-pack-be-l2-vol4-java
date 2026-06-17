@@ -163,6 +163,29 @@ class ProductServiceIntegrationTest {
             assertThat(result.getContent().get(0).getBrandId()).isEqualTo(2L);
         }
 
+        @DisplayName("sort가 LIKES_DESC면, 좋아요 수 내림차순으로 반환한다.")
+        @Test
+        void returnsByLikesDesc() {
+            // given
+            ProductModel a = saveProduct(1L, "A", 1000L);
+            ProductModel b = saveProduct(1L, "B", 2000L);
+            ProductModel c = saveProduct(1L, "C", 3000L);
+            // 좋아요 수: b=3, c=2, a=1
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(c.getId());
+            productService.increaseLikeCount(c.getId());
+            productService.increaseLikeCount(a.getId());
+
+            // when
+            Page<ProductModel> result = productService.getProducts(null, null, ProductSortType.LIKES_DESC, PageRequest.of(0, 10));
+
+            // then
+            assertThat(result.getContent()).extracting(ProductModel::getId)
+                    .containsExactly(b.getId(), c.getId(), a.getId());
+        }
+
         @DisplayName("status가 주어지면, 해당 상태의 상품만 반환한다.")
         @Test
         void filtersByStatus() {
