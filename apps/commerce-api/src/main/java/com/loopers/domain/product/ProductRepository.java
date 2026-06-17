@@ -21,6 +21,10 @@ public interface ProductRepository {
 
     List<ProductModel> findActiveByBrandId(Long brandId);
 
+    int incrementLikeCount(Long id);
+
+    int decrementLikeCount(Long id);
+
     Page<ProductSummary> findActiveSummaries(Long brandId, ProductSortType sort, int page, int size);
 
     ProductDetail getActiveDetailById(Long id);

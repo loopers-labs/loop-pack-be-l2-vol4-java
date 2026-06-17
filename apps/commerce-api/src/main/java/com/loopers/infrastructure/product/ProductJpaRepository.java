@@ -7,7 +7,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.projection.ProductAdminView;
@@ -26,6 +28,16 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     @Query("SELECT p FROM ProductModel p WHERE p.id = :id AND p.deletedAt IS NULL")
     Optional<ProductModel> findByIdAndDeletedAtIsNullForUpdate(Long id);
 
+    @Transactional
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    int incrementLikeCount(Long id);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id")
+    int decrementLikeCount(Long id);
+
     @Query(value = """
         SELECT new com.loopers.domain.product.projection.ProductSummary(
             p.id,
@@ -34,7 +46,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             b.name.value,
             p.price.value,
             p.stock.value,
-            CAST((SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id) AS integer)
+            p.likeCount
         )
         FROM ProductModel p
         JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
@@ -56,12 +68,12 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             b.name.value,
             p.price.value,
             p.stock.value,
-            CAST((SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id) AS integer)
+            p.likeCount
         )
         FROM ProductModel p
         JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
         WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
-        ORDER BY (SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id) DESC, p.id DESC
+        ORDER BY p.likeCount DESC, p.id DESC
         """,
         countQuery = """
             SELECT COUNT(p.id)
@@ -80,7 +92,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             b.name.value,
             p.price.value,
             p.stock.value,
-            CAST((SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id) AS integer)
+            p.likeCount
         )
         FROM ProductModel p
         JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL

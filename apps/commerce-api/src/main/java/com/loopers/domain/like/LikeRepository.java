@@ -10,7 +10,7 @@ public interface LikeRepository {
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
-    void deleteByUserIdAndProductId(Long userId, Long productId);
+    int deleteByUserIdAndProductId(Long userId, Long productId);
 
     Page<ProductSummary> findLikedProductSummaries(Long userId, int page, int size);
 }

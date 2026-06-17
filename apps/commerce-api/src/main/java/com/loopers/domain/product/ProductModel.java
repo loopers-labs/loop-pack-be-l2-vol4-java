@@ -34,6 +34,9 @@ public class ProductModel extends BaseEntity {
     @Embedded
     private Stock stock;
 
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
+
     @Builder
     private ProductModel(Long brandId, String rawName, String rawDescription, Integer rawPrice, Integer rawStock) {
         this.brandId = brandId;

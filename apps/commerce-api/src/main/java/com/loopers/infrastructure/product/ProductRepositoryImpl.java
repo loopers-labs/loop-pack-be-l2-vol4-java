@@ -53,6 +53,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int incrementLikeCount(Long id) {
+        return productJpaRepository.incrementLikeCount(id);
+    }
+
+    @Override
+    public int decrementLikeCount(Long id) {
+        return productJpaRepository.decrementLikeCount(id);
+    }
+
+    @Override
     public Page<ProductSummary> findActiveSummaries(Long brandId, ProductSortType sort, int page, int size) {
         return switch (sort) {
             case LATEST -> productJpaRepository.findActiveSummaries(brandId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
