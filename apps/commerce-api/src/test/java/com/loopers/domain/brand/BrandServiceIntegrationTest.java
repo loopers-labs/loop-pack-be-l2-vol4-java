@@ -148,7 +148,7 @@ class BrandServiceIntegrationTest {
 
         @DisplayName("Sort 미지정이어도 id DESC가 기본 적용되어 페이지 사이에 누락/중복이 발생하지 않는다")
         @Test
-        void appliesIdDescTiebreak_whenSortUnspecified() {
+        void appliesIdDescOrder_whenSortUnspecified() {
             // given - 5개 브랜드, 페이지 크기 2
             BrandModel b1 = brandRepository.save(new BrandModel("B1", "1"));
             BrandModel b2 = brandRepository.save(new BrandModel("B2", "2"));
@@ -172,10 +172,10 @@ class BrandServiceIntegrationTest {
             );
         }
 
-        @DisplayName("caller가 sort 키를 지정해도 id DESC가 tiebreak으로 부착된다 (동일 키 중복 시 결정성 보장)")
+        @DisplayName("caller가 sort 키를 지정해도 id DESC가 보조 정렬 키로 부착된다 (동일 키 중복 시 결정성 보장)")
         @Test
-        void appendsIdDescTiebreak_whenSortAlreadySpecified() {
-            // given - 같은 name으로 2개 (tiebreak 없으면 순서 보장 X)
+        void appendsIdDescOrder_whenSortAlreadySpecified() {
+            // given - 같은 name으로 2개 (보조 정렬 키 없으면 순서 보장 X)
             BrandModel first = brandRepository.save(new BrandModel("SameName", "first"));
             BrandModel second = brandRepository.save(new BrandModel("SameName", "second"));
 
@@ -183,7 +183,7 @@ class BrandServiceIntegrationTest {
             Page<BrandModel> page = brandService.search(
                 PageRequest.of(0, 10, org.springframework.data.domain.Sort.by("name").ascending()));
 
-            // then - 동일 name 사이에서 id DESC tiebreak — second(나중) 가 먼저
+            // then - 동일 name 사이에서 id DESC 보조 정렬 키 — second(나중) 가 먼저
             assertThat(page.getContent()).extracting(BrandModel::getId)
                 .containsExactly(second.getId(), first.getId());
         }

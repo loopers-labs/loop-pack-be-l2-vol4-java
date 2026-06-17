@@ -39,11 +39,11 @@ public class BrandRepositoryImpl implements BrandRepository {
 
     @Override
     public Page<BrandModel> search(Pageable pageable) {
-        return brandJpaRepository.findAllByDeletedAtIsNull(withIdDescTiebreak(pageable));
+        return brandJpaRepository.findAllByDeletedAtIsNull(withIdDescOrder(pageable));
     }
 
-    /** id DESC tiebreak으로 페이지 사이 중복/누락을 방지한다 (ProductRepositoryImpl.toSort와 같은 정책). */
-    private Pageable withIdDescTiebreak(Pageable pageable) {
+    /** id DESC를 보조 정렬 키로 붙여 페이지 사이 중복/누락을 방지한다 (ProductRepositoryImpl.toSort와 같은 정책). */
+    private Pageable withIdDescOrder(Pageable pageable) {
         Sort sort = pageable.getSort();
         Sort normalized = sort.getOrderFor("id") != null
             ? sort
