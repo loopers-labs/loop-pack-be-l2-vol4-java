@@ -9,6 +9,7 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,7 +18,12 @@ import lombok.NoArgsConstructor;
 import java.util.Objects;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_status_like_count", columnList = "status, like_count"),
+        @Index(name = "idx_products_status_brand_like_count", columnList = "status, brand_id, like_count"),
+        @Index(name = "idx_products_status_price", columnList = "status, price"),
+        @Index(name = "idx_products_status_brand_price", columnList = "status, brand_id, price")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductModel extends BaseEntity {
