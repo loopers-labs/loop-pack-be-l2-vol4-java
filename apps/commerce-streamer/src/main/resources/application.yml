@@ -29,6 +29,11 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+# 좋아요 카운터 비동기 집계 (commerce-api가 프로듀서). topic은 발행측과 동일해야 한다.
+like-events:
+  topic: catalog.like-changed.v1
+  reconcile-cron: "0 */10 * * * *"  # 10분마다 product_like COUNT로 likes_count 교정
+
 ---
 spring:
   config:

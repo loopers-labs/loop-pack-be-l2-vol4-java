@@ -3,6 +3,7 @@ package com.loopers.domain.like;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.page.PagePolicy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +17,16 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
     private final ProductService productService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 좋아요 등록 (멱등). 활성 상품 검증 → 신규 INSERT 또는 reactivate → likesCount +1.
-     * 이미 좋아요 상태면 no-op (카운터 변화 없음). 좋아요 변화와 카운터 증가는 동일 트랜잭션 (04 §4.2).
+     * 좋아요 등록 (멱등). 활성 상품 검증 → 신규 INSERT 또는 reactivate → 카운터 +1 이벤트 발행.
+     * 이미 좋아요 상태면 no-op (이벤트 없음).
+     *
+     * <p>카운터(product.likes_count) 증가는 hot row contention 회피를 위해 동기 UPDATE 대신
+     * {@link LikeChangedEvent}로 분리했다. 좋아요 "사실"(product_like 행)은 이 트랜잭션에서 강하게
+     * 커밋하고, 파생 카운터는 커밋 이후 비동기로 집계된다(결과적 일관성). 발행은 "이 트랜잭션이 실제로
+     * 좋아요로 전이시켰을 때"만 한다 → 동시 reactivate 이중카운트 방지.
      */
     @Transactional
     public void like(Long userId, Long productId) {
@@ -29,8 +36,6 @@ public class LikeService {
         if (like != null && like.isActive()) {
             return; // 이미 좋아요 — 멱등 no-op
         }
-        // 좋아요 변화와 카운터 증가는 동일 트랜잭션 (04 §4.2).
-        // 카운터는 "이 트랜잭션이 실제로 좋아요로 전이시켰을 때"만 올린다 → 동시 reactivate 이중카운트 방지.
         boolean transitioned;
         if (like == null) {
             likeRepository.save(new LikeModel(userId, productId)); // 최초 — UNIQUE 제약이 동시 INSERT를 차단
@@ -39,13 +44,14 @@ public class LikeService {
             transitioned = likeRepository.activate(userId, productId) > 0; // 원자적 비활성→활성
         }
         if (transitioned) {
-            productService.increaseLikesCount(productId);
+            eventPublisher.publishEvent(LikeChangedEvent.liked(productId));
         }
     }
 
     /**
-     * 좋아요 취소 (멱등). 활성 좋아요면 soft delete → likesCount -1.
-     * 좋아요가 없거나 이미 취소 상태면 no-op (카운터 변화 없음).
+     * 좋아요 취소 (멱등). 활성 좋아요면 soft delete → 카운터 -1 이벤트 발행.
+     * 좋아요가 없거나 이미 취소 상태면 no-op (이벤트 없음).
+     * 실제 전이한 트랜잭션만(영향 행 1) 이벤트를 발행한다 → 동시 unlike 이중차감 방지.
      */
     @Transactional
     public void unlike(Long userId, Long productId) {
@@ -53,9 +59,8 @@ public class LikeService {
         if (like == null || !like.isActive()) {
             return; // 좋아요 없음 — 멱등 no-op
         }
-        // 원자적 활성→비활성 전이. 실제 전이한 트랜잭션만(영향 행 1) 카운터를 내린다 → 동시 unlike 이중차감 방지.
         if (likeRepository.deactivate(userId, productId) > 0) {
-            productService.decreaseLikesCount(productId);
+            eventPublisher.publishEvent(LikeChangedEvent.unliked(productId));
         }
     }
 
