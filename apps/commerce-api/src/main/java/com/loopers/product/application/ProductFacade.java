@@ -33,6 +33,7 @@ public class ProductFacade {
     private final BrandRepository brandRepository;
     private final BrandService brandService;
     private final StockRepository stockRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public ProductInfo createProduct(String name, String description, Long price, Integer initialStock, Long brandId) {
@@ -44,17 +45,13 @@ public class ProductFacade {
         return ProductInfo.from(product, stock.availableStock());
     }
 
-    @Cacheable(cacheNames = "product", key = "#productId")
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long productId) {
-        ProductModel product = productService.getOrThrow(productRepository.find(productId));
-        Optional<BrandModel> brand = product.getBrandId() != null
-            ? brandRepository.find(product.getBrandId())
-            : Optional.empty();
+        ProductInfo cached = productCacheService.getProductWithoutStock(productId);
         Integer availableStock = stockRepository.findByProductId(productId)
             .map(StockModel::availableStock)
             .orElse(0);
-        return ProductInfo.from(product, productService.resolveBrandName(brand), availableStock);
+        return cached.withStock(availableStock);
     }
 
     @Cacheable(cacheNames = "products", key = "#sort.name() + ':' + #brandId + ':' + #inStock + ':' + #page + ':' + #size")
