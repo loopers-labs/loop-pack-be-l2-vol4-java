@@ -11,6 +11,8 @@ import jakarta.persistence.Table;
 @Table(
     name = "products",
     indexes = {
+        @Index(name = "idx_products_likes_desc", columnList = "like_count DESC, created_at DESC"),
+        @Index(name = "idx_products_brand_likes", columnList = "brand_id, like_count DESC, created_at DESC"),
         @Index(name = "idx_products_created_at", columnList = "created_at DESC"),
         @Index(name = "idx_products_price", columnList = "price ASC"),
         @Index(name = "idx_products_brand_created_at", columnList = "brand_id, created_at DESC"),
