@@ -3,6 +3,7 @@ package com.loopers.infrastructure.product;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.ProductStatus;
 import com.loopers.domain.product.QProductModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -37,10 +38,10 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Page<ProductModel> search(final @Nullable Long brandId, final @Nullable ProductSortType sort, final Pageable pageable) {
+    public Page<ProductModel> search(final @Nullable Long brandId, final @Nullable ProductStatus status, final @Nullable ProductSortType sort, final Pageable pageable) {
         final List<ProductModel> content = queryFactory
                 .selectFrom(QProductModel.productModel)
-                .where(isNotDeleted(), isBrandIdProvided(brandId))
+                .where(isNotDeleted(), isBrandIdProvided(brandId), isStatusProvided(status))
                 .orderBy(toOrder(sort))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -49,7 +50,11 @@ public class ProductRepositoryImpl implements ProductRepository {
         final Long total = queryFactory
                 .select(QProductModel.productModel.count())
                 .from(QProductModel.productModel)
-                .where(isNotDeleted(), isBrandIdProvided(brandId))
+                .where(
+                        isNotDeleted(), 
+                        isBrandIdProvided(brandId), 
+                        isStatusProvided(status)
+                )
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total == null ? 0L : total);
@@ -61,6 +66,10 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     private BooleanExpression isBrandIdProvided(final @Nullable Long brandId) {
         return brandId == null ? null : QProductModel.productModel.brandId.eq(brandId);
+    }
+
+    private BooleanExpression isStatusProvided(final @Nullable ProductStatus status) {
+        return status == null ? null : QProductModel.productModel.status.eq(status);
     }
 
     private OrderSpecifier<?> toOrder(final @Nullable ProductSortType sort) {

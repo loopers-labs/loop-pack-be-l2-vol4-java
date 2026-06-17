@@ -5,6 +5,7 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.ProductStatus;
 import com.loopers.domain.product.ProductStockModel;
 import com.loopers.domain.product.ProductStockService;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +21,9 @@ public class ProductFacade {
     private final ProductStockService productStockService;
     private final BrandService brandService;
 
-    public Page<ProductSummaryInfo> getProducts(Long brandId, ProductSortType sort, Pageable pageable) {
-        Page<ProductModel> products = productService.getProducts(brandId, sort, pageable);
+    public Page<ProductSummaryInfo> getProducts(Long brandId, ProductStatus status, ProductSortType sort, Pageable pageable) {
+        ProductStatus effectiveStatus = status == null ? ProductStatus.ON_SALE : status;
+        Page<ProductModel> products = productService.getProducts(brandId, effectiveStatus, sort, pageable);
         return products.map(ProductSummaryInfo::from);
     }
 
@@ -32,8 +34,8 @@ public class ProductFacade {
     }
 
     // TODO: 관리자 기능으로 변경될 것
-    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.createProduct(brandId, name, description, price, stock);
+    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
+        ProductModel product = productService.createProduct(brandId, name, description, price, stock, status);
         ProductStockModel stockModel = productStockService.getStock(product.getId());
         return ProductInfo.from(product, stockModel);
     }
@@ -46,8 +48,8 @@ public class ProductFacade {
     }
 
     // TODO: 관리자 기능으로 변경될 것
-    public ProductInfo updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
-        ProductModel product = productService.updateProduct(id, brandId, name, description, price, stock);
+    public ProductInfo updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
+        ProductModel product = productService.updateProduct(id, brandId, name, description, price, stock, status);
         ProductStockModel stockModel = productStockService.getStock(id);
         return ProductInfo.from(product, stockModel);
     }

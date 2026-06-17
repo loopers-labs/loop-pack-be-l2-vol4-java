@@ -1,9 +1,13 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -33,22 +37,39 @@ public class ProductModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
     private ProductPrice price;
 
-    private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private ProductStatus status;
+
+    private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.status = status;
     }
 
     public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
-        return new ProductModel(brandId, name, description, price);
+        return new ProductModel(brandId, name, description, price, ProductStatus.ON_SALE);
     }
 
-    public void update(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+    public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
+        return new ProductModel(brandId, name, description, price, status == null ? ProductStatus.ON_SALE : status);
+    }
+
+    public void update(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.status = status == null ? ProductStatus.ON_SALE : status;
+    }
+
+    public void changeStatus(ProductStatus status) {
+        if (status == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 상태는 비어있을 수 없습니다.");
+        }
+        this.status = status;
     }
 
     @Override

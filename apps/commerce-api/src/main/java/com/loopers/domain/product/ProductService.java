@@ -17,11 +17,17 @@ public class ProductService {
 
     @Transactional
     public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        return createProduct(brandId, name, description, price, stock, ProductStatus.ON_SALE);
+    }
+
+    @Transactional
+    public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
         ProductModel product = ProductModel.of(
                 brandId,
                 ProductName.of(name),
                 ProductDescription.of(description),
-                ProductPrice.of(price)
+                ProductPrice.of(price),
+                status
         );
         ProductModel productModel = productRepository.save(product);
         productStockService.createStock(productModel.getId(), stock);
@@ -37,18 +43,19 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductModel> getProducts(Long brandId, ProductSortType sort, Pageable pageable) {
-        return productRepository.search(brandId, sort, pageable);
+    public Page<ProductModel> getProducts(Long brandId, ProductStatus status, ProductSortType sort, Pageable pageable) {
+        return productRepository.search(brandId, status, sort, pageable);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
         ProductModel product = getProduct(id);
         product.update(
                 brandId,
                 ProductName.of(name),
                 ProductDescription.of(description),
-                ProductPrice.of(price)
+                ProductPrice.of(price),
+                status
         );
         productStockService.changeStock(id, stock);
         return product;

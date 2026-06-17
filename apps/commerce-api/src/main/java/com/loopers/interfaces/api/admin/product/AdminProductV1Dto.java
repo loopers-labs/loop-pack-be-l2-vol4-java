@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.admin.product;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.product.ProductStatus;
 
 // TODO: 관리자 기능으로 변경될 것
 public class AdminProductV1Dto {
@@ -10,7 +11,8 @@ public class AdminProductV1Dto {
             String name,
             String description,
             Long price,
-            Integer stock
+            Integer stock,
+            ProductStatus status
     ) {}
 
     public record UpdateProductRequest(
@@ -18,7 +20,8 @@ public class AdminProductV1Dto {
             String name,
             String description,
             Long price,
-            Integer stock
+            Integer stock,
+            ProductStatus status
     ) {}
 
     public record ProductResponse(
@@ -27,7 +30,8 @@ public class AdminProductV1Dto {
             String name,
             String description,
             Long price,
-            Integer stock
+            Integer stock,
+            ProductStatus status
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
@@ -36,7 +40,8 @@ public class AdminProductV1Dto {
                     info.name(),
                     info.description(),
                     info.price(),
-                    info.stock()
+                    info.stock(),
+                    info.status()
             );
         }
     }
