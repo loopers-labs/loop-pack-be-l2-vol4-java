@@ -19,12 +19,26 @@ class OrderModelTest {
         @DisplayName("올바른 정보를 입력하면 PENDING 상태로 생성된다.")
         @Test
         void creates_with_pending_status() {
-            OrderModel order = new OrderModel(1L, 30000L);
+            OrderModel order = new OrderModel(1L, 30000L, 0L, null);
 
             assertAll(
                 () -> assertThat(order.getMemberId()).isEqualTo(1L),
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(30000L),
                 () -> assertThat(order.getTotalAmount()).isEqualTo(30000L),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING)
+            );
+        }
+
+        @DisplayName("쿠폰을 적용하면 할인 금액만큼 최종금액이 감소한다.")
+        @Test
+        void applies_coupon_discount_to_total() {
+            OrderModel order = new OrderModel(1L, 30000L, 5000L, 42L);
+
+            assertAll(
+                () -> assertThat(order.getOriginalAmount()).isEqualTo(30000L),
+                () -> assertThat(order.getDiscountAmount()).isEqualTo(5000L),
+                () -> assertThat(order.getTotalAmount()).isEqualTo(25000L),
+                () -> assertThat(order.getCouponId()).isEqualTo(42L)
             );
         }
 
@@ -32,25 +46,25 @@ class OrderModelTest {
         @Test
         void throws_when_member_id_is_null() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(null, 10000L));
+                () -> new OrderModel(null, 10000L, 0L, null));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("총금액이 null이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("원금액이 null이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throws_when_total_amount_is_null() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(1L, null));
+                () -> new OrderModel(1L, null, 0L, null));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("총금액이 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("원금액이 음수이면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throws_when_total_amount_is_negative() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(1L, -1L));
+                () -> new OrderModel(1L, -1L, 0L, null));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
@@ -63,7 +77,7 @@ class OrderModelTest {
         @DisplayName("PENDING 상태의 주문은 CONFIRMED로 전환된다.")
         @Test
         void confirms_pending_order() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
 
             order.confirm();
 
@@ -73,7 +87,7 @@ class OrderModelTest {
         @DisplayName("CANCELLED 상태의 주문을 확정하면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throws_when_order_is_already_cancelled() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
             order.cancel();
 
             CoreException ex = assertThrows(CoreException.class, order::confirm);
@@ -89,7 +103,7 @@ class OrderModelTest {
         @DisplayName("PENDING 상태의 주문은 CANCELLED로 전환된다.")
         @Test
         void cancels_pending_order() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
 
             order.cancel();
 
@@ -99,7 +113,7 @@ class OrderModelTest {
         @DisplayName("CONFIRMED 상태의 주문을 취소하면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throws_when_order_is_already_confirmed() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
             order.confirm();
 
             CoreException ex = assertThrows(CoreException.class, order::cancel);
@@ -115,7 +129,7 @@ class OrderModelTest {
         @DisplayName("본인의 주문이면 true를 반환한다.")
         @Test
         void returns_true_when_member_matches() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
 
             assertThat(order.isOwnedBy(1L)).isTrue();
         }
@@ -123,7 +137,7 @@ class OrderModelTest {
         @DisplayName("타인의 주문이면 false를 반환한다.")
         @Test
         void returns_false_when_member_does_not_match() {
-            OrderModel order = new OrderModel(1L, 10000L);
+            OrderModel order = new OrderModel(1L, 10000L, 0L, null);
 
             assertThat(order.isOwnedBy(99L)).isFalse();
         }

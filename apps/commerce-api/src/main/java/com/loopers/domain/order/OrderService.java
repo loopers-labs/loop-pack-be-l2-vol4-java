@@ -17,12 +17,12 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
 
     @Transactional
-    public OrderModel createOrder(Long memberId, List<OrderItemCommand> items) {
-        long totalAmount = items.stream()
+    public OrderModel createOrder(Long memberId, List<OrderItemCommand> items, Long couponId, long discountAmount) {
+        long originalAmount = items.stream()
                 .mapToLong(item -> item.price() * item.quantity())
                 .sum();
 
-        OrderModel order = orderRepository.save(new OrderModel(memberId, totalAmount));
+        OrderModel order = orderRepository.save(new OrderModel(memberId, originalAmount, discountAmount, couponId));
 
         List<OrderItemModel> orderItems = items.stream()
                 .map(item -> new OrderItemModel(
