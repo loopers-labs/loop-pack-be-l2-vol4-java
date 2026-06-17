@@ -8,7 +8,8 @@ public interface ProductRepository {
     Optional<Product> findById(Long id);
     Optional<Product> findActiveById(Long id);
     boolean existsActiveById(Long id);
-    List<Product> findAllOnSale(ProductSortOption sort);
+    List<Product> findAllOnSale(Long brandId, ProductSortOption sort, long offset, int limit);
+    long countOnSale(Long brandId);
     List<Product> findAllOrderByLatest();
     List<Product> findAllByIdIn(List<Long> ids);
     int softDeleteByBrandId(Long brandId);

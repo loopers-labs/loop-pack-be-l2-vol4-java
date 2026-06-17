@@ -37,8 +37,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Product> findAllOnSale(ProductSortOption sort) {
-        return productJpaRepository.findAllOnSale(sort);
+    public List<Product> findAllOnSale(Long brandId, ProductSortOption sort, long offset, int limit) {
+        return productJpaRepository.findAllOnSale(brandId, sort, offset, limit);
+    }
+
+    @Override
+    public long countOnSale(Long brandId) {
+        return productJpaRepository.countOnSale(brandId);
     }
 
     @Override

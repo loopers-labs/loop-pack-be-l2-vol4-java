@@ -137,41 +137,95 @@ class ProductV1ApiE2ETest {
     @Nested
     class GetAll {
 
+        private ResponseEntity<ApiResponse<ProductV1Response.Page>> getAll(String query) {
+            ParameterizedTypeReference<ApiResponse<ProductV1Response.Page>> type = new ParameterizedTypeReference<>() {};
+            return testRestTemplate.exchange(ENDPOINT + query, HttpMethod.GET, null, type);
+        }
+
         @Test
-        @DisplayName("판매중 상품만 반환하고 판매중지 상품은 제외한다")
+        @DisplayName("판매중 상품만 content 로 반환하고 판매중지 상품은 제외한다")
         void givenMixedProducts_whenGetAll_thenReturnsOnlyOnSale() {
             saveOnSale("A", 1000L, 5);
             saveOnSale("B", 2000L, 5);
             saveSuspended("판매중지", 3000L, 5);
 
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Response.Detail>>> type = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Response.Detail>>> response =
-                    testRestTemplate.exchange(ENDPOINT, HttpMethod.GET, null, type);
+            ResponseEntity<ApiResponse<ProductV1Response.Page>> response = getAll("");
 
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(response.getBody().data())
+                    () -> assertThat(response.getBody().data().content())
                             .extracting(ProductV1Response.Detail::name)
                             .containsExactlyInAnyOrder("A", "B"),
-                    () -> assertThat(response.getBody().data())
+                    () -> assertThat(response.getBody().data().content())
                             .extracting(ProductV1Response.Detail::brandName)
                             .containsOnly("나이키")
             );
         }
 
         @Test
-        @DisplayName("sort=PRICE_ASC 로 가격 오름차순 정렬해 반환한다")
+        @DisplayName("sort=PRICE_ASC 로 가격 오름차순 정렬해 content 를 반환한다")
         void givenPriceAsc_whenGetAll_thenOrdered() {
             saveOnSale("비싼것", 50_000L, 5);
             saveOnSale("싼것", 10_000L, 5);
 
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Response.Detail>>> type = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Response.Detail>>> response =
-                    testRestTemplate.exchange(ENDPOINT + "?sort=PRICE_ASC", HttpMethod.GET, null, type);
+            ResponseEntity<ApiResponse<ProductV1Response.Page>> response = getAll("?sort=PRICE_ASC");
 
-            assertThat(response.getBody().data())
+            assertThat(response.getBody().data().content())
                     .extracting(ProductV1Response.Detail::name)
                     .containsExactly("싼것", "비싼것");
+        }
+
+        @Test
+        @DisplayName("totalCount 는 판매중 상품 전체 수를 반환한다(페이지 크기와 무관)")
+        void givenManyProducts_whenGetAll_thenTotalCountReflectsAll() {
+            saveOnSale("A", 1000L, 5);
+            saveOnSale("B", 2000L, 5);
+            saveOnSale("C", 3000L, 5);
+
+            ResponseEntity<ApiResponse<ProductV1Response.Page>> response = getAll("?size=2");
+
+            assertAll(
+                    () -> assertThat(response.getBody().data().content()).hasSize(2),
+                    () -> assertThat(response.getBody().data().totalCount()).isEqualTo(3L),
+                    () -> assertThat(response.getBody().data().size()).isEqualTo(2)
+            );
+        }
+
+        @Test
+        @DisplayName("page/size 로 해당 페이지 슬라이스만 반환한다")
+        void givenPageAndSize_whenGetAll_thenReturnsSlice() {
+            saveOnSale("p1", 1000L, 5);
+            saveOnSale("p2", 2000L, 5);
+            saveOnSale("p3", 3000L, 5);
+            saveOnSale("p4", 4000L, 5);
+            saveOnSale("p5", 5000L, 5);
+
+            ResponseEntity<ApiResponse<ProductV1Response.Page>> response = getAll("?sort=PRICE_ASC&page=1&size=2");
+
+            assertAll(
+                    () -> assertThat(response.getBody().data().page()).isEqualTo(1),
+                    () -> assertThat(response.getBody().data().content())
+                            .extracting(ProductV1Response.Detail::name)
+                            .containsExactly("p3", "p4")
+            );
+        }
+
+        @Test
+        @DisplayName("brandId 필터를 주면 해당 브랜드의 상품만 반환한다")
+        void givenBrandFilter_whenGetAll_thenReturnsOnlyThatBrand() {
+            Long otherBrandId = brandRepository.save(Brand.create("아디다스", "설명", "https://cdn/adidas.png")).getId();
+            saveOnSale("나이키상품", 1000L, 5);
+            Product adidasProduct = productRepository.save(Product.create(otherBrandId, "아디다스상품", "설명", 2000L, null));
+            productStockRepository.save(ProductStock.create(adidasProduct.getId(), 5));
+
+            ResponseEntity<ApiResponse<ProductV1Response.Page>> response = getAll("?brandId=" + brandId);
+
+            assertAll(
+                    () -> assertThat(response.getBody().data().content())
+                            .extracting(ProductV1Response.Detail::name)
+                            .containsExactly("나이키상품"),
+                    () -> assertThat(response.getBody().data().totalCount()).isEqualTo(1L)
+            );
         }
     }
 }

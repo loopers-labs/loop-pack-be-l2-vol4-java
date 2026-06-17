@@ -46,6 +46,10 @@ class ProductRepositoryIntegrationTest {
         return productRepository.save(Product.create(BRAND_ID, name, "설명", price, null));
     }
 
+    private Product saveForBrand(Long brandId, String name, long price) {
+        return productRepository.save(Product.create(brandId, name, "설명", price, null));
+    }
+
     private Product saveSuspended(String name, long price) {
         Product product = Product.create(BRAND_ID, name, "설명", price, null);
         product.suspend();
@@ -93,7 +97,7 @@ class ProductRepositoryIntegrationTest {
         Thread.sleep(10);
         saveSuspended("판매중지", 3000L);
 
-        List<Product> result = productRepository.findAllOnSale(ProductSortOption.LATEST);
+        List<Product> result = productRepository.findAllOnSale(null, ProductSortOption.LATEST, 0, 100);
 
         assertThat(result)
                 .extracting(Product::getName)
@@ -107,7 +111,7 @@ class ProductRepositoryIntegrationTest {
         save("싼것", 10_000L);
         saveSuspended("판매중지", 1L);
 
-        List<Product> result = productRepository.findAllOnSale(ProductSortOption.PRICE_ASC);
+        List<Product> result = productRepository.findAllOnSale(null, ProductSortOption.PRICE_ASC, 0, 100);
 
         assertThat(result)
                 .extracting(Product::getName)
@@ -148,10 +152,79 @@ class ProductRepositoryIntegrationTest {
         likeRepository.save(Like.create(2L, suspended.getId()));
         likeRepository.save(Like.create(3L, suspended.getId()));
 
-        List<Product> result = productRepository.findAllOnSale(ProductSortOption.LIKES_DESC);
+        List<Product> result = productRepository.findAllOnSale(null, ProductSortOption.LIKES_DESC, 0, 100);
 
         assertThat(result)
                 .extracting(Product::getName)
                 .containsExactly("많이", "적게", "없음");
+    }
+
+    @Test
+    @DisplayName("findAllOnSale(brandId) 는 brandId 가 주어지면 해당 브랜드의 판매중 상품만 반환한다")
+    void givenBrandFilter_whenFindAllOnSale_thenReturnsOnlyThatBrand() {
+        saveForBrand(1L, "브랜드1-A", 1000L);
+        saveForBrand(1L, "브랜드1-B", 2000L);
+        saveForBrand(2L, "브랜드2-A", 3000L);
+
+        List<Product> result = productRepository.findAllOnSale(1L, ProductSortOption.LATEST, 0, 10);
+
+        assertThat(result)
+                .extracting(Product::getBrandId)
+                .containsOnly(1L);
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("findAllOnSale(brandId=null) 은 전체 브랜드의 판매중 상품을 반환한다")
+    void givenNoBrandFilter_whenFindAllOnSale_thenReturnsAllBrands() {
+        saveForBrand(1L, "브랜드1", 1000L);
+        saveForBrand(2L, "브랜드2", 2000L);
+
+        List<Product> result = productRepository.findAllOnSale(null, ProductSortOption.LATEST, 0, 10);
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("findAllOnSale 은 offset/limit 으로 페이지 슬라이스만 반환한다")
+    void givenOffsetLimit_whenFindAllOnSale_thenReturnsPageSlice() {
+        saveForBrand(1L, "p1", 1000L);
+        saveForBrand(1L, "p2", 2000L);
+        saveForBrand(1L, "p3", 3000L);
+        saveForBrand(1L, "p4", 4000L);
+        saveForBrand(1L, "p5", 5000L);
+
+        List<Product> page2 = productRepository.findAllOnSale(1L, ProductSortOption.PRICE_ASC, 2, 2);
+
+        assertThat(page2)
+                .extracting(Product::getName)
+                .containsExactly("p3", "p4");
+    }
+
+    @Test
+    @DisplayName("countOnSale(brandId) 은 해당 브랜드의 판매중 상품 수만 센다(판매중지·삭제·타브랜드 제외)")
+    void givenBrand_whenCountOnSale_thenCountsOnlyOnSale() {
+        saveForBrand(1L, "온세일1", 1000L);
+        saveForBrand(1L, "온세일2", 2000L);
+        Product suspended = Product.create(1L, "중지", "설명", 3000L, null);
+        suspended.suspend();
+        productRepository.save(suspended);
+        saveForBrand(2L, "다른브랜드", 4000L);
+
+        long count = productRepository.countOnSale(1L);
+
+        assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("countOnSale(brandId=null) 은 전체 판매중 상품 수를 센다")
+    void givenNoBrand_whenCountOnSale_thenCountsAllOnSale() {
+        saveForBrand(1L, "A", 1000L);
+        saveForBrand(2L, "B", 2000L);
+        saveForBrand(3L, "C", 3000L);
+
+        long count = productRepository.countOnSale(null);
+
+        assertThat(count).isEqualTo(3L);
     }
 }

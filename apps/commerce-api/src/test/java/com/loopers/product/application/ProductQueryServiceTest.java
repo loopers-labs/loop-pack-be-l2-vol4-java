@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ProductQueryServiceTest {
@@ -95,67 +96,18 @@ class ProductQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getAll(LATEST) 은 판매중 상품을 latest 정렬로 매핑한다")
-    void givenLatestOption_whenGetAll_thenReturnsDetailsInLatestOrder() {
-        Product a = Product.create(BRAND_ID, "A", "설명", 1000L, null);
-        Product b = Product.create(BRAND_ID, "B", "설명", 2000L, null);
-        when(productRepository.findAllOnSale(ProductSortOption.LATEST)).thenReturn(List.of(b, a));
-        when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
-        when(brandReader.getNames(anyList())).thenReturn(Map.of());
-        when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
-
-        List<ProductResult.Detail> result = productQueryService.getProducts(ProductSortOption.LATEST);
-
-        assertThat(result)
-                .extracting(ProductResult.Detail::name)
-                .containsExactly("B", "A");
-    }
-
-    @Test
-    @DisplayName("getAll(PRICE_ASC) 은 판매중 상품을 price asc 정렬로 매핑한다")
-    void givenPriceAscOption_whenGetAll_thenReturnsDetailsInPriceAscOrder() {
-        Product cheap = Product.create(BRAND_ID, "싼것", "설명", 1000L, null);
-        Product expensive = Product.create(BRAND_ID, "비싼것", "설명", 9000L, null);
-        when(productRepository.findAllOnSale(ProductSortOption.PRICE_ASC)).thenReturn(List.of(cheap, expensive));
-        when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
-        when(brandReader.getNames(anyList())).thenReturn(Map.of());
-        when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
-
-        List<ProductResult.Detail> result = productQueryService.getProducts(ProductSortOption.PRICE_ASC);
-
-        assertThat(result)
-                .extracting(ProductResult.Detail::name)
-                .containsExactly("싼것", "비싼것");
-    }
-
-    @Test
-    @DisplayName("getAll(LIKES_DESC) 은 likeCount 정렬 결과를 그대로 매핑한다")
-    void givenLikesDescOption_whenGetAll_thenReturnsDetailsInRepositoryOrder() {
-        Product popular = Product.create(BRAND_ID, "인기", "설명", 1000L, null);
-        Product unpopular = Product.create(BRAND_ID, "비인기", "설명", 2000L, null);
-        when(productRepository.findAllOnSale(ProductSortOption.LIKES_DESC)).thenReturn(List.of(popular, unpopular));
-        when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
-        when(brandReader.getNames(anyList())).thenReturn(Map.of());
-        when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
-
-        List<ProductResult.Detail> result = productQueryService.getProducts(ProductSortOption.LIKES_DESC);
-
-        assertThat(result)
-                .extracting(ProductResult.Detail::name)
-                .containsExactly("인기", "비인기");
-    }
-
-    @Test
-    @DisplayName("getAll 은 데이터 결함으로 브랜드·재고 행이 깨져 있어도 목록 전체를 실패시키지 않는다(정상 로직에선 생성·삭제가 원자적이라 발생 불가)")
-    void givenCorruptedAuxiliaryData_whenGetAll_thenListSurvivesWithDefaults() {
+    @DisplayName("getProducts 는 데이터 결함으로 브랜드·재고 행이 깨져 있어도 목록 전체를 실패시키지 않는다(정상 로직에선 생성·삭제가 원자적이라 발생 불가)")
+    void givenCorruptedAuxiliaryData_whenGetProducts_thenContentSurvivesWithDefaults() {
         Product a = Product.create(1L, "A", "설명", 1000L, null);
         Product b = Product.create(2L, "B", "설명", 2000L, null);
-        when(productRepository.findAllOnSale(ProductSortOption.LATEST)).thenReturn(List.of(a, b));
+        ProductCommand.PageQuery query = new ProductCommand.PageQuery(null, ProductSortOption.LATEST, 0, 20);
+        when(productRepository.findAllOnSale(null, ProductSortOption.LATEST, 0L, 20)).thenReturn(List.of(a, b));
+        when(productRepository.countOnSale(null)).thenReturn(2L);
         when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
         when(brandReader.getNames(anyList())).thenReturn(Map.of(1L, "브랜드A")); // brandId=2 누락
         when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
 
-        List<ProductResult.Detail> result = productQueryService.getProducts(ProductSortOption.LATEST);
+        List<ProductResult.Detail> result = productQueryService.getProducts(query).content();
 
         assertAll(
                 () -> assertThat(result).hasSize(2),
@@ -164,5 +116,42 @@ class ProductQueryServiceTest {
                 () -> assertThat(result).allSatisfy(detail ->
                         assertThat(detail.displayStatus()).isEqualTo(ProductDisplayStatus.SOLD_OUT))
         );
+    }
+
+    @Test
+    @DisplayName("getProducts(PageQuery) 는 brandId 로 조회해 content 와 totalCount 를 함께 담은 Page 를 반환한다")
+    void givenPageQuery_whenGetProducts_thenReturnsPageWithContentAndTotalCount() {
+        Product a = Product.create(BRAND_ID, "A", "설명", 1000L, null);
+        Product b = Product.create(BRAND_ID, "B", "설명", 2000L, null);
+        ProductCommand.PageQuery query = new ProductCommand.PageQuery(BRAND_ID, ProductSortOption.LATEST, 0, 20);
+        when(productRepository.findAllOnSale(BRAND_ID, ProductSortOption.LATEST, 0L, 20)).thenReturn(List.of(a, b));
+        when(productRepository.countOnSale(BRAND_ID)).thenReturn(42L);
+        when(productStockRepository.findAllByProductIdIn(anyList())).thenReturn(List.of());
+        when(brandReader.getNames(anyList())).thenReturn(Map.of());
+        when(likeReader.countActiveByProductIds(anyList())).thenReturn(Map.of());
+
+        ProductResult.Page result = productQueryService.getProducts(query);
+
+        assertAll(
+                () -> assertThat(result.content())
+                        .extracting(ProductResult.Detail::name)
+                        .containsExactly("A", "B"),
+                () -> assertThat(result.totalCount()).isEqualTo(42L),
+                () -> assertThat(result.page()).isEqualTo(0),
+                () -> assertThat(result.size()).isEqualTo(20)
+        );
+    }
+
+    @Test
+    @DisplayName("getProducts 는 page/size 로 offset 을 계산해 리포지토리에 위임한다 (offset = page * size)")
+    void givenSecondPage_whenGetProducts_thenComputesOffsetAsPageTimesSize() {
+        ProductCommand.PageQuery query = new ProductCommand.PageQuery(null, ProductSortOption.LATEST, 2, 20);
+        when(productRepository.findAllOnSale(null, ProductSortOption.LATEST, 40L, 20)).thenReturn(List.of());
+        when(productRepository.countOnSale(null)).thenReturn(0L);
+
+        ProductResult.Page result = productQueryService.getProducts(query);
+
+        assertThat(result.content()).isEmpty();
+        verify(productRepository).findAllOnSale(null, ProductSortOption.LATEST, 40L, 20);
     }
 }

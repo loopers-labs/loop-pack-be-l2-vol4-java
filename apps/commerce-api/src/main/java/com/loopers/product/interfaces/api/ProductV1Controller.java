@@ -1,7 +1,9 @@
 package com.loopers.product.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.product.application.ProductCommand;
 import com.loopers.product.application.ProductQueryService;
+import com.loopers.product.application.ProductResult;
 import com.loopers.product.domain.ProductSortOption;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,8 +11,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -27,12 +27,14 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     @GetMapping
     @Override
-    public ApiResponse<List<ProductV1Response.Detail>> getAll(
-        @RequestParam(defaultValue = "LATEST") ProductSortOption sort
+    public ApiResponse<ProductV1Response.Page> getAll(
+        @RequestParam(required = false) Long brandId,
+        @RequestParam(defaultValue = "LATEST") ProductSortOption sort,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
     ) {
-        List<ProductV1Response.Detail> responses = productQueryService.getProducts(sort).stream()
-                .map(ProductV1Response.Detail::from)
-                .toList();
-        return ApiResponse.success(responses);
+        ProductResult.Page result = productQueryService.getProducts(
+                new ProductCommand.PageQuery(brandId, sort, page, size));
+        return ApiResponse.success(ProductV1Response.Page.from(result));
     }
 }
