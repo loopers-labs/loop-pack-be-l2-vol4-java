@@ -12,7 +12,7 @@ public interface LikeJpaRepository extends JpaRepository<LikeModel, Long> {
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
-    void deleteByUserIdAndProductId(Long userId, Long productId);
+    int deleteByUserIdAndProductId(Long userId, Long productId);
 
     @Query(value = """
         SELECT new com.loopers.domain.product.projection.ProductSummary(
@@ -22,7 +22,7 @@ public interface LikeJpaRepository extends JpaRepository<LikeModel, Long> {
             b.name.value,
             p.price.value,
             p.stock.value,
-            CAST((SELECT COUNT(l.id) FROM LikeModel l WHERE l.productId = p.id) AS integer)
+            p.likeCount
         )
         FROM LikeModel myLike
         JOIN ProductModel p ON p.id = myLike.productId AND p.deletedAt IS NULL

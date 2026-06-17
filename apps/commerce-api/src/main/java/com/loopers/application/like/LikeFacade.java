@@ -38,13 +38,17 @@ public class LikeFacade {
             .build();
 
         likeRepository.save(like);
+        productRepository.incrementLikeCount(product.getId());
     }
 
     public void deleteLike(Long userId, Long productId) {
         UserModel user = userRepository.getActiveById(userId);
         ProductModel product = productRepository.getActiveById(productId);
 
-        likeRepository.deleteByUserIdAndProductId(user.getId(), product.getId());
+        int deletedCount = likeRepository.deleteByUserIdAndProductId(user.getId(), product.getId());
+        if (deletedCount > 0) {
+            productRepository.decrementLikeCount(product.getId());
+        }
     }
 
     @Transactional(readOnly = true)
