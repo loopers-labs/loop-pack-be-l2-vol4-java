@@ -7,8 +7,9 @@ import com.loopers.domain.order.OrderItemCommand;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.StockDeductionCommand;
+import com.loopers.domain.product.StockDeductionResult;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
@@ -17,8 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -38,26 +37,18 @@ public class OrderFacade {
 
         UserModel user = userService.getUser(loginId, loginPw);
 
-        // 다중 상품 주문 시 데드락 방지: 모든 주문이 productId 오름차순으로 재고 락을 잡도록
-        // 차감 순서를 통일한다. (InnoDB 행 쓰기 락은 커밋까지 유지되므로 잠금 순서가 제각각이면 순환 대기 발생)
-        List<OrderRequest> orderedRequests = requests.stream()
-            .sorted(Comparator.comparing(OrderRequest::productId))
+        // 재고 차감 순서 통일(데드락 방지) 등 잠금 전략은 도메인(ProductService)이 책임진다.
+        List<StockDeductionCommand> deductionCommands = requests.stream()
+            .map(req -> new StockDeductionCommand(req.productId(), req.quantity()))
             .toList();
+        List<StockDeductionResult> deducted = productService.deductStocks(deductionCommands);
 
-        List<OrderItemCommand> itemCommands = new ArrayList<>();
-        long originalPrice = 0L;
-
-        for (OrderRequest req : orderedRequests) {
-            ProductModel product = productService.getProduct(req.productId());
-            productService.deductStock(req.productId(), req.quantity());
-            itemCommands.add(new OrderItemCommand(
-                product.getId(),
-                product.getName(),
-                product.getPrice(),
-                req.quantity()
-            ));
-            originalPrice += product.getPrice() * req.quantity();
-        }
+        List<OrderItemCommand> itemCommands = deducted.stream()
+            .map(d -> new OrderItemCommand(d.productId(), d.productName(), d.price(), d.quantity()))
+            .toList();
+        long originalPrice = deducted.stream()
+            .mapToLong(d -> d.price() * d.quantity())
+            .sum();
 
         long discountAmount = 0L;
         long finalPrice = originalPrice;

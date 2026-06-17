@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -42,6 +43,25 @@ public class ProductService {
         ProductModel product = getProduct(id);
         product.update(brandId, name, description, price, stock);
         return productRepository.save(product);
+    }
+
+    @Transactional
+    public List<StockDeductionResult> deductStocks(List<StockDeductionCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고를 차감할 상품이 1개 이상이어야 합니다.");
+        }
+        // 다중 상품 차감 시 데드락 방지: 모든 트랜잭션이 productId 오름차순으로 재고 락을 잡도록
+        // 차감 순서를 통일한다. (InnoDB 행 쓰기 락은 커밋까지 유지되므로 잠금 순서가 제각각이면 순환 대기 발생)
+        return commands.stream()
+            .sorted(Comparator.comparing(StockDeductionCommand::productId))
+            .map(cmd -> {
+                ProductModel product = getProduct(cmd.productId());
+                deductStock(cmd.productId(), cmd.quantity());
+                return new StockDeductionResult(
+                    product.getId(), product.getName(), product.getPrice(), cmd.quantity()
+                );
+            })
+            .toList();
     }
 
     @Transactional
