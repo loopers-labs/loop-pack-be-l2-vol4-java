@@ -2,6 +2,7 @@ package com.loopers.product.interfaces;
 
 import com.loopers.product.application.ProductFacade;
 import com.loopers.product.application.ProductInfo;
+import com.loopers.product.application.ProductSummaryInfo;
 import com.loopers.product.domain.SortCondition;
 import com.loopers.support.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ public class ProductV1Controller {
     private final ProductFacade productFacade;
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
+    public ApiResponse<List<ProductV1Dto.ProductSummaryResponse>> getProducts(
         @RequestParam(defaultValue = "latest") String sortBy,
         @RequestParam(required = false) Long brandId,
         @RequestParam(defaultValue = "false") boolean inStock,
@@ -29,8 +30,8 @@ public class ProductV1Controller {
         @RequestParam(defaultValue = "20") int size
     ) {
         SortCondition sort = SortCondition.from(sortBy);
-        List<ProductInfo> products = productFacade.getProducts(sort, brandId, inStock, page, size);
-        return ApiResponse.success(products.stream().map(ProductV1Dto.ProductResponse::from).toList());
+        List<ProductSummaryInfo> products = productFacade.getProducts(sort, brandId, inStock, page, size);
+        return ApiResponse.success(products.stream().map(ProductV1Dto.ProductSummaryResponse::from).toList());
     }
 
     @GetMapping("/{productId}")

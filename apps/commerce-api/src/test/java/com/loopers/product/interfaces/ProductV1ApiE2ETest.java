@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -55,7 +56,7 @@ class ProductV1ApiE2ETest {
     @Nested
     class GetProducts {
 
-        @DisplayName("정상 요청이면, 200 OK와 ProductResponse 목록을 반환한다.")
+        @DisplayName("정상 요청이면, 200 OK와 ProductSummaryResponse 목록을 반환한다.")
         @Test
         void returnsProductList_whenRequestIsValid() {
             // arrange
@@ -63,14 +64,32 @@ class ProductV1ApiE2ETest {
             productJpaRepository.save(new ProductModel("조던1", "나이키 농구화", 200000L, null));
 
             // act
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> response =
                 testRestTemplate.exchange(ENDPOINT, HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(response.getBody().data()).hasSize(2)
+            );
+        }
+
+        @DisplayName("목록 응답에는 description 필드가 포함되지 않는다.")
+        @Test
+        void returnsListWithoutDescription_whenRequestIsValid() {
+            // arrange
+            productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화 상세 설명", 150000L, null));
+
+            // act
+            ParameterizedTypeReference<ApiResponse<List<Map<String, Object>>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<Map<String, Object>>>> response =
+                testRestTemplate.exchange(ENDPOINT, HttpMethod.GET, new HttpEntity<>(null), responseType);
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().get(0)).doesNotContainKey("description")
             );
         }
 
@@ -83,8 +102,8 @@ class ProductV1ApiE2ETest {
             productJpaRepository.save(new ProductModel("노브랜드상품", "브랜드 없음", 50000L, null));
 
             // act
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> response =
                 testRestTemplate.exchange(ENDPOINT + "?brandId=" + brand.getId(), HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -104,8 +123,8 @@ class ProductV1ApiE2ETest {
             productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
 
             // act
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> response =
                 testRestTemplate.exchange(ENDPOINT + "?sortBy=price_asc", HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -125,8 +144,8 @@ class ProductV1ApiE2ETest {
             likeFacade.addLike(1L, popular.getId());
 
             // act
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> response =
                 testRestTemplate.exchange(ENDPOINT + "?sortBy=likes_desc", HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -140,8 +159,8 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenSortByIsInvalid() {
             // act
-            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductResponse>>> responseType = new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductResponse>>> response =
+            ParameterizedTypeReference<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductV1Dto.ProductSummaryResponse>>> response =
                 testRestTemplate.exchange(ENDPOINT + "?sortBy=invalid", HttpMethod.GET, new HttpEntity<>(null), responseType);
 
             // assert
@@ -153,11 +172,11 @@ class ProductV1ApiE2ETest {
     @Nested
     class GetProduct {
 
-        @DisplayName("존재하는 productId이면, 200 OK와 ProductResponse를 반환하며 likeCount가 포함된다.")
+        @DisplayName("존재하는 productId이면, 200 OK와 ProductResponse를 반환하며 description이 포함된다.")
         @Test
         void returnsProductResponse_whenProductExists() {
             // arrange
-            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, null));
+            ProductModel saved = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화 상세 설명", 150000L, null));
 
             // act
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
@@ -169,6 +188,7 @@ class ProductV1ApiE2ETest {
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(response.getBody().data().id()).isEqualTo(saved.getId()),
                 () -> assertThat(response.getBody().data().name()).isEqualTo("에어맥스"),
+                () -> assertThat(response.getBody().data().description()).isEqualTo("나이키 운동화 상세 설명"),
                 () -> assertThat(response.getBody().data().likeCount()).isEqualTo(0L)
             );
         }

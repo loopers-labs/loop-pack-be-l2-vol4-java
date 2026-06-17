@@ -58,7 +58,7 @@ public class ProductFacade {
 
     @Cacheable(cacheNames = "products", key = "#sort.name() + ':' + #brandId + ':' + #inStock + ':' + #page + ':' + #size")
     @Transactional(readOnly = true)
-    public List<ProductInfo> getProducts(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
+    public List<ProductSummaryInfo> getProducts(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
         List<ProductModel> products = productRepository.findAll(sort, brandId, inStock, page, size);
 
         List<Long> productIds = products.stream()
@@ -79,7 +79,7 @@ public class ProductFacade {
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
         return products.stream()
-            .map(p -> ProductInfo.from(
+            .map(p -> ProductSummaryInfo.from(
                 p,
                 productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.getBrandId()))),
                 stockMap.getOrDefault(p.getId(), 0)
