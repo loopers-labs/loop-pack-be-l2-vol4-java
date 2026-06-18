@@ -11,7 +11,9 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @SQLRestriction("deleted_at IS NULL")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "product")
+@Table(name = "product", indexes = {
+    @Index(name = "idx_product_brand_like_count", columnList = "brand_id, like_count")
+})
 public class ProductEntity extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -22,6 +24,9 @@ public class ProductEntity extends BaseEntity {
     private String description;
     private Long price;
     private Integer stock;
+
+    @Column(name = "like_count", nullable = false)
+    private long likeCount = 0;
 
     private ProductEntity(BrandEntity brand, String name, String description, Long price, Integer stock) {
         this.brand = brand;
@@ -50,6 +55,7 @@ public class ProductEntity extends BaseEntity {
             description,
             price,
             stock,
+            likeCount,
             getCreatedAt(),
             getUpdatedAt()
         );

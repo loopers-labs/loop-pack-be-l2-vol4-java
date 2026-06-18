@@ -3,6 +3,7 @@ package com.loopers.application.brand;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ public class BrandApplicationService {
 
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public BrandInfo create(String name, String description) {
@@ -42,12 +44,17 @@ public class BrandApplicationService {
         BrandModel brand = brandRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
         brand.update(name, description);
-        return BrandInfo.from(brandRepository.save(brand));
+        BrandInfo result = BrandInfo.from(brandRepository.save(brand));
+        productCacheService.evictBrand(id);
+        productCacheService.evictAllProductLists();
+        return result;
     }
 
     @Transactional
     public void delete(Long id) {
         productRepository.deleteByBrandId(id);
         brandRepository.delete(id);
+        productCacheService.evictBrand(id);
+        productCacheService.evictAllProductLists();
     }
 }

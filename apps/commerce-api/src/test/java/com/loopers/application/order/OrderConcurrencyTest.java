@@ -62,7 +62,7 @@ class OrderConcurrencyTest {
 
             BrandEntity brand = brandJpaRepository.save(BrandEntity.from(new BrandModel("브랜드A", "설명")));
             ProductEntity product = productJpaRepository.save(ProductEntity.from(
-                new ProductModel(null, brand.getId(), "상품A", "설명", 10_000L, STOCK, null, null), brand
+                new ProductModel(null, brand.getId(), "상품A", "설명", 10_000L, STOCK, 0L, null, null), brand
             ));
             Long productId = product.getId();
 
@@ -127,7 +127,7 @@ class OrderConcurrencyTest {
             List<Long> productIds = new java.util.ArrayList<>();
             for (int i = 0; i < THREADS; i++) {
                 ProductEntity p = productJpaRepository.save(ProductEntity.from(
-                    new ProductModel(null, brand.getId(), "상품" + i, "설명", 10_000L, 100, null, null), brand
+                    new ProductModel(null, brand.getId(), "상품" + i, "설명", 10_000L, 100, 0L, null, null), brand
                 ));
                 productIds.add(p.getId());
             }
