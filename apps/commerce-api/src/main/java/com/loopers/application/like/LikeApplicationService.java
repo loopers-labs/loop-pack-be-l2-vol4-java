@@ -29,6 +29,7 @@ public class LikeApplicationService {
             throw new CoreException(ErrorType.CONFLICT, "이미 좋아요한 상품입니다.");
         }
         likeRepository.save(new LikeModel(userId, productId));
+        productRepository.incrementLikeCount(productId);
     }
 
     @Transactional
@@ -36,6 +37,7 @@ public class LikeApplicationService {
         LikeModel like = likeRepository.findByUserIdAndProductId(userId, productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 내역이 없습니다."));
         likeRepository.delete(like.getId());
+        productRepository.decrementLikeCount(productId);
     }
 
     @Transactional(readOnly = true)
