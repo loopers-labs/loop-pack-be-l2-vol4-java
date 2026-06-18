@@ -29,11 +29,27 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+commerce:
+  product-like-summary:
+    sync-fixed-delay-ms: 5000
+    sync-chunk-size: 1000
+    sync-max-chunks-per-run: 3
+
 ---
 spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+commerce:
+  product-like-summary:
+    sync-enabled: false
 
 ---
 spring:

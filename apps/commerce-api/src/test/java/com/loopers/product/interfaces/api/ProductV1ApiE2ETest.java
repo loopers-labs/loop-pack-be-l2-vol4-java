@@ -2,8 +2,10 @@ package com.loopers.product.interfaces.api;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
-import com.loopers.like.domain.LikeService;
+import com.loopers.like.application.LikeFacade;
 import com.loopers.product.domain.Product;
+import com.loopers.product.application.ProductLikeSummarySynchronizer;
+import com.loopers.product.application.ProductLikeSummaryWriter;
 import com.loopers.product.domain.ProductService;
 import com.loopers.stock.domain.ProductStockService;
 import com.loopers.shared.presentation.ApiResponse;
@@ -34,7 +36,9 @@ class ProductV1ApiE2ETest {
     private final BrandService brandService;
     private final ProductService productService;
     private final ProductStockService productStockService;
-    private final LikeService likeService;
+    private final LikeFacade likeFacade;
+    private final ProductLikeSummaryWriter productLikeSummaryWriter;
+    private final ProductLikeSummarySynchronizer productLikeSummarySynchronizer;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -43,14 +47,18 @@ class ProductV1ApiE2ETest {
         BrandService brandService,
         ProductService productService,
         ProductStockService productStockService,
-        LikeService likeService,
+        LikeFacade likeFacade,
+        ProductLikeSummaryWriter productLikeSummaryWriter,
+        ProductLikeSummarySynchronizer productLikeSummarySynchronizer,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
         this.productService = productService;
         this.productStockService = productStockService;
-        this.likeService = likeService;
+        this.likeFacade = likeFacade;
+        this.productLikeSummaryWriter = productLikeSummaryWriter;
+        this.productLikeSummarySynchronizer = productLikeSummarySynchronizer;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -281,6 +289,7 @@ class ProductV1ApiE2ETest {
             price
         );
         productStockService.createProductStock(product.getId(), stockQuantity);
+        productLikeSummaryWriter.initialize(product.getId(), product.getBrandId());
         return product;
     }
 
@@ -300,8 +309,9 @@ class ProductV1ApiE2ETest {
 
     private void likeProduct(Product product, Long... userIds) {
         for (Long userId : userIds) {
-            likeService.like(userId, product.getId());
+            likeFacade.like(userId, product.getId());
         }
+        productLikeSummarySynchronizer.sync();
     }
 
     private ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> getProduct(Long productId) {

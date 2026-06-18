@@ -23,6 +23,7 @@ public class ProductAdminFacade {
     private final BrandService brandService;
     private final ProductService productService;
     private final ProductStockService productStockService;
+    private final ProductLikeSummaryWriter productLikeSummaryWriter;
 
     @Transactional
     public ProductInfo createProduct(CreateProductCommand command) {
@@ -34,6 +35,7 @@ public class ProductAdminFacade {
             command.price()
         );
         ProductStock productStock = productStockService.createProductStock(product.getId(), command.stockQuantity());
+        productLikeSummaryWriter.initialize(product.getId(), product.getBrandId());
         return ProductInfo.from(product, productStock);
     }
 

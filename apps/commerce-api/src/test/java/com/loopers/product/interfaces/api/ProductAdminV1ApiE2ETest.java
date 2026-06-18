@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -32,16 +33,19 @@ class ProductAdminV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
+    private final JdbcTemplate jdbcTemplate;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     ProductAdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandService brandService,
+        JdbcTemplate jdbcTemplate,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
+        this.jdbcTemplate = jdbcTemplate;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -82,7 +86,8 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(data.stockQuantity()).isEqualTo(10),
                 () -> assertThat(data.createdAt()).isNotNull(),
                 () -> assertThat(data.updatedAt()).isNotNull(),
-                () -> assertThat(data.deletedAt()).isNull()
+                () -> assertThat(data.deletedAt()).isNull(),
+                () -> assertThat(likeSummaryCount(data.id())).isZero()
             );
         }
 
@@ -362,6 +367,14 @@ class ProductAdminV1ApiE2ETest {
             HttpMethod.DELETE,
             new HttpEntity<>(headers),
             responseType,
+            productId
+        );
+    }
+
+    private long likeSummaryCount(Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select like_count from product_like_summary where product_id = ?",
+            Long.class,
             productId
         );
     }
