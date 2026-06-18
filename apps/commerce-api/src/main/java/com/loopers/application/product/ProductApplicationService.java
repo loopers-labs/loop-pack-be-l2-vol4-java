@@ -1,6 +1,5 @@
 package com.loopers.application.product;
 
-import com.loopers.application.like.LikeApplicationService;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductDetailService;
@@ -9,13 +8,16 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductWithBrand;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
+import com.loopers.infrastructure.product.ProductCacheStore;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -34,39 +36,55 @@ public class ProductApplicationService {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final StockRepository stockRepository;
-    private final LikeApplicationService likeApplicationService;
     private final ProductDetailService productDetailService;
+    private final ProductCacheStore productCacheStore;
+    private final ApplicationEventPublisher eventPublisher;
 
-    /** 사용자 - 상품 상세 (Product + Brand + Stock + LikeCount 어셈블) */
+    /**
+     * 사용자 - 상품 상세 (Product + Brand + Stock + LikeCount 어셈블).
+     *
+     * <p>Redis 캐시 read-through: 히트 시 DB 접근 없이 반환, 미스 시 DB 조회 후 캐시에 저장한다.
+     * 캐시 장애 시에는 미스로 처리되어 DB 로 폴백한다(ProductCacheStore 내부 격리).
+     */
     @Transactional(readOnly = true)
     public ProductInfo getProductDetail(Long productId) {
+        Optional<ProductInfo> cached = productCacheStore.getDetail(productId);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
         ProductModel product = findActiveProductOrThrow(productId);
         BrandModel brand = findBrandOrThrow(product.getBrandId());
         ProductWithBrand pwb = productDetailService.assemble(product, brand);
         StockModel stock = findStockOrThrow(productId);
-        long likeCount = likeApplicationService.countByProductId(productId);
-        return ProductInfo.forUser(pwb, stock, likeCount);
+        ProductInfo info = ProductInfo.forUser(pwb, stock);   // 좋아요 수는 비정규화 컬럼(like_count) 사용
+        productCacheStore.putDetail(productId, info);
+        return info;
     }
 
     /**
      * 사용자 - 상품 목록.
      *
-     * <p>재고/좋아요 수는 IN 쿼리로 일괄 조회하여 N+1을 회피한다.
-     * 다중 원천 데이터를 DTO 리스트로 묶는 책임은 {@link ProductInfo#assembleUserList} 에 위임한다.
+     * <p>Redis 캐시 read-through. 빈 결과는 캐시하지 않는다(상품 추가 시 무효화 대상에서 누락 방지 + 의미 없음).
+     * 재고는 IN 쿼리로 일괄 조회하여 N+1을 회피하고, 좋아요 수는 비정규화 컬럼을 사용한다.
      */
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
         validateSort(sort);
+        Optional<List<ProductInfo>> cached = productCacheStore.getList(brandId, sort, page, size);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
         List<ProductModel> products = productRepository.findAll(brandId, sort, page, size);
         if (products.isEmpty()) {
             return List.of();
         }
         List<Long> productIds = products.stream().map(ProductModel::getId).toList();
-        return ProductInfo.assembleUserList(
+        List<ProductInfo> infos = ProductInfo.assembleUserList(
             products,
-            stockRepository.findAllByProductIdIn(productIds),
-            likeApplicationService.countByProductIdIn(productIds)
+            stockRepository.findAllByProductIdIn(productIds)
         );
+        productCacheStore.putList(brandId, sort, page, size, infos);
+        return infos;
     }
 
     /** 어드민 - 상품 등록 (브랜드 검증 + 초기 재고 생성) */
@@ -75,6 +93,8 @@ public class ProductApplicationService {
         findBrandOrThrow(brandId);   // 존재 검증만
         ProductModel product = productRepository.save(new ProductModel(brandId, name, description, price));
         StockModel stock = stockRepository.save(StockModel.of(product.getId(), initialStock));
+        // 새 상품이 목록에 즉시 반영되도록 목록 캐시 전체 무효화 (커밋 후)
+        eventPublisher.publishEvent(ProductCacheEvictEvent.listOnly());
         return ProductInfo.forAdmin(product, stock);
     }
 
@@ -90,6 +110,8 @@ public class ProductApplicationService {
             stock.changeQuantity(stockQuantity);
             stockRepository.save(stock);
         }
+        // 가격/이름/재고 변경 → 상세 + 목록 캐시 무효화 (커밋 후)
+        eventPublisher.publishEvent(ProductCacheEvictEvent.detailAndList(productId));
         return ProductInfo.forAdmin(product, stock);
     }
 
@@ -121,6 +143,23 @@ public class ProductApplicationService {
         ProductModel product = findActiveProductOrThrow(productId);
         product.delete();
         productRepository.save(product);
+        // 삭제된 상품이 상세/목록에서 즉시 사라지도록 무효화 (커밋 후)
+        eventPublisher.publishEvent(ProductCacheEvictEvent.detailAndList(productId));
+    }
+
+    /**
+     * 어드민 - like_count 재집계 (drift 보정).
+     *
+     * <p>실시간 원자 동기화로 누적될 수 있는 오차를 실제 likes 집계로 리셋한다.
+     * 재집계로 좋아요 수가 바뀌므로 목록 캐시를 무효화한다(상세는 TTL 로 수렴).
+     *
+     * @return 갱신된 상품 수
+     */
+    @Transactional
+    public int resyncLikeCounts() {
+        int updated = productRepository.resyncAllLikeCounts();
+        eventPublisher.publishEvent(ProductCacheEvictEvent.listOnly());
+        return updated;
     }
 
     private void validateSort(String sort) {
