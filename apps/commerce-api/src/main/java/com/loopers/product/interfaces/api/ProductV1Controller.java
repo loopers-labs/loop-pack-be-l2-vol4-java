@@ -21,17 +21,17 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     @GetMapping("/{productId}")
     @Override
-    public ApiResponse<ProductV1Response.Detail> get(@PathVariable Long productId) {
+    public ApiResponse<ProductV1Response.Detail> get(@PathVariable("productId") Long productId) {
         return ApiResponse.success(ProductV1Response.Detail.from(productQueryService.getProduct(productId)));
     }
 
     @GetMapping
     @Override
     public ApiResponse<ProductV1Response.Page> getAll(
-        @RequestParam(required = false) Long brandId,
-        @RequestParam(defaultValue = "LATEST") ProductSortOption sort,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int size
+        @RequestParam(name = "brandId", required = false) Long brandId,
+        @RequestParam(name = "sort", defaultValue = "LATEST") ProductSortOption sort,
+        @RequestParam(name = "page", defaultValue = "0") int page,
+        @RequestParam(name = "size", defaultValue = "20") int size
     ) {
         ProductResult.Page result = productQueryService.getProducts(
                 new ProductCommand.PageQuery(brandId, sort, page, size));
