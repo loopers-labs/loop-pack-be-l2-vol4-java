@@ -113,7 +113,11 @@ class LikeApiE2ETest {
     @DisplayName("같은 상품을 두 번 좋아요해도 증감분은 1로 유지된다(멱등)")
     @Test
     void like_isIdempotent() {
-        restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
+        ResponseEntity<ApiResponse<Object>> first = restTemplate.exchange(
+            likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(delta()).isEqualTo("1");
+
         ResponseEntity<ApiResponse<Object>> second = restTemplate.exchange(
             likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
 

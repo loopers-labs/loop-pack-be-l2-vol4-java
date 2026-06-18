@@ -18,6 +18,9 @@ public class LikeCountSeeder {
     }
 
     public void seed(Long productId, long likeCount) {
-        jdbcTemplate.update("UPDATE product SET like_count = ? WHERE id = ?", likeCount, productId);
+        int updated = jdbcTemplate.update("UPDATE product SET like_count = ? WHERE id = ?", likeCount, productId);
+        if (updated != 1) {
+            throw new IllegalStateException("like_count 시드 실패: productId=" + productId + " (영향 행 " + updated + ")");
+        }
     }
 }
