@@ -27,6 +27,7 @@ import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductV1ApiE2ETest {
@@ -49,9 +50,13 @@ class ProductV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private BrandModel saveBrand(String name) {
@@ -404,6 +409,30 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
+            );
+        }
+
+        @DisplayName("상세를 연속 조회하면 첫 요청(캐시 미스)·둘째 요청(캐시 히트) 모두 200으로 동일한 좋아요 수를 반환한다.")
+        @Test
+        void returnsSameDetail_onMissThenHit() {
+            // arrange
+            BrandModel brand = saveBrand("감성 브랜드");
+            ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 50);
+            saveLike(1L, product.getId());
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> first =
+                testRestTemplate.exchange(ENDPOINT + "/" + product.getId(), HttpMethod.GET, guestGet(), MAP_RESPONSE);
+            ResponseEntity<ApiResponse<Map<String, Object>>> second =
+                testRestTemplate.exchange(ENDPOINT + "/" + product.getId(), HttpMethod.GET, guestGet(), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(((Number) first.getBody().data().get("likeCount")).intValue()).isEqualTo(1),
+                () -> assertThat(second.getBody().data().get("likeCount"))
+                    .isEqualTo(first.getBody().data().get("likeCount"))
             );
         }
     }
