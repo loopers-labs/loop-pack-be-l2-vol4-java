@@ -114,6 +114,12 @@ public class ProductRepositoryImpl implements ProductRepository {
                     : product.getNumber("price", Long.class).desc(),
                 product.getNumber("id", Long.class).desc()
             );
+            case LIKE_COUNT -> query.orderBy(
+                direction == ProductSortDirection.ASC
+                    ? product.getNumber("likeCount", Long.class).asc()
+                    : product.getNumber("likeCount", Long.class).desc(),
+                product.getNumber("id", Long.class).desc()
+            );
         };
     }
 

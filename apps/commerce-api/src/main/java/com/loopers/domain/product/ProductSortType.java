@@ -5,7 +5,8 @@ import com.loopers.support.error.ErrorType;
 
 public enum ProductSortType {
     LATEST("latest"),
-    PRICE("price");
+    PRICE("price"),
+    LIKE_COUNT("likeCount");
 
     private final String value;
 
