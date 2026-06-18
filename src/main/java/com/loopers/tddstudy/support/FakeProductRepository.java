@@ -67,4 +67,32 @@ public class FakeProductRepository implements ProductRepository {
             throw new RuntimeException("Product id 설정 실패", e);
         }
     }
+
+
+    @Override
+    public List<Product> findAllByFilter(Long brandId, String sort) {
+        return store.values().stream()
+                .filter(p -> brandId == null || brandId.equals(p.getBrandId()))
+                .sorted(Comparator.comparingLong(Product::getLikeCount).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Product> saveAll(List<Product> products) {
+        products.forEach(this::save);
+        return products;
+    }
+
+    //성능테스트용 코드
+
+    @Override
+    public List<Product> findTop10ByOrderByLikeCountDesc() {
+        return store.values().stream()
+                .sorted(Comparator.comparingLong(Product::getLikeCount).reversed())
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+
+
 }

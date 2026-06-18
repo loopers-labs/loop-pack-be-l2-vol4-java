@@ -6,10 +6,12 @@ import com.loopers.tddstudy.domain.product.Product;
 import com.loopers.tddstudy.domain.product.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.Comparator;
+
 
 @Service
 @Transactional
@@ -38,6 +40,8 @@ public class ProductService {
         productRepository.save(product);
     }
 
+    // 상품 상세 조회 — 캐시 적용
+    @Cacheable(cacheNames = "product", key = "#id")
     @Transactional(readOnly = true)
     public Product getById(Long id, Long userId, String userRole) {
         Product product = findOrThrow(id);
@@ -47,36 +51,28 @@ public class ProductService {
         return product;
     }
 
+    // 상품 목록 조회 — 캐시 적용
+    @Cacheable(cacheNames = "products", key = "#brandId + ':' + #sort")
     @Transactional(readOnly = true)
     public List<Product> getAll(Long userId, String userRole, Long brandId, String sort) {
-        return productRepository.findAll().stream()
-                .filter(p -> brandId == null || brandId.equals(p.getBrandId()))
+        return productRepository.findAllByFilter(brandId, sort).stream()
                 .filter(p -> isVisible(p, userId, userRole))
-                .sorted(getComparator(sort))
                 .collect(Collectors.toList());
     }
 
-    private Comparator<Product> getComparator(String sort) {
-        if ("price_asc".equals(sort)) {
-            return Comparator.comparingInt(Product::getPrice);
-        }
-        if ("likes_desc".equals(sort)) {
-            return Comparator.comparingLong(Product::getLikeCount).reversed();
-        }
-        // latest: createdAt desc, id desc (동시 생성 시 tiebreaker)
-        return Comparator.comparing(Product::getCreatedAt)
-                .thenComparing(Product::getId)
-                .reversed();
-    }
 
 
 
+    // 수정 — 캐시 무효화
+    @CacheEvict(cacheNames = {"product", "products"}, allEntries = true)
     public void update(Long id, String name, int price, int stock) {
         Product product = findOrThrow(id);
         product.update(name, price, stock);
         productRepository.save(product);
     }
 
+    // 삭제 — 캐시 무효화
+    @CacheEvict(cacheNames = {"product", "products"}, allEntries = true)
     public void delete(Long id) {
         Product product = findOrThrow(id);
         product.softDelete();

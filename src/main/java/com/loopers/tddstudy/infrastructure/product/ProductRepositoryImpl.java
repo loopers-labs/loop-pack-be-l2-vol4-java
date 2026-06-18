@@ -40,4 +40,33 @@ public class ProductRepositoryImpl implements ProductRepository {
     public List<Product> findAllByBrandId(Long brandId) {
         return jpaRepository.findAllByBrandId(brandId);
     }
+
+    @Override
+    public List<Product> findAllByFilter(Long brandId, String sort) {
+        boolean likeSort = "likes_desc".equals(sort);
+
+        if (brandId != null && likeSort) {
+            return jpaRepository.findAllByBrandIdOrderByLikeCountDesc(brandId);
+        }
+        if (brandId != null) {
+            return jpaRepository.findAllByBrandId(brandId);
+        }
+        if (likeSort) {
+            return jpaRepository.findAllByOrderByLikeCountDesc();
+        }
+        return jpaRepository.findAll();
+    }
+
+    @Override
+    public List<Product> saveAll(List<Product> products) {
+        return jpaRepository.saveAll(products);
+    }
+        //탑10 캐시 테스트용
+    @Override
+    public List<Product> findTop10ByOrderByLikeCountDesc() {
+        return jpaRepository.findTop10ByOrderByLikeCountDesc();
+    }
+
+
+
 }
