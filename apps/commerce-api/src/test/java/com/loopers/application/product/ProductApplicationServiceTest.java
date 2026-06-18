@@ -6,8 +6,10 @@ import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -32,8 +34,17 @@ class ProductApplicationServiceTest {
     private final BrandRepository brandRepository = mock(BrandRepository.class);
     private final LikeRepository likeRepository = mock(LikeRepository.class);
     private final ProductDomainService productDomainService = new ProductDomainService();
+    private final ProductCacheService productCacheService = mock(ProductCacheService.class);
     private final ProductApplicationService productApplicationService =
-        new ProductApplicationService(productRepository, brandRepository, likeRepository, productDomainService);
+        new ProductApplicationService(productRepository, brandRepository, likeRepository, productDomainService, productCacheService);
+
+    @BeforeEach
+    void setUp() {
+        when(productCacheService.getProduct(any())).thenReturn(Optional.empty());
+        when(productCacheService.getBrand(any())).thenReturn(Optional.empty());
+        when(productCacheService.getProductLikeCount(any())).thenReturn(Optional.empty());
+        when(productCacheService.getProductList(any(), anyInt(), anyInt(), any())).thenReturn(Optional.empty());
+    }
 
     private static final Long PRODUCT_ID = 1L;
     private static final Long BRAND_ID = 1L;
@@ -43,7 +54,7 @@ class ProductApplicationServiceTest {
     private static final Integer VALID_STOCK = 10;
 
     private ProductModel stubProduct() {
-        return new ProductModel(PRODUCT_ID, BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK, null, null);
+        return new ProductModel(PRODUCT_ID, BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK, 0L, null, null);
     }
 
     private BrandModel stubBrand() {
@@ -162,7 +173,7 @@ class ProductApplicationServiceTest {
         void callsSave_afterUpdate_whenProductExists() {
             // arrange
             ProductModel product = stubProduct();
-            ProductModel updated = new ProductModel(PRODUCT_ID, BRAND_ID, "아디다스 부스트", "러닝화", 120_000L, 5, null, null);
+            ProductModel updated = new ProductModel(PRODUCT_ID, BRAND_ID, "아디다스 부스트", "러닝화", 120_000L, 5, 0L, null, null);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
             when(productRepository.save(product)).thenReturn(updated);
 

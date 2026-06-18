@@ -14,7 +14,7 @@ class ProductDomainServiceTest {
     private final ProductDomainService productDomainService = new ProductDomainService();
 
     private ProductModel product() {
-        return new ProductModel(1L, 2L, "상품A", "설명", 1_000L, 10, null, null);
+        return new ProductModel(1L, 2L, "상품A", "설명", 1_000L, 10, 0L, null, null);
     }
 
     @DisplayName("상품/브랜드/좋아요수를 조합해 ProductDetail을 만든다.")
