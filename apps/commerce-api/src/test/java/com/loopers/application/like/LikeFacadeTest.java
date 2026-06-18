@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -38,16 +39,17 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
         given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.empty());
         
         // when
         likeFacade.addLike(userId, productId);
 
         // then
-        verify(productRepository).findById(productId);
+        verify(productRepository).findByIdWithLock(productId);
         verify(likeRepository).findByUserIdAndProductId(userId, productId);
         verify(likeRepository).save(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(1);
     }
 
     @Test
@@ -58,16 +60,17 @@ class LikeFacadeTest {
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
         ProductLikeModel existingLike = new ProductLikeModel(userId, productId);
-        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
         given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.of(existingLike));
 
         // when
         likeFacade.addLike(userId, productId);
 
         // then
-        verify(productRepository).findById(productId);
+        verify(productRepository).findByIdWithLock(productId);
         verify(likeRepository).findByUserIdAndProductId(userId, productId);
         verify(likeRepository, never()).save(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 
     @Test
@@ -77,17 +80,19 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
+        product.increaseLikeCount();
         ProductLikeModel existingLike = new ProductLikeModel(userId, productId);
-        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
         given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.of(existingLike));
 
         // when
         likeFacade.removeLike(userId, productId);
 
         // then
-        verify(productRepository).findById(productId);
+        verify(productRepository).findByIdWithLock(productId);
         verify(likeRepository).findByUserIdAndProductId(userId, productId);
         verify(likeRepository).delete(existingLike);
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 
     @Test
@@ -97,15 +102,16 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
         given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.empty());
 
         // when
         likeFacade.removeLike(userId, productId);
 
         // then
-        verify(productRepository).findById(productId);
+        verify(productRepository).findByIdWithLock(productId);
         verify(likeRepository).findByUserIdAndProductId(userId, productId);
         verify(likeRepository, never()).delete(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 }
