@@ -10,9 +10,15 @@ import org.springframework.stereotype.Component;
 public class ProductFacade {
 
     private final ProductApplicationService productApplicationService;
+    private final ProductCacheRepository productCacheRepository;
 
     public ProductInfo getProduct(Long productId) {
-        return productApplicationService.getProduct(productId);
+        return productCacheRepository.find(productId)
+            .orElseGet(() -> {
+                ProductInfo info = productApplicationService.getProduct(productId);
+                productCacheRepository.save(productId, info);
+                return info;
+            });
     }
 
     public Page<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
@@ -26,9 +32,11 @@ public class ProductFacade {
 
     public void updateProduct(Long productId, String name, String description, Long price) {
         productApplicationService.updateProduct(productId, name, description, price);
+        productCacheRepository.evict(productId);
     }
 
     public void deleteProduct(Long productId) {
         productApplicationService.deleteProduct(productId);
+        productCacheRepository.evict(productId);
     }
 }
