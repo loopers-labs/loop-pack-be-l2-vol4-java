@@ -250,7 +250,7 @@ classDiagram
 
 - **`Like`** (AggregateRoot) — 한 사용자가 한 상품을 좋아요한 사실. `(userId, productId)` 쌍이 곧 식별자다. 행동이 거의 없는, 의도적으로 얇은 Aggregate다.
 - **불변식** — 한 (사용자, 상품) 쌍에 좋아요는 최대 1개. 멱등성은 등록 전 존재 확인과 DB 유일 제약이 함께 보장한다(2단계 시퀀스 다이어그램).
-- **좋아요 수** — 따로 저장하지 않고 `Like` 행을 집계(`COUNT`)해 구한다(비정규화 컬럼 없음). 덕분에 좋아요 등록/취소는 `Like` 한 곳만 건드리는 단일 Aggregate 작업이다.
+- **좋아요 수** — 진실은 `Like` 행이지만, 좋아요순 정렬 성능을 위해 다른 Aggregate 인 `Product.like_count` 로 **비정규화**해 보유한다(종속 카운터). 좋아요 등록/취소는 `Like` 행을 INSERT/DELETE 하고, 행이 **실제로** 생기거나 사라질 때만(영향 행 수 == 1) 그 카운터를 원자적으로 증감한다 — 표시/정렬은 카운터를 읽고 `COUNT` 집계를 돌리지 않는다(ERD `products`/`product_likes` 참조).
 
 ### 주문 — `Order` / `OrderItem` / `OrderStatus`
 

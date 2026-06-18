@@ -155,6 +155,10 @@ erDiagram
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
 > **재고 분리** — 재고는 `products`에서 떼어 별도 애그리거트 `inventories`로 둔다(아래 표). `products` 행은 더 이상 `stock_quantity`를 갖지 않으며, 주문의 비관락은 `products`가 아니라 `inventories` 행을 잠근다.
+> **조회 정렬 인덱스 (Round 5)** — 상품 목록의 3개 정렬 유즈케이스를 인덱스로 받친다(전후 EXPLAIN 측정치는 벤치마크 노트 참조):
+> - **좋아요순**: 전역 `(like_count DESC, id DESC)`, 브랜드 필터 `(brand_id, like_count DESC, id DESC)`. 후자는 등치 `brand_id`를 선행시켜 **브랜드 선택도와 무관하게** Top-N이 안정적이다(선택도 큰 브랜드도 filesort 없이 페이지 단위만 읽음).
+> - **가격 오름차순**: 전역 `(price, id DESC)`, 브랜드 필터 `(brand_id, price, id DESC)`. 전역의 경우 InnoDB secondary index 는 리프에 PK(`id ASC`)가 **암묵 부착**되므로 단일 `(price)`만으로는 `ORDER BY price ASC, id DESC` 의 타이브레이크가 어긋나 filesort 가 잔존한다 — 그래서 `id DESC` 를 명시한 복합 인덱스를 둔다. 브랜드 필터는 등치 `brand_id`를 선행시켜 그 안에서 `price` 정렬을 인덱스 순서로 풀어 filesort 를 제거한다(좋아요순 브랜드 변형과 동일한 결).
+> - **최신순**: **별도 인덱스 없음**. `id` 가 auto_increment 라 `id DESC` 가 곧 생성 역순이고, 이는 **클러스터 인덱스(PK) 역스캔**으로 풀린다 — `created_at` 정렬용 인덱스가 불필요하다.
 
 ### 재고 — `inventories`
 
