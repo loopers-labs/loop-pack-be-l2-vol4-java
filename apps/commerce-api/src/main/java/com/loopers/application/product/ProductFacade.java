@@ -4,7 +4,6 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.application.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.application.product.ProductRepository;
-import com.loopers.application.like.LikeRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +21,6 @@ import java.util.stream.Collectors;
 public class ProductFacade {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
-    private final LikeRepository likeRepository;
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
@@ -30,7 +28,7 @@ public class ProductFacade {
             .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
         BrandModel brand = brandRepository.findById(product.getBrandId())
             .orElseThrow(() -> new CoreException(ErrorType.BRAND_NOT_FOUND));
-        int likeCount = likeRepository.countByProductId(id);
+        int likeCount = product.getLikeCount();
         return ProductInfo.from(product, brand.getName(), likeCount);
     }
 
@@ -47,12 +45,9 @@ public class ProductFacade {
         Map<Long, String> brandNameMap = brands.stream()
                 .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
 
-        List<Long> productIds = productPage.getContent().stream().map(ProductModel::getId).toList();
-        Map<Long, Integer> fetchedLikeCounts = likeRepository.countByProductIds(productIds);
-
         return productPage.map(product -> {
             String brandName = brandNameMap.getOrDefault(product.getBrandId(), "알수없음");
-            int likeCount = fetchedLikeCounts.getOrDefault(product.getId(), 0);
+            int likeCount = product.getLikeCount();
                     
             return ProductInfo.from(product, brandName, likeCount);
         });
