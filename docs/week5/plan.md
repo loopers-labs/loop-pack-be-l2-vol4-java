@@ -69,3 +69,31 @@
 ### Step 5: 테스트 코드 수정 및 추가
 - [ ] **Repository 테스트:** LEFT JOIN 제거 후 단순화된 조회 쿼리 정렬 검증
 - [ ] **동시성 테스트 (Concurrency Test):** 10개의 스레드가 동시에 같은 상품에 좋아요 등록/취소를 요청했을 때, `like_count`가 정확하게 일치하는지 (Lost Update가 없는지) 검증
+
+---
+
+## 4. 작업 계획: 상품 조회 API 캐시 적용 및 Fallback 구현
+
+week2 설계 문서(요구사항 및 시퀀스 다이어그램)에 반영된 캐시 전략(옵션 A, B)을 바탕으로 Redis를 활용한 상품 상세 및 목록 조회의 Cache-Aside 전략 및 Fallback 로직을 구현합니다.
+
+### Step 1: Redis 기반 설정 추가
+- [ ] `build.gradle.kts` 내 `spring-boot-starter-data-redis` 의존성 확인/추가
+- [ ] `RedisConfig`를 통해 `RedisConnectionFactory` 및 `RedisTemplate` (Key, Value Serializer 등) 빈 등록
+
+### Step 2: Facade 계층 Cache-Aside & Fallback 로직 구현
+- [ ] **상품 상세 조회 (`getProduct`)**
+  - `RedisTemplate`을 활용하여 수동으로 캐시 제어
+  - Redis 조회 시도, 캐시 힛 시 즉시 반환
+  - 캐시 미스 시 Application 계층(DB) 조회 후 Redis에 저장 (TTL 10분)
+  - `try-catch` 블록으로 Redis 통신 예외 발생 시 DB에서 직접 조회하는 Fallback 로직 구현
+- [ ] **상품 목록 조회 (`getProducts`)**
+  - 조회 조건(`brandId`, `sort`, `pageNumber`, `pageSize`)을 조합하여 키 생성
+  - 상세 조회와 동일한 Cache-Aside 및 Fallback 패턴 적용 (TTL 5분)
+
+### Step 3: Admin 핵심 로직 캐시 수동 무효화 구현
+- [ ] 상품 정보 수정 (`updateProduct`) 및 삭제 (`deleteProduct`) 시 해당하는 상세 상품 정보 캐시 키를 무효화(삭제)하는 로직 추가
+
+### Step 4: 테스트 코드 작성 및 장애 상황 시뮬레이션
+- [ ] **캐시 힛 & 미스 검증:** Redis에 데이터가 있을 때/없을 때 정상 동작 확인
+- [ ] **장애 Fallback 검증:** Redis 의존성을 Mocking하여 `RedisConnectionFailureException` 예외 상황을 강제 발생시키고 DB 응답이 정상 반환되는지 확인
+- [ ] **캐시 무효화 검증:** Admin 기능 실행 후 캐시 데이터가 정상적으로 만료(삭제)되는지 확인
