@@ -2,9 +2,9 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.LikeCountSeeder;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
@@ -37,9 +37,6 @@ class ProductFacadeIntegrationTest {
     private ProductFacade productFacade;
 
     @Autowired
-    private ProductService productService;
-
-    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -53,6 +50,9 @@ class ProductFacadeIntegrationTest {
 
     @Autowired
     private RedisCleanUp redisCleanUp;
+
+    @Autowired
+    private LikeCountSeeder likeCountSeeder;
 
     private Long brandId;
     private Long inStockProductId;
@@ -71,7 +71,7 @@ class ProductFacadeIntegrationTest {
         stockRepository.save(new StockModel(inStockProductId, 10));
         stockRepository.save(new StockModel(outOfStockProductId, 0));
 
-        productService.incrementLikeCount(inStockProductId);
+        likeCountSeeder.seed(inStockProductId, 1L);
     }
 
     @AfterEach
@@ -135,7 +135,7 @@ class ProductFacadeIntegrationTest {
             assertThat(first.likeCount()).isEqualTo(1L);
 
             // when - DB의 likeCount는 2로 증가하지만 캐시는 무효화하지 않는다
-            productService.incrementLikeCount(inStockProductId);
+            likeCountSeeder.seed(inStockProductId, 2L);
             ProductInfo cached = productFacade.getProductDetail(inStockProductId);
 
             // then - 캐시 히트라 옛 값(1) 유지 (정확도 계약: TTL 동안 stale 허용)

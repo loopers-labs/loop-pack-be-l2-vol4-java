@@ -32,6 +32,9 @@ class ProductServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private LikeCountSeeder likeCountSeeder;
+
     private Long brandId;
 
     @BeforeEach
@@ -42,9 +45,9 @@ class ProductServiceIntegrationTest {
         productRepository.save(new ProductModel(brand.getId(),"맨투맨", "심플", 30_000L));
         ProductModel mid = productRepository.save(new ProductModel(brand.getId(),"후드", "포근함", 50_000L));
         ProductModel expensive = productRepository.save(new ProductModel(brand.getId(),"패딩", "겨울", 70_000L));
-        // 좋아요 수: cheap=0, mid=5, expensive=2 — 원자 UPDATE로 시드
-        for (int i = 0; i < 5; i++) productService.incrementLikeCount(mid.getId());
-        for (int i = 0; i < 2; i++) productService.incrementLikeCount(expensive.getId());
+        // 좋아요 수: cheap=0, mid=5, expensive=2 — 컬럼 직접 시드(운영은 Redis 흡수→배치 반영)
+        likeCountSeeder.seed(mid.getId(), 5L);
+        likeCountSeeder.seed(expensive.getId(), 2L);
     }
 
     @AfterEach
