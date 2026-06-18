@@ -100,4 +100,58 @@ class ProductFacadeIntegrationTest {
         // Redis 에러가 삼켜지고 DB 조회가 발생했는지 검증
         verify(productRepository, atLeastOnce()).findById(productId);
     }
+
+    @Test
+    @DisplayName("상품 목록을 처음 조회하면 DB에서 조회하고 캐시에 저장한다. 두 번째 조회하면 DB 조회 없이 캐시에서 반환한다.")
+    void getProducts_ShouldCacheResult() {
+        // given
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        productRepository.save(new ProductModel(brand.getId(), "Air Max", new BigDecimal("1000.00")));
+        productRepository.save(new ProductModel(brand.getId(), "Cortez", new BigDecimal("800.00")));
+
+        Long brandId = brand.getId();
+        String sort = "latest";
+        org.springframework.data.domain.Pageable pageRequest = org.springframework.data.domain.PageRequest.of(0, 10);
+
+        // when - 1차 조회 (Cache Miss)
+        org.springframework.data.domain.Page<ProductInfo> firstResult = productFacade.getProducts(brandId, sort, pageRequest);
+
+        // then - 1차 검증
+        assertThat(firstResult.getContent()).hasSize(2);
+        verify(productRepository, times(1)).findAll(brandId, sort, pageRequest);
+
+        // when - 2차 조회 (Cache Hit)
+        org.springframework.data.domain.Page<ProductInfo> secondResult = productFacade.getProducts(brandId, sort, pageRequest);
+
+        // then - 2차 검증
+        assertThat(secondResult.getContent()).hasSize(2);
+        verify(productRepository, times(1)).findAll(brandId, sort, pageRequest);
+    }
+
+    @Test
+    @DisplayName("Redis 연결 오류가 발생하더라도 예외를 던지지 않고 DB 조회를 통해 상품 목록 정보를 반환한다.")
+    void getProducts_ShouldFallbackToDbOnRedisError() {
+        // given
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        productRepository.save(new ProductModel(brand.getId(), "Air Max", new BigDecimal("1000.00")));
+
+        Long brandId = brand.getId();
+        String sort = "latest";
+        org.springframework.data.domain.Pageable pageRequest = org.springframework.data.domain.PageRequest.of(0, 10);
+
+        // opsForValue() 호출 시 예외를 발생시키는 mock ValueOperations 설정
+        org.springframework.data.redis.core.ValueOperations<String, String> mockValueOps = mock(org.springframework.data.redis.core.ValueOperations.class);
+        doReturn(mockValueOps).when(defaultRedisTemplate).opsForValue();
+        doThrow(new org.springframework.data.redis.RedisConnectionFailureException("Redis Connection Refused"))
+                .when(mockValueOps).get(anyString());
+
+        // when
+        org.springframework.data.domain.Page<ProductInfo> result = productFacade.getProducts(brandId, sort, pageRequest);
+
+        // then
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).name()).isEqualTo("Air Max");
+        // Redis 에러가 삼켜지고 DB 조회가 발생했는지 검증
+        verify(productRepository, atLeastOnce()).findAll(brandId, sort, pageRequest);
+    }
 }

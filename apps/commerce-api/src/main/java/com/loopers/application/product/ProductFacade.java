@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.application.brand.BrandRepository;
@@ -60,6 +61,17 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public Page<ProductInfo> getProducts(Long brandId, String sort, Pageable pageable) {
+        String cacheKey = String.format("product:list::%s:%s:%d:%d", brandId, sort, pageable.getPageNumber(), pageable.getPageSize());
+        try {
+            String cachedJson = defaultRedisTemplate.opsForValue().get(cacheKey);
+            if (cachedJson != null) {
+                PageCache<ProductInfo> pageCache = objectMapper.readValue(cachedJson, new TypeReference<PageCache<ProductInfo>>() {});
+                return pageCache.toPage(pageable);
+            }
+        } catch (Exception e) {
+            log.error("Redis read error for key: {}, falling back to DB", cacheKey, e);
+        }
+
         Page<ProductModel> productPage = productRepository.findAll(brandId, sort, pageable);
 
         List<Long> brandIds = productPage.getContent().stream()
@@ -71,12 +83,22 @@ public class ProductFacade {
         Map<Long, String> brandNameMap = brands.stream()
                 .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
 
-        return productPage.map(product -> {
+        Page<ProductInfo> resultPage = productPage.map(product -> {
             String brandName = brandNameMap.getOrDefault(product.getBrandId(), "알수없음");
             int likeCount = product.getLikeCount();
                     
             return ProductInfo.from(product, brandName, likeCount);
         });
+
+        try {
+            PageCache<ProductInfo> pageCache = PageCache.from(resultPage);
+            String json = objectMapper.writeValueAsString(pageCache);
+            defaultRedisTemplate.opsForValue().set(cacheKey, json, 5, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("Redis write error for key: {}", cacheKey, e);
+        }
+
+        return resultPage;
     }
 
     @Transactional
@@ -130,4 +152,19 @@ public class ProductFacade {
     }
 
     public record StockRequest(Long productId, int quantity) {}
+
+    public record PageCache<T>(
+        List<T> content,
+        long totalElements,
+        int pageNumber,
+        int pageSize
+    ) {
+        public static <T> PageCache<T> from(Page<T> page) {
+            return new PageCache<>(page.getContent(), page.getTotalElements(), page.getNumber(), page.getSize());
+        }
+
+        public Page<T> toPage(Pageable pageable) {
+            return new org.springframework.data.domain.PageImpl<>(content, pageable, totalElements);
+        }
+    }
 }
