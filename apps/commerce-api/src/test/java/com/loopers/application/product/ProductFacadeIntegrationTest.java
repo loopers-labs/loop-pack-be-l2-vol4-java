@@ -36,13 +36,17 @@ class ProductFacadeIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    @Autowired
+    @SpyBean
     private RedisTemplate<String, String> defaultRedisTemplate;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-        defaultRedisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
+        try {
+            defaultRedisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
+        } catch (Exception ignored) {
+            // SpyBean Mocking 상태 등으로 인한 예외 무시
+        }
     }
 
     @Test
@@ -71,5 +75,29 @@ class ProductFacadeIntegrationTest {
         // 전체 호출 횟수가 1회 그대로여야 함 (2차 호출 시 DB 안 거침)
         verify(productRepository, times(1)).findById(productId);
         verify(brandRepository, times(1)).findById(brand.getId());
+    }
+
+    @Test
+    @DisplayName("Redis 연결 오류가 발생하더라도 예외를 던지지 않고 DB 조회를 통해 상품 상세 정보를 반환한다.")
+    void getProduct_ShouldFallbackToDbOnRedisError() {
+        // given
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        ProductModel product = productRepository.save(new ProductModel(brand.getId(), "Air Max", new BigDecimal("1000.00")));
+        Long productId = product.getId();
+
+        // opsForValue() 호출 시 예외를 발생시키는 mock ValueOperations 설정
+        org.springframework.data.redis.core.ValueOperations<String, String> mockValueOps = mock(org.springframework.data.redis.core.ValueOperations.class);
+        doReturn(mockValueOps).when(defaultRedisTemplate).opsForValue();
+        doThrow(new org.springframework.data.redis.RedisConnectionFailureException("Redis Connection Refused"))
+                .when(mockValueOps).get(anyString());
+
+        // when
+        ProductInfo result = productFacade.getProduct(productId);
+
+        // then
+        assertThat(result).isNotNull();
+        assertThat(result.name()).isEqualTo("Air Max");
+        // Redis 에러가 삼켜지고 DB 조회가 발생했는지 검증
+        verify(productRepository, atLeastOnce()).findById(productId);
     }
 }
