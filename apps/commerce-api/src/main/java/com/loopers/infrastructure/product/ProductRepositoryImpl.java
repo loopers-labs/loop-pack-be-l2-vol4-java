@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.loopers.domain.product.QProductModel.productModel;
-import static com.loopers.domain.like.QProductLikeModel.productLikeModel;
 
 @RequiredArgsConstructor
 @Component
@@ -46,34 +45,16 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Page<ProductModel> findAll(Long brandId, String sort, Pageable pageable) {
-        List<ProductModel> content;
-
-        if ("likes_desc".equalsIgnoreCase(sort)) {
-            content = queryFactory
-                    .select(productModel)
-                    .from(productModel)
-                    .leftJoin(productLikeModel).on(productLikeModel.productId.eq(productModel.id))
-                    .where(
-                            brandIdEq(brandId),
-                            productModel.isDeleted.isFalse()
-                    )
-                    .groupBy(productModel.id)
-                    .orderBy(getOrderSpecifiers(sort))
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize())
-                    .fetch();
-        } else {
-            content = queryFactory
-                    .selectFrom(productModel)
-                    .where(
-                            brandIdEq(brandId),
-                            productModel.isDeleted.isFalse()
-                    )
-                    .orderBy(getOrderSpecifiers(sort))
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize())
-                    .fetch();
-        }
+        List<ProductModel> content = queryFactory
+                .selectFrom(productModel)
+                .where(
+                        brandIdEq(brandId),
+                        productModel.isDeleted.isFalse()
+                )
+                .orderBy(getOrderSpecifiers(sort))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
 
         Long total = queryFactory
                 .select(productModel.count())
@@ -97,7 +78,7 @@ public class ProductRepositoryImpl implements ProductRepository {
         List<OrderSpecifier<?>> specifiers = new ArrayList<>();
 
         if ("likes_desc".equalsIgnoreCase(sort)) {
-            specifiers.add(productLikeModel.id.count().desc());
+            specifiers.add(productModel.likeCount.desc());
         }
 
         specifiers.add(productModel.createdAt.desc());

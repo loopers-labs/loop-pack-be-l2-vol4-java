@@ -97,6 +97,13 @@ class ProductRepositoryTest {
         ProductModel product3 = productRepository.save(new ProductModel(brand.getId(), "Air Max 3", new BigDecimal("3000.0000")));
 
         // 좋아요 설정 (product2: 2개, product3: 1개, product1: 0개)
+        product2.increaseLikeCount();
+        product2.increaseLikeCount();
+        productRepository.save(product2);
+
+        product3.increaseLikeCount();
+        productRepository.save(product3);
+
         likeRepository.save(new ProductLikeModel(1L, product2.getId()));
         likeRepository.save(new ProductLikeModel(2L, product2.getId()));
         likeRepository.save(new ProductLikeModel(1L, product3.getId()));
