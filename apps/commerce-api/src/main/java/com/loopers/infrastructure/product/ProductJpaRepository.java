@@ -49,13 +49,12 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             p.likeCount
         )
         FROM ProductModel p
-        JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
+        JOIN BrandModel b ON b.id = p.brandId
         WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
         """,
         countQuery = """
             SELECT COUNT(p.id)
             FROM ProductModel p
-            JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
             WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
             """)
     Page<ProductSummary> findActiveSummaries(Long brandId, Pageable pageable);
@@ -71,14 +70,13 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             p.likeCount
         )
         FROM ProductModel p
-        JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
+        JOIN BrandModel b ON b.id = p.brandId
         WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
         ORDER BY p.likeCount DESC, p.id DESC
         """,
         countQuery = """
             SELECT COUNT(p.id)
             FROM ProductModel p
-            JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
             WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
             """)
     Page<ProductSummary> findActiveSummariesOrderByLikeCount(Long brandId, Pageable pageable);
@@ -95,7 +93,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             p.likeCount
         )
         FROM ProductModel p
-        JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
+        JOIN BrandModel b ON b.id = p.brandId
         WHERE p.id = :productId AND p.deletedAt IS NULL
         """)
     Optional<ProductDetail> findActiveDetailById(Long productId);
@@ -113,14 +111,13 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             p.updatedAt
         )
         FROM ProductModel p
-        JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
+        JOIN BrandModel b ON b.id = p.brandId
         WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
         ORDER BY p.createdAt DESC
         """,
         countQuery = """
             SELECT COUNT(p.id)
             FROM ProductModel p
-            JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
             WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)
             """)
     Page<ProductAdminView> findActiveAdminViews(Long brandId, Pageable pageable);
@@ -138,7 +135,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
             p.updatedAt
         )
         FROM ProductModel p
-        JOIN BrandModel b ON b.id = p.brandId AND b.deletedAt IS NULL
+        JOIN BrandModel b ON b.id = p.brandId
         WHERE p.id = :productId AND p.deletedAt IS NULL
         """)
     Optional<ProductAdminView> findActiveAdminViewById(Long productId);
