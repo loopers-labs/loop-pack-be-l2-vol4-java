@@ -1,4 +1,6 @@
-package com.loopers.domain.coupon;
+﻿package com.loopers.domain.coupon;
+
+import com.loopers.application.coupon.CouponRepository;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -19,7 +21,7 @@ public class CouponAdminService {
 
     public CouponTemplate getTemplate(Long id) {
         return couponRepository.findTemplateById(id)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "鈺곕똻???? ??낅뮉 ?묒쥚猷???쀫탣?깆슦???덈뼄."));
     }
 
     public Page<CouponTemplate> getTemplates(Pageable pageable) {
@@ -40,12 +42,12 @@ public class CouponAdminService {
     }
 
     public void deleteTemplate(Long id) {
-        getTemplate(id); // 존재 확인용
+        getTemplate(id); // 鈺곕똻???類ㅼ뵥??
         couponRepository.deleteTemplate(id);
     }
 
     public Page<CouponIssue> getIssues(Long templateId, Pageable pageable) {
-        getTemplate(templateId); // 존재 확인용
+        getTemplate(templateId); // 鈺곕똻???類ㅼ뵥??
         return couponRepository.findAllIssuesByTemplateId(templateId, pageable);
     }
 }

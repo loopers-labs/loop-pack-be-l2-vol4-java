@@ -23,7 +23,7 @@ class BrandServiceTest {
     private BrandRepository brandRepository;
 
     @Test
-    @DisplayName("브랜드 ID로 조회하면 해당 브랜드 정보가 반환된다.")
+    @DisplayName("釉뚮옖??ID濡?議고쉶?섎㈃ ?대떦 釉뚮옖???뺣낫媛 諛섑솚?쒕떎.")
     void getBrand_ShouldReturnBrand() {
         // given
         Long brandId = 1L;

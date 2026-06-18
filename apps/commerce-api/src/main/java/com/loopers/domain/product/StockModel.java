@@ -37,7 +37,7 @@ public class StockModel {
 
     public void decrease(int amount) {
         if (this.quantity < amount) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "?ш퀬媛 遺議깊빀?덈떎.");
         }
         this.quantity -= amount;
     }

@@ -1,4 +1,6 @@
-package com.loopers.domain.order;
+﻿package com.loopers.domain.order;
+
+import com.loopers.application.order.OrderRepository;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;

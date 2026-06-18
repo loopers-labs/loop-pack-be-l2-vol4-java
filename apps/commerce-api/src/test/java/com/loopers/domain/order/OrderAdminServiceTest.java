@@ -25,7 +25,7 @@ class OrderAdminServiceTest {
     private OrderRepository orderRepository;
 
     @Test
-    @DisplayName("전체 주문 목록을 조회하면 시스템의 모든 주문이 반환된다.")
+    @DisplayName("?꾩껜 二쇰Ц 紐⑸줉??議고쉶?섎㈃ ?쒖뒪?쒖쓽 紐⑤뱺 二쇰Ц??諛섑솚?쒕떎.")
     void getAllOrders_ShouldReturnAllOrders() {
         // given
         OrderModel order1 = new OrderModel(1L);
@@ -41,7 +41,7 @@ class OrderAdminServiceTest {
     }
 
     @Test
-    @DisplayName("주문 ID로 주문 상세 정보를 조회하면 해당 주문 정보가 반환된다.")
+    @DisplayName("二쇰Ц ID濡?二쇰Ц ?곸꽭 ?뺣낫瑜?議고쉶?섎㈃ ?대떦 二쇰Ц ?뺣낫媛 諛섑솚?쒕떎.")
     void getOrder_ShouldReturnOrderDetail() {
         // given
         Long orderId = 100L;

@@ -25,7 +25,7 @@ class OrderAdminFacadeTest {
     private OrderAdminService orderAdminService;
 
     @Test
-    @DisplayName("전체 주문 목록 조회 요청 시 어드민 서비스의 조회 로직이 호출된다.")
+    @DisplayName("?꾩껜 二쇰Ц 紐⑸줉 議고쉶 ?붿껌 ???대뱶誘??쒕퉬?ㅼ쓽 議고쉶 濡쒖쭅???몄텧?쒕떎.")
     void getAllOrders_ShouldCallService() {
         // given
         given(orderAdminService.getAllOrders()).willReturn(List.of(new OrderModel(1L)));
@@ -39,7 +39,7 @@ class OrderAdminFacadeTest {
     }
 
     @Test
-    @DisplayName("단건 주문 상세 조회 요청 시 어드민 서비스의 조회 로직이 호출된다.")
+    @DisplayName("?④굔 二쇰Ц ?곸꽭 議고쉶 ?붿껌 ???대뱶誘??쒕퉬?ㅼ쓽 議고쉶 濡쒖쭅???몄텧?쒕떎.")
     void getOrder_ShouldCallService() {
         // given
         Long orderId = 100L;

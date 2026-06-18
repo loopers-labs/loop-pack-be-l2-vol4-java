@@ -1,4 +1,6 @@
-package com.loopers.domain.payment;
+﻿package com.loopers.domain.payment;
+
+import com.loopers.application.payment.PaymentRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

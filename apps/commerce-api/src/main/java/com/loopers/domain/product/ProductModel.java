@@ -18,7 +18,12 @@ import java.math.BigDecimal;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE product SET is_deleted = true WHERE id = ?")
 @SQLRestriction("is_deleted = false")
-@Table(name = "product")
+@Table(
+        name = "product",
+        indexes = {
+                @Index(name = "idx_brand_id", columnList = "brand_id")
+        }
+)
 public class ProductModel extends BaseSoftDeleteEntity {
 
     @Id
@@ -34,9 +39,6 @@ public class ProductModel extends BaseSoftDeleteEntity {
     @Column(nullable = false, precision = 15, scale = 4)
     private BigDecimal price;
 
-    @Column(nullable = false)
-    private int likeCount = 0;
-
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL)
     private StockModel stock;
 
@@ -49,7 +51,6 @@ public class ProductModel extends BaseSoftDeleteEntity {
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.likeCount = 0;
     }
 
     public void update(String name, BigDecimal price) {
@@ -60,35 +61,25 @@ public class ProductModel extends BaseSoftDeleteEntity {
         this.price = price;
     }
 
-    public void increaseLikeCount() {
-        this.likeCount++;
-    }
-
-    public void decreaseLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount--;
-        }
-    }
-
     public void assignStock(int quantity) {
         this.stock = new StockModel(this, quantity);
     }
 
     private void validateBrandId(Long brandId) {
         if (brandId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "釉뚮옖??ID???꾩닔?낅땲??");
         }
     }
 
     private void validateName(String name) {
         if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "?곹뭹紐낆? 鍮꾩뼱?덉쓣 ???놁뒿?덈떎.");
         }
     }
 
     private void validatePrice(BigDecimal price) {
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "媛寃⑹? 0 ?댁긽?댁뼱???⑸땲??");
         }
     }
 }

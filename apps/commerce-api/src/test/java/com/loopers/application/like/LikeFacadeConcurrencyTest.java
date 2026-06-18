@@ -1,10 +1,10 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.like.LikeRepository;
+import com.loopers.application.brand.BrandRepository;
+import com.loopers.application.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
+import com.loopers.application.product.ProductRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +43,7 @@ class LikeFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동일 사용자가 동시에 좋아요를 누르면 1건만 저장된다.")
+    @DisplayName("?숈씪 ?ъ슜?먭? ?숈떆??醫뗭븘?붾? ?꾨Ⅴ硫?1嫄대쭔 ??λ맂??")
     void addLike_SameUserConcurrent_ShouldSaveOnce() throws InterruptedException, ExecutionException {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("Nike"));
@@ -64,7 +64,7 @@ class LikeFacadeConcurrencyTest {
             for (int i = 0; i < threadCount; i++) {
                 futures.add(executorService.submit(() -> {
                     try {
-                        barrier.await(); // 10개의 스레드가 모두 준비될 때까지 대기 후 일제히 출발
+                        barrier.await(); // 10媛쒖쓽 ?ㅻ젅?쒓? 紐⑤몢 以鍮꾨맆 ?뚭퉴吏 ?湲????쇱젣??異쒕컻
                         likeFacade.addLike(userId, productId);
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -74,9 +74,9 @@ class LikeFacadeConcurrencyTest {
                 }));
             }
 
-            doneLatch.await(); // 모든 스레드의 작업이 끝날 때까지 대기
+            doneLatch.await(); // 紐⑤뱺 ?ㅻ젅?쒖쓽 ?묒뾽???앸궇 ?뚭퉴吏 ?湲?
 
-            // then(스레드 예외 전파 보장)
+            // then(?ㅻ젅???덉쇅 ?꾪뙆 蹂댁옣)
             for (Future<?> f : futures) {
                 f.get();
             }
@@ -88,7 +88,7 @@ class LikeFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("10명의 사용자가 동시에 좋아요를 누르면 락 없이 10개의 이력이 정확히 추가된다.")
+    @DisplayName("10紐낆쓽 ?ъ슜?먭? ?숈떆??醫뗭븘?붾? ?꾨Ⅴ硫????놁씠 10媛쒖쓽 ?대젰???뺥솗??異붽??쒕떎.")
     void addLike_Concurrent10Requests_ShouldSaveAll() throws InterruptedException {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("Nike"));
@@ -126,14 +126,14 @@ class LikeFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("좋아요를 누른 10명의 사용자가 동시에 취소를 요청하면 락 없이 0개로 안전하게 지워진다.")
+    @DisplayName("醫뗭븘?붾? ?꾨Ⅸ 10紐낆쓽 ?ъ슜?먭? ?숈떆??痍⑥냼瑜??붿껌?섎㈃ ???놁씠 0媛쒕줈 ?덉쟾?섍쾶 吏?뚯쭊??")
     void removeLike_Concurrent10Requests_ShouldRemoveAll() throws InterruptedException {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("Nike"));
         ProductModel product = productRepository.save(new ProductModel(brand.getId(), "Air Jordan", new BigDecimal("200000")));
         Long productId = product.getId();
 
-        // 10명 미리 좋아요 처리
+        // 10紐?誘몃━ 醫뗭븘??泥섎━
         for (int i = 0; i < 10; i++) {
             likeFacade.addLike((long) (i + 1), productId);
         }

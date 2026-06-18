@@ -25,11 +25,11 @@ class UserFacadeTest {
     private UserService userService;
 
     @Test
-    @DisplayName("회원가입 요청 시 Service의 signUp을 호출한다.")
+    @DisplayName("?뚯썝媛???붿껌 ??Service??signUp???몄텧?쒕떎.")
     void signUp_ShouldCallService() {
         // when
         userFacade.signUp(
-                "tester01", "Password123!", "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com"
+                "tester01", "Password123!", "?뚯뒪??, LocalDate.of(1990, 1, 1), "tester01@example.com"
         );
 
         // then
@@ -37,14 +37,14 @@ class UserFacadeTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회 시 회원 정보를 반환한다.")
+    @DisplayName("???뺣낫 議고쉶 ???뚯썝 ?뺣낫瑜?諛섑솚?쒕떎.")
     void getMyInfo_ShouldReturnUserInfo() {
         // given
         String loginId = "tester01";
         String password = "Password123!";
         UserInfo userInfo = new UserInfo(
                 "tester01",
-                "홍길동",
+                "?띻만??,
                 LocalDate.of(1990, 1, 1),
                 "tester01@example.com"
         );
@@ -55,13 +55,13 @@ class UserFacadeTest {
 
         // then
         assertThat(response.loginId()).isEqualTo("tester01");
-        assertThat(response.name()).isEqualTo("홍길동");
+        assertThat(response.name()).isEqualTo("?띻만??);
         assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
         assertThat(response.email()).isEqualTo("tester01@example.com");
     }
 
     @Test
-    @DisplayName("비밀번호 수정 요청 시 Service의 updatePassword를 호출한다.")
+    @DisplayName("鍮꾨?踰덊샇 ?섏젙 ?붿껌 ??Service??updatePassword瑜??몄텧?쒕떎.")
     void updatePassword_ShouldCallService() {
         // given
         String loginId = "tester01";

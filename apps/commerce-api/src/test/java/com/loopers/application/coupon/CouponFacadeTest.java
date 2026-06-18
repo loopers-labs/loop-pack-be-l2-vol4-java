@@ -1,7 +1,7 @@
 package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.CouponIssue;
-import com.loopers.domain.coupon.CouponRepository;
+import com.loopers.application.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.support.error.CoreException;
@@ -37,7 +37,7 @@ class CouponFacadeTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 템플릿 ID로 쿠폰 발급을 시도하면 NOT_FOUND 예외가 발생한다.")
+    @DisplayName("議댁옱?섏? ?딅뒗 ?쒗뵆由?ID濡?荑좏룿 諛쒓툒???쒕룄?섎㈃ NOT_FOUND ?덉쇅媛 諛쒖깮?쒕떎.")
     void issueCoupon_TemplateNotFound_ShouldThrowException() {
         // given
         Long userId = 1L;
@@ -51,15 +51,15 @@ class CouponFacadeTest {
     }
 
     @Test
-    @DisplayName("이미 쿠폰을 발급받은 사용자가 다시 동일한 쿠폰을 발급받으려고 하면 CONFLICT 예외가 발생한다.")
+    @DisplayName("?대? 荑좏룿??諛쒓툒諛쏆? ?ъ슜?먭? ?ㅼ떆 ?숈씪??荑좏룿??諛쒓툒諛쏆쑝?ㅺ퀬 ?섎㈃ CONFLICT ?덉쇅媛 諛쒖깮?쒕떎.")
     void issueCoupon_AlreadyIssued_ShouldThrowException() {
         // given
         Long userId = 1L;
         CouponTemplate template = couponRepository.saveTemplate(
-            new CouponTemplate("10% 할인 쿠폰", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
+            new CouponTemplate("10% ?좎씤 荑좏룿", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
         );
 
-        // 첫 번째 발급은 성공해야 함
+        // 泥?踰덉㎏ 諛쒓툒? ?깃났?댁빞 ??
         couponFacade.issueCoupon(userId, template.getId());
 
         // when & then
@@ -70,12 +70,12 @@ class CouponFacadeTest {
     }
 
     @Test
-    @DisplayName("정상적인 발급 요청 시 쿠폰 발급이 성공하고 저장된다.")
+    @DisplayName("?뺤긽?곸씤 諛쒓툒 ?붿껌 ??荑좏룿 諛쒓툒???깃났?섍퀬 ??λ맂??")
     void issueCoupon_Success() {
         // given
         Long userId = 1L;
         CouponTemplate template = couponRepository.saveTemplate(
-            new CouponTemplate("5000원 할인 쿠폰", CouponType.FIXED, new BigDecimal("5000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
+            new CouponTemplate("5000???좎씤 荑좏룿", CouponType.FIXED, new BigDecimal("5000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
         );
 
         // when
@@ -86,7 +86,7 @@ class CouponFacadeTest {
         assertThat(issue.getUserId()).isEqualTo(userId);
         assertThat(issue.getCouponTemplateId()).isEqualTo(template.getId());
 
-        // DB에 실제로 저장되었는지 검증
+        // DB???ㅼ젣濡???λ릺?덈뒗吏 寃利?
         CouponIssue saved = couponRepository.findIssueById(issue.getId()).orElseThrow();
         assertThat(saved.getUserId()).isEqualTo(userId);
         assertThat(saved.getCouponTemplateId()).isEqualTo(template.getId());

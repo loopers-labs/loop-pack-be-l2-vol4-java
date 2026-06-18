@@ -33,12 +33,12 @@ class UserServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("회원가입이 정상적으로 수행되고 저장된다.")
+    @DisplayName("?뚯썝媛?낆씠 ?뺤긽?곸쑝濡??섑뻾?섍퀬 ??λ맂??")
     void signUp_ShouldSaveUser() {
         // given
         String loginId = "tester01";
         String password = "Password123!";
-        String name = "테스터";
+        String name = "?뚯뒪??;
         LocalDate birthDate = LocalDate.of(1990, 1, 1);
         String email = "tester01@example.com";
 
@@ -49,31 +49,31 @@ class UserServiceIntegrationTest {
         UserModel saved = userRepository.findByLoginId(loginId).orElseThrow();
         assertThat(saved.getLoginId()).isEqualTo(loginId);
         assertThat(saved.getName()).isEqualTo(name);
-        assertThat(saved.getPassword()).isNotEqualTo(password); // 암호화 확인
+        assertThat(saved.getPassword()).isNotEqualTo(password); // ?뷀샇???뺤씤
         assertThat(saved.getRole()).isEqualTo(UserRole.USER);
     }
 
     @Test
-    @DisplayName("중복된 loginId로 가입 시 예외가 발생한다.")
+    @DisplayName("以묐났??loginId濡?媛?????덉쇅媛 諛쒖깮?쒕떎.")
     void signUp_DuplicateLoginId_ShouldThrowException() {
         // given
         String loginId = "tester01";
-        userService.signUp(loginId, "Password123!", "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com");
+        userService.signUp(loginId, "Password123!", "?뚯뒪??, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when & then
         CoreException exception = assertThrows(CoreException.class, () -> 
-                userService.signUp(loginId, "AnotherPw123!", "다른이름", LocalDate.of(1990, 1, 1), "other@example.com")
+                userService.signUp(loginId, "AnotherPw123!", "?ㅻⅨ?대쫫", LocalDate.of(1990, 1, 1), "other@example.com")
         );
         assertThat(exception.getErrorType()).isEqualTo(ErrorType.DUPLICATE_LOGIN_ID);
     }
 
     @Test
-    @DisplayName("아이디와 비밀번호가 일치하면 마스킹된 이름이 포함된 회원 정보를 조회할 수 있다.")
+    @DisplayName("?꾩씠?붿? 鍮꾨?踰덊샇媛 ?쇱튂?섎㈃ 留덉뒪?밸맂 ?대쫫???ы븿???뚯썝 ?뺣낫瑜?議고쉶?????덈떎.")
     void getUser_CorrectCredentials_ShouldReturnMaskedUserInfo() {
         // given
         String loginId = "tester01";
         String password = "Password123!";
-        String name = "홍길동";
+        String name = "?띻만??;
         userService.signUp(loginId, password, name, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when
@@ -81,33 +81,33 @@ class UserServiceIntegrationTest {
 
         // then
         assertThat(result.loginId()).isEqualTo(loginId);
-        assertThat(result.name()).isEqualTo("홍길*"); // 마스킹 확인
+        assertThat(result.name()).isEqualTo("?띻만*"); // 留덉뒪???뺤씤
     }
 
     @Test
-    @DisplayName("이름이 2글자인 경우 끝자리만 마스킹된다.")
+    @DisplayName("?대쫫??2湲?먯씤 寃쎌슦 ?앹옄由щ쭔 留덉뒪?밸맂??")
     void getUser_TwoCharsName_ShouldMaskLast() {
         // given
         String loginId = "tester01";
         String password = "Password123!";
-        String name = "홍길";
+        String name = "?띻만";
         userService.signUp(loginId, password, name, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when
         UserInfo result = userService.getUser(loginId, password);
 
         // then
-        assertThat(result.name()).isEqualTo("홍*");
+        assertThat(result.name()).isEqualTo("??");
     }
 
     @Test
-    @DisplayName("비밀번호 수정 시 정상적으로 수정된다.")
+    @DisplayName("鍮꾨?踰덊샇 ?섏젙 ???뺤긽?곸쑝濡??섏젙?쒕떎.")
     void updatePassword_ShouldUpdate() {
         // given
         String loginId = "tester01";
         String oldPassword = "OldPassword123!";
         String newPassword = "NewPassword123!";
-        userService.signUp(loginId, oldPassword, "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com");
+        userService.signUp(loginId, oldPassword, "?뚯뒪??, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when
         userService.updatePassword(loginId, oldPassword, oldPassword, newPassword);
@@ -118,12 +118,12 @@ class UserServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("비밀번호 수정 시 기존 비밀번호와 신규 비밀번호가 같으면 예외가 발생한다.")
+    @DisplayName("鍮꾨?踰덊샇 ?섏젙 ??湲곗〈 鍮꾨?踰덊샇? ?좉퇋 鍮꾨?踰덊샇媛 媛숈쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void updatePassword_SamePassword_ShouldThrowException() {
         // given
         String loginId = "tester01";
         String password = "OldPassword123!";
-        userService.signUp(loginId, password, "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com");
+        userService.signUp(loginId, password, "?뚯뒪??, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when & then
         CoreException exception = assertThrows(CoreException.class, () -> 
@@ -133,11 +133,11 @@ class UserServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("회원 조회 시 비밀번호가 일치하지 않으면 예외가 발생한다.")
+    @DisplayName("?뚯썝 議고쉶 ??鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void getUser_WrongPassword_ShouldThrowException() {
         // given
         String loginId = "tester01";
-        userService.signUp(loginId, "Password123!", "홍길동", LocalDate.of(1990, 1, 1), "tester01@example.com");
+        userService.signUp(loginId, "Password123!", "?띻만??, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when & then
         CoreException exception = assertThrows(CoreException.class, () -> 
@@ -147,7 +147,7 @@ class UserServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 회원 조회 시 예외가 발생한다.")
+    @DisplayName("議댁옱?섏? ?딅뒗 ?뚯썝 議고쉶 ???덉쇅媛 諛쒖깮?쒕떎.")
     void getUser_UserNotFound_ShouldThrowException() {
         // when & then
         CoreException exception = assertThrows(CoreException.class, () -> 
@@ -157,12 +157,12 @@ class UserServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("비밀번호 수정 시 현재 비밀번호가 일치하지 않으면 예외가 발생한다.")
+    @DisplayName("鍮꾨?踰덊샇 ?섏젙 ???꾩옱 鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void updatePassword_CurrentPasswordMismatch_ShouldThrowException() {
         // given
         String loginId = "tester01";
         String password = "OldPassword123!";
-        userService.signUp(loginId, password, "테스터", LocalDate.of(1990, 1, 1), "tester01@example.com");
+        userService.signUp(loginId, password, "?뚯뒪??, LocalDate.of(1990, 1, 1), "tester01@example.com");
 
         // when & then
         CoreException exception = assertThrows(CoreException.class, () -> 

@@ -15,40 +15,40 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UserModelTest {
 
     @Test
-    @DisplayName("로그인 ID가 null이면 예외가 발생한다.")
+    @DisplayName("濡쒓렇??ID媛 null?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validateLoginId_NullId_ShouldThrowException() {
         assertThrows(CoreException.class, () -> UserModel.validateLoginId(null));
     }
 
     @Test
-    @DisplayName("로그인 ID가 5자 미만이면 예외가 발생한다.")
+    @DisplayName("濡쒓렇??ID媛 5??誘몃쭔?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validateLoginId_ShortId_ShouldThrowException() {
         assertThrows(CoreException.class, () -> UserModel.validateLoginId("id"));
     }
 
     @Test
-    @DisplayName("로그인 ID가 20자를 초과하면 예외가 발생한다.")
+    @DisplayName("濡쒓렇??ID媛 20?먮? 珥덇낵?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validateLoginId_LongId_ShouldThrowException() {
         assertThrows(CoreException.class, () -> UserModel.validateLoginId("a".repeat(21)));
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"tester!!", "한글아이디", "test space"})
-    @DisplayName("로그인 ID 형식이 올바르지 않으면 예외가 발생한다.")
+    @ValueSource(strings = {"tester!!", "?쒓??꾩씠??, "test space"})
+    @DisplayName("濡쒓렇??ID ?뺤떇???щ컮瑜댁? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void validateLoginId_InvalidFormat_ShouldThrowException(String invalidId) {
         CoreException exception = assertThrows(CoreException.class, () -> UserModel.validateLoginId(invalidId));
         assertThat(exception.getErrorType()).isEqualTo(ErrorType.INVALID_LOGIN_ID);
     }
 
     @Test
-    @DisplayName("비밀번호가 null이면 예외가 발생한다.")
+    @DisplayName("鍮꾨?踰덊샇媛 null?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validatePassword_NullPassword_ShouldThrowException() {
         assertThrows(CoreException.class, () -> 
                 UserModel.validatePassword(null, LocalDate.of(1990, 1, 1)));
     }
 
     @Test
-    @DisplayName("비밀번호가 8자 미만이면 예외가 발생한다.")
+    @DisplayName("鍮꾨?踰덊샇媛 8??誘몃쭔?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validatePassword_ShortPassword_ShouldThrowException() {
         CoreException exception = assertThrows(CoreException.class, () -> 
                 UserModel.validatePassword("Pass1!", LocalDate.of(1990, 1, 1)));
@@ -56,7 +56,7 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("비밀번호에 생년월일이 포함되면 예외가 발생한다.")
+    @DisplayName("鍮꾨?踰덊샇???앸뀈?붿씪???ы븿?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void validatePassword_ContainsBirthDate_ShouldThrowException() {
         LocalDate birthDate = LocalDate.of(1990, 1, 1);
         CoreException exception = assertThrows(CoreException.class, () -> 
@@ -65,20 +65,20 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("이름이 2자 미만이면 예외가 발생한다.")
+    @DisplayName("?대쫫??2??誘몃쭔?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_ShortName_ShouldThrowException() {
         assertThrows(CoreException.class, () -> 
                 UserModel.builder()
                         .loginId("tester01")
                         .password("Password123!")
-                        .name("홍")
+                        .name("??)
                         .birthDate(LocalDate.of(1990, 1, 1))
                         .email("tester@example.com")
                         .build());
     }
 
     @Test
-    @DisplayName("이름이 20자를 초과하면 예외가 발생한다.")
+    @DisplayName("?대쫫??20?먮? 珥덇낵?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_LongName_ShouldThrowException() {
         assertThrows(CoreException.class, () -> 
                 UserModel.builder()
@@ -91,13 +91,13 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("이름 형식이 올바르지 않으면 예외가 발생한다.")
+    @DisplayName("?대쫫 ?뺤떇???щ컮瑜댁? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_InvalidName_ShouldThrowException() {
         CoreException exception = assertThrows(CoreException.class, () -> 
                 UserModel.builder()
                         .loginId("tester01")
                         .password("Password123!")
-                        .name("홍길동1")
+                        .name("?띻만??")
                         .birthDate(LocalDate.of(1990, 1, 1))
                         .email("tester@example.com")
                         .build());
@@ -105,13 +105,13 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("이메일 형식이 올바르지 않으면 예외가 발생한다.")
+    @DisplayName("?대찓???뺤떇???щ컮瑜댁? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_InvalidEmail_ShouldThrowException() {
         CoreException exception = assertThrows(CoreException.class, () -> 
                 UserModel.builder()
                         .loginId("tester01")
                         .password("Password123!")
-                        .name("홍길동")
+                        .name("?띻만??)
                         .birthDate(LocalDate.of(1990, 1, 1))
                         .email("invalid-email")
                         .build());
@@ -119,26 +119,26 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("생년월일이 null이면 예외가 발생한다.")
+    @DisplayName("?앸뀈?붿씪??null?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_NullBirthDate_ShouldThrowException() {
         assertThrows(CoreException.class, () -> 
                 UserModel.builder()
                         .loginId("tester01")
                         .password("Password123!")
-                        .name("홍길동")
+                        .name("?띻만??)
                         .birthDate(null)
                         .email("tester@example.com")
                         .build());
     }
 
     @Test
-    @DisplayName("생년월일이 미래 날짜이면 예외가 발생한다.")
+    @DisplayName("?앸뀈?붿씪??誘몃옒 ?좎쭨?대㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void constructor_FutureBirthDate_ShouldThrowException() {
         CoreException exception = assertThrows(CoreException.class, () -> 
                 UserModel.builder()
                         .loginId("tester01")
                         .password("Password123!")
-                        .name("홍길동")
+                        .name("?띻만??)
                         .birthDate(LocalDate.now().plusDays(1))
                         .email("tester@example.com")
                         .build());
@@ -147,7 +147,7 @@ class UserModelTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"password123!", "PASSWORD123!", "Password!", "Password123"})
-    @DisplayName("비밀번호 형식이 올바르지 않으면 예외가 발생한다 (대소문자/숫자/특수문자 조합).")
+    @DisplayName("鍮꾨?踰덊샇 ?뺤떇???щ컮瑜댁? ?딆쑝硫??덉쇅媛 諛쒖깮?쒕떎 (??뚮Ц???レ옄/?뱀닔臾몄옄 議고빀).")
     void validatePassword_InvalidFormat_ShouldThrowException(String invalidPassword) {
         CoreException exception = assertThrows(CoreException.class, () -> 
                 UserModel.validatePassword(invalidPassword, LocalDate.of(1990, 1, 1)));
@@ -155,8 +155,8 @@ class UserModelTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"홍길동", "HongGildong"})
-    @DisplayName("올바른 이름 형식은 통과한다.")
+    @ValueSource(strings = {"?띻만??, "HongGildong"})
+    @DisplayName("?щ컮瑜??대쫫 ?뺤떇? ?듦낵?쒕떎.")
     void constructor_ValidName_ShouldPass(String validName) {
         UserModel user = UserModel.builder()
                 .loginId("tester01")
@@ -170,12 +170,12 @@ class UserModelTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"tester@example.com", "test.user@company.co.kr"})
-    @DisplayName("올바른 이메일 형식은 통과한다.")
+    @DisplayName("?щ컮瑜??대찓???뺤떇? ?듦낵?쒕떎.")
     void constructor_ValidEmail_ShouldPass(String validEmail) {
         UserModel user = UserModel.builder()
                 .loginId("tester01")
                 .password("Password123!")
-                .name("홍길동")
+                .name("?띻만??)
                 .birthDate(LocalDate.of(1990, 1, 1))
                 .email(validEmail)
                 .build();
@@ -183,12 +183,12 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("기본 역할은 USER이다.")
+    @DisplayName("湲곕낯 ??븷? USER?대떎.")
     void constructor_DefaultRole_ShouldBeUser() {
         UserModel user = UserModel.builder()
                 .loginId("tester01")
                 .password("Password123!")
-                .name("테스터")
+                .name("?뚯뒪??)
                 .birthDate(LocalDate.of(1990, 1, 1))
                 .email("tester@example.com")
                 .build();

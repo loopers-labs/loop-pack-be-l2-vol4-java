@@ -1,7 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
+import com.loopers.application.brand.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +33,7 @@ class ProductAdminServiceTest {
     private BrandRepository brandRepository;
 
     @Test
-    @DisplayName("상품 정보를 입력하면 상품과 재고가 정상적으로 등록된다.")
+    @DisplayName("?곹뭹 ?뺣낫瑜??낅젰?섎㈃ ?곹뭹怨??ш퀬媛 ?뺤긽?곸쑝濡??깅줉?쒕떎.")
     void registerProduct_ShouldSaveProductAndStock() {
         // given
         Long brandId = 1L;
@@ -55,7 +55,7 @@ class ProductAdminServiceTest {
     }
 
     @Test
-    @DisplayName("존재하는 상품의 정보를 수정하면 업데이트된다.")
+    @DisplayName("議댁옱?섎뒗 ?곹뭹???뺣낫瑜??섏젙?섎㈃ ?낅뜲?댄듃?쒕떎.")
     void updateProduct_ShouldUpdateInfo() {
         // given
         Long productId = 1L;
@@ -75,7 +75,7 @@ class ProductAdminServiceTest {
     }
 
     @Test
-    @DisplayName("상품을 삭제하면 논리 삭제(isDeleted=true) 처리된다.")
+    @DisplayName("?곹뭹????젣?섎㈃ ?쇰━ ??젣(isDeleted=true) 泥섎━?쒕떎.")
     void deleteProduct_ShouldMarkAsDeleted() {
         // given
         Long productId = 1L;
@@ -92,7 +92,7 @@ class ProductAdminServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 브랜드 ID로 상품을 등록하려 하면 예외가 발생한다.")
+    @DisplayName("議댁옱?섏? ?딅뒗 釉뚮옖??ID濡??곹뭹???깅줉?섎젮 ?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void registerProduct_NonExistentBrand_ShouldThrowException() {
         // given
         Long brandId = 999L;

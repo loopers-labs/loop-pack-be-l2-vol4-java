@@ -24,7 +24,7 @@ class LikeServiceTest {
     private LikeRepository likeRepository;
 
     @Test
-    @DisplayName("좋아요 이력 추가를 요청하면 리포지토리에 저장된다.")
+    @DisplayName("醫뗭븘???대젰 異붽?瑜??붿껌?섎㈃ 由ы룷吏?좊━????λ맂??")
     void addLikeRecord_ShouldSave() {
         // given
         Long userId = 1L;
@@ -37,7 +37,7 @@ class LikeServiceTest {
         verify(likeRepository).save(any(ProductLikeModel.class));
     }
     @Test
-    @DisplayName("유니크 제약조건(uk_product_likes_user_product) 예외 발생 시 무시하고 정상 종료된다.")
+    @DisplayName("?좊땲???쒖빟議곌굔(uk_product_likes_user_product) ?덉쇅 諛쒖깮 ??臾댁떆?섍퀬 ?뺤긽 醫낅즺?쒕떎.")
     void addLikeRecord_WhenUniqueConstraintViolation_ShouldIgnore() {
         // given
         Long userId = 1L;
@@ -55,7 +55,7 @@ class LikeServiceTest {
     }
 
     @Test
-    @DisplayName("유니크 제약조건 외의 무결성 예외 발생 시 CoreException으로 전파된다.")
+    @DisplayName("?좊땲???쒖빟議곌굔 ?몄쓽 臾닿껐???덉쇅 諛쒖깮 ??CoreException?쇰줈 ?꾪뙆?쒕떎.")
     void addLikeRecord_WhenOtherIntegrityViolation_ShouldThrowCoreException() {
         // given
         Long userId = 1L;
@@ -69,14 +69,14 @@ class LikeServiceTest {
             likeService.addLikeRecord(userId, productId);
         })
         .isInstanceOf(com.loopers.support.error.CoreException.class)
-        .hasMessageContaining("좋아요 등록 중 무결성 예외가 발생했습니다.")
+        .hasMessageContaining("醫뗭븘???깅줉 以?臾닿껐???덉쇅媛 諛쒖깮?덉뒿?덈떎.")
         .hasCause(exception);
         
         verify(likeRepository).save(any(ProductLikeModel.class));
     }
 
     @Test
-    @DisplayName("좋아요 이력 삭제를 요청하면 리포지토리의 삭제 메서드가 호출된다.")
+    @DisplayName("醫뗭븘???대젰 ??젣瑜??붿껌?섎㈃ 由ы룷吏?좊━????젣 硫붿꽌?쒓? ?몄텧?쒕떎.")
     void removeLikeRecord_ShouldDelete() {
         // given
         Long userId = 1L;
@@ -92,7 +92,7 @@ class LikeServiceTest {
     }
 
     @Test
-    @DisplayName("내가 좋아요 한 상품 목록을 조회하면 전체 목록이 반환된다.")
+    @DisplayName("?닿? 醫뗭븘?????곹뭹 紐⑸줉??議고쉶?섎㈃ ?꾩껜 紐⑸줉??諛섑솚?쒕떎.")
     void getMyLikes_ShouldReturnList() {
         // given
         Long userId = 1L;
@@ -109,7 +109,7 @@ class LikeServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요 이력이 존재하면 true를 반환한다.")
+    @DisplayName("醫뗭븘???대젰??議댁옱?섎㈃ true瑜?諛섑솚?쒕떎.")
     void existsLikeRecord_WhenExists_ShouldReturnTrue() {
         // given
         Long userId = 1L;
@@ -126,7 +126,7 @@ class LikeServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요 이력이 없으면 false를 반환한다.")
+    @DisplayName("醫뗭븘???대젰???놁쑝硫?false瑜?諛섑솚?쒕떎.")
     void existsLikeRecord_WhenNotExists_ShouldReturnFalse() {
         // given
         Long userId = 1L;

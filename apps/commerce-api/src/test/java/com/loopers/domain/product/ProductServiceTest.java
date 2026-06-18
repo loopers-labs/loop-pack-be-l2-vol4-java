@@ -1,8 +1,5 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.like.LikeRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,14 +23,8 @@ class ProductServiceTest {
     @Mock
     private ProductRepository productRepository;
 
-    @Mock
-    private BrandRepository brandRepository;
-
-    @Mock
-    private LikeRepository likeRepository;
-
     @Test
-    @DisplayName("상품 목록 조회를 요청하면 필터와 정렬이 적용된 목록이 반환된다.")
+    @DisplayName("?곹뭹 紐⑸줉 議고쉶瑜??붿껌?섎㈃ ?꾪꽣? ?뺣젹???곸슜??紐⑸줉??諛섑솚?쒕떎.")
     void getProducts_ShouldReturnFilteredAndSortedPage() {
         // given
         Long brandId = 1L;
@@ -51,33 +42,7 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("상품 상세 조회를 요청하면 상품 정보와 브랜드 정보, 그리고 실시간 좋아요 수가 함께 반환된다.")
-    void getProductDetail_ShouldReturnProductWithBrand() {
-        // given
-        Long productId = 1L;
-        Long brandId = 10L;
-        ProductModel product = new ProductModel(brandId, "Air Jordan", new BigDecimal("200000"));
-        ReflectionTestUtils.setField(product, "id", productId);
-        
-        BrandModel brand = new BrandModel("Nike");
-        ReflectionTestUtils.setField(brand, "id", brandId);
-
-        given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(brandRepository.findById(brandId)).willReturn(Optional.of(brand));
-        given(likeRepository.countByProductId(productId)).willReturn(5);
-
-        // when
-        ProductDetail detail = productService.getProductDetail(productId);
-
-        // then
-        assertThat(detail.productId()).isEqualTo(productId);
-        assertThat(detail.name()).isEqualTo("Air Jordan");
-        assertThat(detail.brandName()).isEqualTo("Nike");
-        assertThat(detail.likeCount()).isEqualTo(5);
-    }
-
-    @Test
-    @DisplayName("브랜드 ID를 기반으로 연관된 모든 상품을 논리 삭제한다.")
+    @DisplayName("釉뚮옖??ID瑜?湲곕컲?쇰줈 ?곌???紐⑤뱺 ?곹뭹???쇰━ ??젣?쒕떎.")
     void deleteProductsByBrand_ShouldMarkAllAsDeleted() {
         // given
         Long brandId = 1L;

@@ -1,4 +1,6 @@
-package com.loopers.domain.coupon;
+﻿package com.loopers.domain.coupon;
+
+import com.loopers.application.coupon.CouponRepository;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -16,17 +18,17 @@ public class CouponService {
     private final CouponRepository couponRepository;
 
     public CouponIssue issue(Long userId, Long couponTemplateId) {
-        // 1. 템플릿 존재 여부 검증
+        // 1. ??쀫탣??鈺곕똻????? 野꺜筌?
         CouponTemplate template = couponRepository.findTemplateById(couponTemplateId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 템플릿입니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "鈺곕똻???? ??낅뮉 ?묒쥚猷???쀫탣?깆슦???덈뼄."));
 
-        // 2. 이미 발급된 쿠폰인지 검증 (중복 발급 방지)
+        // 2. ??? 獄쏆뮄????묒쥚猷?紐? 野꺜筌?(餓λ쵎??獄쏆뮄??獄쎻뫗?)
         couponRepository.findIssueByUserIdAndTemplateId(userId, couponTemplateId)
                 .ifPresent(issue -> {
-                    throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
+                    throw new CoreException(ErrorType.CONFLICT, "??? 獄쏆뮄?믦쳸?? ?묒쥚猷??낅빍??");
                 });
 
-        // 3. 쿠폰 발급 내역 저장
+        // 3. ?묒쥚猷?獄쏆뮄????곷열 ????
         CouponIssue newIssue = new CouponIssue(userId, template);
         return couponRepository.saveIssue(newIssue);
     }
@@ -46,7 +48,7 @@ public class CouponService {
 
     public void completeCouponUse(Long couponIssueId, java.math.BigDecimal orderAmount) {
         CouponIssue issue = couponRepository.findIssueById(couponIssueId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 발급 이력입니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "鈺곕똻???? ??낅뮉 ?묒쥚猷?獄쏆뮄???????낅빍??"));
 
         issue.use(orderAmount, java.time.LocalDateTime.now());
         couponRepository.saveIssue(issue);
@@ -54,17 +56,17 @@ public class CouponService {
 
     public java.math.BigDecimal calculateDiscount(Long couponIssueId, java.math.BigDecimal orderAmount) {
         CouponIssue issue = couponRepository.findIssueById(couponIssueId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰 발급 이력입니다."));
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "鈺곕똻???? ??낅뮉 ?묒쥚猷?獄쏆뮄???????낅빍??"));
 
         if (issue.getStatus() == CouponStatus.USED) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 사용 완료된 쿠폰입니다.");
+            throw new CoreException(ErrorType.CONFLICT, "??? ?????袁⑥┷???묒쥚猷??낅빍??");
         }
 
         if (issue.isExpired(java.time.LocalDateTime.now())) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "筌띾슢利???묒쥚猷??낅빍??");
         }
         if (orderAmount.compareTo(issue.getMinOrderAmount()) < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 못했습니다.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "筌ㅼ뮇??雅뚯눖揆 疫뀀뜆釉???겸뫗???? 筌륁궢六??щ빍??");
         }
 
         java.math.BigDecimal discount = java.math.BigDecimal.ZERO;

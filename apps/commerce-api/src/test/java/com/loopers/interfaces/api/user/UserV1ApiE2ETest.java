@@ -45,14 +45,14 @@ class UserV1ApiE2ETest {
     @DisplayName("POST /v1/users/signup")
     @Nested
     class SignUp {
-        @DisplayName("올바른 회원가입 요청을 보내면, 200 OK 응답을 받는다.")
+        @DisplayName("?щ컮瑜??뚯썝媛???붿껌??蹂대궡硫? 200 OK ?묐떟??諛쏅뒗??")
         @Test
         void returnsOk_whenValidRequestIsProvided() {
             // arrange
             UserV1Dto.SignUpRequest signUpRequest = new UserV1Dto.SignUpRequest(
                     "tester123",
                     "Password123!",
-                    "테스터",
+                    "?뚯뒪??,
                     LocalDate.of(1990, 1, 1),
                     "tester@example.com"
             );
@@ -76,11 +76,11 @@ class UserV1ApiE2ETest {
     @DisplayName("GET /v1/users/me")
     @Nested
     class GetMyInfo {
-        @DisplayName("올바른 인증 정보를 헤더에 담아 요청하면, 마스킹된 회원 정보를 반환한다.")
+        @DisplayName("?щ컮瑜??몄쬆 ?뺣낫瑜??ㅻ뜑???댁븘 ?붿껌?섎㈃, 留덉뒪?밸맂 ?뚯썝 ?뺣낫瑜?諛섑솚?쒕떎.")
         @Test
         void returnsMaskedUserInfo_whenValidCredentialsAreProvided() {
             // arrange
-            signUp("tester123", "Password123!", "테스터");
+            signUp("tester123", "Password123!", "?뚯뒪??);
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester123");
@@ -98,15 +98,15 @@ class UserV1ApiE2ETest {
             assertAll(
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                     () -> assertThat(response.getBody().data().loginId()).isEqualTo("tester123"),
-                    () -> assertThat(response.getBody().data().name()).isEqualTo("테스*")
+                    () -> assertThat(response.getBody().data().name()).isEqualTo("?뚯뒪*")
             );
         }
 
-        @DisplayName("잘못된 비밀번호로 요청하면, 401 UNAUTHORIZED 응답을 받는다.")
+        @DisplayName("?섎せ??鍮꾨?踰덊샇濡??붿껌?섎㈃, 401 UNAUTHORIZED ?묐떟??諛쏅뒗??")
         @Test
         void throwsUnauthorized_whenInvalidPasswordIsProvided() {
             // arrange
-            signUp("tester123", "Password123!", "테스터");
+            signUp("tester123", "Password123!", "?뚯뒪??);
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester123");
@@ -131,11 +131,11 @@ class UserV1ApiE2ETest {
     @DisplayName("PATCH /v1/users/me/password")
     @Nested
     class UpdatePassword {
-        @DisplayName("올바른 비밀번호 변경 요청을 보내면, 200 OK 응답을 받고 이후 새 비밀번호로 조회가 가능하다.")
+        @DisplayName("?щ컮瑜?鍮꾨?踰덊샇 蹂寃??붿껌??蹂대궡硫? 200 OK ?묐떟??諛쏄퀬 ?댄썑 ??鍮꾨?踰덊샇濡?議고쉶媛 媛?ν븯??")
         @Test
         void returnsOk_andEnablesLoginWithNewPassword() {
             // arrange
-            signUp("tester123", "OldPassword123!", "테스터");
+            signUp("tester123", "OldPassword123!", "?뚯뒪??);
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Loopers-LoginId", "tester123");

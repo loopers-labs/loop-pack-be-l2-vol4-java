@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderModelTest {
 
     @Test
-    @DisplayName("주문 생성 시 상태는 PENDING이며 오리지널 금액, 할인 금액, 최종 결제 금액 및 쿠폰 식별자가 설정된다.")
+    @DisplayName("二쇰Ц ?앹꽦 ???곹깭??PENDING?대ŉ ?ㅻ━吏??湲덉븸, ?좎씤 湲덉븸, 理쒖쥌 寃곗젣 湲덉븸 諛?荑좏룿 ?앸퀎?먭? ?ㅼ젙?쒕떎.")
     void constructor_ShouldInitializeFieldsAndStatusAsPending() {
         // given
         Long userId = 1L;
@@ -32,7 +32,7 @@ class OrderModelTest {
     }
 
     @Test
-    @DisplayName("주문 상태가 PENDING일 때 complete()을 호출하면 COMPLETED로 변경된다.")
+    @DisplayName("二쇰Ц ?곹깭媛 PENDING????complete()???몄텧?섎㈃ COMPLETED濡?蹂寃쎈맂??")
     void complete_FromPending_ShouldChangeStatusToCompleted() {
         // given
         OrderModel order = new OrderModel(1L, null, new BigDecimal("10000"), BigDecimal.ZERO, new BigDecimal("10000"));
@@ -45,7 +45,7 @@ class OrderModelTest {
     }
 
     @Test
-    @DisplayName("주문 상태가 PENDING일 때 cancel()을 호출하면 CANCELED로 변경된다.")
+    @DisplayName("二쇰Ц ?곹깭媛 PENDING????cancel()???몄텧?섎㈃ CANCELED濡?蹂寃쎈맂??")
     void cancel_FromPending_ShouldChangeStatusToCanceled() {
         // given
         OrderModel order = new OrderModel(1L, null, new BigDecimal("10000"), BigDecimal.ZERO, new BigDecimal("10000"));

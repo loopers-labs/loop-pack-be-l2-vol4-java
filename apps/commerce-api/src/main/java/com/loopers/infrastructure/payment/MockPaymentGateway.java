@@ -21,6 +21,6 @@ public class MockPaymentGateway implements PaymentGateway {
 
     @Override
     public void cancelPayment(String transactionId, BigDecimal amount) {
-        // 모킹 환경이므로 취소 시 별도의 외부 연동 없이 로그 출력 수준으로 간략화
+        // 紐⑦궧 ?섍꼍?대?濡?痍⑥냼 ??蹂꾨룄???몃? ?곕룞 ?놁씠 濡쒓렇 異쒕젰 ?섏??쇰줈 媛꾨왂??
     }
 }

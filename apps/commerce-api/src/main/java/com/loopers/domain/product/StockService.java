@@ -1,4 +1,6 @@
-package com.loopers.domain.product;
+﻿package com.loopers.domain.product;
+
+import com.loopers.application.product.ProductRepository;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -30,7 +32,7 @@ public class StockService {
 
     @Transactional
     public void decreaseStocksWithLock(List<StockRequest> requests) {
-        // 데드락 방지를 위해 상품 ID 오름차순 정렬 후 순차적 락 획득
+        // ?怨뺣굡??獄쎻뫗????袁る퉸 ?怨밸? ID ??살カ筌△뫁???類ｌ졊 ????뽮컧??????얜굣
         List<StockRequest> sortedRequests = requests.stream()
                 .sorted(java.util.Comparator.comparing(StockRequest::productId))
                 .toList();
@@ -49,7 +51,7 @@ public class StockService {
 
     @Transactional
     public void increaseStocks(List<StockRequest> requests) {
-        // 데드락 방지를 위해 상품 ID 오름차순 정렬 후 순차적 락 획득
+        // ?怨뺣굡??獄쎻뫗????袁る퉸 ?怨밸? ID ??살カ筌△뫁???類ｌ졊 ????뽮컧??????얜굣
         List<StockRequest> sortedRequests = requests.stream()
                 .sorted(java.util.Comparator.comparing(StockRequest::productId))
                 .toList();

@@ -39,13 +39,13 @@ class UserControllerTest {
     private UserFacade userFacade;
 
     @Test
-    @DisplayName("회원가입 요청 시 200 OK를 반환하고 Facade를 호출한다.")
+    @DisplayName("?뚯썝媛???붿껌 ??200 OK瑜?諛섑솚?섍퀬 Facade瑜??몄텧?쒕떎.")
     void signUp_ShouldReturnOkAndCallFacade() throws Exception {
         // given
         Map<String, Object> request = new HashMap<>();
         request.put("loginId", "tester01");
         request.put("password", "Password123!");
-        request.put("name", "테스터");
+        request.put("name", "?뚯뒪??);
         request.put("birthDate", LocalDate.of(1990, 1, 1).toString());
         request.put("email", "tester01@example.com");
 
@@ -59,14 +59,14 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회 시 200 OK와 회원 정보를 반환한다.")
+    @DisplayName("???뺣낫 議고쉶 ??200 OK? ?뚯썝 ?뺣낫瑜?諛섑솚?쒕떎.")
     void getMyInfo_ShouldReturnOkAndUserInfo() throws Exception {
         // given
         String loginId = "tester01";
         String password = "Password123!";
         UserInfo response = new UserInfo(
                 "tester01",
-                "테스*",
+                "?뚯뒪*",
                 LocalDate.of(1990, 1, 1),
                 "tester01@example.com"
         );
@@ -78,7 +78,7 @@ class UserControllerTest {
                         .header("X-Loopers-LoginPw", password))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.loginId").value("tester01"))
-                .andExpect(jsonPath("$.data.name").value("테스*"))
+                .andExpect(jsonPath("$.data.name").value("?뚯뒪*"))
                 .andExpect(jsonPath("$.data.birthDate").value("1990-01-01"))
                 .andExpect(jsonPath("$.data.email").value("tester01@example.com"));
 
@@ -86,7 +86,7 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("비밀번호 수정 요청 시 200 OK를 반환하고 Facade를 호출한다.")
+    @DisplayName("鍮꾨?踰덊샇 ?섏젙 ?붿껌 ??200 OK瑜?諛섑솚?섍퀬 Facade瑜??몄텧?쒕떎.")
     void updatePassword_ShouldReturnOkAndCallFacade() throws Exception {
         // given
         String loginId = "tester01";

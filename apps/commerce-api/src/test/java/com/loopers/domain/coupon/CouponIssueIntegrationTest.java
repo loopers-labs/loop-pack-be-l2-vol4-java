@@ -25,7 +25,7 @@ class CouponIssueIntegrationTest {
     }
 
     @Test
-    @DisplayName("동일한 사용자에게 동일한 쿠폰을 중복 발급하면 유니크 제약 조건 위반 예외가 발생해야 한다.")
+    @DisplayName("?숈씪???ъ슜?먯뿉寃??숈씪??荑좏룿??以묐났 諛쒓툒?섎㈃ ?좊땲???쒖빟 議곌굔 ?꾨컲 ?덉쇅媛 諛쒖깮?댁빞 ?쒕떎.")
     void saveIssue_DuplicateUserAndTemplate_ShouldThrowException() {
         // given
         Long userId = 1L;

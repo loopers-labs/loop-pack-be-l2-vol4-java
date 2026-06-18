@@ -1,13 +1,13 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
+import com.loopers.application.brand.BrandRepository;
 import com.loopers.domain.coupon.*;
-import com.loopers.domain.order.OrderRepository;
+import com.loopers.application.order.OrderRepository;
 import com.loopers.domain.payment.PaymentMethod;
-import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.application.payment.PaymentRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
+import com.loopers.application.product.ProductRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +57,7 @@ class OrderFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("재고가 5개 있는 상품에 대해 10명의 사용자가 동시에 checkout을 요청하면 5명만 성공하고 5명은 실패한다.")
+    @DisplayName("?ш퀬媛 5媛??덈뒗 ?곹뭹?????10紐낆쓽 ?ъ슜?먭? ?숈떆??checkout???붿껌?섎㈃ 5紐낅쭔 ?깃났?섍퀬 5紐낆? ?ㅽ뙣?쒕떎.")
     void checkout_ConcurrentStockDecrease_ShouldLimitToStockQuantity() throws InterruptedException {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("Nike"));
@@ -101,7 +101,7 @@ class OrderFacadeConcurrencyTest {
             assertThat(successCount.get()).isEqualTo(5);
             assertThat(failCount.get()).isEqualTo(5);
 
-            // 남은 재고 확인
+            // ?⑥? ?ш퀬 ?뺤씤
             ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
             assertThat(updatedProduct.getStock().getQuantity()).isEqualTo(0);
         } finally {
@@ -110,7 +110,7 @@ class OrderFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동일한 쿠폰을 사용하여 10개의 스레드에서 동시에 checkout을 요청하면 1개만 성공하고 나머지는 실패한다. (Double Spending 방어)")
+    @DisplayName("?숈씪??荑좏룿???ъ슜?섏뿬 10媛쒖쓽 ?ㅻ젅?쒖뿉???숈떆??checkout???붿껌?섎㈃ 1媛쒕쭔 ?깃났?섍퀬 ?섎㉧吏???ㅽ뙣?쒕떎. (Double Spending 諛⑹뼱)")
     void checkout_ConcurrentCouponUse_ShouldPreventDoubleSpending() throws InterruptedException {
         // given
         Long userId = 1L;
@@ -121,7 +121,7 @@ class OrderFacadeConcurrencyTest {
         product = productRepository.save(product);
         Long productId = product.getId();
 
-        // 쿠폰 템플릿 및 발급 데이터 세팅
+        // 荑좏룿 ?쒗뵆由?諛?諛쒓툒 ?곗씠???명똿
         CouponTemplate template = new CouponTemplate(
                 "10% Discount",
                 CouponType.RATE,
@@ -170,7 +170,7 @@ class OrderFacadeConcurrencyTest {
             assertThat(successCount.get()).isEqualTo(1);
             assertThat(failCount.get()).isEqualTo(9);
 
-            // 쿠폰 상태 USED 및 낙관적 락 버전 갱신 확인
+            // 荑좏룿 ?곹깭 USED 諛??숆?????踰꾩쟾 媛깆떊 ?뺤씤
             CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
             assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
             assertThat(updatedIssue.getVersion()).isGreaterThan(0L);

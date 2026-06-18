@@ -27,7 +27,7 @@ class OrderServiceTest {
     private OrderRepository orderRepository;
 
     @Test
-    @DisplayName("주문 생성 요청 시 주문과 상세 정보가 저장된다.")
+    @DisplayName("二쇰Ц ?앹꽦 ?붿껌 ??二쇰Ц怨??곸꽭 ?뺣낫媛 ??λ맂??")
     void createOrder_ShouldSaveOrderAndItems() {
         // given
         Long userId = 1L;
@@ -48,7 +48,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("유저 ID로 주문 목록을 조회하면 해당 유저의 모든 주문이 반환된다.")
+    @DisplayName("?좎? ID濡?二쇰Ц 紐⑸줉??議고쉶?섎㈃ ?대떦 ?좎???紐⑤뱺 二쇰Ц??諛섑솚?쒕떎.")
     void getOrders_ShouldReturnUserOrders() {
         // given
         Long userId = 1L;
@@ -65,7 +65,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문 ID로 주문 상세 정보를 조회하면 해당 주문 정보가 반환된다.")
+    @DisplayName("二쇰Ц ID濡?二쇰Ц ?곸꽭 ?뺣낫瑜?議고쉶?섎㈃ ?대떦 二쇰Ц ?뺣낫媛 諛섑솚?쒕떎.")
     void getOrder_ShouldReturnOrderDetail() {
         // given
         Long orderId = 100L;

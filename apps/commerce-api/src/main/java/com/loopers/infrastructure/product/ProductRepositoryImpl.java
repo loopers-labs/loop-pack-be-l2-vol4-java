@@ -1,17 +1,28 @@
 package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
+import com.loopers.application.product.ProductRepository;
+import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+
+import static com.loopers.domain.product.QProductModel.productModel;
+import static com.loopers.domain.like.QProductLikeModel.productLikeModel;
 
 @RequiredArgsConstructor
 @Component
 public class ProductRepositoryImpl implements ProductRepository {
     private final ProductJpaRepository productJpaRepository;
+    private final JPAQueryFactory queryFactory;
 
     @Override
     public ProductModel save(ProductModel product) {
@@ -34,8 +45,64 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public org.springframework.data.domain.Page<ProductModel> findAll(Long brandId, String sort, org.springframework.data.domain.Pageable pageable) {
-        return org.springframework.data.domain.Page.empty();
+    public Page<ProductModel> findAll(Long brandId, String sort, Pageable pageable) {
+        List<ProductModel> content;
+
+        if ("likes_desc".equalsIgnoreCase(sort)) {
+            content = queryFactory
+                    .select(productModel)
+                    .from(productModel)
+                    .leftJoin(productLikeModel).on(productLikeModel.productId.eq(productModel.id))
+                    .where(
+                            brandIdEq(brandId),
+                            productModel.isDeleted.isFalse()
+                    )
+                    .groupBy(productModel.id)
+                    .orderBy(getOrderSpecifiers(sort))
+                    .offset(pageable.getOffset())
+                    .limit(pageable.getPageSize())
+                    .fetch();
+        } else {
+            content = queryFactory
+                    .selectFrom(productModel)
+                    .where(
+                            brandIdEq(brandId),
+                            productModel.isDeleted.isFalse()
+                    )
+                    .orderBy(getOrderSpecifiers(sort))
+                    .offset(pageable.getOffset())
+                    .limit(pageable.getPageSize())
+                    .fetch();
+        }
+
+        Long total = queryFactory
+                .select(productModel.count())
+                .from(productModel)
+                .where(
+                        brandIdEq(brandId),
+                        productModel.isDeleted.isFalse()
+                )
+                .fetchOne();
+
+        long totalCount = total != null ? total : 0L;
+
+        return new PageImpl<>(content, pageable, totalCount);
+    }
+
+    private BooleanExpression brandIdEq(Long brandId) {
+        return brandId != null ? productModel.brandId.eq(brandId) : null;
+    }
+
+    private OrderSpecifier<?>[] getOrderSpecifiers(String sort) {
+        List<OrderSpecifier<?>> specifiers = new ArrayList<>();
+
+        if ("likes_desc".equalsIgnoreCase(sort)) {
+            specifiers.add(productLikeModel.id.count().desc());
+        }
+
+        specifiers.add(productModel.createdAt.desc());
+
+        return specifiers.toArray(new OrderSpecifier[0]);
     }
 
     @Override

@@ -27,7 +27,7 @@ class StockServiceTest {
     private ProductRepository productRepository;
 
     @Test
-    @DisplayName("재고 차감 요청 시 수량이 충분하면 차감된다.")
+    @DisplayName("?ш퀬 李④컧 ?붿껌 ???섎웾??異⑸텇?섎㈃ 李④컧?쒕떎.")
     void decreaseStocks_Success() {
         // given
         Long productId = 1L;
@@ -47,7 +47,7 @@ class StockServiceTest {
     }
 
     @Test
-    @DisplayName("재고가 부족하면 예외가 발생한다.")
+    @DisplayName("?ш퀬媛 遺議깊븯硫??덉쇅媛 諛쒖깮?쒕떎.")
     void decreaseStocks_Insufficient_ShouldThrowException() {
         // given
         Long productId = 1L;

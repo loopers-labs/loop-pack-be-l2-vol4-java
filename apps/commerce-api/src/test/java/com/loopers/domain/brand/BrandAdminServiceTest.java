@@ -25,7 +25,7 @@ class BrandAdminServiceTest {
     private BrandRepository brandRepository;
 
     @Test
-    @DisplayName("브랜드 정보를 입력하면 브랜드가 정상적으로 등록된다.")
+    @DisplayName("釉뚮옖???뺣낫瑜??낅젰?섎㈃ 釉뚮옖?쒓? ?뺤긽?곸쑝濡??깅줉?쒕떎.")
     void registerBrand_ShouldSaveBrand() {
         // given
         String name = "Nike";
@@ -42,7 +42,7 @@ class BrandAdminServiceTest {
     }
 
     @Test
-    @DisplayName("브랜드 목록 조회를 요청하면 전체 브랜드 목록이 반환된다.")
+    @DisplayName("釉뚮옖??紐⑸줉 議고쉶瑜??붿껌?섎㈃ ?꾩껜 釉뚮옖??紐⑸줉??諛섑솚?쒕떎.")
     void getBrands_ShouldReturnBrandList() {
         // given
         BrandModel brand1 = new BrandModel("Nike");
@@ -61,7 +61,7 @@ class BrandAdminServiceTest {
     }
 
     @Test
-    @DisplayName("존재하는 브랜드의 이름을 수정하면 정보가 업데이트된다.")
+    @DisplayName("議댁옱?섎뒗 釉뚮옖?쒖쓽 ?대쫫???섏젙?섎㈃ ?뺣낫媛 ?낅뜲?댄듃?쒕떎.")
     void updateBrand_ShouldUpdateName() {
         // given
         Long brandId = 1L;
@@ -79,7 +79,7 @@ class BrandAdminServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 브랜드의 수정을 요청하면 예외가 발생한다.")
+    @DisplayName("議댁옱?섏? ?딅뒗 釉뚮옖?쒖쓽 ?섏젙???붿껌?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void updateBrand_NonExistent_ShouldThrowException() {
         // given
         Long brandId = 999L;
@@ -92,7 +92,7 @@ class BrandAdminServiceTest {
     }
 
     @Test
-    @DisplayName("브랜드를 삭제하면 논리 삭제(isDeleted=true) 처리된다.")
+    @DisplayName("釉뚮옖?쒕? ??젣?섎㈃ ?쇰━ ??젣(isDeleted=true) 泥섎━?쒕떎.")
     void deleteBrand_ShouldMarkAsDeleted() {
         // given
         Long brandId = 1L;
@@ -109,7 +109,7 @@ class BrandAdminServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 브랜드의 삭제를 요청하면 예외가 발생한다.")
+    @DisplayName("議댁옱?섏? ?딅뒗 釉뚮옖?쒖쓽 ??젣瑜??붿껌?섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
     void deleteBrand_NonExistent_ShouldThrowException() {
         // given
         Long brandId = 999L;

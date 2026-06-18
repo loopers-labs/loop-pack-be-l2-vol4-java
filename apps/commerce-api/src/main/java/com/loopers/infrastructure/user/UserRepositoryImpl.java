@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.user;
 
 import com.loopers.domain.user.UserModel;
-import com.loopers.domain.user.UserRepository;
+import com.loopers.application.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

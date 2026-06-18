@@ -24,7 +24,7 @@ class BrandAdminFacadeTest {
     private ProductService productService;
 
     @Test
-    @DisplayName("브랜드 삭제 요청 시 브랜드 서비스와 상품 서비스의 삭제 로직이 모두 호출된다.")
+    @DisplayName("釉뚮옖????젣 ?붿껌 ??釉뚮옖???쒕퉬?ㅼ? ?곹뭹 ?쒕퉬?ㅼ쓽 ??젣 濡쒖쭅??紐⑤몢 ?몄텧?쒕떎.")
     void deleteBrand_ShouldCallBothServices() {
         // given
         Long brandId = 1L;

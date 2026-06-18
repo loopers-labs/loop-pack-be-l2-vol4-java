@@ -28,12 +28,12 @@ class LikeFacadeTest {
     private ProductService productService;
 
     @Test
-    @DisplayName("좋아요를 처음 등록하면 상품 존재 여부를 검증하고 이력이 추가된다.")
+    @DisplayName("醫뗭븘?붾? 泥섏쓬 ?깅줉?섎㈃ ?곹뭹 議댁옱 ?щ?瑜?寃利앺븯怨??대젰??異붽??쒕떎.")
     void addLike_NewLike_ShouldAddRecord() {
         // given
         Long userId = 1L;
         Long productId = 10L;
-        ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
+        ProductModel product = new ProductModel(1L, "?곹뭹", new BigDecimal("1000"));
         given(productService.getProduct(productId)).willReturn(product);
         given(likeService.existsLikeRecord(userId, productId)).willReturn(false);
         
@@ -47,12 +47,12 @@ class LikeFacadeTest {
     }
 
     @Test
-    @DisplayName("이미 좋아요를 누른 상품에 다시 좋아요를 요청하면 추가 로직 없이 성공한다. (멱등성)")
+    @DisplayName("?대? 醫뗭븘?붾? ?꾨Ⅸ ?곹뭹???ㅼ떆 醫뗭븘?붾? ?붿껌?섎㈃ 異붽? 濡쒖쭅 ?놁씠 ?깃났?쒕떎. (硫깅벑??")
     void addLike_DuplicateLike_ShouldBeIdempotent() {
         // given
         Long userId = 1L;
         Long productId = 10L;
-        ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
+        ProductModel product = new ProductModel(1L, "?곹뭹", new BigDecimal("1000"));
         given(productService.getProduct(productId)).willReturn(product);
         given(likeService.existsLikeRecord(userId, productId)).willReturn(true);
 
@@ -66,12 +66,12 @@ class LikeFacadeTest {
     }
 
     @Test
-    @DisplayName("좋아요를 취소하면 상품 존재 여부를 검증하고 이력이 삭제된다.")
+    @DisplayName("醫뗭븘?붾? 痍⑥냼?섎㈃ ?곹뭹 議댁옱 ?щ?瑜?寃利앺븯怨??대젰????젣?쒕떎.")
     void removeLike_ExistingLike_ShouldRemoveRecord() {
         // given
         Long userId = 1L;
         Long productId = 10L;
-        ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
+        ProductModel product = new ProductModel(1L, "?곹뭹", new BigDecimal("1000"));
         given(productService.getProduct(productId)).willReturn(product);
         given(likeService.existsLikeRecord(userId, productId)).willReturn(true);
 
@@ -85,12 +85,12 @@ class LikeFacadeTest {
     }
 
     @Test
-    @DisplayName("좋아요를 누른 적 없는 상품에 취소를 요청하면 추가 로직 없이 성공한다. (멱등성)")
+    @DisplayName("醫뗭븘?붾? ?꾨Ⅸ ???녿뒗 ?곹뭹??痍⑥냼瑜??붿껌?섎㈃ 異붽? 濡쒖쭅 ?놁씠 ?깃났?쒕떎. (硫깅벑??")
     void removeLike_NonExistentLike_ShouldBeIdempotent() {
         // given
         Long userId = 1L;
         Long productId = 10L;
-        ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
+        ProductModel product = new ProductModel(1L, "?곹뭹", new BigDecimal("1000"));
         given(productService.getProduct(productId)).willReturn(product);
         given(likeService.existsLikeRecord(userId, productId)).willReturn(false);
 

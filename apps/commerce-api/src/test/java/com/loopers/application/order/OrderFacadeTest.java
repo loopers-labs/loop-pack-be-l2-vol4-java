@@ -47,7 +47,7 @@ class OrderFacadeTest {
     private com.loopers.domain.payment.PaymentGateway paymentGateway;
 
     @Test
-    @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다.")
+    @DisplayName("二쇰Ц ?붿껌 ???곹뭹 ?뺣낫 議고쉶, ?ш퀬 李④컧, 二쇰Ц ?앹꽦???쒖감?곸쑝濡??섑뻾?쒕떎.")
     void createOrder_Success_ShouldCallServices() {
         // given
         Long userId = 1L;
@@ -56,7 +56,7 @@ class OrderFacadeTest {
         OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)));
         
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
-        ReflectionTestUtils.setField(product, "id", productId); // ID 설정 필요
+        ReflectionTestUtils.setField(product, "id", productId); // ID ?ㅼ젙 ?꾩슂
         given(productService.getProductsByIds(List.of(productId))).willReturn(List.of(product));
         given(orderService.createOrder(eq(userId), anyList())).willReturn(100L);
 
@@ -70,7 +70,7 @@ class OrderFacadeTest {
     }
 
     @Test
-    @DisplayName("단일 트랜잭션 기반 통합 주문/결제(checkout)가 모든 단계 성공 시 정상 종료된다.")
+    @DisplayName("?⑥씪 ?몃옖??뀡 湲곕컲 ?듯빀 二쇰Ц/寃곗젣(checkout)媛 紐⑤뱺 ?④퀎 ?깃났 ???뺤긽 醫낅즺?쒕떎.")
     void checkout_Success() {
         // given
         Long userId = 1L;

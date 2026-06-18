@@ -24,7 +24,7 @@ class ProductAdminFacadeTest {
     private ProductAdminService productAdminService;
 
     @Test
-    @DisplayName("상품 등록 요청 시 어드민 서비스의 등록 로직이 호출된다.")
+    @DisplayName("?곹뭹 ?깅줉 ?붿껌 ???대뱶誘??쒕퉬?ㅼ쓽 ?깅줉 濡쒖쭅???몄텧?쒕떎.")
     void registerProduct_ShouldCallService() {
         // given
         Long brandId = 1L;

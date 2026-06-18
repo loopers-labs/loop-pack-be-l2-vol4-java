@@ -33,7 +33,7 @@ class OrderV1ControllerTest {
     private OrderFacade orderFacade;
 
     @Test
-    @DisplayName("통합 주문 결제(checkout) 요청 시 HTTP 200과 orderId가 반환된다.")
+    @DisplayName("?듯빀 二쇰Ц 寃곗젣(checkout) ?붿껌 ??HTTP 200怨?orderId媛 諛섑솚?쒕떎.")
     void checkout_ApiSuccess() throws Exception {
         // given
         Long userId = 1L;

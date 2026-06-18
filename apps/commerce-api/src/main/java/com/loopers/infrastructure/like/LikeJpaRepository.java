@@ -11,4 +11,7 @@ public interface LikeJpaRepository extends JpaRepository<ProductLikeModel, Long>
     List<ProductLikeModel> findAllByUserId(Long userId);
     Optional<ProductLikeModel> findByUserIdAndProductId(Long userId, Long productId);
     long countByProductId(Long productId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT pl.productId, count(pl) FROM ProductLikeModel pl WHERE pl.productId IN :productIds GROUP BY pl.productId")
+    List<Object[]> countByProductIds(@org.springframework.data.repository.query.Param("productIds") List<Long> productIds);
 }

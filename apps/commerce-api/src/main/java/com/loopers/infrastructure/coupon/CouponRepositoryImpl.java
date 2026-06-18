@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.coupon;
 
 import com.loopers.domain.coupon.CouponIssue;
-import com.loopers.domain.coupon.CouponRepository;
+import com.loopers.application.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

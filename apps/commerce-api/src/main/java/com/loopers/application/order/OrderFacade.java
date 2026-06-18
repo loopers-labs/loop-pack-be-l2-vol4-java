@@ -3,7 +3,7 @@ package com.loopers.application.order;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.application.product.ProductRepository;
 import com.loopers.domain.product.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class OrderFacade {
 
     private final OrderService orderService;
-    private final ProductService productService;
+    private final ProductRepository productRepository;
     private final StockService stockService;
     private final com.loopers.domain.coupon.CouponService couponService;
     private final com.loopers.domain.payment.PaymentService paymentService;
@@ -34,21 +34,21 @@ public class OrderFacade {
                 .map(OrderCreateRequest.Item::productId)
                 .toList();
 
-        List<ProductModel> products = productService.getProductsByIds(productIds);
+        List<ProductModel> products = productRepository.findByIdIn(productIds);
         if (products.size() != productIds.size()) {
-            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
+            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "?쇰? ?곹뭹??李얠쓣 ???놁뒿?덈떎.");
         }
 
         Map<Long, ProductModel> productMap = products.stream()
                 .collect(Collectors.toMap(ProductModel::getId, p -> p));
 
-        // 재고 차감 요청 생성
+        // ?ш퀬 李④컧 ?붿껌 ?앹꽦
         List<StockService.StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
                 .toList();
         stockService.decreaseStocks(stockRequests);
 
-        // 주문 생성 요청 생성 (스냅샷 포함)
+        // 二쇰Ц ?앹꽦 ?붿껌 ?앹꽦 (?ㅻ깄???ы븿)
         List<OrderService.OrderItemRequest> orderItemRequests = request.items().stream()
                 .map(item -> {
                     ProductModel product = productMap.get(item.productId());
@@ -56,7 +56,7 @@ public class OrderFacade {
                             product.getId(),
                             product.getName(),
                             product.getPrice(),
-                            "Brand Placeholder", // 실제로는 Brand 조회가 필요할 수 있음
+                            "Brand Placeholder", // ?ㅼ젣濡쒕뒗 Brand 議고쉶媛 ?꾩슂?????덉쓬
                             item.quantity()
                     );
                 }).toList();
@@ -66,20 +66,20 @@ public class OrderFacade {
 
     @Transactional
     public Long checkout(Long userId, OrderCheckoutRequest request) {
-        // 1. [단일 트랜잭션] 재고 차감 (비관적 락 사용) - 영속성 컨텍스트에 락과 함께 먼저 로드하기 위해 가장 먼저 실행
+        // 1. [?⑥씪 ?몃옖??뀡] ?ш퀬 李④컧 (鍮꾧??????ъ슜) - ?곸냽??而⑦뀓?ㅽ듃???쎄낵 ?④퍡 癒쇱? 濡쒕뱶?섍린 ?꾪빐 媛??癒쇱? ?ㅽ뻾
         List<StockService.StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
                 .toList();
         stockService.decreaseStocksWithLock(stockRequests);
 
-        // 2. 상품 조회 및 계산
+        // 2. ?곹뭹 議고쉶 諛?怨꾩궛
         List<Long> productIds = request.items().stream()
                 .map(OrderCheckoutRequest.Item::productId)
                 .toList();
 
-        List<ProductModel> products = productService.getProductsByIds(productIds);
+        List<ProductModel> products = productRepository.findByIdIn(productIds);
         if (products.size() != productIds.size()) {
-            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
+            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "?쇰? ?곹뭹??李얠쓣 ???놁뒿?덈떎.");
         }
 
         Map<Long, ProductModel> productMap = products.stream()
@@ -99,7 +99,7 @@ public class OrderFacade {
 
         java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
 
-        // 3. 주문 생성 (PENDING)
+        // 3. 二쇰Ц ?앹꽦 (PENDING)
         List<OrderService.OrderItemRequest> orderItemRequests = request.items().stream()
                 .map(item -> {
                     ProductModel product = productMap.get(item.productId());
@@ -114,15 +114,15 @@ public class OrderFacade {
 
         Long orderId = orderService.createPendingOrder(userId, orderItemRequests, request.couponIssueId(), totalOriginalAmount, discount, totalPaymentAmount);
 
-        // 4. PG사 결제 승인 요청 (트랜잭션 내부)
+        // 4. PG??寃곗젣 ?뱀씤 ?붿껌 (?몃옖??뀡 ?대?)
         com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult pgResult = null;
         try {
             pgResult = paymentGateway.requestPayment(orderId, totalPaymentAmount, request.paymentMethod());
         } catch (Exception e) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인 요청 중 오류가 발생했습니다: " + e.getMessage());
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "寃곗젣 ?뱀씤 ?붿껌 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎: " + e.getMessage());
         }
 
-        // 5. 결제 및 쿠폰 사용 완료 처리
+        // 5. 寃곗젣 諛?荑좏룿 ?ъ슜 ?꾨즺 泥섎━
         paymentService.savePayment(orderId, request.paymentMethod(), totalPaymentAmount, pgResult.transactionId(), pgResult.approvedAt());
         orderService.completeOrder(orderId);
         
