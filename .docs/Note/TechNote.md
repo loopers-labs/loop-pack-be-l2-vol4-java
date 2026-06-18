@@ -1,4 +1,4 @@
-# [Benchmark] 상품 목록 조회 인덱스 설계 — 브랜드 필터 + 정렬 조합 EXPLAIN 비교
+# [Benchmark] 상품 목록 조회 인덱스 설계 — 단일 vs 복합, 데이터 분포에 따른 선택 기준 (5주차 · 6팀 · 변승진)
 
 ## TL;DR
 
@@ -8,7 +8,7 @@
 
 ---
 
-## Question
+## Question (무엇을 비교하는가)
 
 브랜드 필터(`brand_id`) + 정렬(`like_count`, `created_at`, `price`) 조합 조회에서,
 어떤 인덱스 설계가 실행 계획을 최적화하는가.
@@ -21,7 +21,7 @@
 
 ---
 
-## Setup
+## Setup (측정 환경)
 
 측정은 두 가지 데이터 구성으로 나눠 진행했다.
 
@@ -42,12 +42,12 @@
 | stocks | 1,000,000 | 상품 1:1 |
 
 - **DB**: MySQL 8.x (InnoDB)
-- **측정 방법**: `EXPLAIN` 실행 계획 분석 (`type`, `key`, `rows`, `Extra`)
+- **측정 방법**: `EXPLAIN` 실행 계획 분석 (`type`, `key`, `rows`, `Extra`), `EXPLAIN ANALYZE`로 추정치 대비 실제 실행 시간 검증
 - **쿼리 조건**: `WHERE deleted_at IS NULL`, `ORDER BY {정렬 컬럼}`, `LIMIT 20`
 
 ---
 
-## Results
+## Results (측정 결과)
 
 ### 1단계 — 인덱스 없음 (10만 건 기준)
 
@@ -118,6 +118,30 @@
 - **100브랜드 비균등** — brand_id=1은 가장 오래된 브랜드라 최근 구간의 `created_at` 범위에서 희박하다(filtered=0.19%). rows=1,050으로 늘어나지만 여전히 `idx_products_brand_created_at`(ref / 18,916)보다 낮아 단일 인덱스 스캔 유지.
 
 **결론:** 10만 건 균등 분포에서 rows=5,032로 `idx_products_brand_created_at`을 쓰던 것이 1M 균등에서는 rows=211로 단일 인덱스로 바뀌었다. 이는 인위적 균등 분포가 만든 현상이다. 실 운영에서 brand_id와 created_at 간 상관관계가 강해질수록 단일 인덱스 스캔 비용이 올라가 복합 인덱스로 전환되는 임계점에 가까워진다. `idx_products_brand_created_at`이 필요한 이유다.
+
+---
+
+### 5단계 — EXPLAIN ANALYZE로 본 실제 실행 시간 (1M 건 실측)
+
+`rows`는 옵티마이저의 추정치일 뿐, 실제 비용과 비례하는지는 별도로 확인해야 한다. MySQL 8 컨테이너에 브랜드 100개·상품 100만 건(브랜드 1이 전체의 약 10%를 차지하도록 치우치게 생성, 최종 인덱스 6종 적용)을 직접 적재하고 `EXPLAIN ANALYZE`로 `actual rows`·`actual time`을 측정했다.
+
+| 케이스 | 추정 rows | actual rows | actual time | key |
+|--------|----------:|------------:|------------:|-----|
+| 전체 좋아요순 | 20 | 20 | 0.34 ms | `idx_products_likes_desc` |
+| 전체 최신순 | 20 | 20 | 0.07 ms | `idx_products_created_at` |
+| 전체 가격순 | 20 | 20 | 0.16 ms | `idx_products_price` |
+| 브랜드(1) + 좋아요순 (`ref`) | 207,606 | 20 | 0.63 ms | `idx_products_brand_likes` |
+| 브랜드(1) + 가격순 (`ref`) | 207,606 | 20 | 0.58 ms | `idx_products_brand_price` |
+| 브랜드(1) + 최신순, OFFSET 0 | 207,606 | 20 | 0.43 ms | `idx_products_brand_created_at` |
+| 브랜드(1) + 최신순, OFFSET 100 | 207,606 | 120 | 0.63 ms | `idx_products_brand_created_at` |
+| 브랜드(1) + 최신순, OFFSET 1,000 | 207,606 | 1,020 | 6.94 ms | `idx_products_brand_created_at` |
+
+**확인된 것:**
+
+- 추정 rows(207,606)는 옵티마이저가 "브랜드 1 전체"를 가정한 상한값이고, `LIMIT`이 있으면 실제로는 `actual rows = OFFSET + LIMIT`만큼만 읽고 멈춘다. 추정치와 실측치가 크게 벌어지는 게 비정상이 아니라, `LIMIT` 조기 종료가 정상 동작하고 있다는 신호다.
+- OFFSET 0 → 100 → 1,000으로 갈수록 actual rows가 20 → 120 → 1,020으로, actual time이 0.43 → 0.63 → 6.94ms로 거의 선형으로 늘었다. 딥 페이지 비용이 rows 증가와 함께 실제 시간으로도 그대로 나타난다.
+- 이 데이터셋에서는 브랜드 1이 "최근 30일 생성 상품 0건"으로 극단적으로 분리돼 있어, OFFSET이 커져도 `idx_products_brand_created_at` ref 전략이 끝까지 유지됐다(4단계에서 본 "단일 인덱스로 전략이 뒤집히는" 현상은 brand-date 상관관계가 이보다 약할 때 나타난다 — 상관관계가 강할수록 ref가 처음부터 유리해 뒤집힐 여지조차 없어진다는 뜻으로, 4단계 결론을 반대 방향에서 재확인한 셈이다).
+- 측정은 컨테이너 기동 직후 데이터 적재 → `ANALYZE TABLE` → 곧바로 실행한 값으로, 별도 워밍업 없이 1회 측정한 값이다. 반복 측정으로 분산까지 보는 건 Future Work로 남긴다.
 
 ---
 
