@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,6 +33,7 @@ import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.product.projection.ProductAdminView;
 import com.loopers.domain.product.projection.ProductDetail;
 import com.loopers.domain.product.projection.ProductSummary;
+import com.loopers.support.cache.RedisCacheStore;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -40,6 +45,9 @@ class ProductFacadeTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private RedisCacheStore redisCacheStore;
 
     @InjectMocks
     private ProductFacade productFacade;
@@ -121,7 +129,8 @@ class ProductFacadeTest {
                 () -> assertThat(product.getName().value()).isEqualTo(name),
                 () -> assertThat(product.getPrice().value()).isEqualTo(price),
                 () -> assertThat(product.getStock().value()).isEqualTo(stock),
-                () -> then(productRepository).should().getActiveById(productId)
+                () -> then(productRepository).should().getActiveById(productId),
+                () -> then(redisCacheStore).should().evictAfterCommit("product:detail:1")
             );
         }
 
@@ -163,7 +172,10 @@ class ProductFacadeTest {
             productFacade.deleteProduct(productId);
 
             // assert
-            assertThat(product.getDeletedAt()).isNotNull();
+            assertAll(
+                () -> assertThat(product.getDeletedAt()).isNotNull(),
+                () -> then(redisCacheStore).should().evictAfterCommit("product:detail:1")
+            );
         }
 
         @DisplayName("대상 상품이 없거나 이미 삭제되었으면 예외 없이 아무 동작도 하지 않는다(멱등).")
@@ -176,7 +188,10 @@ class ProductFacadeTest {
             productFacade.deleteProduct(productId);
 
             // assert
-            then(productRepository).should().findActiveById(productId);
+            assertAll(
+                () -> then(productRepository).should().findActiveById(productId),
+                () -> then(redisCacheStore).should(never()).evictAfterCommit(any())
+            );
         }
     }
 
@@ -218,18 +233,79 @@ class ProductFacadeTest {
             // assert
             assertThat(result.getContent().get(0).isAvailable()).isFalse();
         }
+
+        @SuppressWarnings("unchecked")
+        @DisplayName("핫셋(필터 없음·좋아요순·첫 페이지)은 캐시에 있으면 저장소를 조회하지 않는다.")
+        @Test
+        void returnsCachedHotList_whenCacheHit() {
+            // arrange
+            CachedProductSummaryInfos cached = new CachedProductSummaryInfos(
+                List.of(new ProductSummaryInfo(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, true, 100)), 100_000L);
+            given(redisCacheStore.getOrLoad(eq("product:list:likes_desc:p0:s20"), eq(CachedProductSummaryInfos.class), any(Duration.class), any()))
+                .willReturn(cached);
+
+            // act
+            Page<ProductSummaryInfo> result = productFacade.readProducts(null, ProductSortType.LIKES_DESC, 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.getContent()).hasSize(1),
+                () -> assertThat(result.getTotalElements()).isEqualTo(100_000L),
+                () -> then(productRepository).should(never()).findActiveSummaries(any(), any(), anyInt(), anyInt())
+            );
+        }
+
+        @SuppressWarnings("unchecked")
+        @DisplayName("핫셋인데 캐시에 없으면 저장소 조회 후 캐시에 채운다.")
+        @Test
+        void loadsAndCachesHotList_whenCacheMiss() {
+            // arrange
+            ProductSummary summary = new ProductSummary(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, 5, 100);
+            given(productRepository.findActiveSummaries(null, ProductSortType.LIKES_DESC, 0, 20)).willReturn(new PageImpl<>(List.of(summary)));
+            given(redisCacheStore.getOrLoad(eq("product:list:likes_desc:p0:s20"), eq(CachedProductSummaryInfos.class), any(Duration.class), any()))
+                .willAnswer(invocation -> ((Supplier<CachedProductSummaryInfos>) invocation.getArgument(3)).get());
+
+            // act
+            productFacade.readProducts(null, ProductSortType.LIKES_DESC, 0, 20);
+
+            // assert
+            assertAll(
+                () -> then(productRepository).should().findActiveSummaries(null, ProductSortType.LIKES_DESC, 0, 20),
+                () -> then(redisCacheStore).should().getOrLoad(eq("product:list:likes_desc:p0:s20"), eq(CachedProductSummaryInfos.class), eq(Duration.ofSeconds(30)), any())
+            );
+        }
+
+        @DisplayName("브랜드 필터가 있으면 캐시를 거치지 않고 저장소로 직행한다.")
+        @Test
+        void bypassesCache_whenNotHotList() {
+            // arrange
+            ProductSummary summary = new ProductSummary(1L, "감성 가디건", 1L, "감성 브랜드", 39_000, 5, 3);
+            given(productRepository.findActiveSummaries(847L, ProductSortType.LIKES_DESC, 0, 20)).willReturn(new PageImpl<>(List.of(summary)));
+
+            // act
+            productFacade.readProducts(847L, ProductSortType.LIKES_DESC, 0, 20);
+
+            // assert
+            assertAll(
+                () -> then(productRepository).should().findActiveSummaries(847L, ProductSortType.LIKES_DESC, 0, 20),
+                () -> then(redisCacheStore).should(never()).getOrLoad(any(), any(), any(), any())
+            );
+        }
     }
 
     @DisplayName("상품 상세를 조회할 때,")
     @Nested
     class ReadProduct {
 
+        @SuppressWarnings("unchecked")
         @DisplayName("활성 상품이면 상세 정보를 변환해 반환한다.")
         @Test
         void returnsDetailInfo_whenProductIsActive() {
             // arrange
             ProductDetail detail = new ProductDetail(1L, "감성 가디건", "포근한 가디건", 1L, "감성 브랜드", 39_000, 5, 2);
             given(productRepository.getActiveDetailById(1L)).willReturn(detail);
+            given(redisCacheStore.getOrLoad(eq("product:detail:1"), eq(ProductDetailInfo.class), any(Duration.class), any()))
+                .willAnswer(invocation -> ((Supplier<ProductDetailInfo>) invocation.getArgument(3)).get());
 
             // act
             ProductDetailInfo result = productFacade.readProduct(1L);
@@ -242,18 +318,61 @@ class ProductFacadeTest {
             );
         }
 
+        @SuppressWarnings("unchecked")
         @DisplayName("상품이 없거나 삭제되어 조회에 실패하면 NOT_FOUND 예외가 전파된다.")
         @Test
         void throwsNotFound_whenProductIsAbsent() {
             // arrange
             given(productRepository.getActiveDetailById(1L))
                 .willThrow(new CoreException(ErrorType.NOT_FOUND, "상품이 존재하지 않습니다."));
+            given(redisCacheStore.getOrLoad(eq("product:detail:1"), eq(ProductDetailInfo.class), any(Duration.class), any()))
+                .willAnswer(invocation -> ((Supplier<ProductDetailInfo>) invocation.getArgument(3)).get());
 
             // act & assert
             assertThatThrownBy(() -> productFacade.readProduct(1L))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @SuppressWarnings("unchecked")
+        @DisplayName("캐시에 상세가 있으면 저장소를 조회하지 않고 캐시 값을 반환한다.")
+        @Test
+        void returnsCached_whenCacheHit() {
+            // arrange
+            ProductDetailInfo cached = new ProductDetailInfo(1L, "감성 가디건", "포근한 가디건", 1L, "감성 브랜드", 39_000, true, 9);
+            given(redisCacheStore.getOrLoad(eq("product:detail:1"), eq(ProductDetailInfo.class), any(Duration.class), any()))
+                .willReturn(cached);
+
+            // act
+            ProductDetailInfo result = productFacade.readProduct(1L);
+
+            // assert
+            assertAll(
+                () -> assertThat(result).isEqualTo(cached),
+                () -> then(productRepository).should(never()).getActiveDetailById(any())
+            );
+        }
+
+        @SuppressWarnings("unchecked")
+        @DisplayName("캐시에 없으면 저장소를 조회해 캐시에 채우고 반환한다.")
+        @Test
+        void loadsAndCaches_whenCacheMiss() {
+            // arrange
+            ProductDetail detail = new ProductDetail(1L, "감성 가디건", "포근한 가디건", 1L, "감성 브랜드", 39_000, 5, 2);
+            given(productRepository.getActiveDetailById(1L)).willReturn(detail);
+            given(redisCacheStore.getOrLoad(eq("product:detail:1"), eq(ProductDetailInfo.class), any(Duration.class), any()))
+                .willAnswer(invocation -> ((Supplier<ProductDetailInfo>) invocation.getArgument(3)).get());
+
+            // act
+            ProductDetailInfo result = productFacade.readProduct(1L);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.likeCount()).isEqualTo(2),
+                () -> then(productRepository).should().getActiveDetailById(1L),
+                () -> then(redisCacheStore).should().getOrLoad(eq("product:detail:1"), eq(ProductDetailInfo.class), eq(Duration.ofSeconds(60)), any())
+            );
         }
     }
 

@@ -1,5 +1,8 @@
 package com.loopers.application.product;
 
+import java.time.Duration;
+import java.util.function.Supplier;
+
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,6 +11,7 @@ import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.support.cache.RedisCacheStore;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -18,8 +22,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ProductFacade {
 
+    private static final String PRODUCT_DETAIL_KEY_FORMAT = "product:detail:%d";
+    private static final Duration PRODUCT_DETAIL_TTL = Duration.ofSeconds(60);
+    private static final String PRODUCT_HOT_LIST_KEY_FORMAT = "product:list:likes_desc:p0:s%d";
+    private static final Duration PRODUCT_HOT_LIST_TTL = Duration.ofSeconds(30);
+
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final RedisCacheStore redisCacheStore;
 
     public ProductCreateInfo createProduct(Long brandId, String name, String description, Integer price, Integer stock) {
         if (!brandRepository.existsActiveById(brandId)) {
@@ -41,29 +51,48 @@ public class ProductFacade {
         ProductModel product = productRepository.getActiveById(productId);
 
         product.update(name, description, price, stock);
+        redisCacheStore.evictAfterCommit(String.format(PRODUCT_DETAIL_KEY_FORMAT, productId));
 
         return ProductUpdateInfo.from(product);
     }
 
     public void deleteProduct(Long productId) {
-        productRepository.findActiveById(productId).ifPresent(ProductModel::delete);
+        productRepository.findActiveById(productId)
+            .ifPresent(product -> {
+                product.delete();
+                redisCacheStore.evictAfterCommit(String.format(PRODUCT_DETAIL_KEY_FORMAT, productId));
+            });
     }
 
     @Transactional(readOnly = true)
     public Page<ProductSummaryInfo> readProducts(Long brandId, ProductSortType sort, int page, int size) {
-        return productRepository.findActiveSummaries(brandId, sort, page, size)
-            .map(ProductSummaryInfo::from);
+        if (isHotProducts(brandId, sort, page)) {
+            String key = String.format(PRODUCT_HOT_LIST_KEY_FORMAT, size);
+            Supplier<CachedProductSummaryInfos> cachedProductSummaryInfosSupplier = () -> CachedProductSummaryInfos.from(
+                productRepository.findActiveSummaries(brandId, sort, page, size).map(ProductSummaryInfo::from)
+            );
+
+            return redisCacheStore.getOrLoad(key, CachedProductSummaryInfos.class, PRODUCT_HOT_LIST_TTL, cachedProductSummaryInfosSupplier).toPage(page, size);
+        }
+
+        return productRepository.findActiveSummaries(brandId, sort, page, size).map(ProductSummaryInfo::from);
+    }
+
+    private boolean isHotProducts(Long brandId, ProductSortType sort, int page) {
+        return brandId == null && sort == ProductSortType.LIKES_DESC && page == 0;
     }
 
     @Transactional(readOnly = true)
     public ProductDetailInfo readProduct(Long productId) {
-        return ProductDetailInfo.from(productRepository.getActiveDetailById(productId));
+        String key = String.format(PRODUCT_DETAIL_KEY_FORMAT, productId);
+        Supplier<ProductDetailInfo> productDetailInfoSupplier = () -> ProductDetailInfo.from(productRepository.getActiveDetailById(productId));
+
+        return redisCacheStore.getOrLoad(key, ProductDetailInfo.class, PRODUCT_DETAIL_TTL, productDetailInfoSupplier);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductAdminInfo> readProductsForAdmin(Long brandId, int page, int size) {
-        return productRepository.findActiveAdminViews(brandId, page, size)
-            .map(ProductAdminInfo::from);
+        return productRepository.findActiveAdminViews(brandId, page, size).map(ProductAdminInfo::from);
     }
 
     @Transactional(readOnly = true)

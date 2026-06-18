@@ -6,10 +6,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
-public record CachedProductPage(List<ProductSummaryInfo> content, long totalElements) {
+public record CachedProductSummaryInfos(List<ProductSummaryInfo> content, long totalElements) {
 
-    public static CachedProductPage from(Page<ProductSummaryInfo> page) {
-        return new CachedProductPage(page.getContent(), page.getTotalElements());
+    public static CachedProductSummaryInfos from(Page<ProductSummaryInfo> productSummaryInfos) {
+        return new CachedProductSummaryInfos(productSummaryInfos.getContent(), productSummaryInfos.getTotalElements());
     }
 
     public Page<ProductSummaryInfo> toPage(int page, int size) {
