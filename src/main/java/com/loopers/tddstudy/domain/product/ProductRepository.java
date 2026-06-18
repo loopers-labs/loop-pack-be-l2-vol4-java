@@ -14,4 +14,11 @@ public interface ProductRepository {
     List<Product> findAll();
 
     List<Product> findAllByBrandId(Long brandId);
+
+    List<Product> findAllByFilter(Long brandId, String sort);
+
+
+    List<Product> saveAll(List<Product> products);
+
+    List<Product> findTop10ByOrderByLikeCountDesc();
 }

@@ -6,7 +6,7 @@ import org.testcontainers.utility.DockerImageName;
 
 @Configuration
 public class RedisTestContainersConfig {
-    private static final RedisContainer redisContainer = new RedisContainer(DockerImageName.parse("redis:latest"));
+    private static final RedisContainer redisContainer = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
 
     static {
         redisContainer.start();
