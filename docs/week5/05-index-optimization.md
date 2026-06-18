@@ -13,6 +13,32 @@
 
 ---
 
+## 0.1 측정 환경 / 도구 / 시나리오
+
+이 문서의 수치는 **부하 테스트가 아니라 단일 세션에서 `EXPLAIN ANALYZE` 로 단건 쿼리를 측정**한 값이다.
+따라서 RPS·동시 사용자 같은 처리량 차원은 측정 대상이 아니다(동시성 부하는 별도 과제).
+
+**환경 (CPU/메모리/컨테이너 구성)**
+
+- 호스트: AMD Ryzen 5 4500U (6코어/6스레드), RAM 16GB, Windows 10 Pro
+- 컨테이너 런타임: Rancher Desktop (WSL2 백엔드, VM 2 vCPU·4GB 할당)
+- DB: MySQL 8.0.46 (`mysql:8.0` 단일 컨테이너, 리소스 한도 미설정 → VM 자원 공유)
+- 측정 대상 데이터: `loopers_bench` 스키마
+
+**부하 도구**
+
+- 해당 없음 — `mysql` CLI 로 `EXPLAIN` / `EXPLAIN ANALYZE` 를 단건 실행(`benchmark/run.sh`, 단일 세션).
+  ASC↔DESC 비교는 3회 반복 후 typical 값을 기록(§8.2).
+
+**시나리오 (RPS · 동시 사용자 수 · 데이터 규모)**
+
+- RPS: 해당 없음 (단건 쿼리 측정)
+- 동시 사용자 수: 해당 없음 (단일 세션·단일 쿼리)
+- 데이터 규모: 상품 **120,000건**(활성 110,638건), 브랜드 50개, `likes_count` 0~49,998 멱급수 편중, soft-delete ~7.8%
+- 측정 쿼리: A) `brand_id=? AND deleted_at IS NULL ORDER BY likes_count DESC, id DESC` / B) 브랜드 조건 제거 — 각 page 0(OFFSET 0) + 딥오프셋(OFFSET 1000)
+
+---
+
 ## 1. 대상 쿼리
 
 운영 코드 `ProductRepositoryImpl.findActivePage()` 가 생성하는 목록 쿼리 두 가지다.
