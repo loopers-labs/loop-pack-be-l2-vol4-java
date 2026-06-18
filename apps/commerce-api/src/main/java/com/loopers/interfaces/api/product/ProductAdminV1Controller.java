@@ -81,4 +81,12 @@ public class ProductAdminV1Controller {
         productApplicationService.deleteProduct(productId);
         return ApiResponse.success(null);
     }
+
+    /** like_count 재집계 (drift 보정) — 실제 likes 집계로 전체 갱신. */
+    @PostMapping("/like-counts/resync")
+    public ApiResponse<Integer> resyncLikeCounts(
+        @RequestHeader("X-Loopers-Ldap") String ldap
+    ) {
+        return ApiResponse.success(productApplicationService.resyncLikeCounts());
+    }
 }

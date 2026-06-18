@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -28,10 +29,10 @@ import static org.mockito.Mockito.when;
 /**
  * LikeApplicationService 단위 테스트.
  *
- * <p>스타일 2 전환에 따라 LikeService 가 흡수되어 ApplicationService 가 유스케이스 흐름·조회·저장·멱등 처리를
- * 모두 책임지게 되었다. 좋아요 등록/취소의 멱등성과 협력 흐름을 검증한다.
+ * <p>좋아요 등록/취소의 멱등성과, 좋아요 수 비정규화(like_count) 동기화 흐름을 검증한다.
+ * 핵심 원칙: likes 테이블이 실제로 변경된 경우에만 like_count 를 갱신한다.
  *
- * <p>Mockito 로 Repository 와 StockRepository 를 대체하여 Spring 컨텍스트 없이 단위 테스트로 구성한다.
+ * <p>Mockito 로 Repository 를 대체하여 Spring 컨텍스트 없이 단위 테스트로 구성한다.
  */
 class LikeApplicationServiceTest {
 
@@ -52,9 +53,9 @@ class LikeApplicationServiceTest {
     @Nested
     class Like {
 
-        @DisplayName("정상적으로 등록되어 saveAndFlush 가 호출된다.")
+        @DisplayName("정상 등록되면 saveAndFlush 와 like_count 증가가 함께 호출된다.")
         @Test
-        void savesLike_whenNotYetLiked() {
+        void savesLikeAndIncrementsCount_whenNotYetLiked() {
             // arrange
             ProductModel product = new ProductModel(1L, "신발", "러닝화", 50_000L);
             when(productRepository.findById(100L)).thenReturn(Optional.of(product));
@@ -63,13 +64,14 @@ class LikeApplicationServiceTest {
             // act
             sut.like(10L, 100L);
 
-            // assert — saveAndFlush 로 즉시 flush하여 UK 위반을 catch 범위 내에서 처리
+            // assert — INSERT 성공 경로에서만 like_count + 1
             verify(likeRepository, times(1)).saveAndFlush(any(LikeModel.class));
+            verify(productRepository, times(1)).increaseLikeCount(100L);
         }
 
-        @DisplayName("이미 좋아요한 경우 saveAndFlush 가 호출되지 않는다 (멱등 - P-1).")
+        @DisplayName("이미 좋아요한 경우 saveAndFlush 도 like_count 증가도 일어나지 않는다 (멱등 - P-1).")
         @Test
-        void doesNotSave_whenAlreadyLiked() {
+        void doesNothing_whenAlreadyLiked() {
             // arrange
             ProductModel product = new ProductModel(1L, "신발", "러닝화", 50_000L);
             when(productRepository.findById(100L)).thenReturn(Optional.of(product));
@@ -80,19 +82,21 @@ class LikeApplicationServiceTest {
 
             // assert
             verify(likeRepository, never()).saveAndFlush(any());
+            verify(productRepository, never()).increaseLikeCount(anyLong());
         }
 
-        @DisplayName("동시 요청으로 UK 위반이 발생해도 정상 종료된다 (멱등 최후 방어선).")
+        @DisplayName("동시 요청 UK 위반 시 정상 종료하며 like_count 는 증가하지 않는다 (멱등 최후 방어선).")
         @Test
-        void recoversFromUkViolation() {
+        void recoversFromUkViolation_withoutIncrement() {
             // arrange
             ProductModel product = new ProductModel(1L, "신발", "러닝화", 50_000L);
             when(productRepository.findById(100L)).thenReturn(Optional.of(product));
             when(likeRepository.existsByUserIdAndProductId(10L, 100L)).thenReturn(false);
             when(likeRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uk violation"));
 
-            // act & assert
+            // act & assert — likes 무변경이므로 count 도 건드리지 않음
             assertDoesNotThrow(() -> sut.like(10L, 100L));
+            verify(productRepository, never()).increaseLikeCount(anyLong());
         }
 
         @DisplayName("상품이 존재하지 않으면 NOT_FOUND 예외가 발생한다 (P-3).")
@@ -107,6 +111,7 @@ class LikeApplicationServiceTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeRepository, never()).saveAndFlush(any());
+            verify(productRepository, never()).increaseLikeCount(anyLong());
         }
     }
 
@@ -114,41 +119,29 @@ class LikeApplicationServiceTest {
     @Nested
     class Unlike {
 
-        @DisplayName("정상적으로 delete 가 호출된다.")
+        @DisplayName("실제 삭제되면 like_count 감소가 함께 호출된다.")
         @Test
-        void deletesLike() {
+        void deletesAndDecrementsCount_whenLikeExists() {
+            // arrange — delete 가 1행 삭제(실제 좋아요 존재)
+            when(likeRepository.delete(10L, 100L)).thenReturn(1);
+
             // act
             sut.unlike(10L, 100L);
 
             // assert
             verify(likeRepository, times(1)).delete(10L, 100L);
+            verify(productRepository, times(1)).decreaseLikeCount(100L);
         }
 
-        @DisplayName("좋아요가 없는 상태에서 취소해도 예외 없이 정상 종료된다 (멱등 - P-2).")
+        @DisplayName("좋아요가 없으면(0행 삭제) like_count 는 감소하지 않는다 (멱등 - P-2).")
         @Test
-        void isIdempotent_whenNoLikeExists() {
-            // delete 는 0 row 영향이든 1 row 영향이든 예외 없음
+        void doesNotDecrement_whenNoLikeExists() {
+            // arrange — delete 가 0행(원래 없던 좋아요)
+            when(likeRepository.delete(10L, 100L)).thenReturn(0);
 
             // act & assert
             assertDoesNotThrow(() -> sut.unlike(10L, 100L));
-        }
-    }
-
-    @DisplayName("상품의 좋아요 수를 집계할 때,")
-    @Nested
-    class CountByProductId {
-
-        @DisplayName("Repository 의 count 결과를 그대로 반환한다.")
-        @Test
-        void returnsCount() {
-            // arrange
-            when(likeRepository.countByProductId(100L)).thenReturn(42L);
-
-            // act
-            long result = sut.countByProductId(100L);
-
-            // assert
-            assertThat(result).isEqualTo(42L);
+            verify(productRepository, never()).decreaseLikeCount(anyLong());
         }
     }
 }

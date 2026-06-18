@@ -52,4 +52,19 @@ public class ProductRepositoryImpl implements ProductRepository {
     public void softDeleteAllByBrandId(Long brandId) {
         productJpaRepository.softDeleteAllByBrandId(brandId);
     }
+
+    @Override
+    public void increaseLikeCount(Long productId) {
+        productJpaRepository.increaseLikeCount(productId);
+    }
+
+    @Override
+    public void decreaseLikeCount(Long productId) {
+        productJpaRepository.decreaseLikeCount(productId);
+    }
+
+    @Override
+    public int resyncAllLikeCounts() {
+        return productJpaRepository.resyncAllLikeCounts();
+    }
 }

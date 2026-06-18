@@ -24,12 +24,33 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     List<ProductModel> findAllByPriceAsc(@Param("brandId") Long brandId, Pageable pageable);
 
     @Query("SELECT p FROM ProductModel p " +
-        "LEFT JOIN com.loopers.domain.like.LikeModel l ON l.productId = p.id " +
         "WHERE p.deletedAt IS NULL " +
         "AND (:brandId IS NULL OR p.brandId = :brandId) " +
-        "GROUP BY p.id " +
-        "ORDER BY COUNT(l.id) DESC")
+        "ORDER BY p.likeCount DESC")
     List<ProductModel> findAllByLikesDesc(@Param("brandId") Long brandId, Pageable pageable);
+
+    /** 좋아요 등록 시 조건부 원자 증가. 좋아요 INSERT 가 실제 성공한 경우에만 호출된다. */
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    int increaseLikeCount(@Param("id") Long id);
+
+    /** 좋아요 취소 시 조건부 원자 감소. 음수 방지(like_count > 0). 실제 삭제된 경우에만 호출된다. */
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
+    int decreaseLikeCount(@Param("id") Long id);
+
+    /**
+     * 모든 상품의 like_count 를 실제 likes 집계로 재계산(drift 보정).
+     *
+     * <p>평소엔 등록/취소 시 원자 UPDATE 로 실시간 동기화되지만, 동기화 경로 버그나 DB 직접 조작으로
+     * 누적될 수 있는 오차를 주기적으로 리셋한다. 관리용 수동 호출 전제.
+     *
+     * @return 갱신된 상품 행 수
+     */
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.likeCount = "
+        + "(SELECT COUNT(l) FROM com.loopers.domain.like.LikeModel l WHERE l.productId = p.id)")
+    int resyncAllLikeCounts();
 
     @Query("SELECT p FROM ProductModel p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
     List<ProductModel> findAllByBrandId(@Param("brandId") Long brandId);

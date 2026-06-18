@@ -6,9 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -37,29 +35,12 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
-    public void delete(Long userId, Long productId) {
-        likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
+    public int delete(Long userId, Long productId) {
+        return likeJpaRepository.deleteByUserIdAndProductId(userId, productId);
     }
 
     @Override
     public Optional<LikeModel> findByUserIdAndProductId(Long userId, Long productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId);
-    }
-
-    @Override
-    public long countByProductId(Long productId) {
-        return likeJpaRepository.countByProductId(productId);
-    }
-
-    @Override
-    public Map<Long, Long> countByProductIdIn(List<Long> productIds) {
-        if (productIds.isEmpty()) {
-            return Map.of();
-        }
-        return likeJpaRepository.countGroupedByProductIdIn(productIds).stream()
-            .collect(Collectors.toMap(
-                row -> (Long) row[0],
-                row -> (Long) row[1]
-            ));
     }
 }
