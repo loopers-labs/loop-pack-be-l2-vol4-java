@@ -125,6 +125,7 @@ sequenceDiagram
 - 결제 성공 시 모든 상품의 재고 확정 → 주문 확정이 단일 트랜잭션으로 묶인다. 하나라도 실패하면 전체 롤백된다.
 - 포인트 차감 단계가 제거되어 트랜잭션이 재고 확정 + 주문 확정 2단계로 단순해졌다.
 - 결제 실패 시 모든 상품의 reserved_quantity만 되돌린다. total_quantity는 건드리지 않는다.
+- **쿠폰 복구**: 결제 실패/금액 불일치로 주문을 FAILED 처리할 때, 해당 주문에 적용된 쿠폰이 있으면 `releaseCoupon(orderId)`로 `USED → AVAILABLE` 복구한다. (재고 예약 해제와 동일 트랜잭션·동일 시점)
 
 ---
 
@@ -200,6 +201,7 @@ sequenceDiagram
 - 스케줄러는 조회와 위임만 한다. 실제 재고 해제는 StockService, 상태 전이는 OrderService가 책임진다.
 - 복수 상품 주문이므로 주문 1건당 포함된 모든 상품 라인의 예약을 해제한다.
 - 만료 기준은 주문 생성 시간 기준 **15분**으로 한다. (생성 후 15분 초과 PENDING → 만료)
+- 만료 주문에 적용된 쿠폰이 있으면 재고 예약 해제와 함께 `releaseCoupon(orderId)`로 `USED → AVAILABLE` 복구한다.
 
 ---
 
@@ -374,3 +376,119 @@ sequenceDiagram
 - 재고 수정은 조건부 UPDATE로 처리: `UPDATE stocks SET total_quantity = :newTotal WHERE id = :id AND :newTotal >= reserved_quantity`.
 - affected rows = 0이면 새 보유량이 현재 예약량보다 작은 것이므로 **409로 거부**한다. (불변식 `total >= reserved` 보장)
 - 브랜드(brand_id)는 수정 대상에서 제외한다. (변경 불가)
+
+---
+
+## 8. 쿠폰 발급 (POST /api/v1/coupons/{couponId}/issue)
+
+**목적**: 쿠폰 템플릿을 유저에게 발급할 때 중복 발급/만료 검증 흐름을 검증한다.
+**검증 포인트**: 동일 템플릿 중복 발급이 `(user_id, template_id)` 유니크로 차단되는 것, 발급 시점에 만료된 템플릿은 거부되는 것.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API
+    participant CouponFacade
+    participant CouponTemplateService
+    participant UserCouponService
+
+    User->>API: POST /api/v1/coupons/{couponId}/issue
+    API->>CouponFacade: issue(userId, templateId)
+
+    CouponFacade->>CouponTemplateService: findActive(templateId)
+    alt 템플릿 없음/삭제됨
+        CouponTemplateService-->>CouponFacade: CoreException(COUPON_NOT_FOUND)
+        CouponFacade-->>API: 404 Not Found
+    end
+    CouponTemplateService-->>CouponFacade: template (type, value, minOrderAmount, expiredAt)
+
+    alt 템플릿 이미 만료 (expiredAt < now)
+        CouponFacade-->>API: CoreException(COUPON_EXPIRED)
+        API-->>User: 409 Conflict
+    end
+
+    CouponFacade->>UserCouponService: issue(userId, template)
+    Note over UserCouponService: 발급 시점 스냅샷(type/value/minOrderAmount/expiredAt) 저장<br/>status = AVAILABLE
+    alt 이미 발급받음 (user_id, template_id 유니크 위반)
+        UserCouponService-->>CouponFacade: CoreException(COUPON_ALREADY_ISSUED)
+        CouponFacade-->>API: 409 Conflict
+    end
+    UserCouponService-->>CouponFacade: userCoupon
+    CouponFacade-->>API: { userCouponId, status }
+    API-->>User: 201 Created
+```
+
+**읽는 포인트**
+- `{couponId}`는 **템플릿 ID**다. 발급 결과로 `user_coupons` 한 건이 생성된다.
+- 동일 템플릿 중복 발급은 `(user_id, template_id)` 유니크 제약이 DB 레벨에서 막는다. 위반 시 409.
+- 발급 쿠폰은 템플릿의 할인 규칙을 **발급 시점 스냅샷**으로 보관한다. 이후 템플릿이 수정/삭제돼도 이미 발급된 쿠폰엔 영향이 없다.
+
+---
+
+## 9. 주문 생성 시 쿠폰 적용 (POST /api/v1/orders, couponId 포함)
+
+**목적**: 주문 생성 흐름(섹션 1)에 쿠폰 검증·할인·선점(USED)이 끼어드는 위치와 실패 시 롤백을 검증한다.
+**검증 포인트**: 쿠폰 사용이 조건부 UPDATE로 재사용을 막는 것, 재고 예약과 쿠폰 사용이 하나의 트랜잭션으로 묶여 한쪽 실패 시 함께 롤백되는 것.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API
+    participant OrderFacade
+    participant CouponService
+    participant StockService
+    participant OrderService
+    participant PGClient
+
+    User->>API: POST /api/v1/orders (items[], couponId?, 배송지)
+    API->>OrderFacade: createOrder(userId, items, couponId, 배송지)
+
+    Note over OrderFacade, OrderService: 주문 생성 단일 트랜잭션 시작
+    loop 주문 상품(item)별
+        OrderFacade->>StockService: reserveStock(productId, qty)
+        alt 재고 부족
+            StockService-->>OrderFacade: CoreException(OUT_OF_STOCK)
+            Note over OrderFacade: 트랜잭션 롤백 (재고 예약 + 쿠폰 사용 모두 해제)
+            OrderFacade-->>API: 409 Conflict
+        end
+    end
+
+    OrderFacade->>OrderFacade: originalAmount = Σ(price × qty)
+
+    alt couponId 있음
+        OrderFacade->>CouponService: findOwned(couponId, userId)
+        alt 쿠폰 없음 / 타 유저 소유
+            CouponService-->>OrderFacade: CoreException(COUPON_NOT_FOUND)
+            OrderFacade-->>API: 404 (트랜잭션 롤백)
+        end
+        CouponService->>CouponService: 만료/최소주문금액 검증 (expiredAt, minOrderAmount)
+        alt 만료 / 최소금액 미달
+            CouponService-->>OrderFacade: CoreException(COUPON_EXPIRED / COUPON_MIN_ORDER_NOT_MET)
+            OrderFacade-->>API: 409 (트랜잭션 롤백)
+        end
+        OrderFacade->>CouponService: use(couponId, orderId)
+        Note over CouponService: UPDATE user_coupons SET status=USED, order_id=?<br/>WHERE id=? AND status=AVAILABLE
+        alt affected rows = 0 (이미 사용됨, 동시 요청)
+            CouponService-->>OrderFacade: CoreException(COUPON_ALREADY_USED)
+            OrderFacade-->>API: 409 (트랜잭션 롤백)
+        end
+        CouponService->>CouponService: discount = calculate(type, value, originalAmount) (RATE=버림, cap=원금)
+        CouponService-->>OrderFacade: discountAmount
+    end
+
+    OrderFacade->>OrderFacade: pgAmount = originalAmount - discountAmount
+    OrderFacade->>OrderService: createOrder(userId, PENDING, items, originalAmount, discountAmount, pgAmount, couponId, 배송지)
+    OrderService-->>OrderFacade: orderId
+    Note over OrderFacade, OrderService: 트랜잭션 커밋
+
+    OrderFacade->>PGClient: initializePayment(orderId, pgAmount)
+    PGClient-->>OrderFacade: pgRedirectUrl
+    OrderFacade-->>API: { orderId, pgRedirectUrl }
+    API-->>User: 200 OK
+```
+
+**읽는 포인트**
+- 쿠폰 사용은 **조건부 UPDATE**(`status=USED WHERE status=AVAILABLE`)로 처리한다. 동시 요청으로 같은 쿠폰을 두 주문에 쓰려 하면 한쪽은 affected rows=0 → 409로 거부된다. (Lost Update / 이중 사용 방지)
+- 재고 예약과 쿠폰 사용이 **하나의 트랜잭션**에 묶인다. 재고 부족·쿠폰 실패 어느 쪽이든 둘 다 롤백돼 정합성이 유지된다.
+- 할인액은 원금 기준으로 계산하며, 정률은 버림·할인액 상한은 원금이다. 최종 `pgAmount = originalAmount - discountAmount`가 PG 결제 금액이 된다.
+- 결제 실패 / 금액 불일치(섹션 2) 또는 PENDING 만료(섹션 4) 시, 재고 예약 해제와 함께 쿠폰도 `AVAILABLE`로 복구한다(`releaseCoupon(orderId)`).

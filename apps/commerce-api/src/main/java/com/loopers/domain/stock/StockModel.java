@@ -56,17 +56,35 @@ public class StockModel extends BaseEntity {
 
     /** 결제 확정 — reserved 차감 + total 차감 */
     public void confirm(int qty) {
+        if (qty <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "확정 수량은 1 이상이어야 합니다.");
+        }
+        if (this.reservedQuantity < qty) {
+            throw new CoreException(ErrorType.CONFLICT, "예약 수량보다 많이 확정할 수 없습니다.");
+        }
+        if (this.totalQuantity < qty) {
+            throw new CoreException(ErrorType.CONFLICT, "보유 수량보다 많이 확정할 수 없습니다.");
+        }
         this.totalQuantity -= qty;
         this.reservedQuantity -= qty;
     }
 
     /** 결제 실패/만료 — reserved만 해제, total 유지 */
     public void release(int qty) {
+        if (qty <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "해제 수량은 1 이상이어야 합니다.");
+        }
+        if (this.reservedQuantity < qty) {
+            throw new CoreException(ErrorType.CONFLICT, "예약 수량보다 많이 해제할 수 없습니다.");
+        }
         this.reservedQuantity -= qty;
     }
 
     /** 주문 취소(confirm 이후) — total 복구 */
     public void restore(int qty) {
+        if (qty <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복구 수량은 1 이상이어야 합니다.");
+        }
         this.totalQuantity += qty;
     }
 

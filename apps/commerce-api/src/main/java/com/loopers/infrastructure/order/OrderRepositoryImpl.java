@@ -2,7 +2,6 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
-import com.loopers.domain.order.OrderStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +34,21 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByIdForUpdate(UUID id) {
+        return orderJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
+    public Optional<OrderModel> findByIdAndUserIdForUpdate(UUID id, UUID userId) {
+        return orderJpaRepository.findByIdAndUserIdForUpdate(id, userId);
+    }
+
+    @Override
+    public List<OrderModel> findPendingBeforeForUpdate(ZonedDateTime before) {
+        return orderJpaRepository.findPendingBeforeForUpdate(before);
+    }
+
+    @Override
     public Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt, pageable);
     }
@@ -45,13 +59,8 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public List<OrderModel> findPendingBefore(ZonedDateTime before) {
-        return orderJpaRepository.findAllByStatusAndCreatedAtBefore(OrderStatus.PENDING, before);
-    }
-
-    @Override
-    public List<OrderModel> findPendingBeforeWithItems(ZonedDateTime before) {
-        return orderJpaRepository.findAllPendingWithItemsBefore(before);
+    public Optional<OrderModel> findByIdempotencyKey(String idempotencyKey) {
+        return orderJpaRepository.findByIdempotencyKey(idempotencyKey);
     }
 
     @Override

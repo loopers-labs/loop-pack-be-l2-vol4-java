@@ -1,7 +1,6 @@
 package com.loopers.domain.like;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -20,29 +19,21 @@ public class LikeService {
     }
 
     /**
-     * 좋아요 저장 — 이미 존재하면 기존 반환 (멱등).
-     * saveAndFlush로 즉시 DB 전송 → 동시 중복 INSERT 시 DataIntegrityViolationException을
-     * try-catch 내에서 포착 → 기존 레코드 반환.
+     * 좋아요 — 멱등 삽입(INSERT IGNORE). 새로 삽입됐으면 true, 이미 있으면 false.
+     * 동시 중복 요청도 유니크 충돌을 예외 없이 무시하므로 트랜잭션 오염(rollback-only)이 없다.
+     * Facade에서 true일 때만 likeCount 증가.
      */
-    public LikeModel like(UUID userId, UUID productId) {
-        try {
-            return likeRepository.findByUserIdAndProductId(userId, productId)
-                .orElseGet(() -> likeRepository.saveAndFlush(new LikeModel(userId, productId)));
-        } catch (DataIntegrityViolationException e) {
-            return likeRepository.findByUserIdAndProductId(userId, productId).orElseThrow();
-        }
+    public boolean like(UUID userId, UUID productId) {
+        return likeRepository.insertIgnore(userId, productId) == 1;
     }
 
     /**
-     * 좋아요 취소 — 존재하면 삭제 후 true, 없으면 false (멱등)
-     * Facade에서 true일 때만 likeCount 차감
+     * 좋아요 취소 — 멱등 삭제. 실제 삭제됐으면 true, 없으면 false.
+     * bulk DELETE의 실제 영향 행 수로 판정 → 동시 중복 취소 시 한쪽만 true.
+     * Facade에서 true일 때만 likeCount 차감.
      */
     public boolean unlike(UUID userId, UUID productId) {
-        if (!likeRepository.existsByUserIdAndProductId(userId, productId)) {
-            return false;
-        }
-        likeRepository.deleteByUserIdAndProductId(userId, productId);
-        return true;
+        return likeRepository.deleteIfExists(userId, productId) == 1;
     }
 
     public Page<LikeModel> findAllByUserId(UUID userId, Pageable pageable) {

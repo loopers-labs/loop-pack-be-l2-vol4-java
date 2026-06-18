@@ -5,7 +5,6 @@ import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.like.ProductLikeService;
 import com.loopers.domain.product.ProductService;
-import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
@@ -31,20 +30,22 @@ public class LikeFacade {
     private final ProductService productService;
     private final StockService stockService;
 
-    /** 좋아요 등록 — 멱등: 이미 좋아요 시 likeCount 변경 없이 반환 */
+    /** 좋아요 등록 — 멱등: 이미 좋아요 시 likeCount 변경 없이 반환. 원자적 카운트 갱신 후 재조회 */
     @Transactional
     public LikeInfo like(UUID productId, UserModel user) {
-        ProductModel product = productService.getActive(productId);
-        productLikeService.like(user.getId(), productId, product);
-        return LikeInfo.of(productId, product.getLikeCount());
+        productService.getActive(productId); // 존재(활성) 검증 — 404
+        productLikeService.like(user.getId(), productId);
+        long likeCount = productService.getActive(productId).getLikeCount();
+        return LikeInfo.of(productId, likeCount);
     }
 
-    /** 좋아요 취소 — 멱등: 없는 좋아요 취소 시 likeCount 변경 없이 반환 */
+    /** 좋아요 취소 — 멱등: 없는 좋아요 취소 시 likeCount 변경 없이 반환. 원자적 카운트 갱신 후 재조회 */
     @Transactional
     public LikeInfo unlike(UUID productId, UserModel user) {
-        ProductModel product = productService.getActive(productId);
-        productLikeService.unlike(user.getId(), productId, product);
-        return LikeInfo.of(productId, product.getLikeCount());
+        productService.getActive(productId); // 존재(활성) 검증 — 404
+        productLikeService.unlike(user.getId(), productId);
+        long likeCount = productService.getActive(productId).getLikeCount();
+        return LikeInfo.of(productId, likeCount);
     }
 
     /** 좋아요 목록 조회 — 본인 것만 허용, 타인 접근 시 404 */

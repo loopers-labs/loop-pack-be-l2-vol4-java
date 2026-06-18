@@ -14,13 +14,8 @@ public class UserRepositoryImpl implements UserRepository {
     private final UserJpaRepository userJpaRepository;
 
     @Override
-    public UserModel save(UserModel user) {
-        return userJpaRepository.save(user);
-    }
-
-    @Override
-    public boolean existsByLoginId(String loginId) {
-        return userJpaRepository.existsByLoginIdValue(loginId);
+    public UserModel saveAndFlush(UserModel user) {
+        return userJpaRepository.saveAndFlush(user);
     }
 
     @Override

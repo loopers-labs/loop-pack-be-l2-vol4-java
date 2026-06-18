@@ -16,8 +16,14 @@ public class OrderV1Dto {
 
     public record CreateRequest(
         @NotNull @Valid ShippingInfoRequest shippingInfo,
-        @NotEmpty List<@Valid OrderItemRequest> items
-    ) {}
+        @NotEmpty List<@Valid OrderItemRequest> items,
+        UUID couponId
+    ) {
+        /** 쿠폰 미적용 편의 생성자 */
+        public CreateRequest(ShippingInfoRequest shippingInfo, List<OrderItemRequest> items) {
+            this(shippingInfo, items, null);
+        }
+    }
 
     public record ShippingInfoRequest(
         @NotBlank String receiverName,
@@ -35,7 +41,10 @@ public class OrderV1Dto {
     public record OrderResponse(
         UUID id,
         OrderStatus status,
+        Long originalAmount,
+        Long discountAmount,
         Long pgAmount,
+        UUID couponId,
         ShippingInfoResponse shippingInfo,
         List<OrderItemResponse> items,
         ZonedDateTime createdAt
@@ -44,7 +53,10 @@ public class OrderV1Dto {
             return new OrderResponse(
                 info.id(),
                 info.status(),
+                info.originalAmount(),
+                info.discountAmount(),
                 info.pgAmount(),
+                info.couponId(),
                 ShippingInfoResponse.from(info.shippingInfo()),
                 info.items().stream().map(OrderItemResponse::from).toList(),
                 info.createdAt()
@@ -86,7 +98,10 @@ public class OrderV1Dto {
         UUID id,
         UUID userId,
         OrderStatus status,
+        Long originalAmount,
+        Long discountAmount,
         Long pgAmount,
+        UUID couponId,
         ShippingInfoResponse shippingInfo,
         List<OrderItemResponse> items,
         ZonedDateTime createdAt
@@ -96,7 +111,10 @@ public class OrderV1Dto {
                 info.id(),
                 info.userId(),
                 info.status(),
+                info.originalAmount(),
+                info.discountAmount(),
                 info.pgAmount(),
+                info.couponId(),
                 ShippingInfoResponse.from(info.shippingInfo()),
                 info.items().stream().map(OrderItemResponse::from).toList(),
                 info.createdAt()

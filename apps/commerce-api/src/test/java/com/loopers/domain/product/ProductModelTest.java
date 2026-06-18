@@ -118,39 +118,6 @@ class ProductModelTest {
         }
     }
 
-    @DisplayName("좋아요 수를 변경할 때,")
-    @Nested
-    class LikeCount {
-
-        @DisplayName("incrementLikeCount 호출 시, likeCount가 1 증가한다.")
-        @Test
-        void increments_whenIncrement() {
-            ProductModel product = new ProductModel(brand, "상품", "설명", 10_000L);
-            product.incrementLikeCount();
-            assertThat(product.getLikeCount()).isEqualTo(1L);
-        }
-
-        @DisplayName("decrementLikeCount 호출 시, likeCount가 1 감소한다.")
-        @Test
-        void decrements_whenDecrement() {
-            ProductModel product = new ProductModel(brand, "상품", "설명", 10_000L);
-            product.incrementLikeCount();
-            product.incrementLikeCount();
-
-            product.decrementLikeCount();
-
-            assertThat(product.getLikeCount()).isEqualTo(1L);
-        }
-
-        @DisplayName("likeCount가 0일 때 decrementLikeCount 호출 시, 음수가 되지 않는다.")
-        @Test
-        void doesNotGoNegative_whenDecrementAtZero() {
-            ProductModel product = new ProductModel(brand, "상품", "설명", 10_000L);
-            product.decrementLikeCount();
-            assertThat(product.getLikeCount()).isZero();
-        }
-    }
-
     @DisplayName("상품을 삭제할 때,")
     @Nested
     class Delete {

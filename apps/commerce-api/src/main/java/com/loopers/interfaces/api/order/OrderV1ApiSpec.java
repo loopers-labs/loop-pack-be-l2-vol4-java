@@ -13,8 +13,8 @@ import java.util.UUID;
 @Tag(name = "Order V1 API", description = "주문 고객 API")
 public interface OrderV1ApiSpec {
 
-    @Operation(summary = "주문 생성", description = "재고 예약 후 PENDING 상태 주문 생성")
-    ApiResponse<OrderV1Dto.OrderResponse> create(OrderV1Dto.CreateRequest request, UserModel user);
+    @Operation(summary = "주문 생성", description = "재고 예약 후 PENDING 상태 주문 생성. Idempotency-Key 헤더 필수 — 동일 키 재요청 시 기존 주문 반환")
+    ApiResponse<OrderV1Dto.OrderResponse> create(OrderV1Dto.CreateRequest request, String idempotencyKey, UserModel user);
 
     @Operation(summary = "주문 단건 조회", description = "본인 주문만 조회 가능")
     ApiResponse<OrderV1Dto.OrderResponse> get(UUID orderId, UserModel user);

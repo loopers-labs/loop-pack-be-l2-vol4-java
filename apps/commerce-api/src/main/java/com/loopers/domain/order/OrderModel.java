@@ -31,12 +31,24 @@ public class OrderModel extends BaseEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
+    @Column(name = "idempotency_key", unique = true, nullable = false, updatable = false)
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
 
+    @Column(name = "original_amount", nullable = false)
+    private Long originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
     @Column(name = "pg_amount", nullable = false)
     private Long pgAmount;
+
+    @Column(name = "coupon_id", columnDefinition = "BINARY(16)")
+    private UUID couponId;
 
     @Embedded
     private ShippingInfo shippingInfo;
@@ -45,15 +57,27 @@ public class OrderModel extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderItemModel> items = new ArrayList<>();
 
-    public OrderModel(UUID userId, ShippingInfo shippingInfo) {
+    public OrderModel(UUID userId, String idempotencyKey, String receiverName, String receiverPhone,
+                      String zipCode, String address, String detailAddress) {
         this.userId = userId;
-        this.shippingInfo = shippingInfo;
+        this.idempotencyKey = idempotencyKey;
+        this.shippingInfo = new ShippingInfo(receiverName, receiverPhone, zipCode, address, detailAddress);
+        this.originalAmount = 0L;
+        this.discountAmount = 0L;
         this.pgAmount = 0L;
     }
 
     public void addItem(OrderItemModel item) {
         items.add(item);
-        this.pgAmount += item.getSubtotal();
+        this.originalAmount += item.getSubtotal();
+        this.pgAmount = this.originalAmount - this.discountAmount;
+    }
+
+    /** 쿠폰 할인 적용 — 할인액은 호출 측에서 cap/floor 처리해 전달한다. pgAmount = 원금 - 할인. */
+    public void applyCoupon(UUID couponId, long discountAmount) {
+        this.couponId = couponId;
+        this.discountAmount = discountAmount;
+        this.pgAmount = this.originalAmount - discountAmount;
     }
 
     public boolean isPending() {

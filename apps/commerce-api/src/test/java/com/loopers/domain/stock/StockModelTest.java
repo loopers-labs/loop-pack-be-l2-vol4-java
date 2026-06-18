@@ -95,6 +95,26 @@ class StockModelTest {
                 () -> assertThat(stock.getReservedQuantity()).isZero()
             );
         }
+
+        @DisplayName("확정 수량이 0 이하이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQtyIsZeroOrNegative() {
+            StockModel stock = new StockModel(PRODUCT_ID, 100);
+            stock.reserve(10);
+
+            CoreException ex = assertThrows(CoreException.class, () -> stock.confirm(0));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("예약 수량보다 많이 확정하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenQtyExceedsReserved() {
+            StockModel stock = new StockModel(PRODUCT_ID, 100);
+            stock.reserve(5);
+
+            CoreException ex = assertThrows(CoreException.class, () -> stock.confirm(6));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
     }
 
     @DisplayName("예약을 해제할 때,")
@@ -115,6 +135,26 @@ class StockModelTest {
                 () -> assertThat(stock.getAvailableQuantity()).isEqualTo(100)
             );
         }
+
+        @DisplayName("해제 수량이 0 이하이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQtyIsZeroOrNegative() {
+            StockModel stock = new StockModel(PRODUCT_ID, 100);
+            stock.reserve(10);
+
+            CoreException ex = assertThrows(CoreException.class, () -> stock.release(0));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("예약 수량보다 많이 해제하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenQtyExceedsReserved() {
+            StockModel stock = new StockModel(PRODUCT_ID, 100);
+            stock.reserve(5);
+
+            CoreException ex = assertThrows(CoreException.class, () -> stock.release(6));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
     }
 
     @DisplayName("재고를 복구할 때,")
@@ -131,6 +171,15 @@ class StockModelTest {
             stock.restore(10);
 
             assertThat(stock.getTotalQuantity()).isEqualTo(100);
+        }
+
+        @DisplayName("복구 수량이 0 이하이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQtyIsZeroOrNegative() {
+            StockModel stock = new StockModel(PRODUCT_ID, 100);
+
+            CoreException ex = assertThrows(CoreException.class, () -> stock.restore(0));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
 

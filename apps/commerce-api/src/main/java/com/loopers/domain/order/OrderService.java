@@ -1,6 +1,5 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.vo.ShippingInfo;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -18,8 +18,14 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    public OrderModel create(UUID userId, ShippingInfo shippingInfo) {
-        return orderRepository.save(new OrderModel(userId, shippingInfo));
+    public OrderModel create(UUID userId, String idempotencyKey, String receiverName, String receiverPhone,
+                             String zipCode, String address, String detailAddress) {
+        return orderRepository.save(new OrderModel(userId, idempotencyKey, receiverName, receiverPhone,
+                                                   zipCode, address, detailAddress));
+    }
+
+    public Optional<OrderModel> findByIdempotencyKey(String idempotencyKey) {
+        return orderRepository.findByIdempotencyKey(idempotencyKey);
     }
 
     public void addItem(OrderModel order, OrderItemModel item) {
@@ -35,6 +41,23 @@ public class OrderService {
     public OrderModel getByIdAndUser(UUID id, UUID userId) {
         return orderRepository.findByIdAndUserId(id, userId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
+    /** 전이용 — 주문 행 비관적 락 */
+    public OrderModel getForUpdate(UUID id) {
+        return orderRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
+    }
+
+    /** 취소용 — 소유권 + 비관적 락 */
+    public OrderModel getByIdAndUserForUpdate(UUID id, UUID userId) {
+        return orderRepository.findByIdAndUserIdForUpdate(id, userId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
+    /** 만료 배치용 — 대상 주문 비관적 락 (snapshot=승자집합 보장) */
+    public List<OrderModel> findExpiredPendingForUpdate(ZonedDateTime before) {
+        return orderRepository.findPendingBeforeForUpdate(before);
     }
 
     public Page<OrderModel> getListByUser(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
@@ -55,16 +78,6 @@ public class OrderService {
 
     public void cancel(OrderModel order) {
         order.cancel();
-    }
-
-    /** 스케줄러용 — 15분 초과 PENDING 주문 조회 */
-    public List<OrderModel> findExpiredPending(ZonedDateTime before) {
-        return orderRepository.findPendingBefore(before);
-    }
-
-    /** 스케줄러 배치용 — 아이템 fetch join 포함 (N+1 방지) */
-    public List<OrderModel> findExpiredPendingWithItems(ZonedDateTime before) {
-        return orderRepository.findPendingBeforeWithItems(before);
     }
 
     /** 스케줄러 배치 상태 변경 — 단일 UPDATE */

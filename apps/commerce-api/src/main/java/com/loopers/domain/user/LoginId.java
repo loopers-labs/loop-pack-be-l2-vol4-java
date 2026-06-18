@@ -12,7 +12,7 @@ public class LoginId {
 
     private static final Pattern PATTERN = Pattern.compile("^[A-Za-z0-9]{1,10}$");
 
-    @Column(name = "login_id", nullable = false)
+    @Column(name = "login_id", nullable = false, unique = true)
     private String value;
 
     protected LoginId() {}

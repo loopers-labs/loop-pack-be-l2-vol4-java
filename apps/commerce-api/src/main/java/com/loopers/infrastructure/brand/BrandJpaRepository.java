@@ -8,6 +8,4 @@ import java.util.UUID;
 
 public interface BrandJpaRepository extends JpaRepository<BrandModel, UUID> {
     Optional<BrandModel> findByIdAndDeletedAtIsNull(UUID id);
-
-    boolean existsByName(String name);
 }

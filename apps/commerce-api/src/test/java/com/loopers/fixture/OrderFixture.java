@@ -2,7 +2,6 @@ package com.loopers.fixture;
 
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
-import com.loopers.domain.vo.ShippingInfo;
 
 import java.util.UUID;
 
@@ -17,12 +16,8 @@ public class OrderFixture {
     public static final String ADDRESS        = "서울시 강남구 테헤란로 1";
     public static final String DETAIL_ADDRESS = "101호";
 
-    public static ShippingInfo shippingInfo() {
-        return new ShippingInfo(RECEIVER_NAME, RECEIVER_PHONE, ZIP_CODE, ADDRESS, DETAIL_ADDRESS);
-    }
-
     public static OrderModel createModel(UUID userId) {
-        return new OrderModel(userId, shippingInfo());
+        return new OrderModel(userId, RECEIVER_NAME, RECEIVER_PHONE, ZIP_CODE, ADDRESS, DETAIL_ADDRESS);
     }
 
     public static OrderItemModel createItem(UUID productId) {
