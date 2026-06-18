@@ -102,6 +102,7 @@ class UserLikeV1ApiE2ETest {
             .userId(userId)
             .productId(productId)
             .build());
+        productJpaRepository.incrementLikeCount(productId);
     }
 
     private HttpEntity<Void> memberRequest(String loginId) {

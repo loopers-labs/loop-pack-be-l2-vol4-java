@@ -190,7 +190,7 @@ class ProductRepositoryIntegrationTest {
     @Nested
     class FindActiveSummaries {
 
-        @DisplayName("삭제된 상품과 소속 브랜드가 삭제된 상품을 제외하고 브랜드명과 함께 조회한다.")
+        @DisplayName("삭제된 상품과 브랜드 삭제로 함께 삭제된 상품을 제외하고 브랜드명과 함께 조회한다.")
         @Test
         void excludesDeletedProductAndDeletedBrandProduct() {
             // arrange
@@ -200,9 +200,11 @@ class ProductRepositoryIntegrationTest {
             ProductModel deletedProduct = saveProduct(activeBrand.getId(), "삭제 상품", 10_000, 5);
             deletedProduct.delete();
             productJpaRepository.saveAndFlush(deletedProduct);
-            saveProduct(deletedBrand.getId(), "삭제 브랜드 상품", 10_000, 5);
+            ProductModel deletedBrandProduct = saveProduct(deletedBrand.getId(), "삭제 브랜드 상품", 10_000, 5);
             deletedBrand.delete();
             brandJpaRepository.saveAndFlush(deletedBrand);
+            deletedBrandProduct.delete();
+            productJpaRepository.saveAndFlush(deletedBrandProduct);
 
             // act
             Page<ProductSummary> summaries = productRepository.findActiveSummaries(null, ProductSortType.LATEST, 0, 10);
@@ -411,7 +413,7 @@ class ProductRepositoryIntegrationTest {
                 .isEqualTo(ErrorType.NOT_FOUND);
         }
 
-        @DisplayName("소속 브랜드가 삭제된 상품이면 NOT_FOUND 예외가 발생한다.")
+        @DisplayName("브랜드가 삭제되면 그 상품도 함께 삭제되어 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenBrandIsDeleted() {
             // arrange
@@ -419,6 +421,8 @@ class ProductRepositoryIntegrationTest {
             ProductModel product = saveProduct(brand.getId(), "감성 가디건", 39_000, 5);
             brand.delete();
             brandJpaRepository.saveAndFlush(brand);
+            product.delete();
+            productJpaRepository.saveAndFlush(product);
 
             // act & assert
             assertThatThrownBy(() -> productRepository.getActiveDetailById(product.getId()))
