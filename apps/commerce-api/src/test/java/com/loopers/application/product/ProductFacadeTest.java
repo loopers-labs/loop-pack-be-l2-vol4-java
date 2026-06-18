@@ -34,6 +34,12 @@ class ProductFacadeTest {
     @Mock
     private BrandRepository brandRepository;
 
+    @Mock
+    private org.springframework.data.redis.core.RedisTemplate<String, String> defaultRedisTemplate;
+
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     @Test
     @DisplayName("상품 목록을 페이지 조회하여 브랜드명을 병합한 DTO 목록을 반환한다.")
     void getProducts_ShouldReturnProductsWithBrandNames() {
