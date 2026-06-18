@@ -48,31 +48,35 @@ class LikeServiceIntegrationTest {
             Long productId = 101L;
 
             // act
-            Like like = likeService.like(userId, productId);
+            LikeChange change = likeService.like(userId, productId);
 
             // assert
             assertAll(
-                () -> assertThat(like.getId()).isNotNull(),
-                () -> assertThat(like.getUserId()).isEqualTo(userId),
-                () -> assertThat(like.getProductId()).isEqualTo(productId),
+                () -> assertThat(change.productId()).isEqualTo(productId),
+                () -> assertThat(change.countChangeAmount()).isEqualTo(1),
+                () -> assertThat(change.hasCountChange()).isTrue(),
+                () -> assertThat(likeRepository.findByUserIdAndProductId(userId, productId)).isPresent(),
                 () -> assertThat(likeService.countProductLikes(productId)).isEqualTo(1)
             );
         }
 
-        @DisplayName("이미 좋아요한 상품에 다시 등록하면, 기존 좋아요를 유지한다.")
+        @DisplayName("이미 좋아요한 상품에 다시 등록하면, 변경 없이 기존 좋아요를 유지한다.")
         @Test
         void keepsOneLike_whenProductIsAlreadyLiked() {
             // arrange
             Long userId = 1L;
             Long productId = 101L;
-            Like saved = likeService.like(userId, productId);
+            LikeChange created = likeService.like(userId, productId);
 
             // act
-            Like duplicated = likeService.like(userId, productId);
+            LikeChange change = likeService.like(userId, productId);
 
             // assert
             assertAll(
-                () -> assertThat(duplicated.getId()).isEqualTo(saved.getId()),
+                () -> assertThat(created.hasCountChange()).isTrue(),
+                () -> assertThat(change.productId()).isEqualTo(productId),
+                () -> assertThat(change.countChangeAmount()).isZero(),
+                () -> assertThat(change.hasCountChange()).isFalse(),
                 () -> assertThat(likeService.countProductLikes(productId)).isEqualTo(1)
             );
         }
@@ -91,10 +95,13 @@ class LikeServiceIntegrationTest {
             likeService.like(userId, productId);
 
             // act
-            likeService.unlike(userId, productId);
+            LikeChange change = likeService.unlike(userId, productId);
 
             // assert
             assertAll(
+                () -> assertThat(change.productId()).isEqualTo(productId),
+                () -> assertThat(change.countChangeAmount()).isEqualTo(-1),
+                () -> assertThat(change.hasCountChange()).isTrue(),
                 () -> assertThat(likeRepository.findByUserIdAndProductId(userId, productId)).isEmpty(),
                 () -> assertThat(likeService.countProductLikes(productId)).isZero()
             );
@@ -108,10 +115,15 @@ class LikeServiceIntegrationTest {
             Long productId = 101L;
 
             // act
-            likeService.unlike(userId, productId);
+            LikeChange change = likeService.unlike(userId, productId);
 
             // assert
-            assertThat(likeService.countProductLikes(productId)).isZero();
+            assertAll(
+                () -> assertThat(change.productId()).isEqualTo(productId),
+                () -> assertThat(change.countChangeAmount()).isZero(),
+                () -> assertThat(change.hasCountChange()).isFalse(),
+                () -> assertThat(likeService.countProductLikes(productId)).isZero()
+            );
         }
     }
 

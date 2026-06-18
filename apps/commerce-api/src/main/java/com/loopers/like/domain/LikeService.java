@@ -14,9 +14,13 @@ public class LikeService {
     private final LikeRepository likeRepository;
 
     @Transactional
-    public Like like(Long userId, Long productId) {
-        return likeRepository.findByUserIdAndProductId(userId, productId)
-            .orElseGet(() -> likeRepository.save(Like.create(userId, productId)));
+    public LikeChange like(Long userId, Long productId) {
+        if (likeRepository.findByUserIdAndProductId(userId, productId).isPresent()) {
+            return LikeChange.unchanged(productId);
+        }
+
+        likeRepository.save(Like.create(userId, productId));
+        return LikeChange.increased(productId);
     }
 
     @Transactional(readOnly = true)
@@ -30,8 +34,12 @@ public class LikeService {
     }
 
     @Transactional
-    public void unlike(Long userId, Long productId) {
-        likeRepository.findByUserIdAndProductId(userId, productId)
-            .ifPresent(likeRepository::delete);
+    public LikeChange unlike(Long userId, Long productId) {
+        return likeRepository.findByUserIdAndProductId(userId, productId)
+            .map(like -> {
+                likeRepository.delete(like);
+                return LikeChange.decreased(productId);
+            })
+            .orElse(LikeChange.unchanged(productId));
     }
 }

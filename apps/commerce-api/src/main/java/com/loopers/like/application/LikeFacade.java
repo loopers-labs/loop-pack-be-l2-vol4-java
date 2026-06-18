@@ -26,16 +26,15 @@ public class LikeFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final LikeService likeService;
+    private final LikeCommandService likeCommandService;
 
-    @Transactional
     public void like(Long userId, Long productId) {
         productService.getProduct(productId);
-        likeService.like(userId, productId);
+        likeCommandService.like(userId, productId);
     }
 
-    @Transactional
     public void unlike(Long userId, Long productId) {
-        likeService.unlike(userId, productId);
+        likeCommandService.unlike(userId, productId);
     }
 
     @Transactional(readOnly = true)
