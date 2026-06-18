@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,8 +64,11 @@ class RedisCacheStoreConcurrencyIntegrationTest {
             });
         }
         start.countDown();
-        done.await();
-        executor.shutdown();
+        try {
+            assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
 
         // then
         assertThat(loadCount.get()).isEqualTo(1);

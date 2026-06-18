@@ -19,8 +19,9 @@ public class RedisCacheStore implements CacheStore {
     private static final Logger log = LoggerFactory.getLogger(RedisCacheStore.class);
 
     private static final Duration LOCK_TTL = Duration.ofSeconds(5);
-    private static final int LOAD_WAIT_TRIES = 20;
     private static final long LOAD_WAIT_MILLIS = 50L;
+    // 대기창(TRIES * MILLIS)은 LOCK_TTL 이상이어야, 락 보유자가 로딩하는 동안 패자가 먼저 만료돼 loader로 몰리지 않는다.
+    private static final int LOAD_WAIT_TRIES = (int) (LOCK_TTL.toMillis() / LOAD_WAIT_MILLIS);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
