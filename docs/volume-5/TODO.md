@@ -125,26 +125,31 @@ flowchart TD
 > 4개 시나리오 × 인덱스 변형을 다 측정하지 않는다. **각 인덱스 타입의 효과/한계를 가장 잘 보여주는 시나리오로 illustrate** 한 뒤, **최종 인덱스 세트로 S1~S4 전부 측정**해 총괄표에 올린다.
 
 ### 3a. 단일 인덱스의 한계 관찰 (illustrate)
-- [ ] `(like_count)`, `(brand_id)` 단일 인덱스를 걸고 S1·S2 EXPLAIN
-- [ ] 관찰: 필터는 타도 **정렬을 못 커버**(filesort 잔존), 정렬은 타도 필터를 못 좁힘 → 단일 인덱스의 구조적 한계 기록
+- [x] `(like_count)`, `(brand_id)` 단일 인덱스를 걸고 S1·S2 EXPLAIN
+- [x] 관찰: 필터는 타도 **정렬을 못 커버**(filesort 잔존), 정렬은 타도 필터를 못 좁힘 → 단일 인덱스의 구조적 한계 기록
 
 ### 3b. 복합 인덱스 + leftmost prefix (illustrate)
-- [ ] 좋아요 정렬용 `(brand_id, like_count DESC, id DESC)` — S2에서 **정렬 생략**(filesort 사라짐) 확인
-- [ ] **컬럼 순서를 일부러 바꿔**(예: `(like_count, brand_id)`) leftmost prefix가 깨지는 것을 EXPLAIN으로 체감
-- [ ] 최신순용 `(created_at DESC, id DESC)` 또는 `(id DESC)`
+- [x] 좋아요 정렬용 `(brand_id, like_count DESC, id DESC)` — S2에서 **정렬 생략**(filesort 사라짐) 확인
+- [x] **컬럼 순서를 일부러 바꿔**(예: `(like_count, brand_id)`) leftmost prefix가 깨지는 것을 EXPLAIN으로 체감
+- [x] 최신순용 `(created_at DESC, id DESC)` 또는 `(id DESC)`
 
 ### 3c. 커버링 인덱스 (illustrate)
-- [ ] SELECT 컬럼을 인덱스에 포함시켜 `Using index`(북마크 조회 제거) 달성 → 효과 측정 (S1)
+- [x] SELECT 컬럼을 인덱스에 포함시켜 `Using index`(북마크 조회 제거) 달성 → 효과 측정 (S1). **최종 세트에선 제외**(LIMIT 20이라 절약 작고 key_len 439 쓰기 비용)
 
 ### 3d. 옵티마이저·통계·무력화 (학습 재현)
-- [ ] `ANALYZE TABLE products` 전/후 비교 (대량 적재 후 통계 갱신 효과)
-- [ ] **인덱스가 안 쓰이는 경우** 재현: 인기 브랜드(매칭 행 多)에서 옵티마이저가 Full Scan을 택하는 것이 **옳은 비용 판단**임을 EXPLAIN으로 확인
+- [x] `ANALYZE TABLE products` 전/후 비교 (대량 적재 후 통계 갱신 효과)
+- [x] **인덱스가 안 쓰이는 경우** 재현: 인기 브랜드(매칭 행 多)에서 옵티마이저가 Full Scan을 택하는 것이 **옳은 비용 판단**임을 EXPLAIN으로 확인
+
+### 3e. 조인 함정 발견·해결 (계획 외 발견)
+- [x] 최종 세트 적용 후 전역 목록(S1·S3)이 오히려 악화(p95 2.8s) — brand 복합 인덱스가 `b.deleted_at IS NULL` 필터로 옵티마이저를 brands-first로 오판시켜 filesort 유발
+- [x] **원인은 인덱스가 아니라 쿼리**: content는 중복 필터 `b.deleted_at IS NULL` 제거(브랜드 삭제=상품 삭제 불변식상 `p.deleted_at IS NULL`이 함의), count는 쓰지 않는 brands JOIN 제거
+- [x] 정렬 타이브레이크 `id`는 InnoDB PK 자동 부착으로 생략 → 최종 인덱스 6개 슬림화
 
 ### 마무리
-- [ ] 최종 인덱스 세트를 **실제 코드/스키마에 반영**
-- [ ] S1~S4 전체 재측정 → **`reports/03-index.md` 작성** + `SUMMARY.md` 갱신
+- [x] 최종 인덱스 세트를 **실제 코드/스키마에 반영** (`ProductModel` 인덱스 6개 + 쿼리 정정)
+- [x] S1~S4 전체 재측정 → **`reports/03-index.md` 작성** + `SUMMARY.md` 갱신 (전역 2.8s→0.25s, 약 11×)
 
-**검증:** S2에서 `Using filesort`가 사라지고(`Using index` 등장), 인덱스 적용 전후 비교가 보고서에 남는다.
+**검증 ✅:** S2 `Using filesort` 제거 확인. 전역 목록 조인 함정까지 해소해 동시 50명 0% 에러·p95 약 0.25s. 인덱스 적용 전후 비교가 `03-index.md`에 남았다. 남은 전역 count 풀스캔(~21ms)은 Stage 4 캐시로 이관.
 
 ---
 
