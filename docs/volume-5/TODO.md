@@ -110,9 +110,9 @@ flowchart TD
   - 등록/취소의 멱등 의미(중복 등록·미존재 취소)를 기존 동작과 정확히 일치 (`existsBy` early-return / 삭제 행 수 0 분기)
 - [x] 동기화 테스트 — LikeFacade 통합 테스트로 등록/취소 후 `like_count == COUNT(likes)`(멱등 포함) 검증 + 단위 테스트로 증감 호출 검증
 - [x] **서브쿼리 제거** → `like_count` 컬럼 직접 정렬/조회 — 목록(LATEST/PRICE_ASC/LIKES_DESC)·상세·좋아요한 상품 목록 전부
-- [ ] S1~S4 EXPLAIN + k6 재측정
-  - 예상: 서브쿼리는 사라지지만 **인덱스가 아직 없어 정렬은 filesort** → 다음 단계 동기
-- [ ] **`reports/02-denormalization.md` 작성** + `SUMMARY.md` 갱신
+- [x] S1~S4 EXPLAIN + k6 재측정 — 02-explain/02-analyze-denormalization.sql + k6 50VU
+  - 결과: 서브쿼리 제거로 단건 DNF→62.5ms(S1)·7s→46.8ms(S3)·50ms→0ms(S4). 동시 50명 100%에러→**0% 에러**. 단 전역 목록(S1·S3)은 풀스캔+filesort로 p95 2.8s대 → 인덱스 단계 동기
+- [x] **`reports/02-denormalization.md` 작성** + `SUMMARY.md` 갱신
 
 **검증:** like 카운트 서브쿼리가 사라지고, like_count 동기화 테스트가 통과한다. 베이스라인 대비 개선폭이 보고서에 기록된다.
 
