@@ -15,4 +15,6 @@ public interface ProductRepository {
     void delete(Long id);
     void deleteByBrandId(Long brandId);
     List<ProductModel> findAllOrderByLikeCountDesc(Long brandId, Pageable pageable);
+    void incrementLikeCount(Long id);
+    void decrementLikeCount(Long id);
 }
