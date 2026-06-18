@@ -81,7 +81,7 @@ public class ProductRepositoryImpl implements ProductRepository {
             specifiers.add(productModel.likeCount.desc());
         }
 
-        specifiers.add(productModel.createdAt.desc());
+        specifiers.add(productModel.id.desc());
 
         return specifiers.toArray(new OrderSpecifier[0]);
     }
