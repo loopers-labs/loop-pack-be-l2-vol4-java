@@ -120,6 +120,47 @@ class ProductModelTest {
         }
     }
 
+    @DisplayName("좋아요 수를 증가시킬 때,")
+    @Nested
+    class IncrementLikeCount {
+
+        @DisplayName("likeCount 가 1 증가한다.")
+        @Test
+        void increments_like_count_by_one() {
+            ProductModel product = validProduct(10);
+
+            product.incrementLikeCount();
+
+            assertThat(product.getLikeCount()).isEqualTo(1L);
+        }
+    }
+
+    @DisplayName("좋아요 수를 감소시킬 때,")
+    @Nested
+    class DecrementLikeCount {
+
+        @DisplayName("likeCount 가 1 감소한다.")
+        @Test
+        void decrements_like_count_by_one() {
+            ProductModel product = validProduct(10);
+            product.incrementLikeCount();
+
+            product.decrementLikeCount();
+
+            assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("likeCount 가 0 이하로 내려가지 않는다.")
+        @Test
+        void does_not_go_below_zero() {
+            ProductModel product = validProduct(10);
+
+            product.decrementLikeCount();
+
+            assertThat(product.getLikeCount()).isEqualTo(0L);
+        }
+    }
+
     @DisplayName("재고를 복구할 때,")
     @Nested
     class RestoreStock {

@@ -47,4 +47,18 @@ public class ProductService {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);
     }
+
+    @Transactional
+    public void incrementLikeCount(Long productId) {
+        ProductModel product = productRepository.findWithLock(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        product.incrementLikeCount();
+    }
+
+    @Transactional
+    public void decrementLikeCount(Long productId) {
+        ProductModel product = productRepository.findWithLock(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        product.decrementLikeCount();
+    }
 }

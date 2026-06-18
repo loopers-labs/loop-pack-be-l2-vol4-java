@@ -21,6 +21,7 @@ public class ProductModel extends BaseEntity {
     private Integer stock;
     private String imageUrl;
     private ZonedDateTime soldOutAt;
+    private long likeCount;
 
     protected ProductModel() {}
 
@@ -67,6 +68,16 @@ public class ProductModel extends BaseEntity {
         this.stock += quantity;
         if (this.stock > 0) {
             this.soldOutAt = null;
+        }
+    }
+
+    public void incrementLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decrementLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
         }
     }
 

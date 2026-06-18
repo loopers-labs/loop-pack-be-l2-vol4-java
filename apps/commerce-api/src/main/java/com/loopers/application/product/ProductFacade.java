@@ -2,7 +2,6 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
-import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
@@ -22,7 +21,6 @@ public class ProductFacade {
 
     private final ProductService productService;
     private final BrandService brandService;
-    private final LikeService likeService;
 
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock, String imageUrl) {
         brandService.getBrand(brandId);
@@ -64,8 +62,7 @@ public class ProductFacade {
         BrandModel brand = brandService.findBrand(product.getBrandId())
             .filter(b -> !b.isSuspended())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "계약 중지되었거나 삭제된 브랜드의 상품은 조회할 수 없습니다."));
-        long likeCount = likeService.countLikes(product.getId());
-        return ProductDetailInfo.from(product, brand, likeCount);
+        return ProductDetailInfo.from(product, brand, product.getLikeCount());
     }
 
     private ProductDetailInfo toDetailInfo(ProductModel product) {
@@ -73,8 +70,7 @@ public class ProductFacade {
         if (brandOpt.isEmpty() || brandOpt.get().isSuspended()) {
             return null;
         }
-        long likeCount = likeService.countLikes(product.getId());
-        return ProductDetailInfo.from(product, brandOpt.get(), likeCount);
+        return ProductDetailInfo.from(product, brandOpt.get(), product.getLikeCount());
     }
 
     private Comparator<ProductDetailInfo> comparatorOf(ProductSortType sort) {

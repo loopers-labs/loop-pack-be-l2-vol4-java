@@ -13,18 +13,19 @@ public class LikeService {
     private final LikeRepository likeRepository;
 
     @Transactional
-    public void like(Long memberId, Long productId) {
-        boolean alreadyLiked = likeRepository.findActiveLike(memberId, productId).isPresent();
-        if (alreadyLiked) {
-            return;
+    public boolean like(Long memberId, Long productId) {
+        if (likeRepository.findActiveLike(memberId, productId).isPresent()) {
+            return false;
         }
         likeRepository.save(new LikeModel(memberId, productId));
+        return true;
     }
 
     @Transactional
-    public void unlike(Long memberId, Long productId) {
-        likeRepository.findActiveLike(memberId, productId)
-                .ifPresent(LikeModel::delete);
+    public boolean unlike(Long memberId, Long productId) {
+        return likeRepository.findActiveLike(memberId, productId)
+                .map(like -> { like.delete(); return true; })
+                .orElse(false);
     }
 
     @Transactional(readOnly = true)
