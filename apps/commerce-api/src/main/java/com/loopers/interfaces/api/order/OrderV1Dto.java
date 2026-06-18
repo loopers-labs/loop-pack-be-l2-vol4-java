@@ -10,17 +10,17 @@ import java.util.List;
 public class OrderV1Dto {
 
     public record CreateOrderRequest(
-            List<Item> items
+            List<Item> items,
+            Long couponId
     ) {
         public OrderCommand toCommand() {
-            List<OrderCommand.Item> commandItems = items == null 
-                                                   ? List.of() 
+            List<OrderCommand.Item> commandItems = items == null
+                                                   ? List.of()
                                                    : items.stream()
-                                                          .map(
-                                                            i -> new OrderCommand.Item(i.productId(), i.quantity())
-                                                          )
+                                                          .map(i -> new OrderCommand.Item(i.productId(), i.quantity()))
                                                           .toList();
-            return new OrderCommand(commandItems);
+            
+            return new OrderCommand(commandItems, couponId);
         }
     }
 
@@ -34,6 +34,9 @@ public class OrderV1Dto {
             Long userId,
             OrderStatus status,
             Long totalAmount,
+            Long couponId,
+            Long discountAmount,
+            Long finalAmount,
             List<OrderItemResponse> items
     ) {
         public static OrderResponse from(OrderInfo info) {
@@ -42,6 +45,9 @@ public class OrderV1Dto {
                     info.userId(),
                     info.status(),
                     info.totalAmount(),
+                    info.couponId(),
+                    info.discountAmount(),
+                    info.finalAmount(),
                     info.items().stream().map(OrderItemResponse::from).toList()
             );
         }

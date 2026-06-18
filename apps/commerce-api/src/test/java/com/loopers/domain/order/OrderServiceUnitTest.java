@@ -1,5 +1,6 @@
 package com.loopers.domain.order;
 
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.product.ProductDescription;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductName;
@@ -38,6 +39,9 @@ class OrderServiceUnitTest {
     @Mock
     private ProductStockService productStockService;
 
+    @Mock
+    private UserCouponService userCouponService;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -65,10 +69,14 @@ class OrderServiceUnitTest {
             given(orderRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
             // when
-            OrderModel result = orderService.createPendingOrder(99L, List.of(
-                    OrderLine.of(1L, 2),
-                    OrderLine.of(2L, 3)
-            ));
+            OrderModel result = orderService.createPendingOrder(
+                    99L,
+                    List.of(
+                        OrderLine.of(1L, 2),
+                        OrderLine.of(2L, 3)
+                    ),
+                    null
+            );
 
             // then
             verify(productStockService).decreaseStock(1L, 2);

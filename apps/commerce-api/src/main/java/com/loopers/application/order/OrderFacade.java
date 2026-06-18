@@ -29,7 +29,7 @@ public class OrderFacade {
         UserModel user = userService.getMyInfo(loginId);
         List<OrderLine> lines = normalize(command.items());
 
-        OrderModel pendingOrderModel = orderService.createPendingOrder(user.getId(), lines);
+        OrderModel pendingOrderModel = orderService.createPendingOrder(user.getId(), lines, command.couponId());
 
         PaymentResult result = paymentGateway.requestPayment(
                 PaymentCommand.of(pendingOrderModel.getId(), pendingOrderModel.getTotalAmount())

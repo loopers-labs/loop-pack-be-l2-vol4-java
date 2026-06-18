@@ -3,6 +3,10 @@ package com.loopers.interfaces.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.coupon.CouponModel;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.order.PaymentCommand;
 import com.loopers.domain.order.PaymentGateway;
@@ -29,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +64,12 @@ class OrderV1ApiE2ETest {
 
     @Autowired
     private ProductStockService productStockService;
+
+    @Autowired
+    private CouponService couponService;
+
+    @Autowired
+    private UserCouponService userCouponService;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -104,9 +115,10 @@ class OrderV1ApiE2ETest {
             // given
             signUp();
             ProductModel product = saveProduct("티셔츠", 10000L, 10);
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
-                    new OrderV1Dto.Item(product.getId(), 3)
-            ));
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
+                    List.of(new OrderV1Dto.Item(product.getId(), 3)),
+                    null
+            );
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -129,6 +141,40 @@ class OrderV1ApiE2ETest {
             );
         }
 
+        @DisplayName("쿠폰을 적용해 주문하면, 할인이 반영되고 쿠폰은 USED 상태가 된다.")
+        @Test
+        void appliesCoupon_andMarksUsed() throws Exception {
+            // given
+            signUp();
+            ProductModel product = saveProduct("티셔츠", 10000L, 10);
+            CouponModel coupon = couponService.createCoupon("정액 3000원", CouponType.FIXED, 3000L, null,
+                    LocalDateTime.of(2999, 12, 31, 23, 59, 59), null);
+            Long userId = userService.getMyInfo(LOGIN_ID).getId();
+            userCouponService.issue(userId, coupon.getId());
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
+                    List.of(new OrderV1Dto.Item(product.getId(), 2)),
+                    coupon.getId()
+            );
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_ID, LOGIN_ID)
+                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_PW, PASSWORD)
+                                         .contentType(MediaType.APPLICATION_JSON)
+                                         .content(objectMapper.writeValueAsString(request)))
+                                         .andReturn();
+
+            // then
+            OrderV1Dto.OrderResponse order = readOrder(mvcResult);
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()),
+                    () -> assertThat(order.totalAmount()).isEqualTo(20000L),
+                    () -> assertThat(order.discountAmount()).isEqualTo(3000L),
+                    () -> assertThat(order.finalAmount()).isEqualTo(17000L),
+                    () -> assertThat(userCouponService.getMyCoupons(userId).get(0).isUsed()).isTrue()
+            );
+        }
+
         @DisplayName("같은 상품이 중복으로 들어오면, 수량이 합산되어 한 항목으로 처리된다.")
         @Test
         void mergesDuplicateItems() throws Exception {
@@ -138,7 +184,7 @@ class OrderV1ApiE2ETest {
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(product.getId(), 2),
                     new OrderV1Dto.Item(product.getId(), 3)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -168,7 +214,7 @@ class OrderV1ApiE2ETest {
                     .willReturn(PaymentResult.failure("declined"));
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(product.getId(), 3)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -193,7 +239,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("티셔츠", 10000L, 2);
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(product.getId(), 5)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -214,7 +260,7 @@ class OrderV1ApiE2ETest {
             signUp();
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(99999L, 1)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -235,7 +281,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("티셔츠", 10000L, 10);
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(product.getId(), 1)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -252,7 +298,7 @@ class OrderV1ApiE2ETest {
         void returns400_whenEmptyItems() throws Exception {
             // given
             signUp();
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of());
+            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
@@ -274,7 +320,7 @@ class OrderV1ApiE2ETest {
             ProductModel product = saveProduct("티셔츠", 10000L, 10);
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
                     new OrderV1Dto.Item(product.getId(), 0)
-            ));
+            ), null);
 
             // when
             MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)

@@ -1,5 +1,6 @@
 package com.loopers.domain.order;
 
+import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductStockService;
@@ -19,9 +20,10 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductService productService;
     private final ProductStockService productStockService;
+    private final UserCouponService userCouponService;
 
     @Transactional
-    public OrderModel createPendingOrder(Long userId, List<OrderLine> lines) {
+    public OrderModel createPendingOrder(Long userId, List<OrderLine> lines, Long couponId) {
         List<OrderItemModel> items = new ArrayList<>();
         for (OrderLine line : lines) {
             ProductModel product = productService.getProduct(line.productId());
@@ -33,7 +35,11 @@ public class OrderService {
                     line.quantity()
             ));
         }
-        OrderModel order = OrderModel.of(userId, items);
+
+        long originalAmount = items.stream().mapToLong(OrderItemModel::subtotal).sum();
+        long discountAmount = couponId == null ? 0L : userCouponService.use(userId, couponId, originalAmount);
+
+        OrderModel order = OrderModel.of(userId, items, couponId, discountAmount);
         return orderRepository.save(order);
     }
 
@@ -47,10 +53,13 @@ public class OrderService {
     @Transactional
     public OrderModel fail(Long orderId) {
         OrderModel order = getOrder(orderId);
+        order.fail();
         for (OrderItemModel item : order.getOrderItems()) {
             productStockService.increaseStock(item.getProductId(), item.getQuantity());
         }
-        order.fail();
+        if (order.getCouponId() != null) {
+            userCouponService.restore(order.getUserId(), order.getCouponId());
+        }
         return order;
     }
 
