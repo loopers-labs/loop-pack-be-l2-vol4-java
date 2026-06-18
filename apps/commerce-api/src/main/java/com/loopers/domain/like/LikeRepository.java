@@ -2,9 +2,6 @@ package com.loopers.domain.like;
 
 import com.loopers.domain.common.PageResult;
 
-import java.util.Collection;
-import java.util.Map;
-
 public interface LikeRepository {
 
     /** 좋아요 행을 멱등하게 추가한다(INSERT IGNORE). 반환값은 영향받은 행 수 — 1 이면 새로 생김, 0 이면 이미 있음. */
@@ -16,8 +13,6 @@ public interface LikeRepository {
     boolean exists(Long userId, Long productId);
 
     long countByProductId(Long productId);
-
-    Map<Long, Long> countByProductIds(Collection<Long> productIds);
 
     PageResult<Like> findAllByUserId(Long userId, int page, int size);
 }

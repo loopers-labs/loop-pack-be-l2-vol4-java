@@ -8,9 +8,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Collection;
-import java.util.List;
-
 public interface LikeJpaRepository extends JpaRepository<Like, Like.LikeId> {
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
@@ -27,17 +24,4 @@ public interface LikeJpaRepository extends JpaRepository<Like, Like.LikeId> {
         VALUES (:userId, :productId, NOW(6))
     """, nativeQuery = true)
     int insertIgnore(@Param("userId") Long userId, @Param("productId") Long productId);
-
-    @Query("""
-        SELECT l.productId AS productId, COUNT(l) AS count
-        FROM ProductLike l
-        WHERE l.productId IN :productIds
-        GROUP BY l.productId
-    """)
-    List<LikeCountRow> findCountsByProductIds(@Param("productIds") Collection<Long> productIds);
-
-    interface LikeCountRow {
-        Long getProductId();
-        Long getCount();
-    }
 }

@@ -9,10 +9,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 @RequiredArgsConstructor
 @Component
 public class LikeRepositoryImpl implements LikeRepository {
@@ -37,18 +33,6 @@ public class LikeRepositoryImpl implements LikeRepository {
     @Override
     public long countByProductId(Long productId) {
         return likeJpaRepository.countByProductId(productId);
-    }
-
-    @Override
-    public Map<Long, Long> countByProductIds(Collection<Long> productIds) {
-        if (productIds.isEmpty()) {
-            return Map.of();
-        }
-        return likeJpaRepository.findCountsByProductIds(productIds).stream()
-                .collect(Collectors.toMap(
-                        LikeJpaRepository.LikeCountRow::getProductId,
-                        LikeJpaRepository.LikeCountRow::getCount
-                ));
     }
 
     @Override
