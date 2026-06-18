@@ -10,6 +10,8 @@ public class OrderModel {
     private Long id;
     private Long userId;
     private List<OrderLine> orderLines;
+    private Long originalTotalPrice;
+    private Long discountPrice;
     private Long totalPrice;
     private OrderStatus status;
     private ZonedDateTime createdAt;
@@ -17,7 +19,7 @@ public class OrderModel {
 
     protected OrderModel() {}
 
-    public OrderModel(Long id, Long userId, List<OrderLine> orderLines, Long totalPrice, OrderStatus status, ZonedDateTime createdAt, ZonedDateTime updatedAt) {
+    public OrderModel(Long id, Long userId, List<OrderLine> orderLines, Long originalTotalPrice, Long discountPrice, Long totalPrice, OrderStatus status, ZonedDateTime createdAt, ZonedDateTime updatedAt) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "userId는 null일 수 없습니다.");
         }
@@ -33,23 +35,28 @@ public class OrderModel {
         this.id = id;
         this.userId = userId;
         this.orderLines = orderLines;
+        this.originalTotalPrice = originalTotalPrice;
+        this.discountPrice = discountPrice;
         this.totalPrice = totalPrice;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
 
-    public static OrderModel create(Long userId, List<OrderLine> orderLines) {
+    public static OrderModel create(Long userId, List<OrderLine> orderLines, long discountPrice) {
         if (orderLines == null || orderLines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 상품은 1개 이상이어야 합니다.");
         }
-        long totalPrice = orderLines.stream().mapToLong(OrderLine::getTotalPrice).sum();
-        return new OrderModel(null, userId, orderLines, totalPrice, OrderStatus.PENDING, null, null);
+        long originalTotalPrice = orderLines.stream().mapToLong(OrderLine::getTotalPrice).sum();
+        long totalPrice = Math.max(0, originalTotalPrice - discountPrice);
+        return new OrderModel(null, userId, orderLines, originalTotalPrice, discountPrice, totalPrice, OrderStatus.PENDING, null, null);
     }
 
     public Long getId() { return id; }
     public Long getUserId() { return userId; }
     public List<OrderLine> getOrderLines() { return orderLines; }
+    public Long getOriginalTotalPrice() { return originalTotalPrice; }
+    public Long getDiscountPrice() { return discountPrice; }
     public Long getTotalPrice() { return totalPrice; }
     public OrderStatus getStatus() { return status; }
     public ZonedDateTime getCreatedAt() { return createdAt; }

@@ -12,7 +12,7 @@ import java.util.Map;
 @Component
 public class OrderDomainService {
 
-    public OrderModel place(Long userId, Map<Long, Integer> quantitiesByProductId, Map<Long, ProductModel> productsById) {
+    public OrderModel place(Long userId, Map<Long, Integer> quantitiesByProductId, Map<Long, ProductModel> productsById, long discountPrice) {
         if (quantitiesByProductId == null || quantitiesByProductId.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 상품은 1개 이상이어야 합니다.");
         }
@@ -27,6 +27,6 @@ public class OrderDomainService {
             product.decreaseStock(quantity);
             orderLines.add(OrderLine.create(product.getId(), product.getName(), product.getPrice(), quantity));
         }
-        return OrderModel.create(userId, orderLines);
+        return OrderModel.create(userId, orderLines, discountPrice);
     }
 }

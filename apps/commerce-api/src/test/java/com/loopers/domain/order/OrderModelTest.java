@@ -30,11 +30,13 @@ class OrderModelTest {
             );
 
             // act
-            OrderModel order = OrderModel.create(10L, lines);
+            OrderModel order = OrderModel.create(10L, lines, 0L);
 
             // assert
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(10L),
+                () -> assertThat(order.getOriginalTotalPrice()).isEqualTo(5_000L),
+                () -> assertThat(order.getDiscountPrice()).isEqualTo(0L),
                 () -> assertThat(order.getTotalPrice()).isEqualTo(5_000L),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(order.getOrderLines()).hasSize(2)
@@ -45,7 +47,7 @@ class OrderModelTest {
         @Test
         void throwsBadRequest_whenOrderLinesAreEmpty() {
             CoreException result = assertThrows(CoreException.class,
-                () -> OrderModel.create(10L, List.of()));
+                () -> OrderModel.create(10L, List.of(), 0L));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
@@ -61,7 +63,7 @@ class OrderModelTest {
             List<OrderLine> lines = List.of(OrderLine.create(1L, "상품A", 1_000L, 1));
 
             CoreException result = assertThrows(CoreException.class,
-                () -> new OrderModel(1L, null, lines, 1_000L, OrderStatus.PENDING, null, null));
+                () -> new OrderModel(1L, null, lines, 1_000L, 0L, 1_000L, OrderStatus.PENDING, null, null));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }

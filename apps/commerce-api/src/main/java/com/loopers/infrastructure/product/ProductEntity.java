@@ -14,7 +14,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "product")
 public class ProductEntity extends BaseEntity {
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id")
     private BrandEntity brand;
 
