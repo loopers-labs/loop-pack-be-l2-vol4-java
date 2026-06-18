@@ -5,6 +5,7 @@ import com.loopers.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -14,7 +15,17 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    indexes = {
+        @Index(name = "idx_products_like_count", columnList = "like_count"),
+        @Index(name = "idx_products_brand_id_like_count", columnList = "brand_id, like_count"),
+        @Index(name = "idx_products_created_at", columnList = "created_at"),
+        @Index(name = "idx_products_price", columnList = "price"),
+        @Index(name = "idx_products_brand_id_created_at", columnList = "brand_id, created_at"),
+        @Index(name = "idx_products_brand_id_price", columnList = "brand_id, price")
+    }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductModel extends BaseEntity {
