@@ -78,23 +78,17 @@ public class CouponIssue extends BaseTimeEntity {
         return now.isAfter(expiredAt);
     }
 
-    public BigDecimal use(BigDecimal orderAmount, LocalDateTime now) {
-        // 1. ?대? ?ъ슜??荑좏룿?몄? 寃利?
+    public BigDecimal calculateDiscount(BigDecimal orderAmount, LocalDateTime now) {
         if (this.status == CouponStatus.USED) {
-            throw new CoreException(ErrorType.CONFLICT, "?대? ?ъ슜 ?꾨즺??荑좏룿?낅땲??");
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용완료된 쿠폰입니다.");
         }
-
-        // 2. 留뚮즺 ?щ? 寃利?
         if (isExpired(now)) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "留뚮즺??荑좏룿?낅땲??");
+            throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
         }
-
-        // 3. 理쒖냼 二쇰Ц 湲덉븸 寃利?
         if (orderAmount.compareTo(this.minOrderAmount) < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "理쒖냼 二쇰Ц 湲덉븸??異⑹”?섏? 紐삵뻽?듬땲??");
+            throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 못했습니다.");
         }
 
-        // 4. ?좎씤 湲덉븸 怨꾩궛
         BigDecimal discount = BigDecimal.ZERO;
         if (this.couponType == CouponType.FIXED) {
             discount = this.discountValue;
@@ -102,19 +96,19 @@ public class CouponIssue extends BaseTimeEntity {
                 discount = orderAmount;
             }
         } else if (this.couponType == CouponType.RATE) {
-            // ?뺣쪧 怨꾩궛: orderAmount * (value / 100)
             BigDecimal rate = this.discountValue.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
             discount = orderAmount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
 
-            // 理쒕? ?좎씤 湲덉븸 ?쒕룄 ?곸슜
             if (this.maxDiscountAmount != null && discount.compareTo(this.maxDiscountAmount) > 0) {
                 discount = this.maxDiscountAmount;
             }
         }
+        return discount;
+    }
 
-        // 5. ?ъ슜 ?곹깭濡??꾪솚
+    public BigDecimal use(BigDecimal orderAmount, LocalDateTime now) {
+        BigDecimal discount = calculateDiscount(orderAmount, now);
         this.status = CouponStatus.USED;
-
         return discount;
     }
 }
