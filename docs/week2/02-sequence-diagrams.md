@@ -185,34 +185,53 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    title 상품 목록 조회 API 시퀀스 다이어그램
+    title 상품 상세/목록 조회 API 시퀀스 다이어그램 (캐시 및 Fallback 적용)
     actor User
     participant Controller as ProductController
     participant Facade as ProductFacade (Application)
-    participant Repo as ProductQueryRepository (QueryDSL)
+    participant Cache as RedisTemplate
+    participant Repo as Repository
     participant DB as Database
 
-    User->>Controller: GET /api/v1/products?brandId={id}&sort={sort}&page={page}
+    User->>Controller: GET /api/v1/products/{id} (또는 목록)
     activate Controller
 
-    Controller->>Facade: retrieveProducts(condition, pageable)
+    Controller->>Facade: 상품 조회 요청
     activate Facade
 
-    Facade->>Repo: findProductsByCondition(condition, pageable)
-    activate Repo
+    Note right of Facade: [Cache-Aside (Read-Through)] 시도
     
-    Note over Repo: 단순 동적 쿼리 실행
-    Repo->>DB: QueryDSL<br/>WHERE brand_id = {id}<br/>ORDER BY like_count DESC, created_at DESC
-    activate DB
-    DB-->>Repo: List<ProductResponseDto> & TotalCount
-    deactivate DB
+    rect rgba(200, 200, 200, 0.2)
+        Note right of Facade: try Redis 접근
+        Facade->>Cache: GET 캐시 키 (product:detail::123)
+        alt 캐시 히트 (정상)
+            Cache-->>Facade: 직렬화된 데이터 반환
+        else 캐시 미스 (데이터 없음)
+            Cache-->>Facade: null 반환
+        else Redis 에러/타임아웃 (장애 상황)
+            Cache--xFacade: RedisConnectionFailureException
+            Note over Facade: 에러를 로그로 남기고 Swallow(무시)
+        end
+    end
 
-    Repo-->>Facade: Page<ProductResponseDto> 반환
-    deactivate Repo
+    alt 캐시에서 데이터를 얻지 못한 경우 (미스 or 예외 발생)
+        Facade->>Repo: 원본 DB 직접 조회 (SELECT)
+        activate Repo
+        Repo->>DB: Query Execution
+        DB-->>Repo: ResultSet
+        Repo-->>Facade: 상품 Entity / Page 반환
+        deactivate Repo
+        
+        rect rgba(200, 200, 200, 0.2)
+            Note right of Facade: try 캐시에 다시 적재 시도
+            Facade->>Cache: SET 데이터 (상세 10분 / 목록 5분 TTL)
+            Note right of Cache: 만약 적재 시에도 Redis 에러가 나면 <br>마찬가지로 무시(Swallow)
+        end
+    end
 
-    Facade-->>Controller: 200 OK (JSON Response)
+    Facade-->>Controller: 200 OK (DTO 반환)
     deactivate Facade
 
-    Controller-->>User: 상품 목록 반환 (좋아요 수 포함)
+    Controller-->>User: 상품 정보/목록 반환
     deactivate Controller
 ```
