@@ -27,6 +27,9 @@ class ProductFacadeIntegrationTest {
     @Autowired
     private ProductFacade productFacade;
 
+    @Autowired
+    private ProductAdminFacade productAdminFacade;
+
     @SpyBean
     private ProductRepository productRepository;
 
@@ -153,5 +156,28 @@ class ProductFacadeIntegrationTest {
         assertThat(result.getContent().get(0).name()).isEqualTo("Air Max");
         // Redis 에러가 삼켜지고 DB 조회가 발생했는지 검증
         verify(productRepository, atLeastOnce()).findAll(brandId, sort, pageRequest);
+    }
+
+    @Test
+    @DisplayName("상품 정보를 수정하면 해당 상품의 상세조회 캐시가 무효화되어 다음 조회 시 DB에서 새로 조회한다.")
+    void updateProduct_ShouldEvictCache() {
+        // given
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        ProductModel product = productRepository.save(new ProductModel(brand.getId(), "Air Max", new BigDecimal("1000.00")));
+        Long productId = product.getId();
+
+        // 1. 상세 조회하여 캐시 적재 (DB 1회 호출)
+        productFacade.getProduct(productId);
+        verify(productRepository, times(1)).findById(productId);
+
+        // 2. 상품 수정 실행 (캐시가 무효화되어야 함)
+        productAdminFacade.updateProduct(productId, "Air Max Gold", new BigDecimal("1200.00"));
+
+        // 3. 다시 상세 조회 (캐시 미스가 나야 하므로 DB를 다시 거침 -> 총 findById 2회 호출 기대)
+        ProductInfo updatedInfo = productFacade.getProduct(productId);
+
+        // then
+        assertThat(updatedInfo.name()).isEqualTo("Air Max Gold");
+        verify(productRepository, times(3)).findById(productId);
     }
 }

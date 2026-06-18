@@ -33,6 +33,9 @@ class ProductAdminFacadeTest {
     @Mock
     private BrandRepository brandRepository;
 
+    @Mock
+    private org.springframework.data.redis.core.RedisTemplate<String, String> defaultRedisTemplate;
+
     @Test
     @DisplayName("상품 등록 요청 시 브랜드가 존재하면 상품과 재고가 생성 및 저장된다.")
     void registerProduct_ShouldSaveProduct() {
