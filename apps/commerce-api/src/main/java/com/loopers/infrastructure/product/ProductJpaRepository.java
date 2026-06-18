@@ -45,22 +45,4 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     // 브랜드 삭제 cascade 시, 소프트 삭제 '전에' 대상 상품 id 를 모아 재고 cascade 에 넘긴다.
     @Query("SELECT p.id FROM Product p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
     List<Long> findIdsByBrandIdAndDeletedAtIsNull(@Param("brandId") Long brandId);
-
-    @Query("""
-        SELECT p
-        FROM Product p
-        LEFT JOIN ProductLike l ON l.productId = p.id
-        WHERE p.deletedAt IS NULL
-        GROUP BY p
-        ORDER BY COUNT(l) DESC, p.id DESC
-    """)
-    Page<Product> findAllOrderByLikesDesc(Pageable pageable);
-
-    @Query("""
-        SELECT p
-        FROM Product p
-        WHERE p.deletedAt IS NULL
-        ORDER BY p.likeCount DESC, p.id DESC
-    """)
-    Page<Product> findAllOrderByLikeCountDesc(Pageable pageable);
 }

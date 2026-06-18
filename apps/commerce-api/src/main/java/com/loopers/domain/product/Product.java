@@ -20,7 +20,18 @@ import org.hibernate.annotations.DynamicUpdate;
 // 변경된 컬럼만 UPDATE — modify/delete 의 전체 컬럼 UPDATE 가 동시 좋아요 원자 UPDATE 의
 // like_count 증감을 stale 값으로 덮어쓰는 lost update 를 막는다(like_count 는 dirty 가 아니므로 UPDATE 에서 빠진다).
 @DynamicUpdate
-@Table(name = "products", indexes = @Index(name = "idx_products_like_count", columnList = "like_count desc, id desc"))
+// 정렬 유즈케이스별 인덱스:
+//  - 전역 좋아요순   : (like_count desc, id desc)
+//  - 브랜드+좋아요순 : (brand_id, like_count desc, id desc) — 브랜드 선택도와 무관하게 Top-N 안정
+//  - 전역 가격순     : (price, id desc) — id desc 타이브레이크 일치(암묵 PK 는 id asc 라 단일 (price)로는 filesort 잔존)
+//  - 브랜드+가격순   : (brand_id, price, id desc) — brand_id 필터 후 price 정렬을 인덱스 순서로 풀어 filesort 제거
+//  - 최신순         : 인덱스 없음 — id desc(PK 역스캔)로 대체
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_like_count", columnList = "like_count desc, id desc"),
+        @Index(name = "idx_products_brand_like", columnList = "brand_id, like_count desc, id desc"),
+        @Index(name = "idx_products_price_id", columnList = "price, id desc"),
+        @Index(name = "idx_products_brand_price", columnList = "brand_id, price, id desc")
+})
 public class Product extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)

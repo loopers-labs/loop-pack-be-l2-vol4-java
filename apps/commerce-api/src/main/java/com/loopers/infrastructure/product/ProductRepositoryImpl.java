@@ -81,8 +81,9 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     private Page<Product> findOrderByLatest(ProductCommand.Search s) {
+        // id 가 auto_increment 라 id 순 = 생성 순. id desc 는 PK 역스캔으로 풀려 filesort/created_at 인덱스가 불필요.
         Pageable pageable = PageRequest.of(s.page(), s.size(),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+                Sort.by(Sort.Order.desc("id")));
         return s.brandId() == null
                 ? productJpaRepository.findAllByDeletedAtIsNull(pageable)
                 : productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(s.brandId(), pageable);
