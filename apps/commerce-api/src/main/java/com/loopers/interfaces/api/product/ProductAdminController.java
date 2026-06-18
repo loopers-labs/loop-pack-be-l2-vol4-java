@@ -48,7 +48,7 @@ public class ProductAdminController {
 
     private void validateAdmin(String ldap) {
         if (!"loopers.admin".equals(ldap)) {
-            throw new CoreException(ErrorType.NOT_FOUND, "沅뚰븳???놁뒿?덈떎.");
+            throw new CoreException(ErrorType.NOT_FOUND, "권한이 없습니다.");
         }
     }
 }

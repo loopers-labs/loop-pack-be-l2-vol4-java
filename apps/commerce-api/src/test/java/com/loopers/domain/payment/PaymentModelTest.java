@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PaymentModelTest {
 
     @Test
-    @DisplayName("寃곗젣 ?앹꽦 ??二쇰Ц ?앸퀎?? 寃곗젣 ?섎떒, 湲덉븸, 寃곗젣 ?곹깭(APPROVED), ?뱀씤 ?쒓컖 諛?嫄곕옒 ?앸퀎?먭? ?ㅼ젙?쒕떎.")
+    @DisplayName("결제 생성 시 주문 식별자, 결제 수단, 금액, 결제 상태(APPROVED), 승인 시각 및 거래 식별자가 설정된다.")
     void constructor_ShouldInitializeFieldsCorrectly() {
         // given
         Long orderId = 100L;

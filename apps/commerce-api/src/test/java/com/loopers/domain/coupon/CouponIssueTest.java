@@ -9,33 +9,33 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
+        // 두 번째 사용 시도 시 예외 발생
 class CouponIssueTest {
 
     @Test
-    @DisplayName("理쒖냼 二쇰Ц 湲덉븸蹂대떎 二쇰Ц 湲덉븸???곸쑝硫?荑좏룿 ?ъ슜 ???덉쇅媛 諛쒖깮?쒕떎.")
+    @DisplayName("최소 주문 금액보다 주문 금액이 적으면 쿠폰 사용 시 예외가 발생한다.")
     void use_UnderMinOrderAmount_ShouldThrowException() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
-        CouponTemplate template = new CouponTemplate("荑좏룿", CouponType.FIXED, new BigDecimal("1000"), new BigDecimal("10000"), null, now.plusDays(1));
-        // template??id ?명똿???쒕??덉씠?섑븯湲??꾪빐 reflection ?ъ슜 (JPA ?섏〈???놁씠)
+        CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, new BigDecimal("1000"), new BigDecimal("10000"), null, now.plusDays(1));
+        // template에 id 세팅을 시뮬레이션하기 위해 reflection 사용 (JPA 의존성 없이)
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         CouponIssue issue = new CouponIssue(1L, template);
-
+        // 1번 케이스: 5000원 주문에 1000원 할인
         // when & then
         assertThrows(CoreException.class, () -> issue.use(new BigDecimal("9999"), now));
     }
-
+        // 2번 케이스: 500원 주문에 500원 할인 (주문 금액 초과 불가)
     @Test
-    @DisplayName("?대? ?ъ슜??USED) 荑좏룿???ъ슜?섎젮怨??섎㈃ ?덉쇅媛 諛쒖깮?쒕떎.")
+    @DisplayName("이미 사용된(USED) 쿠폰을 사용하려고 하면 예외가 발생한다.")
     void use_AlreadyUsed_ShouldThrowException() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
-        CouponTemplate template = new CouponTemplate("荑좏룿", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
+        CouponTemplate template = new CouponTemplate("쿠폰", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         CouponIssue issue = new CouponIssue(1L, template);
 
-        // 泥?踰덉㎏ ?ъ슜?쇰줈 USED ?곹깭媛 ??
+        // 첫 번째 사용으로 USED 상태가 됨
         issue.use(new BigDecimal("5000"), now);
 
         // ??踰덉㎏ ?ъ슜 ?쒕룄 ???덉쇅 諛쒖깮
@@ -43,11 +43,11 @@ class CouponIssueTest {
     }
 
     @Test
-    @DisplayName("?뺤븸(FIXED) 荑좏룿? 怨좎젙??湲덉븸留뚰겮 ?좎씤?섎ŉ 二쇰Ц 湲덉븸??珥덇낵???좎씤?????녿떎.")
+    @DisplayName("정액(FIXED) 쿠폰은 고정된 금액만큼 할인되며 주문 금액을 초과해 할인될 수 없다.")
     void use_FixedCoupon_ShouldCalculateDiscount() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
-        CouponTemplate template = new CouponTemplate("泥쒖썝?좎씤", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
+        CouponTemplate template = new CouponTemplate("천원할인", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         
         // 1踰?耳?댁뒪: 5000??二쇰Ц??1000???좎씤
@@ -62,11 +62,11 @@ class CouponIssueTest {
     }
 
     @Test
-    @DisplayName("?뺣쪧(RATE) 荑좏룿? 鍮꾩쑉留뚰겮 ?좎씤?섎ŉ 理쒕? ?쒕룄(maxDiscountAmount)媛 ?덉쑝硫??곸슜?쒕떎.")
+    @DisplayName("정률(RATE) 쿠폰은 비율만큼 할인되며 최대 한도(maxDiscountAmount)가 있으면 적용된다.")
     void use_RateCoupon_ShouldCalculateDiscountWithLimit() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 11, 21, 0);
-        CouponTemplate template = new CouponTemplate("10%?좎씤", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("2000"), now.plusDays(1));
+        CouponTemplate template = new CouponTemplate("10%할인", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("2000"), now.plusDays(1));
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         
         CouponIssue issue1 = new CouponIssue(1L, template);

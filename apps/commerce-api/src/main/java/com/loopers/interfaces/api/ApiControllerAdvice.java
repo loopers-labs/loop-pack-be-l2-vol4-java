@@ -34,7 +34,7 @@ public class ApiControllerAdvice {
         String name = e.getName();
         String type = e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "unknown";
         String value = e.getValue() != null ? e.getValue().toString() : "null";
-        String message = String.format("?붿껌 ?뚮씪誘명꽣 '%s' (??? %s)??媛?'%s'??媛) ?섎せ?섏뿀?듬땲??", name, type, value);
+        String message = String.format("요청 파라미터 '%s' (타입: %s)의 값 '%s'이(가) 잘못되었습니다.", name, type, value);
         return failureResponse(ErrorType.BAD_REQUEST, message);
     }
 
@@ -42,7 +42,7 @@ public class ApiControllerAdvice {
     public ResponseEntity<ApiResponse<?>> handleBadRequest(MissingServletRequestParameterException e) {
         String name = e.getParameterName();
         String type = e.getParameterType();
-        String message = String.format("?꾩닔 ?붿껌 ?뚮씪誘명꽣 '%s' (??? %s)媛 ?꾨씫?섏뿀?듬땲??", name, type);
+        String message = String.format("필수 요청 파라미터 '%s' (타입: %s)가 누락되었습니다.", name, type);
         return failureResponse(ErrorType.BAD_REQUEST, message);
     }
 
@@ -62,30 +62,30 @@ public class ApiControllerAdvice {
                 String enumValues = Arrays.stream(enumClass.getEnumConstants())
                     .map(Object::toString)
                     .collect(Collectors.joining(", "));
-                valueIndicationMessage = "?ъ슜 媛?ν븳 媛?: [" + enumValues + "]";
+                valueIndicationMessage = "사용 가능한 값 : [" + enumValues + "]";
             }
 
             String expectedType = invalidFormat.getTargetType().getSimpleName();
             Object value = invalidFormat.getValue();
 
-            errorMessage = String.format("?꾨뱶 '%s'??媛?'%s'??媛) ?덉긽 ???%s)怨??쇱튂?섏? ?딆뒿?덈떎. %s",
+            errorMessage = String.format("필드 '%s'의 값 '%s'이(가) 예상 타입(%s)과 일치하지 않습니다. %s",
                 fieldName, value, expectedType, valueIndicationMessage);
 
         } else if (rootCause instanceof MismatchedInputException mismatchedInput) {
             String fieldPath = mismatchedInput.getPath().stream()
                 .map(ref -> ref.getFieldName() != null ? ref.getFieldName() : "?")
                 .collect(Collectors.joining("."));
-            errorMessage = String.format("?꾩닔 ?꾨뱶 '%s'??媛) ?꾨씫?섏뿀?듬땲??", fieldPath);
+            errorMessage = String.format("필수 필드 '%s'이(가) 누락되었습니다.", fieldPath);
 
         } else if (rootCause instanceof JsonMappingException jsonMapping) {
             String fieldPath = jsonMapping.getPath().stream()
                 .map(ref -> ref.getFieldName() != null ? ref.getFieldName() : "?")
                 .collect(Collectors.joining("."));
-            errorMessage = String.format("?꾨뱶 '%s'?먯꽌 JSON 留ㅽ븨 ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎: %s",
+            errorMessage = String.format("필드 '%s'에서 JSON 매핑 오류가 발생했습니다: %s",
                 fieldPath, jsonMapping.getOriginalMessage());
 
         } else {
-            errorMessage = "?붿껌 蹂몃Ц??泥섎━?섎뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. JSON 硫붿꽭吏 洹쒓꺽???뺤씤?댁＜?몄슂.";
+            errorMessage = "요청 본문을 처리하는 중 오류가 발생했습니다. JSON 메세지 규격을 확인해주세요.";
         }
 
         return failureResponse(ErrorType.BAD_REQUEST, errorMessage);
@@ -95,7 +95,7 @@ public class ApiControllerAdvice {
     public ResponseEntity<ApiResponse<?>> handleBadRequest(ServerWebInputException e) {
         String missingParams = extractMissingParameter(e.getReason() != null ? e.getReason() : "");
         if (!missingParams.isEmpty()) {
-            String message = String.format("?꾩닔 ?붿껌 媛?'%s'媛 ?꾨씫?섏뿀?듬땲??", missingParams);
+            String message = String.format("필수 요청 값 '%s'가 누락되었습니다.", missingParams);
             return failureResponse(ErrorType.BAD_REQUEST, message);
         } else {
             return failureResponse(ErrorType.BAD_REQUEST, null);

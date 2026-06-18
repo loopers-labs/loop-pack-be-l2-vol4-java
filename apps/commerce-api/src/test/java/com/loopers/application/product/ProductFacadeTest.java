@@ -1,8 +1,10 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
+import com.loopers.application.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.application.product.ProductRepository;
+import com.loopers.application.like.LikeRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -28,16 +31,16 @@ class ProductFacadeTest {
     private ProductFacade productFacade;
 
     @Mock
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     @Mock
-    private BrandService brandService;
+    private BrandRepository brandRepository;
 
     @Mock
-    private com.loopers.domain.like.LikeService likeService;
+    private LikeRepository likeRepository;
 
     @Test
-    @DisplayName("?곹뭹 紐⑸줉???섏씠吏?議고쉶?섏뿬 釉뚮옖?쒕챸??蹂묓빀??DTO 紐⑸줉??諛섑솚?쒕떎.")
+    @DisplayName("상품 목록을 페이지 조회하여 브랜드명을 병합한 DTO 목록을 반환한다.")
     void getProducts_ShouldReturnProductsWithBrandNames() {
         // given
         Long brandId = 10L;
@@ -48,13 +51,13 @@ class ProductFacadeTest {
         ReflectionTestUtils.setField(product1, "id", 1L);
 
         Page<ProductModel> productPage = new PageImpl<>(List.of(product1), pageable, 1);
-        given(productService.getProducts(brandId, sort, pageable)).willReturn(productPage);
+        given(productRepository.findAll(brandId, sort, pageable)).willReturn(productPage);
 
         BrandModel brand = new BrandModel("Nike");
         ReflectionTestUtils.setField(brand, "id", brandId);
-        given(brandService.getBrandsByIds(List.of(brandId))).willReturn(List.of(brand));
+        given(brandRepository.findByIds(List.of(brandId))).willReturn(List.of(brand));
 
-        given(likeService.countByProductIds(List.of(1L))).willReturn(java.util.Map.of(1L, 5));
+        given(likeRepository.countByProductIds(List.of(1L))).willReturn(Map.of(1L, 5));
 
         // when
         Page<ProductInfo> result = productFacade.getProducts(brandId, sort, pageable);

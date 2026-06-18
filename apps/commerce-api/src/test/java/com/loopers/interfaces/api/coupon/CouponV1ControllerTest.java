@@ -30,7 +30,7 @@ class CouponV1ControllerTest {
     private CouponFacade couponFacade;
 
     @Test
-    @DisplayName("荑좏룿 諛쒓툒 ?붿껌 ??200 OK瑜?諛섑솚?섍퀬 Facade瑜??몄텧?쒕떎.")
+    @DisplayName("쿠폰 발급 요청 시 200 OK를 반환하고 Facade를 호출한다.")
     void issueCoupon_ShouldReturnOk() throws Exception {
         // given
         Long userId = 1L;
@@ -45,13 +45,13 @@ class CouponV1ControllerTest {
     }
 
     @Test
-    @DisplayName("??荑좏룿 紐⑸줉 議고쉶 ??200 OK? 紐⑸줉??諛섑솚?쒕떎.")
+    @DisplayName("내 쿠폰 목록 조회 시 200 OK와 목록을 반환한다.")
     void getUsersCoupons_ShouldReturnOkAndList() throws Exception {
         // given
         Long userId = 1L;
         List<CouponV1Dto.UserCouponResponse> mockResponse = List.of(
                 new CouponV1Dto.UserCouponResponse(
-                        100L, 10L, "10%?좎씤", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, null, "AVAILABLE", LocalDateTime.now().plusDays(1)
+                        100L, 10L, "10%할인", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, null, "AVAILABLE", LocalDateTime.now().plusDays(1)
                 )
         );
         given(couponFacade.getUsersCoupons(userId)).willReturn(mockResponse);
@@ -61,7 +61,7 @@ class CouponV1ControllerTest {
                         .header("X-Loopers-UserId", userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(100L))
-                .andExpect(jsonPath("$.data[0].name").value("10%?좎씤"))
+                .andExpect(jsonPath("$.data[0].name").value("10%할인"))
                 .andExpect(jsonPath("$.data[0].status").value("AVAILABLE"));
 
         verify(couponFacade).getUsersCoupons(userId);

@@ -1,6 +1,5 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.OrderAdminService;
 import com.loopers.domain.order.OrderModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -22,33 +22,33 @@ class OrderAdminFacadeTest {
     private OrderAdminFacade orderAdminFacade;
 
     @Mock
-    private OrderAdminService orderAdminService;
+    private OrderRepository orderRepository;
 
     @Test
-    @DisplayName("?꾩껜 二쇰Ц 紐⑸줉 議고쉶 ?붿껌 ???대뱶誘??쒕퉬?ㅼ쓽 議고쉶 濡쒖쭅???몄텧?쒕떎.")
-    void getAllOrders_ShouldCallService() {
+    @DisplayName("전체 주문 목록 조회 요청 시 리포지토리의 조회 로직이 호출된다.")
+    void getAllOrders_ShouldCallRepository() {
         // given
-        given(orderAdminService.getAllOrders()).willReturn(List.of(new OrderModel(1L)));
+        given(orderRepository.findAll()).willReturn(List.of(new OrderModel(1L)));
 
         // when
         List<OrderModel> result = orderAdminFacade.getAllOrders();
 
         // then
         assertThat(result).hasSize(1);
-        verify(orderAdminService).getAllOrders();
+        verify(orderRepository).findAll();
     }
 
     @Test
-    @DisplayName("?④굔 二쇰Ц ?곸꽭 議고쉶 ?붿껌 ???대뱶誘??쒕퉬?ㅼ쓽 議고쉶 濡쒖쭅???몄텧?쒕떎.")
-    void getOrder_ShouldCallService() {
+    @DisplayName("단건 주문 상세 조회 요청 시 리포지토리의 조회 로직이 호출된다.")
+    void getOrder_ShouldCallRepository() {
         // given
         Long orderId = 100L;
-        given(orderAdminService.getOrder(orderId)).willReturn(new OrderModel(1L));
+        given(orderRepository.findById(orderId)).willReturn(Optional.of(new OrderModel(1L)));
 
         // when
         orderAdminFacade.getOrder(orderId);
 
         // then
-        verify(orderAdminService).getOrder(orderId);
+        verify(orderRepository).findById(orderId);
     }
 }

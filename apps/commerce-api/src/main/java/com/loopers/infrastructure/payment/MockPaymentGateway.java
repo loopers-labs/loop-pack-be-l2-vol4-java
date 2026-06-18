@@ -1,5 +1,5 @@
 package com.loopers.infrastructure.payment;
-
+        // 모킹 환경이므로 취소 시 별도의 외부 연동 없이 로그 출력 수준으로 간략화
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentMethod;
 import org.springframework.stereotype.Component;

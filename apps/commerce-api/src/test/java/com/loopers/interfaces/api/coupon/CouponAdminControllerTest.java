@@ -39,14 +39,14 @@ class CouponAdminControllerTest {
     private CouponAdminFacade couponAdminFacade;
 
     @Test
-    @DisplayName("?쒗뵆由??깅줉 ?깃났 ??200 OK瑜?諛섑솚?섍퀬 Facade瑜??몄텧?쒕떎.")
+    @DisplayName("템플릿 등록 성공 시 200 OK를 반환하고 Facade를 호출한다.")
     void registerTemplate_ShouldReturnOk() throws Exception {
         // given
         CouponAdminDto.RegisterTemplateRequest request = new CouponAdminDto.RegisterTemplateRequest(
-                "?뚯뒪?몄퓼??, CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10)
+                "테스트쿠폰", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10)
         );
         CouponAdminDto.TemplateResponse response = new CouponAdminDto.TemplateResponse(
-                1L, "?뚯뒪?몄퓼??, CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, request.expiredAt()
+                1L, "테스트쿠폰", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, request.expiredAt()
         );
         given(couponAdminFacade.registerTemplate(any())).willReturn(response);
 
@@ -57,18 +57,18 @@ class CouponAdminControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(1L))
-                .andExpect(jsonPath("$.data.name").value("?뚯뒪?몄퓼??));
+                .andExpect(jsonPath("$.data.name").value("테스트쿠폰"));
 
         verify(couponAdminFacade).registerTemplate(any());
     }
 
     @Test
-    @DisplayName("?쒗뵆由??④굔 議고쉶 ??200 OK? ?곸꽭 ?댁슜??諛섑솚?쒕떎.")
+    @DisplayName("템플릿 단건 조회 시 200 OK와 상세 내용을 반환한다.")
     void getTemplate_ShouldReturnOkAndDetails() throws Exception {
         // given
         Long id = 1L;
         CouponAdminDto.TemplateResponse response = new CouponAdminDto.TemplateResponse(
-                id, "?뚯뒪?몄퓼??, CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10)
+                id, "테스트쿠폰", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10)
         );
         given(couponAdminFacade.getTemplate(id)).willReturn(response);
 
@@ -77,17 +77,17 @@ class CouponAdminControllerTest {
                         .header("X-Loopers-Ldap", "loopers.admin"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(id))
-                .andExpect(jsonPath("$.data.name").value("?뚯뒪?몄퓼??));
+                .andExpect(jsonPath("$.data.name").value("테스트쿠폰"));
 
         verify(couponAdminFacade).getTemplate(id);
     }
 
     @Test
-    @DisplayName("?쒗뵆由?紐⑸줉 議고쉶 ??200 OK? ?섏씠吏?泥섎━??紐⑸줉??諛섑솚?쒕떎.")
+    @DisplayName("템플릿 목록 조회 시 200 OK와 페이징 처리된 목록을 반환한다.")
     void getTemplates_ShouldReturnOkAndPagedList() throws Exception {
         // given
         Page<CouponAdminDto.TemplateResponse> responsePage = new PageImpl<>(List.of(
-                new CouponAdminDto.TemplateResponse(1L, "荑좏룿1", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
+                new CouponAdminDto.TemplateResponse(1L, "쿠폰1", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
         ), PageRequest.of(0, 20), 1);
         given(couponAdminFacade.getTemplates(any())).willReturn(responsePage);
 
@@ -97,21 +97,21 @@ class CouponAdminControllerTest {
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content[0].name").value("荑좏룿1"));
+                .andExpect(jsonPath("$.data.content[0].name").value("쿠폰1"));
 
         verify(couponAdminFacade).getTemplates(any());
     }
 
     @Test
-    @DisplayName("?쒗뵆由??섏젙 ??200 OK? ?섏젙???댁슜??諛섑솚?쒕떎.")
+    @DisplayName("템플릿 수정 시 200 OK와 수정된 내용을 반환한다.")
     void updateTemplate_ShouldReturnOkAndUpdatedDetails() throws Exception {
         // given
         Long id = 1L;
         CouponAdminDto.UpdateTemplateRequest request = new CouponAdminDto.UpdateTemplateRequest(
-                "?섏젙荑좏룿", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("5000"), LocalDateTime.now().plusDays(10)
+                "수정쿠폰", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("5000"), LocalDateTime.now().plusDays(10)
         );
         CouponAdminDto.TemplateResponse response = new CouponAdminDto.TemplateResponse(
-                id, "?섏젙荑좏룿", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("5000"), request.expiredAt()
+                id, "수정쿠폰", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, new BigDecimal("5000"), request.expiredAt()
         );
         given(couponAdminFacade.updateTemplate(eq(id), any())).willReturn(response);
 
@@ -121,13 +121,13 @@ class CouponAdminControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("?섏젙荑좏룿"));
+                .andExpect(jsonPath("$.data.name").value("수정쿠폰"));
 
         verify(couponAdminFacade).updateTemplate(eq(id), any());
     }
 
     @Test
-    @DisplayName("?쒗뵆由???젣 ??200 OK瑜?諛섑솚?섍퀬 Facade瑜??몄텧?쒕떎.")
+    @DisplayName("템플릿 삭제 시 200 OK를 반환하고 Facade를 호출한다.")
     void deleteTemplate_ShouldReturnOk() throws Exception {
         // given
         Long id = 1L;
@@ -141,7 +141,7 @@ class CouponAdminControllerTest {
     }
 
     @Test
-    @DisplayName("?뱀젙 荑좏룿??諛쒓툒 ?댁뿭 議고쉶 ??200 OK? ?섏씠吏?泥섎━??紐⑸줉??諛섑솚?쒕떎.")
+    @DisplayName("특정 쿠폰의 발급 내역 조회 시 200 OK와 페이징 처리된 목록을 반환한다.")
     void getIssues_ShouldReturnOkAndPagedList() throws Exception {
         // given
         Long couponId = 1L;

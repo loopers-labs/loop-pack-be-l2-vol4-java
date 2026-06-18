@@ -44,7 +44,7 @@ public class UserModel extends BaseTimeEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]{5,20}$");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,16}$");
-    private static final Pattern NAME_PATTERN = Pattern.compile("^([媛-??{2,20}|[a-zA-Z]{2,20})$");
+    private static final Pattern NAME_PATTERN = Pattern.compile("^([가-힣]{2,20}|[a-zA-Z]{2,20})$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$");
 
     @Builder

@@ -34,7 +34,7 @@ class ProductV1ControllerTest {
     private ProductFacade productFacade;
 
     @Test
-    @DisplayName("?곹뭹 ?섏씠吏?議고쉶 API ?붿껌 ???щ컮瑜??섏씠吏??뺣낫媛 ?닿릿 PageResponse媛 諛섑솚?쒕떎.")
+    @DisplayName("상품 페이지 조회 API 요청 시 올바른 페이지 정보가 담긴 PageResponse가 반환된다.")
     void getProducts_ApiSuccess() throws Exception {
         // given
         Long brandId = 10L;

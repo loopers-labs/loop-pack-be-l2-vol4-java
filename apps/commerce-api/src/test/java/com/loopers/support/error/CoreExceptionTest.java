@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CoreExceptionTest {
-    @DisplayName("ErrorType 湲곕컲???덉쇅 ?앹꽦 ?? 蹂꾨룄??硫붿떆吏媛 二쇱뼱吏吏 ?딆쑝硫?ErrorType??硫붿떆吏瑜??ъ슜?쒕떎.")
+    @DisplayName("ErrorType 기반의 예외 생성 시, 별도의 메시지가 주어지지 않으면 ErrorType의 메시지를 사용한다.")
     @Test
     void messageShouldBeErrorTypeMessage_whenCustomMessageIsNull() {
         // arrange
@@ -19,7 +19,7 @@ class CoreExceptionTest {
         }
     }
 
-    @DisplayName("ErrorType 湲곕컲???덉쇅 ?앹꽦 ?? 蹂꾨룄??硫붿떆吏媛 二쇱뼱吏硫??대떦 硫붿떆吏瑜??ъ슜?쒕떎.")
+    @DisplayName("ErrorType 기반의 예외 생성 시, 별도의 메시지가 주어지면 해당 메시지를 사용한다.")
     @Test
     void messageShouldBeCustomMessage_whenCustomMessageIsNotNull() {
         // arrange

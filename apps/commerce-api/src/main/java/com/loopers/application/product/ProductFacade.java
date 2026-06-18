@@ -27,7 +27,7 @@ public class ProductFacade {
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
         ProductModel product = productRepository.findById(id)
-            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[id = " + id + "] ?곹뭹??李얠쓣 ???놁뒿?덈떎."));
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
         BrandModel brand = brandRepository.findById(product.getBrandId())
             .orElseThrow(() -> new CoreException(ErrorType.BRAND_NOT_FOUND));
         int likeCount = likeRepository.countByProductId(id);
@@ -51,7 +51,7 @@ public class ProductFacade {
         Map<Long, Integer> fetchedLikeCounts = likeRepository.countByProductIds(productIds);
 
         return productPage.map(product -> {
-            String brandName = brandNameMap.getOrDefault(product.getBrandId(), "?????놁쓬");
+            String brandName = brandNameMap.getOrDefault(product.getBrandId(), "알수없음");
             int likeCount = fetchedLikeCounts.getOrDefault(product.getId(), 0);
                     
             return ProductInfo.from(product, brandName, likeCount);

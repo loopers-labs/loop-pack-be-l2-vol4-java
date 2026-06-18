@@ -67,19 +67,19 @@ public class ProductModel extends BaseSoftDeleteEntity {
 
     private void validateBrandId(Long brandId) {
         if (brandId == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "釉뚮옖??ID???꾩닔?낅땲??");
+            throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
         }
     }
 
     private void validateName(String name) {
         if (name == null || name.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "?곹뭹紐낆? 鍮꾩뼱?덉쓣 ???놁뒿?덈떎.");
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
         }
     }
 
     private void validatePrice(BigDecimal price) {
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "媛寃⑹? 0 ?댁긽?댁뼱???⑸땲??");
+            throw new CoreException(ErrorType.BAD_REQUEST, "가격은 0 이상이어야 합니다.");
         }
     }
 }

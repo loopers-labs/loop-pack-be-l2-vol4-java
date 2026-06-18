@@ -41,7 +41,7 @@ class ProductRepositoryTest {
     }
 
     @Test
-    @DisplayName("釉뚮옖???꾪꽣 ?놁씠 ?섏씠吏?諛??뺣젹 議곌굔??留욌뒗 ?곹뭹 紐⑸줉??議고쉶?쒕떎.")
+    @DisplayName("브랜드 필터 없이 페이지 및 정렬 조건에 맞는 상품 목록을 조회한다.")
     void findAll_WithoutBrandId_ShouldReturnAllProductsWithPagingAndSorting() throws InterruptedException {
         // given
         BrandModel brand1 = brandRepository.save(new BrandModel("Nike"));
@@ -53,19 +53,19 @@ class ProductRepositoryTest {
         Thread.sleep(10);
         ProductModel product3 = productRepository.save(new ProductModel(brand1.getId(), "Jordan", new BigDecimal("1500.0000")));
 
-        // when (湲곕낯 ?뺣젹: latest)
+        // when (기본 정렬: latest)
         Pageable pageable = PageRequest.of(0, 10);
         Page<ProductModel> result = productRepository.findAll(null, "latest", pageable);
 
         // then
         assertThat(result.getContent()).hasSize(3);
-        assertThat(result.getContent().get(0).getId()).isEqualTo(product3.getId()); // 理쒖떊 ?곹뭹??泥?踰덉㎏
+        assertThat(result.getContent().get(0).getId()).isEqualTo(product3.getId()); // 최신 상품이 첫 번째
         assertThat(result.getContent().get(1).getId()).isEqualTo(product2.getId());
         assertThat(result.getContent().get(2).getId()).isEqualTo(product1.getId());
     }
 
     @Test
-    @DisplayName("釉뚮옖???꾪꽣媛 ?덈뒗 寃쎌슦 ?대떦 釉뚮옖?쒖쓽 ?곹뭹留?議고쉶?쒕떎.")
+    @DisplayName("브랜드 필터가 있는 경우 해당 브랜드의 상품만 조회된다.")
     void findAll_WithBrandId_ShouldReturnBrandProducts() {
         // given
         BrandModel brand1 = brandRepository.save(new BrandModel("Nike"));
@@ -85,7 +85,7 @@ class ProductRepositoryTest {
 
 
     @Test
-    @DisplayName("醫뗭븘??留롮????뺣젹 議곌굔???곸슜?섏뿬 ?곹뭹 紐⑸줉??議고쉶?쒕떎.")
+    @DisplayName("좋아요 많은 순 정렬 조건을 적용하여 상품 목록을 조회한다.")
     void findAll_WithSortLikesDesc_ShouldReturnSortedByLikesDesc() throws InterruptedException {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("Nike"));
@@ -96,7 +96,7 @@ class ProductRepositoryTest {
         Thread.sleep(10);
         ProductModel product3 = productRepository.save(new ProductModel(brand.getId(), "Air Max 3", new BigDecimal("3000.0000")));
 
-        // 醫뗭븘???ㅼ젙 (product2: 2媛? product3: 1媛? product1: 0媛?
+        // 좋아요 설정 (product2: 2개, product3: 1개, product1: 0개)
         likeRepository.save(new ProductLikeModel(1L, product2.getId()));
         likeRepository.save(new ProductLikeModel(2L, product2.getId()));
         likeRepository.save(new ProductLikeModel(1L, product3.getId()));
@@ -107,5 +107,8 @@ class ProductRepositoryTest {
 
         // then
         assertThat(result.getContent()).hasSize(3);
-        assertThat(result.getContent().get(0).getId()).isEqualTo(product2.getId()); // 醫뗭븘??2媛?        assertThat(result.getContent().get(1).getId()).isEqualTo(product3.getId()); // 醫뗭븘??1媛?        assertThat(result.getContent().get(2).getId()).isEqualTo(product1.getId()); // 醫뗭븘??0媛?    }
+        assertThat(result.getContent().get(0).getId()).isEqualTo(product2.getId()); // 좋아요 2개
+        assertThat(result.getContent().get(1).getId()).isEqualTo(product3.getId()); // 좋아요 1개
+        assertThat(result.getContent().get(2).getId()).isEqualTo(product1.getId()); // 좋아요 0개
+    }
 }
