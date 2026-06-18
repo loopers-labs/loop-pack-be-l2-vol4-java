@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductCacheDto;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.stock.StockModel;
 
@@ -32,6 +33,22 @@ public record ProductInfo(
             stock.getAvailableQuantity(),
             product.getCreatedAt(),
             product.getDeletedAt()
+        );
+    }
+
+    public static ProductInfo from(ProductCacheDto snapshot, StockModel stock) {
+        return new ProductInfo(
+            snapshot.id(),
+            snapshot.name(),
+            snapshot.description(),
+            snapshot.price(),
+            snapshot.brandName(),
+            snapshot.likeCount(),
+            stock.getTotalQuantity(),
+            stock.getReservedQuantity(),
+            stock.getAvailableQuantity(),
+            snapshot.createdAt(),
+            snapshot.deletedAt()
         );
     }
 }
