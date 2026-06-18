@@ -1,11 +1,8 @@
 package com.loopers.product.application;
 
-import com.loopers.brand.domain.Brand;
-import com.loopers.brand.domain.BrandService;
-import com.loopers.like.domain.LikeService;
-import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductSort;
-import com.loopers.product.domain.ProductService;
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import com.loopers.shared.pagination.PageQuery;
 import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class ProductFacade {
 
-    private final ProductService productService;
-    private final BrandService brandService;
-    private final LikeService likeService;
     private final ProductListQuery productListQuery;
+    private final ProductDetailQuery productDetailQuery;
 
     @Transactional(readOnly = true)
     public PageResult<ProductListInfo> getProducts(int page, int size, Long brandId, String sort) {
@@ -32,9 +27,7 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public ProductDetailInfo getProduct(Long productId) {
-        Product product = productService.getVisibleProduct(productId);
-        Brand brand = brandService.getBrand(product.getBrandId());
-        long likeCount = likeService.countProductLikes(product.getId());
-        return ProductDetailInfo.from(product, brand, likeCount);
+        return productDetailQuery.findVisibleProduct(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다."));
     }
 }

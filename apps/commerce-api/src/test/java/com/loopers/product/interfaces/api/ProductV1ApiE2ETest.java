@@ -22,6 +22,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -40,6 +41,7 @@ class ProductV1ApiE2ETest {
     private final ProductLikeSummaryWriter productLikeSummaryWriter;
     private final ProductLikeSummarySynchronizer productLikeSummarySynchronizer;
     private final DatabaseCleanUp databaseCleanUp;
+    private final JdbcTemplate jdbcTemplate;
 
     @Autowired
     ProductV1ApiE2ETest(
@@ -50,7 +52,8 @@ class ProductV1ApiE2ETest {
         LikeFacade likeFacade,
         ProductLikeSummaryWriter productLikeSummaryWriter,
         ProductLikeSummarySynchronizer productLikeSummarySynchronizer,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        JdbcTemplate jdbcTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
@@ -60,6 +63,7 @@ class ProductV1ApiE2ETest {
         this.productLikeSummaryWriter = productLikeSummaryWriter;
         this.productLikeSummarySynchronizer = productLikeSummarySynchronizer;
         this.databaseCleanUp = databaseCleanUp;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @AfterEach
@@ -99,6 +103,26 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(data.description()).isEqualTo("강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰"),
                 () -> assertThat(data.price()).isEqualTo(1_550_000L),
                 () -> assertThat(data.likeCount()).isZero()
+            );
+        }
+
+        @DisplayName("상품 상세 조회는 요약 테이블의 좋아요 수를 반환한다.")
+        @Test
+        void returnsProductDetailLikeCountFromSummary() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            changeSummaryLikeCount(product.getId(), 7);
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());
+
+            // assert
+            ProductV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(product.getId()),
+                () -> assertThat(data.likeCount()).isEqualTo(7L)
             );
         }
 
@@ -312,6 +336,14 @@ class ProductV1ApiE2ETest {
             likeFacade.like(userId, product.getId());
         }
         productLikeSummarySynchronizer.sync();
+    }
+
+    private void changeSummaryLikeCount(Long productId, long likeCount) {
+        jdbcTemplate.update(
+            "UPDATE product_like_summary SET like_count = ? WHERE product_id = ?",
+            likeCount,
+            productId
+        );
     }
 
     private ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> getProduct(Long productId) {
