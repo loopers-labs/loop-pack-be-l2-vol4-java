@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZonedDateTime;
 
@@ -38,6 +39,9 @@ class ProductCacheIntegrationTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private Long productId;
 
@@ -70,22 +74,44 @@ class ProductCacheIntegrationTest {
         assertThat(productCacheRepository.find(productId)).isPresent();
     }
 
-    @DisplayName("캐시에 값이 있으면(hit), DB가 아닌 캐시에서 읽는다.")
+    @DisplayName("캐시에 값이 있으면(hit), 정적 정보는 캐시에서 읽고 재고는 실시간 DB에서 합성한다.")
     @Test
-    void readsFromCache_onCacheHit() {
-        // Arrange: DB와 다른 값을 캐시에 직접 심어둠
-        ProductInfo cached = new ProductInfo(
+    void readsStaticFromCache_butStockFromDb_onCacheHit() {
+        // Arrange: DB와 다른 정적 정보를 캐시에 직접 심어둠 (캐시에는 재고가 없음)
+        ProductDetailCache cached = new ProductDetailCache(
             productId, 999L, "캐시에서_온_이름", "캐시설명", 55_000L, 7,
-            "캐시브랜드", true, 10, ZonedDateTime.now(), ZonedDateTime.now()
+            "캐시브랜드", ZonedDateTime.now(), ZonedDateTime.now()
         );
         productCacheRepository.save(productId, cached);
 
         // Act
         ProductInfo result = productFacade.getProduct(productId);
 
-        // Assert: DB의 "에어맥스"가 아니라 캐시의 값이 반환됨 → 캐시에서 읽었다는 증명
+        // Assert: 정적 정보는 캐시값 → 캐시에서 읽었다는 증명
         assertThat(result.name()).isEqualTo("캐시에서_온_이름");
         assertThat(result.brandName()).isEqualTo("캐시브랜드");
+        // 재고는 캐시가 아니라 실시간 DB값(100) → 재고가 캐시에서 분리됐다는 증명
+        assertThat(result.stockQuantity()).isEqualTo(100);
+        assertThat(result.inStock()).isTrue();
+    }
+
+    @DisplayName("정적 정보가 캐시된 뒤 재고가 차감되어도, 상세 조회 시 최신 재고가 반영된다.")
+    @Test
+    void reflectsLatestStock_evenWhenStaticInfoCached() {
+        // Arrange: 첫 조회로 정적 정보를 캐시에 적재 (재고 100)
+        ProductInfo first = productFacade.getProduct(productId);
+        assertThat(first.stockQuantity()).isEqualTo(100);
+        assertThat(productCacheRepository.find(productId)).isPresent();
+
+        // Act: 캐시 무효화 없이 재고만 차감 (주문 시 재고 차감을 모사)
+        transactionTemplate.executeWithoutResult(status ->
+            stockRepository.deductStock(productId, 30)
+        );
+        ProductInfo second = productFacade.getProduct(productId);
+
+        // Assert: 정적 캐시는 그대로 살아있지만, 재고는 최신값(70)으로 반영됨
+        assertThat(productCacheRepository.find(productId)).isPresent();
+        assertThat(second.stockQuantity()).isEqualTo(70);
     }
 
     @DisplayName("상품을 수정하면, 해당 상품 캐시가 무효화된다.")

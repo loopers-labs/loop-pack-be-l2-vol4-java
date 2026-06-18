@@ -2,7 +2,7 @@ package com.loopers.infrastructure.product;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.product.ProductCacheRepository;
-import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductDetailCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -23,13 +23,13 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     private final ObjectMapper objectMapper;
 
     @Override
-    public Optional<ProductInfo> find(Long productId) {
+    public Optional<ProductDetailCache> find(Long productId) {
         String cached = redisTemplate.opsForValue().get(key(productId));
         if (cached == null) {
             return Optional.empty(); // cache miss
         }
         try {
-            return Optional.of(objectMapper.readValue(cached, ProductInfo.class)); // cache hit
+            return Optional.of(objectMapper.readValue(cached, ProductDetailCache.class)); // cache hit
         } catch (Exception e) {
             log.warn("상품 캐시 역직렬화 실패, 캐시 무시. productId={}", productId, e);
             return Optional.empty();
@@ -37,9 +37,9 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     }
 
     @Override
-    public void save(Long productId, ProductInfo productInfo) {
+    public void save(Long productId, ProductDetailCache productDetail) {
         try {
-            String json = objectMapper.writeValueAsString(productInfo);
+            String json = objectMapper.writeValueAsString(productDetail);
             redisTemplate.opsForValue().set(key(productId), json, TTL);
         } catch (Exception e) {
             log.warn("상품 캐시 저장 실패, 무시. productId={}", productId, e);

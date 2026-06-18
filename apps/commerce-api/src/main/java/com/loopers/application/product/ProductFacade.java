@@ -13,12 +13,14 @@ public class ProductFacade {
     private final ProductCacheRepository productCacheRepository;
 
     public ProductInfo getProduct(Long productId) {
-        return productCacheRepository.find(productId)
+        ProductDetailCache detail = productCacheRepository.find(productId)
             .orElseGet(() -> {
-                ProductInfo info = productApplicationService.getProduct(productId);
-                productCacheRepository.save(productId, info);
-                return info;
+                ProductDetailCache loaded = productApplicationService.getProductDetailForCache(productId);
+                productCacheRepository.save(productId, loaded);
+                return loaded;
             });
+        int stockQuantity = productApplicationService.getStockQuantity(productId);
+        return ProductInfo.of(detail, stockQuantity);
     }
 
     public Page<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {

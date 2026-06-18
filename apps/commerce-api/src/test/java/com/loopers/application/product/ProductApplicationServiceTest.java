@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -56,28 +55,26 @@ class ProductApplicationServiceTest {
         );
     }
 
-    @DisplayName("상품 단건을 조회할 때, ")
+    @DisplayName("상품 상세 정적 정보를 조회할 때, ")
     @Nested
-    class GetProduct {
+    class GetProductDetailForCache {
 
-        @DisplayName("존재하는 상품이면, 브랜드명과 재고 여부가 포함된 ProductInfo를 반환한다.")
+        @DisplayName("존재하는 상품이면, 브랜드명이 포함된 ProductDetailCache를 반환한다.")
         @Test
-        void returnsProductInfo_whenProductExists() {
+        void returnsProductDetail_whenProductExists() {
             // Arrange
             Product product = Product.create(1L, "에어맥스", "운동화", 100_000L);
             Brand brand = Brand.create("나이키");
-            Stock stock = Stock.create(product.getId(), 10);
 
             when(productDomainService.getProduct(1L)).thenReturn(product);
             when(brandDomainService.getBrand(product.getBrandId())).thenReturn(brand);
-            when(stockDomainService.getStock(anyLong())).thenReturn(stock);
 
             // Act
-            ProductInfo result = productApplicationService.getProduct(1L);
+            ProductDetailCache result = productApplicationService.getProductDetailForCache(1L);
 
             // Assert
             assertThat(result.name()).isEqualTo("에어맥스");
-            assertThat(result.inStock()).isTrue();
+            assertThat(result.brandName()).isEqualTo("나이키");
         }
 
         @DisplayName("존재하지 않는 상품이면, NOT_FOUND 예외가 발생한다.")
@@ -89,11 +86,30 @@ class ProductApplicationServiceTest {
 
             // Act
             CoreException result = assertThrows(CoreException.class, () ->
-                productApplicationService.getProduct(999L)
+                productApplicationService.getProductDetailForCache(999L)
             );
 
             // Assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("재고 수량을 조회할 때, ")
+    @Nested
+    class GetStockQuantity {
+
+        @DisplayName("해당 상품의 현재 재고 수량을 반환한다.")
+        @Test
+        void returnsCurrentStockQuantity() {
+            // Arrange
+            Stock stock = Stock.create(1L, 10);
+            when(stockDomainService.getStock(1L)).thenReturn(stock);
+
+            // Act
+            int quantity = productApplicationService.getStockQuantity(1L);
+
+            // Assert
+            assertThat(quantity).isEqualTo(10);
         }
     }
 
