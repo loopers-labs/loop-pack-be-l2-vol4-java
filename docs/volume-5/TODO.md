@@ -40,7 +40,7 @@ flowchart TD
     S1["Stage 1 · 베이스라인 As-Is\n스칼라 서브쿼리 그대로"] -->|"보고서: 01-baseline"| S2
     S2["Stage 2 · 비정규화\nproducts.like_count (A안)"] -->|"보고서: 02-denormalization"| S3
     S3["Stage 3 · 인덱스\n단일 → 복합 → 커버링"] -->|"보고서: 03-index"| S4
-    S4["Stage 4 · 캐시\n로컬(Caffeine) → Redis"] -->|"보고서: 04-cache"| DOC["Writing Quest\nAS-IS / TO-BE 정리"]
+    S4["Stage 4 · 캐시\nRedis(RedisTemplate)·Facade 레이어"] -->|"보고서: 04-cache"| DOC["Writing Quest\nAS-IS / TO-BE 정리"]
 ```
 
 ---
@@ -153,28 +153,27 @@ flowchart TD
 
 ---
 
-## Stage 4 — 캐시 (로컬 → Redis)
+## Stage 4 — 캐시 (Redis · RedisTemplate · Facade 레이어)
 
-**목표:** 자주·동일하게 요청되는 조회의 DB 호출을 줄여 **캐시로 성능이 얼마나 개선되는지** 측정한다.
+**목표:** 자주·동일하게 요청되는 조회의 DB 호출을 줄여 **캐시로 성능이 얼마나 개선되는지** 측정한다. 설계 결정·근거 전문은 `cache-design.md`.
 
-### 4a. 상세 API — 로컬 캐시 먼저
-- [ ] `@Cacheable`(Caffeine 로컬)로 상세 조회 캐시. 키 = productId, 캐시 대상은 **엔티티가 아닌 DTO**
-- [ ] 상품 수정/삭제 시 `@CacheEvict`, 무효화는 **트랜잭션 커밋 이후(AFTER_COMMIT)**
-- [ ] S4 측정 (hit/miss 시 p95 대비)
+> **계획 변경(2026-06-19):** 로컬(Caffeine) 캐시 단계는 **드롭**. `@Cacheable`로 흐름을 감추는 대신 **RedisTemplate을 감싼 `RedisCacheStore` 래퍼**로 저장·무효화 흐름을 명시하고, 캐시는 무효화 이벤트가 보이는 **Facade 레이어**에 둔다. `likeCount`는 staleness 허용(A), TTL을 정합성 노브로.
 
-### 4b. Redis 전환
-- [ ] `RedisCacheManager` + 직렬화(`GenericJackson2JsonRedisSerializer`, DTO 직렬화) 설정 (modules/redis 활용)
-- [ ] **TTL을 근거로 결정** — like_count·상품 필드의 변경 빈도와 허용 staleness를 따져 상세/목록 각각의 TTL 산정(감 금지, 보고서에 근거 기록)
-- [ ] 캐시 미스 시 정상 DB 폴백 동작 확인
+### 4a. RedisCacheStore 래퍼 (raw RedisTemplate 격리)
+- [x] `com.loopers.support.cache.RedisCacheStore`(`@Component`): `RedisTemplate<String,String>`+`ObjectMapper` 캡슐화. `find`/`put`/`getOrLoad`(read-through)/`evictAfterCommit` + **Redis 예외를 삼켜 MISS로 폴백**하는 안전망. raw `opsForValue()`는 이 클래스 안에만.
 
-### 4c. 목록 API 캐시 (핫셋 한정)
-- [ ] 전략: **필터 없는 인기 정렬(LIKES_DESC, S1) + 앞쪽 몇 페이지만** 짧은 TTL로 캐시
-- [ ] 무효화 범위 트레이드오프(좋아요/상품 변경 시) 결정·기록
+### 4b. 상세 캐싱 (Facade read-through)
+- [x] `ProductFacade.readProduct`: `getOrLoad(key=product:detail:{id}, ProductDetailInfo, TTL 60s, loader)`. HIT→반환(DB 미접근), MISS→loader→put. NOT_FOUND는 캐시 안 함(penetration 회피)
+- [x] 무효화: `updateProduct`/`deleteProduct`에서 `evictAfterCommit(detailKey)` (실제 tx 커밋 이후). 좋아요 증감엔 **무효화 안 함**(TTL 흡수)
+
+### 4c. 목록 캐싱 (핫셋 한정)
+- [x] `ProductFacade.readProducts`: 핫셋(`brandId==null && LIKES_DESC && page==0`)만 `getOrLoad`. value=`CachedProductSummaryInfos`(content+total, Page 평탄화), **TTL 30s**, **(가) TTL-only**. 그 외는 캐시 우회 DB 직행
 
 ### 마무리
-- [ ] S1·S2·S4 캐시 on/off 비교 측정 → **`reports/04-cache.md` 작성** + `SUMMARY.md` 갱신
+- [x] 테스트: `RedisCacheStore` 통합(라운드트립·getOrLoad·record 직렬화·AFTER_COMMIT·예외 폴백) + `ProductFacade` 단위(히트/미스·evict 호출) + E2E(오염 방지·미스 폴백 200)
+- [x] 측정: S4·S1 캐싱, S2·S3 우회 확인 → **`reports/04-cache.md` 작성** + `SUMMARY.md` 갱신 (S1 260→22ms ~12× · S4 99.96% hit · S2·S3 ③ 동급)
 
-**검증:** 캐시 hit 시 API p95가 급감하고, 캐시 미스에도 서비스가 정상 동작한다. on/off 개선폭이 보고서에 남는다.
+**검증 ✅:** 캐시 hit 시 p95 급감(S1 ~12×), 캐시 미스/Redis 장애에도 DB 폴백으로 정상 동작(Fail-Safe 테스트). 캐싱 안 한 시나리오는 인덱스 수준 유지. 개선폭은 `04-cache.md`·`SUMMARY.md`에 기록.
 
 ---
 
@@ -189,7 +188,8 @@ flowchart TD
 
 ```
 docs/volume-5/
-  TODO.md                      ← (이 문서, 로컬 작업용 · 커밋 제외)
+  TODO.md                      ← (이 문서, 작업 계획·진행 체크)
+  cache-design.md              ← Stage 4 캐시 설계 결정·근거·아키텍트 자가점검
   reports/
     TEMPLATE.md                ← 보고서 양식 (시나리오 블록 + 단계 총괄표)
     SUMMARY.md                 ← 단계별 헤드라인 p95 누적 (PM용 사다리)
