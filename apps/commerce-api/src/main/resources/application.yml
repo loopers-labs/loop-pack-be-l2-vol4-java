@@ -29,11 +29,31 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# p6spy SQL 로깅: 기본 비활성 (운영/테스트 노이즈 방지), local 에서만 활성화
+decorator:
+  datasource:
+    enabled: false
+
 ---
 spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+# 실제 바인딩 값이 인라인된 SQL 한 줄을 slf4j 로 출력
+decorator:
+  datasource:
+    enabled: true
+    p6spy:
+      enable-logging: true
+      logging: slf4j
+      # SQL 포맷·노이즈 제거는 spy.properties 의 커스텀 포매터(P6spyPrettySqlFormatter)로 처리
 
 ---
 spring:
