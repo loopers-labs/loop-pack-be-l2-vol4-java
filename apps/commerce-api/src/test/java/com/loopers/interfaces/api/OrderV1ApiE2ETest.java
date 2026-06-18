@@ -546,7 +546,7 @@ class OrderV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(req, authHeaders()),
+                new HttpEntity<>(req, orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -563,7 +563,7 @@ class OrderV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDERS_URL, HttpMethod.POST,
-                new HttpEntity<>(req, authHeaders()),
+                new HttpEntity<>(req, orderHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
