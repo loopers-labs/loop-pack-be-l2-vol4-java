@@ -26,16 +26,18 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * 좋아요 수(집계) 기준 내림차순 정렬. LEFT JOIN 이라 좋아요 0개인 상품도 포함된다.
+     * 좋아요 수 기준 내림차순 정렬.
+     *
+     * Week 5: product_like 집계(JOIN+GROUP BY) 대신 ProductLikeStat read-model 의 like_count 컬럼을 사용한다.
+     * stat 의 (brand_id, like_count) 인덱스가 필터+정렬을 한 번에 커버하므로 temp+filesort 가 제거된다.
      * 같은 좋아요 수면 id 역순(최신 우선)으로 tie-break.
      */
     @Query("""
         SELECT p
         FROM Product p
-        LEFT JOIN com.loopers.domain.like.Like l ON l.productId = p.id
-        WHERE (:brandId IS NULL OR p.brandId = :brandId)
-        GROUP BY p
-        ORDER BY COUNT(l) DESC, p.id DESC
+        JOIN ProductLikeStat s ON s.productId = p.id
+        WHERE (:brandId IS NULL OR s.brandId = :brandId)
+        ORDER BY s.likeCount DESC, p.id DESC
     """)
     List<Product> findAllOrderByLikeCountDesc(@Param("brandId") Long brandId, Pageable pageable);
 }

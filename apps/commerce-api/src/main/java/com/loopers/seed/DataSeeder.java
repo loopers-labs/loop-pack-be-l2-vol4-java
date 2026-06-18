@@ -48,22 +48,46 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        Long current = em.createQuery("SELECT COUNT(p) FROM Product p", Long.class).getSingleResult();
-        if (current >= PRODUCT_COUNT) {
-            log.info("[Seed] 이미 Product {}건 존재. 스킵.", current);
-            return;
+        long startMs = System.currentTimeMillis();
+
+        Long currentProducts = em.createQuery("SELECT COUNT(p) FROM Product p", Long.class).getSingleResult();
+        if (currentProducts < PRODUCT_COUNT) {
+            Random random = new Random(RANDOM_SEED);
+            log.info("=== [Seed] 시작 — Brand {}, Product {}, Like ~80만 ===", BRAND_COUNT, PRODUCT_COUNT);
+            List<Long> brandIds = seedBrands();
+            List<Long> productIds = seedProducts(random, brandIds);
+            seedLikes(random, productIds);
+        } else {
+            log.info("[Seed] Product 이미 {}건 존재. 시드 스킵.", currentProducts);
         }
 
-        long startMs = System.currentTimeMillis();
-        Random random = new Random(RANDOM_SEED);
-        log.info("=== [Seed] 시작 — Brand {}, Product {}, Like ~80만 ===", BRAND_COUNT, PRODUCT_COUNT);
-
-        List<Long> brandIds = seedBrands();
-        List<Long> productIds = seedProducts(random, brandIds);
-        seedLikes(random, productIds);
+        // ProductLikeStat 백필 (한 번 INSERT...SELECT 로)
+        seedProductLikeStat();
 
         long elapsedSec = (System.currentTimeMillis() - startMs) / 1000;
         log.info("=== [Seed] 완료 — 소요 {}초 ===", elapsedSec);
+    }
+
+    /**
+     * 기존 product_like 의 좋아요 수를 집계해 product_like_stat 에 한 번 채운다.
+     * native INSERT...SELECT 한 방으로 처리 — JPA persist 반복보다 훨씬 빠르다.
+     */
+    private void seedProductLikeStat() {
+        Long currentStats = em.createQuery("SELECT COUNT(s) FROM ProductLikeStat s", Long.class).getSingleResult();
+        if (currentStats >= PRODUCT_COUNT) {
+            log.info("[Seed] ProductLikeStat 이미 {}건 존재. 백필 스킵.", currentStats);
+            return;
+        }
+
+        int inserted = em.createNativeQuery("""
+            INSERT INTO product_like_stat (product_id, brand_id, like_count, version, updated_at)
+            SELECT p.id, p.brand_id, COALESCE(l.cnt, 0), 0, NOW()
+            FROM product p
+            LEFT JOIN (
+                SELECT product_id, COUNT(*) AS cnt FROM product_like GROUP BY product_id
+            ) l ON l.product_id = p.id
+            """).executeUpdate();
+        log.info("[Seed] ProductLikeStat {}건 백필 완료", inserted);
     }
 
     private List<Long> seedBrands() {
