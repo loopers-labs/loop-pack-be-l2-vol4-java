@@ -62,7 +62,7 @@ class OrderServiceTest {
             given(orderItemRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
-            OrderResult result = orderService.create(userId, rawLines);
+            OrderResult result = orderService.create(userId, rawLines, 0L, null);
 
             // then
             assertAll(
@@ -73,6 +73,34 @@ class OrderServiceTest {
             );
             verify(orderRepository).save(any(OrderModel.class));
             verify(orderItemRepository).saveAll(anyList());
+        }
+
+        @DisplayName("할인액과 사용 쿠폰이 주어지면, 주문에 금액 3종과 usedCouponId 가 스냅샷된다.")
+        @Test
+        void snapshotsAmountsAndUsedCoupon_whenDiscountIsApplied() {
+            // given
+            Long userId = 1L;
+            Long usedCouponId = 77L;
+            List<OrderLine> rawLines = List.of(
+                new OrderLine(100L, 2, "에어맥스 270", 100_000L, "나이키")
+            );
+            given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> {
+                OrderModel order = invocation.getArgument(0);
+                ReflectionTestUtils.setField(order, "id", 999L);
+                return order;
+            });
+            given(orderItemRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            OrderResult result = orderService.create(userId, rawLines, 30_000L, usedCouponId);
+
+            // then
+            assertAll(
+                () -> assertThat(result.order().getTotalAmount()).isEqualTo(200_000L),
+                () -> assertThat(result.order().getDiscountAmount()).isEqualTo(30_000L),
+                () -> assertThat(result.order().getFinalAmount()).isEqualTo(170_000L),
+                () -> assertThat(result.order().getUsedCouponId()).isEqualTo(77L)
+            );
         }
 
         @DisplayName("같은 productId 가 두 번 들어오면, OrderItem 1행으로 합산되어 저장된다.")
@@ -92,7 +120,7 @@ class OrderServiceTest {
             given(orderItemRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
-            OrderResult result = orderService.create(userId, rawLines);
+            OrderResult result = orderService.create(userId, rawLines, 0L, null);
 
             // then
             assertAll(
@@ -111,7 +139,7 @@ class OrderServiceTest {
 
             // when
             CoreException exception = assertThrows(CoreException.class,
-                () -> orderService.create(userId, rawLines));
+                () -> orderService.create(userId, rawLines, 0L, null));
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.EMPTY_ORDER_ITEMS);
@@ -130,7 +158,7 @@ class OrderServiceTest {
 
             // when
             CoreException exception = assertThrows(CoreException.class,
-                () -> orderService.create(userId, rawLines));
+                () -> orderService.create(userId, rawLines, 0L, null));
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

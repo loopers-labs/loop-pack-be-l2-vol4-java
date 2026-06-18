@@ -4,9 +4,13 @@ import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.user.UserCommand;
 import com.loopers.application.user.UserFacade;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCouponStatus;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -23,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +45,11 @@ class OrderFacadeIntegrationTest {
     private final OrderItemJpaRepository orderItemJpaRepository;
     private final StockJpaRepository stockJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final CouponService couponService;
+    private final UserCouponJpaRepository userCouponJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+
+    private static final ZonedDateTime FAR_FUTURE = ZonedDateTime.parse("2099-12-31T23:59:59+09:00");
 
     private Long userId;
     private Long productAId;
@@ -56,6 +65,8 @@ class OrderFacadeIntegrationTest {
         OrderItemJpaRepository orderItemJpaRepository,
         StockJpaRepository stockJpaRepository,
         ProductJpaRepository productJpaRepository,
+        CouponService couponService,
+        UserCouponJpaRepository userCouponJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.orderFacade = orderFacade;
@@ -66,6 +77,8 @@ class OrderFacadeIntegrationTest {
         this.orderItemJpaRepository = orderItemJpaRepository;
         this.stockJpaRepository = stockJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.couponService = couponService;
+        this.userCouponJpaRepository = userCouponJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -320,6 +333,166 @@ class OrderFacadeIntegrationTest {
                 () -> assertThat(savedItems.get(0).getProductPrice()).isEqualTo(100_000L)
             );
         }
+    }
+
+    @DisplayName("쿠폰을 적용해 주문할 때, ")
+    @Nested
+    class PlaceOrderWithCoupon {
+
+        @DisplayName("유효한 정률 쿠폰을 적용하면, 금액 3종이 정확히 계산되고 쿠폰은 USED 로 전이되며 재고가 차감된다.")
+        @Test
+        void appliesRateCouponAndUsesIt_whenCouponIsValid() {
+            // given
+            Long couponId = issueCoupon(userId, CouponType.RATE, 10L, null);
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), couponId);
+
+            // when
+            OrderInfo result = orderFacade.placeOrder(userId, command);
+
+            // then
+            assertAll(
+                () -> assertThat(result.totalAmount()).isEqualTo(200_000L),
+                () -> assertThat(result.discountAmount()).isEqualTo(20_000L),
+                () -> assertThat(result.finalAmount()).isEqualTo(180_000L),
+                () -> assertThat(result.usedCouponId()).isEqualTo(couponId),
+                () -> assertThat(loadCouponStatus(couponId)).isEqualTo(UserCouponStatus.USED),
+                () -> assertThat(loadStockQuantity(productAId)).isEqualTo(8),
+                () -> assertThat(orderJpaRepository.count()).isEqualTo(1L)
+            );
+        }
+
+        @DisplayName("쿠폰을 적용하지 않으면(couponId=null), 할인 0 · finalAmount = totalAmount 로 주문이 생성된다.")
+        @Test
+        void appliesNoDiscount_whenCouponIdIsNull() {
+            // given
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), null);
+
+            // when
+            OrderInfo result = orderFacade.placeOrder(userId, command);
+
+            // then
+            assertAll(
+                () -> assertThat(result.totalAmount()).isEqualTo(200_000L),
+                () -> assertThat(result.discountAmount()).isEqualTo(0L),
+                () -> assertThat(result.finalAmount()).isEqualTo(200_000L),
+                () -> assertThat(result.usedCouponId()).isNull()
+            );
+        }
+
+        @DisplayName("존재하지 않는 쿠폰이면, COUPON_NOT_FOUND 로 주문이 실패하고 주문·재고가 변하지 않는다.")
+        @Test
+        void rollsBack_whenCouponDoesNotExist() {
+            // given
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), 999L);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderFacade.placeOrder(userId, command));
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.COUPON_NOT_FOUND),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(loadStockQuantity(productAId)).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("타 유저 소유 쿠폰이면, COUPON_NOT_OWNED 로 주문이 실패하고 쿠폰은 AVAILABLE 로 남는다.")
+        @Test
+        void rollsBack_whenCouponBelongsToAnotherUser() {
+            // given
+            Long otherUserId = userFacade.signUp(new UserCommand.SignUp(
+                "user02", "Abcd1234!", "이영희", LocalDate.of(2000, 1, 1), "user2@example.com")).id();
+            Long othersCouponId = issueCoupon(otherUserId, CouponType.FIXED, 3_000L, null);
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), othersCouponId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderFacade.placeOrder(userId, command));
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.COUPON_NOT_OWNED),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(loadCouponStatus(othersCouponId)).isEqualTo(UserCouponStatus.AVAILABLE),
+                () -> assertThat(loadStockQuantity(productAId)).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("이미 사용된 쿠폰이면, COUPON_ALREADY_USED 로 주문이 실패하고 주문·재고가 변하지 않는다.")
+        @Test
+        void rollsBack_whenCouponIsAlreadyUsed() {
+            // given
+            Long couponId = issueCoupon(userId, CouponType.FIXED, 3_000L, null);
+            couponService.use(userId, couponId, 10_000L);
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), couponId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderFacade.placeOrder(userId, command));
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.COUPON_ALREADY_USED),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(loadStockQuantity(productAId)).isEqualTo(10)
+            );
+        }
+
+        @DisplayName("최소 주문 금액에 미달하면, COUPON_MIN_ORDER_AMOUNT_NOT_MET 로 주문이 실패하고 쿠폰은 AVAILABLE 로 남는다.")
+        @Test
+        void rollsBack_whenMinOrderAmountIsNotMet() {
+            // given
+            Long couponId = issueCoupon(userId, CouponType.FIXED, 3_000L, 500_000L);
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 2)), couponId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderFacade.placeOrder(userId, command));
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.COUPON_MIN_ORDER_AMOUNT_NOT_MET),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(loadCouponStatus(couponId)).isEqualTo(UserCouponStatus.AVAILABLE)
+            );
+        }
+
+        @DisplayName("쿠폰을 USED 로 전이한 뒤 재고 부족으로 실패하면, 전체 롤백으로 쿠폰이 다시 AVAILABLE 로 돌아온다. (원자성 정점)")
+        @Test
+        void rollsBackCouponUsage_whenStockShortageOccursAfterCouponApplied() {
+            // given
+            Long couponId = issueCoupon(userId, CouponType.FIXED, 3_000L, null);
+            OrderCommand.Place command = new OrderCommand.Place(
+                List.of(new OrderCommand.Line(productAId, 15)), couponId);
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderFacade.placeOrder(userId, command));
+
+            // then
+            assertAll(
+                () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.OUT_OF_STOCK),
+                () -> assertThat(orderJpaRepository.count()).isZero(),
+                () -> assertThat(loadCouponStatus(couponId)).isEqualTo(UserCouponStatus.AVAILABLE),
+                () -> assertThat(loadStockQuantity(productAId)).isEqualTo(10)
+            );
+        }
+    }
+
+    private Long issueCoupon(Long ownerId, CouponType type, long value, Long minOrderAmount) {
+        Long policyId = couponService.createPolicy("테스트 쿠폰", type, value, minOrderAmount, FAR_FUTURE).getId();
+        return couponService.issue(ownerId, policyId).getId();
+    }
+
+    private UserCouponStatus loadCouponStatus(Long userCouponId) {
+        return userCouponJpaRepository.findById(userCouponId).orElseThrow().getStatus();
     }
 
     private Integer loadStockQuantity(Long productId) {

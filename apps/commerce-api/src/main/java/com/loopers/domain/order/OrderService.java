@@ -26,9 +26,9 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
 
     @Transactional
-    public OrderResult create(Long userId, List<OrderLine> rawLines) {
+    public OrderResult create(Long userId, List<OrderLine> rawLines, long discountAmount, Long usedCouponId) {
         OrderLines lines = OrderLines.of(rawLines);
-        OrderModel order = OrderModel.create(userId, lines);
+        OrderModel order = OrderModel.create(userId, lines, discountAmount, usedCouponId);
         OrderModel saved = orderRepository.save(order);
         List<OrderItem> items = lines.values().stream()
             .map(line -> OrderItem.of(

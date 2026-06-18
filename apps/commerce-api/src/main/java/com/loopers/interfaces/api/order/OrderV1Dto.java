@@ -9,7 +9,11 @@ import java.util.List;
 
 public class OrderV1Dto {
 
-    public record PlaceOrderRequest(List<Item> items) {
+    public record PlaceOrderRequest(List<Item> items, Long couponId) {
+        public PlaceOrderRequest(List<Item> items) {
+            this(items, null);
+        }
+
         public record Item(Long productId, Integer quantity) {
         }
 
@@ -18,7 +22,7 @@ public class OrderV1Dto {
                 : items.stream()
                     .map(item -> new OrderCommand.Line(item.productId(), item.quantity()))
                     .toList();
-            return new OrderCommand.Place(lines);
+            return new OrderCommand.Place(lines, couponId);
         }
     }
 
@@ -26,6 +30,9 @@ public class OrderV1Dto {
         Long id,
         Long userId,
         Long totalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long usedCouponId,
         OrderStatus status,
         List<Item> items,
         ZonedDateTime createdAt
@@ -53,6 +60,9 @@ public class OrderV1Dto {
                 info.id(),
                 info.userId(),
                 info.totalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
+                info.usedCouponId(),
                 info.status(),
                 info.items().stream().map(Item::from).toList(),
                 info.createdAt()
@@ -63,17 +73,29 @@ public class OrderV1Dto {
     public record MyOrderSummary(
         Long id,
         Long totalAmount,
+        Long discountAmount,
+        Long finalAmount,
         OrderStatus status,
         ZonedDateTime createdAt
     ) {
         public static MyOrderSummary from(OrderInfo info) {
-            return new MyOrderSummary(info.id(), info.totalAmount(), info.status(), info.createdAt());
+            return new MyOrderSummary(
+                info.id(),
+                info.totalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
+                info.status(),
+                info.createdAt()
+            );
         }
     }
 
     public record MyOrderDetail(
         Long id,
         Long totalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long usedCouponId,
         OrderStatus status,
         List<OrderResponse.Item> items,
         ZonedDateTime createdAt
@@ -82,6 +104,9 @@ public class OrderV1Dto {
             return new MyOrderDetail(
                 info.id(),
                 info.totalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
+                info.usedCouponId(),
                 info.status(),
                 info.items().stream().map(OrderResponse.Item::from).toList(),
                 info.createdAt()

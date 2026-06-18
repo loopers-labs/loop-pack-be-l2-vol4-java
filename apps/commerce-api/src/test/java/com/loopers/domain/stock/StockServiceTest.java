@@ -38,7 +38,7 @@ class StockServiceTest {
             // given
             Long productId = 1L;
             StockModel stock = new StockModel(productId, 10);
-            given(stockRepository.findByProductId(productId)).willReturn(Optional.of(stock));
+            given(stockRepository.findByProductIdForUpdate(productId)).willReturn(Optional.of(stock));
 
             // when
             stockService.decrease(productId, 3);
@@ -60,7 +60,7 @@ class StockServiceTest {
             // then
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.INVALID_QUANTITY),
-                () -> verify(stockRepository, never()).findByProductId(productId)
+                () -> verify(stockRepository, never()).findByProductIdForUpdate(productId)
             );
         }
 
@@ -77,7 +77,7 @@ class StockServiceTest {
             // then
             assertAll(
                 () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.INVALID_QUANTITY),
-                () -> verify(stockRepository, never()).findByProductId(productId)
+                () -> verify(stockRepository, never()).findByProductIdForUpdate(productId)
             );
         }
 
@@ -86,7 +86,7 @@ class StockServiceTest {
         void throwsProductNotFoundException_whenStockDoesNotExist() {
             // given
             Long productId = 1L;
-            given(stockRepository.findByProductId(productId)).willReturn(Optional.empty());
+            given(stockRepository.findByProductIdForUpdate(productId)).willReturn(Optional.empty());
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -102,7 +102,7 @@ class StockServiceTest {
             // given
             Long productId = 1L;
             StockModel stock = new StockModel(productId, 2);
-            given(stockRepository.findByProductId(productId)).willReturn(Optional.of(stock));
+            given(stockRepository.findByProductIdForUpdate(productId)).willReturn(Optional.of(stock));
 
             // when
             CoreException result = assertThrows(CoreException.class,

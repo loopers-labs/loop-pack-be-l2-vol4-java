@@ -4,6 +4,8 @@ import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.user.UserCommand;
 import com.loopers.application.user.UserFacade;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,9 +48,13 @@ class OrderV1ApiE2ETest {
     private final UserFacade userFacade;
     private final OrderJpaRepository orderJpaRepository;
     private final OrderItemJpaRepository orderItemJpaRepository;
+    private final CouponService couponService;
     private final DatabaseCleanUp databaseCleanUp;
 
+    private static final ZonedDateTime FAR_FUTURE = ZonedDateTime.parse("2099-12-31T23:59:59+09:00");
+
     private Long productAId;
+    private Long userId;
 
     @Autowired
     public OrderV1ApiE2ETest(
@@ -57,6 +64,7 @@ class OrderV1ApiE2ETest {
         UserFacade userFacade,
         OrderJpaRepository orderJpaRepository,
         OrderItemJpaRepository orderItemJpaRepository,
+        CouponService couponService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
@@ -65,6 +73,7 @@ class OrderV1ApiE2ETest {
         this.userFacade = userFacade;
         this.orderJpaRepository = orderJpaRepository;
         this.orderItemJpaRepository = orderItemJpaRepository;
+        this.couponService = couponService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -72,13 +81,13 @@ class OrderV1ApiE2ETest {
     void setUp() {
         Long brandId = brandFacade.create("나이키", "Just Do It").id();
         productAId = productFacade.createProduct("에어맥스 270", "데일리 러닝화", 100_000L, 10, brandId).id();
-        userFacade.signUp(new UserCommand.SignUp(
+        userId = userFacade.signUp(new UserCommand.SignUp(
             LOGIN_ID,
             LOGIN_PW,
             "김철수",
             LocalDate.of(1999, 3, 22),
             "user@example.com"
-        ));
+        )).id();
     }
 
     @AfterEach
@@ -126,6 +135,32 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().items().get(0).brandName()).isEqualTo("나이키"),
                 () -> assertThat(orderJpaRepository.count()).isEqualTo(1L),
                 () -> assertThat(savedItems).hasSize(1)
+            );
+        }
+
+        @DisplayName("couponId 를 함께 보내면, 200 과 함께 응답에 금액 3종(적용 전·할인·최종)과 usedCouponId 가 반영된다.")
+        @Test
+        void returnsDiscountedOrder_whenCouponIdIsProvided() {
+            // given
+            Long policyId = couponService.createPolicy("10% 할인", CouponType.RATE, 10L, null, FAR_FUTURE).getId();
+            Long couponId = couponService.issue(userId, policyId).getId();
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.PlaceOrderRequest.Item(productAId, 2)), couponId);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(response.getBody().data().totalAmount()).isEqualTo(200_000L),
+                () -> assertThat(response.getBody().data().discountAmount()).isEqualTo(20_000L),
+                () -> assertThat(response.getBody().data().finalAmount()).isEqualTo(180_000L),
+                () -> assertThat(response.getBody().data().usedCouponId()).isEqualTo(couponId)
             );
         }
 

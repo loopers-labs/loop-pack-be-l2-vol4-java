@@ -13,6 +13,7 @@ public enum ErrorType {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, HttpStatus.UNAUTHORIZED.getReasonPhrase(), "인증에 실패했습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.getReasonPhrase(), "존재하지 않는 요청입니다."),
     CONFLICT(HttpStatus.CONFLICT, HttpStatus.CONFLICT.getReasonPhrase(), "이미 존재하는 리소스입니다."),
+    CONCURRENCY_CONFLICT(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "동시 요청이 충돌했습니다. 잠시 후 다시 시도해 주세요."),
 
     /** 상품 도메인 */
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", "상품을 찾을 수 없습니다."),
@@ -31,7 +32,16 @@ public enum ErrorType {
     /** 주문 도메인 */
     EMPTY_ORDER_ITEMS(HttpStatus.BAD_REQUEST, "EMPTY_ORDER_ITEMS", "주문 항목이 비어있습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "주문을 찾을 수 없습니다."),
-    INVALID_ORDER_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_ORDER_PERIOD", "조회 기간이 유효하지 않습니다.");
+    INVALID_ORDER_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_ORDER_PERIOD", "조회 기간이 유효하지 않습니다."),
+
+    /** 쿠폰 도메인 */
+    INVALID_COUPON_VALUE(HttpStatus.BAD_REQUEST, "INVALID_COUPON_VALUE", "쿠폰 할인 값이 유효하지 않습니다."),
+    COUPON_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_POLICY_NOT_FOUND", "쿠폰 정책을 찾을 수 없습니다."),
+    COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_NOT_FOUND", "쿠폰을 찾을 수 없습니다."),
+    COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_EXPIRED", "만료된 쿠폰입니다."),
+    COUPON_NOT_OWNED(HttpStatus.NOT_FOUND, "COUPON_NOT_OWNED", "쿠폰을 찾을 수 없습니다."),
+    COUPON_ALREADY_USED(HttpStatus.CONFLICT, "COUPON_ALREADY_USED", "이미 사용된 쿠폰입니다."),
+    COUPON_MIN_ORDER_AMOUNT_NOT_MET(HttpStatus.BAD_REQUEST, "COUPON_MIN_ORDER_AMOUNT_NOT_MET", "쿠폰 최소 주문 금액을 충족하지 못했습니다.");
 
     private final HttpStatus status;
     private final String code;
