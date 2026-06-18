@@ -11,6 +11,7 @@ public class ProductFacade {
 
     private final ProductApplicationService productApplicationService;
     private final ProductCacheRepository productCacheRepository;
+    private final ProductListCacheRepository productListCacheRepository;
 
     public ProductInfo getProduct(Long productId) {
         ProductDetailCache detail = productCacheRepository.find(productId)
@@ -24,7 +25,13 @@ public class ProductFacade {
     }
 
     public Page<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
-        return productApplicationService.getProducts(brandId, ProductSort.from(sort), page, size);
+        return productListCacheRepository.find(brandId, sort, page, size)
+            .map(ProductListCache::toPage)
+            .orElseGet(() -> {
+                Page<ProductInfo> result = productApplicationService.getProducts(brandId, ProductSort.from(sort), page, size);
+                productListCacheRepository.save(brandId, sort, page, size, ProductListCache.from(result));
+                return result;
+            });
     }
 
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, int initialQuantity) {
