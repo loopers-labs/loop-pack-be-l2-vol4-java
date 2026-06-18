@@ -10,7 +10,8 @@ public class OrderV1Dto {
 
     public record PlaceOrderRequest(
         PaymentMethod paymentMethod,
-        List<OrderLineRequest> items
+        List<OrderLineRequest> items,
+        Long couponId   // nullable — 쿠폰 템플릿 ID (01 §5.3), 미적용 시 생략
     ) {}
 
     public record OrderLineRequest(
@@ -23,6 +24,9 @@ public class OrderV1Dto {
         Long userId,
         String status,
         Long totalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long userCouponId,
         String paymentMethod,
         String failureReason,
         List<OrderItemResponse> items
@@ -33,6 +37,9 @@ public class OrderV1Dto {
                 info.userId(),
                 info.status(),
                 info.totalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
+                info.userCouponId(),
                 info.paymentMethod(),
                 info.failureReason(),
                 info.items().stream().map(OrderItemResponse::from).toList()

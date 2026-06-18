@@ -30,7 +30,7 @@ public class LikeServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        ProductModel product = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L, 10);
+        ProductModel product = productService.createProduct(1L, "에어맥스", "러닝화", null, 139000L);
         productId = product.getId();
     }
 

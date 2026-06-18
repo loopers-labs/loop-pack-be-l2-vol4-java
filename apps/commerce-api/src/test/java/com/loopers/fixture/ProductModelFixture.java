@@ -9,7 +9,6 @@ public class ProductModelFixture {
     private String description = "클래식 러닝화";
     private String imageUrl = "http://img.example.com/airmax90.png";
     private Long price = 139000L;
-    private Integer stock = 10;
 
     public static ProductModelFixture aProduct() {
         return new ProductModelFixture();
@@ -20,9 +19,8 @@ public class ProductModelFixture {
     public ProductModelFixture withDescription(String description) { this.description = description; return this; }
     public ProductModelFixture withImageUrl(String imageUrl) { this.imageUrl = imageUrl; return this; }
     public ProductModelFixture withPrice(Long price) { this.price = price; return this; }
-    public ProductModelFixture withStock(Integer stock) { this.stock = stock; return this; }
 
     public ProductModel build() {
-        return new ProductModel(brandId, name, description, imageUrl, price, stock);
+        return new ProductModel(brandId, name, description, imageUrl, price);
     }
 }

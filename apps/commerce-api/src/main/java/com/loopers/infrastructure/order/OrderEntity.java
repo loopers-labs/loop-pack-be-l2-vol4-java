@@ -36,6 +36,15 @@ public class OrderEntity extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
+    @Column(name = "final_amount", nullable = false)
+    private Long finalAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false, length = 20)
     private PaymentMethod paymentMethod;
@@ -53,11 +62,15 @@ public class OrderEntity extends BaseEntity {
 
     protected OrderEntity() {}
 
-    public OrderEntity(Long userId, OrderStatus status, Long totalAmount, PaymentMethod paymentMethod,
-                       String failureReason, ZonedDateTime paidAt, List<OrderItemEntity> items) {
+    public OrderEntity(Long userId, OrderStatus status, Long totalAmount, Long discountAmount, Long finalAmount,
+                       Long userCouponId, PaymentMethod paymentMethod, String failureReason,
+                       ZonedDateTime paidAt, List<OrderItemEntity> items) {
         this.userId = userId;
         this.status = status;
         this.totalAmount = totalAmount;
+        this.discountAmount = discountAmount;
+        this.finalAmount = finalAmount;
+        this.userCouponId = userCouponId;
         this.paymentMethod = paymentMethod;
         this.failureReason = failureReason;
         this.paidAt = paidAt;
@@ -85,6 +98,18 @@ public class OrderEntity extends BaseEntity {
 
     public Long getTotalAmount() {
         return totalAmount;
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getFinalAmount() {
+        return finalAmount;
+    }
+
+    public Long getUserCouponId() {
+        return userCouponId;
     }
 
     public PaymentMethod getPaymentMethod() {

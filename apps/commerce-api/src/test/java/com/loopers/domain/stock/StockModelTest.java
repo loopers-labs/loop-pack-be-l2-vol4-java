@@ -1,4 +1,4 @@
-package com.loopers.domain.product;
+package com.loopers.domain.stock;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -12,7 +12,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class StockTest {
+class StockModelTest {
+
+    private static final Long PRODUCT_ID = 10L;
 
     @Nested
     @DisplayName("Stock 생성")
@@ -22,22 +24,25 @@ public class StockTest {
         @ParameterizedTest
         @ValueSource(ints = {0, 1, 100})
         void given_nonNegative_when_create_then_creates(int value) {
-            Stock stock = new Stock(value);
-            assertThat(stock.getQuantity()).isEqualTo(value);
+            StockModel stock = new StockModel(PRODUCT_ID, value);
+            assertAll(
+                    () -> assertThat(stock.getQuantity()).isEqualTo(value),
+                    () -> assertThat(stock.getProductId()).isEqualTo(PRODUCT_ID)
+            );
         }
 
-        @DisplayName("null이거나 음수면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("productId가 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
-        void given_nullValue_when_create_then_throwsBadRequest() {
-            CoreException result = assertThrows(CoreException.class, () -> new Stock(null));
+        void given_nullProductId_when_create_then_throwsBadRequest() {
+            CoreException result = assertThrows(CoreException.class, () -> new StockModel(null, 10));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("음수면 BAD_REQUEST 예외가 발생한다")
+        @DisplayName("수량이 음수면 BAD_REQUEST 예외가 발생한다")
         @ParameterizedTest
         @ValueSource(ints = {-1, -100})
         void given_negative_when_create_then_throwsBadRequest(int value) {
-            CoreException result = assertThrows(CoreException.class, () -> new Stock(value));
+            CoreException result = assertThrows(CoreException.class, () -> new StockModel(PRODUCT_ID, value));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
@@ -46,37 +51,39 @@ public class StockTest {
     @DisplayName("차감 (deduct)")
     class Deduct {
 
-        @DisplayName("충분하면 차감된 새 Stock을 반환하고, 원본은 불변이다")
+        @DisplayName("충분하면 재고가 차감된다")
         @Test
-        void given_enough_when_deduct_then_returnsNewStock_andOriginalUnchanged() {
-            Stock stock = new Stock(10);
-
-            Stock after = stock.deduct(3);
-
-            assertAll(
-                    () -> assertThat(after.getQuantity()).isEqualTo(7),
-                    () -> assertThat(stock.getQuantity()).isEqualTo(10)   // 불변
-            );
+        void given_enough_when_deduct_then_decreased() {
+            StockModel stock = new StockModel(PRODUCT_ID, 10);
+            stock.deduct(3);
+            assertThat(stock.getQuantity()).isEqualTo(7);
         }
 
         @DisplayName("재고와 동일 수량을 차감하면 0이 된다 (경계)")
         @Test
         void given_exact_when_deduct_then_zero() {
-            assertThat(new Stock(5).deduct(5).getQuantity()).isEqualTo(0);
+            StockModel stock = new StockModel(PRODUCT_ID, 5);
+            stock.deduct(5);
+            assertThat(stock.getQuantity()).isEqualTo(0);
         }
 
-        @DisplayName("재고보다 많으면 CONFLICT 예외가 발생한다")
+        @DisplayName("재고보다 많으면 CONFLICT 예외가 발생하고 재고는 변하지 않는다")
         @Test
         void given_insufficient_when_deduct_then_throwsConflict() {
-            CoreException result = assertThrows(CoreException.class, () -> new Stock(2).deduct(3));
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+            StockModel stock = new StockModel(PRODUCT_ID, 2);
+            CoreException result = assertThrows(CoreException.class, () -> stock.deduct(3));
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT),
+                    () -> assertThat(stock.getQuantity()).isEqualTo(2)
+            );
         }
 
         @DisplayName("차감 수량이 0 이하면 BAD_REQUEST 예외가 발생한다")
         @ParameterizedTest
         @ValueSource(ints = {0, -1})
         void given_nonPositive_when_deduct_then_throwsBadRequest(int amount) {
-            CoreException result = assertThrows(CoreException.class, () -> new Stock(10).deduct(amount));
+            StockModel stock = new StockModel(PRODUCT_ID, 10);
+            CoreException result = assertThrows(CoreException.class, () -> stock.deduct(amount));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
@@ -85,17 +92,20 @@ public class StockTest {
     @DisplayName("복원 (restore)")
     class Restore {
 
-        @DisplayName("복원하면 증가된 새 Stock을 반환한다")
+        @DisplayName("복원하면 재고가 증가한다")
         @Test
         void given_quantity_when_restore_then_increased() {
-            assertThat(new Stock(5).restore(3).getQuantity()).isEqualTo(8);
+            StockModel stock = new StockModel(PRODUCT_ID, 5);
+            stock.restore(3);
+            assertThat(stock.getQuantity()).isEqualTo(8);
         }
 
         @DisplayName("복원 수량이 0 이하면 BAD_REQUEST 예외가 발생한다")
         @ParameterizedTest
         @ValueSource(ints = {0, -1})
         void given_nonPositive_when_restore_then_throwsBadRequest(int amount) {
-            CoreException result = assertThrows(CoreException.class, () -> new Stock(5).restore(amount));
+            StockModel stock = new StockModel(PRODUCT_ID, 5);
+            CoreException result = assertThrows(CoreException.class, () -> stock.restore(amount));
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
@@ -107,27 +117,11 @@ public class StockTest {
         @DisplayName("재고가 요청 수량 이상이면 true, 미만이면 false")
         @Test
         void given_stock_when_isAvailable_then_comparesQuantity() {
-            Stock stock = new Stock(5);
-
+            StockModel stock = new StockModel(PRODUCT_ID, 5);
             assertAll(
                     () -> assertThat(stock.isAvailable(5)).isTrue(),
                     () -> assertThat(stock.isAvailable(3)).isTrue(),
                     () -> assertThat(stock.isAvailable(6)).isFalse()
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("동등성")
-    class Equality {
-
-        @DisplayName("같은 수량이면 equals/hashCode가 동일하다")
-        @Test
-        void given_sameQuantity_when_equals_then_equal() {
-            assertAll(
-                    () -> assertThat(new Stock(7)).isEqualTo(new Stock(7)),
-                    () -> assertThat(new Stock(7)).hasSameHashCodeAs(new Stock(7)),
-                    () -> assertThat(new Stock(7)).isNotEqualTo(new Stock(8))
             );
         }
     }

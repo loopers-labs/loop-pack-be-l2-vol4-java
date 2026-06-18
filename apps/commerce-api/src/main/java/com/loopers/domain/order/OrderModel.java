@@ -18,7 +18,10 @@ public class OrderModel {
     private final Long id;   // 영속 전에는 null, 저장 후 매퍼가 채운 값으로 복원된다.
     private final Long userId;
     private OrderStatus status;
-    private Money totalAmount;
+    private Money totalAmount;        // 쿠폰 적용 전 금액 (라인 합계, 01 §7.7)
+    private Money discountAmount;     // 할인 금액 (미적용 시 0)
+    private Money finalAmount;        // 최종 결제 금액 = totalAmount − discountAmount
+    private Long userCouponId;        // 적용된 발급분 ID (없으면 null, 결제 실패 시 원복 참조)
     private final PaymentMethod paymentMethod;
     private String failureReason;
     private ZonedDateTime paidAt;
@@ -36,14 +39,21 @@ public class OrderModel {
         this.paymentMethod = paymentMethod;
         this.status = OrderStatus.PENDING;
         this.totalAmount = Money.zero();
+        this.discountAmount = Money.zero();
+        this.finalAmount = Money.zero();
+        this.userCouponId = null;
     }
 
-    private OrderModel(Long id, Long userId, OrderStatus status, Money totalAmount, PaymentMethod paymentMethod,
+    private OrderModel(Long id, Long userId, OrderStatus status, Money totalAmount, Money discountAmount,
+                       Money finalAmount, Long userCouponId, PaymentMethod paymentMethod,
                        String failureReason, ZonedDateTime paidAt, List<OrderItem> items) {
         this.id = id;
         this.userId = userId;
         this.status = status;
         this.totalAmount = totalAmount;
+        this.discountAmount = discountAmount;
+        this.finalAmount = finalAmount;
+        this.userCouponId = userCouponId;
         this.paymentMethod = paymentMethod;
         this.failureReason = failureReason;
         this.paidAt = paidAt;
@@ -52,9 +62,11 @@ public class OrderModel {
 
     /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). */
     public static OrderModel reconstitute(Long id, Long userId, OrderStatus status, Money totalAmount,
+                                          Money discountAmount, Money finalAmount, Long userCouponId,
                                           PaymentMethod paymentMethod, String failureReason,
                                           ZonedDateTime paidAt, List<OrderItem> items) {
-        return new OrderModel(id, userId, status, totalAmount, paymentMethod, failureReason, paidAt, items);
+        return new OrderModel(id, userId, status, totalAmount, discountAmount, finalAmount, userCouponId,
+                paymentMethod, failureReason, paidAt, items);
     }
 
     public void addItem(OrderItem item) {
@@ -64,11 +76,22 @@ public class OrderModel {
         this.items.add(item);
     }
 
-    /** lineTotal 합산 → totalAmount (03 §4, Order 책임). */
+    /** lineTotal 합산 → totalAmount (03 §4, Order 책임). 할인 미적용 시 finalAmount = totalAmount. */
     public void calculateTotals() {
         this.totalAmount = items.stream()
                 .map(OrderItem::getLineTotal)
                 .reduce(Money.zero(), Money::add);
+        this.finalAmount = this.totalAmount;
+    }
+
+    /**
+     * 쿠폰 적용 결과를 반영한다 (UC-17). calculateTotals() 이후 호출.
+     * finalAmount = totalAmount − discount, 적용된 발급분 ID를 스냅샷으로 보존한다(원복 참조).
+     */
+    public void applyDiscount(Long userCouponId, Money discount) {
+        this.discountAmount = discount;
+        this.finalAmount = this.totalAmount.subtract(discount);
+        this.userCouponId = userCouponId;
     }
 
     /** PENDING → PAID. 다른 상태에서 호출 시 CONFLICT (04 §5.1). */
@@ -105,6 +128,18 @@ public class OrderModel {
 
     public Money getTotalAmount() {
         return totalAmount;
+    }
+
+    public Money getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Money getFinalAmount() {
+        return finalAmount;
+    }
+
+    public Long getUserCouponId() {
+        return userCouponId;
     }
 
     public PaymentMethod getPaymentMethod() {

@@ -6,11 +6,11 @@ import com.loopers.support.error.ErrorType;
 import java.time.ZonedDateTime;
 
 /**
- * Product Aggregate 루트 — 순수 도메인 객체. 재고/좋아요 수/활성 상태 같은 비즈니스 규칙만 보유하고
+ * Product Aggregate 루트 — 순수 도메인 객체. 좋아요 수/활성 상태 같은 비즈니스 규칙만 보유하고
  * 영속 기술(JPA)에는 의존하지 않는다. JPA 매핑은 infrastructure.product.ProductEntity가 담당하고,
  * 도메인 ↔ 엔티티 변환은 ProductEntityMapper가 처리한다.
  *
- * Stock은 행동 VO로 도메인 내부에서만 사용하고, 영속 시 엔티티에서 Integer 컬럼으로 풀린다.
+ * 재고는 독립 Aggregate(domain.stock.StockModel)로 분리되어 productId(ID 참조)로만 연결한다.
  */
 public class ProductModel {
 
@@ -24,39 +24,36 @@ public class ProductModel {
     private String description;
     private String imageUrl;
     private Long price;
-    private Stock stock;
     private Long likesCount;
     private ZonedDateTime deletedAt;   // null이면 활성 (soft delete, 01 §7.5)
 
-    public ProductModel(Long brandId, String name, String description, String imageUrl, Long price, Integer stock) {
+    public ProductModel(Long brandId, String name, String description, String imageUrl, Long price) {
         this.id = null;
         this.brandId = validateBrandId(brandId);
         this.name = validateName(name);
         this.description = validateDescription(description);
         this.imageUrl = validateImageUrl(imageUrl);
         this.price = validatePrice(price);
-        this.stock = new Stock(stock);
         this.likesCount = 0L;
         this.deletedAt = null;
     }
 
     private ProductModel(Long id, Long brandId, String name, String description, String imageUrl,
-                         Long price, Integer stock, Long likesCount, ZonedDateTime deletedAt) {
+                         Long price, Long likesCount, ZonedDateTime deletedAt) {
         this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.imageUrl = imageUrl;
         this.price = price;
-        this.stock = new Stock(stock);
         this.likesCount = likesCount;
         this.deletedAt = deletedAt;
     }
 
     /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). */
     public static ProductModel reconstitute(Long id, Long brandId, String name, String description, String imageUrl,
-                                            Long price, Integer stock, Long likesCount, ZonedDateTime deletedAt) {
-        return new ProductModel(id, brandId, name, description, imageUrl, price, stock, likesCount, deletedAt);
+                                            Long price, Long likesCount, ZonedDateTime deletedAt) {
+        return new ProductModel(id, brandId, name, description, imageUrl, price, likesCount, deletedAt);
     }
 
     // --- 검증 ---
@@ -103,16 +100,6 @@ public class ProductModel {
 
     // --- 도메인 메서드 ---
 
-    /** 재고 차감. 불변식·부족 검사는 Stock VO에 위임 (04 §4.3). */
-    public void deductStock(int quantity) {
-        this.stock = this.stock.deduct(quantity);
-    }
-
-    /** 재고 복원 (결제 실패 시 원복 — 01 §7.6). */
-    public void restoreStock(int quantity) {
-        this.stock = this.stock.restore(quantity);
-    }
-
     /** 좋아요 수 증가 (01 §7.3). */
     public void incrementLikesCount() {
         this.likesCount += 1;
@@ -140,12 +127,11 @@ public class ProductModel {
         this.deletedAt = null;
     }
 
-    public void update(String newName, String newDescription, String newImageUrl, Long newPrice, Integer newStock) {
+    public void update(String newName, String newDescription, String newImageUrl, Long newPrice) {
         this.name = validateName(newName);
         this.description = validateDescription(newDescription);
         this.imageUrl = validateImageUrl(newImageUrl);
         this.price = validatePrice(newPrice);
-        this.stock = new Stock(newStock);
     }
 
     // --- Getter ---
@@ -172,10 +158,6 @@ public class ProductModel {
 
     public Long getPrice() {
         return price;
-    }
-
-    public Integer getStock() {
-        return stock.getQuantity();
     }
 
     public Long getLikesCount() {

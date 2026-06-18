@@ -4,6 +4,7 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.stock.StockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,8 @@ class OrderServiceTest {
     private OrderRepository orderRepository;
     private ProductService productService;
     private BrandService brandService;
+    private StockService stockService;
+    private com.loopers.domain.coupon.UserCouponService userCouponService;
     private OrderService orderService;
 
     @BeforeEach
@@ -46,11 +49,13 @@ class OrderServiceTest {
         orderRepository = mock(OrderRepository.class);
         productService = mock(ProductService.class);
         brandService = mock(BrandService.class);
-        orderService = new OrderService(orderRepository, productService, brandService);
+        stockService = mock(StockService.class);
+        userCouponService = mock(com.loopers.domain.coupon.UserCouponService.class);
+        orderService = new OrderService(orderRepository, productService, brandService, stockService, userCouponService);
     }
 
-    private ProductModel product(Long id, long price, int stock) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, price, stock, 0L, null);
+    private ProductModel product(Long id, long price) {
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, price, 0L, null);
     }
 
     private BrandModel brand() {
@@ -64,8 +69,8 @@ class OrderServiceTest {
         @DisplayName("여러 상품을 주문하면 각 재고를 차감하고 totalAmount = Σ lineTotal로 PENDING 주문이 생성된다.")
         @Test
         void given_validLines_when_placeOrderPending_then_deductsAndAggregates() {
-            when(productService.getActiveProduct(10L)).thenReturn(product(10L, 10000L, 10));
-            when(productService.getActiveProduct(20L)).thenReturn(product(20L, 5000L, 10));
+            when(productService.getActiveProduct(10L)).thenReturn(product(10L, 10000L));
+            when(productService.getActiveProduct(20L)).thenReturn(product(20L, 5000L));
             when(brandService.getActiveBrand(BRAND_ID)).thenReturn(brand());
             when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -77,8 +82,8 @@ class OrderServiceTest {
                     () -> assertThat(order.getItems()).hasSize(2),
                     () -> assertThat(order.getTotalAmount().getAmount()).isEqualTo(25000L)   // 10000*2 + 5000*1
             );
-            verify(productService).deductStock(10L, 2);
-            verify(productService).deductStock(20L, 1);
+            verify(stockService).decrease(10L, 2);
+            verify(stockService).decrease(20L, 1);
             verify(orderRepository).save(any(OrderModel.class));
         }
     }
@@ -95,6 +100,7 @@ class OrderServiceTest {
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             verifyNoInteractions(productService);
+            verifyNoInteractions(stockService);
             verify(orderRepository, never()).save(any());
         }
 
@@ -108,17 +114,17 @@ class OrderServiceTest {
                     () -> orderService.placeOrderPending(USER_ID, PaymentMethod.CARD, List.of(new OrderLine(9999L, 1))));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            verify(productService, never()).deductStock(anyLong(), anyInt());
+            verify(stockService, never()).decrease(anyLong(), anyInt());
             verify(orderRepository, never()).save(any());
         }
 
         @DisplayName("재고가 부족하면 CONFLICT가 발생하고, 주문을 저장하지 않는다.")
         @Test
         void given_insufficientStock_when_placeOrderPending_then_conflict() {
-            when(productService.getActiveProduct(10L)).thenReturn(product(10L, 10000L, 1));
+            when(productService.getActiveProduct(10L)).thenReturn(product(10L, 10000L));
             when(brandService.getActiveBrand(BRAND_ID)).thenReturn(brand());
             doThrow(new CoreException(ErrorType.CONFLICT, "재고가 부족합니다."))
-                    .when(productService).deductStock(10L, 5);
+                    .when(stockService).decrease(10L, 5);
 
             CoreException ex = assertThrows(CoreException.class,
                     () -> orderService.placeOrderPending(USER_ID, PaymentMethod.CARD, List.of(new OrderLine(10L, 5))));

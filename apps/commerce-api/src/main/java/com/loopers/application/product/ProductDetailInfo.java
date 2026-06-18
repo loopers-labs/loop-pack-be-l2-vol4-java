@@ -19,14 +19,14 @@ public record ProductDetailInfo(
     String brandName,
     boolean liked
 ) {
-    public static ProductDetailInfo of(ProductModel product, BrandModel brand, boolean liked) {
+    public static ProductDetailInfo of(ProductModel product, BrandModel brand, boolean liked, int stockQuantity) {
         return new ProductDetailInfo(
             product.getId(),
             product.getName(),
             product.getDescription(),
             product.getImageUrl(),
             product.getPrice(),
-            product.getStock() > 0,
+            stockQuantity > 0,
             product.getLikesCount(),
             brand.getId(),
             brand.getName(),

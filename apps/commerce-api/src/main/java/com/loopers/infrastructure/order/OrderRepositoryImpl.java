@@ -42,6 +42,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findForUpdate(Long id) {
+        return orderJpaRepository.findByIdForUpdate(id).map(OrderEntityMapper::toDomain);
+    }
+
+    @Override
     public List<OrderModel> findByUserId(Long userId, int page, int size) {
         return orderJpaRepository.findByUserIdOrderByIdDesc(userId, PageRequest.of(page, size)).stream()
                 .map(OrderEntityMapper::toDomain)
