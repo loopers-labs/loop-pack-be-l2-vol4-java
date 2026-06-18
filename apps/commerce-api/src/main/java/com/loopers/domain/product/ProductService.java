@@ -1,8 +1,10 @@
 package com.loopers.domain.product;
 
+import com.loopers.support.config.CacheConfig;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#id")
     public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
         ProductModel product = getProduct(id);
         product.update(
@@ -62,16 +65,19 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     public void increaseLikeCount(Long productId) {
         productRepository.increaseLikeCount(productId);
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     public void decreaseLikeCount(Long productId) {
         productRepository.decreaseLikeCount(productId);
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#id")
     public void deleteProduct(Long id) {
         ProductModel product = getProduct(id);
         product.delete();
