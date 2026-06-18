@@ -61,7 +61,13 @@ public class LikeCountSyncTasklet implements Tasklet {
                 if (raw == null) {
                     continue;
                 }
-                long delta = Long.parseLong(raw);
+                long delta;
+                try {
+                    delta = Long.parseLong(raw);
+                } catch (NumberFormatException e) {
+                    log.warn("좋아요 증감분 값 파싱 실패 key={}, raw={}", key, raw, e);
+                    continue;
+                }
                 if (delta == 0) {
                     continue;
                 }
@@ -73,7 +79,9 @@ public class LikeCountSyncTasklet implements Tasklet {
                     applied++;
                 } catch (RuntimeException e) {
                     failed++;
-                    log.warn("좋아요 수 동기화 실패 productId={}, delta={}", productId, delta, e);
+                    // claim한 증감분을 되돌려 다음 실행에 재시도. set이 아닌 increment라 그 사이 도착한 INCRBY를 덮지 않는다.
+                    redisTemplate.opsForValue().increment(key, delta);
+                    log.warn("좋아요 수 동기화 실패, 증감분 복원 productId={}, delta={}", productId, delta, e);
                 }
             }
         }
