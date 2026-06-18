@@ -33,6 +33,9 @@ classDiagram
         +Long brandId
         +String name
         +BigDecimal price
+        +int likeCount
+        +increaseLikeCount()
+        +decreaseLikeCount()
     }
     Product --|> BaseSoftDeleteEntity
     

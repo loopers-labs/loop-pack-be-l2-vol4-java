@@ -22,6 +22,7 @@ erDiagram
         bigint brand_id FK
         varchar name
         decimal_15_4 price
+        int like_count "비정규화된 좋아요 수"
         boolean is_deleted "논리 삭제 플래그"
         datetime created_at
         datetime updated_at

@@ -73,19 +73,27 @@ sequenceDiagram
     Controller->>Facade: 좋아요 등록 요청
     activate Facade
 
-    Facade->>Repo: 상품 단순 조회 (SELECT)
-    Repo-->>Facade: Product 엔티티 반환 (없으면 예외)
+    rect rgba(128, 128, 128, 0.2)
+        Note right of Facade: [@Transactional Begin]
 
-    Facade->>Repo: 좋아요 데이터 존재 여부 조회
-    Repo-->>Facade: 존재 여부 반환 (boolean)
+        Facade->>Repo: 상품 존재 여부 조회 + 비관적 락 획득 (SELECT FOR UPDATE)
+        Repo-->>Facade: Product 엔티티 반환 (없으면 예외)
 
-    alt 이미 등록된 경우 (좋아요 존재함)
-        Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
-    else 신규 등록인 경우 (좋아요 존재하지 않음)
-        Facade->>Domain: ProductLike 객체 생성
-        Domain-->>Facade: ProductLike 엔티티
-        Facade->>Repo: 좋아요 데이터 저장 (INSERT)
-        Repo-->>Facade: 저장 완료
+        Facade->>Repo: 좋아요 데이터 존재 여부 조회
+        Repo-->>Facade: 존재 여부 반환 (boolean)
+
+        alt 이미 등록된 경우 (좋아요 존재함)
+            Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
+        else 신규 등록인 경우 (좋아요 존재하지 않음)
+            Facade->>Domain: ProductLike 객체 생성
+            Domain-->>Facade: ProductLike 엔티티
+            Facade->>Repo: 좋아요 데이터 저장 (INSERT)
+            
+            Facade->>Domain: Product.increaseLikeCount()
+            Facade->>Repo: 상품 테이블 갱신 (UPDATE)
+            Repo-->>Facade: 갱신 완료
+        end
+        Note right of Facade: [@Transactional Commit]
     end
 
     Facade-->>Controller: 성공 반환
@@ -109,17 +117,25 @@ sequenceDiagram
     Controller->>Facade: 좋아요 취소 요청
     activate Facade
 
-    Facade->>Repo: 상품 존재 여부 확인 (SELECT)
-    Repo-->>Facade: Product 엔티티 반환 (없으면 예외)
+    rect rgba(128, 128, 128, 0.2)
+        Note right of Facade: [@Transactional Begin]
 
-    Facade->>Repo: 좋아요 데이터 존재 여부 조회
-    Repo-->>Facade: 존재 여부 반환
+        Facade->>Repo: 상품 존재 여부 확인 + 비관적 락 획득 (SELECT FOR UPDATE)
+        Repo-->>Facade: Product 엔티티 반환 (없으면 예외)
 
-    alt 누른 적이 없는 경우 (좋아요 미존재)
-        Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
-    else 기존에 누른 경우 (좋아요 존재함)
-        Facade->>Repo: 해당 유저/상품의 좋아요 데이터 삭제 (DELETE)
-        Repo-->>Facade: 삭제 완료
+        Facade->>Repo: 좋아요 데이터 존재 여부 조회
+        Repo-->>Facade: 존재 여부 반환
+
+        alt 누른 적이 없는 경우 (좋아요 미존재)
+            Note over Facade: 멱등성 보장: 추가 처리 없이 성공 리턴
+        else 기존에 누른 경우 (좋아요 존재함)
+            Facade->>Repo: 해당 유저/상품의 좋아요 데이터 삭제 (DELETE)
+            
+            Facade->>Domain: Product.decreaseLikeCount()
+            Facade->>Repo: 상품 테이블 갱신 (UPDATE)
+            Repo-->>Facade: 삭제 및 갱신 완료
+        end
+        Note right of Facade: [@Transactional Commit]
     end
 
     Facade-->>Controller: 성공 반환
@@ -185,8 +201,8 @@ sequenceDiagram
     Facade->>Repo: findProductsByCondition(condition, pageable)
     activate Repo
     
-    Note over Repo: 동적 쿼리 및 정렬 실행
-    Repo->>DB: QueryDSL LEFT JOIN product_likes<br/>WHERE brand_id = {id}<br/>GROUP BY product.id<br/>ORDER BY COUNT(likes) DESC, created_at DESC
+    Note over Repo: 단순 동적 쿼리 실행
+    Repo->>DB: QueryDSL<br/>WHERE brand_id = {id}<br/>ORDER BY like_count DESC, created_at DESC
     activate DB
     DB-->>Repo: List<ProductResponseDto> & TotalCount
     deactivate DB
