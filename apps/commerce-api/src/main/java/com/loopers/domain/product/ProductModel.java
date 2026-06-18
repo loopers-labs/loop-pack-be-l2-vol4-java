@@ -42,6 +42,9 @@ public class ProductModel extends BaseSoftDeleteEntity {
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL)
     private StockModel stock;
 
+    @Column(nullable = false, columnDefinition = "int default 0")
+    private int likeCount = 0;
+
     @Builder
     public ProductModel(Long brandId, String name, BigDecimal price) {
         validateBrandId(brandId);
@@ -63,6 +66,17 @@ public class ProductModel extends BaseSoftDeleteEntity {
 
     public void assignStock(int quantity) {
         this.stock = new StockModel(this, quantity);
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "좋아요 수는 0보다 작을 수 없습니다.");
+        }
+        this.likeCount--;
     }
 
     private void validateBrandId(Long brandId) {
