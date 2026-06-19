@@ -1,7 +1,14 @@
 package com.loopers.interfaces.api.order;
 
+import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.CouponInfo;
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.product.Product;
+import com.loopers.infrastructure.coupon.IssuedCouponJpaEntity;
+import com.loopers.infrastructure.coupon.IssuedCouponJpaRepository;
+import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.brand.BrandJpaEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaEntity;
@@ -24,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,20 +44,29 @@ class OrderV1ApiE2ETest {
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
 
     private final TestRestTemplate testRestTemplate;
+    private final CouponFacade couponFacade;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final IssuedCouponJpaRepository issuedCouponJpaRepository;
+    private final OrderJpaRepository orderJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     OrderV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
+        CouponFacade couponFacade,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
+        IssuedCouponJpaRepository issuedCouponJpaRepository,
+        OrderJpaRepository orderJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
+        this.couponFacade = couponFacade;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.issuedCouponJpaRepository = issuedCouponJpaRepository;
+        this.orderJpaRepository = orderJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -89,6 +106,9 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.userLoginId()).isEqualTo("user1234"),
                 () -> assertThat(data.totalAmount()).isEqualTo(60_000L),
+                () -> assertThat(data.originalAmount()).isEqualTo(60_000L),
+                () -> assertThat(data.discountAmount()).isZero(),
+                () -> assertThat(data.finalAmount()).isEqualTo(60_000L),
                 () -> assertThat(data.orderLines()).hasSize(1),
                 () -> assertThat(data.orderLines().get(0).productId()).isEqualTo(product.getId()),
                 () -> assertThat(data.failures()).isEmpty(),
@@ -96,9 +116,9 @@ class OrderV1ApiE2ETest {
             );
         }
 
-        @DisplayName("일부 상품의 재고가 부족하면, 가능한 상품만 주문하고 실패 상품을 응답에 포함한다.")
+        @DisplayName("일부 상품의 재고가 부족하면, 전체 주문을 실패시키고 재고를 변경하지 않는다.")
         @Test
-        void createsOrderWithAvailableProductsAndReturnsFailures_whenSomeProductsAreOutOfStock() {
+        void throwsConflictAndDoesNotDeductStock_whenSomeProductsAreOutOfStock() {
             // arrange
             signup("user1234", "abc123!?");
             BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
@@ -112,6 +132,54 @@ class OrderV1ApiE2ETest {
             );
 
             // act
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    voidResponseType()
+                );
+
+            ProductJpaEntity savedAvailableProduct = productJpaRepository.findById(availableProduct.getId()).orElseThrow();
+            ProductJpaEntity savedOutOfStockProduct = productJpaRepository.findById(outOfStockProduct.getId()).orElseThrow();
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(savedAvailableProduct.getStock()).isEqualTo(10),
+                () -> assertThat(savedOutOfStockProduct.getStock()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("쿠폰을 적용해 주문하면, 할인 금액을 반영하고 쿠폰을 사용 완료 처리한다.")
+        @Test
+        void createsOrderWithCouponAndMarksCouponUsed() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            ZonedDateTime now = ZonedDateTime.now();
+            couponFacade.createCoupon(
+                "사용하지 않는 1000원 할인",
+                CouponType.FIXED,
+                1_000L,
+                0L,
+                now.plusDays(7)
+            );
+            CouponInfo.Template orderCoupon = couponFacade.createCoupon(
+                "신규가입 10% 할인",
+                CouponType.RATE,
+                10L,
+                10_000L,
+                now.plusDays(7)
+            );
+            CouponInfo.Issued issuedCoupon = couponFacade.issueCoupon(orderCoupon.id(), "user1234", now);
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2)),
+                orderCoupon.id()
+            );
+
+            // act
             ResponseEntity<ApiResponse<OrderDto.Create.V1.Response>> response =
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
@@ -120,19 +188,53 @@ class OrderV1ApiE2ETest {
                     orderResponseType()
                 );
 
-            ProductJpaEntity savedAvailableProduct = productJpaRepository.findById(availableProduct.getId()).orElseThrow();
-            ProductJpaEntity savedOutOfStockProduct = productJpaRepository.findById(outOfStockProduct.getId()).orElseThrow();
+            ProductJpaEntity savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            IssuedCouponJpaEntity savedIssuedCoupon = issuedCouponJpaRepository
+                .findByCouponIdAndUserLoginIdAndDeletedAtIsNull(orderCoupon.id(), "user1234")
+                .orElseThrow();
 
             // assert
             OrderDto.Create.V1.Response data = response.getBody().data();
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(data.orderLines()).hasSize(1),
-                () -> assertThat(data.orderLines().get(0).productId()).isEqualTo(availableProduct.getId()),
-                () -> assertThat(data.failures()).hasSize(1),
-                () -> assertThat(data.failures().get(0).productId()).isEqualTo(outOfStockProduct.getId()),
-                () -> assertThat(savedAvailableProduct.getStock()).isEqualTo(8),
-                () -> assertThat(savedOutOfStockProduct.getStock()).isEqualTo(1)
+                () -> assertThat(data.originalAmount()).isEqualTo(60_000L),
+                () -> assertThat(data.discountAmount()).isEqualTo(6_000L),
+                () -> assertThat(data.finalAmount()).isEqualTo(54_000L),
+                () -> assertThat(data.totalAmount()).isEqualTo(54_000L),
+                () -> assertThat(orderCoupon.id()).isNotEqualTo(issuedCoupon.id()),
+                () -> assertThat(savedProduct.getStock()).isEqualTo(8),
+                () -> assertThat(savedIssuedCoupon.getStatus()).isEqualTo(CouponStatus.USED)
+            );
+        }
+
+        @DisplayName("쿠폰을 사용할 수 없으면, 주문을 실패시키고 재고와 주문을 변경하지 않는다.")
+        @Test
+        void rollsBackStockAndOrder_whenCouponCannotBeUsed() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2)),
+                9_999L
+            );
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    voidResponseType()
+                );
+
+            ProductJpaEntity savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(savedProduct.getStock()).isEqualTo(10),
+                () -> assertThat(orderJpaRepository.count()).isZero()
             );
         }
 

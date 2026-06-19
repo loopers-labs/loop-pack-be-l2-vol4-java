@@ -22,6 +22,10 @@ public class ProductReader {
         return productRepository.findAllByIds(ids);
     }
 
+    public List<Product> findProductsByIdsForUpdate(List<Long> ids) {
+        return productRepository.findAllByIdsForUpdate(ids);
+    }
+
     public List<Product> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
         ProductSort productSort = ProductSort.from(sort);
         PageCriteria pageCriteria = PageCriteria.of(page, size);

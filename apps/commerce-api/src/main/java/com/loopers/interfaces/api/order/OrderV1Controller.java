@@ -31,7 +31,7 @@ public class OrderV1Controller {
         @LoginUser AuthenticatedUser user,
         @Valid @RequestBody OrderDto.Create.V1.Request request
     ) {
-        OrderInfo info = orderFacade.createOrder(user.loginId(), request.toCommands());
+        OrderInfo info = orderFacade.createOrder(user.loginId(), request.toCommands(), request.couponId());
         OrderDto.Create.V1.Response response = OrderDto.Create.V1.Response.from(info);
         return ApiResponse.success(response);
     }

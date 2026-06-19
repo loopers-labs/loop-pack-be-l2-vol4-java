@@ -14,21 +14,35 @@ public class Order {
     private String userLoginId;
     private OrderStatus status;
     private List<OrderLine> orderLines = new ArrayList<>();
+    private Long discountAmount;
     private ZonedDateTime createdAt;
 
     public Order(String userLoginId, List<OrderLine> orderLines) {
-        this(null, userLoginId, OrderStatus.CREATED, orderLines, null);
+        this(userLoginId, orderLines, 0L);
     }
 
-    private Order(Long id, String userLoginId, OrderStatus status, List<OrderLine> orderLines, ZonedDateTime createdAt) {
+    public Order(String userLoginId, List<OrderLine> orderLines, Long discountAmount) {
+        this(null, userLoginId, OrderStatus.CREATED, orderLines, discountAmount, null);
+    }
+
+    private Order(
+        Long id,
+        String userLoginId,
+        OrderStatus status,
+        List<OrderLine> orderLines,
+        Long discountAmount,
+        ZonedDateTime createdAt
+    ) {
         validateUserLoginId(userLoginId);
         validateStatus(status);
         validateOrderLines(orderLines);
+        validateDiscountAmount(orderLines, discountAmount);
 
         this.id = id;
         this.userLoginId = userLoginId;
         this.status = status;
         this.orderLines.addAll(orderLines);
+        this.discountAmount = discountAmount;
         this.createdAt = createdAt;
     }
 
@@ -37,9 +51,10 @@ public class Order {
         String userLoginId,
         OrderStatus status,
         List<OrderLine> orderLines,
+        Long discountAmount,
         ZonedDateTime createdAt
     ) {
-        return new Order(id, userLoginId, status, orderLines, createdAt);
+        return new Order(id, userLoginId, status, orderLines, discountAmount, createdAt);
     }
 
     public Long getId() {
@@ -62,10 +77,27 @@ public class Order {
         return createdAt;
     }
 
-    public Long getTotalAmount() {
+    public Long getOriginalAmount() {
         return orderLines.stream()
             .mapToLong(OrderLine::getAmount)
             .sum();
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getFinalAmount() {
+        return getOriginalAmount() - discountAmount;
+    }
+
+    public Long getTotalAmount() {
+        return getFinalAmount();
+    }
+
+    public void applyDiscount(Long discountAmount) {
+        validateDiscountAmount(orderLines, discountAmount);
+        this.discountAmount = discountAmount;
     }
 
     private void validateUserLoginId(String userLoginId) {
@@ -83,6 +115,18 @@ public class Order {
     private void validateOrderLines(List<OrderLine> orderLines) {
         if (orderLines == null || orderLines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 상품은 1개 이상이어야 합니다.");
+        }
+    }
+
+    private void validateDiscountAmount(List<OrderLine> orderLines, Long discountAmount) {
+        if (discountAmount == null || discountAmount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 0 이상이어야 합니다.");
+        }
+        Long originalAmount = orderLines.stream()
+            .mapToLong(OrderLine::getAmount)
+            .sum();
+        if (discountAmount > originalAmount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 주문 금액보다 클 수 없습니다.");
         }
     }
 }

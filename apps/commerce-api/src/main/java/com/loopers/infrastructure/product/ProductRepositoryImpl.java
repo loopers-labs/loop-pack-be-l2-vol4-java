@@ -47,6 +47,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<Product> findAllByIdsForUpdate(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNullForUpdate(ids).stream()
+            .map(ProductJpaEntity::toDomain)
+            .toList();
+    }
+
+    @Override
     public List<Product> findAll(ProductSort sort, int page, int size) {
         return productJpaRepository.findAllByDeletedAtIsNull(PageRequest.of(page, size, toJpaSort(sort))).stream()
             .map(ProductJpaEntity::toDomain)
