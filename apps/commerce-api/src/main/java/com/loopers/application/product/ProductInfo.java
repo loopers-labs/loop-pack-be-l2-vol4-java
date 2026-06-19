@@ -12,6 +12,7 @@ public record ProductInfo(
         String status,
         Long brandId,
         String brandName,
+        Long minPrice,
         long likeCount,
         List<StockInfo> stocks
 ) {
@@ -28,6 +29,7 @@ public record ProductInfo(
                 product.getStatus().getDescription(),
                 product.getBrandId(),
                 brand.getName(),
+                product.getMinPrice(),
                 likeCount,
                 List.of()
         );
@@ -40,6 +42,7 @@ public record ProductInfo(
                 product.getStatus().getDescription(),
                 product.getBrandId(),
                 brand.getName(),
+                product.getMinPrice(),
                 likeCount,
                 stocks.stream().map(StockInfo::from).toList()
         );
