@@ -32,6 +32,7 @@ public class ProductCacheStore implements ProductCachePort {
         return "product:detail:" + id;
     }
 
+    @Override
     public Optional<ProductDetailInfo> getDetail(Long id) {
         try {
             String json = redisTemplate.opsForValue().get(detailKey(id));
@@ -45,6 +46,7 @@ public class ProductCacheStore implements ProductCachePort {
         }
     }
 
+    @Override
     public void putDetail(ProductDetailInfo info, Duration ttl) {
         try {
             redisTemplate.opsForValue().set(detailKey(info.id()), objectMapper.writeValueAsString(info), ttl);
@@ -53,6 +55,7 @@ public class ProductCacheStore implements ProductCachePort {
         }
     }
 
+    @Override
     public void evictDetail(Long id) {
         try {
             redisTemplate.delete(detailKey(id));

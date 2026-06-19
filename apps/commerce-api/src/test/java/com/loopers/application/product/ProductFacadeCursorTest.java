@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,5 +89,27 @@ class ProductFacadeCursorTest {
 
         ProductCursorPage cached = facade.getProductsByLikesCursor(1L, null, 2);
         assertThat(cached.items()).extracting(ProductInfo::id).containsExactly(1L, 2L); // stale = 블롭 히트 증명
+    }
+
+    @DisplayName("over-fetch 윈도가 꽉 찬 채 대량 삭제로 미달이어도, 다음 커서를 줘 뒤 페이지를 잃지 않는다")
+    @Test
+    void full_window_under_filled_still_emits_next_cursor() {
+        seeder.seed(20, 1);
+        List<ProductRank> ranks = new ArrayList<>();
+        for (long i = 1; i <= 10; i++) {
+            ranks.add(new ProductRank(i, 1L, 100 - i)); // 1(99) > 2(98) > ... > 10(90)
+        }
+        rankRepository.replaceAll(ranks);
+
+        // 1페이지로 커서 확보(블롭 경로) → [1,2]
+        ProductCursorPage page1 = facade.getProductsByLikesCursor(1L, null, 2);
+        assertThat(page1.items()).extracting(ProductInfo::id).containsExactly(1L, 2L);
+
+        // 2페이지 윈도[3,4,5,6](need=4, 꽉 참) 중 3,4,5 삭제 → 6만 남아 size(2) 미달
+        jdbc.update("UPDATE product SET deleted_at = NOW() WHERE id IN (3, 4, 5)");
+        ProductCursorPage page2 = facade.getProductsByLikesCursor(1L, page1.nextCursor(), 2);
+
+        assertThat(page2.items()).extracting(ProductInfo::id).containsExactly(6L); // 미달이지만
+        assertThat(page2.nextCursor()).isNotNull(); // 7~10 을 잃지 않도록 다음 커서 발급
     }
 }

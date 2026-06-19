@@ -88,27 +88,33 @@ public class ProductFacade {
             throw new CoreException(ErrorType.BAD_REQUEST, "size 가 올바르지 않습니다.");
         }
         LikesCursor cursor = LikesCursor.decode(cursorToken);
-        Long lastLike = cursor == null ? null : cursor.likeCount();
-        Long lastId = cursor == null ? null : cursor.productId();
+        int need = size * OVER_FETCH;
+        RankedWindow window = loadRankedForCursor(brandId, cursor, need);
+        List<RankedProduct> ranked = window.ranked();
 
-        List<RankedProduct> ranked = loadRankedForCursor(brandId, cursor, lastLike, lastId, size);
+        // 배치 조회로 N+1 제거 — rank 의 productId 들을 한 번에(미삭제만).
+        List<Long> ids = ranked.stream().map(RankedProduct::productId).toList();
+        Map<Long, ProductModel> products = productRepository.findAllByIds(ids).stream()
+            .collect(Collectors.toMap(ProductModel::getId, p -> p));
 
         List<ProductInfo> items = new ArrayList<>(size);
         RankedProduct lastRanked = null;
         for (RankedProduct r : ranked) {
             lastRanked = r;
-            Optional<ProductModel> product = productRepository.find(r.productId()); // find = 미삭제만
-            if (product.isEmpty()) {
+            ProductModel product = products.get(r.productId());
+            if (product == null) {
                 continue; // 삭제/누락 필터
             }
-            items.add(ProductInfo.from(product.get(), r.likeCount()));
+            items.add(ProductInfo.from(product, r.likeCount()));
             if (items.size() == size) {
                 break;
             }
         }
 
-        String next = (items.size() < size || lastRanked == null)
-            ? null // 다 못 채웠으면 뒤가 없는 마지막 페이지
+        // size 를 못 채웠어도 윈도가 꽉 찼으면(뒤에 더 있음) 다음 커서를 줘 페이지 유실을 막는다.
+        boolean mightHaveMore = items.size() == size || window.full();
+        String next = (lastRanked == null || !mightHaveMore)
+            ? null
             : new LikesCursor(lastRanked.likeCount(), lastRanked.productId()).encode();
         return new ProductCursorPage(items, next);
     }
@@ -130,20 +136,24 @@ public class ProductFacade {
         productCache.evictDetail(id);
     }
 
-    /** 첫 페이지(hot)는 top-N 블롭 캐시 경유, 이후 페이지는 DB 직접(키셋). */
-    private List<RankedProduct> loadRankedForCursor(Long brandId, LikesCursor cursor, Long lastLike, Long lastId, int size) {
-        int need = size * OVER_FETCH;
+    /** 첫 페이지(hot)는 top-N 블롭 캐시 경유, 이후 페이지는 DB 직접(키셋). full=윈도가 한도만큼 꽉 참(뒤에 더 있을 수 있음). */
+    private RankedWindow loadRankedForCursor(Long brandId, LikesCursor cursor, int need) {
         if (cursor == null && need <= BLOB_SIZE) {
-            Optional<List<RankedProduct>> blob = productCache.getLikesBlob(brandId);
-            if (blob.isPresent()) {
-                return blob.get();
+            List<RankedProduct> blob = productCache.getLikesBlob(brandId).orElse(null);
+            if (blob == null) {
+                blob = productRankRepository.findRankedByBrandLikesDesc(brandId, null, null, BLOB_SIZE);
+                productCache.putLikesBlob(brandId, blob, LIST_TTL);
             }
-            List<RankedProduct> top = productRankRepository.findRankedByBrandLikesDesc(brandId, null, null, BLOB_SIZE);
-            productCache.putLikesBlob(brandId, top, LIST_TTL);
-            return top;
+            return new RankedWindow(blob, blob.size() == BLOB_SIZE);
         }
-        return productRankRepository.findRankedByBrandLikesDesc(brandId, lastLike, lastId, need);
+        Long lastLike = cursor == null ? null : cursor.likeCount();
+        Long lastId = cursor == null ? null : cursor.productId();
+        List<RankedProduct> ranked = productRankRepository.findRankedByBrandLikesDesc(brandId, lastLike, lastId, need);
+        return new RankedWindow(ranked, ranked.size() == need);
     }
+
+    /** 키셋 윈도 결과. full 이면 요청 한도만큼 꽉 차 뒤에 더 있을 수 있음. */
+    private record RankedWindow(List<RankedProduct> ranked, boolean full) {}
 
     private ProductModel loadProduct(Long id) {
         return productRepository.find(id)
