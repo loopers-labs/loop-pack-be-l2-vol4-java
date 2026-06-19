@@ -5,10 +5,19 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "product")
+@Table(
+    name = "product",
+    indexes = {
+        // 브랜드 필터(등호) + 좋아요순 정렬을 한 인덱스로 커버 → filesort 제거
+        @Index(name = "idx_product_brand_like", columnList = "brand_id, like_count, id"),
+        // 브랜드 필터 없는 전체 좋아요순 정렬용 (brand_id 선두를 못 쓰는 패턴)
+        @Index(name = "idx_product_like", columnList = "like_count, id")
+    }
+)
 public class ProductModel extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)
