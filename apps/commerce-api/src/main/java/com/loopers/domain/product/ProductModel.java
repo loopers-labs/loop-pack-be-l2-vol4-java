@@ -5,10 +5,14 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "product")
+@Table(name = "product", indexes = {
+    @Index(name = "idx_product_brand_like", columnList = "brand_id, like_count"),
+    @Index(name = "idx_product_like", columnList = "like_count")
+})
 public class ProductModel extends BaseEntity {
 
     private String name;
