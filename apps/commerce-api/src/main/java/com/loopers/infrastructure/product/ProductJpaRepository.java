@@ -30,15 +30,16 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
      *
      * Week 5: product_like 집계(JOIN+GROUP BY) 대신 ProductLikeStat read-model 의 like_count 컬럼을 사용한다.
      * stat 의 (brand_id, like_count) 인덱스가 필터+정렬을 한 번에 커버한다.
-     * tie-break 도 stat 의 productId(=PK) 로 잡아 mixed-table ordering 을 피하고 인덱스로 정렬한다.
-     * → temp + filesort 제거.
+     *
+     * LEFT JOIN + COALESCE: 신규 상품처럼 stat 이 아직 없을 수 있는 상품도 결과에서 누락되지 않게 한다
+     * (stat 없으면 like_count = 0 으로 처리). brandId 필터는 stat 이 아닌 Product 기준으로.
      */
     @Query("""
         SELECT p
         FROM Product p
-        JOIN ProductLikeStat s ON s.productId = p.id
-        WHERE (:brandId IS NULL OR s.brandId = :brandId)
-        ORDER BY s.likeCount DESC, s.productId DESC
+        LEFT JOIN ProductLikeStat s ON s.productId = p.id
+        WHERE (:brandId IS NULL OR p.brandId = :brandId)
+        ORDER BY COALESCE(s.likeCount, 0) DESC, p.id DESC
     """)
     List<Product> findAllOrderByLikeCountDesc(@Param("brandId") Long brandId, Pageable pageable);
 }
