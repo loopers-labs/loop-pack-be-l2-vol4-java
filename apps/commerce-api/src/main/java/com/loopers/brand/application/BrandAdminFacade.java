@@ -2,6 +2,7 @@ package com.loopers.brand.application;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
+import com.loopers.product.application.ProductDetailViewInvalidator;
 import com.loopers.product.domain.ProductService;
 import com.loopers.shared.pagination.PageQuery;
 import com.loopers.shared.pagination.PageResult;
@@ -15,6 +16,7 @@ public class BrandAdminFacade {
 
     private final BrandService brandService;
     private final ProductService productService;
+    private final ProductDetailViewInvalidator productDetailViewInvalidator;
 
     public BrandInfo createBrand(CreateBrandCommand command) {
         Brand brand = brandService.createBrand(command.name(), command.description());
@@ -31,14 +33,16 @@ public class BrandAdminFacade {
             .map(BrandInfo::from);
     }
 
+    @Transactional
     public BrandInfo updateBrand(UpdateBrandCommand command) {
         Brand brand = brandService.updateBrand(command.brandId(), command.name(), command.description());
+        productDetailViewInvalidator.invalidateAll(productService.getActiveProductIdsByBrandId(command.brandId()));
         return BrandInfo.from(brand);
     }
 
     @Transactional
     public void deleteBrand(Long brandId) {
         brandService.deleteBrand(brandId);
-        productService.deleteProductsByBrandId(brandId);
+        productDetailViewInvalidator.invalidateAll(productService.deleteProductsByBrandId(brandId));
     }
 }

@@ -2,9 +2,16 @@ package com.loopers.brand.interfaces.api;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
+import com.loopers.product.application.ProductLikeSummaryWriter;
+import com.loopers.product.domain.Product;
+import com.loopers.product.domain.ProductService;
+import com.loopers.product.interfaces.api.ProductV1Dto;
 import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.shared.presentation.PageResponse;
+import com.loopers.stock.domain.ProductStockService;
+import com.loopers.testcontainers.RedisTestContainersConfig;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -12,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -23,31 +31,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(RedisTestContainersConfig.class)
 class BrandAdminV1ApiE2ETest {
 
     private static final String ENDPOINT_BRANDS = "/api-admin/v1/brands";
     private static final String ENDPOINT_BRAND_DETAIL = "/api-admin/v1/brands/{brandId}";
+    private static final String ENDPOINT_PUBLIC_PRODUCT_DETAIL = "/api/v1/products/{productId}";
     private static final String HEADER_ADMIN_LDAP = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
+    private final ProductService productService;
+    private final ProductStockService productStockService;
+    private final ProductLikeSummaryWriter productLikeSummaryWriter;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     BrandAdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandService brandService,
-        DatabaseCleanUp databaseCleanUp
+        ProductService productService,
+        ProductStockService productStockService,
+        ProductLikeSummaryWriter productLikeSummaryWriter,
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
+        this.productService = productService;
+        this.productStockService = productStockService;
+        this.productLikeSummaryWriter = productLikeSummaryWriter;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("POST /api-admin/v1/brands")
@@ -201,6 +224,33 @@ class BrandAdminV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().description()).isEqualTo("사용자 경험과 서비스를 함께 제공하는 브랜드")
             );
         }
+
+        @DisplayName("브랜드 수정 후 공개 상품 상세 조회 캐시를 무효화한다.")
+        @Test
+        void evictsProductDetailCache_whenBrandIsUpdated() {
+            // arrange
+            Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(saved, "아이폰 16 Pro", 1_550_000L, 10);
+            getPublicProduct(product.getId());
+            BrandAdminV1Dto.UpdateBrandRequest request = new BrandAdminV1Dto.UpdateBrandRequest(
+                "애플 스토어",
+                "사용자 경험과 서비스를 함께 제공하는 브랜드"
+            );
+
+            // act
+            updateBrand(saved.getId(), request, adminHeaders());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getPublicProduct(product.getId());
+
+            // assert
+            ProductV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(product.getId()),
+                () -> assertThat(data.brand().id()).isEqualTo(saved.getId()),
+                () -> assertThat(data.brand().name()).isEqualTo("애플 스토어"),
+                () -> assertThat(data.brand().description()).isEqualTo("사용자 경험과 서비스를 함께 제공하는 브랜드")
+            );
+        }
     }
 
     @DisplayName("DELETE /api-admin/v1/brands/{brandId}")
@@ -222,6 +272,22 @@ class BrandAdminV1ApiE2ETest {
                 () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
             );
+        }
+
+        @DisplayName("브랜드 삭제 후 공개 상품 상세 조회 캐시를 무효화한다.")
+        @Test
+        void evictsProductDetailCache_whenBrandIsDeleted() {
+            // arrange
+            Brand saved = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(saved, "아이폰 16 Pro", 1_550_000L, 10);
+            getPublicProduct(product.getId());
+
+            // act
+            deleteBrand(saved.getId(), adminHeaders());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getPublicProduct(product.getId());
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
 
         @DisplayName("이미 삭제된 브랜드 ID가 주어지면, 404 NOT_FOUND를 반환한다.")
@@ -296,6 +362,29 @@ class BrandAdminV1ApiE2ETest {
             new HttpEntity<>(headers),
             responseType,
             brandId
+        );
+    }
+
+    private Product createProduct(Brand brand, String name, long price, int stockQuantity) {
+        Product product = productService.createProduct(
+            brand.getId(),
+            name,
+            "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+            price
+        );
+        productStockService.createProductStock(product.getId(), stockQuantity);
+        productLikeSummaryWriter.initialize(product.getId(), product.getBrandId());
+        return product;
+    }
+
+    private ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> getPublicProduct(Long productId) {
+        ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PUBLIC_PRODUCT_DETAIL,
+            HttpMethod.GET,
+            null,
+            responseType,
+            productId
         );
     }
 

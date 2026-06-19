@@ -35,6 +35,16 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
 
     List<Product> findAllByBrandIdAndDeletedAtIsNull(Long brandId);
 
+    @Query(
+        """
+            select p.id
+            from Product p
+            where p.brandId = :brandId
+              and p.deletedAt is null
+            """
+    )
+    List<Long> findActiveIdsByBrandId(@Param("brandId") Long brandId);
+
     Page<Product> findByDeletedAtIsNull(Pageable pageable);
 
     Page<Product> findByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);

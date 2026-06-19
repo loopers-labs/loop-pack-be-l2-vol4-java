@@ -3,9 +3,9 @@ package com.loopers.product.infrastructure;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.config.redis.RedisConfig;
-import com.loopers.product.application.ProductDetailCacheEvictor;
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductDetailQuery;
+import com.loopers.product.application.ProductDetailViewInvalidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
@@ -15,13 +15,15 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Primary
 @Component
-public class CachedProductDetailQuery implements ProductDetailQuery, ProductDetailCacheEvictor {
+public class CachedProductDetailQuery implements ProductDetailQuery, ProductDetailViewInvalidator {
 
     private static final String CACHE_KEY_PREFIX = "product:detail:v1:";
     private static final String LOCK_KEY_SUFFIX = ":lock";
@@ -71,27 +73,39 @@ public class CachedProductDetailQuery implements ProductDetailQuery, ProductDeta
     }
 
     @Override
-    public void evict(Long productId) {
-        String cacheKey = cacheKey(productId);
+    public void invalidate(Long productId) {
+        invalidateAll(List.of(productId));
+    }
+
+    @Override
+    public void invalidateAll(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return;
+        }
+
+        List<String> cacheKeys = productIds.stream()
+            .map(this::cacheKey)
+            .toList();
+
         if (TransactionSynchronizationManager.isActualTransactionActive()
             && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    delete(cacheKey, productId);
+                    delete(cacheKeys);
                 }
             });
             return;
         }
 
-        delete(cacheKey, productId);
+        delete(cacheKeys);
     }
 
-    private void delete(String cacheKey, Long productId) {
+    private void delete(Collection<String> cacheKeys) {
         try {
-            redisTemplate.delete(cacheKey);
+            redisTemplate.delete(cacheKeys);
         } catch (RuntimeException e) {
-            log.warn("Failed to evict product detail cache. productId={}", productId, e);
+            log.warn("Failed to evict product detail cache. count={}", cacheKeys.size(), e);
         }
     }
 

@@ -59,6 +59,11 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public List<Long> getActiveProductIdsByBrandId(Long brandId) {
+        return productRepository.findActiveIdsByBrandId(brandId);
+    }
+
+    @Transactional(readOnly = true)
     public PageResult<Product> getVisibleProducts(PageQuery query, Long brandId, ProductSort sort) {
         return productRepository.findVisibleAll(query, brandId, sort);
     }
@@ -75,9 +80,12 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProductsByBrandId(Long brandId) {
-        productRepository.findActiveAllByBrandId(brandId)
-            .forEach(Product::delete);
+    public List<Long> deleteProductsByBrandId(Long brandId) {
+        List<Product> products = productRepository.findActiveAllByBrandId(brandId);
+        products.forEach(Product::delete);
+        return products.stream()
+            .map(Product::getId)
+            .toList();
     }
 
     @Transactional

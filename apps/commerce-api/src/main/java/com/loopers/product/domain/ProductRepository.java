@@ -19,6 +19,8 @@ public interface ProductRepository {
 
     List<Product> findActiveAllByBrandId(Long brandId);
 
+    List<Long> findActiveIdsByBrandId(Long brandId);
+
     PageResult<Product> findActiveAll(PageQuery query, Long brandId);
 
     PageResult<Product> findVisibleAll(PageQuery query, Long brandId, ProductSort sort);
