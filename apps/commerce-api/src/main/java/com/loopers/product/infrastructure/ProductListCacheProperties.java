@@ -36,5 +36,8 @@ public record ProductListCacheProperties(
         if (cacheableMaxItems <= 0) {
             throw new IllegalArgumentException("cacheableMaxItems must be positive.");
         }
+        if (cacheableMaxItems < cacheableMaxSize) {
+            throw new IllegalArgumentException("cacheableMaxItems must be greater than or equal to cacheableMaxSize.");
+        }
     }
 }

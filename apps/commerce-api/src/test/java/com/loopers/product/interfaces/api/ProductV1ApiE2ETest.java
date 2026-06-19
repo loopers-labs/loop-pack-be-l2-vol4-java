@@ -439,6 +439,28 @@ class ProductV1ApiE2ETest {
             );
         }
 
+        @DisplayName("상위 노출 구간을 넘는 상품 목록 조회 결과는 데이터가 있어도 Redis에 저장하지 않는다.")
+        @Test
+        void doesNotStoreProductListCache_whenPageIsOutsideTopItems() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            for (int sequence = 1; sequence <= 201; sequence++) {
+                createProduct(brand, "아이폰 테스트 상품 " + sequence, 1_000_000L + sequence, 10);
+            }
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                getProducts("?brandId=" + brand.getId() + "&sort=latest&page=200&size=1");
+
+            // assert
+            String cacheKey = productListCacheKey(brand.getId(), "latest", 200, 1);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().content()).hasSize(1),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isFalse()
+            );
+        }
+
         @DisplayName("삭제된 상품이 있으면 200 OK와 삭제 상품을 제외한 목록을 반환한다.")
         @Test
         void excludesDeletedProduct_whenProductIsDeleted() {
