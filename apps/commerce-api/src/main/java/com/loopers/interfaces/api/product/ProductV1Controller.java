@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductCursorPage;
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
@@ -55,6 +56,17 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
         return ApiResponse.success(responses);
+    }
+
+    @GetMapping("/cursor")
+    @Override
+    public ApiResponse<ProductV1Dto.CursorPageResponse> getProductsByCursor(
+        @RequestParam(value = "brandId", required = false) Long brandId,
+        @RequestParam(value = "cursor", required = false) String cursor,
+        @RequestParam(value = "size", required = false, defaultValue = "20") int size
+    ) {
+        ProductCursorPage page = productFacade.getProductsByLikesCursor(brandId, cursor, size);
+        return ApiResponse.success(ProductV1Dto.CursorPageResponse.from(page));
     }
 
     @PutMapping("/{productId}")

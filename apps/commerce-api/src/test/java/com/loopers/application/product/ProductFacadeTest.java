@@ -5,6 +5,7 @@ import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +28,8 @@ class ProductFacadeTest {
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final BrandRepository brandRepository = mock(BrandRepository.class);
     private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
-    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository);
+    private final ProductRankRepository productRankRepository = mock(ProductRankRepository.class);
+    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository);
 
     @DisplayName("상품 상세를 조회할 때, ")
     @Nested
