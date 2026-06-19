@@ -43,19 +43,23 @@ public class ProductApplicationService {
     /**
      * 사용자 - 상품 상세 (Product + Brand + Stock + LikeCount 어셈블).
      *
-     * <p>Redis 캐시 read-through: 히트 시 DB 접근 없이 반환, 미스 시 DB 조회 후 캐시에 저장한다.
+     * <p>Redis 캐시 read-through: 히트 시 상품 기본 정보는 캐시에서 반환하고,
+     * 재고(inStock/remainingStock)는 항상 DB 에서 실시간 조회한다.
+     * 주문 처리 중 재고가 변동되어도 캐시된 값이 노출되지 않도록 분리한다.
      * 캐시 장애 시에는 미스로 처리되어 DB 로 폴백한다(ProductCacheStore 내부 격리).
      */
     @Transactional(readOnly = true)
     public ProductInfo getProductDetail(Long productId) {
+        // 재고는 캐시 분리 정책 — 캐시 히트 여부와 무관하게 항상 DB 직접 조회.
+        // 주문으로 재고가 실시간 변동되므로 캐시 값을 신뢰할 수 없다.
+        StockModel stock = findStockOrThrow(productId);
         Optional<ProductInfo> cached = productCacheStore.getDetail(productId);
         if (cached.isPresent()) {
-            return cached.get();
+            return cached.get().withStock(stock);
         }
         ProductModel product = findActiveProductOrThrow(productId);
         BrandModel brand = findBrandOrThrow(product.getBrandId());
         ProductWithBrand pwb = productDetailService.assemble(product, brand);
-        StockModel stock = findStockOrThrow(productId);
         ProductInfo info = ProductInfo.forUser(pwb, stock);   // 좋아요 수는 비정규화 컬럼(like_count) 사용
         productCacheStore.putDetail(productId, info);
         return info;
@@ -93,8 +97,7 @@ public class ProductApplicationService {
         findBrandOrThrow(brandId);   // 존재 검증만
         ProductModel product = productRepository.save(new ProductModel(brandId, name, description, price));
         StockModel stock = stockRepository.save(StockModel.of(product.getId(), initialStock));
-        // 새 상품이 목록에 즉시 반영되도록 목록 캐시 전체 무효화 (커밋 후)
-        eventPublisher.publishEvent(ProductCacheEvictEvent.listOnly());
+        // 신규 상품은 목록 캐시를 즉시 무효화하지 않는다 — TTL 만료 시 자동 반영 (목록 캐시 TTL 3분)
         return ProductInfo.forAdmin(product, stock);
     }
 

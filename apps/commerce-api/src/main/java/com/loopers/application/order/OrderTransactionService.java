@@ -1,6 +1,5 @@
 package com.loopers.application.order;
 
-import com.loopers.application.product.ProductCacheEvictEvent;
 import com.loopers.domain.common.Money;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.UserCouponModel;
@@ -19,7 +18,6 @@ import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,15 +53,11 @@ import java.util.Set;
 @Service
 public class OrderTransactionService {
 
-    /** 재고 표시 노출 임계값. 이하면 상세 화면에 수량을 노출하므로, 이 구간 변동 시 상세 캐시를 무효화한다. */
-    private static final int LOW_STOCK_DISPLAY_THRESHOLD = 10;
-
     private final OrderService orderService;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final UserCouponRepository userCouponRepository;
-    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * TX1 — 주문 생성 (무점유 견적): 재고/쿠폰 검증 + 금액 확정 + 주문 PENDING 저장.
@@ -156,8 +150,6 @@ public class OrderTransactionService {
                 throw new CoreException(ErrorType.BAD_REQUEST,
                     "[productId = " + item.getProductId() + "] 재고가 부족하여 주문을 진행할 수 없습니다.");
             }
-            // 재고 표시(10개 이하 노출)가 바뀐 상품은 상세 캐시 무효화 (커밋 후 실행)
-            evictDetailIfStockDisplayChanged(item.getProductId());
         }
 
         // 쿠폰 사용 확정 — 견적 때 검증했지만 견적~확정 사이의 변화(만료/타 기기 사용)를 재검증
@@ -221,10 +213,7 @@ public class OrderTransactionService {
         // 재고 복구 — 차감과 동일하게 productId 오름차순
         order.getItems().stream()
             .sorted(Comparator.comparingLong(OrderItemModel::getProductId))
-            .forEach(item -> {
-                stockRepository.restoreAtomically(item.getProductId(), item.getQuantity());
-                evictDetailIfStockDisplayChanged(item.getProductId());
-            });
+            .forEach(item -> stockRepository.restoreAtomically(item.getProductId(), item.getQuantity()));
 
         // 쿠폰 복구 (USED → AVAILABLE)
         if (order.getUserCouponId() != null) {
@@ -292,20 +281,5 @@ public class OrderTransactionService {
                 "[productId = " + productId + "] 재고 정보를 찾을 수 없습니다."));
     }
 
-    /**
-     * 변경 후 재고가 노출 임계값 이하면 상세 캐시 무효화 이벤트를 발행한다.
-     *
-     * <p>재고가 11개 이상 구간에서만 움직이면 화면 표시(수량 비노출)가 그대로라 evict 하지 않는다 —
-     * 좋아요와 달리 재고 표시는 실시간성이 중요하므로 표시가 바뀌는 구간만 선별 무효화한다.
-     * 실제 삭제는 {@link ProductCacheEvictListener}가 커밋 후 수행한다.
-     */
-    private void evictDetailIfStockDisplayChanged(Long productId) {
-        int remaining = stockRepository.findByProductId(productId)
-            .map(StockModel::getQuantity)
-            .orElse(0);
-        if (remaining <= LOW_STOCK_DISPLAY_THRESHOLD) {
-            eventPublisher.publishEvent(ProductCacheEvictEvent.detailOnly(productId));
-        }
-    }
 }
 

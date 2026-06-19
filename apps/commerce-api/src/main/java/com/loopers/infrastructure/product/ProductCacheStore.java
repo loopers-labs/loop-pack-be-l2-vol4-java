@@ -38,7 +38,8 @@ public class ProductCacheStore {
 
     private static final String DETAIL_PREFIX = "product:detail:";
     private static final String LIST_PREFIX = "product:list:";
-    private static final Duration TTL = Duration.ofMinutes(5);
+    private static final Duration DETAIL_TTL = Duration.ofMinutes(10);
+    private static final Duration LIST_TTL = Duration.ofMinutes(3);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
@@ -60,7 +61,7 @@ public class ProductCacheStore {
 
     public void putDetail(Long productId, ProductInfo info) {
         try {
-            redisTemplate.opsForValue().set(detailKey(productId), objectMapper.writeValueAsString(info), TTL);
+            redisTemplate.opsForValue().set(detailKey(productId), objectMapper.writeValueAsString(info), DETAIL_TTL);
         } catch (Exception e) {
             log.warn("상품 상세 캐시 저장 실패 — 무시. productId: {}", productId, e);
         }
@@ -91,7 +92,7 @@ public class ProductCacheStore {
 
     public void putList(Long brandId, String sort, int page, int size, List<ProductInfo> infos) {
         try {
-            redisTemplate.opsForValue().set(listKey(brandId, sort, page, size), objectMapper.writeValueAsString(infos), TTL);
+            redisTemplate.opsForValue().set(listKey(brandId, sort, page, size), objectMapper.writeValueAsString(infos), LIST_TTL);
         } catch (Exception e) {
             log.warn("상품 목록 캐시 저장 실패 — 무시.", e);
         }

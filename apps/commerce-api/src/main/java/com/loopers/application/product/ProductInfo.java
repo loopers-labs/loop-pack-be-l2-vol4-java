@@ -99,6 +99,14 @@ public record ProductInfo(
             .toList();
     }
 
+    /** 캐시된 상세 정보의 재고 필드만 최신 DB 값으로 교체한다. 재고는 캐시에서 분리되어 항상 실시간 조회된다. */
+    public ProductInfo withStock(StockModel stockModel) {
+        return new ProductInfo(
+            id, brandId, brandName, name, description, price,
+            stock, stockModel.isAvailable(), stockModel.getDisplayQuantity(), likeCount
+        );
+    }
+
     /**
      * 어드민 목록 어셈블 — 상품 + 재고를 묶어 {@link ProductInfo} 리스트로 반환.
      *
