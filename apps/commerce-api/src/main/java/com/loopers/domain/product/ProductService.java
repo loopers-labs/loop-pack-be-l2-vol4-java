@@ -17,6 +17,7 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductStatsService productStatsService;
 
     public ProductModel getById(Long id) {
         return productRepository.find(id)
@@ -47,8 +48,11 @@ public class ProductService {
         return productRepository.findProducts(brandId, pageable);
     }
 
+    @Transactional
     public ProductModel create(Long brandId, String name, BigDecimal price) {
-        return productRepository.save(new ProductModel(brandId, name, price));
+        ProductModel product = productRepository.save(new ProductModel(brandId, name, price));
+        productStatsService.create(product);
+        return product;
     }
 
     public ProductModel update(Long id, String name, BigDecimal price) {
@@ -59,25 +63,18 @@ public class ProductService {
         return productRepository.save(product);
     }
 
+    @Transactional
     public void delete(Long id) {
         ProductModel product = getById(id);
 
         product.delete();
 
         productRepository.save(product);
+        productStatsService.softDelete(id);
     }
 
     public void softDeleteAllByBrandId(Long brandId) {
         productRepository.softDeleteAllByBrandId(brandId, ZonedDateTime.now());
     }
 
-    @Transactional
-    public void increaseLikeCount(Long id) {
-        productRepository.increaseLikeCount(id);
-    }
-
-    @Transactional
-    public void decreaseLikeCount(Long id) {
-        productRepository.decreaseLikeCount(id);
-    }
 }

@@ -20,11 +20,5 @@ public interface ProductRepository {
 
     Page<ProductModel> findProducts(Long brandId, Pageable pageable);
 
-    // 동시성 안전: 원자적 UPDATE로 처리하여 race condition 없이 카운트 정합성을 보장한다.
-    void increaseLikeCount(Long id);
-
-    // 동시성 안전: 원자적 UPDATE로 처리하여 race condition 없이 카운트 정합성을 보장한다.
-    void decreaseLikeCount(Long id);
-
     void softDeleteAllByBrandId(Long brandId, ZonedDateTime deletedAt);
 }

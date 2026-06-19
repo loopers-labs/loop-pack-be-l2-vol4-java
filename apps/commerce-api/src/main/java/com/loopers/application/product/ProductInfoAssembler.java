@@ -3,6 +3,8 @@ package com.loopers.application.product;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsService;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class ProductInfoAssembler {
 
     private final BrandService brandService;
     private final StockService stockService;
+    private final ProductStatsService productStatsService;
 
     public List<ProductInfo> toInfoList(List<ProductModel> products) {
         Set<Long> brandIds = products.stream()
@@ -29,8 +32,14 @@ public class ProductInfoAssembler {
                 .collect(Collectors.toSet());
         Map<Long, BrandModel> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, StockModel> stockMap = stockService.getMapByProductIds(productIds);
+        Map<Long, ProductStatsModel> statsMap = productStatsService.getMapByProductIds(productIds);
         return products.stream()
-                .map(product -> ProductInfo.from(product, brandMap.get(product.getBrandId()), stockMap.get(product.getId())))
+                .map(product -> ProductInfo.from(
+                    product,
+                    brandMap.get(product.getBrandId()),
+                    stockMap.get(product.getId()),
+                    statsMap.get(product.getId())
+                ))
                 .toList();
     }
 }

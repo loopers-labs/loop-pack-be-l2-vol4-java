@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.stock.StockModel;
 
 import java.math.BigDecimal;
@@ -14,13 +15,13 @@ public record ProductInfo(
     Long likeCount,
     boolean inStock
 ) {
-    public static ProductInfo from(ProductModel product, BrandModel brand, StockModel stock) {
+    public static ProductInfo from(ProductModel product, BrandModel brand, StockModel stock, ProductStatsModel stats) {
         return new ProductInfo(
             product.getId(),
             brand.getName(),
             product.getName(),
             product.getPrice(),
-            product.getLikeCount(),
+            stats.getLikeCount(),
             stock.isInStock()
         );
     }
