@@ -21,6 +21,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 @RequiredArgsConstructor
 @Component
 public class ProductService {
@@ -63,13 +68,21 @@ public class ProductService {
     )
     @Transactional(readOnly = true)
     public Page<ProductInfo> getAll(Pageable pageable, ProductSearchCondition condition) {
-        return productRepository.findAllActive(pageable, condition)
-            .map(product -> {
-                StockModel stock = stockRepository.findByProductId(product.getId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));
-                ProductDetail detail = productDomainService.assembleDetail(product, stock);
-                return ProductInfo.from(detail);
-            });
+        Page<ProductModel> products = productRepository.findAllActive(pageable, condition);
+
+        List<Long> productIds = products.getContent().stream()
+            .map(ProductModel::getId)
+            .toList();
+
+        Map<Long, StockModel> stockByProductId = stockRepository.findAllByProductIds(productIds)
+            .stream()
+            .collect(Collectors.toMap(s -> s.getProduct().getId(), s -> s));
+
+        return products.map(product -> {
+            StockModel stock = Optional.ofNullable(stockByProductId.get(product.getId()))
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));
+            return ProductInfo.from(productDomainService.assembleDetail(product, stock));
+        });
     }
 
     @Caching(evict = {
