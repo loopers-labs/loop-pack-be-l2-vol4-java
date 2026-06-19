@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductDetail;
@@ -12,6 +13,9 @@ import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -41,6 +45,7 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Cacheable(value = CacheConfig.PRODUCT_DETAIL, key = "#id")
     @Transactional(readOnly = true)
     public ProductInfo getById(Long id) {
         ProductModel product = productRepository.findActiveById(id)
@@ -52,6 +57,10 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Cacheable(
+        value = CacheConfig.PRODUCT_LIST,
+        key   = "(#condition.brandId != null ? #condition.brandId : 'all') + ':' + #condition.sortType.name() + ':' + #pageable.pageNumber + ':' + #pageable.pageSize"
+    )
     @Transactional(readOnly = true)
     public Page<ProductInfo> getAll(Pageable pageable, ProductSearchCondition condition) {
         return productRepository.findAllActive(pageable, condition)
@@ -63,6 +72,10 @@ public class ProductService {
             });
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#id"),
+        @CacheEvict(value = CacheConfig.PRODUCT_LIST,   allEntries = true)
+    })
     @Transactional
     public ProductInfo update(Long id, ProductUpdateCommand command) {
         ProductModel product = productRepository.findActiveById(id)
@@ -77,6 +90,10 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#id"),
+        @CacheEvict(value = CacheConfig.PRODUCT_LIST,   allEntries = true)
+    })
     @Transactional
     public void delete(Long id) {
         ProductModel product = productRepository.findActiveById(id)

@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
@@ -7,6 +8,7 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class LikeService {
      * - 이미 좋아요한 상품 → 정상 응답 (멱등)
      * - 신규 좋아요 → products.like_count atomic 증가
      */
+    @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
     public void like(Long userId, Long productId) {
         ProductModel product = productRepository.findById(productId)
@@ -46,6 +49,7 @@ public class LikeService {
      * - 이미 취소된 상태에서 재요청해도 정상 처리
      * - 좋아요 취소 → products.like_count atomic 감소 (0 미만 방지)
      */
+    @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
     public void unlike(Long userId, Long productId) {
         if (!likeRepository.existsByUserIdAndProductId(userId, productId)) {
