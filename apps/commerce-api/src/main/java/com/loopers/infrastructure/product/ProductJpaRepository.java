@@ -11,23 +11,26 @@ import java.util.List;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
 
-    @Query("SELECT p FROM ProductModel p " +
-        "WHERE p.deletedAt IS NULL " +
-        "AND (:brandId IS NULL OR p.brandId = :brandId) " +
-        "ORDER BY p.createdAt DESC")
-    List<ProductModel> findAllByLatest(@Param("brandId") Long brandId, Pageable pageable);
+    // ---- latest ----
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL ORDER BY p.createdAt DESC")
+    List<ProductModel> findAllByLatestAll(Pageable pageable);
 
-    @Query("SELECT p FROM ProductModel p " +
-        "WHERE p.deletedAt IS NULL " +
-        "AND (:brandId IS NULL OR p.brandId = :brandId) " +
-        "ORDER BY p.price ASC")
-    List<ProductModel> findAllByPriceAsc(@Param("brandId") Long brandId, Pageable pageable);
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId ORDER BY p.createdAt DESC")
+    List<ProductModel> findAllByLatestWithBrand(@Param("brandId") Long brandId, Pageable pageable);
 
-    @Query("SELECT p FROM ProductModel p " +
-        "WHERE p.deletedAt IS NULL " +
-        "AND (:brandId IS NULL OR p.brandId = :brandId) " +
-        "ORDER BY p.likeCount DESC")
-    List<ProductModel> findAllByLikesDesc(@Param("brandId") Long brandId, Pageable pageable);
+    // ---- price_asc ----
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL ORDER BY p.price ASC")
+    List<ProductModel> findAllByPriceAscAll(Pageable pageable);
+
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId ORDER BY p.price ASC")
+    List<ProductModel> findAllByPriceAscWithBrand(@Param("brandId") Long brandId, Pageable pageable);
+
+    // ---- likes_desc ----
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL ORDER BY p.likeCount DESC")
+    List<ProductModel> findAllByLikesDescAll(Pageable pageable);
+
+    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId ORDER BY p.likeCount DESC")
+    List<ProductModel> findAllByLikesDescWithBrand(@Param("brandId") Long brandId, Pageable pageable);
 
     /** 좋아요 등록 시 조건부 원자 증가. 좋아요 INSERT 가 실제 성공한 경우에만 호출된다. */
     @Modifying

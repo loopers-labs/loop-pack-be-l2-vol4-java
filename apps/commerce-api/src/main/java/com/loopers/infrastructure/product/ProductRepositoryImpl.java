@@ -37,9 +37,15 @@ public class ProductRepositoryImpl implements ProductRepository {
         Pageable pageable = PageRequest.of(page, size);
         String sortKey = sort == null ? "latest" : sort;
         return switch (sortKey) {
-            case "price_asc" -> productJpaRepository.findAllByPriceAsc(brandId, pageable);
-            case "likes_desc" -> productJpaRepository.findAllByLikesDesc(brandId, pageable);
-            default -> productJpaRepository.findAllByLatest(brandId, pageable);
+            case "price_asc" -> brandId == null
+                ? productJpaRepository.findAllByPriceAscAll(pageable)
+                : productJpaRepository.findAllByPriceAscWithBrand(brandId, pageable);
+            case "likes_desc" -> brandId == null
+                ? productJpaRepository.findAllByLikesDescAll(pageable)
+                : productJpaRepository.findAllByLikesDescWithBrand(brandId, pageable);
+            default -> brandId == null
+                ? productJpaRepository.findAllByLatestAll(pageable)
+                : productJpaRepository.findAllByLatestWithBrand(brandId, pageable);
         };
     }
 
