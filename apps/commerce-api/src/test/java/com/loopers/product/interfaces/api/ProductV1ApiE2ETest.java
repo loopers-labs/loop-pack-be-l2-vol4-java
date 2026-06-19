@@ -43,6 +43,7 @@ class ProductV1ApiE2ETest {
     private static final String ENDPOINT_PRODUCTS = "/api/v1/products";
     private static final String ENDPOINT_PRODUCT_DETAIL = "/api/v1/products/{productId}";
     private static final String PRODUCT_DETAIL_CACHE_KEY_PREFIX = "product:detail:v1:";
+    private static final String PRODUCT_LIST_CACHE_KEY_PREFIX = "product:list:v1:";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
@@ -333,6 +334,107 @@ class ProductV1ApiE2ETest {
             );
         }
 
+        @DisplayName("상품 목록 조회 결과를 Redis에 TTL과 함께 저장한다.")
+        @Test
+        void storesProductListCacheWithTtl_whenProductListIsReturned() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            changeSummaryLikeCount(product.getId(), 7);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                getProducts("?brandId=" + brand.getId() + "&sort=likes_desc&page=0&size=20");
+
+            // assert
+            String cacheKey = productListCacheKey(brand.getId(), "likes_desc", 0, 20);
+            Long ttlSeconds = redisTemplate.getExpire(cacheKey, TimeUnit.SECONDS);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
+                () -> assertThat(redisTemplate.opsForValue().get(cacheKey)).contains("\"likeCount\":7"),
+                () -> assertThat(ttlSeconds).isBetween(1L, 13L)
+            );
+        }
+
+        @DisplayName("상품 목록 조회 결과가 캐시되면 TTL 안에서는 캐시된 좋아요순 목록을 반환한다.")
+        @Test
+        void returnsCachedProductList_whenSummaryChangesBeforeCacheExpires() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            Product iphone = createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            Product pro = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            Product proMax = createProduct(brand, "아이폰 16 Pro Max", 1_900_000L, 5);
+            changeSummaryLikeCount(iphone.getId(), 2);
+            changeSummaryLikeCount(pro.getId(), 0);
+            changeSummaryLikeCount(proMax.getId(), 1);
+            String query = "?brandId=" + brand.getId() + "&sort=likes_desc&page=0&size=20";
+            getProducts(query);
+            changeSummaryLikeCount(iphone.getId(), 0);
+            changeSummaryLikeCount(pro.getId(), 9);
+            changeSummaryLikeCount(proMax.getId(), 1);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response = getProducts(query);
+
+            // assert
+            PageResponse<ProductV1Dto.ProductResponse> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::name)
+                    .containsExactly("아이폰 16", "아이폰 16 Pro Max", "아이폰 16 Pro"),
+                () -> assertThat(data.content())
+                    .extracting(ProductV1Dto.ProductResponse::likeCount)
+                    .containsExactly(2L, 1L, 0L)
+            );
+        }
+
+        @DisplayName("캐시 대상 크기를 넘는 상품 목록 조회 결과는 Redis에 저장하지 않는다.")
+        @Test
+        void doesNotStoreProductListCache_whenPageSizeIsTooLarge() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                getProducts("?brandId=" + brand.getId() + "&sort=latest&page=0&size=51");
+
+            // assert
+            String cacheKey = productListCacheKey(brand.getId(), "latest", 0, 51);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().content()).hasSize(1),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isFalse()
+            );
+        }
+
+        @DisplayName("세 번째 페이지 이후라도 상위 노출 구간이면 상품 목록 조회 결과를 Redis에 저장한다.")
+        @Test
+        void storesProductListCache_whenPageIsWithinTopItems() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            createProduct(brand, "아이폰 16", 1_250_000L, 7);
+            createProduct(brand, "아이폰 16 Plus", 1_350_000L, 7);
+            createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            createProduct(brand, "아이폰 16 Pro Max", 1_900_000L, 5);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                getProducts("?brandId=" + brand.getId() + "&sort=latest&page=3&size=1");
+
+            // assert
+            String cacheKey = productListCacheKey(brand.getId(), "latest", 3, 1);
+            Long ttlSeconds = redisTemplate.getExpire(cacheKey, TimeUnit.SECONDS);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().content()).hasSize(1),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
+                () -> assertThat(ttlSeconds).isBetween(1L, 13L)
+            );
+        }
+
         @DisplayName("삭제된 상품이 있으면 200 OK와 삭제 상품을 제외한 목록을 반환한다.")
         @Test
         void excludesDeletedProduct_whenProductIsDeleted() {
@@ -446,5 +548,14 @@ class ProductV1ApiE2ETest {
 
     private String productDetailCacheKey(Long productId) {
         return PRODUCT_DETAIL_CACHE_KEY_PREFIX + productId;
+    }
+
+    private String productListCacheKey(Long brandId, String sort, int page, int size) {
+        String brandKey = brandId == null ? "all" : String.valueOf(brandId);
+        return PRODUCT_LIST_CACHE_KEY_PREFIX
+            + "brand:" + brandKey
+            + ":sort:" + sort
+            + ":page:" + page
+            + ":size:" + size;
     }
 }

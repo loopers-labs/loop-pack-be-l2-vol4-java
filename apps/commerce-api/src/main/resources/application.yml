@@ -41,6 +41,14 @@ commerce:
     lock-ttl-seconds: 3
     lock-wait-millis: 80
     lock-wait-attempts: 3
+  product-list-cache:
+    ttl-seconds: 10
+    jitter-seconds: 3
+    lock-ttl-seconds: 3
+    lock-wait-millis: 80
+    lock-wait-attempts: 3
+    cacheable-max-size: 50
+    cacheable-max-items: 200
 
 ---
 spring:
