@@ -2,30 +2,36 @@ package com.loopers.product.interfaces.api;
 
 import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
+import com.loopers.config.redis.RedisConfig;
 import com.loopers.like.application.LikeFacade;
-import com.loopers.product.domain.Product;
 import com.loopers.product.application.ProductLikeSummarySynchronizer;
 import com.loopers.product.application.ProductLikeSummaryWriter;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductService;
+import com.loopers.product.infrastructure.ProductDetailCacheProperties;
 import com.loopers.stock.domain.ProductStockService;
 import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.shared.presentation.PageResponse;
 import com.loopers.testcontainers.RedisTestContainersConfig;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.context.annotation.Import;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -36,6 +42,7 @@ class ProductV1ApiE2ETest {
 
     private static final String ENDPOINT_PRODUCTS = "/api/v1/products";
     private static final String ENDPOINT_PRODUCT_DETAIL = "/api/v1/products/{productId}";
+    private static final String PRODUCT_DETAIL_CACHE_KEY_PREFIX = "product:detail:v1:";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandService brandService;
@@ -44,9 +51,11 @@ class ProductV1ApiE2ETest {
     private final LikeFacade likeFacade;
     private final ProductLikeSummaryWriter productLikeSummaryWriter;
     private final ProductLikeSummarySynchronizer productLikeSummarySynchronizer;
+    private final ProductDetailCacheProperties productDetailCacheProperties;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
     private final JdbcTemplate jdbcTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     ProductV1ApiE2ETest(
@@ -57,9 +66,11 @@ class ProductV1ApiE2ETest {
         LikeFacade likeFacade,
         ProductLikeSummaryWriter productLikeSummaryWriter,
         ProductLikeSummarySynchronizer productLikeSummarySynchronizer,
+        ProductDetailCacheProperties productDetailCacheProperties,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp,
-        JdbcTemplate jdbcTemplate
+        JdbcTemplate jdbcTemplate,
+        @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> redisTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
@@ -68,9 +79,11 @@ class ProductV1ApiE2ETest {
         this.likeFacade = likeFacade;
         this.productLikeSummaryWriter = productLikeSummaryWriter;
         this.productLikeSummarySynchronizer = productLikeSummarySynchronizer;
+        this.productDetailCacheProperties = productDetailCacheProperties;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
         this.jdbcTemplate = jdbcTemplate;
+        this.redisTemplate = redisTemplate;
     }
 
     @AfterEach
@@ -153,6 +166,50 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.id()).isEqualTo(product.getId()),
                 () -> assertThat(data.likeCount()).isEqualTo(7L)
+            );
+        }
+
+        @DisplayName("상품 상세 조회 결과를 Redis에 TTL과 함께 저장한다.")
+        @Test
+        void storesProductDetailCacheWithTtl_whenProductDetailIsReturned() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 편리하게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            changeSummaryLikeCount(product.getId(), 7);
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());
+
+            // assert
+            String cacheKey = productDetailCacheKey(product.getId());
+            Long ttlSeconds = redisTemplate.getExpire(cacheKey, TimeUnit.SECONDS);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
+                () -> assertThat(redisTemplate.opsForValue().get(cacheKey)).contains("\"likeCount\":7"),
+                () -> assertThat(ttlSeconds).isBetween(
+                    1L,
+                    productDetailCacheProperties.ttlSeconds() + productDetailCacheProperties.jitterSeconds()
+                )
+            );
+        }
+
+        @DisplayName("존재하지 않는 상품 상세 조회 결과를 Redis에 짧은 TTL로 저장한다.")
+        @Test
+        void storesNegativeCacheWithShortTtl_whenProductDoesNotExist() {
+            // arrange
+            Long missingProductId = 999_999L;
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(missingProductId);
+
+            // assert
+            String cacheKey = productDetailCacheKey(missingProductId);
+            Long ttlSeconds = redisTemplate.getExpire(cacheKey, TimeUnit.SECONDS);
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
+                () -> assertThat(ttlSeconds).isBetween(1L, productDetailCacheProperties.negativeTtlSeconds())
             );
         }
 
@@ -385,5 +442,9 @@ class ProductV1ApiE2ETest {
             responseType,
             productId
         );
+    }
+
+    private String productDetailCacheKey(Long productId) {
+        return PRODUCT_DETAIL_CACHE_KEY_PREFIX + productId;
     }
 }
