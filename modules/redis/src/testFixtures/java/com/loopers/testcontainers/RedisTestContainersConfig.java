@@ -10,9 +10,8 @@ public class RedisTestContainersConfig {
 
     static {
         redisContainer.start();
-    }
-
-    public RedisTestContainersConfig() {
+        // MySqlTestContainersConfig 과 동일하게 static 블록에서 세팅해야
+        // RedisProperties 바인딩보다 먼저 적용된다(생성자는 너무 늦어 application.yml 값이 박힘).
         System.setProperty("datasource.redis.database", "0");
         System.setProperty("datasource.redis.master.host", redisContainer.getHost());
         System.setProperty("datasource.redis.master.port", String.valueOf(redisContainer.getFirstMappedPort()));
