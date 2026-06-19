@@ -9,6 +9,7 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -40,23 +42,30 @@ class ProductV1ApiE2ETest {
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     ProductV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp,
+        RedisTemplate<String, String> redisTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
+        this.redisTemplate = redisTemplate;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("GET /api/v1/products/{productId}")
@@ -87,6 +96,30 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(data.brand().id()).isEqualTo(brand.getId()),
                 () -> assertThat(data.brand().name()).isEqualTo("Loopers"),
                 () -> assertThat(data.likeCount()).isZero()
+            );
+        }
+
+        @DisplayName("상품 상세 조회 결과를 Redis에 캐시한다.")
+        @Test
+        void cachesProductDetail_whenProductExists() {
+            // arrange
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+
+            // act
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_PRODUCTS + "/" + product.getId(),
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    productResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(redisTemplate.opsForValue().get("product:detail:" + product.getId()))
+                    .contains("\"id\":" + product.getId())
             );
         }
     }
@@ -185,6 +218,32 @@ class ProductV1ApiE2ETest {
             );
         }
 
+        @DisplayName("상품 목록 조회 결과를 Redis에 캐시한다.")
+        @Test
+        void cachesProductList_whenProductsAreReturned() {
+            // arrange
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            saveProduct(Product.reconstruct(null, brand.getId(), "양말", "부드러운 양말", 5_000L, 10, 1, false));
+            saveProduct(Product.reconstruct(null, brand.getId(), "코트", "따뜻한 코트", 90_000L, 10, 5, false));
+
+            // act
+            ResponseEntity<ApiResponse<List<ProductDto.List.V1.Response>>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_PRODUCTS + "?brandId=" + brand.getId() + "&sort=likes_desc&page=0&size=20",
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    productListResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(redisTemplate.opsForValue().get(
+                    "product:list:brand:" + brand.getId() + ":sort:likes_desc:page:0:size:20"
+                )).contains("\"likeCount\":5")
+            );
+        }
+
         @DisplayName("존재하지 않는 브랜드 ID로 필터링하면, 404 NOT_FOUND 응답을 받는다.")
         @Test
         void throwsNotFound_whenBrandFilterDoesNotExist() {
@@ -250,6 +309,44 @@ class ProductV1ApiE2ETest {
             assertAll(
                 () -> assertThat(likeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(productResponse.getBody().data().likeCount()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("좋아요 수가 변경되면, 캐시된 상품 상세도 최신 좋아요 수를 반환한다.")
+        @Test
+        void returnsLatestLikeCount_whenCachedProductIsLiked() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId(),
+                HttpMethod.GET,
+                HttpEntity.EMPTY,
+                productResponseType()
+            );
+
+            // act
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
+                HttpMethod.POST,
+                new HttpEntity<>(authHeaders("user1234", "abc123!?")),
+                voidResponseType()
+            );
+
+            ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> productResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_PRODUCTS + "/" + product.getId(),
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    productResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(productResponse.getBody().data().likeCount()).isEqualTo(1),
+                () -> assertThat(redisTemplate.opsForValue().get("product:detail:" + product.getId()))
+                    .contains("\"likeCount\":1")
             );
         }
 
