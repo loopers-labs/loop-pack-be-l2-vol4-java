@@ -71,4 +71,14 @@ class InMemoryProductRepository implements ProductRepository {
                 .filter(p -> ids.contains(p.getId()))
                 .toList();
     }
+
+    @Override
+    public void increaseLikeCount(Long productId) {
+        find(productId).ifPresent(ProductModel::increaseLikeCount);
+    }
+
+    @Override
+    public void decreaseLikeCount(Long productId) {
+        find(productId).ifPresent(ProductModel::decreaseLikeCount);
+    }
 }
