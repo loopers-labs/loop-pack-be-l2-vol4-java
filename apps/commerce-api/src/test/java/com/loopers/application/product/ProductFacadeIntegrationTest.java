@@ -12,6 +12,7 @@ import com.loopers.interfaces.api.product.SortType;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,9 +52,13 @@ class ProductFacadeIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private BrandModel saveBrand(String name) {
@@ -141,6 +146,33 @@ class ProductFacadeIntegrationTest {
         }
     }
 
+    @DisplayName("상품 상세를 캐시로 조회할 때,")
+    @Nested
+    class ProductCache {
+
+        @DisplayName("캐시에 적재된 이후에는 DB 값이 바뀌어도 캐시된 값이 그대로 반환된다.")
+        @Test
+        void returnsCachedValue_evenAfterDatabaseIsChanged() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "에어맥스", BigDecimal.valueOf(150000));
+            saveStock(product.getId(), 10L);
+            ProductInfo cached = productFacade.getProduct(product.getId());
+
+            product.update("변경된 이름", BigDecimal.valueOf(999999));
+            productRepository.save(product);
+
+            // when
+            ProductInfo result = productFacade.getProduct(product.getId());
+
+            // then
+            assertAll(
+                    () -> assertThat(result.name()).isEqualTo(cached.name()),
+                    () -> assertThat(result.price()).isEqualByComparingTo(cached.price())
+            );
+        }
+    }
+
     @DisplayName("상품 목록을 조회할 때,")
     @Nested
     class GetProducts {
@@ -195,6 +227,33 @@ class ProductFacadeIntegrationTest {
         }
     }
 
+    @DisplayName("상품 목록을 캐시로 조회할 때,")
+    @Nested
+    class ProductListCache {
+
+        @DisplayName("캐시에 적재된 이후 새 상품이 추가돼도 totalElements를 포함해 캐시된 결과가 그대로 반환된다.")
+        @Test
+        void returnsCachedPage_evenAfterNewProductIsAdded() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel productA = saveProduct(brand.getId(), "상품A", BigDecimal.valueOf(10000));
+            saveStock(productA.getId(), 5L);
+            Page<ProductInfo> cached = productFacade.getProducts(brand.getId(), PageRequest.of(0, 20, SortType.LATEST.toSort()));
+
+            ProductModel productB = saveProduct(brand.getId(), "상품B", BigDecimal.valueOf(20000));
+            saveStock(productB.getId(), 3L);
+
+            // when
+            Page<ProductInfo> result = productFacade.getProducts(brand.getId(), PageRequest.of(0, 20, SortType.LATEST.toSort()));
+
+            // then
+            assertAll(
+                    () -> assertThat(result.getTotalElements()).isEqualTo(cached.getTotalElements()),
+                    () -> assertThat(result.getContent()).hasSize(cached.getContent().size())
+            );
+        }
+    }
+
     @DisplayName("상품을 수정할 때,")
     @Nested
     class UpdateProduct {
@@ -227,6 +286,26 @@ class ProductFacadeIntegrationTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("캐시에 적재된 상품을 수정하면 이후 조회 시 갱신된 값이 반환된다.")
+        @Test
+        void returnsUpdatedValue_whenCachedProductIsUpdated() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "기존 상품", BigDecimal.valueOf(100000));
+            saveStock(product.getId(), 10L);
+            productFacade.getProduct(product.getId());
+
+            // when
+            productFacade.updateProductForAdmin(product.getId(), "수정 상품", BigDecimal.valueOf(200000), 20L);
+            ProductInfo result = productFacade.getProduct(product.getId());
+
+            // then
+            assertAll(
+                    () -> assertThat(result.name()).isEqualTo("수정 상품"),
+                    () -> assertThat(result.price()).isEqualByComparingTo(BigDecimal.valueOf(200000))
+            );
         }
     }
 
@@ -270,6 +349,24 @@ class ProductFacadeIntegrationTest {
 
             // then - @SQLRestriction으로 인해 soft delete된 stats는 조회되지 않음
             assertThat(productStatsRepository.findByProduct(product)).isEmpty();
+        }
+
+        @DisplayName("캐시에 적재된 상품을 삭제하면 이후 조회 시 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenCachedProductIsDeleted() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "상품", BigDecimal.valueOf(100000));
+            saveStock(product.getId(), 10L);
+            productFacade.getProduct(product.getId());
+
+            // when
+            productFacade.deleteProduct(product.getId());
+
+            // then
+            CoreException result = assertThrows(CoreException.class,
+                    () -> productFacade.getProduct(product.getId()));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 

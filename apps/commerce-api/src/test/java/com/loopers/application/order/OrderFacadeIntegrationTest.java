@@ -1,5 +1,7 @@
 package com.loopers.application.order;
 
+import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.coupon.CouponTemplateModel;
@@ -10,6 +12,8 @@ import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.domain.user.Gender;
@@ -19,6 +23,7 @@ import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +50,9 @@ class OrderFacadeIntegrationTest {
     private OrderFacade orderFacade;
 
     @Autowired
+    private ProductFacade productFacade;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -69,11 +77,18 @@ class OrderFacadeIntegrationTest {
     private PasswordEncryptor passwordEncryptor;
 
     @Autowired
+    private ProductStatsRepository productStatsRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private UserModel saveUser() {
@@ -262,6 +277,28 @@ class OrderFacadeIntegrationTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("주문 전에 캐시된 상품이라도 주문(재고 차감) 후 조회하면 최신 inStock이 반영된다.")
+        @Test
+        void invalidatesProductCache_whenStockIsDecreasedByOrder() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
+            productStatsRepository.save(new ProductStatsModel(product));
+            saveStock(product.getId(), 1L);
+            productFacade.getProduct(product.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            ProductInfo result = productFacade.getProduct(product.getId());
+
+            // then
+            assertThat(result.inStock()).isFalse();
         }
     }
 

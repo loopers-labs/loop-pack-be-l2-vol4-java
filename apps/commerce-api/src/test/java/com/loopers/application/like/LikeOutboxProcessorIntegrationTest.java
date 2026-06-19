@@ -1,5 +1,7 @@
 package com.loopers.application.like;
 
+import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.like.LikeEventType;
@@ -10,7 +12,10 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.stock.StockModel;
+import com.loopers.domain.stock.StockRepository;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +39,9 @@ class LikeOutboxProcessorIntegrationTest {
     private LikeOutboxRepository likeOutboxRepository;
 
     @Autowired
+    private ProductFacade productFacade;
+
+    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -43,11 +51,18 @@ class LikeOutboxProcessorIntegrationTest {
     private ProductStatsRepository productStatsRepository;
 
     @Autowired
+    private StockRepository stockRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private ProductModel createProductWithStats() {
@@ -116,6 +131,23 @@ class LikeOutboxProcessorIntegrationTest {
             // then
             Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
             assertThat(likeCount).isEqualTo(1L);
+        }
+
+        @DisplayName("상품 상세가 캐시에 적재된 상태에서 좋아요가 처리되면 이후 조회 시 likeCount가 최신으로 반영된다.")
+        @Test
+        void invalidatesProductCache_whenLikeIsProcessed() {
+            // given
+            ProductModel product = createProductWithStats();
+            stockRepository.save(new StockModel(product.getId(), 10L));
+            productFacade.getProduct(product.getId());
+            likeOutboxRepository.save(new LikeOutboxModel(product.getId(), LikeEventType.LIKED_EVENT));
+
+            // when
+            likeOutboxProcessor.process();
+            ProductInfo result = productFacade.getProduct(product.getId());
+
+            // then
+            assertThat(result.likeCount()).isEqualTo(1L);
         }
     }
 }
