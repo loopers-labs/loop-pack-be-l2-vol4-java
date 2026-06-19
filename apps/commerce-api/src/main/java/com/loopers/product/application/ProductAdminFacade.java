@@ -24,6 +24,7 @@ public class ProductAdminFacade {
     private final ProductService productService;
     private final ProductStockService productStockService;
     private final ProductLikeSummaryWriter productLikeSummaryWriter;
+    private final ProductDetailCacheEvictor productDetailCacheEvictor;
 
     @Transactional
     public ProductInfo createProduct(CreateProductCommand command) {
@@ -36,6 +37,7 @@ public class ProductAdminFacade {
         );
         ProductStock productStock = productStockService.createProductStock(product.getId(), command.stockQuantity());
         productLikeSummaryWriter.initialize(product.getId(), product.getBrandId());
+        productDetailCacheEvictor.evict(product.getId());
         return ProductInfo.from(product, productStock);
     }
 
@@ -67,6 +69,7 @@ public class ProductAdminFacade {
 
     public void deleteProduct(Long productId) {
         productService.deleteProduct(productId);
+        productDetailCacheEvictor.evict(productId);
     }
 
     @Transactional
@@ -81,6 +84,7 @@ public class ProductAdminFacade {
         if (command.hasStockChange()) {
             productStock = productStockService.changeProductStock(product.getId(), command.stockQuantity());
         }
+        productDetailCacheEvictor.evict(product.getId());
         return ProductInfo.from(product, productStock);
     }
 }

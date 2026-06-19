@@ -4,7 +4,9 @@ import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandService;
 import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.shared.presentation.PageResponse;
+import com.loopers.testcontainers.RedisTestContainersConfig;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,15 +21,18 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(RedisTestContainersConfig.class)
 class ProductAdminV1ApiE2ETest {
 
     private static final String ENDPOINT_PRODUCTS = "/api-admin/v1/products";
     private static final String ENDPOINT_PRODUCT_DETAIL = "/api-admin/v1/products/{productId}";
+    private static final String ENDPOINT_PUBLIC_PRODUCT_DETAIL = "/api/v1/products/{productId}";
     private static final String HEADER_ADMIN_LDAP = "X-Loopers-Ldap";
     private static final String ADMIN_LDAP = "loopers.admin";
 
@@ -35,23 +40,27 @@ class ProductAdminV1ApiE2ETest {
     private final BrandService brandService;
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     ProductAdminV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandService brandService,
         JdbcTemplate jdbcTemplate,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandService = brandService;
         this.jdbcTemplate = jdbcTemplate;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("POST /api-admin/v1/products")
@@ -294,6 +303,41 @@ class ProductAdminV1ApiE2ETest {
                 () -> assertThat(data.stockQuantity()).isEqualTo(10)
             );
         }
+
+        @DisplayName("상품 수정 후 공개 상세 조회 캐시를 무효화한다.")
+        @Test
+        void evictsPublicProductDetailCache_whenProductIsUpdated() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Long productId = createProduct(new ProductAdminV1Dto.CreateProductRequest(
+                brand.getId(),
+                "아이폰 16 Pro",
+                "강력한 성능과 정교한 카메라 경험을 제공하는 스마트폰",
+                1_550_000L,
+                10
+            ), adminHeaders()).getBody().data().id();
+            getPublicProduct(productId);
+            ProductAdminV1Dto.UpdateProductRequest request = new ProductAdminV1Dto.UpdateProductRequest(
+                "아이폰 16 Pro Max",
+                "더 큰 화면과 향상된 배터리를 제공하는 스마트폰",
+                1_900_000L,
+                null
+            );
+
+            // act
+            updateProduct(productId, request, adminHeaders());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getPublicProduct(productId);
+
+            // assert
+            ProductV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(productId),
+                () -> assertThat(data.name()).isEqualTo("아이폰 16 Pro Max"),
+                () -> assertThat(data.description()).isEqualTo("더 큰 화면과 향상된 배터리를 제공하는 스마트폰"),
+                () -> assertThat(data.price()).isEqualTo(1_900_000L)
+            );
+        }
     }
 
     @DisplayName("DELETE /api-admin/v1/products/{productId}")
@@ -345,6 +389,17 @@ class ProductAdminV1ApiE2ETest {
             ENDPOINT_PRODUCT_DETAIL,
             HttpMethod.GET,
             new HttpEntity<>(headers),
+            responseType,
+            productId
+        );
+    }
+
+    private ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> getPublicProduct(Long productId) {
+        ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PUBLIC_PRODUCT_DETAIL,
+            HttpMethod.GET,
+            null,
             responseType,
             productId
         );

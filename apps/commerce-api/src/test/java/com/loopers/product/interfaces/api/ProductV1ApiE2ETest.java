@@ -10,7 +10,9 @@ import com.loopers.product.domain.ProductService;
 import com.loopers.stock.domain.ProductStockService;
 import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.shared.presentation.PageResponse;
+import com.loopers.testcontainers.RedisTestContainersConfig;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,11 +25,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(RedisTestContainersConfig.class)
 class ProductV1ApiE2ETest {
 
     private static final String ENDPOINT_PRODUCTS = "/api/v1/products";
@@ -41,6 +45,7 @@ class ProductV1ApiE2ETest {
     private final ProductLikeSummaryWriter productLikeSummaryWriter;
     private final ProductLikeSummarySynchronizer productLikeSummarySynchronizer;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -53,6 +58,7 @@ class ProductV1ApiE2ETest {
         ProductLikeSummaryWriter productLikeSummaryWriter,
         ProductLikeSummarySynchronizer productLikeSummarySynchronizer,
         DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp,
         JdbcTemplate jdbcTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
@@ -63,12 +69,14 @@ class ProductV1ApiE2ETest {
         this.productLikeSummaryWriter = productLikeSummaryWriter;
         this.productLikeSummarySynchronizer = productLikeSummarySynchronizer;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("GET /api/v1/products/{productId}")
@@ -113,6 +121,28 @@ class ProductV1ApiE2ETest {
             Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
             Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
             changeSummaryLikeCount(product.getId(), 7);
+
+            // act
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());
+
+            // assert
+            ProductV1Dto.ProductResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.id()).isEqualTo(product.getId()),
+                () -> assertThat(data.likeCount()).isEqualTo(7L)
+            );
+        }
+
+        @DisplayName("상품 상세 조회 결과가 캐시되면 TTL 안에서는 캐시된 좋아요 수를 반환한다.")
+        @Test
+        void returnsCachedProductDetail_whenSummaryChangesBeforeCacheExpires() {
+            // arrange
+            Brand brand = brandService.createBrand("애플", "기술과 디자인으로 일상을 새롭게 만드는 브랜드");
+            Product product = createProduct(brand, "아이폰 16 Pro", 1_550_000L, 10);
+            changeSummaryLikeCount(product.getId(), 7);
+            getProduct(product.getId());
+            changeSummaryLikeCount(product.getId(), 11);
 
             // act
             ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = getProduct(product.getId());

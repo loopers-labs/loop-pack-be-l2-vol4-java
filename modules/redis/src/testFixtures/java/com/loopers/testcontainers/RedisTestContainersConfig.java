@@ -10,9 +10,6 @@ public class RedisTestContainersConfig {
 
     static {
         redisContainer.start();
-    }
-
-    public RedisTestContainersConfig() {
         System.setProperty("datasource.redis.database", "0");
         System.setProperty("datasource.redis.master.host", redisContainer.getHost());
         System.setProperty("datasource.redis.master.port", String.valueOf(redisContainer.getFirstMappedPort()));

@@ -34,6 +34,13 @@ commerce:
     sync-fixed-delay-ms: 5000
     sync-chunk-size: 1000
     sync-max-chunks-per-run: 3
+  product-detail-cache:
+    ttl-seconds: 30
+    jitter-seconds: 5
+    negative-ttl-seconds: 10
+    lock-ttl-seconds: 3
+    lock-wait-millis: 80
+    lock-wait-attempts: 3
 
 ---
 spring:
