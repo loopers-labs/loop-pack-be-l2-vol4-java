@@ -45,6 +45,16 @@ public class ProductService {
     }
 
     @Transactional
+    public void deductStock(Long id, int quantity) {
+        // 원자적 조건부 UPDATE: 읽기-검사-쓰기를 단일 쿼리로 처리해 고경쟁 상황의 초과판매를 차단한다.
+        // 영향받은 행이 0이면 재고가 부족하다는 의미다.
+        int updated = productRepository.deductStock(id, quantity);
+        if (updated == 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
+        }
+    }
+
+    @Transactional
     public void deleteProduct(Long id) {
         getProduct(id); // 존재 여부 확인
         productRepository.delete(id);

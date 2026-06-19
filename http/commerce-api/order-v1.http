@@ -1,0 +1,161 @@
+### ============================================================
+### Order API v1 테스트
+###
+### [테스트 순서]
+###   1. 유저 생성
+###   2. 브랜드 생성 (brandId 확인)
+###   3. 상품 생성 (productId 확인)
+###   4. 정상 주문 생성
+###   5. 재고 부족 주문 실패
+###   6. 존재하지 않는 상품 주문 실패
+###   7. 유저 인증 실패
+###   8. items 빈 배열 주문 실패
+### ============================================================
+
+
+# ──────────────────────────────────────────
+# 1. 유저 생성
+# 예상 응답: 200 / id, loginId 반환
+# ──────────────────────────────────────────
+### 유저 생성
+POST {{commerce-api}}/api/v1/users
+Content-Type: application/json
+
+{
+  "loginId": "testuser",
+  "loginPw": "testpw"
+}
+
+
+# ──────────────────────────────────────────
+# 2. 브랜드 생성 (테스트용 데이터 준비)
+# 예상 응답: 201 / brandId 확인 후 아래 productId에 입력
+# ──────────────────────────────────────────
+### 브랜드 생성
+POST {{commerce-api}}/api/v1/brands
+Content-Type: application/json
+
+{
+  "name": "나이키",
+  "description": "스포츠 브랜드",
+  "logoUrl": null
+}
+
+
+# ──────────────────────────────────────────
+# 2. 상품 생성 (재고 5개)
+# 예상 응답: 200 / productId 확인 후 아래 주문 요청에 입력
+# ──────────────────────────────────────────
+### 상품 생성 (brandId는 위에서 생성된 ID로 교체)
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "brandId": 1,
+  "name": "에어맥스 90",
+  "description": "클래식 러닝화",
+  "price": 159000,
+  "stock": 5
+}
+
+
+# ──────────────────────────────────────────
+# 3. [정상] 주문 생성
+# 예상 응답: 200 / status: PENDING, totalPrice: 318000
+# ──────────────────────────────────────────
+### 정상 주문 생성 (재고 5 중 2개 주문)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: testpw
+
+{
+  "items": [
+    { "productId": 1, "quantity": 2 }
+  ]
+}
+
+
+# ──────────────────────────────────────────
+# 4. [실패] 재고 부족 — 남은 재고 3개인데 10개 요청
+# 예상 응답: 400 BAD_REQUEST / "재고가 부족합니다."
+# ──────────────────────────────────────────
+### 재고 부족 주문
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: testpw
+
+{
+  "items": [
+    { "productId": 1, "quantity": 10 }
+  ]
+}
+
+
+# ──────────────────────────────────────────
+# 5. [실패] 존재하지 않는 상품 주문
+# 예상 응답: 404 NOT_FOUND / "상품을 찾을 수 없습니다."
+# ──────────────────────────────────────────
+### 존재하지 않는 상품
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: testpw
+
+{
+  "items": [
+    { "productId": 99999, "quantity": 1 }
+  ]
+}
+
+
+# ──────────────────────────────────────────
+# 6. [실패] 유저 인증 실패 (존재하지 않는 loginId)
+# 예상 응답: 404 NOT_FOUND / "유저를 찾을 수 없습니다."
+# ──────────────────────────────────────────
+### 인증 실패 — 없는 유저
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: unknown
+X-Loopers-LoginPw: wrongpw
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ]
+}
+
+
+# ──────────────────────────────────────────
+# 7. [실패] items 빈 배열
+# 예상 응답: 400 BAD_REQUEST / "주문 항목은 1개 이상이어야 합니다."
+# ──────────────────────────────────────────
+### 빈 items 주문
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: testpw
+
+{
+  "items": []
+}
+
+
+# ──────────────────────────────────────────
+# 8. [정상] 여러 상품 동시 주문
+# 예상 응답: 200 / items 2개, totalPrice 합산값
+# (두 번째 상품을 별도로 생성한 뒤 productId 교체)
+# ──────────────────────────────────────────
+### 다중 상품 주문
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: testpw
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 2, "quantity": 3 }
+  ]
+}
