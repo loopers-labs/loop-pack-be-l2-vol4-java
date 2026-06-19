@@ -8,6 +8,7 @@ import com.loopers.domain.product.ProductLikeStatRepository;
 import com.loopers.domain.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,14 +57,23 @@ public class ProductLikeStatEventHandler {
 
     /**
      * stat 이 없으면 product 의 brandId 를 가져와 0 으로 초기화한다.
-     * 백필 단계(Stage 5)에서 모든 product 에 대해 미리 init 되므로 실제로는 보조 경로.
+     * 백필 단계에서 모든 product 에 대해 미리 init 되므로 실제로는 보조 경로지만,
+     * 신규 상품에 좋아요가 거의 동시에 여러 건 들어오면 init save 가 동시 발생해 PK 충돌이 날 수 있다.
+     * 충돌 시 다른 스레드가 먼저 만든 row 를 다시 조회해 진행한다 (좋아요 유실 방지).
      */
     private ProductLikeStat getOrInit(Long productId) {
         return productLikeStatRepository.find(productId)
             .orElseGet(() -> {
                 Product product = productRepository.find(productId)
                     .orElseThrow(() -> new IllegalStateException("Product not found: " + productId));
-                return productLikeStatRepository.save(ProductLikeStat.init(product.getId(), product.getBrandId()));
+                try {
+                    return productLikeStatRepository.save(
+                        ProductLikeStat.init(product.getId(), product.getBrandId())
+                    );
+                } catch (DataIntegrityViolationException e) {
+                    // 다른 핸들러가 이미 init 한 경우 — 그 row 를 다시 조회해 사용
+                    return productLikeStatRepository.find(productId).orElseThrow(() -> e);
+                }
             });
     }
 }
