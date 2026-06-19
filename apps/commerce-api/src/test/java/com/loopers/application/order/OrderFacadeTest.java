@@ -12,6 +12,7 @@ import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.FakeOrderRepository;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.product.FakeProductLikeStatRepository;
 import com.loopers.domain.product.FakeProductRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
@@ -55,7 +56,7 @@ class OrderFacadeTest {
         orderRepository = new FakeOrderRepository();
         couponRepository = new FakeCouponRepository();
         userCouponRepository = new FakeUserCouponRepository();
-        ProductService productService = new ProductService(productRepository);
+        ProductService productService = new ProductService(productRepository, new FakeProductLikeStatRepository());
         OrderService orderService = new OrderService();
         CouponService couponService = new CouponService(couponRepository, userCouponRepository);
         orderFacade = new OrderFacade(orderService, productService, couponService, orderRepository);

@@ -14,11 +14,18 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductLikeStatRepository productLikeStatRepository;
 
+    /**
+     * 상품 생성 시 ProductLikeStat 도 0 으로 같이 init 한다.
+     * 신규 상품이 좋아요 정렬 쿼리에서 누락되지 않도록 보장하기 위함이다 (좋아요 0 으로 시작).
+     * 같은 트랜잭션 안이라 product 와 stat 의 원자성도 같이 보장된다.
+     */
     @Transactional
     public Product createProduct(String name, String description, Money price, Integer stock, Long brandId) {
-        Product product = Product.create(name, description, price, stock, brandId);
-        return productRepository.save(product);
+        Product product = productRepository.save(Product.create(name, description, price, stock, brandId));
+        productLikeStatRepository.save(ProductLikeStat.init(product.getId(), product.getBrandId()));
+        return product;
     }
 
     @Transactional(readOnly = true)
