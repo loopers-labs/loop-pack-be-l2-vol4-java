@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "wishlists", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_wishlist_user_product", columnNames = {"user_id", "product_id"})
+        @UniqueConstraint(name = "uq_wishlist_user_product", columnNames = {"product_id", "user_id"})
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WishlistModel extends BaseEntity {
