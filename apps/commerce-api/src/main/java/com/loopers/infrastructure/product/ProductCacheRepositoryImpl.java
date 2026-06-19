@@ -1,8 +1,10 @@
-package com.loopers.application.product;
+package com.loopers.infrastructure.product;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.product.ProductCacheRepository;
+import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.common.PageCriteria;
 import com.loopers.domain.product.ProductSort;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +20,7 @@ import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
-public class ProductCacheService {
+public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     private static final Duration DETAIL_TTL = Duration.ofMinutes(10);
     private static final Duration LIST_TTL = Duration.ofSeconds(30);
     private static final String LIST_KEYS_KEY = "product:list:keys";
@@ -26,32 +28,38 @@ public class ProductCacheService {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
 
+    @Override
     public Optional<ProductInfo> getProduct(Long productId) {
         String key = detailKey(productId);
         return get(key)
             .flatMap(value -> read(value, ProductInfo.class, key));
     }
 
+    @Override
     public void cacheProduct(ProductInfo productInfo) {
         set(detailKey(productInfo.id()), write(productInfo), DETAIL_TTL);
     }
 
+    @Override
     public Optional<List<ProductInfo>> getProducts(Long brandId, String sort, Integer page, Integer size) {
         String key = listKey(brandId, sort, page, size);
         return get(key)
             .flatMap(value -> read(value, new TypeReference<>() {}, key));
     }
 
+    @Override
     public void cacheProducts(Long brandId, String sort, Integer page, Integer size, List<ProductInfo> productInfos) {
         String key = listKey(brandId, sort, page, size);
         set(key, write(productInfos), LIST_TTL);
         runCacheCommand(() -> redisTemplate.opsForSet().add(LIST_KEYS_KEY, key));
     }
 
+    @Override
     public void evictProduct(Long productId) {
         runCacheCommand(() -> redisTemplate.delete(detailKey(productId)));
     }
 
+    @Override
     public void evictProductLists() {
         runCacheCommand(() -> {
             Set<String> keys = redisTemplate.opsForSet().members(LIST_KEYS_KEY);

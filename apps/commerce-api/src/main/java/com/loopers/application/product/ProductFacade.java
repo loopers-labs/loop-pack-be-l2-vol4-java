@@ -17,21 +17,21 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final ProductBrandProcessService productBrandProcessService;
-    private final ProductCacheService productCacheService;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
         Brand brand = brandService.getBrand(brandId);
         Product product = productService.createProduct(brandId, name, description, price, stock);
         ProductInfo productInfo = ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
-        productCacheService.evictProductLists();
-        productCacheService.cacheProduct(productInfo);
+        productCacheRepository.evictProductLists();
+        productCacheRepository.cacheProduct(productInfo);
         return productInfo;
     }
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
-        return productCacheService.getProduct(id)
+        return productCacheRepository.getProduct(id)
             .orElseGet(() -> getProductFromDb(id));
     }
 
@@ -39,7 +39,7 @@ public class ProductFacade {
         Product product = productService.getProduct(id);
         Brand brand = brandService.getBrand(product.getBrandId());
         ProductInfo productInfo = ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
-        productCacheService.cacheProduct(productInfo);
+        productCacheRepository.cacheProduct(productInfo);
         return productInfo;
     }
 
@@ -49,7 +49,7 @@ public class ProductFacade {
             brandService.validateBrandExists(brandId);
         }
 
-        return productCacheService.getProducts(brandId, sort, page, size)
+        return productCacheRepository.getProducts(brandId, sort, page, size)
             .orElseGet(() -> getAllProductsFromDb(brandId, sort, page, size));
     }
 
@@ -60,7 +60,7 @@ public class ProductFacade {
         List<ProductInfo> productInfos = productBrandProcessService.getProductDetailViews(products, brands).stream()
             .map(ProductInfo::from)
             .toList();
-        productCacheService.cacheProducts(brandId, sort, page, size, productInfos);
+        productCacheRepository.cacheProducts(brandId, sort, page, size, productInfos);
         return productInfos;
     }
 
@@ -69,16 +69,16 @@ public class ProductFacade {
         Product product = productService.updateProduct(id, name, description, price, stock);
         Brand brand = brandService.getBrand(product.getBrandId());
         ProductInfo productInfo = ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
-        productCacheService.evictProduct(id);
-        productCacheService.evictProductLists();
-        productCacheService.cacheProduct(productInfo);
+        productCacheRepository.evictProduct(id);
+        productCacheRepository.evictProductLists();
+        productCacheRepository.cacheProduct(productInfo);
         return productInfo;
     }
 
     @Transactional
     public void deleteProduct(Long id) {
         productService.deleteProduct(id);
-        productCacheService.evictProduct(id);
-        productCacheService.evictProductLists();
+        productCacheRepository.evictProduct(id);
+        productCacheRepository.evictProductLists();
     }
 }

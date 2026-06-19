@@ -1,7 +1,7 @@
 package com.loopers.application.like;
 
+import com.loopers.application.product.ProductCacheRepository;
 import com.loopers.application.product.ProductInfo;
-import com.loopers.application.product.ProductCacheService;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.ProductLike;
@@ -25,7 +25,7 @@ public class ProductLikeFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final ProductBrandProcessService productBrandProcessService;
-    private final ProductCacheService productCacheService;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional
     public void likeProduct(String userLoginId, Long productId) {
@@ -33,8 +33,8 @@ public class ProductLikeFacade {
         boolean created = productLikeService.likeProduct(userLoginId, product);
         if (created) {
             productService.saveProducts(List.of(product));
-            productCacheService.evictProduct(productId);
-            productCacheService.evictProductLists();
+            productCacheRepository.evictProduct(productId);
+            productCacheRepository.evictProductLists();
         }
     }
 
@@ -44,8 +44,8 @@ public class ProductLikeFacade {
         boolean deleted = productLikeService.unlikeProduct(userLoginId, product);
         if (deleted) {
             productService.saveProducts(List.of(product));
-            productCacheService.evictProduct(productId);
-            productCacheService.evictProductLists();
+            productCacheRepository.evictProduct(productId);
+            productCacheRepository.evictProductLists();
         }
     }
 
