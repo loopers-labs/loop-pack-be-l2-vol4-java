@@ -21,7 +21,8 @@ import java.math.BigDecimal;
 @Table(
         name = "product",
         indexes = {
-                @Index(name = "idx_product_brand_like_count_id", columnList = "brand_id, like_count DESC, id DESC")
+                @Index(name = "idx_product_brand_like_count_id", columnList = "brand_id, like_count DESC, id DESC"),
+                @Index(name = "idx_product_like_count_id", columnList = "like_count DESC, id DESC")
         }
 )
 public class ProductModel extends BaseSoftDeleteEntity {
