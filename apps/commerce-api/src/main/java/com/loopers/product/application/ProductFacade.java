@@ -7,7 +7,6 @@ import com.loopers.shared.pagination.PageQuery;
 import com.loopers.shared.pagination.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
@@ -16,7 +15,6 @@ public class ProductFacade {
     private final ProductListQuery productListQuery;
     private final ProductDetailQuery productDetailQuery;
 
-    @Transactional(readOnly = true)
     public PageResult<ProductListInfo> getProducts(int page, int size, Long brandId, String sort) {
         return productListQuery.findVisibleProducts(
             new PageQuery(page, size),
@@ -25,7 +23,6 @@ public class ProductFacade {
         );
     }
 
-    @Transactional(readOnly = true)
     public ProductDetailInfo getProduct(Long productId) {
         return productDetailQuery.findVisibleProduct(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다."));
