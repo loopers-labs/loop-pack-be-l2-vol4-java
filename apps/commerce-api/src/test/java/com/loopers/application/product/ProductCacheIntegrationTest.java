@@ -72,12 +72,12 @@ class ProductCacheIntegrationTest {
     @Test
     void list_evicted_afterCreateProduct() {
         createProduct("상품A", 100_000L, 10);
-        List<ProductListItemInfo> first = productFacade.getProducts(null, ProductSortType.LATEST, 0, 20, null);
-        int before = first.size();
+        ProductListResult first = productFacade.getProducts(null, ProductSortType.LATEST, null, 20, null);
+        int before = first.items().size();
 
         createProduct("상품B", 100_000L, 10);                      // evictListForNewProduct
 
-        List<ProductListItemInfo> second = productFacade.getProducts(null, ProductSortType.LATEST, 0, 20, null);
-        assertThat(second).hasSize(before + 1);                    // 무효화 → 새 상품 반영
+        ProductListResult second = productFacade.getProducts(null, ProductSortType.LATEST, null, 20, null);
+        assertThat(second.items()).hasSize(before + 1);            // 무효화 → 새 상품 반영
     }
 }

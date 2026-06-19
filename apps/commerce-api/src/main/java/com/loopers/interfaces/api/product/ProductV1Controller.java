@@ -2,13 +2,12 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductListResult;
 import com.loopers.application.user.UserFacade;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -57,21 +56,18 @@ public class ProductV1Controller {
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductListItemResponse>> getProducts(
+    public ApiResponse<ProductV1Dto.ProductListPageResponse> getProducts(
         @RequestParam(value = "brandId", required = false) Long brandId,
         @RequestParam(value = "sort", defaultValue = "LATEST") ProductSortType sort,
-        @RequestParam(value = "page", defaultValue = "0") int page,
+        @RequestParam(value = "cursor", required = false) String cursor,
         @RequestParam(value = "size", defaultValue = "20") int size,
         @RequestHeader(value = "X-Loopers-LoginId", required = false) String loginId,
         @RequestHeader(value = "X-Loopers-LoginPw", required = false) String loginPw
     ) {
         // 식별된 User만 각 상품의 좋아요 여부를 본다. 헤더 없으면 Guest(liked=false).
         Long userId = (loginId != null && loginPw != null) ? userFacade.authenticate(loginId, loginPw) : null;
-        List<ProductV1Dto.ProductListItemResponse> responses =
-            productFacade.getProducts(brandId, sort, page, size, userId).stream()
-                .map(ProductV1Dto.ProductListItemResponse::from)
-                .toList();
-        return ApiResponse.success(responses);
+        ProductListResult result = productFacade.getProducts(brandId, sort, cursor, size, userId);
+        return ApiResponse.success(ProductV1Dto.ProductListPageResponse.from(result));
     }
 
     @PutMapping("/{productId}")

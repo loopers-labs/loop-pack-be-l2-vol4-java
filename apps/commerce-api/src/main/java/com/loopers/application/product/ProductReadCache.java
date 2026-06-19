@@ -17,7 +17,7 @@ import java.util.List;
  * <p>캐시 적용은 프록시 기반(AOP)이라 같은 빈 내부 호출은 동작하지 않으므로, 캐시 진입점을 별도 빈으로
  * 분리해 Facade가 외부 호출하게 한다. liked 조합은 캐시 밖(Facade)에서 한다 — 여기엔 사용자 무관 데이터만.
  *
- * <p>키 설계: 상세 {@code product:detail::{id}}, 목록 {@code product:list::{brandId}:{sort}:{page}:{size}}.
+ * <p>키 설계: 상세 {@code product:detail::{id}}, 목록 {@code product:list::{brandId}:{sort}:{cursor}:{size}}.
  * 무효화: 상세는 단건 키 정밀 evict, 목록은 페이지↔상품 역추적이 어려워 allEntries evict(보수적) + 짧은 TTL.
  */
 @Component
@@ -32,9 +32,9 @@ public class ProductReadCache {
     }
 
     @Cacheable(cacheNames = CacheConfig.PRODUCT_LIST,
-            key = "#brandId + ':' + #sort + ':' + #page + ':' + #size")
-    public List<CachedProductListItem> getList(Long brandId, ProductSortType sort, int page, int size) {
-        return productQueryService.getProductList(brandId, sort, page, size).stream()
+            key = "#brandId + ':' + #sort + ':' + #cursor + ':' + #size")
+    public List<CachedProductListItem> getList(Long brandId, ProductSortType sort, String cursor, int size) {
+        return productQueryService.getProductList(brandId, sort, cursor, size).stream()
                 .map(CachedProductListItem::from)
                 .toList();
     }

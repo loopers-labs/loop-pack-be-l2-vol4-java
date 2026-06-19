@@ -45,8 +45,8 @@ public class ProductQueryService {
      * 브랜드명은 한 번의 batch 조회(IN)로 채워 N+1을 피한다. 좋아요 여부는 Facade가 별도 batch 조합한다.
      */
     @Transactional(readOnly = true)
-    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, int page, int size) {
-        List<ProductModel> products = productService.getProducts(brandId, sort, page, size);
+    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, String cursor, int size) {
+        List<ProductModel> products = productService.getProducts(brandId, sort, cursor, size);
 
         List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
         Map<Long, String> brandNames = brandService.findByIds(brandIds).stream()

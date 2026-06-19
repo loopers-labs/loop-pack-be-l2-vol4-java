@@ -1,7 +1,9 @@
 package com.loopers.domain.product;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.page.ProductCursorCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,7 +36,7 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productRepository = mock(ProductRepository.class);
-        productService = new ProductService(productRepository);
+        productService = new ProductService(productRepository, new ProductCursorCodec(new ObjectMapper()));
     }
 
     private static ProductModel active(Long id, long likes) {
