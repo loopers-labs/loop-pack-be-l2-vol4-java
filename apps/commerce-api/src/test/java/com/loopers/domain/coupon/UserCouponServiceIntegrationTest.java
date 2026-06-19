@@ -170,10 +170,10 @@ class UserCouponServiceIntegrationTest {
             CouponModel coupon = saveValidCoupon();
             sut.issue(coupon.getId(), USER_ID);
 
-            Page<UserCouponModel> result = sut.getListByCouponId(coupon.getId(), PageRequest.of(0, 20));
+            Page<UserCouponIssue> result = sut.getListByCouponId(coupon.getId(), PageRequest.of(0, 20));
 
             assertThat(result.getTotalElements()).isEqualTo(1);
-            assertThat(result.getContent().get(0).getUserId()).isEqualTo(USER_ID);
+            assertThat(result.getContent().get(0).userId()).isEqualTo(USER_ID);
         }
 
         @DisplayName("발급 내역이 없으면, 빈 페이지를 반환한다.")
@@ -181,7 +181,7 @@ class UserCouponServiceIntegrationTest {
         void returnsEmptyPage_whenNoIssuesExist() {
             CouponModel coupon = saveValidCoupon();
 
-            Page<UserCouponModel> result = sut.getListByCouponId(coupon.getId(), PageRequest.of(0, 20));
+            Page<UserCouponIssue> result = sut.getListByCouponId(coupon.getId(), PageRequest.of(0, 20));
 
             assertThat(result.getTotalElements()).isZero();
         }
