@@ -2,6 +2,7 @@ package com.loopers.infrastructure.productrank;
 
 import com.loopers.domain.productrank.ProductRank;
 import com.loopers.domain.productrank.ProductRankRepository;
+import com.loopers.domain.productrank.RankedProduct;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +19,8 @@ public class ProductRankRepositoryImpl implements ProductRankRepository {
     private final EntityManager em;
 
     @Override
-    public List<Long> findIdsByBrandLikesDesc(Long brandId, Long lastLikeCount, Long lastProductId, int limit) {
-        StringBuilder sql = new StringBuilder("SELECT product_id FROM product_rank WHERE 1 = 1");
+    public List<RankedProduct> findRankedByBrandLikesDesc(Long brandId, Long lastLikeCount, Long lastProductId, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT product_id, like_count FROM product_rank WHERE 1 = 1");
         if (brandId != null) {
             sql.append(" AND brand_id = :brandId");
         }
@@ -39,8 +40,10 @@ public class ProductRankRepositoryImpl implements ProductRankRepository {
         query.setMaxResults(limit);
 
         @SuppressWarnings("unchecked")
-        List<Number> rows = query.getResultList();
-        return rows.stream().map(Number::longValue).toList();
+        List<Object[]> rows = query.getResultList();
+        return rows.stream()
+            .map(row -> new RankedProduct(((Number) row[0]).longValue(), ((Number) row[1]).longValue()))
+            .toList();
     }
 
     @Override
@@ -48,5 +51,18 @@ public class ProductRankRepositoryImpl implements ProductRankRepository {
     public void replaceAll(List<ProductRank> ranks) {
         jpa.deleteAllInBatch();
         jpa.saveAll(ranks);
+    }
+
+    @Override
+    @Transactional
+    public void rebuildFromSource() {
+        em.createNativeQuery("DELETE FROM product_rank").executeUpdate();
+        em.createNativeQuery("""
+            INSERT INTO product_rank (product_id, brand_id, like_count, created_at, updated_at)
+            SELECT p.id, p.brand_id, COALESCE(plc.like_count, 0), NOW(), NOW()
+            FROM product p
+            LEFT JOIN product_like_count plc ON plc.product_id = p.id
+            WHERE p.deleted_at IS NULL
+            """).executeUpdate();
     }
 }

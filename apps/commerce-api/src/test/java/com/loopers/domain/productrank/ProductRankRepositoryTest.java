@@ -22,6 +22,10 @@ class ProductRankRepositoryTest {
         databaseCleanUp.truncateAllTables();
     }
 
+    private List<Long> ids(List<RankedProduct> ranked) {
+        return ranked.stream().map(RankedProduct::productId).toList();
+    }
+
     @DisplayName("키셋이 likes_desc 순서로 중복 없이 페이지를 넘긴다")
     @Test
     void keyset_returns_likes_desc_and_pages_without_dup() {
@@ -33,12 +37,12 @@ class ProductRankRepositoryTest {
         ));
 
         // 1페이지: 상위 2개 — 50(id1), 그다음 like 30 동률은 product_id DESC 라 id3 먼저
-        List<Long> page1 = repository.findIdsByBrandLikesDesc(7L, null, null, 2);
-        assertThat(page1).containsExactly(1L, 3L);
+        List<RankedProduct> page1 = repository.findRankedByBrandLikesDesc(7L, null, null, 2);
+        assertThat(ids(page1)).containsExactly(1L, 3L);
 
         // 2페이지: 커서=(30, 3) 다음부터
-        List<Long> page2 = repository.findIdsByBrandLikesDesc(7L, 30L, 3L, 2);
-        assertThat(page2).containsExactly(2L, 4L);
+        List<RankedProduct> page2 = repository.findRankedByBrandLikesDesc(7L, 30L, 3L, 2);
+        assertThat(ids(page2)).containsExactly(2L, 4L);
     }
 
     @DisplayName("brandId 가 null 이면 무필터 전체에서 정렬한다")
@@ -49,7 +53,8 @@ class ProductRankRepositoryTest {
             new ProductRank(2L, 8L, 99L)
         ));
 
-        List<Long> top = repository.findIdsByBrandLikesDesc(null, null, null, 1);
-        assertThat(top).containsExactly(2L);
+        List<RankedProduct> top = repository.findRankedByBrandLikesDesc(null, null, null, 1);
+        assertThat(ids(top)).containsExactly(2L);
+        assertThat(top.get(0).likeCount()).isEqualTo(99L);
     }
 }
