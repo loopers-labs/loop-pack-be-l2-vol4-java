@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -14,7 +15,19 @@ import lombok.Getter;
 
 @Getter
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    indexes = {
+        // 브랜드 필터 + 정렬 3종
+        @Index(name = "idx_products_brand_likes",   columnList = "brand_id, like_count DESC"),
+        @Index(name = "idx_products_brand_price",   columnList = "brand_id, price"),
+        @Index(name = "idx_products_brand_created", columnList = "brand_id, created_at DESC"),
+        // 브랜드 필터 없음 + 정렬 (deleted_at 제외 — 5% 삭제율에서 post-filter가 더 빠름)
+        @Index(name = "idx_products_likes",         columnList = "like_count DESC"),
+        @Index(name = "idx_products_created",       columnList = "created_at DESC"),
+        @Index(name = "idx_products_price",         columnList = "price"),
+    }
+)
 public class ProductModel extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
