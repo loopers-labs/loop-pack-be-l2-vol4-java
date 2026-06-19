@@ -100,9 +100,78 @@ mysql -h 127.0.0.1 -P 3306 -u application -papplication loopers \
 | `brandId + latest` | AS-IS | table scan 100,000 rows, sort, actual time 약 23.4ms |
 | `brandId + latest` | TO-BE | index lookup 20 rows, actual time 약 0.077ms |
 
+## Cache / HTTP 부하 측정
+
+캐시는 DB 실행 계획이 없으므로 `EXPLAIN`이 아니라 HTTP 응답 시간, 처리량, Redis/MySQL 카운터, Actuator 지표로 확인했다.
+
+측정 조건:
+
+- 실행 방식: `./gradlew :apps:commerce-api:bootRun`
+- 데이터: 상품 100,000건, 브랜드 100건
+- 대상 API: `GET /api/v1/products?brandId=42&sort=likes_desc&page=0&size=20`
+- 부하 도구: ApacheBench `ab -n 1000 -c 20`
+- 모니터링: `/actuator/prometheus`, Redis `INFO stats`, MySQL `SHOW GLOBAL STATUS`
+
+### Cold Cache
+
+Redis를 매 요청 전에 `FLUSHALL`하고 30회 단건 요청을 측정했다.
+
+| count | min | avg | p50 | p95 | max |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 30 | 8.45ms | 20.27ms | 9.77ms | 24.24ms | 297.09ms |
+
+`max`는 로컬 환경의 일시적 outlier로 보고, 비교 판단은 p50/p95를 우선 본다.
+
+### Warm Cache
+
+Redis를 비운 뒤 1회 prewarm 요청으로 목록 캐시를 생성하고, 같은 API에 `ab -n 1000 -c 20`을 실행했다.
+
+| 지표 | 결과 |
+| --- | ---: |
+| Complete requests | 1,000 |
+| Failed requests | 0 |
+| Requests per second | 2,561.72 req/s |
+| Time per request | 7.807ms |
+| p50 | 6ms |
+| p95 | 14ms |
+| p99 | 29ms |
+| Actuator server-side avg | 6.023ms |
+
+### Cache Hit / DB 부하 확인
+
+Warm cache 부하 구간의 카운터 변화:
+
+| 카운터 | 변화 |
+| --- | ---: |
+| Redis `keyspace_hits` | +1,000 |
+| Redis `keyspace_misses` | +0 |
+| MySQL `Com_select` | +5 |
+
+초기 측정에서는 Redis hit가 1,000건 발생해도 MySQL `Com_select`가 약 1,000건 증가했다.
+원인은 상품 목록 캐시 확인 전에 `brandService.validateBrandExists(brandId)`를 매번 호출하던 흐름이었다.
+캐시 hit 시에는 캐시된 목록 자체가 이미 유효한 브랜드 조건으로 만들어진 결과이므로, 캐시를 먼저 확인하고 miss일 때만 브랜드 존재 검증과 DB 조회를 수행하도록 보강했다.
+
+보강 후에는 warm cache 요청 1,000건에서 Redis hit가 1,000건 발생했고 MySQL select 증가는 5건 수준으로 줄었다.
+잔여 select는 측정/상태 확인 과정과 커넥션 관리에서 발생할 수 있는 로컬 환경 노이즈로 본다.
+
+### 서버 상태 스냅샷
+
+Warm cache 부하 직후 Actuator/Prometheus 스냅샷:
+
+| 지표 | 값 |
+| --- | ---: |
+| JVM heap used | 약 80.7MB |
+| JVM heap committed | 약 174.0MB |
+| JVM live threads | 64 |
+| Hikari active / idle / pending | 0 / 30 / 0 |
+| process CPU usage | 약 25.8% |
+| system CPU usage | 약 68.7% |
+
 ## 판단 근거
 
 - Materialized View는 이번 과제에서 Nice-To-Have다. 현재 구현은 이미 `Product.likeCount` 비정규화 구조를 갖고 있으므로, 먼저 이 구조를 인덱스와 캐시로 보강한다.
 - 상품 상세 캐시는 키가 단순해서 명시 무효화가 가능하다.
 - 상품 목록 캐시는 조건 조합이 많고 좋아요 변경에 영향을 받으므로 TTL을 짧게 둔다. 현재 구현은 변경 이벤트에서 추적 중인 목록 키를 지우지만, 운영 규모가 커지면 짧은 TTL 중심으로 무효화 범위를 줄이는 선택도 가능하다.
 - Redis 장애, 캐시 miss, 캐시 직렬화 실패는 서비스 실패가 아니라 DB 조회 fallback 또는 캐시 쓰기 skip으로 처리한다.
+- 상품/브랜드 삭제, 좋아요 변경 시 캐시는 명시적으로 무효화한다. 다만 Redis 장애로 무효화가 실패하더라도 DB 변경을 실패시키지는 않고, 짧은 목록 TTL로 stale 가능 시간을 제한한다.
+- 로컬 측정에서는 인덱스 적용 후 DB 조회 자체도 충분히 빨라, 캐시는 단건 latency보다 반복 조회의 DB 부하 흡수와 p95 안정화 측면에서 의미가 컸다.
