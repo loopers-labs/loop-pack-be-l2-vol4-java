@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
@@ -25,4 +26,8 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
     List<ProductModel> findAllByBrandId(Long brandId);
 
     Page<ProductModel> findAllByBrandId(Long brandId, Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE ProductModel p SET p.deletedAt = :deletedAt WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
+    void softDeleteAllByBrandId(@Param("brandId") Long brandId, @Param("deletedAt") ZonedDateTime deletedAt);
 }

@@ -14,7 +14,7 @@ import org.hibernate.annotations.SQLRestriction;
 public class UserModel extends BaseEntity {
 
     @Embedded
-    @AttributeOverride(name = "value", column = @Column(name = "login_id"))
+    @AttributeOverride(name = "value", column = @Column(name = "login_id", unique = true))
     private LoginId loginId;
 
     @Embedded

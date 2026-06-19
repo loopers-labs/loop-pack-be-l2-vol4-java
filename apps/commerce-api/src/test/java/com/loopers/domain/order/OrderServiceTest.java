@@ -40,9 +40,9 @@ class OrderServiceTest {
     @Nested
     class Create {
 
-        @DisplayName("유효한 입력이면 totalPrice가 계산된 OrderModel이 반환된다.")
+        @DisplayName("유효한 입력이면 originalPrice가 계산된 OrderModel이 반환된다.")
         @Test
-        void returnsOrderModel_withCalculatedTotalPrice() {
+        void returnsOrderModel_withCalculatedOriginalPrice() {
             // given
             Long userId = 1L;
             List<OrderItemData> itemDataList = List.of(
@@ -53,16 +53,16 @@ class OrderServiceTest {
 
             OrderItemModel itemA = new OrderItemModel(1L, "상품A", BigDecimal.valueOf(10000), 2L);
             OrderItemModel itemB = new OrderItemModel(2L, "상품B", BigDecimal.valueOf(5000), 1L);
-            OrderModel saved = new OrderModel(userId, expectedTotal, List.of(itemA, itemB));
+            OrderModel saved = new OrderModel(userId, expectedTotal, BigDecimal.ZERO, List.of(itemA, itemB));
             when(orderRepository.save(any(OrderModel.class))).thenReturn(saved);
 
             // when
-            OrderModel result = orderService.create(userId, itemDataList);
+            OrderModel result = orderService.create(userId, itemDataList, BigDecimal.ZERO);
 
             // then
             assertAll(
                     () -> assertThat(result.getUserId()).isEqualTo(userId),
-                    () -> assertThat(result.getTotalPrice()).isEqualByComparingTo(expectedTotal),
+                    () -> assertThat(result.getOriginalPrice()).isEqualByComparingTo(expectedTotal),
                     () -> assertThat(result.getStatus()).isEqualTo(OrderStatus.PLACED)
             );
         }
@@ -77,7 +77,7 @@ class OrderServiceTest {
         void returnsOrderModel_whenOrderExists() {
             // given
             Long orderId = 1L;
-            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000),
+            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO,
                     List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
@@ -117,7 +117,7 @@ class OrderServiceTest {
             ZoneId zone = ZoneId.of("Asia/Seoul");
             ZonedDateTime from = startAt.atStartOfDay(zone);
             ZonedDateTime to = endAt.plusDays(1).atStartOfDay(zone);
-            OrderModel order = new OrderModel(userId, BigDecimal.valueOf(10000),
+            OrderModel order = new OrderModel(userId, BigDecimal.valueOf(10000), BigDecimal.ZERO,
                     List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
             when(orderRepository.findAllByUserIdAndCreatedAtBetween(userId, from, to))
                     .thenReturn(List.of(order));
@@ -176,7 +176,7 @@ class OrderServiceTest {
         void returnsOrderModel_whenOrderExists() {
             // given
             Long orderId = 1L;
-            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000),
+            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO,
                     List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
             when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(order));
 
@@ -211,7 +211,7 @@ class OrderServiceTest {
         void returnsOrderPage_whenOrdersExist() {
             // given
             Pageable pageable = PageRequest.of(0, 20);
-            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000),
+            OrderModel order = new OrderModel(1L, BigDecimal.valueOf(10000), BigDecimal.ZERO,
                     List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
             Page<OrderModel> page = new PageImpl<>(List.of(order));
             when(orderRepository.findAll(pageable)).thenReturn(page);

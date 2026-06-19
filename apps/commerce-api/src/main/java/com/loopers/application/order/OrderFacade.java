@@ -1,5 +1,9 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.domain.coupon.CouponTemplateService;
+import com.loopers.domain.coupon.IssuedCouponModel;
+import com.loopers.domain.coupon.IssuedCouponService;
 import com.loopers.domain.order.OrderItemData;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
@@ -12,7 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,20 +31,20 @@ public class OrderFacade {
     private final ProductService productService;
     private final StockService stockService;
     private final OrderService orderService;
+    private final IssuedCouponService issuedCouponService;
+    private final CouponTemplateService couponTemplateService;
 
     public record OrderItemDto(Long productId, Long quantity) {
     }
 
     @Transactional
-    public OrderInfo createOrder(String loginId, String loginPw, List<OrderItemDto> orderItems) {
+    public OrderInfo createOrder(String loginId, String loginPw, List<OrderItemDto> orderItems, Long issuedCouponId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
 
         List<Long> productIds = orderItems.stream().map(OrderItemDto::productId).toList();
 
         Map<Long, ProductModel> productMap = productService.findAllByIdsOrThrow(productIds).stream()
                 .collect(Collectors.toMap(ProductModel::getId, p -> p));
-
-        orderItems.forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
 
         List<OrderItemData> itemDataList = orderItems.stream()
                 .map(cmd -> {
@@ -47,7 +53,24 @@ public class OrderFacade {
                 })
                 .toList();
 
-        OrderModel saved = orderService.create(user.getId(), itemDataList);
+        BigDecimal originalPrice = itemDataList.stream()
+                .map(d -> d.productPrice().multiply(BigDecimal.valueOf(d.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (issuedCouponId != null) {
+            IssuedCouponModel issued = issuedCouponService.getMyIssuedCoupon(issuedCouponId, user.getId());
+            CouponTemplateModel template = couponTemplateService.getById(issued.getCouponTemplateId());
+            template.validateApplicability(originalPrice);
+            issuedCouponService.use(issued.getId());
+            discountAmount = template.calculateDiscountAmount(originalPrice);
+        }
+
+        orderItems.stream()
+                .sorted(Comparator.comparingLong(OrderItemDto::productId))
+                .forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
+
+        OrderModel saved = orderService.create(user.getId(), itemDataList, discountAmount);
         return OrderInfo.from(saved);
     }
 

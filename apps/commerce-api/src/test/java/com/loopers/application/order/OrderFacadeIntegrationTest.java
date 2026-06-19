@@ -2,6 +2,11 @@ package com.loopers.application.order;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.IssuedCouponModel;
+import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -23,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +60,12 @@ class OrderFacadeIntegrationTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private CouponTemplateRepository couponTemplateRepository;
+
+    @Autowired
+    private IssuedCouponRepository issuedCouponRepository;
+
+    @Autowired
     private PasswordEncryptor passwordEncryptor;
 
     @Autowired
@@ -77,6 +89,15 @@ class OrderFacadeIntegrationTest {
         stockRepository.save(new StockModel(productId, quantity));
     }
 
+    private CouponTemplateModel saveTemplate(BigDecimal minOrderAmount, ZonedDateTime expiredAt) {
+        return couponTemplateRepository.save(
+                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt));
+    }
+
+    private IssuedCouponModel saveIssuedCoupon(Long couponTemplateId, Long userId) {
+        return issuedCouponRepository.save(new IssuedCouponModel(couponTemplateId, userId));
+    }
+
     @DisplayName("주문을 생성할 때,")
     @Nested
     class CreateOrder {
@@ -93,13 +114,15 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands);
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
 
             // then
             StockModel stock = stockRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                     () -> assertThat(result.status()).isEqualTo("PLACED"),
-                    () -> assertThat(result.totalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(result.originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(result.discountAmount()).isEqualByComparingTo(BigDecimal.ZERO),
+                    () -> assertThat(result.finalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
                     () -> assertThat(result.items()).hasSize(1),
                     () -> assertThat(result.items().get(0).productName()).isEqualTo("테스트 상품"),
                     () -> assertThat(result.items().get(0).productPrice()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
@@ -107,9 +130,9 @@ class OrderFacadeIntegrationTest {
             );
         }
 
-        @DisplayName("여러 상품을 주문하면 totalPrice가 각 상품의 가격 × 수량 합산으로 계산된다.")
+        @DisplayName("여러 상품을 주문하면 originalPrice가 각 상품의 가격 × 수량 합산으로 계산된다.")
         @Test
-        void calculatesTotalPrice_whenMultipleItemsOrdered() {
+        void calculatesOriginalPrice_whenMultipleItemsOrdered() {
             // given
             saveUser();
             BrandModel brand = brandRepository.save(new BrandModel("브랜드"));
@@ -123,10 +146,10 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands);
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
 
             // then
-            assertThat(result.totalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000));
+            assertThat(result.originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000));
         }
 
         @DisplayName("주문 항목에 상품 정보가 스냅샷으로 저장되어, 상품 정보 변경 후에도 주문에는 원래 값이 유지된다.")
@@ -139,7 +162,7 @@ class OrderFacadeIntegrationTest {
             List<OrderFacade.OrderItemDto> commands = List.of(
                     new OrderFacade.OrderItemDto(product.getId(), 1L)
             );
-            OrderInfo orderInfo = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands);
+            OrderInfo orderInfo = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
 
             // 상품 정보 변경
             product.update("변경된 상품명", BigDecimal.valueOf(99999));
@@ -166,7 +189,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -185,7 +208,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
 
             // then
             StockModel stock = stockRepository.findByProductId(product.getId()).orElseThrow();
@@ -211,7 +234,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            assertThrows(CoreException.class, () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands));
+            assertThrows(CoreException.class, () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
 
             // then
             StockModel stockA = stockRepository.findByProductId(productA.getId()).orElseThrow();
@@ -235,7 +258,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, "WrongPass1!", commands));
+                    () -> orderFacade.createOrder(LOGIN_ID, "WrongPass1!", commands, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -254,7 +277,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
             orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
-                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
+                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             LocalDate today = LocalDate.now();
 
@@ -273,7 +296,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
             orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
-                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
+                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             LocalDate yesterday = LocalDate.now().minusDays(1);
 
@@ -292,7 +315,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
             orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
-                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
+                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             String otherId = "other01";
             userRepository.save(new UserModel(otherId, LOGIN_PW, "다른유저", "1991-01-01", "other@example.com", Gender.FEMALE, passwordEncryptor));
@@ -319,7 +342,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
             OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
-                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
+                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             // when
             OrderInfo result = orderFacade.getOrder(LOGIN_ID, LOGIN_PW, created.id());
@@ -336,7 +359,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
             OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
-                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)));
+                    List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             String otherId = "other01";
             userRepository.save(new UserModel(otherId, LOGIN_PW, "다른유저", "1991-01-01", "other@example.com", Gender.FEMALE, passwordEncryptor));
@@ -361,6 +384,159 @@ class OrderFacadeIntegrationTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("쿠폰을 적용하여 주문을 생성할 때,")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        @DisplayName("유효한 FIXED 쿠폰을 적용하면 할인이 적용된 주문이 생성되고, 쿠폰은 USED 상태로 변경된다.")
+        @Test
+        void appliesFixedCouponDiscount_whenValidCouponProvided() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 2L)
+            );
+
+            // when
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId());
+
+            // then
+            IssuedCouponModel usedCoupon = issuedCouponRepository.findById(issued.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(result.originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(result.discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000)),
+                    () -> assertThat(result.finalPrice()).isEqualByComparingTo(BigDecimal.valueOf(19000)),
+                    () -> assertThat(orderRepository.findById(result.id())).isPresent(),
+                    () -> assertThat(usedCoupon.getStatus()).isEqualTo(com.loopers.domain.coupon.CouponStatus.USED)
+            );
+        }
+
+        @DisplayName("존재하지 않는 issuedCouponId로 주문하면 NOT_FOUND 예외가 발생하고 주문이 저장되지 않는다.")
+        @Test
+        void throwsNotFoundException_whenIssuedCouponDoesNotExist() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, 999L));
+
+            // then
+            List<OrderInfo> orders = orderFacade.getOrders(LOGIN_ID, LOGIN_PW, LocalDate.now().minusDays(1), LocalDate.now());
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND),
+                    () -> assertThat(orders).isEmpty()
+            );
+        }
+
+        @DisplayName("만료된 쿠폰을 적용하면 BAD_REQUEST 예외가 발생하고 주문이 저장되지 않는다.")
+        @Test
+        void throwsBadRequest_whenCouponIsExpired() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().minusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("최소 주문 금액 미충족 쿠폰을 적용하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenMinOrderAmountNotMet() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(5000));
+            saveStock(product.getId(), 5L);
+
+            CouponTemplateModel template = saveTemplate(BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("다른 사용자의 쿠폰을 적용하면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenCouponOwnedByAnotherUser() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+
+            String otherId = "other01";
+            UserModel otherUser = userRepository.save(new UserModel(otherId, LOGIN_PW, "다른유저", "1991-01-01", "other@example.com", Gender.FEMALE, passwordEncryptor));
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), otherUser.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+
+        @DisplayName("이미 사용된 쿠폰을 적용하면 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenCouponAlreadyUsed() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 10L);
+
+            CouponTemplateModel template = saveTemplate(null, ZonedDateTime.now().plusDays(1));
+            IssuedCouponModel issued = saveIssuedCoupon(template.getId(), user.getId());
+
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 }

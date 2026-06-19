@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +41,13 @@ public class StockService {
         StockModel stock = getByProductId(productId);
         stock.delete();
         stockRepository.save(stock);
+    }
+
+    public void softDeleteAllByProductIds(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return;
+        }
+        stockRepository.softDeleteAllByProductIdIn(productIds, ZonedDateTime.now());
     }
 
     @Transactional

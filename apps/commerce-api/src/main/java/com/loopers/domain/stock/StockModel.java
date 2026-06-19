@@ -33,6 +33,10 @@ public class StockModel extends BaseEntity {
         this.quantity = newQuantity;
     }
 
+    public boolean isInStock() {
+        return quantity > 0;
+    }
+
     private void validate(Long quantity) {
         if (quantity == null || quantity < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고 수량은 0 이상이어야 합니다.");

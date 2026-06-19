@@ -14,7 +14,8 @@ import java.util.List;
 public class OrderV1Dto {
 
     public record CreateRequest(
-            @NotEmpty @Valid List<OrderItemRequest> items
+            @NotEmpty @Valid List<OrderItemRequest> items,
+            Long couponId
     ) {
     }
 
@@ -27,7 +28,9 @@ public class OrderV1Dto {
     public record OrderResponse(
             Long id,
             String status,
-            BigDecimal totalPrice,
+            BigDecimal originalPrice,
+            BigDecimal discountAmount,
+            BigDecimal finalPrice,
             List<OrderItemResponse> items,
             ZonedDateTime createdAt
     ) {
@@ -35,7 +38,9 @@ public class OrderV1Dto {
             return new OrderResponse(
                     info.id(),
                     info.status(),
-                    info.totalPrice(),
+                    info.originalPrice(),
+                    info.discountAmount(),
+                    info.finalPrice(),
                     info.items().stream().map(OrderItemResponse::from).toList(),
                     info.createdAt()
             );

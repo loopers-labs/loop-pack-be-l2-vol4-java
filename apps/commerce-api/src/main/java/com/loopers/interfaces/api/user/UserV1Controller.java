@@ -1,11 +1,13 @@
 package com.loopers.interfaces.api.user;
 
+import com.loopers.application.coupon.CouponFacade;
 import com.loopers.application.like.LikeFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.application.user.UserInfo;
 import com.loopers.domain.user.UserService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.coupon.CouponV1Dto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +28,7 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     private final UserService userService;
     private final LikeFacade likeFacade;
+    private final CouponFacade couponFacade;
 
     @PostMapping
     @Override
@@ -60,6 +63,17 @@ public class UserV1Controller implements UserV1ApiSpec {
     ) {
         userService.changePassword(loginId, loginPw, request.oldPassword(), request.newPassword());
         return ApiResponse.success(null);
+    }
+
+    @GetMapping("/me/coupons")
+    @Override
+    public ApiResponse<List<CouponV1Dto.MyIssuedCouponResponse>> getMyCoupons(
+            @RequestHeader(AuthHeaders.LOGIN_ID) String loginId,
+            @RequestHeader(AuthHeaders.LOGIN_PW) String loginPw
+    ) {
+        return ApiResponse.success(couponFacade.getMyIssuedCoupons(loginId, loginPw).stream()
+                .map(CouponV1Dto.MyIssuedCouponResponse::from)
+                .toList());
     }
 
     @GetMapping("/{userId}/likes")
