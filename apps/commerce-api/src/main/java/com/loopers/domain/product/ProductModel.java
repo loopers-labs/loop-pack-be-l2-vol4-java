@@ -14,12 +14,10 @@ import java.math.BigDecimal;
 @Getter
 @Entity
 @Table(name = "product", indexes = {
-    @Index(name = "idx_product_deleted_at_created_at", columnList = "deleted_at, created_at"),
-    @Index(name = "idx_product_deleted_at_price",      columnList = "deleted_at, price"),
-    @Index(name = "idx_product_deleted_at_like_count", columnList = "deleted_at, like_count"),
-    @Index(name = "idx_product_brand_id_deleted_at_created_at", columnList = "brand_id, deleted_at, created_at"),
-    @Index(name = "idx_product_brand_id_deleted_at_price",      columnList = "brand_id, deleted_at, price"),
-    @Index(name = "idx_product_brand_id_deleted_at_like_count", columnList = "brand_id, deleted_at, like_count")
+    @Index(name = "idx_product_deleted_at",       columnList = "deleted_at"),
+    @Index(name = "idx_product_deleted_at_price", columnList = "deleted_at, price"),
+    @Index(name = "idx_product_brand_id_deleted_at",       columnList = "brand_id, deleted_at"),
+    @Index(name = "idx_product_brand_id_deleted_at_price", columnList = "brand_id, deleted_at, price")
 })
 @SQLRestriction("deleted_at IS NULL")
 public class ProductModel extends BaseEntity {
@@ -27,7 +25,6 @@ public class ProductModel extends BaseEntity {
     private Long brandId;
     private String name;
     private BigDecimal price;
-    private Long likeCount;
 
     protected ProductModel() {
     }
@@ -38,7 +35,6 @@ public class ProductModel extends BaseEntity {
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.likeCount = 0L;
     }
 
     public void update(String newName, BigDecimal newPrice) {

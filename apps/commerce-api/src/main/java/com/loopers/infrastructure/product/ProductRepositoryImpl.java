@@ -77,16 +77,6 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public void increaseLikeCount(Long id) {
-        productJpaRepository.increaseLikeCount(id);
-    }
-
-    @Override
-    public void decreaseLikeCount(Long id) {
-        productJpaRepository.decreaseLikeCount(id);
-    }
-
-    @Override
     public void softDeleteAllByBrandId(Long brandId, ZonedDateTime deletedAt) {
         productJpaRepository.softDeleteAllByBrandId(brandId, deletedAt);
     }
@@ -94,10 +84,9 @@ public class ProductRepositoryImpl implements ProductRepository {
     private OrderSpecifier<?>[] toOrderSpecifiers(Sort sort, QProductModel product) {
         return sort.stream()
             .map(order -> (OrderSpecifier<?>) switch (order.getProperty()) {
-                case "createdAt" -> order.isDescending() ? product.createdAt.desc() : product.createdAt.asc();
+                case "id" -> order.isDescending() ? product.id.desc() : product.id.asc();
                 case "price" -> order.isDescending() ? product.price.desc() : product.price.asc();
-                case "likeCount" -> order.isDescending() ? product.likeCount.desc() : product.likeCount.asc();
-                default -> product.createdAt.desc();
+                default -> product.id.desc();
             })
             .toArray(OrderSpecifier[]::new);
     }

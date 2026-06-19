@@ -8,7 +8,7 @@ import static org.springframework.data.domain.Sort.Direction.DESC;
 public enum SortType {
     LATEST {
         @Override
-        public Sort toSort() { return Sort.by(DESC, "createdAt"); }
+        public Sort toSort() { return Sort.by(DESC, "id"); }
     },
     PRICE_ASC {
         @Override
