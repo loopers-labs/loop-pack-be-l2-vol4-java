@@ -180,10 +180,12 @@ support/error
 - 현재 구조는 순수 4-tier layered architecture가 아니라 DDD + Ports & Adapters 기준으로 본다.
 - API 유스케이스 호출 흐름은 `interfaces -> application -> domain -> repository port -> infrastructure adapter`로 표현한다.
 - 소스 import 의존 방향은 `interfaces -> application -> domain`, `infrastructure -> domain`이다.
+- 캐시, 메시징, 외부 API처럼 application 유스케이스가 소유한 outbound port는 `application`에 둘 수 있고, 이 경우 infrastructure adapter는 해당 application port를 import해 구현할 수 있다.
 - `domain`은 `infrastructure` 구현체, Spring Data JPA, `*JpaEntity`를 import하지 않는다.
 - `infrastructure`는 domain Repository port 구현과 domain 객체-`*JpaEntity` 매핑을 위해 `domain`을 import할 수 있다.
 - 다이어그램의 `*Repository -> *RepositoryImpl` 화살표는 소스 import가 아니라 port-adapter binding을 의미한다.
 - `interfaces -> domain` 직접 참조는 허용한다.
+- 상태 변경 이후 캐시 무효화, 이벤트 발행, 알림, 감사 로그처럼 application 레벨 부수효과가 필요한 command API는 Controller에서 Domain Service를 직접 호출하지 않고 Facade를 경유한다.
 
 ### 에러 처리
 
