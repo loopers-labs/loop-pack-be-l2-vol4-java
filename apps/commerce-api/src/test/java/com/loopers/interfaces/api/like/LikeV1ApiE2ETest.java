@@ -10,6 +10,7 @@ import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
+import com.loopers.application.like.LikeOutboxProcessor;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
@@ -42,6 +43,9 @@ class LikeV1ApiE2ETest {
 
     @Autowired
     private TestRestTemplate testRestTemplate;
+
+    @Autowired
+    private LikeOutboxProcessor likeOutboxProcessor;
 
     @Autowired
     private UserRepository userRepository;
@@ -96,6 +100,7 @@ class LikeV1ApiE2ETest {
                 authHeaderEntity(LOGIN_ID, LOGIN_PW),
                 responseType
             );
+            likeOutboxProcessor.process();
 
             // then
             ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
@@ -121,6 +126,7 @@ class LikeV1ApiE2ETest {
                 authHeaderEntity(LOGIN_ID, LOGIN_PW),
                 Void.class
             );
+            likeOutboxProcessor.process();
 
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
@@ -130,6 +136,7 @@ class LikeV1ApiE2ETest {
                 authHeaderEntity(LOGIN_ID, LOGIN_PW),
                 responseType
             );
+            likeOutboxProcessor.process();
 
             // then
             ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
@@ -236,6 +243,7 @@ class LikeV1ApiE2ETest {
                 authHeaderEntity(LOGIN_ID, LOGIN_PW),
                 Void.class
             );
+            likeOutboxProcessor.process();
 
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
@@ -245,6 +253,7 @@ class LikeV1ApiE2ETest {
                 authHeaderEntity(LOGIN_ID, LOGIN_PW),
                 responseType
             );
+            likeOutboxProcessor.process();
 
             // then
             ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();

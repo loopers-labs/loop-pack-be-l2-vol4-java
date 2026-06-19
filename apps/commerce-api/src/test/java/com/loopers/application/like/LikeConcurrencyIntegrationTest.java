@@ -36,6 +36,9 @@ class LikeConcurrencyIntegrationTest {
     private LikeFacade likeFacade;
 
     @Autowired
+    private LikeOutboxProcessor likeOutboxProcessor;
+
+    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -96,6 +99,7 @@ class LikeConcurrencyIntegrationTest {
         startGate.countDown();
         done.await();
         executor.shutdown();
+        likeOutboxProcessor.process();
 
         // then
         Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
@@ -124,6 +128,7 @@ class LikeConcurrencyIntegrationTest {
         for (String loginId : loginIds) {
             likeFacade.like(loginId, LOGIN_PW, productId);
         }
+        likeOutboxProcessor.process();
 
         // when
         CountDownLatch startGate = new CountDownLatch(1);
@@ -145,6 +150,7 @@ class LikeConcurrencyIntegrationTest {
         startGate.countDown();
         done.await();
         executor.shutdown();
+        likeOutboxProcessor.process();
 
         // then
         Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();

@@ -42,6 +42,9 @@ class LikeFacadeIntegrationTest {
     private LikeFacade likeFacade;
 
     @Autowired
+    private LikeOutboxProcessor likeOutboxProcessor;
+
+    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
@@ -164,6 +167,7 @@ class LikeFacadeIntegrationTest {
 
             // when
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(1L);
@@ -175,9 +179,11 @@ class LikeFacadeIntegrationTest {
             // given
             Long productId = createProduct();
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // when
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(1L);
@@ -209,9 +215,11 @@ class LikeFacadeIntegrationTest {
             // given
             Long productId = createProduct();
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // when
             likeFacade.unlike(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(0L);
@@ -225,6 +233,7 @@ class LikeFacadeIntegrationTest {
 
             // when
             likeFacade.unlike(LOGIN_ID, LOGIN_PW, productId);
+            likeOutboxProcessor.process();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(0L);
