@@ -6,7 +6,6 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,13 +16,13 @@ public class BrandProductDeleteService {
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
 
-    @Transactional
-    public void deleteBrand(Long brandId) {
+    public BrandProductDeleteResult deleteBrand(Long brandId) {
         Brand brand = getBrand(brandId);
         List<Product> products = productRepository.findAllByBrandId(brandId);
         deleteBrandWithProducts(brand, products);
         brandRepository.save(brand);
         products.forEach(productRepository::save);
+        return new BrandProductDeleteResult(brand, products);
     }
 
     public void deleteBrandWithProducts(Brand brand, List<Product> products) {
