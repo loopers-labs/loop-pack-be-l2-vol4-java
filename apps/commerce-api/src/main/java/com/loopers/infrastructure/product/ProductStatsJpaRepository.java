@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.product;
 
+import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductStatsModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -11,7 +12,7 @@ import java.util.Optional;
 
 public interface ProductStatsJpaRepository extends JpaRepository<ProductStatsModel, Long> {
 
-    Optional<ProductStatsModel> findByProductId(Long productId);
+    Optional<ProductStatsModel> findByProduct(ProductModel product);
 
     List<ProductStatsModel> findAllByProductIdIn(List<Long> productIds);
 

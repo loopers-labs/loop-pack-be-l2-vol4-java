@@ -98,7 +98,7 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(persistedStats.getLikeCount()).isEqualTo(1L)
@@ -132,7 +132,7 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(persistedStats.getLikeCount()).isEqualTo(1L)
@@ -247,7 +247,7 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(persistedStats.getLikeCount()).isEqualTo(0L)
@@ -275,7 +275,7 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProduct(product).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                 () -> assertThat(persistedStats.getLikeCount()).isEqualTo(0L)

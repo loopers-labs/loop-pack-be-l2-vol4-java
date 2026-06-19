@@ -31,7 +31,7 @@ abstract class ProductStatsRepositoryContractTest {
         repository().decreaseLikeCount(product.getId());
 
         // then
-        ProductStatsModel found = repository().findByProductId(product.getId()).orElseThrow();
+        ProductStatsModel found = repository().findByProduct(product).orElseThrow();
         assertAll(
                 () -> assertThat(found.getLikeCount()).isEqualTo(0L),
                 () -> assertThat(found.getLikeCount()).isGreaterThanOrEqualTo(0L)

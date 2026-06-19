@@ -98,7 +98,8 @@ class LikeFacadeIntegrationTest {
     }
 
     private Long likeCountOf(Long productId) {
-        return productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
+        ProductModel product = productRepository.find(productId).orElseThrow();
+        return productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
     }
 
     @DisplayName("좋아요 상품 목록을 조회할 때,")

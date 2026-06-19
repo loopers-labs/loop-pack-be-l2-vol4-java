@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.domain.user.Gender;
@@ -53,6 +55,7 @@ class UserV1ApiE2ETest {
     private final UserRepository userRepository;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final ProductStatsRepository productStatsRepository;
     private final StockRepository stockRepository;
     private final CouponTemplateRepository couponTemplateRepository;
     private final IssuedCouponRepository issuedCouponRepository;
@@ -65,6 +68,7 @@ class UserV1ApiE2ETest {
         UserRepository userRepository,
         BrandRepository brandRepository,
         ProductRepository productRepository,
+        ProductStatsRepository productStatsRepository,
         StockRepository stockRepository,
         CouponTemplateRepository couponTemplateRepository,
         IssuedCouponRepository issuedCouponRepository,
@@ -75,6 +79,7 @@ class UserV1ApiE2ETest {
         this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
+        this.productStatsRepository = productStatsRepository;
         this.stockRepository = stockRepository;
         this.couponTemplateRepository = couponTemplateRepository;
         this.issuedCouponRepository = issuedCouponRepository;
@@ -281,6 +286,7 @@ class UserV1ApiE2ETest {
             ));
             BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
             ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            productStatsRepository.save(new ProductStatsModel(product));
             stockRepository.save(new StockModel(product.getId(), 10L));
             testRestTemplate.exchange(
                 "/api/v1/products/" + product.getId() + "/likes",

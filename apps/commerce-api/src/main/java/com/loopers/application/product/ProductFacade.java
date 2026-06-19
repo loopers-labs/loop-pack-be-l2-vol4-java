@@ -36,7 +36,7 @@ public class ProductFacade {
         ProductModel product = productService.getById(id);
         BrandModel brand = brandService.getById(product.getBrandId());
         StockModel stock = stockService.getByProductId(id);
-        ProductStatsModel stats = productStatsService.getByProductId(id);
+        ProductStatsModel stats = productStatsService.getByProduct(product);
         return ProductInfo.from(product, brand, stock, stats);
     }
 
@@ -71,7 +71,7 @@ public class ProductFacade {
         ProductModel product = productService.getById(id);
         BrandModel brand = brandService.getById(product.getBrandId());
         StockModel stock = stockService.getByProductId(id);
-        ProductStatsModel stats = productStatsService.getByProductId(id);
+        ProductStatsModel stats = productStatsService.getByProduct(product);
         return ProductAdminInfo.from(product, brand, stock, stats);
     }
 
@@ -80,7 +80,7 @@ public class ProductFacade {
         BrandModel brand = brandService.getById(brandId);
         ProductModel product = productService.create(brandId, name, price);
         StockModel stock = stockService.create(product.getId(), stockQuantity);
-        ProductStatsModel stats = productStatsService.getByProductId(product.getId());
+        ProductStatsModel stats = productStatsService.getByProduct(product);
         return ProductAdminInfo.from(product, brand, stock, stats);
     }
 
@@ -89,7 +89,7 @@ public class ProductFacade {
         ProductModel product = productService.update(id, name, price);
         StockModel stock = stockService.update(id, stockQuantity);
         BrandModel brand = brandService.getById(product.getBrandId());
-        ProductStatsModel stats = productStatsService.getByProductId(id);
+        ProductStatsModel stats = productStatsService.getByProduct(product);
         return ProductAdminInfo.from(product, brand, stock, stats);
     }
 

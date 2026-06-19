@@ -4,6 +4,8 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.interfaces.api.product.SortType;
@@ -44,6 +46,9 @@ class ProductFacadeIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private ProductStatsRepository productStatsRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -56,7 +61,9 @@ class ProductFacadeIntegrationTest {
     }
 
     private ProductModel saveProduct(Long brandId, String name, BigDecimal price) {
-        return productRepository.save(new ProductModel(brandId, name, price));
+        ProductModel product = productRepository.save(new ProductModel(brandId, name, price));
+        productStatsRepository.save(new ProductStatsModel(product));
+        return product;
     }
 
     private void saveStock(Long productId, Long quantity) {
@@ -248,6 +255,21 @@ class ProductFacadeIntegrationTest {
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("상품이 삭제되면 product_stats도 함께 soft delete된다.")
+        @Test
+        void softDeletesProductStats_whenProductIsDeleted() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "상품", BigDecimal.valueOf(100000));
+            saveStock(product.getId(), 10L);
+
+            // when
+            productFacade.deleteProduct(product.getId());
+
+            // then - @SQLRestriction으로 인해 soft delete된 stats는 조회되지 않음
+            assertThat(productStatsRepository.findByProduct(product)).isEmpty();
         }
     }
 

@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.product;
 
+import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.product.QProductStatsModel;
@@ -26,8 +27,8 @@ public class ProductStatsRepositoryImpl implements ProductStatsRepository {
     }
 
     @Override
-    public Optional<ProductStatsModel> findByProductId(Long productId) {
-        return productStatsJpaRepository.findByProductId(productId);
+    public Optional<ProductStatsModel> findByProduct(ProductModel product) {
+        return productStatsJpaRepository.findByProduct(product);
     }
 
     @Override
