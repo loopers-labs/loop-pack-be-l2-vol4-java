@@ -80,6 +80,11 @@ public class ProductRepositoryImpl implements ProductRepository {
             .toList();
     }
 
+    @Override
+    public void updateLikeCount(Long productId, Integer likeCount) {
+        productJpaRepository.updateLikeCount(productId, likeCount);
+    }
+
     private Sort toJpaSort(ProductSort sort) {
         return switch (sort) {
             case LATEST -> Sort.by(Sort.Direction.DESC, "createdAt");

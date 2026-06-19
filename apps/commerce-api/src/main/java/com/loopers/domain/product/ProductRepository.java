@@ -11,4 +11,5 @@ public interface ProductRepository {
     List<Product> findAll(ProductSort sort, int page, int size);
     List<Product> findAllByBrandId(Long brandId);
     List<Product> findAllByBrandId(Long brandId, ProductSort sort, int page, int size);
+    void updateLikeCount(Long productId, Integer likeCount);
 }

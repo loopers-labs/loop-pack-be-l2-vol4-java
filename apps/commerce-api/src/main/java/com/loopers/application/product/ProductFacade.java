@@ -18,6 +18,7 @@ public class ProductFacade {
     private final BrandService brandService;
     private final ProductBrandProcessService productBrandProcessService;
     private final ProductCacheRepository productCacheRepository;
+    private final ProductLikeCountRepository productLikeCountRepository;
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
@@ -38,7 +39,9 @@ public class ProductFacade {
     private ProductInfo getProductFromDb(Long id) {
         Product product = productService.getProduct(id);
         Brand brand = brandService.getBrand(product.getBrandId());
-        ProductInfo productInfo = ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
+        ProductInfo productInfo = applyLatestLikeCount(
+            ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand))
+        );
         productCacheRepository.cacheProduct(productInfo);
         return productInfo;
     }
@@ -59,16 +62,25 @@ public class ProductFacade {
         List<Brand> brands = brandService.getBrandsByIds(brandIds);
         List<ProductInfo> productInfos = productBrandProcessService.getProductDetailViews(products, brands).stream()
             .map(ProductInfo::from)
+            .map(this::applyLatestLikeCount)
             .toList();
         productCacheRepository.cacheProducts(brandId, sort, page, size, productInfos);
         return productInfos;
+    }
+
+    private ProductInfo applyLatestLikeCount(ProductInfo productInfo) {
+        return productLikeCountRepository.get(productInfo.id())
+            .map(productInfo::withLikeCount)
+            .orElse(productInfo);
     }
 
     @Transactional
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
         Product product = productService.updateProduct(id, name, description, price, stock);
         Brand brand = brandService.getBrand(product.getBrandId());
-        ProductInfo productInfo = ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand));
+        ProductInfo productInfo = applyLatestLikeCount(
+            ProductInfo.from(productBrandProcessService.getProductDetailView(product, brand))
+        );
         productCacheRepository.evictProduct(id);
         productCacheRepository.evictProductLists();
         productCacheRepository.cacheProduct(productInfo);

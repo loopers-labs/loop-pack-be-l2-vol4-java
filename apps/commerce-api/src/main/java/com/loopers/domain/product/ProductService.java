@@ -41,6 +41,10 @@ public class ProductService {
         productWriter.saveProducts(products);
     }
 
+    public void updateLikeCountSnapshot(Long productId, Integer likeCount) {
+        productWriter.updateLikeCountSnapshot(productId, likeCount);
+    }
+
     @Transactional
     public void deleteProduct(Long id) {
         productWriter.deleteProduct(id);

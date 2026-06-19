@@ -27,6 +27,18 @@ public record ProductInfo(
         );
     }
 
+    public ProductInfo withLikeCount(Integer newLikeCount) {
+        return new ProductInfo(
+            id,
+            brand,
+            name,
+            description,
+            price,
+            stock,
+            newLikeCount
+        );
+    }
+
     public record BrandInfo(
         Long id,
         String name,

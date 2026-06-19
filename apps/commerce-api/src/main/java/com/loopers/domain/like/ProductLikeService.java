@@ -17,9 +17,9 @@ public class ProductLikeService {
 
     private final ProductLikeRepository productLikeRepository;
 
-    public boolean likeProduct(String userLoginId, Product product) {
-        Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, product.getId());
-        ProductLikeResult result = createLike(userLoginId, product.getId(), product, existingLike);
+    public boolean likeProduct(String userLoginId, Long productId) {
+        Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, productId);
+        ProductLikeResult result = createLike(userLoginId, productId, existingLike);
 
         if (result.created()) {
             productLikeRepository.save(result.productLike());
@@ -27,13 +27,13 @@ public class ProductLikeService {
         return result.created();
     }
 
-    public boolean unlikeProduct(String userLoginId, Product product) {
-        Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, product.getId());
+    public boolean unlikeProduct(String userLoginId, Long productId) {
+        Optional<ProductLike> existingLike = productLikeRepository.find(userLoginId, productId);
         if (existingLike.isEmpty()) {
             return false;
         }
 
-        boolean deleted = deleteLike(product, existingLike);
+        boolean deleted = deleteLike(existingLike);
         if (deleted) {
             productLikeRepository.delete(existingLike.get());
         }
@@ -47,7 +47,6 @@ public class ProductLikeService {
     public ProductLikeResult createLike(
         String userLoginId,
         Long productId,
-        Product product,
         Optional<ProductLike> existingLike
     ) {
         if (existingLike.isPresent()) {
@@ -55,16 +54,11 @@ public class ProductLikeService {
         }
 
         ProductLike productLike = new ProductLike(userLoginId, productId);
-        product.increaseLikeCount();
         return new ProductLikeResult(productLike, true);
     }
 
-    public boolean deleteLike(Product product, Optional<ProductLike> existingLike) {
-        if (existingLike.isEmpty()) {
-            return false;
-        }
-        product.decreaseLikeCount();
-        return true;
+    public boolean deleteLike(Optional<ProductLike> existingLike) {
+        return existingLike.isPresent();
     }
 
     public List<Product> getLikedProducts(
