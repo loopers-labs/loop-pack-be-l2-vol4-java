@@ -9,6 +9,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,9 +36,10 @@ public class ProductService {
     }
 
     /**
-     * 고객 상세 조회 캐시용 — brand LAZY 로드는 호출부(ProductFacade)의 @Transactional 범위에서 처리됨.
-     * like/unlike 발생 시 @CacheEvict 필수 (LikeFacade).
+     * 고객 상세 조회 캐시용 — 캐시 HIT 시 TX 미개방, MISS 시 TX 안에서 brand LAZY 로드.
+     * Cache AOP(OUTER) → TX AOP(INNER) 순서 보장 (CacheConfig.order = LOWEST_PRECEDENCE - 1).
      */
+    @Transactional(readOnly = true)
     @Cacheable(value = CacheConfig.PRODUCT_CACHE, key = "#id")
     public ProductCacheDto getActiveSnapshot(UUID id) {
         ProductModel product = productRepository.findActive(id)
