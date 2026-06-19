@@ -2,7 +2,7 @@
 
 ## 개요
 
-[설계 검토 문서](analysis/like-count-denormalization-analysis.md)에서 도출한 두 가지 문제를 순차적으로 해결한다.
+[설계 검토 문서](../analysis/like-count-denormalization-analysis.md)에서 도출한 두 가지 문제를 순차적으로 해결한다.
 
 | 문제 | 원인 | 해결 단계 |
 |---|---|---|
