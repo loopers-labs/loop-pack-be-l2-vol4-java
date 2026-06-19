@@ -1,12 +1,16 @@
 package com.loopers.application.like;
 
+import com.loopers.application.product.ProductCacheEvictEvent;
 import com.loopers.domain.like.LikeEventType;
 import com.loopers.domain.like.LikeOutboxService;
 import com.loopers.domain.product.ProductStatsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -14,6 +18,7 @@ public class LikeOutboxEventListener {
 
     private final ProductStatsService productStatsService;
     private final LikeOutboxService likeOutboxService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // markDoneIfPending과 increase/decreaseLikeCount를 같은 트랜잭션으로 묶어 멱등성을 보장한다.
     // 중복 이벤트가 발행돼도 markDoneIfPending이 false를 반환하면 조기 종료한다.
@@ -28,5 +33,6 @@ public class LikeOutboxEventListener {
         } else if (event.eventType() == LikeEventType.UNLIKED_EVENT) {
             productStatsService.decreaseLikeCount(event.productId());
         }
+        eventPublisher.publishEvent(new ProductCacheEvictEvent(List.of(event.productId())));
     }
 }

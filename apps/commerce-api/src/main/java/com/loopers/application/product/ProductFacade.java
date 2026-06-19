@@ -8,7 +8,10 @@ import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsService;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
+import com.loopers.infrastructure.product.ProductCacheStore;
+import com.loopers.infrastructure.product.ProductListCacheValue;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,28 +35,44 @@ public class ProductFacade {
     private final ProductStatsService productStatsService;
     private final StockService stockService;
     private final ProductInfoAssembler productInfoAssembler;
+    private final ProductCacheStore productCacheStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ProductInfo getProduct(Long id) {
+        Optional<ProductInfo> cached = productCacheStore.findProduct(id);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
         ProductModel product = productService.getById(id);
         BrandModel brand = brandService.getById(product.getBrandId());
         StockModel stock = stockService.getByProductId(id);
         ProductStatsModel stats = productStatsService.getByProduct(product);
-        return ProductInfo.from(product, brand, stock, stats);
+        ProductInfo info = ProductInfo.from(product, brand, stock, stats);
+        productCacheStore.putProduct(id, info);
+        return info;
     }
 
     public Page<ProductInfo> getProducts(Long brandId, Pageable pageable) {
-        if (isLikesDesc(pageable)) {
-            return getProductsOrderByLikeCountDesc(brandId, pageable);
+        String listKey = productCacheStore.listKey(brandId, pageable.getSort().toString(), pageable.getPageNumber(), pageable.getPageSize());
+        Optional<ProductListCacheValue> cached = productCacheStore.findList(listKey);
+        if (cached.isPresent()) {
+            ProductListCacheValue value = cached.get();
+            return new PageImpl<>(value.content(), pageable, value.totalElements());
         }
-        Page<ProductModel> productPage = productService.findProducts(brandId, pageable);
-        List<ProductInfo> infos = productInfoAssembler.toInfoList(productPage.getContent());
-        return new PageImpl<>(infos, pageable, productPage.getTotalElements());
+
+        Page<ProductInfo> page = isLikesDesc(pageable)
+            ? getProductsOrderByLikeCountDesc(brandId, pageable)
+            : getProductsByLatestOrPrice(brandId, pageable);
+
+        productCacheStore.putList(listKey, new ProductListCacheValue(page.getContent(), page.getTotalElements()));
+        return page;
     }
 
     @Transactional
     public void deleteProduct(Long id) {
         productService.delete(id);
         stockService.delete(id);
+        eventPublisher.publishEvent(new ProductCacheEvictEvent(List.of(id)));
     }
 
     public Page<ProductInfo> getProductsByBrandId(Long brandId, Pageable pageable) {
@@ -90,7 +110,14 @@ public class ProductFacade {
         StockModel stock = stockService.update(id, stockQuantity);
         BrandModel brand = brandService.getById(product.getBrandId());
         ProductStatsModel stats = productStatsService.getByProduct(product);
+        eventPublisher.publishEvent(new ProductCacheEvictEvent(List.of(id)));
         return ProductAdminInfo.from(product, brand, stock, stats);
+    }
+
+    private Page<ProductInfo> getProductsByLatestOrPrice(Long brandId, Pageable pageable) {
+        Page<ProductModel> productPage = productService.findProducts(brandId, pageable);
+        List<ProductInfo> infos = productInfoAssembler.toInfoList(productPage.getContent());
+        return new PageImpl<>(infos, pageable, productPage.getTotalElements());
     }
 
     private Page<ProductInfo> getProductsOrderByLikeCountDesc(Long brandId, Pageable pageable) {
