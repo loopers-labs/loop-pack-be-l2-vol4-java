@@ -15,11 +15,4 @@ public enum ProductSortType {
         return description;
     }
 
-    public static ProductSortType from(String value) {
-        return switch (value.toLowerCase()) {
-            case "price_asc" -> PRICE_ASC;
-            case "likes_desc" -> LIKES_DESC;
-            default -> LATEST;
-        };
-    }
 }

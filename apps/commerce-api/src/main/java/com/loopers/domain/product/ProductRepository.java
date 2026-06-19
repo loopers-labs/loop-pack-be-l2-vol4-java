@@ -16,4 +16,6 @@ public interface ProductRepository {
     Page<ProductModel> findAll(Long brandId, ProductSortType sort, Pageable pageable);
     Page<ProductModel> findAllForAdmin(Long brandId, Pageable pageable);
     List<ProductModel> findAllByIds(List<Long> ids);
+    void increaseLikeCount(Long productId);
+    void decreaseLikeCount(Long productId);
 }
