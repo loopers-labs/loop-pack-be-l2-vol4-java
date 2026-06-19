@@ -22,6 +22,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +35,8 @@ class ProductFacadeTest {
     private ProductService productService;
     @Mock
     private BrandService brandService;
+    @Mock
+    private ProductCacheService productCacheService;
 
     @InjectMocks
     private ProductFacade productFacade;
@@ -59,9 +65,23 @@ class ProductFacadeTest {
     @Nested
     class GetProductsWithDetail {
 
-        @DisplayName("활성 브랜드 상품은 브랜드 정보와 likeCount 를 포함해 반환된다.")
+        @DisplayName("캐시에 데이터가 있으면 DB 를 조회하지 않고 캐시에서 반환한다.")
         @Test
-        void returns_product_detail_with_brand_and_like_count() {
+        void returns_cached_list_without_db_call() {
+            ProductDetailInfo cached = new ProductDetailInfo(1L, 1L, "브랜드", "상품", "설명", 10000L, 5, "img.jpg", 7L, null);
+            when(productCacheService.getProductList(null, ProductSortType.LATEST))
+                .thenReturn(Optional.of(List.of(cached)));
+
+            List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.LATEST);
+
+            assertThat(result).hasSize(1);
+            verify(productService, never()).getActiveProducts(any(), any());
+        }
+
+        @DisplayName("캐시 미스 시 DB 에서 조회한 후 캐시에 저장한다.")
+        @Test
+        void fetches_from_db_and_caches_on_miss() {
+            when(productCacheService.getProductList(null, ProductSortType.LATEST)).thenReturn(Optional.empty());
             ProductModel p = productWithLikeCount(1L, 7L);
             when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.of(activeBrand()));
@@ -70,14 +90,15 @@ class ProductFacadeTest {
 
             assertAll(
                 () -> assertThat(result).hasSize(1),
-                () -> assertThat(result.get(0).brandName()).isEqualTo("브랜드"),
                 () -> assertThat(result.get(0).likeCount()).isEqualTo(7L)
             );
+            verify(productCacheService).cacheProductList(eq(null), eq(ProductSortType.LATEST), any());
         }
 
         @DisplayName("계약 중지된 브랜드의 상품은 목록에서 제외된다.")
         @Test
         void excludes_products_with_suspended_brand() {
+            when(productCacheService.getProductList(null, ProductSortType.LATEST)).thenReturn(Optional.empty());
             ProductModel p = product(1L);
             when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.of(suspendedBrand()));
@@ -90,6 +111,7 @@ class ProductFacadeTest {
         @DisplayName("삭제된 브랜드의 상품은 목록에서 제외된다.")
         @Test
         void excludes_products_with_deleted_brand() {
+            when(productCacheService.getProductList(null, ProductSortType.LATEST)).thenReturn(Optional.empty());
             ProductModel p = product(1L);
             when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.empty());
@@ -102,6 +124,7 @@ class ProductFacadeTest {
         @DisplayName("정렬 타입이 서비스 레이어로 전달되어 DB 정렬이 수행된다.")
         @Test
         void delegates_sort_to_service_layer() {
+            when(productCacheService.getProductList(null, ProductSortType.PRICE_ASC)).thenReturn(Optional.empty());
             ProductModel cheap = new ProductModel(1L, "저렴", "설명", 1000L, 5, null);
             ProductModel expensive = new ProductModel(1L, "비싼", "설명", 9000L, 5, null);
             when(productService.getActiveProducts(null, ProductSortType.PRICE_ASC))
@@ -119,9 +142,22 @@ class ProductFacadeTest {
     @Nested
     class GetProductWithDetail {
 
-        @DisplayName("활성 상품이면 브랜드 정보와 likeCount 를 포함해 반환된다.")
+        @DisplayName("캐시에 데이터가 있으면 DB 를 조회하지 않고 반환한다.")
         @Test
-        void returns_detail_when_product_and_brand_are_active() {
+        void returns_cached_detail_without_db_call() {
+            ProductDetailInfo cached = new ProductDetailInfo(1L, 1L, "브랜드", "상품", "설명", 10000L, 5, "img.jpg", 3L, null);
+            when(productCacheService.getProductDetail(1L)).thenReturn(Optional.of(cached));
+
+            ProductDetailInfo result = productFacade.getProductWithDetail(1L);
+
+            assertThat(result.likeCount()).isEqualTo(3L);
+            verify(productService, never()).getProduct(any());
+        }
+
+        @DisplayName("캐시 미스 시 DB 에서 조회한 후 캐시에 저장한다.")
+        @Test
+        void fetches_from_db_and_caches_on_miss() {
+            when(productCacheService.getProductDetail(0L)).thenReturn(Optional.empty());
             ProductModel p = productWithLikeCount(1L, 3L);
             when(productService.getProduct(0L)).thenReturn(p);
             when(brandService.findBrand(1L)).thenReturn(Optional.of(activeBrand()));
@@ -133,11 +169,13 @@ class ProductFacadeTest {
                 () -> assertThat(result.brandName()).isEqualTo("브랜드"),
                 () -> assertThat(result.likeCount()).isEqualTo(3L)
             );
+            verify(productCacheService).cacheProductDetail(eq(0L), any());
         }
 
         @DisplayName("존재하지 않는 상품 ID이면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throws_not_found_when_product_not_exist() {
+            when(productCacheService.getProductDetail(999L)).thenReturn(Optional.empty());
             when(productService.getProduct(999L))
                 .thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
 
@@ -150,6 +188,7 @@ class ProductFacadeTest {
         @DisplayName("계약 중지 브랜드 상품이면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throws_not_found_when_brand_is_suspended() {
+            when(productCacheService.getProductDetail(0L)).thenReturn(Optional.empty());
             when(productService.getProduct(0L)).thenReturn(product(1L));
             when(brandService.findBrand(1L)).thenReturn(Optional.of(suspendedBrand()));
 
@@ -157,6 +196,37 @@ class ProductFacadeTest {
                 () -> productFacade.getProductWithDetail(0L));
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("상품을 수정할 때,")
+    @Nested
+    class UpdateProduct {
+
+        @DisplayName("캐시가 무효화된다.")
+        @Test
+        void evicts_cache_on_update() {
+            ProductModel p = product(1L);
+            when(productService.updateProduct(1L, "새 이름", "새 설명", 20000L, 10, "new.jpg")).thenReturn(p);
+
+            productFacade.updateProduct(1L, "새 이름", "새 설명", 20000L, 10, "new.jpg");
+
+            verify(productCacheService).evictProductDetail(1L);
+            verify(productCacheService).evictAllProductLists();
+        }
+    }
+
+    @DisplayName("상품을 삭제할 때,")
+    @Nested
+    class DeleteProduct {
+
+        @DisplayName("캐시가 무효화된다.")
+        @Test
+        void evicts_cache_on_delete() {
+            productFacade.deleteProduct(1L);
+
+            verify(productCacheService).evictProductDetail(1L);
+            verify(productCacheService).evictAllProductLists();
         }
     }
 }

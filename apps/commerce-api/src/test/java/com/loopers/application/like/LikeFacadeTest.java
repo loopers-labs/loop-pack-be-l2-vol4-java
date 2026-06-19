@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.application.product.ProductCacheService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductService;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,9 @@ class LikeFacadeTest {
     @Mock
     private ProductService productService;
 
+    @Mock
+    private ProductCacheService productCacheService;
+
     @InjectMocks
     private LikeFacade likeFacade;
 
@@ -30,24 +34,27 @@ class LikeFacadeTest {
     @Nested
     class Like {
 
-        @DisplayName("새 좋아요가 등록되면 상품의 likeCount 를 1 증가시킨다.")
+        @DisplayName("새 좋아요가 등록되면 상품의 likeCount 를 증가시키고 캐시를 무효화한다.")
         @Test
-        void increments_like_count_when_new_like_is_created() {
+        void increments_like_count_and_evicts_cache_when_new_like() {
             when(likeService.like(1L, 2L)).thenReturn(true);
 
             likeFacade.like(1L, 2L);
 
             verify(productService).incrementLikeCount(2L);
+            verify(productCacheService).evictProductDetail(2L);
+            verify(productCacheService).evictAllProductLists();
         }
 
-        @DisplayName("이미 좋아요한 상품이면 likeCount 를 변경하지 않는다. (멱등)")
+        @DisplayName("이미 좋아요한 상품이면 likeCount 와 캐시를 변경하지 않는다. (멱등)")
         @Test
-        void does_not_increment_like_count_when_already_liked() {
+        void does_not_change_anything_when_already_liked() {
             when(likeService.like(1L, 2L)).thenReturn(false);
 
             likeFacade.like(1L, 2L);
 
             verify(productService, never()).incrementLikeCount(2L);
+            verify(productCacheService, never()).evictProductDetail(2L);
         }
     }
 
@@ -55,24 +62,27 @@ class LikeFacadeTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요가 취소되면 상품의 likeCount 를 1 감소시킨다.")
+        @DisplayName("좋아요가 취소되면 상품의 likeCount 를 감소시키고 캐시를 무효화한다.")
         @Test
-        void decrements_like_count_when_like_is_cancelled() {
+        void decrements_like_count_and_evicts_cache_when_cancelled() {
             when(likeService.unlike(1L, 2L)).thenReturn(true);
 
             likeFacade.unlike(1L, 2L);
 
             verify(productService).decrementLikeCount(2L);
+            verify(productCacheService).evictProductDetail(2L);
+            verify(productCacheService).evictAllProductLists();
         }
 
-        @DisplayName("활성 좋아요가 없으면 likeCount 를 변경하지 않는다. (멱등)")
+        @DisplayName("활성 좋아요가 없으면 likeCount 와 캐시를 변경하지 않는다. (멱등)")
         @Test
-        void does_not_decrement_like_count_when_no_active_like() {
+        void does_not_change_anything_when_no_active_like() {
             when(likeService.unlike(1L, 2L)).thenReturn(false);
 
             likeFacade.unlike(1L, 2L);
 
             verify(productService, never()).decrementLikeCount(2L);
+            verify(productCacheService, never()).evictProductDetail(2L);
         }
     }
 }
