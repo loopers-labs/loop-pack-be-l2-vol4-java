@@ -13,6 +13,7 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -75,7 +76,8 @@ public class RedisConfig{
             List<RedisNodeInfo> replicas,
             Consumer<LettuceClientConfiguration.LettuceClientConfigurationBuilder> customizer
     ){
-        LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder();
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder()
+                .commandTimeout(Duration.ofMillis(300));   // 죽은/느린 Redis 를 300ms 이상 기다리지 않는다 (빨리 실패 → DB 폴백)
         if(customizer != null) customizer.accept(builder);
         LettuceClientConfiguration clientConfig = builder.build();
         RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
