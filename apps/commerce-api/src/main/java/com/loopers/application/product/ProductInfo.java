@@ -9,9 +9,9 @@ public record ProductInfo(
     String description,
     Long price,
     Integer stock,
-    int likeCount
+    long likeCount
 ) {
-    public static ProductInfo from(ProductModel product) {
+    public static ProductInfo from(ProductModel product, long likeCount) {
         return new ProductInfo(
             product.getId(),
             product.getBrandId(),
@@ -19,7 +19,7 @@ public record ProductInfo(
             product.getDescription(),
             product.getPrice(),
             product.getStock(),
-            product.getLikeCount()
+            likeCount
         );
     }
 }

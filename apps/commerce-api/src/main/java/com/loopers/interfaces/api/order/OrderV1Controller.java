@@ -25,7 +25,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
         AuthHeaders auth,
         @RequestBody OrderV1Dto.CreateOrderRequest request
     ) {
-        OrderInfo info = orderFacade.createOrder(auth.loginId(), request.toCriteria());
+        OrderInfo info = orderFacade.createOrder(auth.loginId(), request.toCommand());
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 

@@ -2,23 +2,25 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderItemInfo;
-import com.loopers.application.order.PlaceOrderCriteria;
+import com.loopers.application.order.PlaceOrderCommand;
 
 import java.util.List;
 
 public class OrderV1Dto {
 
     public record CreateOrderRequest(
-        List<OrderItemRequest> items
+        List<OrderItemRequest> items,
+        Long couponId
     ) {
-        public PlaceOrderCriteria toCriteria() {
+        public PlaceOrderCommand toCommand() {
             if (items == null) {
-                return new PlaceOrderCriteria(List.of());
+                return new PlaceOrderCommand(List.of(), couponId);
             }
-            return new PlaceOrderCriteria(
+            return new PlaceOrderCommand(
                 items.stream()
-                    .map(item -> new PlaceOrderCriteria.Item(item.productId(), item.quantity()))
-                    .toList()
+                    .map(item -> new PlaceOrderCommand.Item(item.productId(), item.quantity()))
+                    .toList(),
+                couponId
             );
         }
     }
@@ -33,6 +35,8 @@ public class OrderV1Dto {
         Long userId,
         String status,
         Long totalAmount,
+        Long discountAmount,
+        Long finalAmount,
         List<OrderItemResponse> items
     ) {
         public static OrderResponse from(OrderInfo info) {
@@ -41,6 +45,8 @@ public class OrderV1Dto {
                 info.userId(),
                 info.status(),
                 info.totalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
                 info.items().stream()
                     .map(OrderItemResponse::from)
                     .toList()

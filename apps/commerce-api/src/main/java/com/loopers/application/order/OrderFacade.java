@@ -1,5 +1,7 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.UserCoupon;
+import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -14,7 +16,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -24,24 +30,45 @@ public class OrderFacade {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
-    public OrderInfo createOrder(String loginId, PlaceOrderCriteria criteria) {
+    public OrderInfo createOrder(String loginId, PlaceOrderCommand command) {
         UserModel user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
-        List<OrderLine> lines = criteria.items().stream()
+        // 쿠폰 조회는 상품 락 획득 "이전"에 — FOR UPDATE 보유 시간을 줄이고, 무효 쿠폰이면 락 없이 조기 실패
+        UserCoupon userCoupon = (command.couponId() != null)
+            ? userCouponRepository.find(command.couponId())
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."))
+            : null;
+
+        // 비관적 락 배치 조회 — productId 오름차순으로 잠가 다중 상품 주문 간 교차 데드락 방지
+        List<Long> productIds = command.items().stream()
+            .map(PlaceOrderCommand.Item::productId)
+            .distinct()
+            .sorted()
+            .toList();
+        Map<Long, ProductModel> products = productRepository.findAllForUpdate(productIds).stream()
+            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+
+        List<OrderLine> lines = command.items().stream()
             .map(item -> {
-                ProductModel product = productRepository.find(item.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
-                        "[id = " + item.productId() + "] 상품을 찾을 수 없습니다."));
+                ProductModel product = products.get(item.productId());
+                if (product == null) {
+                    throw new CoreException(ErrorType.NOT_FOUND,
+                        "[id = " + item.productId() + "] 상품을 찾을 수 없습니다.");
+                }
                 return new OrderLine(product, item.quantity());
             })
             .toList();
 
-        OrderModel order = orderService.place(user.getId(), lines);
+        OrderModel order = orderService.place(user.getId(), lines, userCoupon, ZonedDateTime.now());
 
         lines.forEach(line -> productRepository.save(line.product())); // 재고 차감 반영
+        if (userCoupon != null) {
+            userCouponRepository.save(userCoupon); // USED 반영 — 커밋 시점 @Version 검증
+        }
         OrderModel saved = orderRepository.save(order);
         return OrderInfo.from(saved);
     }

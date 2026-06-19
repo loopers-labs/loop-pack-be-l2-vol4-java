@@ -22,7 +22,7 @@ public enum ProductSortType {
         return switch (this) {
             case LATEST -> Sort.by(Sort.Direction.DESC, "createdAt");
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount");
-            case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount");
+            case LIKES_DESC -> Sort.unsorted(); // 정렬은 집계 테이블 조인 쿼리(ORDER BY)에서 수행
         };
     }
 }

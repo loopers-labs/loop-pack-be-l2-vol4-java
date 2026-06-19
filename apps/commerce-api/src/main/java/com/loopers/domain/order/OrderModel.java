@@ -35,6 +35,17 @@ public class OrderModel extends BaseEntity {
     @AttributeOverride(name = "amount", column = @Column(name = "total_amount", nullable = false))
     private Money totalAmount;
 
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "discount_amount", nullable = false))
+    private Money discountAmount;
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "final_amount", nullable = false))
+    private Money finalAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "order_id", nullable = false)
     private List<OrderItemModel> items = new ArrayList<>();
@@ -42,6 +53,10 @@ public class OrderModel extends BaseEntity {
     protected OrderModel() {}
 
     public OrderModel(Long userId, List<OrderItemModel> items) {
+        this(userId, items, Money.ZERO, null);
+    }
+
+    public OrderModel(Long userId, List<OrderItemModel> items, Money discountAmount, Long userCouponId) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "유저 ID는 필수입니다.");
         }
@@ -54,6 +69,11 @@ public class OrderModel extends BaseEntity {
         this.totalAmount = this.items.stream()
             .map(OrderItemModel::subtotal)
             .reduce(Money.ZERO, Money::plus);
+        Money discount = (discountAmount != null) ? discountAmount : Money.ZERO;
+        // 할인은 총액을 상한으로 한다 (최종 금액 음수 방지)
+        this.discountAmount = Money.of(Math.min(discount.getAmount(), this.totalAmount.getAmount()));
+        this.finalAmount = this.totalAmount.minus(this.discountAmount);
+        this.userCouponId = userCouponId;
     }
 
     public boolean isOwnedBy(Long userId) {
@@ -70,6 +90,18 @@ public class OrderModel extends BaseEntity {
 
     public Long getTotalAmount() {
         return totalAmount.getAmount();
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount.getAmount();
+    }
+
+    public Long getFinalAmount() {
+        return finalAmount.getAmount();
+    }
+
+    public Long getUserCouponId() {
+        return userCouponId;
     }
 
     public List<OrderItemModel> getItems() {

@@ -30,7 +30,7 @@ class ProductModelTest {
     @Nested
     class Create {
 
-        @DisplayName("모든 정보가 유효하면, Product 가 정상적으로 생성되고 좋아요 수는 0 이다.")
+        @DisplayName("모든 정보가 유효하면, Product 가 정상적으로 생성된다.")
         @Test
         void createsProduct_whenAllInputsAreValid() {
             // act
@@ -42,8 +42,7 @@ class ProductModelTest {
                 () -> assertThat(product.getName()).isEqualTo(VALID_NAME),
                 () -> assertThat(product.getDescription()).isEqualTo(VALID_DESCRIPTION),
                 () -> assertThat(product.getPrice()).isEqualTo(VALID_PRICE),
-                () -> assertThat(product.getStock()).isEqualTo(VALID_STOCK),
-                () -> assertThat(product.getLikeCount()).isEqualTo(0)
+                () -> assertThat(product.getStock()).isEqualTo(VALID_STOCK)
             );
         }
 
@@ -198,54 +197,6 @@ class ProductModelTest {
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @DisplayName("좋아요 수를 변경할 때, ")
-    @Nested
-    class LikeCount {
-
-        @DisplayName("증가시키면, 호출한 만큼 좋아요 수가 늘어난다.")
-        @Test
-        void increases() {
-            // arrange
-            ProductModel product = product();
-
-            // act
-            product.increaseLikeCount();
-            product.increaseLikeCount();
-            product.increaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(3);
-        }
-
-        @DisplayName("감소시키면, 좋아요 수가 줄어든다.")
-        @Test
-        void decreases() {
-            // arrange
-            ProductModel product = product();
-            product.increaseLikeCount();
-            product.increaseLikeCount();
-
-            // act
-            product.decreaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(1);
-        }
-
-        @DisplayName("좋아요 수가 0 일 때 감소시켜도, 0 미만으로 내려가지 않는다.")
-        @Test
-        void doesNotGoBelowZero() {
-            // arrange
-            ProductModel product = product(); // likeCount 0
-
-            // act
-            product.decreaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(0);
         }
     }
 

@@ -9,6 +9,8 @@ public record OrderInfo(
     Long userId,
     String status,
     Long totalAmount,
+    Long discountAmount,
+    Long finalAmount,
     List<OrderItemInfo> items
 ) {
     public static OrderInfo from(OrderModel order) {
@@ -17,6 +19,8 @@ public record OrderInfo(
             order.getUserId(),
             order.getStatus().name(),
             order.getTotalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             order.getItems().stream()
                 .map(OrderItemInfo::from)
                 .toList()

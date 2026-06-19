@@ -1,0 +1,26 @@
+### ===== 사전 준비 =====
+### 1) users-v1.http 로 tester01 가입
+### 2) coupons-admin-v1.http 로 쿠폰 템플릿 등록 (couponId = 1 가정)
+
+### ===== 정상 시나리오 =====
+
+### 쿠폰 발급
+POST {{commerce-api}}/api/v1/coupons/1/issue
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+### 내 쿠폰 목록 조회 (AVAILABLE / USED / EXPIRED 상태 포함)
+GET {{commerce-api}}/api/v1/users/me/coupons
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+
+### ===== 에러 시나리오 =====
+
+### [404 Not Found] 존재하지 않는 쿠폰 템플릿 발급
+POST {{commerce-api}}/api/v1/coupons/99999/issue
+X-Loopers-LoginId: tester01
+X-Loopers-LoginPw: Password1!
+
+### [400 Bad Request] 인증 헤더 누락
+GET {{commerce-api}}/api/v1/users/me/coupons

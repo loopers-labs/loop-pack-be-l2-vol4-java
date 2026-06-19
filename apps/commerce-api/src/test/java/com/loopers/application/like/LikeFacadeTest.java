@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
@@ -30,7 +31,9 @@ class LikeFacadeTest {
     private final LikeRepository likeRepository = mock(LikeRepository.class);
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
-    private final LikeFacade likeFacade = new LikeFacade(likeRepository, productRepository, userRepository);
+    private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
+    private final LikeFacade likeFacade =
+        new LikeFacade(likeRepository, productRepository, userRepository, likeCountRepository);
 
     private void givenUser(long id) {
         UserModel user = mock(UserModel.class);
@@ -46,22 +49,21 @@ class LikeFacadeTest {
     @Nested
     class Like {
 
-        @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 상품 좋아요 수를 증가시킨다.")
+        @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 좋아요 집계를 증가시킨다.")
         @Test
         void savesAndIncrements() {
             // arrange
-            ProductModel product = product();
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
+            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product()));
 
             // act
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
             // assert
             verify(likeRepository).save(any(LikeModel.class));
-            verify(productRepository).save(product);
-            assertThat(product.getLikeCount()).isEqualTo(1);
+            verify(likeCountRepository).increase(PRODUCT_ID);
+            verify(productRepository, never()).save(any());
         }
 
         @DisplayName("이미 좋아요한 경우, 아무 것도 하지 않는다. (멱등)")
@@ -76,10 +78,10 @@ class LikeFacadeTest {
 
             // assert
             verify(likeRepository, never()).save(any());
-            verify(productRepository, never()).save(any());
+            verify(likeCountRepository, never()).increase(any());
         }
 
-        @DisplayName("상품이 없으면 NOT_FOUND 이고 Like 는 저장되지 않는다.")
+        @DisplayName("상품이 없으면 NOT_FOUND 이고 Like 저장·집계 증가도 하지 않는다.")
         @Test
         void throwsNotFound_whenProductMissing() {
             // arrange
@@ -93,6 +95,7 @@ class LikeFacadeTest {
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeRepository, never()).save(any());
+            verify(likeCountRepository, never()).increase(any());
         }
 
         @DisplayName("유저가 없으면 NOT_FOUND 이고 좋아요 처리도 하지 않는다.")
@@ -114,22 +117,19 @@ class LikeFacadeTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요한 상태면, Like 삭제 후 상품 좋아요 수를 감소시킨다.")
+        @DisplayName("좋아요한 상태면, Like 삭제 후 좋아요 집계를 감소시킨다.")
         @Test
         void deletesAndDecrements() {
             // arrange
-            ProductModel product = product();
-            product.increaseLikeCount(); // likeCount = 1
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(true);
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
 
             // act
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 
             // assert
             verify(likeRepository).deleteBy(7L, PRODUCT_ID);
-            assertThat(product.getLikeCount()).isEqualTo(0);
+            verify(likeCountRepository).decrease(PRODUCT_ID);
         }
 
         @DisplayName("좋아요하지 않은 상태면, 아무 것도 하지 않는다. (멱등)")
@@ -144,6 +144,7 @@ class LikeFacadeTest {
 
             // assert
             verify(likeRepository, never()).deleteBy(any(), any());
+            verify(likeCountRepository, never()).decrease(any());
         }
     }
 }

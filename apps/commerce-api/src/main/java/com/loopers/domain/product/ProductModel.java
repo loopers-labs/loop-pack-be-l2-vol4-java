@@ -29,9 +29,6 @@ public class ProductModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "stock", nullable = false))
     private Quantity stock;
 
-    @Column(name = "like_count", nullable = false)
-    private int likeCount = 0;
-
     protected ProductModel() {}
 
     public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
@@ -78,10 +75,6 @@ public class ProductModel extends BaseEntity {
         return stock.getValue();
     }
 
-    public int getLikeCount() {
-        return likeCount;
-    }
-
     public void decreaseStock(Quantity quantity) {
         if (quantity == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 필수입니다.");
@@ -90,16 +83,6 @@ public class ProductModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
         }
         this.stock = this.stock.minus(quantity);
-    }
-
-    public void increaseLikeCount() {
-        this.likeCount++;
-    }
-
-    public void decreaseLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount--;
-        }
     }
 
     public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
