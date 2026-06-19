@@ -56,7 +56,11 @@ public class ProductFacade {
      *  - Redis 장애 시 try-catch 로 흡수 후 DB 조회 fallback (캐시 미스로 처리)
      */
     public List<ProductDetailInfo> getProducts(Long brandId, String sort, int page, int size) {
-        String cacheKey = buildProductListKey(brandId, sort, page, size);
+        // sort 를 먼저 정규화한 뒤 캐시 키를 만든다.
+        // 그렇지 않으면 "LIKES_DESC" / "likes_desc" / "Likes_Desc" 가 모두 다른 키로 저장되어
+        // 동일 조회가 캐시 분리되고 히트율이 떨어진다.
+        ProductSortType sortType = ProductSortType.from(sort);
+        String cacheKey = buildProductListKey(brandId, sortType, page, size);
 
         // 1) Redis 조회 (장애나도 서비스 안 죽게 try-catch)
         try {
@@ -72,7 +76,6 @@ public class ProductFacade {
 
         // 2) DB 조회
         log.debug("[Cache MISS] {}", cacheKey);
-        ProductSortType sortType = ProductSortType.from(sort);
         List<Product> products = productService.getProducts(brandId, sortType, page, size);
         List<ProductDetailInfo> result = productDisplayService.getProductDetails(products).stream()
             .map(ProductDetailInfo::from)
@@ -102,9 +105,9 @@ public class ProductFacade {
         productService.deleteProduct(id);
     }
 
-    private String buildProductListKey(Long brandId, String sort, int page, int size) {
+    private String buildProductListKey(Long brandId, ProductSortType sortType, int page, int size) {
         return CacheConfig.CACHE_PRODUCT_LIST_PREFIX
             + (brandId == null ? "all" : brandId) + ":"
-            + sort + ":" + page + ":" + size;
+            + sortType.name() + ":" + page + ":" + size;
     }
 }
