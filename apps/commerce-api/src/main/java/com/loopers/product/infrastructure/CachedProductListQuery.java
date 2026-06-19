@@ -171,17 +171,9 @@ public class CachedProductListQuery implements ProductListQuery {
         String brandKey = brandId == null ? "all" : String.valueOf(brandId);
         return CACHE_KEY_PREFIX
             + "brand:" + brandKey
-            + ":sort:" + sortKey(sort)
+            + ":sort:" + sort.value()
             + ":page:" + query.page()
             + ":size:" + query.size();
-    }
-
-    private String sortKey(ProductSort sort) {
-        return switch (sort) {
-            case LATEST -> "latest";
-            case PRICE_ASC -> "price_asc";
-            case LIKES_DESC -> "likes_desc";
-        };
     }
 
     private String lockKey(String cacheKey) {

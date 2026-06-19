@@ -16,6 +16,10 @@ public enum ProductSort {
         this.value = value;
     }
 
+    public String value() {
+        return value;
+    }
+
     public static ProductSort from(String value) {
         if (value == null || value.isBlank()) {
             return LATEST;

@@ -9,6 +9,7 @@ import com.loopers.product.application.ProductLikeSummaryWriter;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductService;
 import com.loopers.product.infrastructure.ProductDetailCacheProperties;
+import com.loopers.product.infrastructure.ProductListCacheProperties;
 import com.loopers.stock.domain.ProductStockService;
 import com.loopers.shared.presentation.ApiResponse;
 import com.loopers.shared.presentation.PageResponse;
@@ -53,6 +54,7 @@ class ProductV1ApiE2ETest {
     private final ProductLikeSummaryWriter productLikeSummaryWriter;
     private final ProductLikeSummarySynchronizer productLikeSummarySynchronizer;
     private final ProductDetailCacheProperties productDetailCacheProperties;
+    private final ProductListCacheProperties productListCacheProperties;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
     private final JdbcTemplate jdbcTemplate;
@@ -68,6 +70,7 @@ class ProductV1ApiE2ETest {
         ProductLikeSummaryWriter productLikeSummaryWriter,
         ProductLikeSummarySynchronizer productLikeSummarySynchronizer,
         ProductDetailCacheProperties productDetailCacheProperties,
+        ProductListCacheProperties productListCacheProperties,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp,
         JdbcTemplate jdbcTemplate,
@@ -81,6 +84,7 @@ class ProductV1ApiE2ETest {
         this.productLikeSummaryWriter = productLikeSummaryWriter;
         this.productLikeSummarySynchronizer = productLikeSummarySynchronizer;
         this.productDetailCacheProperties = productDetailCacheProperties;
+        this.productListCacheProperties = productListCacheProperties;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
         this.jdbcTemplate = jdbcTemplate;
@@ -353,7 +357,7 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
                 () -> assertThat(redisTemplate.opsForValue().get(cacheKey)).contains("\"likeCount\":7"),
-                () -> assertThat(ttlSeconds).isBetween(1L, 13L)
+                () -> assertThat(ttlSeconds).isBetween(1L, productListCacheTtlMaxSeconds())
             );
         }
 
@@ -431,7 +435,7 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().content()).hasSize(1),
                 () -> assertThat(redisTemplate.hasKey(cacheKey)).isTrue(),
-                () -> assertThat(ttlSeconds).isBetween(1L, 13L)
+                () -> assertThat(ttlSeconds).isBetween(1L, productListCacheTtlMaxSeconds())
             );
         }
 
@@ -557,5 +561,9 @@ class ProductV1ApiE2ETest {
             + ":sort:" + sort
             + ":page:" + page
             + ":size:" + size;
+    }
+
+    private long productListCacheTtlMaxSeconds() {
+        return productListCacheProperties.ttlSeconds() + productListCacheProperties.jitterSeconds();
     }
 }
