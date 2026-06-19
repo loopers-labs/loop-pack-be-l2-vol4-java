@@ -10,6 +10,8 @@ public record OrderInfo(
     Long id,
     Long userId,
     OrderStatus status,
+    int originalAmount,
+    int discountAmount,
     int totalAmount,
     List<OrderItemInfo> items,
     ZonedDateTime createdAt
@@ -22,6 +24,8 @@ public record OrderInfo(
             order.getId(),
             order.getUserId(),
             order.getStatus(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
             order.getTotalAmount(),
             itemInfos,
             order.getCreatedAt()

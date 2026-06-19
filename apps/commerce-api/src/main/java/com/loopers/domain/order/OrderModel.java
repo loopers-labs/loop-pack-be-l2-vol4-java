@@ -28,6 +28,13 @@ public class OrderModel extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status;
 
+    @Column(name = "original_amount", nullable = false)
+    private int originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private int discountAmount;
+
+    /** 최종 결제 금액 = originalAmount - discountAmount */
     @Column(name = "total_amount", nullable = false)
     private int totalAmount;
 
@@ -42,22 +49,22 @@ public class OrderModel extends BaseEntity {
         }
         this.userId = userId;
         this.status = OrderStatus.PENDING;
+        this.originalAmount = 0;
+        this.discountAmount = 0;
         this.totalAmount = 0;
     }
 
-    /**
-     * 주문 항목을 컬렉션에 추가한다.
-     * 총 금액 계산은 OrderPricingService가 담당하며, applyTotal()로 별도 반영한다.
-     */
     public void addItem(OrderItemModel item) {
         this.items.add(item);
     }
 
     /**
-     * OrderPricingService가 계산한 총 금액을 주문에 반영한다.
+     * 금액 스냅샷을 확정한다. 쿠폰 없을 때는 discountAmount=0으로 호출한다.
      */
-    public void applyTotal(int totalAmount) {
-        this.totalAmount = totalAmount;
+    public void applyPricing(int originalAmount, int discountAmount) {
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount;
+        this.totalAmount = originalAmount - discountAmount;
     }
 
     public List<OrderItemModel> getItems() {

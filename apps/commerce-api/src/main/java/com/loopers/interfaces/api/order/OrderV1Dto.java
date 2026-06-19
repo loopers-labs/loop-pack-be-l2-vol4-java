@@ -25,12 +25,14 @@ public class OrderV1Dto {
     }
 
     public record CreateOrderRequest(
-        @NotEmpty @Valid List<OrderItemRequest> items
+        @NotEmpty @Valid List<OrderItemRequest> items,
+        Long couponId
     ) {
         public OrderCreateCommand toCommand(Long userId) {
             return new OrderCreateCommand(
                 userId,
-                items.stream().map(OrderItemRequest::toCommand).toList()
+                items.stream().map(OrderItemRequest::toCommand).toList(),
+                couponId
             );
         }
     }
@@ -59,6 +61,8 @@ public class OrderV1Dto {
         Long id,
         Long userId,
         OrderStatus status,
+        int originalAmount,
+        int discountAmount,
         int totalAmount,
         List<OrderItemResponse> items,
         ZonedDateTime createdAt
@@ -68,6 +72,8 @@ public class OrderV1Dto {
                 info.id(),
                 info.userId(),
                 info.status(),
+                info.originalAmount(),
+                info.discountAmount(),
                 info.totalAmount(),
                 info.items().stream().map(OrderItemResponse::from).toList(),
                 info.createdAt()

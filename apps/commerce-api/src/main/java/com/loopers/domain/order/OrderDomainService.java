@@ -1,9 +1,6 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.stock.StockModel;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +12,6 @@ import java.util.Map;
  *
  * - 상태(Repository) 없이 도메인 객체 간 협력 로직만 담당
  * - OrderFacade에서 영속화 전·후 순수 도메인 로직을 위임받아 처리한다.
- *   · 재고 사전 검증: 한 건이라도 부족하면 전체 실패 (주문은 원자적)
  *   · 주문 엔티티 조립: Product 스냅샷 → OrderItem, 총 금액 계산은 OrderPricingService에 위임
  */
 @RequiredArgsConstructor
@@ -23,24 +19,6 @@ import java.util.Map;
 public class OrderDomainService {
 
     private final OrderPricingService orderPricingService;
-
-    /**
-     * 재고 사전 검증.
-     * 요청 수량이 현재 재고보다 많은 항목이 하나라도 있으면 BAD_REQUEST.
-     *
-     * @param stockMap    productId → StockModel
-     * @param quantityMap productId → 요청 수량
-     */
-    public void validateStocks(Map<Long, StockModel> stockMap, Map<Long, Integer> quantityMap) {
-        quantityMap.forEach((productId, requestedQty) -> {
-            StockModel stock = stockMap.get(productId);
-            if (stock.getQuantity() < requestedQty) {
-                throw new CoreException(ErrorType.BAD_REQUEST,
-                    "재고가 부족합니다. productId=" + productId
-                        + " (요청: " + requestedQty + ", 재고: " + stock.getQuantity() + ")");
-            }
-        });
-    }
 
     /**
      * 주문 엔티티 조립.
@@ -66,7 +44,7 @@ public class OrderDomainService {
             );
             order.addItem(item);
         });
-        order.applyTotal(orderPricingService.calculateTotal(order.getItems()));
+        order.applyPricing(orderPricingService.calculateTotal(order.getItems()), 0);
         return order;
     }
 }
