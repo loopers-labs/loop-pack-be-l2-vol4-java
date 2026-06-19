@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("commerce.product-list-cache")
 public record ProductListCacheProperties(
-    @DefaultValue("10") long ttlSeconds,
+    @DefaultValue("30") long ttlSeconds,
     @DefaultValue("3") long jitterSeconds,
     @DefaultValue("3") long lockTtlSeconds,
     @DefaultValue("80") long lockWaitMillis,
