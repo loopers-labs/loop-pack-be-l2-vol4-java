@@ -32,8 +32,7 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.BAD_REQUEST, "등록되지 않은 브랜드입니다."));
         brand.validateActive();
 
-        ProductModel product = new ProductModel(brand, command.name(), command.price());
-        productRepository.save(product);
+        ProductModel product = productRepository.save(new ProductModel(brand, command.name(), command.price()));
 
         StockModel stock = new StockModel(product, command.initialStock());
         stockRepository.save(stock);
