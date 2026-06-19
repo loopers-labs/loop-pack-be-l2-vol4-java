@@ -67,12 +67,12 @@ public class ProductStockRepositoryImpl implements ProductStockRepository {
     }
 
     @Override
-    public boolean updateStockAttributes(Long stockId, Long price, Integer delta) {
+    public boolean updateStockAttributes(Long productId, Long stockId, Long price, Integer delta) {
         QProductStockModel stock = QProductStockModel.productStockModel;
         JPAUpdateClause update = queryFactory.update(stock);
         if (price != null) update.set(stock.price.value, price);
         if (delta != null) update.set(stock.stockQuantity.value, stock.stockQuantity.value.add(delta));
-        BooleanExpression where = stock.id.eq(stockId);
+        BooleanExpression where = stock.id.eq(stockId).and(stock.product.id.eq(productId));
         if (delta != null) where = where.and(stock.stockQuantity.value.add(delta).goe(0));
         return update.where(where).execute() > 0;
     }
