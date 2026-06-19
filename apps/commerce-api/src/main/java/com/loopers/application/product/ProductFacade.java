@@ -45,15 +45,15 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getAllProducts(Long brandId, String sort, Integer page, Integer size) {
-        if (brandId != null) {
-            brandService.validateBrandExists(brandId);
-        }
-
         return productCacheRepository.getProducts(brandId, sort, page, size)
             .orElseGet(() -> getAllProductsFromDb(brandId, sort, page, size));
     }
 
     private List<ProductInfo> getAllProductsFromDb(Long brandId, String sort, Integer page, Integer size) {
+        if (brandId != null) {
+            brandService.validateBrandExists(brandId);
+        }
+
         List<Product> products = productService.getAllProducts(brandId, sort, page, size);
         List<Long> brandIds = productBrandProcessService.getBrandIds(products);
         List<Brand> brands = brandService.getBrandsByIds(brandIds);
