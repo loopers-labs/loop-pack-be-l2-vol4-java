@@ -3,6 +3,7 @@ package com.loopers.domain.concurrency;
 import com.loopers.application.coupon.CouponFacade;
 import com.loopers.application.coupon.CouponInfo;
 import com.loopers.application.like.ProductLikeFacade;
+import com.loopers.application.product.ProductLikeCountFlushService;
 import com.loopers.application.order.OrderFacade;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.coupon.CouponStatus;
@@ -21,6 +22,7 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,39 +49,46 @@ class TransactionalConcurrencyIntegrationTest {
     private final OrderFacade orderFacade;
     private final CouponFacade couponFacade;
     private final ProductLikeFacade productLikeFacade;
+    private final ProductLikeCountFlushService productLikeCountFlushService;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final OrderJpaRepository orderJpaRepository;
     private final IssuedCouponJpaRepository issuedCouponJpaRepository;
     private final ProductLikeJpaRepository productLikeJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     TransactionalConcurrencyIntegrationTest(
         OrderFacade orderFacade,
         CouponFacade couponFacade,
         ProductLikeFacade productLikeFacade,
+        ProductLikeCountFlushService productLikeCountFlushService,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
         OrderJpaRepository orderJpaRepository,
         IssuedCouponJpaRepository issuedCouponJpaRepository,
         ProductLikeJpaRepository productLikeJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.orderFacade = orderFacade;
         this.couponFacade = couponFacade;
         this.productLikeFacade = productLikeFacade;
+        this.productLikeCountFlushService = productLikeCountFlushService;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.issuedCouponJpaRepository = issuedCouponJpaRepository;
         this.productLikeJpaRepository = productLikeJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("동일 상품을 동시에 주문해도 재고만큼만 주문되고 재고가 음수가 되지 않는다.")
@@ -213,6 +222,7 @@ class TransactionalConcurrencyIntegrationTest {
         List<Throwable> failures = runConcurrently(threadCount, index -> {
             productLikeFacade.likeProduct("user" + index, product.getId());
         });
+        productLikeCountFlushService.flushDirtyLikeCounts();
 
         // assert
         ProductJpaEntity updatedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
@@ -239,6 +249,7 @@ class TransactionalConcurrencyIntegrationTest {
         List<Throwable> failures = runConcurrently(threadCount, index -> {
             productLikeFacade.unlikeProduct("user" + index, product.getId());
         });
+        productLikeCountFlushService.flushDirtyLikeCounts();
 
         // assert
         ProductJpaEntity updatedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
