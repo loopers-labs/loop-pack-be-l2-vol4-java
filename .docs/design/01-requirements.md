@@ -131,14 +131,14 @@
 - 상품의 브랜드는 이미 등록된 브랜드여야 함
 - 상품의 브랜드는 수정 불가
 - 상품 목록 정렬 기준: `latest`(기본) / `price_asc` / `likes_desc`
-- likeCount 컬럼 역정규화 (목록 조회 시 COUNT 쿼리 제거)
+- 좋아요 수는 `product_like_view` 분리 테이블로 관리 (목록 조회 시 COUNT 쿼리 제거, products 테이블 락 경합 격리)
 
 ---
 
 ### 좋아요 (Like)
 
-- 좋아요 등록 시 Like 저장 + Product.likeCount +1 (단일 트랜잭션)
-- 좋아요 취소 시 Like 삭제 + Product.likeCount -1 (단일 트랜잭션)
+- 좋아요 등록 시 Like 저장 + product_like_view.like_count +1 (단일 트랜잭션)
+- 좋아요 취소 시 Like 삭제 + product_like_view.like_count -1 (단일 트랜잭션)
 - 이미 좋아요한 상품에 재등록 시 200 OK 반환 (멱등 처리 — 네트워크 재시도 안전)
 - 좋아요 목록 조회 시 상품 기본 정보(상품명, 가격, 브랜드명) JOIN하여 반환
 
@@ -179,7 +179,7 @@
 
 ### 응답성 (Performance)
 - 상품 목록 조회: Offset 기반 페이지네이션 (기본 size: 20)
-- Product 테이블에 likeCount 역정규화 (목록 조회 시 COUNT 쿼리 제거)
+- 좋아요 수는 `product_like_view` 분리 테이블로 관리 (목록 조회 시 COUNT 쿼리 제거, products 테이블 락 경합 격리)
 
 ### 에러 처리 (Error Handling)
 - 표준 HTTP 상태코드 사용 (400 / 401 / 403 / 404 / 409)
@@ -238,12 +238,15 @@
 
 **상품 목록 쿼리 파라미터:**
 
-| 파라미터 | 예시 | 설명 |
-|---------|------|------|
-| `brandId` | `1` | 브랜드 필터링 |
-| `sort` | `latest` / `price_asc` / `likes_desc` | 정렬 기준 (기본: `latest`) |
-| `page` | `0` | 페이지 번호 (기본값 0) |
-| `size` | `20` | 페이지당 수 (기본값 20) |
+| 파라미터 | 예시 | 설명 | 상태 |
+|---------|------|------|------|
+| `brandId` | `1` | 브랜드 필터링 | ✅ 구현 |
+| `sort` | `latest` / `price_asc` / `likes_desc` | 정렬 기준 (기본: `latest`) | ✅ 구현 |
+| `page` | `0` | 페이지 번호 (기본값 0) | ✅ 구현 |
+| `size` | `20` | 페이지당 수 (기본값 20) | ✅ 구현 |
+| `minPrice` | `10000` | 최소 가격 필터 | ⬜ 미구현 |
+| `maxPrice` | `50000` | 최대 가격 필터 | ⬜ 미구현 |
+| `inStock` | `true` | 재고 있는 상품만 조회 | ⬜ 미구현 |
 
 ### 좋아요 (Likes)
 
@@ -252,6 +255,14 @@
 | POST | `/api/v1/products/{productId}/likes` | USER | 좋아요 등록 |
 | DELETE | `/api/v1/products/{productId}/likes` | USER | 좋아요 취소 |
 | GET | `/api/v1/users/{userId}/likes` | USER | 내 좋아요 목록 조회 |
+
+**내 좋아요 목록 쿼리 파라미터:**
+
+| 파라미터 | 예시 | 설명 | 상태 |
+|---------|------|------|------|
+| `sort` | `latest` / `likes_desc` | 정렬 기준 (기본: `latest` — 좋아요한 시간순) | ⬜ 미구현 (`likes_desc` 추가 필요) |
+| `page` | `0` | 페이지 번호 | ✅ 구현 |
+| `size` | `20` | 페이지당 수 | ✅ 구현 |
 
 ### 주문 (Orders)
 
@@ -338,7 +349,7 @@
 1. 로그인 회원이 상품에 좋아요를 요청한다
 2. 상품 존재 여부를 확인한다
 3. 이미 좋아요했는지 확인한다
-4. Like를 저장하고 Product.likeCount를 +1한다 (단일 트랜잭션)
+4. Like를 저장하고 product_like_view.like_count를 +1한다 (단일 트랜잭션)
 
 **Exception Flow**
 - 비로그인 상태 → 401 Unauthorized

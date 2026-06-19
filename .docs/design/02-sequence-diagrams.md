@@ -175,12 +175,12 @@ sequenceDiagram
 ## SD-03. 좋아요 등록
 
 ### 왜 이 다이어그램이 필요한가?
-좋아요는 단순해 보이지만 **likeCount 역정규화 동기화** 책임이 숨어 있습니다.
-- Like 저장과 Product.likeCount +1이 같은 트랜잭션인지
+좋아요는 단순해 보이지만 **product_like_view 동기화** 책임이 숨어 있습니다.
+- Like 저장과 product_like_view.like_count +1이 같은 트랜잭션인지
 - 중복 좋아요 방지 로직의 위치를 확인합니다.
 
 ### 검증 포인트
-- Like 저장과 likeCount 증가가 같은 트랜잭션 안에 있는가?
+- Like 저장과 like_count 증가가 같은 트랜잭션 안에 있는가?
 - 이미 좋아요한 상품에 재등록 시 200으로 멱등 처리되는가?
 
 ```mermaid
@@ -190,11 +190,12 @@ sequenceDiagram
     participant LikeService
     participant ProductRepository
     participant LikeRepository
+    participant ProductLikeViewRepository
 
     Client->>LikeController: POST /api/v1/products/{productId}/likes
     LikeController->>LikeController: 헤더 인증 검증
 
-    Note over LikeService,LikeRepository: @Transactional 시작
+    Note over LikeService,ProductLikeViewRepository: @Transactional 시작
 
     LikeController->>LikeService: addLike(memberId, productId)
 
@@ -205,23 +206,24 @@ sequenceDiagram
     LikeRepository-->>LikeService: true / false
 
     alt 이미 좋아요한 경우 (멱등 처리)
-        Note over LikeService,LikeRepository: @Transactional 종료 (저장 없음)
+        Note over LikeService,ProductLikeViewRepository: @Transactional 종료 (저장 없음)
         LikeService-->>LikeController: 200 OK (이미 좋아요 상태)
         LikeController-->>Client: 200 OK
     else 좋아요하지 않은 경우
         LikeService->>LikeRepository: save(Like)
-        LikeService->>ProductRepository: increaseLikeCount(productId)
-        Note right of ProductRepository: UPDATE products\nSET like_count = like_count + 1\nWHERE id = ?
-        Note over LikeService,LikeRepository: @Transactional 종료 (커밋)
+        LikeService->>ProductLikeViewRepository: increment(productId)
+        Note right of ProductLikeViewRepository: UPDATE product_like_view\nSET like_count = like_count + 1\nWHERE product_id = ?
+        Note over LikeService,ProductLikeViewRepository: @Transactional 종료 (커밋)
         LikeService-->>LikeController: 성공
         LikeController-->>Client: 201 Created
     end
 ```
 
 ### 읽는 포인트
-1. Like 저장과 likeCount +1은 단일 트랜잭션입니다. 둘 중 하나가 실패하면 전체 롤백되어 카운트 불일치를 방지합니다.
-2. 동시 좋아요 요청이 몰릴 경우 likeCount가 순간적으로 정확하지 않을 수 있습니다. 정렬 참고용 수치이므로 소폭 오차는 허용합니다.
-3. 중복 체크는 Service 레이어에서 DB 조회로 확인합니다.
+1. Like 저장과 like_count +1은 단일 트랜잭션입니다. 둘 중 하나가 실패하면 전체 롤백되어 카운트 불일치를 방지합니다.
+2. `product_like_view`는 좋아요 연산만 접근하는 전용 테이블이라, `products` 테이블과 락 경합이 발생하지 않습니다.
+3. 동시 좋아요 요청이 몰릴 경우 like_count가 순간적으로 정확하지 않을 수 있습니다. 정렬 참고용 수치이므로 소폭 오차는 허용합니다.
+4. 중복 체크는 Service 레이어에서 DB 조회로 확인합니다.
 
 ### 잠재 리스크
 - 동시에 같은 사용자가 동일 상품에 좋아요를 2번 요청하면 둘 다 existsByMemberIdAndProductId 체크를 통과할 수 있음 → DB Unique 제약(member_id + product_id)으로 하나만 저장되고 나머지는 예외 발생. 멱등 처리로 재시도는 안전하게 200 반환

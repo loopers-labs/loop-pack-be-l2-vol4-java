@@ -80,11 +80,15 @@ classDiagram
     class Product {
         +name: String
         +price: Long
-        +likeCount: int
         +brandId: Long
-        +increaseLikeCount() void
-        +decreaseLikeCount() void
         +softDelete() void
+    }
+
+    class ProductLikeView {
+        +productId: Long
+        +likeCount: int
+        +increment() void
+        +decrement() void
     }
 
     class Stock {
@@ -153,6 +157,7 @@ classDiagram
     SoftDeletableEntity <|-- Brand
     SoftDeletableEntity <|-- Product
     SoftDeletableEntity <|-- Stock
+    BaseEntity <|-- ProductLikeView
     SoftDeletableEntity <|-- Order
     BaseEntity <|-- Like
     BaseEntity <|-- OrderItem
@@ -168,6 +173,7 @@ classDiagram
     %% ────────── 합성 Composition ──────────
     Order "1" *-- "1..*" OrderItem : 포함
     Product "1" *-- "1" Stock : 포함
+    Product "1" *-- "1" ProductLikeView : 좋아요 수
 
     %% ────────── 연관 Association ──────────
     Product "0..*" --> "1" Brand : 소속
