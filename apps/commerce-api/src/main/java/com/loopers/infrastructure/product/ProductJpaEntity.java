@@ -2,18 +2,29 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.product.Product;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "product")
+@Table(
+    name = "product",
+    indexes = {
+        @Index(name = "idx_product_brand_like_count", columnList = "brand_id, like_count"),
+        @Index(name = "idx_product_brand_price", columnList = "brand_id, price"),
+        @Index(name = "idx_product_brand_created_at", columnList = "brand_id, created_at")
+    }
+)
 public class ProductJpaEntity extends BaseEntity {
 
+    @Column(name = "brand_id")
     private Long brandId;
     private String name;
     private String description;
     private Long price;
     private Integer stock;
+    @Column(name = "like_count")
     private Integer likeCount;
 
     protected ProductJpaEntity() {
