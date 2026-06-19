@@ -8,6 +8,7 @@ import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class ProductCursorV1ApiE2ETest {
     private final ProductJpaRepository productJpaRepository;
     private final ProductRankRepository productRankRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     public ProductCursorV1ApiE2ETest(
@@ -38,18 +40,21 @@ class ProductCursorV1ApiE2ETest {
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
         ProductRankRepository productRankRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.productRankRepository = productRankRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private final ParameterizedTypeReference<ApiResponse<ProductV1Dto.CursorPageResponse>> responseType =

@@ -29,7 +29,8 @@ class ProductFacadeTest {
     private final BrandRepository brandRepository = mock(BrandRepository.class);
     private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
     private final ProductRankRepository productRankRepository = mock(ProductRankRepository.class);
-    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository);
+    private final ProductCachePort productCache = mock(ProductCachePort.class);
+    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache);
 
     @DisplayName("상품 상세를 조회할 때, ")
     @Nested

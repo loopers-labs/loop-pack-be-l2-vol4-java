@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +31,12 @@ public class ProductFacade {
     private final BrandRepository brandRepository;
     private final LikeCountRepository likeCountRepository;
     private final ProductRankRepository productRankRepository;
+    private final ProductCachePort productCache;
 
     private static final int OVER_FETCH = 2; // 삭제/누락 보정용 여유분 배수
+    private static final int BLOB_SIZE = 100; // 첫 페이지 hot 경로용 top-N 블롭 크기
+    private static final Duration DETAIL_TTL = Duration.ofMinutes(10);
+    private static final Duration LIST_TTL = Duration.ofSeconds(60); // 목록 블롭 짧은 TTL(순수 TTL 무효화)
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
@@ -46,11 +51,17 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public ProductDetailInfo getProductDetail(Long id) {
+        Optional<ProductDetailInfo> cached = productCache.getDetail(id);
+        if (cached.isPresent()) {
+            return cached.get(); // 캐시 히트
+        }
         ProductModel product = loadProduct(id);
         BrandModel brand = brandRepository.find(product.getBrandId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
-        return ProductDetailInfo.from(product, brand, likeCountOf(id));
+        ProductDetailInfo info = ProductDetailInfo.from(product, brand, likeCountOf(id));
+        productCache.putDetail(info, DETAIL_TTL); // read-through
+        return info;
     }
 
     @Transactional(readOnly = true)
@@ -80,8 +91,7 @@ public class ProductFacade {
         Long lastLike = cursor == null ? null : cursor.likeCount();
         Long lastId = cursor == null ? null : cursor.productId();
 
-        List<RankedProduct> ranked =
-            productRankRepository.findRankedByBrandLikesDesc(brandId, lastLike, lastId, size * OVER_FETCH);
+        List<RankedProduct> ranked = loadRankedForCursor(brandId, cursor, lastLike, lastId, size);
 
         List<ProductInfo> items = new ArrayList<>(size);
         RankedProduct lastRanked = null;
@@ -107,7 +117,9 @@ public class ProductFacade {
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
         ProductModel product = loadProduct(id);
         product.update(name, description, price, stock);
-        return ProductInfo.from(productRepository.save(product), likeCountOf(id));
+        ProductInfo result = ProductInfo.from(productRepository.save(product), likeCountOf(id));
+        productCache.evictDetail(id); // 상품 수정 시 상세 캐시 정밀 evict
+        return result;
     }
 
     @Transactional
@@ -115,6 +127,22 @@ public class ProductFacade {
         ProductModel product = loadProduct(id);
         product.delete(); // soft delete
         productRepository.save(product);
+        productCache.evictDetail(id);
+    }
+
+    /** 첫 페이지(hot)는 top-N 블롭 캐시 경유, 이후 페이지는 DB 직접(키셋). */
+    private List<RankedProduct> loadRankedForCursor(Long brandId, LikesCursor cursor, Long lastLike, Long lastId, int size) {
+        int need = size * OVER_FETCH;
+        if (cursor == null && need <= BLOB_SIZE) {
+            Optional<List<RankedProduct>> blob = productCache.getLikesBlob(brandId);
+            if (blob.isPresent()) {
+                return blob.get();
+            }
+            List<RankedProduct> top = productRankRepository.findRankedByBrandLikesDesc(brandId, null, null, BLOB_SIZE);
+            productCache.putLikesBlob(brandId, top, LIST_TTL);
+            return top;
+        }
+        return productRankRepository.findRankedByBrandLikesDesc(brandId, lastLike, lastId, need);
     }
 
     private ProductModel loadProduct(Long id) {
