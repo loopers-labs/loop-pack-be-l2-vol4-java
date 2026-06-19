@@ -232,27 +232,62 @@ Phase 2 흐름:
 
 LikeFacade.like()  ─ @Transactional ─┐
   ├─ likeService.register()           │  likes 테이블 INSERT
-  └─ likeOutboxService.record()       │  like_outbox 테이블 INSERT
+  └─ likeOutboxService.record()       │  like_outbox 테이블 INSERT (PENDING)
                                       ─┘  ← API 즉시 반환
 
-LikeOutboxProcessor (스케줄러, 별도 스레드)
-  └─ 미처리 outbox 조회
-       └─ productStatsService.increaseLikeCount() / decreaseLikeCount()
-            └─ outbox 상태를 DONE으로 업데이트
+LikeOutboxProcessor (스케줄러, @Scheduled fixedDelay=1000)
+  └─ PENDING outbox 조회
+       └─ ApplicationEventPublisher.publishEvent(LikeCountChangedEvent)
+
+LikeOutboxEventListener (@EventListener)
+  └─ @Transactional
+       ├─ markDoneIfPending(outboxId)  ← UPDATE WHERE status='PENDING' (멱등성 보장)
+       │    true  → 처리 권한 획득
+       │    false → 이미 처리됨, 조기 종료
+       └─ productStatsService.increase/decreaseLikeCount()
 ```
+
+**설계 결정 사항**
+
+- `delta`(+1/-1) 대신 `LikeEventType` enum(`LIKED_EVENT` / `UNLIKED_EVENT`)으로 의도를 명시적으로 표현한다.
+- `OutboxStatus`는 `PENDING` / `DONE` 두 가지만 사용한다. FAILED 상태는 재시도 한도 로직이 생길 때 추가한다.
+- 릴레이(processor)는 이벤트 발행만 담당하고, 비즈니스 처리는 리스너가 담당한다. 이를 통해 향후 리스너 추가(알림, 랭킹 등) 시 processor 변경 없이 구독만 추가하면 된다.
+- 멀티 인스턴스 환경에서의 중복 처리는 릴레이에서 막는 대신 리스너의 `markDoneIfPending`이 원자적 UPDATE로 처리 권한을 선점하는 방식으로 보장한다.
+- `ProductStatsService.increase/decreaseLikeCount()`에 `@Transactional`을 추가한다. `@Modifying` UPDATE는 활성 트랜잭션이 필수이기 때문이다.
 
 ### 구현 작업 목록
 
-#### 1. `LikeOutboxModel` 엔티티
+#### 0. 사전 변경
+
+- `CommerceApiApplication`에 `@EnableScheduling` 추가
+- `ProductStatsService.increaseLikeCount()` / `decreaseLikeCount()`에 `@Transactional` 추가
+
+#### 1. `LikeEventType` enum
+
+```
+domain/like/LikeEventType.java
+```
+
+- `LIKED_EVENT`, `UNLIKED_EVENT`
+
+#### 2. `OutboxStatus` enum
+
+```
+domain/like/OutboxStatus.java
+```
+
+- `PENDING`, `DONE`
+
+#### 3. `LikeOutboxModel` 엔티티
 
 ```
 domain/like/LikeOutboxModel.java
 ```
 
-- 필드: `productId`, `delta`(+1/-1), `status`(PENDING/DONE/FAILED)
+- 필드: `productId`, `eventType`(LikeEventType), `status`(OutboxStatus)
 - `BaseEntity` 상속
 
-#### 2. `LikeOutboxRepository` 인터페이스 + 인프라 구현
+#### 4. `LikeOutboxRepository` 인터페이스 + 인프라 구현
 
 ```
 domain/like/LikeOutboxRepository.java
@@ -260,18 +295,20 @@ infrastructure/like/LikeOutboxJpaRepository.java
 infrastructure/like/LikeOutboxRepositoryImpl.java
 ```
 
-- `findAllByStatus(OutboxStatus status)` — 배치 처리용
+- `findAllByStatusOrderByIdAsc(OutboxStatus)` — id ASC 정렬로 발생 순서 처리
+- `markDoneIfPending(Long id)` — `UPDATE WHERE status='PENDING'`, affected rows > 0이면 true
 
-#### 3. `LikeOutboxService`
+#### 5. `LikeOutboxService`
 
 ```
 domain/like/LikeOutboxService.java
 ```
 
-- `record(Long productId, int delta)` — PENDING 레코드 저장
+- `record(Long productId, LikeEventType eventType)` — PENDING 레코드 저장
 - `findPending()` — 미처리 목록 조회
+- `markDoneIfPending(Long id)` — 멱등성 가드, `@Transactional`
 
-#### 4. `LikeFacade` 변경
+#### 6. `LikeFacade` 변경
 
 ```java
 // Before (Phase 1)
@@ -281,27 +318,44 @@ if (likeService.register(...).isApplied()) {
 
 // After (Phase 2)
 if (likeService.register(...).isApplied()) {
-    likeOutboxService.record(product.getId(), +1);
+    likeOutboxService.record(product.getId(), LikeEventType.LIKED_EVENT);
 }
 ```
 
-#### 5. `LikeOutboxProcessor` 스케줄러
+#### 7. `LikeOutboxProcessor` (릴레이)
 
 ```
 application/like/LikeOutboxProcessor.java
 ```
 
-- `@Scheduled(fixedDelay = 1000)` 또는 Batch Job
-- PENDING outbox 조회 → `productStatsService.increase/decreaseLikeCount()` → 상태 DONE 업데이트
-- at-least-once 보장: outbox 레코드는 DONE으로 마킹된 이후에만 삭제(또는 유지)
-- 중복 처리 안전: `likes` 테이블의 `uk_likes_user_product` 유니크 제약이 멱등성을 뒷받침
+- `@Scheduled(fixedDelay = 1000)`
+- PENDING outbox 조회 → `ApplicationEventPublisher.publishEvent(LikeCountChangedEvent)`
+- 이벤트 발행만 담당, 비즈니스 처리는 리스너에 위임
 
-#### 6. 테스트 추가
+#### 8. `LikeCountChangedEvent`
+
+```
+application/like/LikeCountChangedEvent.java
+```
+
+- `record LikeCountChangedEvent(Long outboxId, Long productId, LikeEventType eventType)`
+
+#### 9. `LikeOutboxEventListener` (컨슈머)
+
+```
+application/like/LikeOutboxEventListener.java
+```
+
+- `@EventListener` + `@Transactional`
+- `markDoneIfPending()` → false면 조기 종료 (중복 처리 방지)
+- `productStatsService.increase/decreaseLikeCount()` — markDoneIfPending과 같은 트랜잭션
+
+#### 10. 테스트 추가
 
 | 파일 | 내용 |
 |---|---|
 | `LikeFacadeIntegrationTest` | like 후 outbox PENDING 레코드 생성 확인 |
-| `LikeOutboxProcessorIntegrationTest` | 프로세서 실행 후 `product_stats.like_count` 반영 및 outbox DONE 전환 확인 |
+| `LikeOutboxProcessorIntegrationTest` | processor.process() 직접 호출 후 `product_stats.like_count` 반영 및 outbox DONE 전환 확인 |
 
 ---
 

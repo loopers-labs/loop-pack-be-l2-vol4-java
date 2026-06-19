@@ -72,18 +72,7 @@
   - [x] 브랜드 필터 없음 + LIKES_DESC (A3): `productStatsService.findPage()` 경유
   - [x] 브랜드 필터 있음 + LIKES_DESC (B3): `productStatsService.findPageByProductIds()` 경유
 
-### 9. 데이터 이행
-
-- [ ] 백필 SQL 작성 및 검증
-  ```sql
-  INSERT INTO product_stats (product_id, like_count, created_at, updated_at)
-  SELECT id, like_count, NOW(), NOW()
-  FROM product
-  ON DUPLICATE KEY UPDATE like_count = VALUES(like_count);
-  ```
-- [ ] `product.like_count` 컬럼 제거는 별도 배포로 분리
-
-### 10. 테스트
+### 9. 테스트
 
 - [x] `ProductStatsServiceTest` — 신규 단위 테스트
 - [x] `LikeFacadeIntegrationTest` — given에 `ProductStatsModel` 초기 데이터 추가, `productStatsRepository`로 결과 검증
@@ -99,39 +88,67 @@
 
 > Phase 1 완료 후 진행
 
-### 1. LikeOutboxModel 엔티티
+### 0. 사전 변경
 
-- [ ] `domain/like/LikeOutboxModel.java` 생성
-  - [ ] `productId`, `delta`(+1/-1), `status`(PENDING/DONE/FAILED) 필드
-  - [ ] `BaseEntity` 상속
+- [x] `CommerceApiApplication`에 `@EnableScheduling` 추가
+- [x] `ProductStatsService.increaseLikeCount()` / `decreaseLikeCount()`에 `@Transactional` 추가
 
-### 2. LikeOutboxRepository
+### 1. LikeEventType enum
 
-- [ ] `domain/like/LikeOutboxRepository.java` 생성
-  - [ ] `save(LikeOutboxModel)`
-  - [ ] `findAllByStatus(OutboxStatus status)`
-- [ ] `infrastructure/like/LikeOutboxJpaRepository.java` 생성
-- [ ] `infrastructure/like/LikeOutboxRepositoryImpl.java` 생성
+- [x] `domain/like/LikeEventType.java` 생성
+  - [x] `LIKED_EVENT`, `UNLIKED_EVENT`
 
-### 3. LikeOutboxService
+### 2. OutboxStatus enum
 
-- [ ] `domain/like/LikeOutboxService.java` 생성
-  - [ ] `record(Long productId, int delta)` — PENDING 레코드 저장
-  - [ ] `findPending()` — 미처리 목록 조회
+- [x] `domain/like/OutboxStatus.java` 생성
+  - [x] `PENDING`, `DONE`
 
-### 4. LikeFacade 변경
+### 3. LikeOutboxModel 엔티티
 
-- [ ] `like()`: `productStatsService.increaseLikeCount()` → `likeOutboxService.record(productId, +1)`
-- [ ] `unlike()`: `productStatsService.decreaseLikeCount()` → `likeOutboxService.record(productId, -1)`
+- [x] `domain/like/LikeOutboxModel.java` 생성
+  - [x] `productId`, `eventType`(LikeEventType), `status`(OutboxStatus) 필드
+  - [x] `BaseEntity` 상속
 
-### 5. LikeOutboxProcessor
+### 4. LikeOutboxRepository
 
-- [ ] `application/like/LikeOutboxProcessor.java` 생성
-  - [ ] `@Scheduled(fixedDelay = 1000)`
-  - [ ] PENDING outbox 조회 → `productStatsService.increase/decreaseLikeCount()` → 상태 DONE 업데이트
-  - [ ] at-least-once 보장: DONE 마킹 후 삭제 또는 영구 보관 결정
+- [x] `domain/like/LikeOutboxRepository.java` 생성
+  - [x] `save(LikeOutboxModel)`
+  - [x] `findAllByStatusOrderByIdAsc(OutboxStatus)` — id ASC 정렬로 발생 순서 보장
+  - [x] `markDoneIfPending(Long id)` — `UPDATE WHERE status='PENDING'`, 멱등성 보장
+- [x] `infrastructure/like/LikeOutboxJpaRepository.java` 생성
+- [x] `infrastructure/like/LikeOutboxRepositoryImpl.java` 생성
 
-### 6. 테스트
+### 5. LikeOutboxService
 
-- [ ] `LikeFacadeIntegrationTest` — like 후 outbox PENDING 레코드 생성 확인
-- [ ] `LikeOutboxProcessorIntegrationTest` — 프로세서 실행 후 `product_stats.like_count` 반영 및 outbox DONE 전환 확인
+- [x] `domain/like/LikeOutboxService.java` 생성
+  - [x] `record(Long productId, LikeEventType eventType)` — PENDING 레코드 저장
+  - [x] `findPending()` — 미처리 목록 조회
+  - [x] `markDoneIfPending(Long id)` — 멱등성 가드, `@Transactional`
+
+### 6. LikeFacade 변경
+
+- [x] `like()`: `productStatsService.increaseLikeCount()` → `likeOutboxService.record(productId, LikeEventType.LIKED_EVENT)`
+- [x] `unlike()`: `productStatsService.decreaseLikeCount()` → `likeOutboxService.record(productId, LikeEventType.UNLIKED_EVENT)`
+
+### 7. LikeOutboxProcessor (릴레이)
+
+- [x] `application/like/LikeOutboxProcessor.java` 생성
+  - [x] `@Scheduled(fixedDelay = 1000)`
+  - [x] PENDING outbox 조회 → `ApplicationEventPublisher.publishEvent(LikeCountChangedEvent)` 발행만 담당
+
+### 8. LikeCountChangedEvent
+
+- [x] `application/like/LikeCountChangedEvent.java` 생성
+  - [x] `record LikeCountChangedEvent(Long outboxId, Long productId, LikeEventType eventType)`
+
+### 9. LikeOutboxEventListener (컨슈머)
+
+- [x] `application/like/LikeOutboxEventListener.java` 생성
+  - [x] `@EventListener` + `@Transactional`
+  - [x] `markDoneIfPending()` false면 조기 종료 — 중복 이벤트 멱등 처리
+  - [x] `productStatsService.increase/decreaseLikeCount()` — markDoneIfPending과 같은 트랜잭션으로 원자적 커밋
+
+### 10. 테스트
+
+- [x] `LikeFacadeIntegrationTest` — like 후 `processor.process()` 호출로 `product_stats.like_count` 반영 검증
+- [x] `LikeOutboxProcessorIntegrationTest` — `processor.process()` 직접 호출 후 `product_stats.like_count` 반영 및 outbox DONE 전환 확인
