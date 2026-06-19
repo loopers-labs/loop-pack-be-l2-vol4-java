@@ -8,6 +8,13 @@ public interface ProductRepository {
 
     Optional<Product> find(Long id);
 
+    /**
+     * 비관적 쓰기 락(SELECT ... FOR UPDATE)으로 상품을 조회한다.
+     * 재고 차감처럼 high-contention 한 write 경로에서만 사용한다.
+     * 호출자는 트랜잭션 내부에 있어야 한다.
+     */
+    Optional<Product> findForUpdate(Long id);
+
     List<Product> findAll();
 
     /**

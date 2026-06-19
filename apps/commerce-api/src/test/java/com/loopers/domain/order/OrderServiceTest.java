@@ -31,9 +31,9 @@ class OrderServiceTest {
     @Nested
     class CreateOrder {
 
-        @DisplayName("정상 주문이면, 각 상품의 재고가 차감되고 총액이 계산된 주문이 생성된다.")
+        @DisplayName("쿠폰 미적용 시, 각 상품의 재고가 차감되고 원금=최종 금액인 주문이 생성된다.")
         @Test
-        void createsOrder_andDecreasesStock_whenValid() {
+        void createsOrder_andDecreasesStock_whenNoCoupon() {
             // arrange
             Product productA = product("상품A", 1_500L, 10);
             Product productB = product("상품B", 1_000L, 5);
@@ -43,14 +43,35 @@ class OrderServiceTest {
             );
 
             // act
-            Order order = orderService.createOrder(1L, lines);
+            Order order = orderService.createOrder(1L, lines, null, null);
 
             // assert
             assertThat(productA.getStock()).isEqualTo(8);
             assertThat(productB.getStock()).isEqualTo(4);
-            assertThat(order.getTotalPrice()).isEqualTo(Money.of(4_000L));
+            assertThat(order.getOriginalAmount()).isEqualTo(Money.of(4_000L));
+            assertThat(order.getDiscountAmount()).isEqualTo(Money.zero());
+            assertThat(order.getFinalAmount()).isEqualTo(Money.of(4_000L));
+            assertThat(order.getUserCouponId()).isNull();
             assertThat(order.getItems()).hasSize(2);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CREATED);
+        }
+
+        @DisplayName("쿠폰 적용 시, 재고 차감과 함께 할인 금액이 반영된 주문이 생성된다.")
+        @Test
+        void createsOrder_withDiscount_whenCouponApplied() {
+            // arrange
+            Product productA = product("상품A", 1_500L, 10);
+            List<OrderLine> lines = List.of(new OrderLine(productA, 2));
+
+            // act
+            Order order = orderService.createOrder(1L, lines, 77L, Money.of(1_000L));
+
+            // assert
+            assertThat(productA.getStock()).isEqualTo(8);
+            assertThat(order.getOriginalAmount()).isEqualTo(Money.of(3_000L));
+            assertThat(order.getDiscountAmount()).isEqualTo(Money.of(1_000L));
+            assertThat(order.getFinalAmount()).isEqualTo(Money.of(2_000L));
+            assertThat(order.getUserCouponId()).isEqualTo(77L);
         }
 
         @DisplayName("재고가 부족한 상품이 포함되면, CONFLICT 예외가 발생한다.")
@@ -62,7 +83,7 @@ class OrderServiceTest {
 
             // act
             CoreException result = assertThrows(CoreException.class,
-                () -> orderService.createOrder(1L, lines));
+                () -> orderService.createOrder(1L, lines, null, null));
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
@@ -72,7 +93,7 @@ class OrderServiceTest {
         @Test
         void throwsBadRequest_whenLinesAreEmpty() {
             CoreException result = assertThrows(CoreException.class,
-                () -> orderService.createOrder(1L, List.of()));
+                () -> orderService.createOrder(1L, List.of(), null, null));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }

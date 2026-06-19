@@ -34,6 +34,14 @@ public record Money(BigDecimal amount) {
         return new Money(this.amount.add(other.amount));
     }
 
+    /**
+     * 두 금액의 차를 반환한다. 결과가 음수가 되면 컴팩트 생성자에서 BAD_REQUEST 가 발생한다.
+     * 사용처: 주문 최종 결제 금액(finalAmount = originalAmount - discountAmount) 계산 등.
+     */
+    public Money minus(Money other) {
+        return new Money(this.amount.subtract(other.amount));
+    }
+
     public Money multiply(int quantity) {
         if (quantity < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "수량은 0 이상이어야 합니다.");

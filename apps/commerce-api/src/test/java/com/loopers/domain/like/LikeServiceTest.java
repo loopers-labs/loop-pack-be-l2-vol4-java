@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,7 +19,9 @@ class LikeServiceTest {
     @BeforeEach
     void setUp() {
         likeRepository = new FakeLikeRepository();
-        likeService = new LikeService(likeRepository);
+        // 단위 테스트에서는 이벤트를 무시한다 (ProductLikeStat 갱신 자체는 다른 핸들러의 책임).
+        ApplicationEventPublisher noopPublisher = event -> { /* no-op */ };
+        likeService = new LikeService(likeRepository, noopPublisher);
     }
 
     @DisplayName("좋아요를 등록할 때, ")

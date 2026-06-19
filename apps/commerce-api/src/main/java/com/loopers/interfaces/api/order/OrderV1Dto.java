@@ -13,7 +13,10 @@ public class OrderV1Dto {
     public record CreateOrderRequest(
         @NotEmpty(message = "주문 항목은 1개 이상이어야 합니다.")
         @Valid
-        List<Item> items
+        List<Item> items,
+
+        /** 적용할 쿠폰(UserCoupon.id). 미적용 시 null. */
+        Long couponId
     ) {
         public record Item(
             @NotNull(message = "productId 는 필수입니다.")
@@ -26,7 +29,10 @@ public class OrderV1Dto {
     public record OrderResponse(
         Long orderId,
         Long userId,
-        Long totalPrice,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long userCouponId,
         String status,
         List<OrderItemResponse> items
     ) {
@@ -34,7 +40,16 @@ public class OrderV1Dto {
             List<OrderItemResponse> items = info.items().stream()
                 .map(OrderItemResponse::from)
                 .toList();
-            return new OrderResponse(info.orderId(), info.userId(), info.totalPrice(), info.status(), items);
+            return new OrderResponse(
+                info.orderId(),
+                info.userId(),
+                info.originalAmount(),
+                info.discountAmount(),
+                info.finalAmount(),
+                info.userCouponId(),
+                info.status(),
+                items
+            );
         }
     }
 
