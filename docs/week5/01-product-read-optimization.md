@@ -2,19 +2,19 @@
 
 ## TL;DR
 
-상품 목록의 `brandId + likes_desc` 조회는 `Product.likeCount` 비정규화 값을 유지하고, 복합 인덱스와 Redis cache-aside 전략을 함께 적용한다.
+상품 목록의 `brandId + likes_desc` 조회는 `Product.likeCount` 비정규화 값을 정렬용 스냅샷으로 유지하고, 복합 인덱스와 Redis cache-aside 전략을 함께 적용한다.
 
 ## 범위
 
 - 상품 목록 조회: `brandId`, `sort`, `page`, `size`
 - 상품 상세 조회: `productId`
-- 좋아요 등록/취소: `Product.likeCount` 동기화와 캐시 무효화
+- 좋아요 등록/취소: `product_like` 원본 관계 저장, Redis 좋아요 카운터 반영, 캐시 무효화
 
 ## AS-IS
 
 - 상품 목록 조회는 JPA `PageRequest`와 `Sort`로 처리한다.
 - `likes_desc` 정렬은 `Product.likeCount` 기준으로 동작한다.
-- 좋아요 등록/취소 시 `Product`를 비관적 락으로 조회하고 `likeCount`를 증감한다.
+- 좋아요 등록/취소 시 `Product`를 비관적 락으로 조회하고 `likeCount`를 즉시 증감한다.
 - Redis 설정은 있었지만 상품 조회 캐시는 적용되어 있지 않았다.
 
 ## TO-BE
@@ -32,10 +32,27 @@
 ### Structure
 
 좋아요 관계 원본은 `product_like` 테이블에 유지한다.
-정렬용 집계 값은 `product.like_count`에 둔다.
+최신 표시용 집계 값은 Redis 카운터에 먼저 반영하고, 정렬용 집계 값은 `product.like_count`에 스냅샷으로 둔다.
 
 이 선택은 조회 시 `JOIN + GROUP BY + ORDER BY`를 매번 수행하지 않기 위한 비정규화다.
-대신 좋아요 등록/취소 시 `likeCount` 동기화 책임이 생긴다.
+대신 좋아요 등록/취소 시 Redis 카운터와 DB 스냅샷 동기화 책임이 생긴다.
+
+좋아요 쓰기 흐름:
+
+1. `product_like` 테이블에 좋아요 관계를 저장/삭제한다.
+2. Redis `product:like-count:{productId}` 값을 `INCR/DECR`한다.
+3. Redis dirty set에 productId를 기록한다.
+4. 주기 flush가 dirty productId의 Redis 카운터 값을 `product.like_count`에 반영한다.
+5. 상품 상세/목록 응답은 Redis 카운터가 있으면 표시용 `likeCount`에 우선 반영한다.
+
+Redis 카운터 갱신에 실패하면 기존 방식처럼 상품 row를 비관적 락으로 조회해 `product.like_count`를 즉시 증감한다.
+즉, Redis 장애가 좋아요 등록/취소 API 실패로 이어지지 않게 하고, 장애 시에는 쓰기 경합 완화 효과만 포기한다.
+
+트레이드오프:
+
+- `product.like_count`는 실시간 정답이 아니라 목록 정렬을 위한 지연 반영 스냅샷이다.
+- 상세/목록에 표시되는 좋아요 수는 Redis 카운터가 있으면 최신값에 가깝게 보정된다.
+- `likes_desc` 목록의 정렬 순서는 flush 전까지 DB 스냅샷 기준이므로, 아주 짧은 시간 동안 표시 카운트와 정렬 순서가 어긋날 수 있다.
 
 ### Cache
 
@@ -49,6 +66,8 @@ Redis cache-aside 전략을 적용했다.
 캐시 miss 또는 Redis 장애 시에는 DB 조회 경로로 fallback한다.
 캐시 직렬화 실패도 본 조회 흐름을 실패시키지 않고 캐시 쓰기만 건너뛴다.
 목록 캐시 키 추적 set은 목록 캐시 TTL보다 조금 길게 유지해, 목록 키가 만료된 뒤 추적 set만 장기간 남는 상황을 줄인다.
+좋아요 카운터 Redis 장애는 캐시 장애와 별도로 처리한다.
+카운터 갱신 실패 시에는 DB row lock 기반 증감으로 fallback해 `product_like` 원본 관계와 `product.like_count` 스냅샷이 함께 갱신되도록 했다.
 
 ## Benchmark 절차
 
@@ -170,6 +189,8 @@ Warm cache 부하 직후 Actuator/Prometheus 스냅샷:
 ## 판단 근거
 
 - Materialized View는 이번 과제에서 Nice-To-Have다. 현재 구현은 이미 `Product.likeCount` 비정규화 구조를 갖고 있으므로, 먼저 이 구조를 인덱스와 캐시로 보강한다.
+- `Product.likeCount`를 매 좋아요마다 직접 갱신하면 인기 상품 하나에 쓰기가 몰릴 때 row lock 경합이 커질 수 있다. 그래서 정상 경로는 Redis 카운터로 분산하고, DB 값은 배치성 스냅샷으로 반영한다.
+- Redis가 장애일 때도 좋아요 기능 자체가 실패하면 안 되므로, 카운터 갱신 실패 시에는 기존 DB row lock 갱신 경로로 fallback한다.
 - 상품 상세 캐시는 키가 단순해서 명시 무효화가 가능하다.
 - 상품 목록 캐시는 조건 조합이 많고 좋아요 변경에 영향을 받으므로 TTL을 짧게 둔다. 현재 구현은 변경 이벤트에서 추적 중인 목록 키를 지우지만, 운영 규모가 커지면 짧은 TTL 중심으로 무효화 범위를 줄이는 선택도 가능하다.
 - Redis 장애, 캐시 miss, 캐시 직렬화 실패는 서비스 실패가 아니라 DB 조회 fallback 또는 캐시 쓰기 skip으로 처리한다.
