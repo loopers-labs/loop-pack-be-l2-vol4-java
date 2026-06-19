@@ -35,6 +35,11 @@ public class ProductService {
         return productRepository.findAllActive(brandId);
     }
 
+    @Transactional(readOnly = true)
+    public List<ProductModel> getActiveProducts(Long brandId, ProductSortType sort) {
+        return productRepository.findAllActive(brandId, sort);
+    }
+
     @Transactional
     public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock, String imageUrl) {
         ProductModel product = getProduct(id);

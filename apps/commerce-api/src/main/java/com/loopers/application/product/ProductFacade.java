@@ -10,7 +10,6 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,10 +49,9 @@ public class ProductFacade {
     }
 
     public List<ProductDetailInfo> getProductsWithDetail(Long brandId, ProductSortType sort) {
-        return productService.getActiveProducts(brandId).stream()
+        return productService.getActiveProducts(brandId, sort).stream()
             .map(this::toDetailInfo)
             .filter(Objects::nonNull)
-            .sorted(comparatorOf(sort))
             .toList();
     }
 
@@ -73,11 +71,4 @@ public class ProductFacade {
         return ProductDetailInfo.from(product, brandOpt.get(), product.getLikeCount());
     }
 
-    private Comparator<ProductDetailInfo> comparatorOf(ProductSortType sort) {
-        return switch (sort) {
-            case PRICE_ASC -> Comparator.comparingLong(ProductDetailInfo::price);
-            case LIKES_DESC -> Comparator.comparingLong(ProductDetailInfo::likeCount).reversed();
-            case LATEST -> Comparator.comparing(ProductDetailInfo::createdAt).reversed();
-        };
-    }
 }

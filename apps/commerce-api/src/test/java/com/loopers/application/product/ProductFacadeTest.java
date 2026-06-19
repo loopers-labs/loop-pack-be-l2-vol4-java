@@ -63,7 +63,7 @@ class ProductFacadeTest {
         @Test
         void returns_product_detail_with_brand_and_like_count() {
             ProductModel p = productWithLikeCount(1L, 7L);
-            when(productService.getActiveProducts(null)).thenReturn(List.of(p));
+            when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.of(activeBrand()));
 
             List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.LATEST);
@@ -79,7 +79,7 @@ class ProductFacadeTest {
         @Test
         void excludes_products_with_suspended_brand() {
             ProductModel p = product(1L);
-            when(productService.getActiveProducts(null)).thenReturn(List.of(p));
+            when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.of(suspendedBrand()));
 
             List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.LATEST);
@@ -91,7 +91,7 @@ class ProductFacadeTest {
         @Test
         void excludes_products_with_deleted_brand() {
             ProductModel p = product(1L);
-            when(productService.getActiveProducts(null)).thenReturn(List.of(p));
+            when(productService.getActiveProducts(null, ProductSortType.LATEST)).thenReturn(List.of(p));
             when(brandService.findBrand(1L)).thenReturn(Optional.empty());
 
             List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.LATEST);
@@ -99,36 +99,19 @@ class ProductFacadeTest {
             assertThat(result).isEmpty();
         }
 
-        @DisplayName("PRICE_ASC 정렬 시 가격 오름차순으로 반환된다.")
+        @DisplayName("정렬 타입이 서비스 레이어로 전달되어 DB 정렬이 수행된다.")
         @Test
-        void returns_sorted_by_price_asc() {
+        void delegates_sort_to_service_layer() {
             ProductModel cheap = new ProductModel(1L, "저렴", "설명", 1000L, 5, null);
             ProductModel expensive = new ProductModel(1L, "비싼", "설명", 9000L, 5, null);
-            BrandModel brand = activeBrand();
-
-            when(productService.getActiveProducts(null)).thenReturn(List.of(expensive, cheap));
-            when(brandService.findBrand(1L)).thenReturn(Optional.of(brand));
+            when(productService.getActiveProducts(null, ProductSortType.PRICE_ASC))
+                .thenReturn(List.of(cheap, expensive));
+            when(brandService.findBrand(1L)).thenReturn(Optional.of(activeBrand()));
 
             List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.PRICE_ASC);
 
             assertThat(result.get(0).price()).isEqualTo(1000L);
             assertThat(result.get(1).price()).isEqualTo(9000L);
-        }
-
-        @DisplayName("LIKES_DESC 정렬 시 좋아요 수 내림차순으로 반환된다.")
-        @Test
-        void returns_sorted_by_likes_desc() {
-            ProductModel p1 = productWithLikeCount(1L, 5L);
-            ProductModel p2 = productWithLikeCount(1L, 20L);
-            BrandModel brand = activeBrand();
-
-            when(productService.getActiveProducts(null)).thenReturn(List.of(p1, p2));
-            when(brandService.findBrand(1L)).thenReturn(Optional.of(brand));
-
-            List<ProductDetailInfo> result = productFacade.getProductsWithDetail(null, ProductSortType.LIKES_DESC);
-
-            assertThat(result.get(0).likeCount()).isEqualTo(20L);
-            assertThat(result.get(1).likeCount()).isEqualTo(5L);
         }
     }
 
