@@ -1,8 +1,10 @@
 package com.loopers.benchmark;
 
+import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.support.seed.ProductSeeder;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -27,6 +29,7 @@ class ProductReadPerfBenchmarkTest {
     private static final Logger log = LoggerFactory.getLogger(ProductReadPerfBenchmarkTest.class);
 
     @Autowired ProductSeeder seeder;
+    @Autowired ProductRankRepository productRankRepository;
     @Autowired JdbcTemplate jdbc;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
@@ -58,5 +61,40 @@ class ProductReadPerfBenchmarkTest {
         assertThat(hasFilesort)
             .as("cross-table 정렬이라 filesort 가 떠야 한다 (AS-IS 근거)")
             .isTrue();
+    }
+
+    @Disabled("수동 벤치마크 — 10k 시드. 측정 수치는 docs/issue 의 Benchmark Report 참고")
+    @DisplayName("c(cross-table) vs b(product_rank) likes_desc EXPLAIN·시간 비교 (AS-IS/TO-BE 수치)")
+    @Test
+    void c_vs_b_likes_desc_explain_and_timing() {
+        seeder.seed(10_000, 200);
+        productRankRepository.rebuildFromSource();
+        jdbc.execute("ANALYZE TABLE product");
+        jdbc.execute("ANALYZE TABLE product_like_count");
+        jdbc.execute("ANALYZE TABLE product_rank");
+
+        long brandId = 42L;
+        String cSql = "SELECT p.* FROM product p LEFT JOIN product_like_count plc ON plc.product_id = p.id "
+            + "WHERE p.brand_id = " + brandId + " AND p.deleted_at IS NULL "
+            + "ORDER BY COALESCE(plc.like_count, 0) DESC, p.id DESC LIMIT 20";
+        String bSql = "SELECT product_id FROM product_rank WHERE brand_id = " + brandId + " "
+            + "ORDER BY like_count DESC, product_id DESC LIMIT 20";
+
+        explain("c", cSql);
+        explain("b", bSql);
+        log.info("[BENCH-TIME] c={}ms  b={}ms", timeMs(cSql), timeMs(bSql));
+    }
+
+    private void explain(String tag, String sql) {
+        for (Map<String, Object> row : jdbc.queryForList("EXPLAIN " + sql)) {
+            log.info("[BENCH-EXPLAIN {}] table={} type={} key={} rows={} Extra={}",
+                tag, row.get("table"), row.get("type"), row.get("key"), row.get("rows"), row.get("Extra"));
+        }
+    }
+
+    private long timeMs(String sql) {
+        long t0 = System.nanoTime();
+        jdbc.queryForList(sql);
+        return (System.nanoTime() - t0) / 1_000_000;
     }
 }
