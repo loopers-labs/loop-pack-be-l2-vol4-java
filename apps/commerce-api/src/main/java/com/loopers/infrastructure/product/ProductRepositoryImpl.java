@@ -2,7 +2,9 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -40,6 +42,23 @@ public class ProductRepositoryImpl implements ProductRepository {
             return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId);
         }
         return productJpaRepository.findAllByDeletedAtIsNull();
+    }
+
+    @Override
+    public List<ProductModel> findAllActive(Long brandId, ProductSortType sort) {
+        Sort jpaSort = toJpaSort(sort);
+        if (brandId != null) {
+            return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, jpaSort);
+        }
+        return productJpaRepository.findAllByDeletedAtIsNull(jpaSort);
+    }
+
+    private Sort toJpaSort(ProductSortType sort) {
+        return switch (sort) {
+            case LATEST -> Sort.by(Sort.Direction.DESC, "createdAt");
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
+            case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount");
+        };
     }
 
     @Override

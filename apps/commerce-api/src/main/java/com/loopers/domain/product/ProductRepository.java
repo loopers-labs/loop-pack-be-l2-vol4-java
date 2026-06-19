@@ -9,5 +9,6 @@ public interface ProductRepository {
     Optional<ProductModel> findWithLock(Long id);
     List<ProductModel> findAll();
     List<ProductModel> findAllActive(Long brandId);
+    List<ProductModel> findAllActive(Long brandId, ProductSortType sort);
     void delete(Long id);
 }

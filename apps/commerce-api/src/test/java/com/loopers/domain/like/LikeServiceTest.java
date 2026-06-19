@@ -30,24 +30,26 @@ class LikeServiceTest {
     @Nested
     class Like {
 
-        @DisplayName("활성 좋아요가 없으면 새 좋아요를 저장한다.")
+        @DisplayName("활성 좋아요가 없으면 새 좋아요를 저장하고 true 를 반환한다.")
         @Test
-        void saves_new_like_when_no_active_like_exists() {
+        void saves_new_like_and_returns_true_when_no_active_like_exists() {
             when(likeRepository.findActiveLike(1L, 1L)).thenReturn(Optional.empty());
             when(likeRepository.save(any(LikeModel.class))).thenReturn(new LikeModel(1L, 1L));
 
-            likeService.like(1L, 1L);
+            boolean result = likeService.like(1L, 1L);
 
+            assertThat(result).isTrue();
             verify(likeRepository).save(any(LikeModel.class));
         }
 
-        @DisplayName("이미 활성 좋아요가 있으면 저장을 생략한다. (멱등)")
+        @DisplayName("이미 활성 좋아요가 있으면 저장을 생략하고 false 를 반환한다. (멱등)")
         @Test
-        void skips_save_when_active_like_already_exists() {
+        void skips_save_and_returns_false_when_active_like_already_exists() {
             when(likeRepository.findActiveLike(1L, 1L)).thenReturn(Optional.of(new LikeModel(1L, 1L)));
 
-            likeService.like(1L, 1L);
+            boolean result = likeService.like(1L, 1L);
 
+            assertThat(result).isFalse();
             verify(likeRepository, never()).save(any());
         }
     }
@@ -56,24 +58,26 @@ class LikeServiceTest {
     @Nested
     class Unlike {
 
-        @DisplayName("활성 좋아요가 있으면 soft delete 처리된다.")
+        @DisplayName("활성 좋아요가 있으면 soft delete 처리하고 true 를 반환한다.")
         @Test
-        void soft_deletes_like_when_active_like_exists() {
+        void soft_deletes_like_and_returns_true_when_active_like_exists() {
             LikeModel like = new LikeModel(1L, 1L);
             when(likeRepository.findActiveLike(1L, 1L)).thenReturn(Optional.of(like));
 
-            likeService.unlike(1L, 1L);
+            boolean result = likeService.unlike(1L, 1L);
 
+            assertThat(result).isTrue();
             assertThat(like.getDeletedAt()).isNotNull();
         }
 
-        @DisplayName("활성 좋아요가 없으면 아무 동작도 하지 않는다. (멱등)")
+        @DisplayName("활성 좋아요가 없으면 아무 동작도 하지 않고 false 를 반환한다. (멱등)")
         @Test
-        void does_nothing_when_no_active_like_exists() {
+        void does_nothing_and_returns_false_when_no_active_like_exists() {
             when(likeRepository.findActiveLike(1L, 1L)).thenReturn(Optional.empty());
 
-            likeService.unlike(1L, 1L);
+            boolean result = likeService.unlike(1L, 1L);
 
+            assertThat(result).isFalse();
             verify(likeRepository, never()).save(any());
         }
     }

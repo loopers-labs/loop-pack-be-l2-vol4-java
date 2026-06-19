@@ -4,6 +4,7 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
@@ -11,7 +12,10 @@ import java.time.ZonedDateTime;
 
 @Entity
 @Getter
-@Table(name = "product")
+@Table(name = "product", indexes = {
+    @Index(name = "idx_product_brand_deleted_like", columnList = "brand_id, deleted_at, like_count"),
+    @Index(name = "idx_product_deleted_like", columnList = "deleted_at, like_count")
+})
 public class ProductModel extends BaseEntity {
 
     private Long brandId;
@@ -21,6 +25,7 @@ public class ProductModel extends BaseEntity {
     private Integer stock;
     private String imageUrl;
     private ZonedDateTime soldOutAt;
+    private long likeCount;
 
     protected ProductModel() {}
 
@@ -67,6 +72,16 @@ public class ProductModel extends BaseEntity {
         this.stock += quantity;
         if (this.stock > 0) {
             this.soldOutAt = null;
+        }
+    }
+
+    public void incrementLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decrementLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
         }
     }
 
