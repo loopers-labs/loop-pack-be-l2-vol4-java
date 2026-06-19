@@ -22,8 +22,8 @@ public class ProductStatsService {
         return productStatsRepository.save(new ProductStatsModel(product));
     }
 
-    public void softDelete(Long productId) {
-        ProductStatsModel stats = getByProductId(productId);
+    public void delete(ProductModel product) {
+        ProductStatsModel stats = getByProduct(product);
         stats.delete();
         productStatsRepository.save(stats);
     }
@@ -36,9 +36,9 @@ public class ProductStatsService {
         productStatsRepository.decreaseLikeCount(productId);
     }
 
-    public ProductStatsModel getByProductId(Long productId) {
-        return productStatsRepository.findByProductId(productId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품 통계를 찾을 수 없습니다."));
+    public ProductStatsModel getByProduct(ProductModel product) {
+        return productStatsRepository.findByProduct(product)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + product.getId() + "] 상품 통계를 찾을 수 없습니다."));
     }
 
     public Map<Long, ProductStatsModel> getMapByProductIds(Set<Long> productIds) {

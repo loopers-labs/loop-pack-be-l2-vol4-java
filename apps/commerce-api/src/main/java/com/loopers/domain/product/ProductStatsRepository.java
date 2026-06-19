@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface ProductStatsRepository {
     ProductStatsModel save(ProductStatsModel productStats);
 
-    Optional<ProductStatsModel> findByProductId(Long productId);
+    Optional<ProductStatsModel> findByProduct(ProductModel product);
 
     List<ProductStatsModel> findAllByProductIds(List<Long> productIds);
 

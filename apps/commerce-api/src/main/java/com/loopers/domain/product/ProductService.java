@@ -67,10 +67,10 @@ public class ProductService {
     public void delete(Long id) {
         ProductModel product = getById(id);
 
-        product.delete();
+        productStatsService.delete(product);
 
+        product.delete();
         productRepository.save(product);
-        productStatsService.softDelete(id);
     }
 
     public void softDeleteAllByBrandId(Long brandId) {

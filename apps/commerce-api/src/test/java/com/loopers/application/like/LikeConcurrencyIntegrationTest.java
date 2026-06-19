@@ -98,7 +98,7 @@ class LikeConcurrencyIntegrationTest {
         executor.shutdown();
 
         // then
-        Long likeCount = productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
+        Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
         assertThat(likeCount).isEqualTo((long) THREAD_COUNT);
     }
 
@@ -147,7 +147,7 @@ class LikeConcurrencyIntegrationTest {
         executor.shutdown();
 
         // then
-        Long likeCount = productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
+        Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
         assertThat(likeCount).isEqualTo(0L);
     }
 }

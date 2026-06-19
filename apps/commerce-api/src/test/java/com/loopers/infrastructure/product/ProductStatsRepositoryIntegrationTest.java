@@ -50,7 +50,7 @@ class ProductStatsRepositoryIntegrationTest extends ProductStatsRepositoryContra
         em.clear();
 
         // then
-        ProductStatsModel found = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+        ProductStatsModel found = productStatsRepository.findByProduct(product).orElseThrow();
         assertThat(found.getLikeCount()).isEqualTo(1L);
     }
 
@@ -67,7 +67,7 @@ class ProductStatsRepositoryIntegrationTest extends ProductStatsRepositoryContra
         em.clear();
 
         // then
-        ProductStatsModel found = productStatsRepository.findByProductId(product.getId()).orElseThrow();
+        ProductStatsModel found = productStatsRepository.findByProduct(product).orElseThrow();
         assertThat(found.getLikeCount()).isEqualTo(0L);
     }
 }

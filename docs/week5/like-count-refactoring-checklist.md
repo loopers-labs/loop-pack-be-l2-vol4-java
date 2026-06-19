@@ -8,69 +8,69 @@
 
 ### 1. ProductStatsModel 엔티티
 
-- [ ] `domain/product/ProductStatsModel.java` 생성
-  - [ ] `productId`, `likeCount` 필드
-  - [ ] `BaseEntity` 상속
-  - [ ] `@Table(name = "product_stats")` + unique constraint `(product_id)` + index `(deleted_at, like_count)`
+- [x] `domain/product/ProductStatsModel.java` 생성
+  - [x] `likeCount` 필드 (`product`는 `@OneToOne ProductModel`로 구현)
+  - [x] `BaseEntity` 상속
+  - [x] `@Table(name = "product_stats")` + unique constraint `(product_id)` + index `(deleted_at, like_count)`
 
 ### 2. ProductStatsRepository
 
-- [ ] `domain/product/ProductStatsRepository.java` 생성
-  - [ ] `save(ProductStatsModel)`
-  - [ ] `findByProductId(Long productId)`
-  - [ ] `increaseLikeCount(Long productId)` — 원자적 UPDATE, 동시성 주석 필수
-  - [ ] `decreaseLikeCount(Long productId)` — 원자적 UPDATE, 동시성 주석 필수
-  - [ ] `findPageOrderByLikeCountDesc(Pageable pageable)` — A3용
-  - [ ] `findPageByProductIdsOrderByLikeCountDesc(List<Long> productIds, Pageable pageable)` — B3용
+- [x] `domain/product/ProductStatsRepository.java` 생성
+  - [x] `save(ProductStatsModel)`
+  - [x] `findByProductId(Long productId)`
+  - [x] `increaseLikeCount(Long productId)` — 원자적 UPDATE, 동시성 주석 필수
+  - [x] `decreaseLikeCount(Long productId)` — 원자적 UPDATE, 동시성 주석 필수
+  - [x] `findPageOrderByLikeCountDesc(Pageable pageable)` — A3용
+  - [x] `findPageByProductIdsOrderByLikeCountDesc(List<Long> productIds, Pageable pageable)` — B3용
 
 ### 3. 인프라 구현
 
-- [ ] `infrastructure/product/ProductStatsJpaRepository.java` 생성
-  - [ ] `increaseLikeCount`: `@Modifying @Query` 원자적 UPDATE
-  - [ ] `decreaseLikeCount`: `@Modifying @Query` 원자적 UPDATE
-- [ ] `infrastructure/product/ProductStatsRepositoryImpl.java` 생성
-  - [ ] A3 쿼리: `product_stats` 단독 `(deleted_at, like_count)` 인덱스 활용
-  - [ ] B3 쿼리: `product` 드라이빙 조인, `(brand_id, deleted_at)` 선필터링 후 like_count 정렬
+- [x] `infrastructure/product/ProductStatsJpaRepository.java` 생성
+  - [x] `increaseLikeCount`: `@Modifying @Query` 원자적 UPDATE
+  - [x] `decreaseLikeCount`: `@Modifying @Query` 원자적 UPDATE
+- [x] `infrastructure/product/ProductStatsRepositoryImpl.java` 생성
+  - [x] A3 쿼리: `product_stats` 단독 `(deleted_at, like_count)` 인덱스 활용
+  - [x] B3 쿼리: IN 쿼리로 구현 (`product_stats.product.id in (productIds)`). `ProductFacade`에서 brandId로 productIds 먼저 조회 후 위임하는 2-step 방식
 
 ### 4. ProductStatsService
 
-- [ ] `domain/product/ProductStatsService.java` 생성
-  - [ ] `create(Long productId)` — 상품 생성 시 초기 row 삽입
-  - [ ] `softDelete(Long productId)` — 상품 soft delete 시 연동
-  - [ ] `increaseLikeCount(Long productId)`
-  - [ ] `decreaseLikeCount(Long productId)`
-  - [ ] `getByProductId(Long productId)` — NOT_FOUND 예외
-  - [ ] `getMapByProductIds(Set<Long> productIds)`
-  - [ ] `findPage(Pageable pageable)` — A3용
-  - [ ] `findPageByProductIds(List<Long> productIds, Pageable pageable)` — B3용
+- [x] `domain/product/ProductStatsService.java` 생성
+  - [x] `create(ProductModel product)` — 상품 생성 시 초기 row 삽입
+  - [x] `softDelete(Long productId)` — 상품 soft delete 시 연동
+  - [x] `increaseLikeCount(Long productId)`
+  - [x] `decreaseLikeCount(Long productId)`
+  - [x] `getByProductId(Long productId)` — NOT_FOUND 예외
+  - [x] `getMapByProductIds(Set<Long> productIds)`
+  - [x] `findPage(Pageable pageable)` — A3용
+  - [x] `findPageByProductIds(List<Long> productIds, Pageable pageable)` — B3용
 
 ### 5. ProductModel 변경
 
-- [ ] `likeCount` 필드 및 getter 제거
-- [ ] 인덱스 변경
-  - [ ] `idx_product_deleted_at_like_count` 제거
-  - [ ] `idx_product_brand_id_deleted_at_like_count` 제거
-  - [ ] `idx_product_brand_id_deleted_at` 추가
-- [ ] `ProductRepository.increaseLikeCount` / `decreaseLikeCount` 제거
-- [ ] `ProductJpaRepository` / `ProductRepositoryImpl` 해당 구현 제거
+- [x] `likeCount` 필드 및 getter 제거
+- [x] 인덱스 변경
+  - [x] `idx_product_deleted_at_like_count` 제거
+  - [x] `idx_product_brand_id_deleted_at_like_count` 제거
+  - [x] `idx_product_brand_id_deleted_at` 추가
+- [x] `ProductRepository.increaseLikeCount` / `decreaseLikeCount` 제거
+- [x] `ProductJpaRepository` / `ProductRepositoryImpl` 해당 구현 제거
 
 ### 6. 상품 생성 / 삭제 연동
 
-- [ ] `ProductService.create()` 또는 `ProductFacade` — 상품 생성 시 `productStatsService.create()` 호출
-- [ ] `ProductService.delete()` 또는 `ProductFacade` — 상품 soft delete 시 `productStatsService.softDelete()` 같은 트랜잭션에서 호출
+- [x] `ProductService.create()` — 상품 생성 시 `productStatsService.create()` 호출
+- [x] `ProductService.delete()` — 상품 soft delete 시 `productStatsService.softDelete()` 같은 트랜잭션에서 호출 (product soft delete 전에 먼저 호출해야 JOIN 조건 충족)
 
 ### 7. LikeFacade 변경
 
-- [ ] `like()`: `productService.increaseLikeCount()` → `productStatsService.increaseLikeCount()`
-- [ ] `unlike()`: `productService.decreaseLikeCount()` → `productStatsService.decreaseLikeCount()`
+- [x] `like()`: `productService.increaseLikeCount()` → `productStatsService.increaseLikeCount()`
+- [x] `unlike()`: `productService.decreaseLikeCount()` → `productStatsService.decreaseLikeCount()`
 
 ### 8. 읽기 경로 변경
 
-- [ ] `ProductInfoAssembler.toInfoList()` — `productStatsService.getMapByProductIds()`로 likeCount 조립
-- [ ] `ProductInfo.from()` — `product.getLikeCount()` → `stats.getLikeCount()`
-- [ ] `ProductFacade.findProducts()` — 정렬 조건 분기
-  - [ ] 브랜드 필터 없음 + LIKES_DESC (A3): `productStatsService.findPage()` 경유
-  - [ ] 브랜드 필터 있음 + LIKES_DESC (B3): `productStatsService.findPageByProductIds()` 경유
+- [x] `ProductInfoAssembler.toInfoList()` — `productStatsService.getMapByProductIds()`로 likeCount 조립
+- [x] `ProductInfo.from()` — stats 파라미터 추가, `stats.getLikeCount()` 사용
+- [x] `ProductFacade.getProducts()` — 정렬 조건 분기
+  - [x] 브랜드 필터 없음 + LIKES_DESC (A3): `productStatsService.findPage()` 경유
+  - [x] 브랜드 필터 있음 + LIKES_DESC (B3): `productStatsService.findPageByProductIds()` 경유
 
 ### 9. 데이터 이행
 
@@ -85,13 +85,13 @@
 
 ### 10. 테스트
 
-- [ ] `ProductStatsServiceTest` — 신규 단위 테스트
-- [ ] `LikeFacadeIntegrationTest` — given에 `ProductStatsModel` 초기 데이터 추가, `productStatsRepository`로 결과 검증
-- [ ] `LikeConcurrencyIntegrationTest` — 검증 대상을 `product_stats.like_count`로 변경
-- [ ] `ProductFacadeIntegrationTest`
-  - [ ] like_count 정렬 시나리오 검증 경로 변경
-  - [ ] 상품 soft delete 시 product_stats도 함께 soft delete 검증
-- [ ] `ProductModelTest` — `likeCount` 관련 테스트 케이스 제거
+- [x] `ProductStatsServiceTest` — 신규 단위 테스트
+- [x] `LikeFacadeIntegrationTest` — given에 `ProductStatsModel` 초기 데이터 추가, `productStatsRepository`로 결과 검증
+- [x] `LikeConcurrencyIntegrationTest` — 검증 대상을 `product_stats.like_count`로 변경
+- [x] `ProductFacadeIntegrationTest`
+  - [x] like_count 정렬 시나리오 검증 경로 변경
+  - [x] 상품 soft delete 시 product_stats도 함께 soft delete 검증
+- [x] `ProductModelTest` — `likeCount` 관련 테스트 케이스 제거
 
 ---
 
