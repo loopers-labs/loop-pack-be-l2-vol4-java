@@ -43,10 +43,12 @@ Redis cache-aside 전략을 적용했다.
 
 | 대상 | 키 | TTL | 무효화 |
 | --- | --- | --- | --- |
-| 상품 상세 | `product:detail:{productId}` | 10분 | 상품 수정/삭제, 좋아요 등록/취소 |
-| 상품 목록 | `product:list:brand:{brandId}:sort:{sort}:page:{page}:size:{size}` | 30초 | 상품 생성/수정/삭제, 좋아요 등록/취소 |
+| 상품 상세 | `product:detail:{productId}` | 10분 | 상품 수정/삭제, 브랜드 삭제, 좋아요 등록/취소 |
+| 상품 목록 | `product:list:brand:{brandId}:sort:{sort}:page:{page}:size:{size}` | 30초 | 상품 생성/수정/삭제, 브랜드 삭제, 좋아요 등록/취소 |
 
 캐시 miss 또는 Redis 장애 시에는 DB 조회 경로로 fallback한다.
+캐시 직렬화 실패도 본 조회 흐름을 실패시키지 않고 캐시 쓰기만 건너뛴다.
+목록 캐시 키 추적 set은 목록 캐시 TTL보다 조금 길게 유지해, 목록 키가 만료된 뒤 추적 set만 장기간 남는 상황을 줄인다.
 
 ## Benchmark 절차
 
@@ -103,4 +105,4 @@ mysql -h 127.0.0.1 -P 3306 -u application -papplication loopers \
 - Materialized View는 이번 과제에서 Nice-To-Have다. 현재 구현은 이미 `Product.likeCount` 비정규화 구조를 갖고 있으므로, 먼저 이 구조를 인덱스와 캐시로 보강한다.
 - 상품 상세 캐시는 키가 단순해서 명시 무효화가 가능하다.
 - 상품 목록 캐시는 조건 조합이 많고 좋아요 변경에 영향을 받으므로 TTL을 짧게 둔다. 현재 구현은 변경 이벤트에서 추적 중인 목록 키를 지우지만, 운영 규모가 커지면 짧은 TTL 중심으로 무효화 범위를 줄이는 선택도 가능하다.
-- Redis 장애나 캐시 miss는 서비스 실패가 아니라 DB 조회 fallback으로 처리한다.
+- Redis 장애, 캐시 miss, 캐시 직렬화 실패는 서비스 실패가 아니라 DB 조회 fallback 또는 캐시 쓰기 skip으로 처리한다.

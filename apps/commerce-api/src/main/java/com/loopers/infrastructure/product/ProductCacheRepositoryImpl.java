@@ -8,8 +8,7 @@ import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.common.PageCriteria;
 import com.loopers.domain.product.ProductSort;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.RedisSystemException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +22,7 @@ import java.util.Set;
 public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     private static final Duration DETAIL_TTL = Duration.ofMinutes(10);
     private static final Duration LIST_TTL = Duration.ofSeconds(30);
+    private static final Duration LIST_KEYS_TTL = LIST_TTL.multipliedBy(2);
     private static final String LIST_KEYS_KEY = "product:list:keys";
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -37,7 +37,8 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
 
     @Override
     public void cacheProduct(ProductInfo productInfo) {
-        set(detailKey(productInfo.id()), write(productInfo), DETAIL_TTL);
+        write(productInfo)
+            .ifPresent(value -> set(detailKey(productInfo.id()), value, DETAIL_TTL));
     }
 
     @Override
@@ -50,8 +51,14 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     @Override
     public void cacheProducts(Long brandId, String sort, Integer page, Integer size, List<ProductInfo> productInfos) {
         String key = listKey(brandId, sort, page, size);
-        set(key, write(productInfos), LIST_TTL);
-        runCacheCommand(() -> redisTemplate.opsForSet().add(LIST_KEYS_KEY, key));
+        write(productInfos)
+            .ifPresent(value -> {
+                runCacheCommand(() -> {
+                    redisTemplate.opsForValue().set(key, value, LIST_TTL);
+                    redisTemplate.opsForSet().add(LIST_KEYS_KEY, key);
+                    redisTemplate.expire(LIST_KEYS_KEY, LIST_KEYS_TTL);
+                });
+            });
     }
 
     @Override
@@ -88,7 +95,7 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     private Optional<String> get(String key) {
         try {
             return Optional.ofNullable(redisTemplate.opsForValue().get(key));
-        } catch (RedisConnectionFailureException | RedisSystemException e) {
+        } catch (DataAccessException e) {
             return Optional.empty();
         }
     }
@@ -97,11 +104,11 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
         runCacheCommand(() -> redisTemplate.opsForValue().set(key, value, ttl));
     }
 
-    private String write(Object value) {
+    private Optional<String> write(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
+            return Optional.of(objectMapper.writeValueAsString(value));
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("상품 캐시 직렬화에 실패했습니다.", e);
+            return Optional.empty();
         }
     }
 
@@ -130,7 +137,7 @@ public class ProductCacheRepositoryImpl implements ProductCacheRepository {
     private void runCacheCommand(Runnable command) {
         try {
             command.run();
-        } catch (RedisConnectionFailureException | RedisSystemException ignored) {
+        } catch (DataAccessException ignored) {
         }
     }
 }
