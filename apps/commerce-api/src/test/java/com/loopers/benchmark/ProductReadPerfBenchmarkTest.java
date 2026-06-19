@@ -63,26 +63,43 @@ class ProductReadPerfBenchmarkTest {
             .isTrue();
     }
 
-    @Disabled("수동 벤치마크 — 10k 시드. 측정 수치는 docs/issue 의 Benchmark Report 참고")
-    @DisplayName("c(cross-table) vs b(product_rank) likes_desc EXPLAIN·시간 비교 (AS-IS/TO-BE 수치)")
+    @Disabled("수동 벤치마크. 측정 수치는 Benchmark Report 참고")
+    @DisplayName("읽기 경로 벤치: c vs b EXPLAIN·시간 + OFFSET vs 키셋 딥페이지")
     @Test
-    void c_vs_b_likes_desc_explain_and_timing() {
-        seeder.seed(10_000, 200);
+    void benchmark_read_paths() {
+        int n = 30_000;
+        seeder.seed(n, 200);
         productRankRepository.rebuildFromSource();
         jdbc.execute("ANALYZE TABLE product");
         jdbc.execute("ANALYZE TABLE product_like_count");
         jdbc.execute("ANALYZE TABLE product_rank");
 
+        // (1) brand 필터 likes_desc: c(cross-table 조인) vs b(읽기모델)
         long brandId = 42L;
         String cSql = "SELECT p.* FROM product p LEFT JOIN product_like_count plc ON plc.product_id = p.id "
             + "WHERE p.brand_id = " + brandId + " AND p.deleted_at IS NULL "
             + "ORDER BY COALESCE(plc.like_count, 0) DESC, p.id DESC LIMIT 20";
         String bSql = "SELECT product_id FROM product_rank WHERE brand_id = " + brandId + " "
             + "ORDER BY like_count DESC, product_id DESC LIMIT 20";
-
         explain("c", cSql);
         explain("b", bSql);
-        log.info("[BENCH-TIME] c={}ms  b={}ms", timeMs(cSql), timeMs(bSql));
+        log.info("[BENCH n={} brand] c={}us  b={}us", n, avgMicros(cSql), avgMicros(bSql));
+
+        // (2) 무필터 likes_desc 딥페이지: OFFSET vs 키셋 (같은 위치=10000번째 다음 20개)
+        int deep = 10_000;
+        String offsetSql = "SELECT product_id FROM product_rank "
+            + "ORDER BY like_count DESC, product_id DESC LIMIT 20 OFFSET " + deep;
+        Map<String, Object> at = jdbc.queryForMap(
+            "SELECT like_count, product_id FROM product_rank "
+            + "ORDER BY like_count DESC, product_id DESC LIMIT 1 OFFSET " + (deep - 1));
+        long lc = ((Number) at.get("like_count")).longValue();
+        long pid = ((Number) at.get("product_id")).longValue();
+        String keysetSql = "SELECT product_id FROM product_rank "
+            + "WHERE (like_count < " + lc + " OR (like_count = " + lc + " AND product_id < " + pid + ")) "
+            + "ORDER BY like_count DESC, product_id DESC LIMIT 20";
+        explain("offset", offsetSql);
+        explain("keyset", keysetSql);
+        log.info("[BENCH deep={}] OFFSET={}us  keyset={}us", deep, avgMicros(offsetSql), avgMicros(keysetSql));
     }
 
     private void explain(String tag, String sql) {
@@ -92,9 +109,16 @@ class ProductReadPerfBenchmarkTest {
         }
     }
 
-    private long timeMs(String sql) {
+    /** 워밍업 후 30회 평균(마이크로초). ms 단위는 너무 거칠어 us 로 본다. */
+    private long avgMicros(String sql) {
+        for (int i = 0; i < 5; i++) {
+            jdbc.queryForList(sql);
+        }
+        int runs = 30;
         long t0 = System.nanoTime();
-        jdbc.queryForList(sql);
-        return (System.nanoTime() - t0) / 1_000_000;
+        for (int i = 0; i < runs; i++) {
+            jdbc.queryForList(sql);
+        }
+        return (System.nanoTime() - t0) / runs / 1_000;
     }
 }
