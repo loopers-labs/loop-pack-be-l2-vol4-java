@@ -23,9 +23,9 @@ class ProductModelTest {
     @Nested
     class Create {
 
-        @DisplayName("정상 입력으로 상품이 생성되면 입력값이 설정되고 likeCount는 0으로 초기화된다.")
+        @DisplayName("정상 입력으로 상품이 생성되면 입력값이 설정된다.")
         @Test
-        void createsProductModel_withGivenValuesAndLikeCountZero() {
+        void createsProductModel_withGivenValues() {
             // given
             Long brandId = 1L;
             String name = "테스트 상품";
@@ -38,8 +38,7 @@ class ProductModelTest {
             assertAll(
                     () -> assertThat(product.getBrandId()).isEqualTo(brandId),
                     () -> assertThat(product.getName()).isEqualTo(name),
-                    () -> assertThat(product.getPrice()).isEqualByComparingTo(price),
-                    () -> assertThat(product.getLikeCount()).isEqualTo(0L)
+                    () -> assertThat(product.getPrice()).isEqualByComparingTo(price)
             );
         }
 

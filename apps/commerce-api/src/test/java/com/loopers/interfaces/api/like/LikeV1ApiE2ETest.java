@@ -4,6 +4,8 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
@@ -51,6 +53,9 @@ class LikeV1ApiE2ETest {
     private ProductRepository productRepository;
 
     @Autowired
+    private ProductStatsRepository productStatsRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -81,6 +86,7 @@ class LikeV1ApiE2ETest {
             ));
             BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
             ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            productStatsRepository.save(new ProductStatsModel(product));
 
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
@@ -92,10 +98,10 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductModel persisted = productRepository.find(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(persisted.getLikeCount()).isEqualTo(1L)
+                () -> assertThat(persistedStats.getLikeCount()).isEqualTo(1L)
             );
         }
 
@@ -108,6 +114,7 @@ class LikeV1ApiE2ETest {
             ));
             BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
             ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            productStatsRepository.save(new ProductStatsModel(product));
             testRestTemplate.exchange(
                 BASE_URL + "/" + product.getId() + "/likes",
                 HttpMethod.POST,
@@ -125,10 +132,10 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductModel persisted = productRepository.find(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(persisted.getLikeCount()).isEqualTo(1L)
+                () -> assertThat(persistedStats.getLikeCount()).isEqualTo(1L)
             );
         }
 
@@ -222,6 +229,7 @@ class LikeV1ApiE2ETest {
             ));
             BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
             ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            productStatsRepository.save(new ProductStatsModel(product));
             testRestTemplate.exchange(
                 BASE_URL + "/" + product.getId() + "/likes",
                 HttpMethod.POST,
@@ -239,10 +247,10 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductModel persisted = productRepository.find(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(persisted.getLikeCount()).isEqualTo(0L)
+                () -> assertThat(persistedStats.getLikeCount()).isEqualTo(0L)
             );
         }
 
@@ -255,6 +263,7 @@ class LikeV1ApiE2ETest {
             ));
             BrandModel brand = brandRepository.save(new BrandModel("테스트브랜드"));
             ProductModel product = productRepository.save(new ProductModel(brand.getId(), "테스트상품", BigDecimal.valueOf(5000)));
+            productStatsRepository.save(new ProductStatsModel(product));
 
             // when
             ParameterizedTypeReference<ApiResponse<Void>> responseType = new ParameterizedTypeReference<>() {};
@@ -266,10 +275,10 @@ class LikeV1ApiE2ETest {
             );
 
             // then
-            ProductModel persisted = productRepository.find(product.getId()).orElseThrow();
+            ProductStatsModel persistedStats = productStatsRepository.findByProductId(product.getId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(persisted.getLikeCount()).isEqualTo(0L)
+                () -> assertThat(persistedStats.getLikeCount()).isEqualTo(0L)
             );
         }
 

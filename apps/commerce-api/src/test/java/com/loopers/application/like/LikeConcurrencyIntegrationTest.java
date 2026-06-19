@@ -4,6 +4,8 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
@@ -40,6 +42,9 @@ class LikeConcurrencyIntegrationTest {
     private ProductRepository productRepository;
 
     @Autowired
+    private ProductStatsRepository productStatsRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -59,6 +64,7 @@ class LikeConcurrencyIntegrationTest {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("브랜드"));
         ProductModel product = productRepository.save(new ProductModel(brand.getId(), "상품", BigDecimal.valueOf(10000)));
+        productStatsRepository.save(new ProductStatsModel(product));
         Long productId = product.getId();
 
         List<String> loginIds = new ArrayList<>();
@@ -92,7 +98,7 @@ class LikeConcurrencyIntegrationTest {
         executor.shutdown();
 
         // then
-        Long likeCount = productRepository.find(productId).orElseThrow().getLikeCount();
+        Long likeCount = productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
         assertThat(likeCount).isEqualTo((long) THREAD_COUNT);
     }
 
@@ -102,6 +108,7 @@ class LikeConcurrencyIntegrationTest {
         // given
         BrandModel brand = brandRepository.save(new BrandModel("브랜드"));
         ProductModel product = productRepository.save(new ProductModel(brand.getId(), "상품", BigDecimal.valueOf(10000)));
+        productStatsRepository.save(new ProductStatsModel(product));
         Long productId = product.getId();
 
         List<String> loginIds = new ArrayList<>();
@@ -140,7 +147,7 @@ class LikeConcurrencyIntegrationTest {
         executor.shutdown();
 
         // then
-        Long likeCount = productRepository.find(productId).orElseThrow().getLikeCount();
+        Long likeCount = productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
         assertThat(likeCount).isEqualTo(0L);
     }
 }

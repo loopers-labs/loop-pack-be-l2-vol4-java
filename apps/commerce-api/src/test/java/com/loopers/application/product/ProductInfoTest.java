@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.stock.StockModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 class ProductInfoTest {
 
-    @DisplayName("ProductModel, BrandModel, StockModel 로부터 ProductInfo 를 생성할 때, ")
+    @DisplayName("ProductModel, BrandModel, StockModel, ProductStatsModel 로부터 ProductInfo 를 생성할 때, ")
     @Nested
     class From {
 
@@ -25,9 +26,10 @@ class ProductInfoTest {
             ProductModel product = new ProductModel(1L, "에어맥스", BigDecimal.valueOf(150000));
             BrandModel brand = new BrandModel("Nike");
             StockModel stock = new StockModel(null, 5L);
+            ProductStatsModel stats = new ProductStatsModel(product);
 
             // when
-            ProductInfo result = ProductInfo.from(product, brand, stock);
+            ProductInfo result = ProductInfo.from(product, brand, stock, stats);
 
             // then
             assertAll(
@@ -47,9 +49,10 @@ class ProductInfoTest {
             ProductModel product = new ProductModel(1L, "에어맥스", BigDecimal.valueOf(150000));
             BrandModel brand = new BrandModel("Nike");
             StockModel stock = new StockModel(null, 0L);
+            ProductStatsModel stats = new ProductStatsModel(product);
 
             // when
-            ProductInfo result = ProductInfo.from(product, brand, stock);
+            ProductInfo result = ProductInfo.from(product, brand, stock, stats);
 
             // then
             assertThat(result.inStock()).isFalse();

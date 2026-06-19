@@ -6,6 +6,8 @@ import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.domain.user.Gender;
@@ -41,6 +43,9 @@ class LikeFacadeIntegrationTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private ProductStatsRepository productStatsRepository;
 
     @Autowired
     private BrandRepository brandRepository;
@@ -79,7 +84,9 @@ class LikeFacadeIntegrationTest {
     }
 
     private Long createProduct(Long brandId) {
-        return productRepository.save(new ProductModel(brandId, "상품", BigDecimal.valueOf(1000))).getId();
+        ProductModel product = productRepository.save(new ProductModel(brandId, "상품", BigDecimal.valueOf(1000)));
+        productStatsRepository.save(new ProductStatsModel(product));
+        return product.getId();
     }
 
     private Long createProduct() {
@@ -91,7 +98,7 @@ class LikeFacadeIntegrationTest {
     }
 
     private Long likeCountOf(Long productId) {
-        return productRepository.find(productId).orElseThrow().getLikeCount();
+        return productStatsRepository.findByProductId(productId).orElseThrow().getLikeCount();
     }
 
     @DisplayName("좋아요 상품 목록을 조회할 때,")

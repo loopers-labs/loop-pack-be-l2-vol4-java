@@ -26,11 +26,13 @@ class ProductServiceTest {
 
     private ProductService productService;
     private ProductRepository productRepository;
+    private ProductStatsService productStatsService;
 
     @BeforeEach
     void setUp() {
         productRepository = mock(ProductRepository.class);
-        productService = new ProductService(productRepository);
+        productStatsService = mock(ProductStatsService.class);
+        productService = new ProductService(productRepository, productStatsService);
     }
 
     @DisplayName("상품을 ID로 조회할 때,")
@@ -207,36 +209,6 @@ class ProductServiceTest {
 
             // then
             assertThat(result.getContent()).hasSize(1);
-        }
-    }
-
-    @DisplayName("좋아요 수를 증가할 때,")
-    @Nested
-    class IncreaseLikeCount {
-
-        @DisplayName("예외 없이 완료된다.")
-        @Test
-        void increasesLikeCount_whenProductExists() {
-            // given
-            Long id = 1L;
-
-            // when & then
-            assertDoesNotThrow(() -> productService.increaseLikeCount(id));
-        }
-    }
-
-    @DisplayName("좋아요 수를 감소할 때,")
-    @Nested
-    class DecreaseLikeCount {
-
-        @DisplayName("예외 없이 완료된다.")
-        @Test
-        void decreasesLikeCount_whenProductExists() {
-            // given
-            Long id = 1L;
-
-            // when & then
-            assertDoesNotThrow(() -> productService.decreaseLikeCount(id));
         }
     }
 

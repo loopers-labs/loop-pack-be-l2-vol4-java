@@ -3,6 +3,8 @@ package com.loopers.application.product;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsService;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,18 +29,26 @@ class ProductInfoAssemblerTest {
     private ProductInfoAssembler assembler;
     private BrandService brandService;
     private StockService stockService;
+    private ProductStatsService productStatsService;
 
     @BeforeEach
     void setUp() {
         brandService = mock(BrandService.class);
         stockService = mock(StockService.class);
-        assembler = new ProductInfoAssembler(brandService, stockService);
+        productStatsService = mock(ProductStatsService.class);
+        assembler = new ProductInfoAssembler(brandService, stockService, productStatsService);
     }
 
-    // 비영속 ProductModel 은 id 가 null 이므로 stockMap 키도 null 로 구성한다.
+    // 비영속 ProductModel 은 id 가 null 이므로 map 키도 null 로 구성한다.
     private Map<Long, StockModel> stockMapWithNullKey(Long quantity) {
         Map<Long, StockModel> map = new HashMap<>();
         map.put(null, new StockModel(null, quantity));
+        return map;
+    }
+
+    private Map<Long, ProductStatsModel> statsMapWithNullKey(ProductStatsModel stats) {
+        Map<Long, ProductStatsModel> map = new HashMap<>();
+        map.put(null, stats);
         return map;
     }
 
@@ -58,8 +68,10 @@ class ProductInfoAssemblerTest {
             // given
             ProductModel product = new ProductModel(1L, "에어맥스", BigDecimal.valueOf(150000));
             BrandModel brand = new BrandModel("Nike");
+            ProductStatsModel stats = new ProductStatsModel(product);
             when(brandService.getMapByIds(Set.of(1L))).thenReturn(Map.of(1L, brand));
             when(stockService.getMapByProductIds(nullIdSet())).thenReturn(stockMapWithNullKey(5L));
+            when(productStatsService.getMapByProductIds(nullIdSet())).thenReturn(statsMapWithNullKey(stats));
 
             // when
             List<ProductInfo> result = assembler.toInfoList(List.of(product));
@@ -83,8 +95,10 @@ class ProductInfoAssemblerTest {
             ProductModel adidasProduct = new ProductModel(2L, "울트라부스트", BigDecimal.valueOf(180000));
             BrandModel nike = new BrandModel("Nike");
             BrandModel adidas = new BrandModel("Adidas");
+            ProductStatsModel stats = new ProductStatsModel(nikeProduct);
             when(brandService.getMapByIds(Set.of(1L, 2L))).thenReturn(Map.of(1L, nike, 2L, adidas));
             when(stockService.getMapByProductIds(nullIdSet())).thenReturn(stockMapWithNullKey(5L));
+            when(productStatsService.getMapByProductIds(nullIdSet())).thenReturn(statsMapWithNullKey(stats));
 
             // when
             List<ProductInfo> result = assembler.toInfoList(List.of(nikeProduct, adidasProduct));
@@ -103,6 +117,7 @@ class ProductInfoAssemblerTest {
             // given
             when(brandService.getMapByIds(Set.of())).thenReturn(Map.of());
             when(stockService.getMapByProductIds(Set.of())).thenReturn(Map.of());
+            when(productStatsService.getMapByProductIds(Set.of())).thenReturn(Map.of());
 
             // when
             List<ProductInfo> result = assembler.toInfoList(List.of());

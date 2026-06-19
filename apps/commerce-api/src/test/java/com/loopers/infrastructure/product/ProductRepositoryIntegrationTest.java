@@ -30,21 +30,6 @@ class ProductRepositoryIntegrationTest extends ProductRepositoryContractTest {
         return productRepository;
     }
 
-    @DisplayName("좋아요 수를 원자적으로 증가시킬 때, likeCount 가 1 증가한다.")
-    @Test
-    void increaseLikeCount_increasesLikeCountByOne() {
-        // given
-        ProductModel product = productRepository.save(new ProductModel(1L, "상품B", BigDecimal.valueOf(10000)));
-
-        // when
-        productRepository.increaseLikeCount(product.getId());
-        em.clear();
-
-        // then
-        ProductModel found = productRepository.find(product.getId()).orElseThrow();
-        assertThat(found.getLikeCount()).isEqualTo(1L);
-    }
-
     @DisplayName("brandId에 해당하는 상품을 일괄 소프트 삭제할 때, 해당 브랜드의 상품들이 조회되지 않는다.")
     @Test
     void softDeleteAllByBrandId_softDeletesProductsUnderBrand() {
@@ -82,21 +67,5 @@ class ProductRepositoryIntegrationTest extends ProductRepositoryContractTest {
             () -> assertThat(productRepository.find(targetProduct.getId())).isEmpty(),
             () -> assertThat(productRepository.find(otherProduct.getId())).isPresent()
         );
-    }
-
-    @DisplayName("좋아요 수를 원자적으로 감소시킬 때, likeCount 가 1 감소한다.")
-    @Test
-    void decreaseLikeCount_decreasesLikeCountByOne() {
-        // given
-        ProductModel product = productRepository.save(new ProductModel(1L, "상품C", BigDecimal.valueOf(10000)));
-        productRepository.increaseLikeCount(product.getId());
-
-        // when
-        productRepository.decreaseLikeCount(product.getId());
-        em.clear();
-
-        // then
-        ProductModel found = productRepository.find(product.getId()).orElseThrow();
-        assertThat(found.getLikeCount()).isEqualTo(0L);
     }
 }
