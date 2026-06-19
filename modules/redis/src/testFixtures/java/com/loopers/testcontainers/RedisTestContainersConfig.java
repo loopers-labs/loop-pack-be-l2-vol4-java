@@ -6,13 +6,10 @@ import org.testcontainers.utility.DockerImageName;
 
 @Configuration
 public class RedisTestContainersConfig {
-    private static final RedisContainer redisContainer = new RedisContainer(DockerImageName.parse("redis:latest"));
+    private static final RedisContainer redisContainer = new RedisContainer(DockerImageName.parse("redis:7.0"));
 
     static {
         redisContainer.start();
-    }
-
-    public RedisTestContainersConfig() {
         System.setProperty("datasource.redis.database", "0");
         System.setProperty("datasource.redis.master.host", redisContainer.getHost());
         System.setProperty("datasource.redis.master.port", String.valueOf(redisContainer.getFirstMappedPort()));
