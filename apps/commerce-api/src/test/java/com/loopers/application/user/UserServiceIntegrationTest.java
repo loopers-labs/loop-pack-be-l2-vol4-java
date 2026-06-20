@@ -1,6 +1,7 @@
-package com.loopers.domain.user;
+package com.loopers.application.user;
 
-import com.loopers.application.user.UserService;
+import com.loopers.domain.user.PasswordEncryptor;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.user.UserEntity;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.support.error.CoreException;

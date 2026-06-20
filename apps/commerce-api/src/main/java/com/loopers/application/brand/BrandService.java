@@ -16,6 +16,7 @@ public class BrandService {
 
     private final BrandRepository brandRepository;
 
+    @Transactional(readOnly = true)
     public Brand getBrand(Long id) {
         return brandRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드 입니다."));
@@ -26,6 +27,7 @@ public class BrandService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 브랜드 입니다."));
     }
 
+    @Transactional(readOnly = true)
     public Page<Brand> getAllBrands(Pageable pageable) {
         return brandRepository.findAll(pageable);
     }

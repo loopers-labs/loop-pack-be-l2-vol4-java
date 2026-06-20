@@ -56,3 +56,7 @@ spring:
 springdoc:
   api-docs:
     enabled: false
+
+decorator:
+  datasource:
+    enabled: false

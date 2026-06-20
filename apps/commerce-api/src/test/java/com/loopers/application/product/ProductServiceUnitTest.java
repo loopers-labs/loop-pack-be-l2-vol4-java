@@ -1,13 +1,19 @@
-package com.loopers.domain.product;
+package com.loopers.application.product;
 
-import com.loopers.application.product.ProductService;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductCacheRepository;
+import com.loopers.domain.product.ProductLikeCountRepository;
+import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSort;
+import com.loopers.domain.product.ProductStock;
+import com.loopers.domain.product.ProductStockRepository;
+import org.springframework.data.domain.Page;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
@@ -29,7 +35,45 @@ class ProductServiceUnitTest {
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(new FakeProductRepository(), new FakeProductStockRepository());
+        productService = new ProductService(new FakeProductRepository(), new FakeProductStockRepository(), new FakeProductLikeCountRepository(), new FakeProductCacheRepository());
+    }
+
+    static class FakeProductCacheRepository implements ProductCacheRepository {
+        @Override
+        public java.util.Optional<Product> findById(Long productId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void save(Product product) {
+        }
+
+        @Override
+        public java.util.Optional<Page<Product>> findAll(Long brandId, ProductSort sort, int page, int size) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void saveAll(Long brandId, ProductSort sort, int page, int size, Page<Product> products) {
+        }
+
+        @Override
+        public void evict(Long productId) {
+        }
+
+        @Override
+        public void evictAll() {
+        }
+    }
+
+    static class FakeProductLikeCountRepository implements ProductLikeCountRepository {
+        @Override
+        public void increment(Long productId) {
+        }
+
+        @Override
+        public void decrement(Long productId) {
+        }
     }
 
     static class FakeProductRepository implements ProductRepository {
@@ -84,6 +128,10 @@ class ProductServiceUnitTest {
 
         @Override
         public void decrementLikeCount(Long id) {
+        }
+
+        @Override
+        public void adjustLikeCount(Long id, long amount) {
         }
     }
 

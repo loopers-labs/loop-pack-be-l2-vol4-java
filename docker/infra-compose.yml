@@ -3,11 +3,11 @@ services:
   mysql:
     image: mysql:8.0
     ports:
-      - "3306:3306"
+      - "42631:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_USER=application
-      - MYSQL_PASSWORD=application
+      - MYSQL_USER=loopers
+      - MYSQL_PASSWORD=loopers!!!
       - MYSQL_DATABASE=loopers
       - MYSQL_CHARACTER_SET=utf8mb4
       - MYSQL_COLLATE=utf8mb4_general_ci

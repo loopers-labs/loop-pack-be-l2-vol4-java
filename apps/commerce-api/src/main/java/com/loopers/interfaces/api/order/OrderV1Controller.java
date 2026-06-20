@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -54,8 +54,9 @@ public class OrderV1Controller {
             throw new CoreException(ErrorType.BAD_REQUEST, "종료일은 시작일보다 이전일 수 없습니다.");
         }
 
-        ZonedDateTime start = startAt.atStartOfDay(ZoneOffset.UTC);
-        ZonedDateTime end = endAt.atTime(23, 59, 59).atZone(ZoneOffset.UTC);
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime start = startAt.atStartOfDay(zone);
+        ZonedDateTime end = endAt.atTime(23, 59, 59).atZone(zone);
 
         List<Order> orders = orderService.getOrders(user.getId(), start, end);
         return ApiResponse.success(orders.stream().map(OrderV1Dto.OrderSummary::from).toList());

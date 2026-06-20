@@ -12,4 +12,5 @@ public interface ProductRepository {
     void deleteAllByBrandId(Long brandId);
     void incrementLikeCount(Long id);
     void decrementLikeCount(Long id);
+    void adjustLikeCount(Long id, long amount);
 }

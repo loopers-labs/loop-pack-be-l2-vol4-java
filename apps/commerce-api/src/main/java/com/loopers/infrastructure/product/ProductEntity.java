@@ -4,6 +4,7 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.domain.product.Product;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
@@ -11,7 +12,17 @@ import java.math.BigDecimal;
 
 @Getter
 @Entity(name = "Product")
-@Table(name = "product")
+@Table(
+    name = "product",
+    indexes = {
+        @Index(name = "idx_product_deleted_at_created_at",          columnList = "deleted_at, created_at"),
+        @Index(name = "idx_product_deleted_at_price",               columnList = "deleted_at, price"),
+        @Index(name = "idx_product_deleted_at_like_count",          columnList = "deleted_at, like_count"),
+        @Index(name = "idx_product_brand_id_deleted_at_created_at", columnList = "brand_id, deleted_at, created_at"),
+        @Index(name = "idx_product_brand_id_deleted_at_price",      columnList = "brand_id, deleted_at, price"),
+        @Index(name = "idx_product_brand_id_deleted_at_like_count", columnList = "brand_id, deleted_at, like_count")
+    }
+)
 public class ProductEntity extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)

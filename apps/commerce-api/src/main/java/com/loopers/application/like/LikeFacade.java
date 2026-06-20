@@ -6,6 +6,7 @@ import com.loopers.application.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,13 +18,14 @@ public class LikeFacade {
 
     private final LikeService likeService;
     private final ProductService productService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void like(LikeCommand.Like command) {
         productService.getProduct(command.productId());
         boolean added = likeService.like(command.userId(), command.productId());
         if (added) {
-            productService.incrementLikeCount(command.productId());
+            eventPublisher.publishEvent(new LikeCountChangedEvent(command.productId(), true));
         }
     }
 
@@ -32,7 +34,7 @@ public class LikeFacade {
         productService.getProduct(command.productId());
         boolean removed = likeService.unlike(command.userId(), command.productId());
         if (removed) {
-            productService.decrementLikeCount(command.productId());
+            eventPublisher.publishEvent(new LikeCountChangedEvent(command.productId(), false));
         }
     }
 

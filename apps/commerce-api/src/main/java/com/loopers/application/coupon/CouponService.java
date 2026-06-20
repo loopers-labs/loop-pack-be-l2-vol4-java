@@ -30,6 +30,7 @@ public class CouponService {
         return issuedCouponRepository.save(new IssuedCoupon(couponId, userId, coupon.getExpiredAt()));
     }
 
+    @Transactional(readOnly = true)
     public List<CouponInfo.MyCoupon> getUserCoupons(Long userId) {
         return issuedCouponRepository.findAllByUserId(userId).stream()
             .map(CouponInfo.MyCoupon::of)
@@ -56,11 +57,13 @@ public class CouponService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Coupon getCoupon(Long couponId) {
         return couponRepository.findById(couponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 쿠폰입니다."));
     }
 
+    @Transactional(readOnly = true)
     public Page<Coupon> getCoupons(Pageable pageable) {
         return couponRepository.findAll(pageable);
     }
@@ -87,6 +90,7 @@ public class CouponService {
         couponRepository.save(coupon);
     }
 
+    @Transactional(readOnly = true)
     public Page<IssuedCoupon> getIssuedCoupons(Long couponId, Pageable pageable) {
         getCoupon(couponId);
         return issuedCouponRepository.findAllByCouponId(couponId, pageable);

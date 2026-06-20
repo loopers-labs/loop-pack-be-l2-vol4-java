@@ -1,12 +1,12 @@
-package com.loopers.domain.like;
+package com.loopers.application.like;
 
-import com.loopers.application.like.LikeService;
+import com.loopers.domain.like.ProductLike;
+import com.loopers.domain.like.ProductLikeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

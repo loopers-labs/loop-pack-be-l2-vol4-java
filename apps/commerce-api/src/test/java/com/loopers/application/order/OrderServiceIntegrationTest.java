@@ -1,6 +1,8 @@
-package com.loopers.domain.order;
+package com.loopers.application.order;
 
-import com.loopers.application.order.OrderService;
+import com.loopers.domain.order.Order;
+import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;

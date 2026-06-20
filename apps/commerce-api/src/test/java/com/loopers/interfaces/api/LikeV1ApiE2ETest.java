@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -48,6 +49,7 @@ class LikeV1ApiE2ETest {
     @Autowired private ProductStockJpaRepository productStockJpaRepository;
     @Autowired private UserJpaRepository userJpaRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
+    @Autowired private RedisTemplate<String, String> redisTemplate;
 
     private Long userId;
     private Long productId;
@@ -70,6 +72,11 @@ class LikeV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisTemplate.delete(redisTemplate.keys("product:like:pending:*"));
+    }
+
+    private String likePendingKey(Long pid) {
+        return "product:like:pending:" + pid;
     }
 
     private HttpHeaders authHeaders() {
@@ -87,43 +94,31 @@ class LikeV1ApiE2ETest {
     @Nested
     class LikeProduct {
 
-        @DisplayName("좋아요하면 200을 반환하고 상품의 likeCount가 1 증가한다.")
+        @DisplayName("좋아요하면 200을 반환하고 Redis delta가 1 증가한다.")
         @Test
-        void returnsOk_andIncrementsLikeCount() {
+        void returnsOk_andIncrementsLikeDeltaInRedis() {
             ResponseEntity<ApiResponse<Void>> likeResponse = testRestTemplate.exchange(
                 likesUrl(productId), HttpMethod.POST,
                 new HttpEntity<>(authHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse = testRestTemplate.exchange(
-                PRODUCTS_URL + "/" + productId, HttpMethod.GET,
-                new HttpEntity<>(null),
-                new ParameterizedTypeReference<>() {}
-            );
-
             assertAll(
                 () -> assertThat(likeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(productResponse.getBody().data().likeCount()).isEqualTo(1L)
+                () -> assertThat(redisTemplate.opsForValue().get(likePendingKey(productId))).isEqualTo("1")
             );
         }
 
-        @DisplayName("이미 좋아요한 상품에 다시 좋아요해도 200을 반환하고 likeCount는 1을 유지한다.")
+        @DisplayName("이미 좋아요한 상품에 다시 좋아요해도 200을 반환하고 Redis delta는 1을 유지한다.")
         @Test
-        void returnsOk_andLikeCountStaysAt1_whenAlreadyLiked() {
+        void returnsOk_andLikeDeltaStaysAt1_whenAlreadyLiked() {
             testRestTemplate.exchange(likesUrl(productId), HttpMethod.POST,
                 new HttpEntity<>(authHeaders()), new ParameterizedTypeReference<ApiResponse<Void>>() {});
 
             testRestTemplate.exchange(likesUrl(productId), HttpMethod.POST,
                 new HttpEntity<>(authHeaders()), new ParameterizedTypeReference<ApiResponse<Void>>() {});
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse = testRestTemplate.exchange(
-                PRODUCTS_URL + "/" + productId, HttpMethod.GET,
-                new HttpEntity<>(null),
-                new ParameterizedTypeReference<>() {}
-            );
-
-            assertThat(productResponse.getBody().data().likeCount()).isEqualTo(1L);
+            assertThat(redisTemplate.opsForValue().get(likePendingKey(productId))).isEqualTo("1");
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요하면, 404를 반환한다.")
@@ -155,9 +150,9 @@ class LikeV1ApiE2ETest {
     @Nested
     class UnlikeProduct {
 
-        @DisplayName("좋아요를 취소하면 200을 반환하고 likeCount가 0으로 감소한다.")
+        @DisplayName("좋아요를 취소하면 200을 반환하고 Redis delta가 0이 된다.")
         @Test
-        void returnsOk_andDecrementsLikeCount() {
+        void returnsOk_andLikeDeltaIsZero_whenUnliked() {
             testRestTemplate.exchange(likesUrl(productId), HttpMethod.POST,
                 new HttpEntity<>(authHeaders()), new ParameterizedTypeReference<ApiResponse<Void>>() {});
 
@@ -167,37 +162,22 @@ class LikeV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {}
             );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse = testRestTemplate.exchange(
-                PRODUCTS_URL + "/" + productId, HttpMethod.GET,
-                new HttpEntity<>(null),
-                new ParameterizedTypeReference<>() {}
-            );
-
             assertAll(
                 () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(productResponse.getBody().data().likeCount()).isEqualTo(0L)
+                () -> assertThat(redisTemplate.opsForValue().get(likePendingKey(productId))).isEqualTo("0")
             );
         }
 
-        @DisplayName("좋아요하지 않은 상품을 취소해도 200을 반환하고 likeCount는 0을 유지한다.")
+        @DisplayName("좋아요하지 않은 상품을 취소해도 200을 반환한다.")
         @Test
-        void returnsOk_andLikeCountStaysAt0_whenNotLiked() {
+        void returnsOk_whenUnlikeWithoutPriorLike() {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 likesUrl(productId), HttpMethod.DELETE,
                 new HttpEntity<>(authHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> productResponse = testRestTemplate.exchange(
-                PRODUCTS_URL + "/" + productId, HttpMethod.GET,
-                new HttpEntity<>(null),
-                new ParameterizedTypeReference<>() {}
-            );
-
-            assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(productResponse.getBody().data().likeCount()).isEqualTo(0L)
-            );
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
     }
 

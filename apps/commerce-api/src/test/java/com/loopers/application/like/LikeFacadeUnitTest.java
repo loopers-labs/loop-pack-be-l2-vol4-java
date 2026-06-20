@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -27,12 +28,13 @@ class LikeFacadeUnitTest {
 
     @Mock private LikeService likeService;
     @Mock private ProductService productService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private LikeFacade likeFacade;
 
     @BeforeEach
     void setUp() {
-        likeFacade = new LikeFacade(likeService, productService);
+        likeFacade = new LikeFacade(likeService, productService, eventPublisher);
     }
 
     private Product product(Long id) {
@@ -44,26 +46,26 @@ class LikeFacadeUnitTest {
     @Nested
     class Like {
 
-        @DisplayName("신규 좋아요이면, 상품의 likeCount가 증가한다.")
+        @DisplayName("신규 좋아요이면, likeCount 증가 이벤트를 발행한다.")
         @Test
-        void incrementsLikeCount_whenNewLikeIsAdded() {
+        void publishesLikeCountIncreasedEvent_whenNewLikeIsAdded() {
             given(productService.getProduct(10L)).willReturn(product(10L));
             given(likeService.like(1L, 10L)).willReturn(true);
 
             likeFacade.like(new LikeCommand.Like(1L, 10L));
 
-            then(productService).should().incrementLikeCount(10L);
+            then(eventPublisher).should().publishEvent(new LikeCountChangedEvent(10L, true));
         }
 
-        @DisplayName("이미 좋아요한 상품이면, likeCount를 증가시키지 않는다.")
+        @DisplayName("이미 좋아요한 상품이면, 이벤트를 발행하지 않는다.")
         @Test
-        void doesNotIncrementLikeCount_whenAlreadyLiked() {
+        void doesNotPublishEvent_whenAlreadyLiked() {
             given(productService.getProduct(10L)).willReturn(product(10L));
             given(likeService.like(1L, 10L)).willReturn(false);
 
             likeFacade.like(new LikeCommand.Like(1L, 10L));
 
-            then(productService).should(never()).incrementLikeCount(10L);
+            then(eventPublisher).should(never()).publishEvent(new LikeCountChangedEvent(10L, true));
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요하면, NOT_FOUND 예외가 발생한다.")
@@ -84,26 +86,26 @@ class LikeFacadeUnitTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요를 취소하면, 상품의 likeCount가 감소한다.")
+        @DisplayName("좋아요를 취소하면, likeCount 감소 이벤트를 발행한다.")
         @Test
-        void decrementsLikeCount_whenLikeIsRemoved() {
+        void publishesLikeCountDecreasedEvent_whenLikeIsRemoved() {
             given(productService.getProduct(10L)).willReturn(product(10L));
             given(likeService.unlike(1L, 10L)).willReturn(true);
 
             likeFacade.unlike(new LikeCommand.Unlike(1L, 10L));
 
-            then(productService).should().decrementLikeCount(10L);
+            then(eventPublisher).should().publishEvent(new LikeCountChangedEvent(10L, false));
         }
 
-        @DisplayName("좋아요하지 않은 상품을 취소하면, likeCount를 감소시키지 않는다.")
+        @DisplayName("좋아요하지 않은 상품을 취소하면, 이벤트를 발행하지 않는다.")
         @Test
-        void doesNotDecrementLikeCount_whenNotLiked() {
+        void doesNotPublishEvent_whenNotLiked() {
             given(productService.getProduct(10L)).willReturn(product(10L));
             given(likeService.unlike(1L, 10L)).willReturn(false);
 
             likeFacade.unlike(new LikeCommand.Unlike(1L, 10L));
 
-            then(productService).should(never()).decrementLikeCount(10L);
+            then(eventPublisher).should(never()).publishEvent(new LikeCountChangedEvent(10L, false));
         }
     }
 

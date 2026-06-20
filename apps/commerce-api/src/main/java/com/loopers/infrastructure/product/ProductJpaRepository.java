@@ -32,4 +32,9 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
     @Modifying
     @Query("UPDATE Product p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
     void decrementLikeCount(@Param("id") Long id);
+
+    @Transactional
+    @Modifying
+    @Query(value = "UPDATE product SET like_count = GREATEST(0, like_count + :amount) WHERE id = :id", nativeQuery = true)
+    void adjustLikeCount(@Param("id") Long id, @Param("amount") long amount);
 }
