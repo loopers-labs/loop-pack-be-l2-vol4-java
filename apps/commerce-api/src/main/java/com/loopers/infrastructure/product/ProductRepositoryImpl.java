@@ -71,16 +71,16 @@ public class ProductRepositoryImpl implements ProductRepository {
         where.and(product.status.eq(ProductStatus.ACTIVE));
         where.and(product.deletedAt.isNull());
 
-        OrderSpecifier<?> orderSpecifier = switch (sort) {
-            case LATEST -> product.createdAt.desc();
-            case PRICE_ASC -> product.minPrice.asc();
-            case LIKES_DESC -> product.likeCount.desc();
+        List<OrderSpecifier<?>> orderSpecifiers = switch (sort) {
+            case LATEST -> List.of(product.createdAt.desc(), product.id.desc());
+            case PRICE_ASC -> List.of(product.minPrice.asc(), product.id.asc());
+            case LIKES_DESC -> List.of(product.likeCount.desc(), product.id.desc());
         };
 
         List<ProductModel> content = queryFactory
                 .selectFrom(product)
                 .where(where)
-                .orderBy(orderSpecifier)
+                .orderBy(orderSpecifiers.toArray(OrderSpecifier[]::new))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
