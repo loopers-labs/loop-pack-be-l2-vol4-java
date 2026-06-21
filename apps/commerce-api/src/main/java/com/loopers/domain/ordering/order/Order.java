@@ -13,36 +13,54 @@ public class Order extends DomainEntity {
 
     private String userId;
 
-    private Long totalAmount;
+    private Long originalAmount;
+
+    private Long discountAmount;
+
+    private Long finalAmount;
+
+    private Long couponId;
 
     private OrderStatus status;
 
     private List<OrderLine> lines = new ArrayList<>();
 
     public Order(String userId, List<OrderLine> lines) {
+        this(userId, lines, null, 0L);
+    }
+
+    public Order(String userId, List<OrderLine> lines, Long couponId, Long discountAmount) {
         validateUserId(userId);
         validateLines(lines);
 
         this.userId = userId;
         this.lines = new ArrayList<>(lines);
-        this.totalAmount = lines.stream()
+        this.originalAmount = lines.stream()
             .mapToLong(OrderLine::getLineAmount)
             .sum();
+        validateDiscountAmount(discountAmount, originalAmount);
+        this.discountAmount = discountAmount;
+        this.finalAmount = originalAmount - discountAmount;
+        this.couponId = couponId;
         this.status = OrderStatus.PAYMENT_PENDING;
     }
 
     public static Order reconstruct(
         Long id,
         String userId,
-        Long totalAmount,
+        Long originalAmount,
+        Long discountAmount,
+        Long finalAmount,
+        Long couponId,
         OrderStatus status,
         List<OrderLine> lines,
         ZonedDateTime createdAt,
         ZonedDateTime updatedAt,
         ZonedDateTime deletedAt
     ) {
-        Order order = new Order(userId, lines);
-        order.totalAmount = totalAmount == null ? order.totalAmount : totalAmount;
+        Order order = new Order(userId, lines, couponId, discountAmount == null ? 0L : discountAmount);
+        order.originalAmount = originalAmount == null ? order.originalAmount : originalAmount;
+        order.finalAmount = finalAmount == null ? order.finalAmount : finalAmount;
         order.status = status == null ? order.status : status;
         order.assignMetadata(id, createdAt, updatedAt, deletedAt);
         return order;
@@ -52,8 +70,20 @@ public class Order extends DomainEntity {
         return userId;
     }
 
-    public Long getTotalAmount() {
-        return totalAmount;
+    public Long getOriginalAmount() {
+        return originalAmount;
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getFinalAmount() {
+        return finalAmount;
+    }
+
+    public Long getCouponId() {
+        return couponId;
     }
 
     public OrderStatus getStatus() {
@@ -66,6 +96,10 @@ public class Order extends DomainEntity {
 
     public boolean isPaid() {
         return status == OrderStatus.PAID;
+    }
+
+    public boolean requiresPayment() {
+        return finalAmount > 0;
     }
 
     public List<OrderLine> getLines() {
@@ -102,6 +136,12 @@ public class Order extends DomainEntity {
     private void validateLines(List<OrderLine> value) {
         if (value == null || value.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
+        }
+    }
+
+    private void validateDiscountAmount(Long value, Long originalAmount) {
+        if (value == null || value < 0 || value > originalAmount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 주문 금액 범위 안이어야 합니다.");
         }
     }
 }

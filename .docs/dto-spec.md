@@ -138,11 +138,19 @@ It is a helper document only and is not part of the submission set.
 
 ## Order DTO
 
+### Coupon Identifier Rule
+
+- `OrderCreateRequest.couponId` is an issued coupon ID owned by the current user.
+- `POST /api/v1/coupons/{couponId}/issue` uses a coupon template ID in its path.
+- Admin coupon APIs also use coupon template IDs in their paths.
+- Keep these identifiers distinct even though the external field name is `couponId`.
+
 ### `OrderCreateRequest`
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `items` | `List<OrderCreateItemRequest>` | Ordered product items. |
+| `couponId` | `long?` | Optional issued coupon identifier owned by the current user. |
 
 ### `OrderCreateItemRequest`
 
@@ -153,8 +161,8 @@ It is a helper document only and is not part of the submission set.
 
 ### Rules
 
-- Keep the request body to `items` only.
-- Do not include delivery, coupon, payment method, or calculated amount fields in the request.
+- Keep the request body to `items` and optional issued `couponId`.
+- Do not include delivery, payment method, or calculated amount fields in the request.
 - Let the server calculate totals and status.
 
 ### `OrderCreateResponse`
@@ -163,7 +171,10 @@ It is a helper document only and is not part of the submission set.
 | --- | --- | --- |
 | `orderId` | `long` | Order identifier. |
 | `orderStatus` | `OrderStatus` | Created order status. |
-| `totalAmount` | `long` | Order total amount. |
+| `originalAmount` | `long` | Product total before discount. |
+| `discountAmount` | `long` | Applied coupon discount. |
+| `finalAmount` | `long` | Final payment amount. |
+| `couponId` | `long?` | Applied issued coupon identifier. |
 
 ### `OrderListItemResponse`
 
@@ -171,8 +182,11 @@ It is a helper document only and is not part of the submission set.
 | --- | --- | --- |
 | `orderId` | `long` | Order identifier. |
 | `orderStatus` | `OrderStatus` | Current order status. |
-| `paymentStatus` | `PaymentStatus` | Current payment status. Non-null; immediately after order creation it is `REQUESTED`. |
-| `totalAmount` | `long` | Order total amount. |
+| `paymentStatus` | `PaymentStatus` | Current payment status. Zero amount orders return `NOT_REQUIRED`. |
+| `originalAmount` | `long` | Product total before discount. |
+| `discountAmount` | `long` | Applied coupon discount. |
+| `finalAmount` | `long` | Final payment amount. |
+| `couponId` | `long?` | Applied issued coupon identifier. |
 | `createdAt` | `datetime` | Order creation time. |
 
 ### `OrderDetailResponse`
@@ -181,9 +195,12 @@ It is a helper document only and is not part of the submission set.
 | --- | --- | --- |
 | `orderId` | `long` | Order identifier. |
 | `orderStatus` | `OrderStatus` | Current order status. |
-| `paymentStatus` | `PaymentStatus` | Current payment status. Non-null; immediately after order creation it is `REQUESTED`. |
+| `paymentStatus` | `PaymentStatus` | Current payment status. Zero amount orders return `NOT_REQUIRED`. |
 | `failureReason` | `string?` | Failure reason when present. |
-| `totalAmount` | `long` | Order total amount. |
+| `originalAmount` | `long` | Product total before discount. |
+| `discountAmount` | `long` | Applied coupon discount. |
+| `finalAmount` | `long` | Final payment amount. |
+| `couponId` | `long?` | Applied issued coupon identifier. |
 | `items` | `List<OrderDetailItemResponse>` | Snapshot item list. |
 
 ### `OrderDetailItemResponse`
@@ -266,8 +283,11 @@ It is a helper document only and is not part of the submission set.
 | `orderId` | `long` | Order identifier. |
 | `userId` | `string` | Existing identity module user identifier. |
 | `orderStatus` | `OrderStatus` | Current order status. |
-| `paymentStatus` | `PaymentStatus` | Current payment status. Non-null; immediately after order creation it is `REQUESTED`. |
-| `totalAmount` | `long` | Order total amount. |
+| `paymentStatus` | `PaymentStatus` | Current payment status. Zero amount orders return `NOT_REQUIRED`. |
+| `originalAmount` | `long` | Product total before discount. |
+| `discountAmount` | `long` | Applied coupon discount. |
+| `finalAmount` | `long` | Final payment amount. |
+| `couponId` | `long?` | Applied issued coupon identifier. |
 | `createdAt` | `datetime` | Order creation time. |
 
 ### Admin API Mapping
@@ -287,6 +307,47 @@ It is a helper document only and is not part of the submission set.
 | `DELETE /api-admin/v1/products/{productId}` | `ApiResponse<Void>`; internally sets `ProductStatus.STOPPED` |
 | `GET /api-admin/v1/orders?page&size` | `ApiResponse<PageResponse<AdminOrderListItemResponse>>` |
 | `GET /api-admin/v1/orders/{orderId}` | `ApiResponse<OrderDetailResponse>` |
+
+## Coupon DTO
+
+### `CouponTemplateRequest`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | `string` | Coupon template display name. |
+| `type` | `FIXED \| RATE` | Fixed amount or rate discount. |
+| `value` | `long` | Positive discount amount or rate from 1 to 100. |
+| `minOrderAmount` | `long?` | Optional minimum original order amount. |
+| `maxIssuesPerUser` | `int` | Positive per-user issue limit. |
+| `expiredAt` | `datetime` | Required future expiration time. |
+
+### `IssuedCouponResponse`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `couponId` | `long` | Issued coupon identifier used by order requests. |
+| `couponTemplateId` | `long` | Coupon template identifier. |
+| `couponName` | `string` | Current template display name. |
+| `type` | `FIXED \| RATE` | Snapshotted discount type. |
+| `value` | `long` | Snapshotted discount value. |
+| `minOrderAmount` | `long?` | Snapshotted minimum original order amount. |
+| `expiredAt` | `datetime` | Snapshotted expiration time. |
+| `status` | `AVAILABLE \| USED \| EXPIRED` | Calculated issued coupon state. |
+| `issuedAt` | `datetime` | Issue time. |
+| `usedAt` | `datetime?` | Use time when present. |
+
+### API Mapping
+
+| API | Response DTO |
+| --- | --- |
+| `POST /api/v1/coupons/{couponId}/issue` | `ApiResponse<IssuedCouponResponse>`; path ID is a template ID |
+| `GET /api/v1/users/me/coupons?page&size` | `ApiResponse<PageResponse<IssuedCouponResponse>>` |
+| `GET /api-admin/v1/coupons?page&size` | `ApiResponse<PageResponse<CouponTemplateResponse>>` |
+| `GET /api-admin/v1/coupons/{couponId}` | `ApiResponse<CouponTemplateResponse>` |
+| `POST /api-admin/v1/coupons` | `ApiResponse<CouponTemplateResponse>` |
+| `PUT /api-admin/v1/coupons/{couponId}` | `ApiResponse<CouponTemplateResponse>` |
+| `DELETE /api-admin/v1/coupons/{couponId}` | `ApiResponse<Void>` |
+| `GET /api-admin/v1/coupons/{couponId}/issues?page&size` | `ApiResponse<PageResponse<CouponIssueResponse>>` |
 
 ## Payment DTO
 
@@ -352,7 +413,9 @@ It is a helper document only and is not part of the submission set.
 | --- | --- | --- |
 | `orderId` | `long` | Order identifier. |
 | `userId` | `string` | Existing identity module user identifier. |
-| `totalAmount` | `long` | Paid order total amount. |
+| `originalAmount` | `long` | Product total before discount. |
+| `discountAmount` | `long` | Applied coupon discount. |
+| `finalAmount` | `long` | Final paid amount. |
 | `paidAt` | `datetime` | Payment completion time. |
 | `items` | `List<OrderPaidItem>` | Order snapshot items. |
 

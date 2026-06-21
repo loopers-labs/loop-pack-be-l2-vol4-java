@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loopers 트랜잭션 분석"
+  short_description: "4주차 트랜잭션 경계와 락을 점검합니다"
+  default_prompt: "Use $loopers-transaction-analysis to Loopers 4주차 주문, 쿠폰, 재고, 결제, Outbox 트랜잭션 설계를 점검합니다."

@@ -33,7 +33,7 @@ public class OrderQueryService {
 
         Order order = orderRepository.findByIdAndUserId(orderId, userId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
-        Payment payment = getPayment(order.getId());
+        Payment payment = getPayment(order);
 
         return OrderResult.Detail.from(order, payment);
     }
@@ -52,7 +52,7 @@ public class OrderQueryService {
             .collect(Collectors.toMap(Payment::getOrderId, Function.identity()));
 
         return orders.stream()
-            .map(order -> OrderResult.Summary.from(order, getPaymentFrom(payments, order.getId())))
+            .map(order -> OrderResult.Summary.from(order, getPaymentFrom(payments, order)))
             .toList();
     }
 
@@ -69,7 +69,7 @@ public class OrderQueryService {
             .collect(Collectors.toMap(Payment::getOrderId, Function.identity()));
 
         List<OrderResult.Summary> items = orders.stream()
-            .map(order -> OrderResult.Summary.from(order, getPaymentFrom(payments, order.getId())))
+            .map(order -> OrderResult.Summary.from(order, getPaymentFrom(payments, order)))
             .toList();
 
         return PageResult.of(items, page, size, totalElements);
@@ -81,23 +81,33 @@ public class OrderQueryService {
 
         Order order = orderRepository.find(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
-        Payment payment = getPayment(order.getId());
+        Payment payment = getPayment(order);
 
         return OrderResult.Detail.from(order, payment);
     }
 
-    private Payment getPayment(Long orderId) {
-        return paymentRepository.findByOrderId(orderId)
-            .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "[orderId = " + orderId + "] 결제 정보를 찾을 수 없습니다."));
+    private Payment getPayment(Order order) {
+        return paymentRepository.findByOrderId(order.getId())
+            .orElseGet(() -> paymentNotRequiredOrThrow(order));
     }
 
-    private Payment getPaymentFrom(Map<Long, Payment> payments, Long orderId) {
-        Payment payment = payments.get(orderId);
+    private Payment getPaymentFrom(Map<Long, Payment> payments, Order order) {
+        Payment payment = payments.get(order.getId());
         if (payment == null) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "[orderId = " + orderId + "] 결제 정보를 찾을 수 없습니다.");
+            return paymentNotRequiredOrThrow(order);
         }
 
         return payment;
+    }
+
+    private Payment paymentNotRequiredOrThrow(Order order) {
+        if (!order.requiresPayment()) {
+            return null;
+        }
+        throw new CoreException(
+            ErrorType.INTERNAL_ERROR,
+            "[orderId = " + order.getId() + "] 결제 정보를 찾을 수 없습니다."
+        );
     }
 
     private void validateListQuery(OrderQuery.ListOrders query) {

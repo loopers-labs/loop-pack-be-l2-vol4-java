@@ -9,7 +9,9 @@ import java.util.List;
 public record OrderPaidEvent(
     Long orderId,
     String userId,
-    Long totalAmount,
+    Long originalAmount,
+    Long discountAmount,
+    Long finalAmount,
     ZonedDateTime paidAt,
     List<Item> items
 ) {
@@ -17,7 +19,9 @@ public record OrderPaidEvent(
         return new OrderPaidEvent(
             order.getId(),
             order.getUserId(),
-            order.getTotalAmount(),
+            order.getOriginalAmount(),
+            order.getDiscountAmount(),
+            order.getFinalAmount(),
             ZonedDateTime.now(),
             order.getLines().stream()
                 .map(Item::from)

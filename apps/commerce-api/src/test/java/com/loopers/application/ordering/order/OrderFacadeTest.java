@@ -4,6 +4,7 @@ import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.domain.catalog.product.ProductSearchCondition;
 import com.loopers.domain.catalog.product.StockService;
+import com.loopers.application.coupon.CouponUseService;
 import com.loopers.domain.ordering.order.Order;
 import com.loopers.domain.ordering.order.OrderRepository;
 import com.loopers.domain.ordering.order.OrderStatus;
@@ -59,7 +60,9 @@ class OrderFacadeTest {
             assertAll(
                 () -> assertThat(result.orderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING),
                 () -> assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.REQUESTED),
-                () -> assertThat(result.totalAmount()).isEqualTo(4_000L),
+                () -> assertThat(result.originalAmount()).isEqualTo(4_000L),
+                () -> assertThat(result.discountAmount()).isZero(),
+                () -> assertThat(result.finalAmount()).isEqualTo(4_000L),
                 () -> assertThat(result.items()).hasSize(2),
                 () -> assertThat(product1.getStockQuantity()).isEqualTo(8),
                 () -> assertThat(product2.getStockQuantity()).isEqualTo(4),
@@ -214,8 +217,9 @@ class OrderFacadeTest {
         private final FakeOrderRepository orderRepository = new FakeOrderRepository();
         private final FakePaymentRepository paymentRepository = new FakePaymentRepository();
         private final OrderFacade facade = new OrderFacade(
-            new OrderCommandService(orderRepository, new StockService(productRepository)),
-            new PaymentCommandService(paymentRepository)
+            new OrderCommandService(orderRepository, new StockService(productRepository), new CouponUseService(null)),
+            new PaymentCommandService(paymentRepository),
+            null
         );
         private final OrderQueryService queryService = new OrderQueryService(orderRepository, paymentRepository);
 
