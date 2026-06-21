@@ -4,6 +4,7 @@ import com.loopers.domain.BaseEntity;
 import com.loopers.support.Guard;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -11,7 +12,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "wishlists", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_wishlist_user_product", columnNames = {"product_id", "user_id"})
+        @UniqueConstraint(name = "uq_wishlist_user_product", columnNames = {"user_id", "product_id"})
+}, indexes = {
+        @Index(name = "idx_wishlist_product_id", columnList = "product_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WishlistModel extends BaseEntity {
