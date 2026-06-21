@@ -1,0 +1,30 @@
+### 결제 요청
+POST {{commerce-api}}/api/v1/payments
+X-Loopers-LoginId: user1
+X-Loopers-LoginPw: password
+Content-Type: application/json
+
+{
+  "orderId": 1351039135,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451"
+}
+
+### PG 콜백 수신
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20250816:TR:9577c5",
+  "orderId": "1351039135",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "status": "SUCCESS",
+  "reason": null
+}
+
+### 결제 상태 수동 동기화
+POST {{commerce-api}}/api/v1/payments/1351039135/sync
+X-Loopers-LoginId: user1
+X-Loopers-LoginPw: password

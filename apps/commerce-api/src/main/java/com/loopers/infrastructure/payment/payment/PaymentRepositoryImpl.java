@@ -31,6 +31,11 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByTransactionKey(String transactionKey) {
+        return paymentJpaRepository.findByTransactionKey(transactionKey).map(PaymentJpaEntity::toDomain);
+    }
+
+    @Override
     public List<Payment> findAllByOrderIds(Collection<Long> orderIds) {
         return paymentJpaRepository.findByOrderIdIn(orderIds)
             .stream()

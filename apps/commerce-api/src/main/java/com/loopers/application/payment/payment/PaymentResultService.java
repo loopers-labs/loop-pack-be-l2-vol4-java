@@ -24,7 +24,7 @@ public class PaymentResultService {
     @Transactional
     public PaymentProcessResult markSuccess(Long orderId, String transactionKey) {
         Payment payment = getPayment(orderId);
-        if (!payment.isRequested()) {
+        if (!isCompletable(payment)) {
             return PaymentProcessResult.noop(orderId);
         }
 
@@ -43,7 +43,7 @@ public class PaymentResultService {
     @Transactional
     public PaymentProcessResult expirePayment(Long orderId) {
         Payment payment = getPayment(orderId);
-        if (!payment.isRequested()) {
+        if (!isCompletable(payment)) {
             return PaymentProcessResult.noop(orderId);
         }
 
@@ -53,7 +53,7 @@ public class PaymentResultService {
     @Transactional
     public PaymentProcessResult failPaymentAndRestoreStock(Long orderId, String reason) {
         Payment payment = getPayment(orderId);
-        if (!payment.isRequested()) {
+        if (!isCompletable(payment)) {
             return PaymentProcessResult.noop(orderId);
         }
 
@@ -66,7 +66,7 @@ public class PaymentResultService {
     @Transactional
     public PaymentProcessResult cancelPaymentAndRestoreStock(Long orderId, String reason) {
         Payment payment = getPayment(orderId);
-        if (!payment.isRequested()) {
+        if (!isCompletable(payment)) {
             return PaymentProcessResult.noop(orderId);
         }
 
@@ -81,6 +81,10 @@ public class PaymentResultService {
         paymentRepository.save(payment);
         orderCommandService.markPaymentFailedAndRestoreStock(orderId);
         return PaymentProcessResult.expired(orderId);
+    }
+
+    private boolean isCompletable(Payment payment) {
+        return payment.isRequested() || payment.isProcessing();
     }
 
     private Payment getPayment(Long orderId) {

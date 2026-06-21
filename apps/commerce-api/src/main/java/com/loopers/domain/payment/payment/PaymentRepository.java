@@ -9,6 +9,10 @@ public interface PaymentRepository {
 
     Optional<Payment> findByOrderId(Long orderId);
 
+    default Optional<Payment> findByTransactionKey(String transactionKey) {
+        return Optional.empty();
+    }
+
     List<Payment> findAllByOrderIds(Collection<Long> orderIds);
 
     List<Payment> findRequestedPayments();

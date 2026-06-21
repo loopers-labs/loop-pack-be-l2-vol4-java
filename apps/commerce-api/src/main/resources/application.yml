@@ -30,6 +30,11 @@ springdoc:
     path: /swagger-ui.html
 
 commerce:
+  pg-simulator:
+    base-url: http://localhost:8082
+    connect-timeout: 300ms
+    read-timeout: 800ms
+    callback-url: http://localhost:8080/api/v1/payments/callback
   cache:
     product:
       enabled: true
