@@ -1,64 +1,90 @@
 ## 🧭 Context & Decision
 
 ### 문제 정의
-- **현재 동작/제약**: 주문 흐름이 `주문 생성 → 결제 시작 → 결제 확정` 3단계 API로 분리. 초기 설계에서 쿠폰 소비는 주문 생성, 재고 선점은 결제 시작 트랜잭션에서 각각 처리됨.
-- **문제(리스크)**: 결제 시작이 실패하면 주문 생성에서 이미 커밋된 쿠폰 소비가 롤백되지 않아 쿠폰이 영구 소진됨. 동시 주문 시 동일한 쿠폰·재고 row에 여러 스레드가 동시에 접근하면 Lost Update 발생.
-- **성공 기준**: 쿠폰 소비 + 재고 선점 + 주문 생성이 원자적으로 처리되어 부분 성공이 없고, 동시 요청 시 재고·쿠폰 정합성이 보장됨.
+- **현재 동작/제약**: 10만 건 이상의 데이터에서 브랜드 필터 + 정렬 조합 조회 시 풀스캔 + filesort 발생. 좋아요순 정렬을 위해 매번 `COUNT(*)` 집계가 필요하고, 동일 조건의 반복 요청에도 매번 DB를 조회하는 구조.
+- **문제(리스크)**: EXPLAIN 기준 `type: ALL`, rows: 99,516, `Using filesort`. 트래픽이 몰릴수록 DB 부하가 선형으로 증가.
+- **성공 기준**: 인덱스 스캔으로 전환되어 rows가 LIMIT에 근접하고 filesort가 제거됨. 동일 조건 반복 요청 시 DB를 조회하지 않음.
 
 ---
 
 ### 선택지와 결정
 
-**[결정 1] 트랜잭션 범위 — 쿠폰·재고·주문을 어느 단계에서 묶을 것인가**
+**[결정 1] OR 조건 제거 — 쿼리 분리 vs Null Object Pattern**
 
 - 고려한 대안:
-  - A (기존): 쿠폰 소비는 `createOrder`, 재고 선점은 `startPayment` 트랜잭션으로 분리
-  - B: 쿠폰 소비 + 재고 선점 + 주문 생성을 `createOrder` 단일 트랜잭션으로 통합
+  - A (기존): `WHERE brand_id = :brandId OR :brandId IS NULL` 단일 메서드
+  - B (쿼리 분리): `findAllActive` / `findAllActiveByBrandId` 두 메서드로 분리, 호출부에서 brandId null 여부로 분기
+  - C (Null Object Pattern): 노브랜드 전용 브랜드 레코드를 삽입해 `brand_id = NULL`을 없앰
 - 최종 결정: **B**
-- 트레이드오프: `createOrder` 트랜잭션이 재고·쿠폰 락을 동시에 보유해 락 경합 범위가 넓어지지만, 셋 중 하나라도 실패하면 모두 롤백되어 부분 성공이 없어짐. `startPayment`는 상태 전이(`PENDING_PAYMENT → IN_PAYMENT`)만 담당하도록 단순해짐.
+- 트레이드오프: OR 조건이 있으면 옵티마이저가 "brandId가 null일 수도 있다"고 판단해 인덱스를 타지 않고 풀스캔을 선택한다. 쿼리 분리로 OR 조건 자체를 없애면 이 문제가 해결된다. C는 데이터 모델 변경을 수반하는데, 쿼리 분리만으로 해결된 시점에서 오버엔지니어링이다.
 
 ---
 
-**[결정 2] 동시성 제어 — 어떤 락 전략을 사용할 것인가**
+**[결정 2] 좋아요 수 정렬 구조 — 반정규화 vs Materialized View**
 
 - 고려한 대안:
-  - A (낙관적 락): `@Version`으로 충돌 감지 후 재시도
-  - B (비관적 락): 쓰기 직전 `SELECT FOR UPDATE`
-  - C (원자적 UPDATE): `UPDATE SET reserved_stock = reserved_stock + qty WHERE (total_stock - reserved_stock) >= qty` 조건부 갱신
-- 최종 결정: **재고는 B (비관적 락), 쿠폰은 C (원자적 UPDATE)**
-- 트레이드오프:
-  - 낙관적 락은 쿠폰(유저별 row 분리, 충돌 빈도 낮음)엔 적합하지만, 재고(모든 유저가 같은 row 경쟁, 충돌 빈도 높음)엔 재시도 폭풍이 발생할 수 있음
-  - 재고에 원자적 UPDATE를 적용하지 않은 이유: `affected rows = 0`만 반환되어 재고 부족인지 row 없음인지 Java에서 알 수 없음 → `StockModel.reserve()` 도메인 검증 로직을 유지할 수 없음
-  - 쿠폰에 원자적 UPDATE를 적용한 이유: `AVAILABLE → USED` 단순 상태 전이라 조건이 간단하고, `affected rows = 0`이면 "이미 사용됨"으로 명확히 해석 가능
-- 추후 개선 여지: 트래픽이 늘어 재고 처리량이 병목이 되면 재고도 원자적 UPDATE로 전환 검토 가능
+  - A (반정규화): `products.like_count` 컬럼에 좋아요 수를 미리 집계해두고 등록/취소 시 원자 UPDATE로 동기화
+  - B (Materialized View): 별도 snapshot 테이블을 만들고 스케줄러로 주기적 재계산
+- 최종 결정: **A**
+- 트레이드오프: B는 좋아요가 등록/취소될 때마다 갱신되지 않아 배치 주기만큼 stale이 발생한다. 좋아요 수는 "대략적인 인기순"이 목적이므로 순간적인 불일치는 허용되지만, 반정규화는 원자 UPDATE(`like_count = like_count ± 1`)로 훨씬 가까운 시점에 동기화된다. 운영 복잡도(스케줄러 관리)도 낮다.
+
+---
+
+**[결정 3] like_count 인덱스 유지 여부**
+
+- 고려한 대안:
+  - A (인덱스 유지): 좋아요 등록/취소마다 B-Tree 갱신 비용 발생
+  - B (인덱스 제거): 쓰기 비용 절감. 대신 캐시 미스 시 filesort(99K rows) 발생
+- 최종 결정: **A**
+- 트레이드오프: 좋아요는 결제·재고처럼 정합성이 엄격하지 않아 쓰기 경합이 크리티컬하지 않다. Redis 캐시가 읽기 경로를 흡수하므로 캐시 히트 시에는 DB를 전혀 조회하지 않아 인덱스가 사용되지 않는다. 캐시 미스 시에는 인덱스가 없으면 rows 99K filesort가 발생하고, 있으면 rows 20으로 끝난다. 쓰기 경합의 실질 원인은 인덱스가 아니라 row lock 자체이므로 인덱스를 제거해도 해결되지 않는다.
+
+---
+
+**[결정 4] inStock 필터 구현 방식 — EXISTS vs JOIN vs 반정규화**
+
+- 고려한 대안:
+  - A (JOIN): `products JOIN stocks ON ...` 추가
+  - B (반정규화): `products.available_stock` 컬럼 추가
+  - C (EXISTS 서브쿼리): `WHERE EXISTS (SELECT 1 FROM stocks WHERE product_id = p.id AND total_stock - reserved_stock > 0)`
+- 최종 결정: **C**
+- 트레이드오프: A는 옵티마이저가 stocks를 드라이빙 테이블로 선택하면 products의 정렬 인덱스가 무력화되고 filesort가 재발한다. B는 재고는 정합성이 중요한 데이터라 쓰기마다 동기화 부담이 크다(재고 부족/선점 상황에서 불일치 발생 시 잘못된 필터 결과를 낸다). C는 products 인덱스를 드라이빙으로 유지하면서 재고 조건을 정확하게 표현한다. Redis 캐시와 조합해 EXISTS 실행 빈도를 줄인다.
+
+---
+
+**[결정 5] Redis 캐시 evict 전략**
+
+- 고려한 대안:
+  - A: 수정된 상품이 포함된 페이지만 선택적으로 evict
+  - B: 상품 수정/삭제/좋아요 이벤트 시 `products` 목록 캐시 전체 evict (`allEntries = true`)
+- 최종 결정: **B**
+- 트레이드오프: 어떤 파라미터 조합의 캐시 엔트리에 해당 상품이 포함되어 있는지 런타임에 알 수 없다. 선택적 evict를 구현하려면 상품 ID → 캐시 키 역방향 매핑이 필요하고, 구현 복잡도 대비 이득이 작다. 전체 evict는 공격적이지만, 좋아요처럼 빈번한 이벤트에서는 캐시 히트율이 낮아지는 부작용이 있다.
+
+---
+
+**[결정 6] 상품 상세 재고 — 캐시 포함 vs 실시간 조회**
+
+- 고려한 대안:
+  - A: `OrderFacade`에 `@CacheEvict` 추가 — 재고 변경 시 product 캐시를 무효화
+  - B (실시간 조회): 재고를 캐시에서 제외하고, 상세 조회 시 항상 DB에서 직접 조회
+  - C: TTL을 짧게 조정 — stale 허용 범위만 줄이는 것
+- 최종 결정: **B**
+- 트레이드오프: A는 주문이 빈번한 환경에서 캐시 히트율을 급격히 낮춘다. C는 stale 문제를 구조적으로 해결하지 못한다. 재고는 구매 결정에 직접 사용되는 정보라 항상 정확해야 한다. 목록 화면의 재고(참고용)와 달리 상세 화면의 재고는 실시간 조회가 적합하다고 판단했다. `ProductCacheService`를 별도 bean으로 분리해 self-invocation 없이 상품 데이터만 캐싱하고, 재고는 `ProductFacade`에서 후처리로 조합한다.
 
 ---
 
 ## 🤔 고민한 점 / 막혔던 부분
 
-쿠폰도 처음엔 재고와 동일하게 비관적 락(`SELECT FOR UPDATE`)으로 구현했다. 그런데 쿠폰 이슈 row는 유저별로 분리되어 있어 같은 row에 동시 접근하는 상황이 현실적으로 드물다. 비관적 락은 SELECT 시점부터 COMMIT까지 DB 락을 유지하므로, 충돌 빈도가 낮은 쿠폰에 적용하면 락 보유 시간만 길어지고 얻는 이점이 적다.
+`deleted_at IS NULL` 조건을 인덱스에 포함할지 처음에 고민했다. selectivity가 낮은 컬럼을 선두에 두면 오히려 인덱스 효율이 떨어진다는 이유로 제외했는데, "그러면 LIMIT이 있는 쿼리에서도 인덱스가 비효율적인가"라는 의문이 남았다.
 
-반면 쿠폰의 상태 전이는 `AVAILABLE → USED`로 단순해서 `WHERE status = AVAILABLE` 하나로 SQL에 조건을 표현할 수 있다. 원자적 UPDATE는 락 없이 WHERE 조건으로 "오직 하나만 성공"을 보장하고, `affected rows = 0`이면 "이미 사용됨"으로 명확히 해석된다.
-
-다만 원자적 UPDATE 하나만으로는 "보유하지 않은 쿠폰"(404)과 "이미 사용된 쿠폰"(400)을 구분할 수 없다. 그래서 소유 확인(락 없는 SELECT)과 상태 전이(원자적 UPDATE)를 두 단계로 분리했다. 이 사이의 race condition — 두 스레드가 소유 확인을 동시에 통과하는 경우 — 은 step 2의 WHERE 조건이 막아준다. 동시에 통과하더라도 UPDATE를 성공시키는 건 하나뿐이다.
+EXPLAIN으로 확인해보니 `LIMIT 20`이 있으면 인덱스를 순서대로 읽다가 조건에 맞는 20개를 찾는 즉시 멈춘다(`type: index`). selectivity가 낮아도 LIMIT이 조기 종료 조건으로 작동해 실질 읽기 비용이 작았다. selectivity 문제는 LIMIT 없는 전체 스캔에서만 인덱스를 무력화한다는 결론에 도달했다.
 
 ---
 
-락 메서드를 분리하지 않아 발생한 이슈가 있었다.
+OFFSET 페이지네이션의 한계를 인덱스 분석 중에 확인했다. 1페이지(OFFSET 0)는 rows = 20으로 끝나지만, OFFSET 50,000이면 rows = 50,020이 된다. rows가 OFFSET에 정비례해 선형 증가하고, 브랜드 + 최신순 조합에서는 OFFSET 1,000부터 옵티마이저가 인덱스 전략을 바꾸면서 filesort까지 재등장했다.
 
-처음에는 기존 조회 메서드에 직접 `@Lock(LockModeType.PESSIMISTIC_WRITE)`를 추가했다. 실행하자 `@Transactional(readOnly = true)` 컨텍스트에서 호출될 때 `SELECT FOR UPDATE`를 발급할 수 없다는 `GenericJDBCException`이 발생하며 테스트 9개가 실패했다.
+커버링 인덱스로 row lookup을 줄이면 딥 페이지에서 I/O를 절반으로 줄일 수 있다. 그런데 `name` 컬럼이 인덱스에 없어서 row lookup이 반드시 발생하고, `name`을 6개 인덱스에 추가하면 varchar로 인한 인덱스 크기 증가와 쓰기 비용이 부담이다. 커버링 인덱스 효과가 가장 큰 구간이 offset 페이지네이션의 구조적 한계 구간과 겹친다는 점도 아이러니였다.
 
-원인은 readOnly 트랜잭션에서는 쓰기 락을 획득할 수 없다는 것이었다. 해결책은 락이 필요한 경우와 일반 조회를 아예 다른 메서드로 분리하는 것이었다.
-
-```java
-findAllByProductIds(ids)         // 일반 조회 (readOnly 포함 모든 컨텍스트)
-findAllByProductIdsWithLock(ids) // 쓰기 전용 (PESSIMISTIC_WRITE)
-```
-
-이후로는 `@Lock`은 반드시 `WithLock` 접미사를 가진 전용 메서드에만 적용하는 규칙을 지키고 있다.
+이 문제를 구조적으로 해결하려면 OFFSET 자체를 없애는 방향이 맞는 것 같다. 커서 기반 페이지네이션(`WHERE id < :lastId LIMIT 20`)이 그 방법 중 하나라고 생각하는데, 페이지 깊이와 무관하게 항상 rows = 20으로 고정되기 때문이다. 다만 정렬 기준이 `like_count`처럼 중복 가능한 컬럼이면 커서 설계가 복잡해지는 만큼, 도입 시 정렬 조건별 커서 전략을 별도로 고민해야 할 것 같다.
 
 ---
-
 ## 🙋 기타
-
-`startPayment` 중복 호출 방어를 위해 `IN_PAYMENT` 상태를 추가했다. 재고 선점이 `createOrder`로 이동했기 때문에 `startPayment`는 상태 전이만 담당하는데, 같은 주문으로 두 번 호출하면 `PENDING_PAYMENT` 상태 체크로 막는다. 충돌 빈도가 낮고 한 사용자의 중복 요청이 대상이라 별도 락은 적용하지 않았다.

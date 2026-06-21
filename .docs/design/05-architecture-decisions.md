@@ -1007,3 +1007,52 @@ return new OrderModel(userId, items, couponIssueId, discountAmount);
 |------|------------|-----------|
 | race condition 허용 | 어드민 수정 빈도가 극히 낮아 충돌 창(window)이 열릴 확률이 매우 낮음. 발생하더라도 쿠폰 1장 초과 발급 수준으로 영향 범위가 작음 | 수정·발급 동시 실행 시 stale read로 만료된 쿠폰이 발급될 가능성이 이론적으로 존재 |
 | 발급 비관적 락 미적용 | 트래픽이 높은 발급 경로에 락을 추가하면 어드민 수정이 없는 상황에서도 모든 동시 발급이 직렬화됨 | — |
+
+---
+
+## 미결 사항 — 성능 개선 설계 과정에서 남긴 과제
+
+> Round 5 인덱스 + 캐시 설계 과정에서 확인됐지만 현재 구현에 포함하지 않은 항목들.
+> 트래픽 증가 또는 장애 상황에서 먼저 드러날 것으로 예상되는 순서로 나열.
+
+### ① Redis SPOF — CacheErrorHandler fallback 미적용
+
+현재 `@Cacheable`은 Redis 장애 시 예외를 던진다. 성능 개선 목적으로 넣은 캐시가 단일 장애 지점(SPOF)이 되는 구조.
+
+**해결 방향:** `CachingConfigurer`를 구현해 `cacheErrorHandler()`에서 `SimpleCacheErrorHandler`(예외 무시 → DB fallback)를 반환.
+
+---
+
+### ② Thundering Herd — 목록 캐시 전체 evict 후 동시 요청 폭주
+
+좋아요 이벤트마다 `products` 캐시를 `allEntries = true`로 전체 삭제한다. evict 직후 동시 요청이 모두 캐시 미스로 DB에 쏟아지면 DB 과부하 발생.
+
+**해결 방향 (택 1):**
+- Redis `SETNX` 기반 뮤텍스: 캐시 미스 시 첫 요청만 DB 조회, 나머지 대기
+- Cache Warming: evict 후 백그라운드에서 주요 파라미터 조합을 미리 채움
+
+---
+
+### ③ like_count 인덱스 2개 — 좋아요 집중 시 B-tree 갱신 경합
+
+`idx_products_likes_desc`, `idx_products_brand_likes` 두 인덱스 모두 `like_count`를 포함한다. 인기 상품에 좋아요가 몰리면 매 UPDATE마다 두 인덱스의 노드 이동이 발생하고 row lock 경합이 심해진다.
+
+**해결 방향:** Redis `INCR`로 좋아요 수를 집계하고 배치로 MySQL에 반영. DB 쓰기 횟수를 줄여 인덱스 갱신 경합 해소. Eventual Consistency 허용이 전제.
+
+---
+
+### ④ soft delete 상품 인덱스 누적 — MySQL partial index 미지원
+
+삭제된 상품이 인덱스에서 제거되지 않아 데이터가 쌓일수록 인덱스 크기가 커지고 `deleted_at IS NULL` 필터에서 버리는 행이 늘어난다. PostgreSQL의 partial index로 해결 가능하지만 MySQL은 미지원.
+
+**해결 방향 (택 1):**
+- 삭제 후 N일 경과한 상품을 주기적으로 물리 삭제하는 배치
+- 테이블 파티셔닝으로 삭제 데이터를 별도 파티션에 격리
+
+---
+
+### ⑤ PRICE_ASC / LATEST 정렬 — 인덱스 없이 filesort
+
+좋아요순에만 인덱스를 적용했고 나머지 두 정렬은 filesort로 처리된다. 데이터 증가 + 캐시 hit rate 저하 시 병목이 될 수 있다.
+
+**해결 방향:** 실제 slow query log로 측정 후, 문제가 확인될 때 해당 정렬 컬럼에 인덱스 추가. 현재는 미루어도 무방.

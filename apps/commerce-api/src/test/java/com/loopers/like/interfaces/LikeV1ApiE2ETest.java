@@ -1,5 +1,7 @@
 package com.loopers.like.interfaces;
 
+import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.infrastructure.BrandJpaRepository;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.infrastructure.ProductJpaRepository;
@@ -39,6 +41,9 @@ class LikeV1ApiE2ETest {
 
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
+    @Autowired
+    private BrandJpaRepository brandJpaRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -223,6 +228,26 @@ class LikeV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+
+        @DisplayName("브랜드가 있는 상품을 좋아요했을 때, 응답에 brandName이 포함된다.")
+        @Test
+        void returnsBrandName_whenLikedProductHasBrand() {
+            // arrange
+            BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "스포츠 브랜드"));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, brand.getId()));
+            testRestTemplate.exchange(
+                "/api/v1/products/" + product.getId() + "/likes",
+                HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<List<ProductInfo>>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<List<ProductInfo>>> response =
+                testRestTemplate.exchange("/api/v1/users/" + userId + "/likes", HttpMethod.GET, new HttpEntity<>(authHeaders()), responseType);
+
+            // assert
+            assertThat(response.getBody().data().get(0).brandName()).isEqualTo("나이키");
         }
     }
 }

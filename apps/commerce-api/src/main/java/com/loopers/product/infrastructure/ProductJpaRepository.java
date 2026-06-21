@@ -1,6 +1,7 @@
 package com.loopers.product.infrastructure;
 
 import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.ProductSummaryModel;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,8 +14,23 @@ import java.util.Optional;
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
     Optional<ProductModel> findByIdAndDeletedAtIsNull(Long id);
 
-    @Query("SELECT p FROM ProductModel p WHERE p.deletedAt IS NULL AND (:brandId IS NULL OR p.brandId = :brandId)")
-    List<ProductModel> findAllWithFilter(@Param("brandId") Long brandId, Pageable pageable);
+    @Query("SELECT NEW com.loopers.product.domain.ProductSummaryModel(p.id, p.name, p.price, p.brandId, p.likeCount) FROM ProductModel p WHERE p.deletedAt IS NULL")
+    List<ProductSummaryModel> findAllActive(Pageable pageable);
+
+    @Query("SELECT NEW com.loopers.product.domain.ProductSummaryModel(p.id, p.name, p.price, p.brandId, p.likeCount) FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId")
+    List<ProductSummaryModel> findAllActiveByBrandId(@Param("brandId") Long brandId, Pageable pageable);
+
+    @Query("""
+        SELECT NEW com.loopers.product.domain.ProductSummaryModel(p.id, p.name, p.price, p.brandId, p.likeCount) FROM ProductModel p WHERE p.deletedAt IS NULL
+        AND EXISTS (SELECT 1 FROM StockModel s WHERE s.productId = p.id AND (s.totalStock - s.reservedStock) > 0)
+        """)
+    List<ProductSummaryModel> findAllActiveInStock(Pageable pageable);
+
+    @Query("""
+        SELECT NEW com.loopers.product.domain.ProductSummaryModel(p.id, p.name, p.price, p.brandId, p.likeCount) FROM ProductModel p WHERE p.deletedAt IS NULL AND p.brandId = :brandId
+        AND EXISTS (SELECT 1 FROM StockModel s WHERE s.productId = p.id AND (s.totalStock - s.reservedStock) > 0)
+        """)
+    List<ProductSummaryModel> findAllActiveByBrandIdInStock(@Param("brandId") Long brandId, Pageable pageable);
 
     @Query("SELECT p FROM ProductModel p WHERE p.id IN :ids AND p.deletedAt IS NULL")
     List<ProductModel> findAllByIds(@Param("ids") List<Long> ids);

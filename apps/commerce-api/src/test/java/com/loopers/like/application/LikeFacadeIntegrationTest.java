@@ -1,5 +1,7 @@
 package com.loopers.like.application;
 
+import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.infrastructure.BrandJpaRepository;
 import com.loopers.like.infrastructure.LikeJpaRepository;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.domain.ProductModel;
@@ -31,6 +33,9 @@ class LikeFacadeIntegrationTest {
 
     @Autowired
     private ProductJpaRepository productJpaRepository;
+
+    @Autowired
+    private BrandJpaRepository brandJpaRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -155,6 +160,35 @@ class LikeFacadeIntegrationTest {
 
             // assert
             assertThat(result).isEmpty();
+        }
+
+        @DisplayName("브랜드가 있는 상품을 좋아요했을 때, brandName이 채워진 ProductInfo를 반환한다.")
+        @Test
+        void returnsBrandName_whenLikedProductHasBrand() {
+            // arrange
+            BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "스포츠 브랜드"));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어맥스", "나이키 운동화", 150000L, brand.getId()));
+            likeFacade.addLike(1L, product.getId());
+
+            // act
+            List<ProductInfo> result = likeFacade.getLikedProducts(1L);
+
+            // assert
+            assertThat(result.get(0).brandName()).isEqualTo("나이키");
+        }
+
+        @DisplayName("brandId가 null인 상품(노브랜드)을 좋아요했을 때, brandName이 null인 ProductInfo를 반환한다.")
+        @Test
+        void returnsNullBrandName_whenLikedProductHasNoBrand() {
+            // arrange
+            ProductModel product = productJpaRepository.save(new ProductModel("기본 티셔츠", "무브랜드 상품", 10000L, null));
+            likeFacade.addLike(1L, product.getId());
+
+            // act
+            List<ProductInfo> result = likeFacade.getLikedProducts(1L);
+
+            // assert
+            assertThat(result.get(0).brandName()).isNull();
         }
     }
 }

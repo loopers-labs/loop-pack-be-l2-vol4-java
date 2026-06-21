@@ -2,6 +2,7 @@ package com.loopers.product.infrastructure;
 
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.product.domain.ProductSummaryModel;
 import com.loopers.product.domain.SortCondition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -28,14 +29,22 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<ProductModel> findAll(SortCondition sort, Long brandId, int page, int size) {
+    public List<ProductSummaryModel> findAll(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
         Sort springSort = switch (sort) {
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
             case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount")
                 .and(Sort.by(Sort.Direction.DESC, "createdAt"));
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
-        return productJpaRepository.findAllWithFilter(brandId, PageRequest.of(page, size, springSort));
+        PageRequest pageRequest = PageRequest.of(page, size, springSort);
+        if (inStock) {
+            return brandId == null
+                ? productJpaRepository.findAllActiveInStock(pageRequest)
+                : productJpaRepository.findAllActiveByBrandIdInStock(brandId, pageRequest);
+        }
+        return brandId == null
+            ? productJpaRepository.findAllActive(pageRequest)
+            : productJpaRepository.findAllActiveByBrandId(brandId, pageRequest);
     }
 
     @Override

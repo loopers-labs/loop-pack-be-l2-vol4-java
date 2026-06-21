@@ -6,10 +6,14 @@ import com.loopers.brand.domain.BrandService;
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
 import com.loopers.product.domain.ProductService;
+import com.loopers.product.domain.ProductSummaryModel;
 import com.loopers.product.domain.SortCondition;
 import com.loopers.stock.domain.StockModel;
 import com.loopers.stock.domain.StockRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,7 @@ public class ProductFacade {
     private final BrandRepository brandRepository;
     private final BrandService brandService;
     private final StockRepository stockRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public ProductInfo createProduct(String name, String description, Long price, Integer initialStock, Long brandId) {
@@ -42,29 +47,27 @@ public class ProductFacade {
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long productId) {
-        ProductModel product = productService.getOrThrow(productRepository.find(productId));
-        Optional<BrandModel> brand = product.getBrandId() != null
-            ? brandRepository.find(product.getBrandId())
-            : Optional.empty();
+        ProductInfo cached = productCacheService.getProductWithoutStock(productId);
         Integer availableStock = stockRepository.findByProductId(productId)
             .map(StockModel::availableStock)
             .orElse(0);
-        return ProductInfo.from(product, productService.resolveBrandName(brand), availableStock);
+        return cached.withStock(availableStock);
     }
 
+    @Cacheable(cacheNames = "products", key = "#sort.name() + ':' + #brandId + ':' + #inStock + ':' + #page + ':' + #size")
     @Transactional(readOnly = true)
-    public List<ProductInfo> getProducts(SortCondition sort, Long brandId, int page, int size) {
-        List<ProductModel> products = productRepository.findAll(sort, brandId, page, size);
+    public List<ProductSummaryInfo> getProducts(SortCondition sort, Long brandId, boolean inStock, int page, int size) {
+        List<ProductSummaryModel> products = productRepository.findAll(sort, brandId, inStock, page, size);
 
         List<Long> productIds = products.stream()
-            .map(ProductModel::getId)
+            .map(ProductSummaryModel::id)
             .toList();
 
         Map<Long, Integer> stockMap = stockRepository.findAllByProductIds(productIds).stream()
             .collect(Collectors.toMap(StockModel::getProductId, StockModel::availableStock));
 
         List<Long> brandIds = products.stream()
-            .map(ProductModel::getBrandId)
+            .map(ProductSummaryModel::brandId)
             .filter(Objects::nonNull)
             .distinct()
             .toList();
@@ -74,14 +77,18 @@ public class ProductFacade {
             .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
 
         return products.stream()
-            .map(p -> ProductInfo.from(
+            .map(p -> ProductSummaryInfo.from(
                 p,
-                productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.getBrandId()))),
-                stockMap.getOrDefault(p.getId(), 0)
+                productService.resolveBrandName(Optional.ofNullable(brandMap.get(p.brandId()))),
+                stockMap.getOrDefault(p.id(), 0)
             ))
             .toList();
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "product", key = "#productId"),
+        @CacheEvict(cacheNames = "products", allEntries = true)
+    })
     @Transactional
     public ProductInfo updateProduct(Long productId, String name, String description, Long price) {
         ProductModel product = productService.getOrThrow(productRepository.find(productId));
@@ -93,6 +100,10 @@ public class ProductFacade {
         return ProductInfo.from(product, availableStock);
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "product", key = "#productId"),
+        @CacheEvict(cacheNames = "products", allEntries = true)
+    })
     @Transactional
     public void deleteProduct(Long productId) {
         ProductModel product = productService.getOrThrow(productRepository.find(productId));

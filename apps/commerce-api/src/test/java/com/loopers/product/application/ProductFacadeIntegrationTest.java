@@ -181,15 +181,15 @@ class ProductFacadeIntegrationTest {
     @Nested
     class GetProducts {
 
-        @DisplayName("상품이 있으면, ProductInfo 목록을 반환한다.")
+        @DisplayName("상품이 있으면, ProductSummaryInfo 목록을 반환하며 description이 없다.")
         @Test
-        void returnsProductInfoList_whenProductsExist() {
+        void returnsSummaryList_whenProductsExist() {
             // arrange
             savedProduct("에어맥스", 100);
             savedProduct("조던1", 50);
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, 0, 20);
+            List<ProductSummaryInfo> result = productFacade.getProducts(SortCondition.LATEST, null, false, 0, 20);
 
             // assert
             assertThat(result).hasSize(2);
@@ -205,7 +205,7 @@ class ProductFacadeIntegrationTest {
             productJpaRepository.save(deleted);
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LATEST, null, 0, 20);
+            List<ProductSummaryInfo> result = productFacade.getProducts(SortCondition.LATEST, null, false, 0, 20);
 
             // assert
             assertThat(result).hasSize(1);
@@ -220,7 +220,7 @@ class ProductFacadeIntegrationTest {
             likeFacade.addLike(1L, popular.getId());
 
             // act
-            List<ProductInfo> result = productFacade.getProducts(SortCondition.LIKES_DESC, null, 0, 20);
+            List<ProductSummaryInfo> result = productFacade.getProducts(SortCondition.LIKES_DESC, null, false, 0, 20);
 
             // assert
             assertThat(result.get(0).id()).isEqualTo(popular.getId());

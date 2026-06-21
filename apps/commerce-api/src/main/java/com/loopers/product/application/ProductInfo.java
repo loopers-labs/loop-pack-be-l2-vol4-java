@@ -29,4 +29,8 @@ public record ProductInfo(Long id, String name, String description, Long price, 
             model.getLikeCount()
         );
     }
+
+    public ProductInfo withStock(Integer availableStock) {
+        return new ProductInfo(id, name, description, price, availableStock, brandId, brandName, likeCount);
+    }
 }
