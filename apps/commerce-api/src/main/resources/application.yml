@@ -29,6 +29,21 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+commerce:
+  cache:
+    product:
+      enabled: true
+      ttl: 5m
+  workers:
+    payment:
+      enabled: false
+      initial-delay-ms: 5000
+      fixed-delay-ms: 5000
+    event-relay:
+      enabled: false
+      initial-delay-ms: 5000
+      fixed-delay-ms: 5000
+
 ---
 spring:
   config:
