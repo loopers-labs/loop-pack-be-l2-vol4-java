@@ -1,8 +1,11 @@
 package com.loopers.application.brand;
 
+import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -31,6 +34,10 @@ public class BrandFacade {
         return BrandInfo.from(brandService.update(brandId, name));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisConfig.PRODUCT_LIST_LATEST_PRICE_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisConfig.PRODUCT_LIST_LIKES_CACHE, allEntries = true)
+    })
     @Transactional
     public void delete(Long brandId) {
         brandService.delete(brandId);

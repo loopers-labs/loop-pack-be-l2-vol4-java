@@ -48,6 +48,11 @@ public class ProductService {
     }
 
     @Transactional
+    public void updateMinPrice(Long productId, Long minPrice) {
+        get(productId).updateMinPrice(minPrice);
+    }
+
+    @Transactional
     public ProductModel update(Long id, ProductName name) {
         ProductModel product = get(id);
         product.update(name);
@@ -62,6 +67,16 @@ public class ProductService {
     @Transactional
     public void suspendAllByBrandId(Long brandId) {
         productRepository.suspendAllByBrandId(brandId);
+    }
+
+    @Transactional
+    public void increaseLikeCount(Long productId) {
+        productRepository.increaseLikeCount(productId);
+    }
+
+    @Transactional
+    public void decreaseLikeCount(Long productId) {
+        productRepository.decreaseLikeCount(productId);
     }
 
 }

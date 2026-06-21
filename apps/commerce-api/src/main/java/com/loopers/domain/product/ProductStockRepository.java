@@ -9,5 +9,5 @@ public interface ProductStockRepository {
     List<ProductStockModel> findAllByProductId(Long productId);
     boolean decreaseIfSufficient(Long stockId, int quantity);
     void increaseStock(Long stockId, int quantity);
-    boolean updateStockAttributes(Long stockId, Long price, Integer delta);
+    boolean updateStockAttributes(Long productId, Long stockId, Long price, Integer delta);
 }

@@ -46,9 +46,13 @@ public class ProductStockService {
     }
 
     @Transactional
-    public ProductStockModel updateStock(Long stockId, Long price, Integer stockQuantity) {
+    public ProductStockModel updateStock(Long productId, Long stockId, Long price, Integer stockQuantity) {
+        ProductStockModel stock = get(stockId);
+        if (!stock.getProduct().getId().equals(productId)) {
+            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + stockId + "] 해당 상품의 재고를 찾을 수 없습니다.");
+        }
         if (price != null || stockQuantity != null) {
-            boolean updated = productStockRepository.updateStockAttributes(stockId, price, stockQuantity);
+            boolean updated = productStockRepository.updateStockAttributes(productId, stockId, price, stockQuantity);
             if (!updated && stockQuantity != null) {
                 throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
             }

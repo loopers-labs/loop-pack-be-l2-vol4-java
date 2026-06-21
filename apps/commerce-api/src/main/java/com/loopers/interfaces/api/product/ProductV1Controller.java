@@ -1,6 +1,8 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductPageResult;
+import com.loopers.domain.product.enums.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
 
 @RequiredArgsConstructor
 @RestController
@@ -23,19 +26,18 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     @Override
     public ApiResponse<PageResponse<ProductV1Dto.ProductResponse>> getProducts(
             @RequestParam(required = false) Long brandId,
-            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(defaultValue = "LATEST") ProductSortType sort,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        return ApiResponse.success(
-                PageResponse.from(productFacade.getProducts(brandId, sort, pageable)
-                        .map(ProductV1Dto.ProductResponse::from))
-        );
+        ProductPageResult<ProductV1Dto.ProductResponse> result = productFacade.getProducts(brandId, sort, pageable)
+                .map(ProductV1Dto.ProductResponse::from);
+        return ApiResponse.success(PageResponse.from(result.content(), pageable, result.totalElements()));
     }
 
     @GetMapping("/{productId}")
     @Override
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(@PathVariable Long productId) {
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(
+    public ApiResponse<ProductV1Dto.ProductDetailResponse> getProduct(@PathVariable Long productId) {
+        return ApiResponse.success(ProductV1Dto.ProductDetailResponse.from(
                 productFacade.getProduct(productId)
         ));
     }

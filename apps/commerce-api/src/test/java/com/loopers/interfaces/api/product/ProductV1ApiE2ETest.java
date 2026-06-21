@@ -79,6 +79,55 @@ class ProductV1ApiE2ETest {
             assertThat(response.getBody().data().content()).hasSize(1);
             assertThat(response.getBody().data().content().get(0).brandId()).isEqualTo(brand.getId());
         }
+
+        @DisplayName("sort=LATEST를 주면, 200 OK를 반환한다.")
+        @Test
+        void returnsOk_whenSortIsLatest() {
+            ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> type = new ParameterizedTypeReference<>() {};
+
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                    testRestTemplate.exchange("/api/v1/products?sort=LATEST", HttpMethod.GET, null, type);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().data().content()).hasSize(1);
+        }
+
+        @DisplayName("sort=latest처럼 소문자로 주면, enum 값과 대소문자가 일치하지 않아 400 BAD_REQUEST를 반환한다.")
+        @Test
+        void returnsBadRequest_whenSortIsLowerCase() {
+            ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> type = new ParameterizedTypeReference<>() {};
+
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                    testRestTemplate.exchange("/api/v1/products?sort=latest", HttpMethod.GET, null, type);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL);
+        }
+
+        @DisplayName("sort=PRICE_ASC를 주면, 200 OK를 반환한다.")
+        @Test
+        void returnsOk_whenSortIsPriceAsc() {
+            ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> type = new ParameterizedTypeReference<>() {};
+
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                    testRestTemplate.exchange("/api/v1/products?sort=PRICE_ASC", HttpMethod.GET, null, type);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().data().content()).hasSize(1);
+        }
+
+        @DisplayName("sort=INVALID처럼 존재하지 않는 값을 주면, 400 BAD_REQUEST와 표준 에러 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenSortIsInvalid() {
+            ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> type = new ParameterizedTypeReference<>() {};
+
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductResponse>>> response =
+                    testRestTemplate.exchange("/api/v1/products?sort=INVALID", HttpMethod.GET, null, type);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL);
+            assertThat(response.getBody().meta().errorCode()).isNotBlank();
+        }
     }
 
     @DisplayName("GET /api/v1/products/{productId}")

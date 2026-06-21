@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 
 @RequiredArgsConstructor
 @Component
@@ -41,15 +40,5 @@ public class WishlistService {
     @Transactional(readOnly = true)
     public List<WishlistProductSnapshot> getListWithDetails(Long userId) {
         return wishlistRepository.findLikedProductSnapshotsByUserId(userId);
-    }
-
-    @Transactional(readOnly = true)
-    public long countByProductId(Long productId) {
-        return wishlistRepository.countByProductId(productId);
-    }
-
-    @Transactional(readOnly = true)
-    public Map<Long, Long> countsByProductIds(List<Long> productIds) {
-        return wishlistRepository.countsByProductIds(productIds);
     }
 }

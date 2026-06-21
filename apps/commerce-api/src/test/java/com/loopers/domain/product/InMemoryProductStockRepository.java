@@ -38,7 +38,7 @@ class InMemoryProductStockRepository implements ProductStockRepository {
     }
 
     @Override
-    public boolean updateStockAttributes(Long stockId, Long price, Integer delta) {
+    public boolean updateStockAttributes(Long productId, Long stockId, Long price, Integer delta) {
         return false;
     }
 }

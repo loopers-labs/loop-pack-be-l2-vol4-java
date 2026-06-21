@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -111,56 +110,4 @@ class WishlistServiceIntegrationTest {
         }
     }
 
-    @DisplayName("상품 찜 수 단건 조회 시,")
-    @Nested
-    class CountByProductId {
-
-        @DisplayName("여러 사용자가 찜한 수를 정확히 반환한다.")
-        @Test
-        void returnsCorrectCount_whenMultipleUsersWishlist() {
-            saveWishlist(USER_ID, PRODUCT_ID);
-            saveWishlist(OTHER_USER_ID, PRODUCT_ID);
-
-            long count = wishlistService.countByProductId(PRODUCT_ID);
-
-            assertThat(count).isEqualTo(2);
-        }
-
-        @DisplayName("찜이 없는 상품은 0을 반환한다.")
-        @Test
-        void returnsZero_whenNoWishlists() {
-            long count = wishlistService.countByProductId(PRODUCT_ID);
-
-            assertThat(count).isEqualTo(0L);
-        }
-    }
-
-    @DisplayName("상품 목록 찜 수 일괄 조회 시,")
-    @Nested
-    class CountsByProductIds {
-
-        @DisplayName("각 상품의 찜 수를 productId 기준 맵으로 반환한다.")
-        @Test
-        void returnsCountMapByProductId() {
-            saveWishlist(USER_ID, PRODUCT_ID);
-            saveWishlist(OTHER_USER_ID, PRODUCT_ID);
-            saveWishlist(USER_ID, OTHER_PRODUCT_ID);
-
-            Map<Long, Long> counts = wishlistService.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
-
-            assertThat(counts.get(PRODUCT_ID)).isEqualTo(2L);
-            assertThat(counts.get(OTHER_PRODUCT_ID)).isEqualTo(1L);
-        }
-
-        @DisplayName("찜이 없는 상품은 맵에 포함되지 않는다.")
-        @Test
-        void excludesProductsWithNoWishlists() {
-            saveWishlist(USER_ID, PRODUCT_ID);
-
-            Map<Long, Long> counts = wishlistService.countsByProductIds(List.of(PRODUCT_ID, OTHER_PRODUCT_ID));
-
-            assertThat(counts).containsKey(PRODUCT_ID);
-            assertThat(counts).doesNotContainKey(OTHER_PRODUCT_ID);
-        }
-    }
 }

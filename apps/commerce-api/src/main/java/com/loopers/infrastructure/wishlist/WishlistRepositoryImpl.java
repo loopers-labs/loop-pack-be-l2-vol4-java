@@ -13,9 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -71,26 +69,5 @@ public class WishlistRepositoryImpl implements WishlistRepository {
                 .where(wishlist.userId.eq(userId).and(wishlist.productId.eq(productId)))
                 .execute();
         return (int) deleted;
-    }
-
-    @Override
-    public long countByProductId(Long productId) {
-        return wishlistJpaRepository.countByProductId(productId);
-    }
-
-    @Override
-    public Map<Long, Long> countsByProductIds(List<Long> productIds) {
-        QWishlistModel wishlist = QWishlistModel.wishlistModel;
-        return queryFactory
-                .select(wishlist.productId, wishlist.id.count())
-                .from(wishlist)
-                .where(wishlist.productId.in(productIds))
-                .groupBy(wishlist.productId)
-                .fetch()
-                .stream()
-                .collect(Collectors.toMap(
-                        tuple -> tuple.get(wishlist.productId),
-                        tuple -> tuple.get(wishlist.id.count())
-                ));
     }
 }
