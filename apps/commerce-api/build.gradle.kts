@@ -14,6 +14,9 @@ dependencies {
     // security
     implementation("org.springframework.boot:spring-boot-starter-security")
 
+    // SQL 로깅 (실제 바인딩 값 인라인, local 프로파일에서만 활성화)
+    implementation("com.github.gavlyukovskiy:p6spy-spring-boot-starter:${project.properties["p6spyVersion"]}")
+
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")

@@ -24,4 +24,24 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long>, Prod
         WHERE p.brandId = :brandId AND p.deletedAt IS NULL
         """)
     int softDeleteByBrandId(@Param("brandId") Long brandId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE Product p
+        SET p.likeCount = p.likeCount + :delta
+        WHERE p.id = :id
+        """)
+    int incrementLikeCount(@Param("id") Long id, @Param("delta") long delta);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE products p
+        LEFT JOIN (
+            SELECT product_id, COUNT(*) AS cnt
+            FROM likes WHERE deleted_at IS NULL
+            GROUP BY product_id
+        ) t ON p.id = t.product_id
+        SET p.like_count = COALESCE(t.cnt, 0)
+        """, nativeQuery = true)
+    int reconcileLikeCounts();
 }

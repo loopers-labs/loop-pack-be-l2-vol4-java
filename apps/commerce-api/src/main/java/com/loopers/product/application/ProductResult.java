@@ -3,7 +3,17 @@ package com.loopers.product.application;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDisplayStatus;
 
+import java.util.List;
+
 public class ProductResult {
+
+    public record Page(
+        List<Detail> content,
+        long totalCount,
+        int page,
+        int size
+    ) {
+    }
 
     public record Detail(
         Long id,
@@ -16,7 +26,7 @@ public class ProductResult {
         String thumbnailUrl,
         long likeCount
     ) {
-        public static Detail from(Product product, String brandName, int stockQuantity, long likeCount) {
+        public static Detail from(Product product, String brandName, int stockQuantity) {
             return new Detail(
                 product.getId(),
                 product.getBrandId(),
@@ -26,7 +36,7 @@ public class ProductResult {
                 product.getPrice().value(),
                 product.displayStatus(stockQuantity),
                 product.getThumbnailUrl(),
-                likeCount
+                product.getLikeCount()
             );
         }
     }
