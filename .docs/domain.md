@@ -105,7 +105,7 @@
 
 - 결제 worker의 외부 PG 호출을 DB 트랜잭션 밖으로 옮긴다.
 - 짧은 선점 트랜잭션에서 `REQUESTED -> PROCESSING` 전이와 lease 만료시각을 저장한다.
-- `PaymentStatus.PROCESSING`과 lease 만료시각은 현재 코드에 아직 반영되지 않은 목표 구조다.
+- `PaymentStatus.PROCESSING`은 6주차 PG 요청 접수 상태로 코드에 반영했다. lease 만료시각은 아직 반영되지 않은 목표 구조다.
 - 0원 주문의 payment row 저장 정책은 결제 worker 개선 전에 별도로 확정한다.
 
 ## 외부 식별자
@@ -155,7 +155,7 @@
 | 상태 | 의미 |
 | --- | --- |
 | `REQUESTED` | 주문 생성 후 외부 결제 요청 대기 |
-| `PROCESSING` | 목표 구조에서 worker가 선점해 외부 결제를 처리 중임. 현재 코드에는 아직 미반영 |
+| `PROCESSING` | PG 결제 요청이 접수되어 외부 최종 결과를 기다리는 중 |
 | `SUCCESS` | 외부 결제 성공 |
 | `FAILED` | 외부 결제 실패 |
 | `CANCELED` | 외부 결제 취소 |

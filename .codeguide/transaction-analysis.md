@@ -62,7 +62,7 @@
 4. lease 만료 PROCESSING 건은 worker 중단 건으로 보고 재처리
 ```
 
-`PaymentStatus.PROCESSING`과 lease 만료시각은 목표 구조이며 현재 코드에는 아직 반영되지 않았다.
+`PaymentStatus.PROCESSING`은 6주차 PG 요청 접수 상태로 코드에 반영했다. lease 만료시각은 목표 구조이며 현재 코드에는 아직 반영되지 않았다.
 
 ## 점검 체크리스트
 
