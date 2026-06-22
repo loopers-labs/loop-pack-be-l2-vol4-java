@@ -6,14 +6,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProductDomainService {
 
-    public ProductDetail combineWithBrand(ProductModel product, BrandModel brand) {
+    public ProductDetail combineWithBrand(ProductModel product, BrandModel brand, int likeCount) {
         return new ProductDetail(
             product.getId(),
             product.getName(),
             product.getPrice(),
             brand.getId(),
             brand.getName(),
-            product.getLikeCount()
+            likeCount
         );
     }
 }

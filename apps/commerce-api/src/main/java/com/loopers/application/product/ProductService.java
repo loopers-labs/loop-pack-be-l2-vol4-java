@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
@@ -31,8 +32,8 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductModel> getAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
-        return productRepository.findAll(brandId, sort, pageRequest);
+    public Page<ProductModel> getAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
+        return productRepository.findAll(filter, sort, pageRequest);
     }
 
     @Transactional

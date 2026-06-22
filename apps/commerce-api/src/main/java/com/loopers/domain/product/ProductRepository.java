@@ -10,6 +10,7 @@ public interface ProductRepository {
     ProductModel save(ProductModel product);
     Optional<ProductModel> findById(Long id);
     Optional<ProductModel> findByIdForUpdate(Long id);
-    Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest);
+    Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest);
     List<ProductModel> findAllByBrandId(Long brandId);
+    List<ProductModel> findAllByIds(List<Long> ids);
 }

@@ -11,14 +11,14 @@ public record ProductInfo(
     String brandName,
     int likeCount
 ) {
-    public static ProductInfo from(ProductModel product) {
+    public static ProductInfo from(ProductModel product, int likeCount) {
         return new ProductInfo(
             product.getId(),
             product.getName(),
             product.getPrice(),
             product.getBrandId(),
             null,
-            product.getLikeCount()
+            likeCount
         );
     }
 
