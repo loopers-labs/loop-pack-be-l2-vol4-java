@@ -50,4 +50,17 @@ public class ProductService {
     public Map<Long, Long> countByBrandIds(Collection<Long> brandIds) {
         return productRepository.countByBrandIds(brandIds);
     }
+
+    @Transactional
+    public void incrementLikeCount(Long productId) {
+        int updated = productRepository.incrementLikeCount(productId);
+        if (updated == 0) {
+            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다.");
+        }
+    }
+
+    @Transactional
+    public void decrementLikeCount(Long productId) {
+        productRepository.decrementLikeCount(productId);
+    }
 }

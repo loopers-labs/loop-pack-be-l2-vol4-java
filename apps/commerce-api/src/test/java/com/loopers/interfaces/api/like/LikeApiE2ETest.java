@@ -1,27 +1,23 @@
 package com.loopers.interfaces.api.like;
 
 import com.loopers.application.user.UserFacade;
-import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
-import com.loopers.infrastructure.like.RedisLikeCountStore;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.product.dto.ProductV1Response;
 import com.loopers.utils.DatabaseCleanUp;
-import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -32,10 +28,6 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * 좋아요 API E2E. 좋아요 수는 Redis 증감분으로 흡수되고 product.like_count는 배치가 주기 반영하므로,
- * 이 테스트는 API가 좋아요를 흡수했는지(증감분)를 검증한다. 컬럼 반영은 배치 잡 테스트(commerce-batch)가 담당한다.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class LikeApiE2ETest {
 
@@ -60,13 +52,6 @@ class LikeApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    @Autowired
-    private RedisCleanUp redisCleanUp;
-
-    @Autowired
-    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
-    private RedisTemplate<String, String> masterRedisTemplate;
-
     private Long productId;
 
     @BeforeEach
@@ -80,7 +65,6 @@ class LikeApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders userHeaders() {
@@ -94,46 +78,46 @@ class LikeApiE2ETest {
         return "/api/v1/products/" + productId + "/likes";
     }
 
-    private String delta() {
-        return masterRedisTemplate.opsForValue().get(RedisLikeCountStore.DELTA_KEY_PREFIX + productId);
+    private Long likeCount() {
+        ResponseEntity<ApiResponse<ProductV1Response>> response = restTemplate.exchange(
+            "/api/v1/products/" + productId, HttpMethod.GET, HttpEntity.EMPTY,
+            new ParameterizedTypeReference<>() {}
+        );
+        return response.getBody().data().likeCount();
     }
 
-    @DisplayName("좋아요를 등록하면 200 OK이고 좋아요 증감분이 1 누적된다")
+    @DisplayName("좋아요를 등록하면 200 OK이고 상품 좋아요 수가 1 증가한다")
     @Test
-    void like_accumulatesDelta() {
+    void like_increasesLikeCount() {
         ResponseEntity<ApiResponse<Object>> response = restTemplate.exchange(
             likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()),
             new ParameterizedTypeReference<>() {}
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(delta()).isEqualTo("1");
+        assertThat(likeCount()).isEqualTo(1L);
     }
 
-    @DisplayName("같은 상품을 두 번 좋아요해도 증감분은 1로 유지된다(멱등)")
+    @DisplayName("같은 상품을 두 번 좋아요해도 좋아요 수는 1로 유지된다(멱등)")
     @Test
     void like_isIdempotent() {
-        ResponseEntity<ApiResponse<Object>> first = restTemplate.exchange(
-            likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
-        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(delta()).isEqualTo("1");
-
+        restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
         ResponseEntity<ApiResponse<Object>> second = restTemplate.exchange(
             likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
 
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(delta()).isEqualTo("1");
+        assertThat(likeCount()).isEqualTo(1L);
     }
 
-    @DisplayName("좋아요 후 취소하면 증감분이 0으로 상쇄된다")
+    @DisplayName("좋아요 후 취소하면 좋아요 수가 0으로 돌아간다")
     @Test
-    void unlike_decrementsDelta() {
+    void unlike_decreasesLikeCount() {
         restTemplate.exchange(likeUrl(), HttpMethod.POST, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<ApiResponse<Object>>() {});
         ResponseEntity<ApiResponse<Object>> deleteRes = restTemplate.exchange(
             likeUrl(), HttpMethod.DELETE, new HttpEntity<>(userHeaders()), new ParameterizedTypeReference<>() {});
 
         assertThat(deleteRes.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(delta()).isEqualTo("0");
+        assertThat(likeCount()).isZero();
     }
 
     @DisplayName("인증 헤더 없이 좋아요하면 401 UNAUTHORIZED 를 반환한다")

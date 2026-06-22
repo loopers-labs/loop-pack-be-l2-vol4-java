@@ -2,16 +2,15 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.product.LikeCountSeeder;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.SortOption;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
-import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +36,9 @@ class ProductFacadeIntegrationTest {
     private ProductFacade productFacade;
 
     @Autowired
+    private ProductService productService;
+
+    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
@@ -47,12 +49,6 @@ class ProductFacadeIntegrationTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
-
-    @Autowired
-    private RedisCleanUp redisCleanUp;
-
-    @Autowired
-    private LikeCountSeeder likeCountSeeder;
 
     private Long brandId;
     private Long inStockProductId;
@@ -71,13 +67,12 @@ class ProductFacadeIntegrationTest {
         stockRepository.save(new StockModel(inStockProductId, 10));
         stockRepository.save(new StockModel(outOfStockProductId, 0));
 
-        likeCountSeeder.seed(inStockProductId, 1L);
+        productService.incrementLikeCount(inStockProductId);
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-        redisCleanUp.truncateAll();
     }
 
     @DisplayName("상품 상세 조회 시")
@@ -120,26 +115,6 @@ class ProductFacadeIntegrationTest {
 
             // then
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-        }
-    }
-
-    @DisplayName("캐시 적용 시")
-    @Nested
-    class Caching {
-
-        @DisplayName("상세를 캐싱한 뒤 좋아요 수가 늘어도 TTL 동안은 캐시된 옛 값이 반환된다")
-        @Test
-        void servesStaleLikeCount_withinTtl() {
-            // given - 첫 조회로 likeCount=1 캐싱
-            ProductInfo first = productFacade.getProductDetail(inStockProductId);
-            assertThat(first.likeCount()).isEqualTo(1L);
-
-            // when - DB의 likeCount는 2로 증가하지만 캐시는 무효화하지 않는다
-            likeCountSeeder.seed(inStockProductId, 2L);
-            ProductInfo cached = productFacade.getProductDetail(inStockProductId);
-
-            // then - 캐시 히트라 옛 값(1) 유지 (정확도 계약: TTL 동안 stale 허용)
-            assertThat(cached.likeCount()).isEqualTo(1L);
         }
     }
 

@@ -118,4 +118,64 @@ class ProductServiceTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
+
+    @DisplayName("좋아요 수 증가 시")
+    @Nested
+    class IncrementLikeCount {
+
+        @DisplayName("원자 UPDATE를 위임하고 1행 영향 시 정상 종료한다")
+        @Test
+        void delegatesAtomicIncrement_whenProductExists() {
+            // given
+            when(productRepository.incrementLikeCount(PRODUCT_ID)).thenReturn(1);
+
+            // when
+            productService.incrementLikeCount(PRODUCT_ID);
+
+            // then
+            verify(productRepository).incrementLikeCount(PRODUCT_ID);
+        }
+
+        @DisplayName("영향받은 행이 0이면 상품 부재로 보고 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenNoRowsAffected() {
+            // given
+            when(productRepository.incrementLikeCount(PRODUCT_ID)).thenReturn(0);
+
+            // when
+            CoreException ex = assertThrows(CoreException.class, () -> productService.incrementLikeCount(PRODUCT_ID));
+
+            // then
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("좋아요 수 감소 시")
+    @Nested
+    class DecrementLikeCount {
+
+        @DisplayName("원자 UPDATE(likeCount > 0 가드 포함)를 위임한다")
+        @Test
+        void delegatesAtomicDecrement() {
+            // given
+            when(productRepository.decrementLikeCount(PRODUCT_ID)).thenReturn(1);
+
+            // when
+            productService.decrementLikeCount(PRODUCT_ID);
+
+            // then
+            verify(productRepository).decrementLikeCount(PRODUCT_ID);
+        }
+
+        @DisplayName("영향받은 행이 0이어도 멱등 처리한다 (이미 0이거나 동시성 보정)")
+        @Test
+        void isIdempotent_whenNoRowsAffected() {
+            // given
+            when(productRepository.decrementLikeCount(PRODUCT_ID)).thenReturn(0);
+
+            // when / then — 예외 없이 통과
+            productService.decrementLikeCount(PRODUCT_ID);
+            verify(productRepository).decrementLikeCount(PRODUCT_ID);
+        }
+    }
 }
