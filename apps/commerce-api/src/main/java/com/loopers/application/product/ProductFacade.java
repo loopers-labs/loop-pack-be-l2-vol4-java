@@ -12,6 +12,7 @@ import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.stock.StockModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class ProductFacade {
     private final BrandService brandService;
     private final ProductDomainService productDomainService;
     private final ProductLikeViewRepository productLikeViewRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public ProductInfo createProduct(String name, Long price, Long brandId, int stockQuantity) {
@@ -36,20 +38,39 @@ public class ProductFacade {
         ProductModel product = productService.create(new ProductModel(name, price, brandId));
         stockService.create(new StockModel(product.getId(), stockQuantity));
         productLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
+        productCacheService.evictAllList();
         return ProductInfo.from(product, 0);
     }
 
     public ProductInfo getProduct(Long id) {
-        ProductModel product = productService.getById(id);
-        BrandModel brand = brandService.getById(product.getBrandId());
-        int likeCount = productLikeViewRepository.findByProductId(id)
-            .map(ProductLikeViewModel::getLikeCount)
-            .orElse(0);
-        int stockQuantity = stockService.getByProductId(id).getQuantity();
-        return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity));
+        return productCacheService.getDetail(id)
+            .map(cached -> {
+                Long price = productService.getById(id).getPrice();
+                int stockQuantity = stockService.getByProductId(id).getQuantity();
+                return new ProductInfo(cached.id(), cached.name(), price, cached.brandId(), cached.brandName(), cached.likeCount(), stockQuantity);
+            })
+            .orElseGet(() -> {
+                ProductModel product = productService.getById(id);
+                BrandModel brand = brandService.getById(product.getBrandId());
+                int likeCount = productLikeViewRepository.findByProductId(id)
+                    .map(ProductLikeViewModel::getLikeCount)
+                    .orElse(0);
+                int stockQuantity = stockService.getByProductId(id).getQuantity();
+                productCacheService.putDetail(id, new ProductCacheItem(id, product.getName(), brand.getId(), brand.getName(), likeCount));
+                return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity));
+            });
     }
 
     public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, Long minPrice, Long maxPrice, Boolean inStock, int page, int size) {
+        boolean cacheable = brandId == null && minPrice == null && maxPrice == null && !Boolean.TRUE.equals(inStock) && page < 3;
+
+        if (cacheable) {
+            List<ProductInfo> cached = productCacheService.getList(sort, page).orElse(null);
+            if (cached != null) {
+                return new PageImpl<>(cached, PageRequest.of(page, size), (long) page * size + cached.size());
+            }
+        }
+
         ProductFilter filter = ProductFilter.of(brandId, minPrice, maxPrice, inStock);
         Page<ProductModel> products = productService.getAll(filter, sort, PageRequest.of(page, size));
 
@@ -58,8 +79,14 @@ public class ProductFacade {
             .stream()
             .collect(Collectors.toMap(ProductLikeViewModel::getProductId, ProductLikeViewModel::getLikeCount));
 
-        return products.map(product ->
+        Page<ProductInfo> result = products.map(product ->
             ProductInfo.from(product, likeCountMap.getOrDefault(product.getId(), 0)));
+
+        if (cacheable) {
+            productCacheService.putList(sort, page, result.getContent());
+        }
+
+        return result;
     }
 
     @Transactional
@@ -68,6 +95,8 @@ public class ProductFacade {
         int likeCount = productLikeViewRepository.findByProductId(id)
             .map(ProductLikeViewModel::getLikeCount)
             .orElse(0);
+        productCacheService.evictDetail(id);
+        productCacheService.evictAllList();
         return ProductInfo.from(product, likeCount);
     }
 
@@ -75,6 +104,8 @@ public class ProductFacade {
     public void deleteProduct(Long id) {
         productService.delete(id);
         productLikeViewRepository.deleteByProductId(id);
+        productCacheService.evictDetail(id);
+        productCacheService.evictAllList();
     }
 
     @Transactional
