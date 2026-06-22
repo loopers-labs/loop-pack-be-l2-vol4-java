@@ -45,7 +45,8 @@ public class ProductFacade {
         int likeCount = productLikeViewRepository.findByProductId(id)
             .map(ProductLikeViewModel::getLikeCount)
             .orElse(0);
-        return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount));
+        int stockQuantity = stockService.getByProductId(id).getQuantity();
+        return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity));
     }
 
     public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, Long minPrice, Long maxPrice, Boolean inStock, int page, int size) {
