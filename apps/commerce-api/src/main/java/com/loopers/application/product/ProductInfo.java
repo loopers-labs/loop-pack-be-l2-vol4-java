@@ -1,21 +1,35 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 
 public record ProductInfo(
     Long id,
     String name,
-    String description,
     Long price,
-    Integer stock
+    Long brandId,
+    String brandName,
+    int likeCount
 ) {
     public static ProductInfo from(ProductModel product) {
         return new ProductInfo(
             product.getId(),
             product.getName(),
-            product.getDescription(),
             product.getPrice(),
-            product.getStock()
+            product.getBrandId(),
+            null,
+            product.getLikeCount()
+        );
+    }
+
+    public static ProductInfo from(ProductDetail detail) {
+        return new ProductInfo(
+            detail.id(),
+            detail.name(),
+            detail.price(),
+            detail.brandId(),
+            detail.brandName(),
+            detail.likeCount()
         );
     }
 }

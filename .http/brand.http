@@ -1,0 +1,42 @@
+### 브랜드 상세 조회 (PUBLIC)
+GET http://localhost:8080/api/v1/brands/1
+
+---
+
+### 브랜드 목록 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/brands
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 브랜드 상세 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 브랜드 등록 (ADMIN)
+POST http://localhost:8080/api-admin/v1/brands
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "나이키"
+}
+
+---
+
+### 브랜드 수정 (ADMIN)
+PUT http://localhost:8080/api-admin/v1/brands/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "나이키 코리아"
+}
+
+---
+
+### 브랜드 삭제 (ADMIN) — 연결 상품/재고/좋아요 연쇄 삭제
+DELETE http://localhost:8080/api-admin/v1/brands/1
+X-Loopers-Ldap: loopers.admin
