@@ -26,7 +26,7 @@ class ProductDomainServiceTest {
         setId(brand, 1L);
 
         // act
-        ProductDetail detail = productDomainService.combineWithBrand(product, brand);
+        ProductDetail detail = productDomainService.combineWithBrand(product, brand, 0);
 
         // assert
         assertThat(detail.id()).isEqualTo(1L);
@@ -42,14 +42,12 @@ class ProductDomainServiceTest {
     void combineWithBrand_reflectsLikeCount() {
         // arrange
         ProductModel product = new ProductModel("에어맥스90", 159000L, 2L);
-        product.increaseLikeCount();
-        product.increaseLikeCount();
         BrandModel brand = new BrandModel("나이키");
         setId(product, 2L);
         setId(brand, 2L);
 
         // act
-        ProductDetail detail = productDomainService.combineWithBrand(product, brand);
+        ProductDetail detail = productDomainService.combineWithBrand(product, brand, 2);
 
         // assert
         assertThat(detail.likeCount()).isEqualTo(2);

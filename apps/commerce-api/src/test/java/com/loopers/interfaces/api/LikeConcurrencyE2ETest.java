@@ -1,9 +1,11 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.application.user.UserService;
+import com.loopers.domain.product.ProductLikeViewModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.product.ProductLikeViewJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +43,9 @@ class LikeConcurrencyE2ETest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private ProductLikeViewJpaRepository productLikeViewJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     private ProductModel savedProduct;
@@ -48,6 +53,7 @@ class LikeConcurrencyE2ETest {
     @BeforeEach
     void setUp() {
         savedProduct = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+        productLikeViewJpaRepository.save(new ProductLikeViewModel(savedProduct.getId()));
     }
 
     @AfterEach
@@ -86,7 +92,7 @@ class LikeConcurrencyE2ETest {
         executor.shutdown();
 
         // assert
-        ProductModel result = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+        ProductLikeViewModel result = productLikeViewJpaRepository.findById(savedProduct.getId()).orElseThrow();
         assertThat(result.getLikeCount()).isEqualTo(10);
     }
 
@@ -102,7 +108,6 @@ class LikeConcurrencyE2ETest {
             userService.signUp(new UserModel(loginId, "Password1!", "유저" + i, LocalDate.of(1990, 1, 1), "u" + i + "@test.com"));
             HttpHeaders h = headers(loginId);
             headersList.add(h);
-            // 순차 좋아요 (likeCount=10 보장)
             testRestTemplate.exchange(likeUrl, HttpMethod.POST, new HttpEntity<>(h), Void.class);
         }
 
@@ -125,7 +130,7 @@ class LikeConcurrencyE2ETest {
         executor.shutdown();
 
         // assert
-        ProductModel result = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+        ProductLikeViewModel result = productLikeViewJpaRepository.findById(savedProduct.getId()).orElseThrow();
         assertThat(result.getLikeCount()).isEqualTo(0);
     }
 

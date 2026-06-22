@@ -30,7 +30,6 @@ class ProductModelTest {
             assertThat(product.getName()).isEqualTo(name);
             assertThat(product.getPrice()).isEqualTo(price);
             assertThat(product.getBrandId()).isEqualTo(brandId);
-            assertThat(product.getLikeCount()).isZero();
         }
 
         @DisplayName("이름이 null이면, BAD_REQUEST 예외가 발생한다.")
@@ -130,35 +129,5 @@ class ProductModelTest {
         }
     }
 
-    @DisplayName("좋아요 수를 변경할 때,")
-    @Nested
-    class LikeCount {
 
-        @DisplayName("increaseLikeCount를 호출하면, likeCount가 1 증가한다.")
-        @Test
-        void increasesLikeCount_whenCalled() {
-            // arrange
-            ProductModel product = new ProductModel("에어포스1", 139000L, 1L);
-
-            // act
-            product.increaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isEqualTo(1);
-        }
-
-        @DisplayName("decreaseLikeCount를 호출하면, likeCount가 1 감소한다.")
-        @Test
-        void decreasesLikeCount_whenCalled() {
-            // arrange
-            ProductModel product = new ProductModel("에어포스1", 139000L, 1L);
-            product.increaseLikeCount();
-
-            // act
-            product.decreaseLikeCount();
-
-            // assert
-            assertThat(product.getLikeCount()).isZero();
-        }
-    }
 }

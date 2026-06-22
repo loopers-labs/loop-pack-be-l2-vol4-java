@@ -2,6 +2,10 @@ package com.loopers.application.like;
 
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.like.LikeSort;
+import com.loopers.domain.product.ProductFilter;
+import com.loopers.domain.product.ProductLikeViewModel;
+import com.loopers.domain.product.ProductLikeViewRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
@@ -29,12 +33,14 @@ class LikeServiceTest {
     private LikeService likeService;
     private FakeLikeRepository fakeLikeRepository;
     private FakeProductRepository fakeProductRepository;
+    private FakeProductLikeViewRepository fakeProductLikeViewRepository;
 
     @BeforeEach
     void setUp() {
         fakeLikeRepository = new FakeLikeRepository();
         fakeProductRepository = new FakeProductRepository();
-        likeService = new LikeService(fakeLikeRepository, fakeProductRepository);
+        fakeProductLikeViewRepository = new FakeProductLikeViewRepository();
+        likeService = new LikeService(fakeLikeRepository, fakeProductRepository, fakeProductLikeViewRepository);
     }
 
     @DisplayName("좋아요를 등록할 때,")
@@ -46,6 +52,7 @@ class LikeServiceTest {
         void like_savesLike_andIncrementsLikeCount() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
 
             // act
@@ -53,7 +60,7 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.existsByMemberIdAndProductId(memberId, product.getId())).isTrue();
-            assertThat(fakeProductRepository.findById(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
+            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
         }
 
         @DisplayName("이미 좋아요한 상품에 재등록 시, 멱등 처리되어 likeCount가 변하지 않는다.")
@@ -61,6 +68,7 @@ class LikeServiceTest {
         void like_returnsOk_whenAlreadyLiked() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product.getId());
 
@@ -69,7 +77,7 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.countByMemberIdAndProductId(memberId, product.getId())).isEqualTo(1);
-            assertThat(fakeProductRepository.findById(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
+            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
         }
     }
 
@@ -82,6 +90,7 @@ class LikeServiceTest {
         void unlike_deletesLike_andDecrementsLikeCount() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product.getId());
 
@@ -90,7 +99,7 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.existsByMemberIdAndProductId(memberId, product.getId())).isFalse();
-            assertThat(fakeProductRepository.findById(product.getId()).orElseThrow().getLikeCount()).isZero();
+            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isZero();
         }
 
         @DisplayName("좋아요하지 않은 상품을 취소하면, NOT_FOUND 예외가 발생한다.")
@@ -98,6 +107,7 @@ class LikeServiceTest {
         void unlike_throwsException_whenNotLiked() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
 
             // act & assert
@@ -118,15 +128,39 @@ class LikeServiceTest {
             // arrange
             ProductModel product1 = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
             ProductModel product2 = fakeProductRepository.save(new ProductModel("에어맥스90", 159000L, 1L));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product1.getId()));
+            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product2.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product1.getId());
             likeService.like(memberId, product2.getId());
 
             // act
-            List<LikeModel> likes = likeService.getLikesByMemberId(memberId);
+            List<LikeInfo> infos = likeService.getLikeInfosByMemberId(memberId, LikeSort.LATEST);
 
             // assert
-            assertThat(likes).hasSize(2);
+            assertThat(infos).hasSize(2);
+        }
+
+        @DisplayName("likes_desc 정렬로 조회하면, likeCount 내림차순으로 반환된다.")
+        @Test
+        void getLikes_returnsSortedByLikesDesc() {
+            // arrange
+            ProductModel product1 = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            ProductModel product2 = fakeProductRepository.save(new ProductModel("에어맥스90", 159000L, 1L));
+            ProductLikeViewModel plv1 = fakeProductLikeViewRepository.save(new ProductLikeViewModel(product1.getId()));
+            ProductLikeViewModel plv2 = fakeProductLikeViewRepository.save(new ProductLikeViewModel(product2.getId()));
+            plv2.increment();
+            plv2.increment();
+            Long memberId = 1L;
+            likeService.like(memberId, product1.getId());
+            likeService.like(memberId, product2.getId());
+
+            // act
+            List<LikeInfo> infos = likeService.getLikeInfosByMemberId(memberId, LikeSort.LIKES_DESC);
+
+            // assert
+            assertThat(infos.get(0).productId()).isEqualTo(product2.getId());
+            assertThat(infos.get(1).productId()).isEqualTo(product1.getId());
         }
     }
 
@@ -155,6 +189,13 @@ class LikeServiceTest {
 
         @Override
         public List<LikeModel> findAllByMemberId(Long memberId) {
+            return store.values().stream()
+                .filter(l -> l.getMemberId().equals(memberId))
+                .toList();
+        }
+
+        @Override
+        public List<LikeModel> findAllByMemberIdOrderByCreatedAtDesc(Long memberId) {
             return store.values().stream()
                 .filter(l -> l.getMemberId().equals(memberId))
                 .toList();
@@ -221,9 +262,17 @@ class LikeServiceTest {
         }
 
         @Override
-        public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
+        public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
             List<ProductModel> list = new ArrayList<>(store.values());
             return new org.springframework.data.domain.PageImpl<>(list, pageRequest, list.size());
+        }
+
+        @Override
+        public List<ProductModel> findAllByIds(List<Long> ids) {
+            return ids.stream()
+                .map(store::get)
+                .filter(p -> p != null && p.getDeletedAt() == null)
+                .toList();
         }
 
         private void setId(ProductModel product, long id) {
@@ -234,6 +283,40 @@ class LikeServiceTest {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    private static class FakeProductLikeViewRepository implements ProductLikeViewRepository {
+
+        private final Map<Long, ProductLikeViewModel> store = new HashMap<>();
+
+        @Override
+        public ProductLikeViewModel save(ProductLikeViewModel view) {
+            store.put(view.getProductId(), view);
+            return view;
+        }
+
+        @Override
+        public Optional<ProductLikeViewModel> findByProductId(Long productId) {
+            return Optional.ofNullable(store.get(productId));
+        }
+
+        @Override
+        public Optional<ProductLikeViewModel> findByProductIdForUpdate(Long productId) {
+            return findByProductId(productId);
+        }
+
+        @Override
+        public List<ProductLikeViewModel> findAllByProductIdIn(List<Long> productIds) {
+            return productIds.stream()
+                .map(store::get)
+                .filter(v -> v != null)
+                .toList();
+        }
+
+        @Override
+        public void deleteByProductId(Long productId) {
+            store.remove(productId);
         }
     }
 }

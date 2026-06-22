@@ -1,8 +1,10 @@
 package com.loopers.domain.like;
 
 import com.loopers.application.like.LikeService;
+import com.loopers.domain.product.ProductLikeViewModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.product.ProductJpaRepository;
+import com.loopers.infrastructure.product.ProductLikeViewJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +25,9 @@ class LikeServiceIntegrationTest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
+    private ProductLikeViewJpaRepository productLikeViewJpaRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
@@ -39,13 +44,14 @@ class LikeServiceIntegrationTest {
         void like_incrementsLikeCount_atDbLevel() {
             // arrange
             ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
 
             // act
             likeService.like(memberId, product.getId());
 
             // assert
-            ProductModel updated = productJpaRepository.findById(product.getId()).orElseThrow();
+            ProductLikeViewModel updated = productLikeViewJpaRepository.findById(product.getId()).orElseThrow();
             assertThat(updated.getLikeCount()).isEqualTo(1);
         }
     }
@@ -59,6 +65,7 @@ class LikeServiceIntegrationTest {
         void unlike_decrementsLikeCount_atDbLevel() {
             // arrange
             ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
+            productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product.getId());
 
@@ -66,7 +73,7 @@ class LikeServiceIntegrationTest {
             likeService.unlike(memberId, product.getId());
 
             // assert
-            ProductModel updated = productJpaRepository.findById(product.getId()).orElseThrow();
+            ProductLikeViewModel updated = productLikeViewJpaRepository.findById(product.getId()).orElseThrow();
             assertThat(updated.getLikeCount()).isZero();
         }
     }
