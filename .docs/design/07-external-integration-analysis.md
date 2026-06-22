@@ -24,13 +24,31 @@ PG 호출 자체가 없고 내부 상태만 바꾼다.
 
 | 항목 | 값 |
 |------|---|
-| 포트 | 8082 (commerce-api는 8080) |
+| 포트 | 8082 (commerce-api는 8080), 관리용 포트 8083 |
 | 언어 | Kotlin + Spring Boot |
 | DB | MySQL (`paymentgateway` 스키마) |
 | 요청 성공 확률 | 60% (40%는 즉시 INTERNAL_ERROR 반환) |
 | 요청 지연 | 100ms ~ 500ms (동기, 응답 전 블로킹) |
 | 처리 지연 (비동기) | 1s ~ 5s (요청 수락 후 별도 스레드) |
 | 처리 결과 | 성공 70% / 한도초과 20% / 잘못된 카드 10% |
+| 비동기 실행 모델 | `@EnableAsync`만 선언, 커스텀 `Executor` 빈 없음 → Spring Boot 기본 `ThreadPoolTaskExecutor`(core 8 / 무제한 큐) 사용 |
+
+> 소스: `apps/pg-simulator/src/main/kotlin/com/loopers/`
+
+### 패키지 구조 (레이어드 아키텍처)
+
+```
+interfaces.api.payment      PaymentApi (Controller), PaymentDto (요청/응답 + 자체 검증)
+interfaces.event.payment    PaymentEventListener (@Async 비동기 처리 트리거)
+application.payment         PaymentApplicationService, PaymentCommand, TransactionInfo, OrderInfo
+domain.payment              Payment (엔티티), PaymentEvent, TransactionStatus, CardType,
+                             PaymentRepository / PaymentEventPublisher / PaymentRelay (인터페이스),
+                             TransactionKeyGenerator
+infrastructure.payment      PaymentCoreRepository(JPA 구현), PaymentCoreEventPublisher(스프링 이벤트 구현),
+                             PaymentCoreRelay(RestTemplate 콜백 구현)
+```
+
+domain은 `Repository`/`EventPublisher`/`Relay`를 인터페이스로만 알고, infrastructure가 JPA/Spring Event/RestTemplate로 구현하는 포트-어댑터 구조다. commerce-api와 동일한 패턴.
 
 ### API 엔드포인트
 
@@ -44,67 +62,119 @@ PG 호출 자체가 없고 내부 상태만 바꾼다.
 
 ```json
 {
-  "orderId": "1351039135",       // 6자리 이상 문자열
-  "cardType": "SAMSUNG",         // SAMSUNG | KB | HYUNDAI
-  "cardNo": "1234-5678-9814-1451", // xxxx-xxxx-xxxx-xxxx 형식
-  "amount": 5000,                // 양의 정수
-  "callbackUrl": "http://localhost:8080/..." // 반드시 http://localhost:8080으로 시작
+  "orderId": "1351039135",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "callbackUrl": "http://localhost:8080/..."
 }
 ```
 
-> **주의:** callbackUrl은 코드에 `http://localhost:8080` prefix 검증이 하드코딩되어 있다.
-> commerce-api의 콜백 엔드포인트 URL을 그대로 넘겨야 한다.
+**검증 규칙 (`PaymentDto.PaymentRequest.validate()`, 컨트롤러 진입 직후 — 지연/실패 확률 적용 전)**
 
-### 내부 처리 흐름 (비동기)
+| 필드 | 규칙 | 위반 시 |
+|------|------|---------|
+| `orderId` | blank 아니고 길이 ≥ 6 | `BAD_REQUEST` "주문 ID는 6자리 이상 문자열이어야 합니다." |
+| `cardNo` | 정규식 `^\d{4}-\d{4}-\d{4}-\d{4}$` | `BAD_REQUEST` "카드 번호는 xxxx-xxxx-xxxx-xxxx 형식이어야 합니다." |
+| `amount` | > 0 | `BAD_REQUEST` "결제금액은 양의 정수여야 합니다." |
+| `callbackUrl` | `http://localhost:8080` 로 시작 | `BAD_REQUEST` "콜백 URL 은 http://localhost:8080 로 시작해야 합니다." |
+
+> `amount > 0` 검증은 `PaymentCommand.CreateTransaction.validate()`에서도 한 번 더 일어난다 (`PaymentApplicationService.createTransaction()` 진입 시). DTO 레이어와 도메인 커맨드 레이어에 동일 규칙이 중복돼 있다 — pg-simulator 자체 설계의 사소한 중복이며 commerce-api에서 신경 쓸 부분은 아니다.
+
+> **주의:** `callbackUrl`은 `http://localhost:8080` prefix가 하드코딩 검증돼 있어, commerce-api 외 다른 호스트/포트로는 콜백을 보낼 수 없다.
+
+### Payment 엔티티
+
+```kotlin
+@Entity
+@Table(
+    name = "payments",
+    indexes = [
+        Index(columnList = "user_id, transaction_key"),
+        Index(columnList = "user_id, order_id"),
+        Index(columnList = "user_id, order_id, transaction_key", unique = true),
+    ]
+)
+class Payment(
+    @Id val transactionKey: String,   // PK, TransactionKeyGenerator가 생성
+    val userId: String,
+    val orderId: String,
+    val cardType: CardType,
+    val cardNo: String,
+    val amount: Long,
+    val callbackUrl: String,
+) {
+    var status: TransactionStatus = PENDING   // private set — approve/invalidCard/limitExceeded로만 변경
+    var reason: String? = null
+    var createdAt: LocalDateTime = now()
+    var updatedAt: LocalDateTime = now()
+}
+```
+
+**상태 전이**
+
+```
+PENDING ──── approve() ──────► SUCCESS  (reason: "정상 승인되었습니다.")
+        └─── limitExceeded() ─► FAILED  (reason: "한도초과입니다. 다른 카드를 선택해주세요.")
+        └─── invalidCard() ───► FAILED  (reason: "잘못된 카드입니다. 다른 카드를 선택해주세요.")
+```
+
+- 세 전이 메서드 모두 진입 시 `status != PENDING`이면 `INTERNAL_ERROR`를 던지는 가드가 있다. 다만 이 메서드들은 `PaymentApplicationService.handle()` 내부에서만, 이벤트 리스너를 통해 transactionKey당 정확히 1번만 호출되도록 설계돼 있어 — pg-simulator 내부에서는 이 가드가 실제로 발동할 경로가 없다. "이중 안전장치"에 가깝다.
+- **`(userId, orderId, transaction_key)` unique 인덱스는 중복 방지 효과가 없다.** `transactionKey`는 매 요청마다 `TransactionKeyGenerator`가 새 UUID로 생성하므로, 같은 `orderId`로 N번 요청하면 유니크 인덱스를 통과하는 **별도의 Payment row N개**가 생성되고, 각각 독립적으로 비동기 처리(승인/실패)된다. 즉 PG 쪽에는 "같은 주문에 대한 멱등성 보장"이 전혀 없다 — commerce-api가 PG를 중복 호출하지 않도록 직접 막아야 한다.
+
+### 요청~처리 전체 흐름 (단계별)
 
 ```
 [commerce-api]                          [pg-simulator]
       │
       │  POST /api/v1/payments
       │ ─────────────────────────────────────────────────────► PaymentApi.request()
-      │                                                              │
-      │                                                    100~500ms 지연 (동기 블로킹)
-      │                                                    40% 확률 → 즉시 500 에러 반환
+      │                                                              │ ① request.validate() (즉시, 실패 시 400)
+      │                                                              │ ② Thread.sleep(100~500ms)  ← Tomcat 워커 스레드 점유
+      │                                                              │ ③ 40% 확률 → CoreException(INTERNAL_ERROR) (②를 거친 후 발생)
       │                                                              │ (60% 통과)
-      │                                                    Payment 생성 (status: PENDING)
-      │                                                    PaymentEvent.PaymentCreated 발행
-      │  ◄──────── { transactionKey, status: PENDING } ────────────┤
-      │                                                              │ [DB 커밋 후]
-      │                                                    @Async @TransactionalEventListener
-      │                                                    1~5초 지연 (별도 스레드)
+      │                                                              │ ④ createTransaction() [@Transactional]
+      │                                                              │    - transactionKey 생성
+      │                                                              │    - Payment 저장 (status: PENDING)
+      │                                                              │    - PaymentEvent.PaymentCreated 발행(트랜잭션 내 큐잉)
+      │  ◄──────── { transactionKey, status: PENDING } ────────────┤    - 메서드 리턴 → 트랜잭션 커밋
       │                                                              │
-      │                                                    approve() 70%
-      │                                                    limitExceeded() 20%
-      │                                                    invalidCard() 10%
-      │                                                    PaymentEvent.PaymentHandled 발행
-      │                                                              │ [DB 커밋 후]
-      │                                                    @Async @TransactionalEventListener
+      │                                                              │ ⑤ [AFTER_COMMIT] @Async PaymentEventListener.handle(PaymentCreated)
+      │                                                              │    - 풀의 별도 스레드에서 실행
+      │                                                              │    - Thread.sleep(1~5s)
+      │                                                              │    - paymentApplicationService.handle(transactionKey)
+      │                                                              │
+      │                                                              │ ⑥ handle() [@Transactional] : rate = (1..100).random()
+      │                                                              │    1~20   → limitExceeded()
+      │                                                              │    21~30  → invalidCard()
+      │                                                              │    31~100 → approve()
+      │                                                              │    PaymentEvent.PaymentHandled 발행 → 트랜잭션 커밋
+      │                                                              │
+      │                                                              │ ⑦ [AFTER_COMMIT] @Async PaymentEventListener.handle(PaymentHandled)
+      │                                                              │    - notifyTransactionResult() (비@Transactional, 단순 조회+호출)
       │  POST {callbackUrl}                                          │
-      │ ◄──────────────────────────────────────────────── PaymentCoreRelay.notify()
+      │ ◄──────────────────────────────────────────────── ⑧ PaymentCoreRelay.notify() — RestTemplate.postForEntity()
 ```
 
-### Payment 엔티티 상태
+**눈에 띄는 디테일**
 
-```
-PENDING ──── approve() ──────► SUCCESS
-        └─── limitExceeded() ─► FAILED  (reason: "한도초과입니다.")
-        └─── invalidCard() ───► FAILED  (reason: "잘못된 카드입니다.")
-```
+- ②의 `Thread.sleep`은 검증(①) **이후**, 실패 확률 판정(③) **이전**에 실행된다 → 40% 실패 케이스도 100~500ms 지연을 동일하게 물고 간다. "빠르게 실패"하는 경로가 없다.
+- ⑤와 ⑦은 각각 별개의 `@Async` 호출이라 풀의 다른 스레드가 잡을 수도, 같은 스레드가 잡을 수도 있다. 커스텀 `Executor` 설정이 없으므로 Spring Boot 기본값(core 8, 무제한 큐)을 그대로 쓰는데, ⑤ 단계에서 스레드 하나가 `Thread.sleep(1~5s)`로 통째로 점유되므로, 동시에 들어오는 결제 건이 8개를 넘으면 **뒤의 건은 큐에서 대기하다가 "1~5초"보다 더 늦게 처리될 수 있다** (테스트 환경에서 동시 결제 수가 많아지면 문서상 스펙(1~5s)보다 실제 지연이 커질 수 있다는 뜻).
+- ⑥의 비율 판정은 매 호출마다 새로 `(1..100).random()`을 굴리는 것이라, 같은 PG 인스턴스라도 같은 카드/같은 사용자라고 결과가 보장되지 않는다 (재현 불가능한 랜덤 — 테스트에서 특정 결과를 강제하려면 mock/stub이 필요하다는 의미).
 
-- 상태 전이는 `PENDING`에서만 가능 — 이미 처리된 건에 재처리 시도 시 예외
-- `transactionKey`가 PK이며 `(userId, orderId, transactionKey)` unique 인덱스 존재
-  → 같은 orderId로 여러 번 요청하면 **별도 거래 건으로 중복 생성됨**
-
-### 콜백 전송 방식
+### 콜백(Relay) 전송 방식
 
 ```kotlin
-// PaymentCoreRelay.kt
-restTemplate.postForEntity(callbackUrl, transactionInfo, Any::class.java)
+// PaymentCoreRelay.kt — 싱글턴 RestTemplate (커넥션/타임아웃 설정 없음)
+runCatching {
+    restTemplate.postForEntity(callbackUrl, transactionInfo, Any::class.java)
+}.onFailure { e -> logger.error("콜백 호출을 실패했습니다. {}", e.message, e) }
 ```
 
-- 타임아웃 설정 없음
-- 실패 시 재시도 없음 (`runCatching { }.onFailure { logger.error(...) }` 로 그냥 삼킴)
-- 콜백 실패 시 PG 입장에서는 아무 일도 일어나지 않음
+- `notifyTransactionResult()` 자체는 `@Transactional`이 아니다 — Payment를 다시 조회만 하고 쓰기는 없다.
+- `RestTemplate()` 기본 생성자는 connect/read 타임아웃을 설정하지 않는다 → 상대(commerce-api)가 커넥션만 열어두고 응답하지 않으면 OS 소켓 타임아웃까지 무한정 대기할 수 있다.
+- 실패는 로그만 남기고 끝 (`runCatching`으로 삼킴) — 재시도 없음, 콜백 실패가 PG 쪽 Payment 상태에 영향을 주지 않음.
+- 즉 "콜백 전송 성공 여부"를 PG는 전혀 추적하지 않는다 — 콜백이 commerce-api에 도달했는지 확인할 방법은 PG의 조회 API(`GET /api/v1/payments/{transactionKey}`)로 상태를 다시 묻는 것뿐이다.
 
 **콜백으로 전달되는 데이터 (TransactionInfo)**
 
@@ -112,13 +182,23 @@ restTemplate.postForEntity(callbackUrl, transactionInfo, Any::class.java)
 {
   "transactionKey": "20250816:TR:9577c5",
   "orderId": "1351039135",
-  "status": "SUCCESS",           // SUCCESS | FAILED
+  "status": "SUCCESS",
   "reason": "정상 승인되었습니다.",
   "cardType": "SAMSUNG",
   "cardNo": "1234-5678-9814-1451",
   "amount": 5000
 }
 ```
+
+### transactionKey 생성 규칙
+
+```kotlin
+// TransactionKeyGenerator.kt
+"${yyyyMMdd}:TR:${UUID.randomUUID().toString().replace("-", "").substring(0, 6)}"
+// 예: "20260622:TR:9577c5"
+```
+
+- 날짜는 일 단위까지만 들어가고, 충돌 방지는 UUID 앞 6자리(16^6 ≈ 1,677만 조합)에 의존한다. 하루에 같은 PG 인스턴스에서 결제량이 매우 많아지면 충돌 가능성이 이론적으로 존재하지만, `transactionKey`가 `@Id`라 충돌 시 `save()`에서 PK 제약 위반으로 즉시 실패한다 (별도 재시도 로직 없음).
 
 ---
 
