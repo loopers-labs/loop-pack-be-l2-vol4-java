@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ## 1. 커밋 규칙
 - volume-2 설계 제출 커밋에는 `.docs/design` 디렉토리의 아래 4개 파일만 포함한다.
   - `.docs/design/01-requirements.md`
@@ -130,4 +129,3 @@
 2. null-safety, thread-safety 고려
 3. 테스트 가능한 구조로 설계
 4. 기존 코드 패턴 분석 후 일관성 유지
->>>>>>> ddf28e8a8cc71ff953a39429f6e5085bb01d0bd1
