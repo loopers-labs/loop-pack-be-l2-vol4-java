@@ -18,23 +18,20 @@ public class ProductCacheService {
     private static final String LIST_KEY_PREFIX = "product:list:";
     private static final long TTL_SECONDS = 300;
 
-    private final RedisTemplate<String, String> readTemplate;
-    private final RedisTemplate<String, String> writeTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
 
     public ProductCacheService(
-        RedisTemplate<String, String> defaultRedisTemplate,
         @Qualifier("redisTemplateMaster") RedisTemplate<String, String> masterRedisTemplate,
         ObjectMapper objectMapper
     ) {
-        this.readTemplate = defaultRedisTemplate;
-        this.writeTemplate = masterRedisTemplate;
+        this.redisTemplate = masterRedisTemplate;
         this.objectMapper = objectMapper;
     }
 
     public Optional<ProductCacheItem> getDetail(Long productId) {
         try {
-            String json = readTemplate.opsForValue().get(detailKey(productId));
+            String json = redisTemplate.opsForValue().get(detailKey(productId));
             if (json == null) return Optional.empty();
             return Optional.of(objectMapper.readValue(json, ProductCacheItem.class));
         } catch (Exception e) {
@@ -45,7 +42,7 @@ public class ProductCacheService {
     public void putDetail(Long productId, ProductCacheItem item) {
         try {
             String json = objectMapper.writeValueAsString(item);
-            writeTemplate.opsForValue().set(detailKey(productId), json, TTL_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(detailKey(productId), json, TTL_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
             // Redis 장애 시 무시 — DB 직접 조회로 fallback
         }
@@ -53,7 +50,7 @@ public class ProductCacheService {
 
     public void evictDetail(Long productId) {
         try {
-            writeTemplate.delete(detailKey(productId));
+            redisTemplate.delete(detailKey(productId));
         } catch (Exception e) {
             // ignore
         }
@@ -61,7 +58,7 @@ public class ProductCacheService {
 
     public Optional<List<ProductInfo>> getList(ProductSort sort, int page) {
         try {
-            String json = readTemplate.opsForValue().get(listKey(sort, page));
+            String json = redisTemplate.opsForValue().get(listKey(sort, page));
             if (json == null) return Optional.empty();
             return Optional.of(objectMapper.readValue(json, new TypeReference<List<ProductInfo>>() {}));
         } catch (Exception e) {
@@ -72,7 +69,7 @@ public class ProductCacheService {
     public void putList(ProductSort sort, int page, List<ProductInfo> items) {
         try {
             String json = objectMapper.writeValueAsString(items);
-            writeTemplate.opsForValue().set(listKey(sort, page), json, TTL_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(listKey(sort, page), json, TTL_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
             // ignore
         }
@@ -82,7 +79,7 @@ public class ProductCacheService {
         try {
             for (ProductSort sort : ProductSort.values()) {
                 for (int page = 0; page < 3; page++) {
-                    writeTemplate.delete(listKey(sort, page));
+                    redisTemplate.delete(listKey(sort, page));
                 }
             }
         } catch (Exception e) {

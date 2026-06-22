@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductCacheE2ETest {
+
+    private static final String ADMIN_HEADER = "X-Loopers-Ldap";
+    private static final String ADMIN_HEADER_VALUE = "loopers.admin";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -141,11 +145,13 @@ class ProductCacheE2ETest {
             );
 
             // admin API로 수정 — 캐시 evict 발생
+            HttpHeaders adminHeaders = new HttpHeaders();
+            adminHeaders.set(ADMIN_HEADER, ADMIN_HEADER_VALUE);
             ProductDto.UpdateRequest updateRequest = new ProductDto.UpdateRequest("에어맥스90", 159000L);
             testRestTemplate.exchange(
                 "/api-admin/v1/products/" + product.getId(),
                 HttpMethod.PUT,
-                new HttpEntity<>(updateRequest),
+                new HttpEntity<>(updateRequest, adminHeaders),
                 new ParameterizedTypeReference<ApiResponse<ProductDto.ProductResponse>>() {}
             );
 
@@ -178,9 +184,12 @@ class ProductCacheE2ETest {
             );
 
             // admin API로 삭제 — 캐시 evict 발생
+            HttpHeaders adminHeaders = new HttpHeaders();
+            adminHeaders.set(ADMIN_HEADER, ADMIN_HEADER_VALUE);
             testRestTemplate.exchange(
                 "/api-admin/v1/products/" + product.getId(),
-                HttpMethod.DELETE, null,
+                HttpMethod.DELETE,
+                new HttpEntity<>(adminHeaders),
                 new ParameterizedTypeReference<ApiResponse<Void>>() {}
             );
 
@@ -260,11 +269,13 @@ class ProductCacheE2ETest {
             assertThat(productCacheService.getList(ProductSort.LATEST, 0)).isPresent();
 
             // act — 새 상품 등록 (목록 캐시 evict 발생)
+            HttpHeaders adminHeaders = new HttpHeaders();
+            adminHeaders.set(ADMIN_HEADER, ADMIN_HEADER_VALUE);
             ProductDto.CreateRequest createRequest = new ProductDto.CreateRequest("에어맥스90", 159000L, brand.getId(), 5);
             testRestTemplate.exchange(
                 "/api-admin/v1/products",
                 HttpMethod.POST,
-                new HttpEntity<>(createRequest),
+                new HttpEntity<>(createRequest, adminHeaders),
                 new ParameterizedTypeReference<ApiResponse<ProductDto.ProductResponse>>() {}
             );
 
