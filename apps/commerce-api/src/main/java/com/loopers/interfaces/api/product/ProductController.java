@@ -24,10 +24,13 @@ public class ProductController {
     public ApiResponse<ProductDto.ProductPageResponse> getProducts(
         @RequestParam(required = false) Long brandId,
         @RequestParam(defaultValue = "latest") ProductSort sort,
+        @RequestParam(required = false) Long minPrice,
+        @RequestParam(required = false) Long maxPrice,
+        @RequestParam(required = false) Boolean inStock,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        Page<ProductInfo> result = productFacade.getProducts(brandId, sort, page, size);
+        Page<ProductInfo> result = productFacade.getProducts(brandId, sort, minPrice, maxPrice, inStock, page, size);
         List<ProductDto.ProductResponse> products = result.getContent().stream()
             .map(ProductDto.ProductResponse::from)
             .toList();
@@ -46,10 +49,13 @@ public class ProductController {
     public ApiResponse<ProductDto.ProductPageResponse> getProductsAdmin(
         @RequestParam(required = false) Long brandId,
         @RequestParam(defaultValue = "latest") ProductSort sort,
+        @RequestParam(required = false) Long minPrice,
+        @RequestParam(required = false) Long maxPrice,
+        @RequestParam(required = false) Boolean inStock,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        Page<ProductInfo> result = productFacade.getProducts(brandId, sort, page, size);
+        Page<ProductInfo> result = productFacade.getProducts(brandId, sort, minPrice, maxPrice, inStock, page, size);
         List<ProductDto.ProductResponse> products = result.getContent().stream()
             .map(ProductDto.ProductResponse::from)
             .toList();

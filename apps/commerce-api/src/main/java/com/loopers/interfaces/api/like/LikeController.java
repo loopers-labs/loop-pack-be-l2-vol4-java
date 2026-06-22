@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.like;
 
 import com.loopers.application.like.LikeFacade;
+import com.loopers.domain.like.LikeSort;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -36,12 +37,13 @@ public class LikeController {
     @GetMapping("/api/v1/users/{userId}/likes")
     public ApiResponse<List<LikeDto.LikeResponse>> getLikes(
         @PathVariable Long userId,
-        @RequestAttribute("userId") Long loginUserId
+        @RequestAttribute("userId") Long loginUserId,
+        @RequestParam(defaultValue = "latest") LikeSort sort
     ) {
         if (!userId.equals(loginUserId)) {
             throw new CoreException(ErrorType.FORBIDDEN, "본인의 좋아요 목록만 조회할 수 있습니다.");
         }
-        List<LikeDto.LikeResponse> likes = likeFacade.getLikes(userId).stream()
+        List<LikeDto.LikeResponse> likes = likeFacade.getLikes(userId, sort).stream()
             .map(LikeDto.LikeResponse::from)
             .toList();
         return ApiResponse.success(likes);
