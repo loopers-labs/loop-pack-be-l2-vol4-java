@@ -64,6 +64,10 @@ public class OrderModel extends BaseEntity {
         this.status = OrderStatus.CONFIRMED;
     }
 
+    public void failPayment() {
+        this.status = OrderStatus.PAYMENT_FAILED;
+    }
+
     public Long getUserId() { return userId; }
     public OrderStatus getStatus() { return status; }
     public List<OrderItemModel> getItems() { return items; }

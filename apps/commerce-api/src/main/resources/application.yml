@@ -34,6 +34,27 @@ spring:
   config:
     activate:
       on-profile: local, test
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+pg:
+  url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg-simulator:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      pg-simulator:
+        timeout-duration: 600ms
 
 ---
 spring:
