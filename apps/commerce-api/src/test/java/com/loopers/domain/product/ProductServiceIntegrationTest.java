@@ -1,6 +1,7 @@
 package com.loopers.domain.product;
 
 import com.loopers.application.product.ProductService;
+import com.loopers.domain.product.ProductFilter;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -48,7 +49,7 @@ class ProductServiceIntegrationTest {
             productJpaRepository.save(deleted);
 
             // act
-            Page<ProductModel> result = productService.getAll(null, ProductSort.LATEST, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(null, null, null, null), ProductSort.LATEST, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getTotalElements()).isEqualTo(1);
@@ -64,7 +65,7 @@ class ProductServiceIntegrationTest {
             productJpaRepository.save(new ProductModel("상품C", 20000L, 1L));
 
             // act
-            Page<ProductModel> result = productService.getAll(null, ProductSort.PRICE_ASC, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(null, null, null, null), ProductSort.PRICE_ASC, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent().get(0).getPrice()).isEqualTo(10000L);
@@ -80,7 +81,7 @@ class ProductServiceIntegrationTest {
             productJpaRepository.save(new ProductModel("아디다스상품", 99000L, 2L));
 
             // act
-            Page<ProductModel> result = productService.getAll(1L, ProductSort.LATEST, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(1L, null, null, null), ProductSort.LATEST, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getTotalElements()).isEqualTo(1);
