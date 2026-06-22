@@ -11,6 +11,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // 외부 PG(pg-simulator) 연동 — 선언적 HTTP(OpenFeign) + 재시도/서킷(Resilience4j).
+    // 버전은 spring-cloud BOM(2024.0.1)이 관리 → 핀 불필요. @Retry/@CircuitBreaker AOP를 위해 aop 스타터 포함.
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // security (BCrypt 비밀번호 해싱 — 필터체인/자동설정 없이 crypto 유틸만)
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")

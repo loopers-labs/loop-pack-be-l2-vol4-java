@@ -30,6 +30,32 @@ like-events:
   topic: catalog.like-changed.v1
   partitions: 3
 
+# 외부 PG(pg-simulator) 연동
+pg-simulator:
+  base-url: http://localhost:8082
+
+# 회복성 — pg-simulator는 동기 요청의 40%를 일시 500으로 떨군다.
+resilience4j:
+  retry:
+    instances:
+      pgSimulator:
+        max-attempts: 4              # 최초 1 + 재시도 3 (0.6^4 ≈ 13% 까지 실패 누적 확률을 낮춤)
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException        # 연결/타임아웃
+          - feign.FeignException.InternalServerError   # 주입된 500
+  circuitbreaker:
+    instances:
+      pgSimulator:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 70           # 40% 정상 실패보다 높게 — 진짜 장애에만 개방
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
 springdoc:
   use-fqn: true
   swagger-ui:
