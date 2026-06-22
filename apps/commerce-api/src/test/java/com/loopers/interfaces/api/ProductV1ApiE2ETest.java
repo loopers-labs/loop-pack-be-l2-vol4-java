@@ -6,6 +6,7 @@ import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,23 +29,27 @@ class ProductV1ApiE2ETest {
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     public ProductV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private ProductModel persistProduct() {

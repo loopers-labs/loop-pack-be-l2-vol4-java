@@ -14,6 +14,7 @@ import java.util.Optional;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
     Optional<ProductModel> findByIdAndDeletedAtIsNull(Long id);
+    List<ProductModel> findByIdInAndDeletedAtIsNull(List<Long> ids);
     Page<ProductModel> findByDeletedAtIsNull(Pageable pageable);
     Page<ProductModel> findByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
 

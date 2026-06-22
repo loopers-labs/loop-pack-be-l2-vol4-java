@@ -1,7 +1,10 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductCursorPage;
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductInfo;
+
+import java.util.List;
 
 public class ProductV1Dto {
     public record CreateProductRequest(
@@ -61,6 +64,18 @@ public class ProductV1Dto {
                 info.price(),
                 info.stock(),
                 info.likeCount()
+            );
+        }
+    }
+
+    public record CursorPageResponse(
+        List<ProductResponse> items,
+        String nextCursor
+    ) {
+        public static CursorPageResponse from(ProductCursorPage page) {
+            return new CursorPageResponse(
+                page.items().stream().map(ProductResponse::from).toList(),
+                page.nextCursor()
             );
         }
     }
