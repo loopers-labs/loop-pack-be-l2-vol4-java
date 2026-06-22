@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
@@ -7,6 +8,7 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ public class LikeFacade {
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
 
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
     public void like(Long userId, Long productId) {
         ProductModel product = productRepository.findById(productId)
@@ -31,6 +34,7 @@ public class LikeFacade {
         productRepository.increaseLikeCount(productId);   // 원자적 UPDATE
     }
 
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
     public void unlike(Long userId, Long productId) {
         ProductModel product = productRepository.findById(productId)
