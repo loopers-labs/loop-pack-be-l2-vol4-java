@@ -1,10 +1,19 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.OrderItemModel;
+import com.loopers.domain.order.ProductSnapshot;
+import com.loopers.application.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
-import com.loopers.domain.product.StockService;
+import com.loopers.application.product.ProductRepository;
+import com.loopers.application.product.ProductFacade;
+import com.loopers.application.product.ProductFacade.StockRequest;
+import com.loopers.application.coupon.CouponRepository;
+import com.loopers.domain.coupon.CouponIssue;
+import com.loopers.application.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentModel;
+import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,12 +31,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderFacade {
 
-    private final OrderService orderService;
-    private final ProductService productService;
-    private final StockService stockService;
-    private final com.loopers.domain.coupon.CouponService couponService;
-    private final com.loopers.domain.payment.PaymentService paymentService;
-    private final com.loopers.domain.payment.PaymentGateway paymentGateway;
+    private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
+    private final ProductFacade productFacade;
+    private final CouponRepository couponRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentGateway paymentGateway;
 
     @Transactional
     public Long createOrder(Long userId, OrderCreateRequest request) {
@@ -34,7 +44,7 @@ public class OrderFacade {
                 .map(OrderCreateRequest.Item::productId)
                 .toList();
 
-        List<ProductModel> products = productService.getProductsByIds(productIds);
+        List<ProductModel> products = productRepository.findByIds(productIds);
         if (products.size() != productIds.size()) {
             throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
         }
@@ -42,42 +52,34 @@ public class OrderFacade {
         Map<Long, ProductModel> productMap = products.stream()
                 .collect(Collectors.toMap(ProductModel::getId, p -> p));
 
-        // 재고 차감 요청 생성
-        List<StockService.StockRequest> stockRequests = request.items().stream()
-                .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
+        List<StockRequest> stockRequests = request.items().stream()
+                .map(item -> new StockRequest(item.productId(), item.quantity()))
                 .toList();
-        stockService.decreaseStocks(stockRequests);
+        productFacade.decreaseStocks(stockRequests);
 
-        // 주문 생성 요청 생성 (스냅샷 포함)
-        List<OrderService.OrderItemRequest> orderItemRequests = request.items().stream()
-                .map(item -> {
-                    ProductModel product = productMap.get(item.productId());
-                    return new OrderService.OrderItemRequest(
-                            product.getId(),
-                            product.getName(),
-                            product.getPrice(),
-                            "Brand Placeholder", // 실제로는 Brand 조회가 필요할 수 있음
-                            item.quantity()
-                    );
-                }).toList();
+        OrderModel order = new OrderModel(userId);
+        for (OrderCreateRequest.Item item : request.items()) {
+            ProductModel product = productMap.get(item.productId());
+            ProductSnapshot snapshot = new ProductSnapshot(product.getName(), product.getPrice(), "Brand Placeholder");
+            OrderItemModel orderItem = new OrderItemModel(order, product.getId(), snapshot, item.quantity());
+            order.addItem(orderItem);
+        }
 
-        return orderService.createOrder(userId, orderItemRequests);
+        return orderRepository.save(order).getId();
     }
 
     @Transactional
     public Long checkout(Long userId, OrderCheckoutRequest request) {
-        // 1. [단일 트랜잭션] 재고 차감 (비관적 락 사용) - 영속성 컨텍스트에 락과 함께 먼저 로드하기 위해 가장 먼저 실행
-        List<StockService.StockRequest> stockRequests = request.items().stream()
-                .map(item -> new StockService.StockRequest(item.productId(), item.quantity()))
+        List<StockRequest> stockRequests = request.items().stream()
+                .map(item -> new StockRequest(item.productId(), item.quantity()))
                 .toList();
-        stockService.decreaseStocksWithLock(stockRequests);
+        productFacade.decreaseStocks(stockRequests);
 
-        // 2. 상품 조회 및 계산
         List<Long> productIds = request.items().stream()
                 .map(OrderCheckoutRequest.Item::productId)
                 .toList();
 
-        List<ProductModel> products = productService.getProductsByIds(productIds);
+        List<ProductModel> products = productRepository.findByIds(productIds);
         if (products.size() != productIds.size()) {
             throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
         }
@@ -93,41 +95,40 @@ public class OrderFacade {
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
 
         java.math.BigDecimal discount = java.math.BigDecimal.ZERO;
+        CouponIssue couponIssue = null;
         if (request.couponIssueId() != null) {
-            discount = couponService.calculateDiscount(request.couponIssueId(), totalOriginalAmount);
+            couponIssue = couponRepository.findIssueById(request.couponIssueId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "조회할 수 없는 쿠폰발급내역입니다."));
+            discount = couponIssue.calculateDiscount(totalOriginalAmount, LocalDateTime.now());
         }
 
         java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
 
-        // 3. 주문 생성 (PENDING)
-        List<OrderService.OrderItemRequest> orderItemRequests = request.items().stream()
-                .map(item -> {
-                    ProductModel product = productMap.get(item.productId());
-                    return new OrderService.OrderItemRequest(
-                            product.getId(),
-                            product.getName(),
-                            product.getPrice(),
-                            "Brand Placeholder",
-                            item.quantity()
-                    );
-                }).toList();
+        OrderModel order = new OrderModel(userId, request.couponIssueId(), totalOriginalAmount, discount, totalPaymentAmount);
+        for (OrderCheckoutRequest.Item item : request.items()) {
+            ProductModel product = productMap.get(item.productId());
+            ProductSnapshot snapshot = new ProductSnapshot(product.getName(), product.getPrice(), "Brand Placeholder");
+            OrderItemModel orderItem = new OrderItemModel(order, product.getId(), snapshot, item.quantity());
+            order.addItem(orderItem);
+        }
+        Long orderId = orderRepository.save(order).getId();
 
-        Long orderId = orderService.createPendingOrder(userId, orderItemRequests, request.couponIssueId(), totalOriginalAmount, discount, totalPaymentAmount);
-
-        // 4. PG사 결제 승인 요청 (트랜잭션 내부)
-        com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult pgResult = null;
+        PaymentGatewayResult pgResult = null;
         try {
             pgResult = paymentGateway.requestPayment(orderId, totalPaymentAmount, request.paymentMethod());
         } catch (Exception e) {
             throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인 요청 중 오류가 발생했습니다: " + e.getMessage());
         }
 
-        // 5. 결제 및 쿠폰 사용 완료 처리
-        paymentService.savePayment(orderId, request.paymentMethod(), totalPaymentAmount, pgResult.transactionId(), pgResult.approvedAt());
-        orderService.completeOrder(orderId);
+        PaymentModel payment = new PaymentModel(orderId, request.paymentMethod(), totalPaymentAmount, pgResult.transactionId(), pgResult.approvedAt());
+        paymentRepository.save(payment);
         
-        if (request.couponIssueId() != null) {
-            couponService.completeCouponUse(request.couponIssueId(), totalOriginalAmount);
+        order.complete();
+        orderRepository.save(order);
+        
+        if (couponIssue != null) {
+            couponIssue.markUsed();
+            couponRepository.saveIssue(couponIssue);
         }
 
         return orderId;

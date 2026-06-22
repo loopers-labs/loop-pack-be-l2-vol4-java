@@ -78,23 +78,17 @@ public class CouponIssue extends BaseTimeEntity {
         return now.isAfter(expiredAt);
     }
 
-    public BigDecimal use(BigDecimal orderAmount, LocalDateTime now) {
-        // 1. 이미 사용된 쿠폰인지 검증
+    public BigDecimal calculateDiscount(BigDecimal orderAmount, LocalDateTime now) {
         if (this.status == CouponStatus.USED) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 사용 완료된 쿠폰입니다.");
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용완료된 쿠폰입니다.");
         }
-
-        // 2. 만료 여부 검증
         if (isExpired(now)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
         }
-
-        // 3. 최소 주문 금액 검증
         if (orderAmount.compareTo(this.minOrderAmount) < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 못했습니다.");
         }
 
-        // 4. 할인 금액 계산
         BigDecimal discount = BigDecimal.ZERO;
         if (this.couponType == CouponType.FIXED) {
             discount = this.discountValue;
@@ -102,19 +96,20 @@ public class CouponIssue extends BaseTimeEntity {
                 discount = orderAmount;
             }
         } else if (this.couponType == CouponType.RATE) {
-            // 정률 계산: orderAmount * (value / 100)
             BigDecimal rate = this.discountValue.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
             discount = orderAmount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
 
-            // 최대 할인 금액 한도 적용
             if (this.maxDiscountAmount != null && discount.compareTo(this.maxDiscountAmount) > 0) {
                 discount = this.maxDiscountAmount;
             }
         }
-
-        // 5. 사용 상태로 전환
-        this.status = CouponStatus.USED;
-
         return discount;
+    }
+
+    public void markUsed() {
+        if (this.status == CouponStatus.USED) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용완료된 쿠폰입니다.");
+        }
+        this.status = CouponStatus.USED;
     }
 }

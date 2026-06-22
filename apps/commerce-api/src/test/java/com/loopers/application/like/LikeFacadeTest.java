@@ -1,8 +1,9 @@
 package com.loopers.application.like;
 
-import com.loopers.domain.like.LikeService;
+import com.loopers.application.product.ProductRepository;
+import com.loopers.domain.like.ProductLikeModel;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductService;
+import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,7 +12,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -22,10 +27,10 @@ class LikeFacadeTest {
     private LikeFacade likeFacade;
 
     @Mock
-    private LikeService likeService;
+    private LikeRepository likeRepository;
 
     @Mock
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     @Test
     @DisplayName("좋아요를 처음 등록하면 상품 존재 여부를 검증하고 이력이 추가된다.")
@@ -34,16 +39,17 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productService.getProduct(productId)).willReturn(product);
-        given(likeService.existsLikeRecord(userId, productId)).willReturn(false);
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
+        given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.empty());
         
         // when
         likeFacade.addLike(userId, productId);
 
         // then
-        verify(productService).getProduct(productId);
-        verify(likeService).existsLikeRecord(userId, productId);
-        verify(likeService).addLikeRecord(userId, productId);
+        verify(productRepository).findByIdWithLock(productId);
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+        verify(likeRepository).save(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(1);
     }
 
     @Test
@@ -53,16 +59,18 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productService.getProduct(productId)).willReturn(product);
-        given(likeService.existsLikeRecord(userId, productId)).willReturn(true);
+        ProductLikeModel existingLike = new ProductLikeModel(userId, productId);
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
+        given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.of(existingLike));
 
         // when
         likeFacade.addLike(userId, productId);
 
         // then
-        verify(productService).getProduct(productId);
-        verify(likeService).existsLikeRecord(userId, productId);
-        verify(likeService, never()).addLikeRecord(userId, productId);
+        verify(productRepository).findByIdWithLock(productId);
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+        verify(likeRepository, never()).save(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 
     @Test
@@ -72,16 +80,19 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productService.getProduct(productId)).willReturn(product);
-        given(likeService.existsLikeRecord(userId, productId)).willReturn(true);
+        product.increaseLikeCount();
+        ProductLikeModel existingLike = new ProductLikeModel(userId, productId);
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
+        given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.of(existingLike));
 
         // when
         likeFacade.removeLike(userId, productId);
 
         // then
-        verify(productService).getProduct(productId);
-        verify(likeService).existsLikeRecord(userId, productId);
-        verify(likeService).removeLikeRecord(userId, productId);
+        verify(productRepository).findByIdWithLock(productId);
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+        verify(likeRepository).delete(existingLike);
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 
     @Test
@@ -91,15 +102,16 @@ class LikeFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         ProductModel product = new ProductModel(1L, "상품", new BigDecimal("1000"));
-        given(productService.getProduct(productId)).willReturn(product);
-        given(likeService.existsLikeRecord(userId, productId)).willReturn(false);
+        given(productRepository.findByIdWithLock(productId)).willReturn(Optional.of(product));
+        given(likeRepository.findByUserIdAndProductId(userId, productId)).willReturn(Optional.empty());
 
         // when
         likeFacade.removeLike(userId, productId);
 
         // then
-        verify(productService).getProduct(productId);
-        verify(likeService).existsLikeRecord(userId, productId);
-        verify(likeService, never()).removeLikeRecord(userId, productId);
+        verify(productRepository).findByIdWithLock(productId);
+        verify(likeRepository).findByUserIdAndProductId(userId, productId);
+        verify(likeRepository, never()).delete(any(ProductLikeModel.class));
+        assertThat(product.getLikeCount()).isEqualTo(0);
     }
 }

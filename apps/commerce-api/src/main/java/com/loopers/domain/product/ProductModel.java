@@ -18,7 +18,13 @@ import java.math.BigDecimal;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE product SET is_deleted = true WHERE id = ?")
 @SQLRestriction("is_deleted = false")
-@Table(name = "product")
+@Table(
+        name = "product",
+        indexes = {
+                @Index(name = "idx_product_brand_like_count_id", columnList = "brand_id, like_count DESC, id DESC"),
+                @Index(name = "idx_product_like_count_id", columnList = "like_count DESC, id DESC")
+        }
+)
 public class ProductModel extends BaseSoftDeleteEntity {
 
     @Id
@@ -34,11 +40,11 @@ public class ProductModel extends BaseSoftDeleteEntity {
     @Column(nullable = false, precision = 15, scale = 4)
     private BigDecimal price;
 
-    @Column(nullable = false)
-    private int likeCount = 0;
-
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL)
     private StockModel stock;
+
+    @Column(nullable = false, columnDefinition = "int default 0")
+    private int likeCount = 0;
 
     @Builder
     public ProductModel(Long brandId, String name, BigDecimal price) {
@@ -49,7 +55,6 @@ public class ProductModel extends BaseSoftDeleteEntity {
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.likeCount = 0;
     }
 
     public void update(String name, BigDecimal price) {
@@ -60,18 +65,19 @@ public class ProductModel extends BaseSoftDeleteEntity {
         this.price = price;
     }
 
+    public void assignStock(int quantity) {
+        this.stock = new StockModel(this, quantity);
+    }
+
     public void increaseLikeCount() {
         this.likeCount++;
     }
 
     public void decreaseLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount--;
+        if (this.likeCount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "좋아요 수는 0보다 작을 수 없습니다.");
         }
-    }
-
-    public void assignStock(int quantity) {
-        this.stock = new StockModel(this, quantity);
+        this.likeCount--;
     }
 
     private void validateBrandId(Long brandId) {

@@ -1,5 +1,6 @@
-package com.loopers.domain.order;
+package com.loopers.application.order;
 
+import com.loopers.domain.order.OrderModel;
 import java.util.Optional;
 import java.util.List;
 

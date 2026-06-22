@@ -1,42 +1,57 @@
 package com.loopers.application.like;
 
-import com.loopers.domain.like.LikeService;
-import com.loopers.domain.product.ProductService;
+import com.loopers.application.product.ProductRepository;
+import com.loopers.domain.like.ProductLikeModel;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class LikeFacade {
 
-    private final LikeService likeService;
-    private final ProductService productService;
+    private final LikeRepository likeRepository;
+    private final ProductRepository productRepository;
 
     public void addLike(Long userId, Long productId) {
-        // 1. 상품 존재 여부 조회 (일반 SELECT)
-        productService.getProduct(productId);
+        ProductModel product = productRepository.findByIdWithLock(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));
 
-        // 2. 이미 좋아요를 눌렀는지 확인 (멱등성 보장)
-        if (likeService.existsLikeRecord(userId, productId)) {
+        if (likeRepository.findByUserIdAndProductId(userId, productId).isPresent()) {
             return;
         }
 
-        // 3. 좋아요 추가
-        likeService.addLikeRecord(userId, productId);
+        try {
+            likeRepository.save(new ProductLikeModel(userId, productId));
+            product.increaseLikeCount();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String rootMessage = e.getRootCause() != null && e.getRootCause().getMessage() != null 
+                ? e.getRootCause().getMessage().toLowerCase() : "";
+                
+            if (message.contains("uk_product_likes_user_product") || rootMessage.contains("uk_product_likes_user_product")) {
+                // Ignore unique constraint violation for idempotency
+            } else {
+                CoreException ex = new CoreException(ErrorType.INTERNAL_ERROR, "좋아요 등록 중 무결성 예외가 발생했습니다.");
+                ex.initCause(e);
+                throw ex;
+            }
+        }
     }
 
     public void removeLike(Long userId, Long productId) {
-        // 1. 상품 존재 여부 조회 (일반 SELECT)
-        productService.getProduct(productId);
+        ProductModel product = productRepository.findByIdWithLock(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.PRODUCT_NOT_FOUND));
 
-        // 2. 좋아요가 존재하는 경우에만 삭제 (멱등성 보장)
-        if (!likeService.existsLikeRecord(userId, productId)) {
-            return;
-        }
-
-        // 3. 좋아요 삭제
-        likeService.removeLikeRecord(userId, productId);
+        likeRepository.findByUserIdAndProductId(userId, productId).ifPresent(like -> {
+            likeRepository.delete(like);
+            product.decreaseLikeCount();
+        });
     }
 }

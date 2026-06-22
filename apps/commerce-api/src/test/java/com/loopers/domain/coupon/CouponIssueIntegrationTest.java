@@ -1,5 +1,6 @@
 package com.loopers.domain.coupon;
 
+import com.loopers.application.coupon.CouponRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

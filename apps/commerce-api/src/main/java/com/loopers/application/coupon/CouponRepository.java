@@ -1,5 +1,7 @@
-package com.loopers.domain.coupon;
+package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponTemplate;
+import com.loopers.domain.coupon.CouponIssue;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.like;
 
-import com.loopers.domain.like.LikeRepository;
+import com.loopers.application.like.LikeRepository;
 import com.loopers.domain.like.ProductLikeModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -42,5 +42,15 @@ public class LikeRepositoryImpl implements LikeRepository {
     @Override
     public int countByProductId(Long productId) {
         return (int) likeJpaRepository.countByProductId(productId);
+    }
+
+    @Override
+    public java.util.Map<Long, Integer> countByProductIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) return java.util.Collections.emptyMap();
+        List<Object[]> results = likeJpaRepository.countByProductIds(productIds);
+        return results.stream().collect(java.util.stream.Collectors.toMap(
+                row -> (Long) row[0],
+                row -> ((Long) row[1]).intValue()
+        ));
     }
 }

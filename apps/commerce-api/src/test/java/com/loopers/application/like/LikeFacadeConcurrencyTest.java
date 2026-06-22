@@ -1,10 +1,10 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.like.LikeRepository;
+import com.loopers.application.brand.BrandRepository;
+import com.loopers.application.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
+import com.loopers.application.product.ProductRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +82,8 @@ class LikeFacadeConcurrencyTest {
             }
 
             assertThat(likeRepository.countByProductId(productId)).isEqualTo(1);
+            ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
+            assertThat(updatedProduct.getLikeCount()).isEqualTo(1);
         } finally {
             executorService.shutdown();
         }
@@ -120,6 +122,8 @@ class LikeFacadeConcurrencyTest {
             // then
             int likeCount = likeRepository.countByProductId(productId);
             assertThat(likeCount).isEqualTo(threadCount);
+            ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
+            assertThat(updatedProduct.getLikeCount()).isEqualTo(threadCount);
         } finally {
             executorService.shutdown();
         }
@@ -165,6 +169,8 @@ class LikeFacadeConcurrencyTest {
             // then
             int likeCount = likeRepository.countByProductId(productId);
             assertThat(likeCount).isEqualTo(0);
+            ProductModel updatedProduct = productRepository.findById(productId).orElseThrow();
+            assertThat(updatedProduct.getLikeCount()).isEqualTo(0);
         } finally {
             executorService.shutdown();
         }

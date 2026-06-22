@@ -70,16 +70,22 @@
 *   API request, response DTO와 응용 레이어의 DTO는 분리해 작성하도록 합니다.
 *   패키징 전략은 4개 레이어 패키지를 두고, 하위에 도메인 별로 패키징하는 형태로 작성합니다.
 *   서비스 빈(Bean) 등록 시 `@Service` 대신 `@Component`를 사용하도록 합니다.
-*   조회 작업이나 단일 데이터 변경 작업 시에는 `@Transactional`을 사용하지 않으며, 여러 데이터를 변경하여 트랜잭션 원자성이 필요한 상황에서만 `@Transactional`을 사용하도록 합니다.
+*   `@Transactional`: 조회 작업이나 단일 데이터 변경 작업 시에는 사용하지 않으며, 여러 데이터를 변경하여 트랜잭션 원자성이 필요한 상황 또는 더티 체킹 등 영속성 관련 기능을 사용해야 하는 경우에 한해서 사용합니다.
 
 ### 레이어별 책임
 1.  **Interfaces Layer (API):** 요청 수신, 응답 반환, 단순한 입력 유효성 검사.
-2.  **Application Layer (Facade):** 여러 도메인 서비스를 조합(Orchestration)하여 유스케이스 구현. DTO 변환을 수행한다.
-    *   여러 도메인을 조합하는 유스케이스의 경우, **Facade가 핵심 비즈니스 조율 및 트랜잭션 경계**가 된다.
-    *   단일 도메인 유스케이스의 경우, Facade는 비즈니스 로직 없이 **단순 트랜잭션 경계 설정 및 DTO 변환 역할**만 수행한다.
-3.  **Domain Layer:** 핵심 비즈니스 로직(Entity, VO)과 도메인 서비스 위치. Repository 인터페이스를 정의한다.
-    *   단일 도메인 유스케이스의 비즈니스 로직은 **Domain Service**가 담당한다.
-4.  **Infrastructure Layer:** JPA, Redis 등 기술 구현체 제공. 외부 연동 처리.
+2.  **Application Layer (Facade):**
+   *   여러 도메인 서비스를 조합하여 유스케이스를 구현하고 DTO 변환을 수행하며 트랜잭션 경계를
+   설정한다.
+   *   데이터베이스 접근을 위한 **Repository 인터페이스가 위치**한다.
+   *   스프링 컴포넌트 의존성 관리를 전담하며, Repository를 통해 엔티티를 조회하여 **Domain Layer(애그리거트 또는 도메인 서비스)의 파라미터로 전달**하는 역할을 한다.
+3.  **Domain Layer:**
+   *   핵심 비즈니스 로직(Entity, VO)과 도메인 서비스가 위치한다.
+   *   **Domain Service:** 도메인 객체(Entity)들이 직접 수행하기 어려운 도메인 로직을 위임받아 처리한다. (`PointChargingService`, `CouponApplyService` 등 다수 객체의 협력이 필요한 로직을 담당한다.
+   *   **Repository 주입 및 사용 금지:** 도메인 서비스나 애그리거트는 Repository를 직접 주입받아 사용하지 않는다. 외부 데이터나 상태가 필요한 경우 Application Layer로부터 파라미터로 전달받아 처리한다. (Pure Java 지향)
+   *   외부 모듈(라이브러리) 연동이 필요한 핵심 정책은 도메인에 인터페이스만 두고, Application Layer에서 주입받아 실행한다.
+4.  **Infrastructure Layer:**
+   *   Application Layer에서 정의된 Repository 인터페이스 등의 기술적 구현체(JPA, Redis 등)를 제공한다.
 
 ---
 

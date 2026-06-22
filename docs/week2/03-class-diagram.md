@@ -33,16 +33,19 @@ classDiagram
         +Long brandId
         +String name
         +BigDecimal price
-        +Stock stock
+        +int likeCount
+        +increaseLikeCount()
+        +decreaseLikeCount()
     }
     Product --|> BaseSoftDeleteEntity
     
     class Stock {
         +Long productId
-        +Product product
         +int quantity
         +decrease(int amount)
+        +restore(int amount)
     }
+    Stock "1" -- "1" Product : reference
     
     class ProductLike {
         +Long id
@@ -59,6 +62,7 @@ classDiagram
         +BigDecimal minOrderAmount
         +BigDecimal maxDiscountAmount
         +LocalDateTime expiredAt
+        +isValid() boolean
     }
     CouponTemplate --|> BaseSoftDeleteEntity
 
@@ -68,7 +72,7 @@ classDiagram
         +Long couponTemplateId
         +CouponStatus status
         +Long version
-        +use(template: CouponTemplate, orderAmount: BigDecimal): BigDecimal
+        +use(orderAmount: BigDecimal): BigDecimal
     }
     CouponIssue --|> BaseTimeEntity
     
@@ -81,7 +85,7 @@ classDiagram
         +BigDecimal totalPaymentAmount
         +OrderStatus status "PENDING, COMPLETED, CANCELED"
         +List~OrderItem~ items
-        +complete()
+        +completePayment()
         +cancel()
     }
     Order --|> BaseTimeEntity
@@ -131,11 +135,6 @@ classDiagram
         +cancelPayment(transactionId): PaymentResponse
     }
 
-    class MockPaymentGateway {
-        +requestPayment(amount, method): PaymentResponse
-        +cancelPayment(transactionId): PaymentResponse
-    }
-
     class PaymentResponse {
         +String transactionId
         +boolean isSuccess
@@ -144,7 +143,6 @@ classDiagram
 
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains
-    Product "1" -- "1" Stock : has
     User "1" -- "*" Order : places
     Order "1" -- "*" OrderItem : contains
     User "1" -- "*" ProductLike : likes
@@ -153,9 +151,16 @@ classDiagram
     CouponTemplate "1" -- "*" CouponIssue : issues
     CouponIssue "1" -- "0..1" Order : applied to
     Order "1" ..> "0..1" Payment : reference (id)
-    PaymentGateway <|.. MockPaymentGateway : implements
 
-    %% 파사드(Facade) 계층 (복합 트랜잭션 제어)
+    %% 인프라스트럭처 (Repository)
+    class OrderRepository { <<interface>> }
+    class ProductRepository { <<interface>> }
+    class StockRepository { <<interface>> }
+    class CouponRepository { <<interface>> }
+    class LikeRepository { <<interface>> }
+    class PaymentRepository { <<interface>> }
+
+    %% 파사드(Facade) 계층 (트랜잭션 및 흐름 제어)
     class OrderFacade {
         +checkout(userId, request, method)
     }
@@ -169,56 +174,32 @@ classDiagram
     class CouponFacade {
         +issueCoupon(userId, couponTemplateId)
     }
-
-    %% 서비스(Service) 계층 (단일 도메인 로직 및 조회)
-    class OrderService {
-        +createOrder(userId, items, discountAmount)
-        +getOrder(orderId)
-        +completeOrder(orderId)
-        +cancelOrder(orderId)
-    }
-    class PaymentService {
-        +savePayment(orderId, amount, method, transactionId)
-    }
-    class ProductService {
-        +getProducts(brandId, sort, pageable)
-        +getProductDetail(productId)
-        +getProductsByIds(ids)
-        +deleteProductsByBrand(brandId)
-    }
-    class BrandService {
-        +getBrand(brandId)
-        +deleteBrand(brandId)
-    }
-    class StockService {
-        +decreaseStocks(stockRequests)
-        +restoreStocks(stockRequests)
-    }
-    class LikeService {
-        +existsLikeRecord(userId, productId) boolean
-        +addLikeRecord(userId, productId)
-        +removeLikeRecord(userId, productId)
-    }
-    class CouponService {
-        +issueCoupon(userId, templateId)
-        +getUserCoupons(userId)
-        +verifyAndUseCoupon(couponIssueId, orderAmount)
-        +completeCouponUse(couponIssueId)
+    class ProductFacade {
+        +retrieveProducts(condition, pageable)
     }
 
-    %% 의존 방향
-    OrderFacade ..> OrderService
-    OrderFacade ..> ProductService
-    OrderFacade ..> StockService
-    OrderFacade ..> CouponService
-    OrderFacade ..> PaymentService
+    %% 도메인 서비스 (Domain Service) - 여러 엔티티의 협력이 필요한 순수 로직
+    class OrderDomainService {
+        <<DomainService>>
+        +createOrder(User, items, CouponIssue)
+        +calculateTotalAmount()
+    }
+
+    %% Facade 의존성 (Facade -> Repository, Domain Service, PG)
+    OrderFacade ..> OrderRepository
+    OrderFacade ..> ProductRepository
+    OrderFacade ..> StockRepository
+    OrderFacade ..> CouponRepository
+    OrderFacade ..> PaymentRepository
+    OrderFacade ..> OrderDomainService
     OrderFacade ..> PaymentGateway
     
-    BrandAdminFacade ..> BrandService
-    BrandAdminFacade ..> ProductService
+    BrandAdminFacade ..> ProductRepository
     
-    LikeFacade ..> LikeService
-    LikeFacade ..> ProductService
+    LikeFacade ..> LikeRepository
+    LikeFacade ..> ProductRepository
 
-    CouponFacade ..> CouponService
+    CouponFacade ..> CouponRepository
+
+    ProductFacade ..> ProductRepository
 ```

@@ -1,7 +1,7 @@
 package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.CouponIssue;
-import com.loopers.domain.coupon.CouponRepository;
+import com.loopers.application.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.support.error.CoreException;
@@ -30,7 +30,7 @@ class CouponFacadeTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
-
+        // 첫 번째 발급은 성공해야 함
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
@@ -59,7 +59,7 @@ class CouponFacadeTest {
             new CouponTemplate("10% 할인 쿠폰", CouponType.RATE, new BigDecimal("10"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(10))
         );
 
-        // 첫 번째 발급은 성공해야 함
+        // 泥?踰덉㎏ 諛쒓툒? ?깃났?댁빞 ??
         couponFacade.issueCoupon(userId, template.getId());
 
         // when & then

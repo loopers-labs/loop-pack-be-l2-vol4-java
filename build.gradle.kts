@@ -71,6 +71,9 @@ subprojects {
 
     tasks.withType(Jar::class) { enabled = true }
     tasks.withType(BootJar::class) { enabled = false }
+    tasks.withType<JavaCompile> {
+        options.encoding = "UTF-8"
+    }
 
     configure(allprojects.filter { it.parent?.name.equals("apps") }) {
         tasks.withType(Jar::class) { enabled = false }
