@@ -73,7 +73,7 @@ public class OrderFacade {
         List<StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockRequest(item.productId(), item.quantity()))
                 .toList();
-        productFacade.decreaseStocksWithLock(stockRequests);
+        productFacade.decreaseStocks(stockRequests);
 
         List<Long> productIds = request.items().stream()
                 .map(OrderCheckoutRequest.Item::productId)

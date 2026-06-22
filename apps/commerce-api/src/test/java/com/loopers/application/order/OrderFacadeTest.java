@@ -125,7 +125,7 @@ class OrderFacadeTest {
 
         // then
         assertThat(resultOrderId).isEqualTo(100L);
-        verify(productFacade).decreaseStocksWithLock(anyList());
+        verify(productFacade).decreaseStocks(anyList());
         verify(paymentGateway).requestPayment(eq(100L), eq(new BigDecimal("360000")), eq(method));
         verify(paymentRepository).save(any(PaymentModel.class));
         verify(couponRepository).saveIssue(couponIssue);
