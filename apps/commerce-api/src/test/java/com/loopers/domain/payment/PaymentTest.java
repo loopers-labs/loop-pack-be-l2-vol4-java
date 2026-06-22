@@ -50,14 +50,14 @@ class PaymentTest {
     class StartProcessing {
 
         @Test
-        @DisplayName("PENDING 상태에서 startProcessing을 호출하면 IN_PROGRESS로 전환되고 transactionKey가 세팅된다.")
+        @DisplayName("PENDING 상태에서 markInProgress을 호출하면 IN_PROGRESS로 전환되고 transactionKey가 세팅된다.")
         void startsProcessing_whenStatusIsPending() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             String transactionKey = "20260622:TR:a1b2c3";
 
             // Act
-            payment.startProcessing(transactionKey);
+            payment.markInProgress(transactionKey);
 
             // Assert
             assertAll(
@@ -67,15 +67,15 @@ class PaymentTest {
         }
 
         @Test
-        @DisplayName("PENDING이 아닌 상태에서 startProcessing을 호출하면 예외가 발생한다.")
+        @DisplayName("PENDING이 아닌 상태에서 markInProgress을 호출하면 예외가 발생한다.")
         void throwsException_whenStartProcessingCalledOnNonPendingStatus() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            payment.startProcessing("20260622:TR:a1b2c3");
+            payment.markInProgress("20260622:TR:a1b2c3");
 
             // Act & Assert
             CoreException exception = assertThrows(CoreException.class,
-                () -> payment.startProcessing("20260622:TR:b2c3d4"));
+                () -> payment.markInProgress("20260622:TR:b2c3d4"));
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
@@ -89,7 +89,7 @@ class PaymentTest {
         void completesPayment_withSuccess_whenCallbackIsSuccess() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            payment.startProcessing("20260622:TR:a1b2c3");
+            payment.markInProgress("20260622:TR:a1b2c3");
             String reason = "정상 승인되었습니다.";
 
             // Act
@@ -108,7 +108,7 @@ class PaymentTest {
         void completesPayment_withFailed_whenCallbackIsFailed() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            payment.startProcessing("20260622:TR:a1b2c3");
+            payment.markInProgress("20260622:TR:a1b2c3");
             String reason = "한도초과입니다.";
 
             // Act
@@ -157,7 +157,7 @@ class PaymentTest {
         void abandonsPayment_whenStatusIsInProgress() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            payment.startProcessing("20260622:TR:a1b2c3");
+            payment.markInProgress("20260622:TR:a1b2c3");
 
             // Act
             payment.abandon();
@@ -171,7 +171,7 @@ class PaymentTest {
         void throwsException_whenAbandonCalledOnSuccessStatus() {
             // Arrange
             Payment payment = new Payment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            payment.startProcessing("20260622:TR:a1b2c3");
+            payment.markInProgress("20260622:TR:a1b2c3");
             payment.complete(PaymentStatus.SUCCESS, "정상 승인되었습니다.");
 
             // Act & Assert

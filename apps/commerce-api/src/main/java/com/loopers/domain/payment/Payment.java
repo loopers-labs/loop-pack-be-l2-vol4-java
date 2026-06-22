@@ -49,7 +49,7 @@ public class Payment extends BaseDomain {
         this.deletedAt = deletedAt;
     }
 
-    public void startProcessing(String transactionKey) {
+    public void markInProgress(String transactionKey) {
         if (this.status != PaymentStatus.PENDING) {
             throw new CoreException(ErrorType.CONFLICT, "PENDING 상태의 결제만 처리 시작할 수 있습니다.");
         }
