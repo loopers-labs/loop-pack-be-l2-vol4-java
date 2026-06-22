@@ -44,6 +44,20 @@ classDiagram
         ADMIN
     }
 
+    class CouponType {
+        <<enumeration>>
+        FIXED
+        RATE
+    }
+
+    class CouponStatus {
+        <<enumeration>>
+        AVAILABLE
+        USED
+        EXPIRED
+        BLOCKED
+    }
+
     %% ────────── Entities ──────────
     class Member {
         +loginId: String
@@ -66,11 +80,15 @@ classDiagram
     class Product {
         +name: String
         +price: Long
-        +likeCount: int
         +brandId: Long
-        +increaseLikeCount() void
-        +decreaseLikeCount() void
         +softDelete() void
+    }
+
+    class ProductLikeView {
+        +productId: Long
+        +likeCount: int
+        +increment() void
+        +decrement() void
     }
 
     class Stock {
@@ -104,23 +122,58 @@ classDiagram
         +quantity: int
     }
 
+    class CouponTemplateModel {
+        +name: String
+        +type: CouponType
+        +value: Long
+        +minOrderAmount: Long
+        +expiredAt: LocalDateTime
+        +isActive: boolean
+        +isBlocked: boolean
+        +update(name, isActive) void
+        +block() void
+        +isExpired() boolean
+        +canIssue() boolean
+    }
+
+    class UserCouponModel {
+        +memberId: Long
+        +templateId: Long
+        +usedAt: LocalDateTime
+        +version: int
+        +use() void
+        +getStatus(expiredAt, templateBlocked) CouponStatus
+    }
+
+    class CouponDomainService {
+        <<service>>
+        +calculateDiscount(template, orderAmount) long
+        +validateMinOrderAmount(template, orderAmount) void
+    }
+
     %% ────────── 상속 ──────────
     BaseEntity <|-- SoftDeletableEntity
     SoftDeletableEntity <|-- Member
     SoftDeletableEntity <|-- Brand
     SoftDeletableEntity <|-- Product
     SoftDeletableEntity <|-- Stock
+    BaseEntity <|-- ProductLikeView
     SoftDeletableEntity <|-- Order
     BaseEntity <|-- Like
     BaseEntity <|-- OrderItem
+    BaseEntity <|-- CouponTemplateModel
+    BaseEntity <|-- UserCouponModel
 
     %% ────────── Enum 사용 ──────────
     Member "1" --> "1" Role
     Order "1" --> "1" OrderStatus
+    CouponTemplateModel "1" --> "1" CouponType
+    UserCouponModel "1" --> "1" CouponStatus
 
     %% ────────── 합성 Composition ──────────
     Order "1" *-- "1..*" OrderItem : 포함
     Product "1" *-- "1" Stock : 포함
+    Product "1" *-- "1" ProductLikeView : 좋아요 수
 
     %% ────────── 연관 Association ──────────
     Product "0..*" --> "1" Brand : 소속
@@ -128,6 +181,8 @@ classDiagram
     Like "0..*" --> "1" Member : 좋아요한 회원
     Like "0..*" --> "1" Product : 좋아요한 상품
     OrderItem "0..*" --> "1" Product : 스냅샷 참조
+    UserCouponModel "0..*" --> "1" Member : 소유자
+    UserCouponModel "0..*" --> "1" CouponTemplateModel : 발급 기반
 ```
 
 ### 관계 종류 설명

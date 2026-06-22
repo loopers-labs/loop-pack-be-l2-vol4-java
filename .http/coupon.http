@@ -1,0 +1,92 @@
+### 쿠폰 템플릿 목록 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/coupons
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 쿠폰 템플릿 생성 (ADMIN) — FIXED
+POST http://localhost:8080/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "1000원 할인 쿠폰",
+  "type": "FIXED",
+  "value": 1000,
+  "minOrderAmount": 5000,
+  "expiredAt": "2027-12-31T23:59:59"
+}
+
+---
+
+### 쿠폰 템플릿 생성 (ADMIN) — RATE
+POST http://localhost:8080/api-admin/v1/coupons
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "10% 할인 쿠폰",
+  "type": "RATE",
+  "value": 10,
+  "minOrderAmount": null,
+  "expiredAt": "2027-12-31T23:59:59"
+}
+
+---
+
+### 쿠폰 템플릿 상세 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 쿠폰 템플릿 수정 (ADMIN)
+PUT http://localhost:8080/api-admin/v1/coupons/1
+Content-Type: application/json
+X-Loopers-Ldap: loopers.admin
+
+{
+  "name": "1000원 할인 쿠폰 (수정)",
+  "isActive": false
+}
+
+---
+
+### 쿠폰 발급 현황 조회 (ADMIN)
+GET http://localhost:8080/api-admin/v1/coupons/1/issues?page=0&size=20
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 쿠폰 발급 (USER)
+POST http://localhost:8080/api/v1/coupons/1/issue
+X-Loopers-LoginId: user01
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 내 쿠폰 목록 조회 (USER)
+GET http://localhost:8080/api/v1/users/me/coupons
+X-Loopers-LoginId: user01
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 쿠폰 템플릿 삭제 (ADMIN) — isActive=false soft disable
+DELETE http://localhost:8080/api-admin/v1/coupons/1
+X-Loopers-Ldap: loopers.admin
+
+---
+
+### 쿠폰 적용 주문 생성 (USER)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: user01
+X-Loopers-LoginPw: Password1!
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ],
+  "userCouponId": 1
+}

@@ -25,7 +25,7 @@ public class OrderController {
         @Valid @RequestBody OrderDto.CreateRequest request,
         @RequestAttribute("userId") Long userId
     ) {
-        OrderInfo info = orderFacade.createOrder(userId, OrderDto.toCommands(request.items()));
+        OrderInfo info = orderFacade.createOrder(userId, OrderDto.toCommands(request.items()), request.couponId());
         return ApiResponse.success(OrderDto.OrderResponse.from(info));
     }
 

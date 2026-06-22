@@ -29,6 +29,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public Optional<ProductModel> findByIdForUpdate(Long id) {
+        return productJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
     public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
         PageRequest sortedPage = PageRequest.of(
             pageRequest.getPageNumber(),

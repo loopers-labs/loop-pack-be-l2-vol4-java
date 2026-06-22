@@ -59,7 +59,7 @@ class OrderServiceTest {
             List<OrderItemCommand> items = List.of(new OrderItemCommand(product.getId(), 2));
 
             // act
-            OrderModel saved = orderService.create(1L, items);
+            OrderModel saved = orderService.create(1L, items, null, 20000L, 0L);
 
             // assert
             assertThat(saved.getId()).isNotNull();
@@ -76,7 +76,7 @@ class OrderServiceTest {
             List<OrderItemCommand> items = List.of(new OrderItemCommand(nonExistentProductId, 1));
 
             // act & assert
-            assertThatThrownBy(() -> orderService.create(1L, items))
+            assertThatThrownBy(() -> orderService.create(1L, items, null, 0L, 0L))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
@@ -92,7 +92,7 @@ class OrderServiceTest {
             List<OrderItemCommand> items = List.of(new OrderItemCommand(product.getId(), 5));
 
             // act & assert
-            assertThatThrownBy(() -> orderService.create(1L, items))
+            assertThatThrownBy(() -> orderService.create(1L, items, null, 10000L, 0L))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.BAD_REQUEST);
@@ -109,7 +109,7 @@ class OrderServiceTest {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
             fakeStockRepository.save(new StockModel(product.getId(), 10));
-            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
 
             // act & assert
             assertThatThrownBy(() -> orderService.cancel(saved.getId(), 2L))
@@ -124,7 +124,7 @@ class OrderServiceTest {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
             fakeStockRepository.save(new StockModel(product.getId(), 10));
-            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
             orderService.cancel(saved.getId(), 1L);
 
             // act & assert
@@ -145,7 +145,7 @@ class OrderServiceTest {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
             fakeStockRepository.save(new StockModel(product.getId(), 10));
-            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderModel saved = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
 
             // act
             orderService.confirm(saved.getId(), 1L);
@@ -166,8 +166,8 @@ class OrderServiceTest {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
             fakeStockRepository.save(new StockModel(product.getId(), 10));
-            orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)));
-            orderService.create(2L, List.of(new OrderItemCommand(product.getId(), 1)));
+            orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
+            orderService.create(2L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
 
             // act
             List<OrderModel> orders = orderService.getOrders(1L, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
@@ -257,6 +257,11 @@ class OrderServiceTest {
         public Optional<ProductModel> findById(Long id) {
             return Optional.ofNullable(store.get(id))
                 .filter(p -> p.getDeletedAt() == null);
+        }
+
+        @Override
+        public Optional<ProductModel> findByIdForUpdate(Long id) {
+            return findById(id);
         }
 
         @Override

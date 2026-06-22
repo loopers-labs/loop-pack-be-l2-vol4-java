@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -116,6 +118,18 @@ public class ApiControllerAdvice {
             .collect(Collectors.joining(", "));
 
         return failureResponse(ErrorType.BAD_REQUEST, errorMessage);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolationException : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, null);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(ObjectOptimisticLockingFailureException e) {
+        log.warn("ObjectOptimisticLockingFailureException : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, null);
     }
 
     @ExceptionHandler

@@ -1,9 +1,14 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.application.user.UserService;
+import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.user.UserModel;
+import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
+import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.interfaces.api.order.OrderDto;
@@ -42,6 +47,12 @@ class OrderApiE2ETest {
 
     @Autowired
     private StockJpaRepository stockJpaRepository;
+
+    @Autowired
+    private CouponTemplateJpaRepository couponTemplateJpaRepository;
+
+    @Autowired
+    private UserCouponJpaRepository userCouponJpaRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -306,6 +317,160 @@ class OrderApiE2ETest {
             assertThat(response.getBody().data().orderId()).isEqualTo(orderId);
             assertThat(response.getBody().data().items()).hasSize(1);
             assertThat(response.getBody().data().items().get(0).productName()).isEqualTo("에어포스1");
+        }
+    }
+
+    @DisplayName("POST /api/v1/orders (쿠폰 적용)")
+    @Nested
+    class CreateOrderWithCoupon {
+
+        @DisplayName("쿠폰 없이 주문 시 discountAmount=0, totalPrice=originalAmount이다.")
+        @Test
+        void noCoupon_discountIsZero() {
+            // arrange
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), null
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(response.getBody().data().discountAmount()).isEqualTo(0L);
+            assertThat(response.getBody().data().totalPrice()).isEqualTo(response.getBody().data().originalAmount());
+        }
+
+        @DisplayName("FIXED 쿠폰 적용 시 totalPrice = originalAmount - fixedAmount이다.")
+        @Test
+        void fixedCoupon_appliesDiscount() {
+            // arrange
+            CouponTemplateModel template = couponTemplateJpaRepository.save(
+                new CouponTemplateModel("1000원 할인", CouponType.FIXED, 1000L, null, java.time.LocalDateTime.now().plusDays(7)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(
+                new UserCouponModel(savedUser.getId(), template.getId()));
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(response.getBody().data().discountAmount()).isEqualTo(1000L);
+            assertThat(response.getBody().data().totalPrice()).isEqualTo(response.getBody().data().originalAmount() - 1000L);
+        }
+
+        @DisplayName("RATE 쿠폰 적용 시 totalPrice = originalAmount - (originalAmount × rate / 100)이다.")
+        @Test
+        void rateCoupon_appliesDiscount() {
+            // arrange
+            CouponTemplateModel template = couponTemplateJpaRepository.save(
+                new CouponTemplateModel("10% 할인", CouponType.RATE, 10L, null, java.time.LocalDateTime.now().plusDays(7)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(
+                new UserCouponModel(savedUser.getId(), template.getId()));
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert: savedProduct.price=10000, 10% → discount=1000
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(response.getBody().data().discountAmount()).isEqualTo(1000L);
+            assertThat(response.getBody().data().totalPrice()).isEqualTo(9000L);
+        }
+
+        @DisplayName("최소 주문 금액 미달 쿠폰 사용 시 400이 반환된다.")
+        @Test
+        void minOrderAmount_returns400_whenNotMet() {
+            // arrange
+            CouponTemplateModel template = couponTemplateJpaRepository.save(
+                new CouponTemplateModel("1000원 할인", CouponType.FIXED, 1000L, 50000L, java.time.LocalDateTime.now().plusDays(7)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(
+                new UserCouponModel(savedUser.getId(), template.getId()));
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("이미 사용된 쿠폰으로 주문 시 400이 반환된다.")
+        @Test
+        void usedCoupon_returns400() {
+            // arrange
+            CouponTemplateModel template = couponTemplateJpaRepository.save(
+                new CouponTemplateModel("1000원 할인", CouponType.FIXED, 1000L, null, java.time.LocalDateTime.now().plusDays(7)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(
+                new UserCouponModel(savedUser.getId(), template.getId()));
+            userCoupon.use();
+            userCouponJpaRepository.save(userCoupon);
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("차단된 쿠폰으로 주문 시 400이 반환된다.")
+        @Test
+        void blockedCoupon_returns400() {
+            // arrange
+            CouponTemplateModel template = couponTemplateJpaRepository.save(
+                new CouponTemplateModel("1000원 할인", CouponType.FIXED, 1000L, null, java.time.LocalDateTime.now().plusDays(7)));
+            UserCouponModel userCoupon = userCouponJpaRepository.save(
+                new UserCouponModel(savedUser.getId(), template.getId()));
+            template.block();
+            couponTemplateJpaRepository.save(template);
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1)), userCoupon.getId()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 

@@ -21,7 +21,7 @@ public class LikeService {
 
     @Transactional
     public void like(Long memberId, Long productId) {
-        ProductModel product = productRepository.findById(productId)
+        ProductModel product = productRepository.findByIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품을 찾을 수 없습니다."));
 
         boolean alreadyLiked = likeRepository.findByMemberIdAndProductId(memberId, productId).isPresent();
@@ -38,7 +38,7 @@ public class LikeService {
         LikeModel like = likeRepository.findByMemberIdAndProductId(memberId, productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 정보를 찾을 수 없습니다."));
 
-        ProductModel product = productRepository.findById(productId)
+        ProductModel product = productRepository.findByIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품을 찾을 수 없습니다."));
 
         likeRepository.delete(like);
