@@ -16,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.mockito.Mockito;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,6 +50,9 @@ class OrderFacadeConcurrencyTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @SpyBean
+    private PaymentGateway paymentGateway;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -178,5 +183,53 @@ class OrderFacadeConcurrencyTest {
         } finally {
             executorService.shutdown();
         }
+    }
+
+    @Test
+    @DisplayName("결제 진행 중 쿠폰 만료 시간이 지나도 정상적으로 결제가 완료되고 쿠폰이 사용 처리된다.")
+    void checkout_CouponExpirationBoundary_ShouldNotThrowException() throws InterruptedException {
+        // given
+        Long userId = 1L;
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        
+        ProductModel product = new ProductModel(brand.getId(), "Air Jordan", new BigDecimal("200000"));
+        product.assignStock(10);
+        product = productRepository.save(product);
+        Long productId = product.getId();
+
+        // 1초 뒤에 만료되는 쿠폰 생성
+        CouponTemplate template = new CouponTemplate(
+                "Boundary Coupon",
+                CouponType.FIXED,
+                new BigDecimal("10000"),
+                new BigDecimal("0"),
+                null,
+                LocalDateTime.now().plusSeconds(1)
+        );
+        template = couponRepository.saveTemplate(template);
+
+        CouponIssue couponIssue = new CouponIssue(userId, template);
+        couponIssue = couponRepository.saveIssue(couponIssue);
+        Long couponIssueId = couponIssue.getId();
+
+        // 결제 승인에 1.5초가 걸린다고 가정
+        Mockito.doAnswer(invocation -> {
+            Thread.sleep(1500);
+            return invocation.callRealMethod();
+        }).when(paymentGateway).requestPayment(Mockito.anyLong(), Mockito.any(), Mockito.any());
+
+        OrderCheckoutRequest request = new OrderCheckoutRequest(
+                List.of(new OrderCheckoutRequest.Item(productId, 1)),
+                couponIssueId,
+                PaymentMethod.CARD
+        );
+
+        // when
+        Long orderId = orderFacade.checkout(userId, request);
+
+        // then
+        assertThat(orderId).isNotNull();
+        CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
+        assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
     }
 }

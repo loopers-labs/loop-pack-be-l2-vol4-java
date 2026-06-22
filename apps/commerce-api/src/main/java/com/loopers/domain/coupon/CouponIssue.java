@@ -106,9 +106,10 @@ public class CouponIssue extends BaseTimeEntity {
         return discount;
     }
 
-    public BigDecimal use(BigDecimal orderAmount, LocalDateTime now) {
-        BigDecimal discount = calculateDiscount(orderAmount, now);
+    public void markUsed() {
+        if (this.status == CouponStatus.USED) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 사용완료된 쿠폰입니다.");
+        }
         this.status = CouponStatus.USED;
-        return discount;
     }
 }

@@ -127,7 +127,7 @@ public class OrderFacade {
         orderRepository.save(order);
         
         if (couponIssue != null) {
-            couponIssue.use(totalOriginalAmount, LocalDateTime.now());
+            couponIssue.markUsed();
             couponRepository.saveIssue(couponIssue);
         }
 
