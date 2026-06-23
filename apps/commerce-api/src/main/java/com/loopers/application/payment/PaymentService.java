@@ -19,8 +19,8 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
 
     @Transactional
-    public Payment createPayment(Long orderId, CardType cardType, String cardNo, Long amount) {
-        return paymentRepository.save(new Payment(orderId, cardType, cardNo, amount));
+    public Payment createPayment(Long userId, Long orderId, CardType cardType, String cardNo, Long amount) {
+        return paymentRepository.save(new Payment(userId, orderId, cardType, cardNo, amount));
     }
 
     @Transactional

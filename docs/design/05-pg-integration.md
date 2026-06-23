@@ -102,6 +102,52 @@ Content-Type: application/json
 
 - 요청 처리에 100~500ms 지연 존재
 - **40% 확률로 `500 INTERNAL_ERROR` 즉시 반환** → 재시도 필요
+- 500은 트랜잭션 생성 **이전**에 반환된다. 즉, 500 응답 시 PG에 트랜잭션이 존재하지 않는다.
+  - 재시도가 PG 중복 트랜잭션을 만들지 않으므로 안전하다.
+  - 단, 실제 PG 환경에서는 이 보장이 없으므로 멱등성 키 설계가 필요할 수 있다.
+
+### 결제 상태 확인 `GET /api/v1/payments/{transactionKey}`
+
+| 항목 | 값 |
+|---|---|
+| 인증 헤더 | `X-USER-ID: {userId}` |
+| 용도 | 콜백 미수신 시 배치가 `IN_PROGRESS` Payment의 최종 상태를 확인 |
+
+**Response Body**
+
+```json
+{
+  "transactionKey": "20260621:TR:9577c5",
+  "orderId": "1351039135",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "status": "SUCCESS",
+  "reason": "정상 승인되었습니다."
+}
+```
+
+### 주문별 트랜잭션 목록 조회 `GET /api/v1/payments?orderId={orderId}`
+
+| 항목 | 값 |
+|---|---|
+| 인증 헤더 | `X-USER-ID: {userId}` |
+| 용도 | 진단 / 관리 목적. 배치 주 폴링 수단으로는 적합하지 않다. |
+
+**Response Body**
+
+```json
+{
+  "orderId": "1351039135",
+  "transactions": [
+    { "transactionKey": "20260621:TR:9577c5", "status": "SUCCESS", "reason": "정상 승인되었습니다." }
+  ]
+}
+```
+
+> **주의**: 동일 orderId에 여러 트랜잭션이 존재할 수 있다 (재시도 등 원인).
+> 배치에서 이 API를 사용할 경우 어느 transactionKey를 기준으로 삼을지 판단 기준이 필요하다.
+> PG DB는 `(user_id, order_id)` 조합에 unique 제약이 없으므로 중복 트랜잭션이 허용된다.
 
 ### PG 콜백 페이로드
 
@@ -214,6 +260,12 @@ sequenceDiagram
 | `ABANDONED` | 배치가 폴링 후 포기 | `PENDING` 또는 `IN_PROGRESS` 상태에서 배치 최대 조회 횟수 초과 시 |
 
 배치는 `PENDING` / `IN_PROGRESS` 상태의 Payment를 주기적으로 폴링하여 콜백 미수신 건을 보완한다.
+두 상태는 PG 조회 방법이 다르므로 배치에서 분기 처리한다.
+
+| 상태 | transactionKey | 배치 동작 | PG 조회 API |
+|---|---|---|---|
+| `PENDING` | null | PG에 트랜잭션 없음. 폴링 횟수 초과 시 `ABANDONED` | 사용 안 함 |
+| `IN_PROGRESS` | 있음 | `GET /{transactionKey}` 로 최종 상태 확인 후 반영 | `GET /api/v1/payments/{transactionKey}` |
 
 ---
 
@@ -221,9 +273,10 @@ sequenceDiagram
 
 | 시나리오 | 원인 | 대응 |
 |---|---|---|
-| PG 요청 즉시 실패 | 서버 불안정 (40% 확률) | 최대 N회 재시도 후 실패 시 `503` 반환 |
-| 콜백 미수신 | 네트워크 단절 또는 PG 처리 지연 | PG 조회 API 폴링으로 보완 가능 (별도 배치) |
-| 콜백 중복 수신 | PG 재전송 | `transactionKey` 기준 멱등 처리 |
+| PG 요청 즉시 실패 | 서버 불안정 (40% 확률) | 최대 2회 재시도 (총 3회 시도) 후 실패 시 `503` 반환, Payment는 `PENDING` 유지 |
+| PG 요청 최종 실패 후 Payment `PENDING` 방치 | 재시도 모두 소진 | 배치가 폴링 횟수 초과 시 `ABANDONED` 처리 |
+| 콜백 미수신 (`IN_PROGRESS` 방치) | 네트워크 단절 또는 PG 처리 지연 | 배치가 `GET /{transactionKey}` 로 최종 상태 확인 후 반영 |
+| 콜백 중복 수신 | PG 재전송 | `transactionKey` 기준 멱등 처리 (이미 종료 상태면 무시) |
 
 ---
 
@@ -247,9 +300,18 @@ sequenceDiagram
 
 [배치 폴링]
   PENDING / IN_PROGRESS Payment 조회
-  PG 조회 API 호출
-  Payment 상태 업데이트 (SUCCESS / FAILED / ABANDONED)
-  ──────────────── COMMIT (건별)
+
+  PENDING (transactionKey = null)
+    → PG에 트랜잭션 없음
+    → 폴링 횟수 초과 시 Payment ABANDONED
+    ──────────────── COMMIT (건별)
+
+  IN_PROGRESS (transactionKey 있음)
+    → GET /api/v1/payments/{transactionKey} 호출
+    → SUCCESS: Payment SUCCESS, Order CONFIRMED
+    → FAILED:  Payment FAILED,  Order CANCELED
+    → 폴링 횟수 초과 시 Payment ABANDONED
+    ──────────────── COMMIT (건별)
 ```
 
 - PG HTTP 호출은 트랜잭션 외부에서 수행한다.

@@ -24,6 +24,10 @@ spring:
       - logging.yml
       - monitoring.yml
 
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
 springdoc:
   use-fqn: true
   swagger-ui:

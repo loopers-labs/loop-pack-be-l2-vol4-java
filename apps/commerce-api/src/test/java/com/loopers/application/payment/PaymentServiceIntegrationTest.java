@@ -41,7 +41,7 @@ class PaymentServiceIntegrationTest {
         @Test
         void createsPayment_withPendingStatus_whenValidInfoIsProvided() {
             // Arrange & Act
-            Payment payment = paymentService.createPayment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            Payment payment = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
 
             // Assert
             assertAll(
@@ -61,7 +61,7 @@ class PaymentServiceIntegrationTest {
         @Test
         void startsProcessing_setsTransactionKeyAndInProgress() {
             // Arrange
-            Payment payment = paymentService.createPayment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            Payment payment = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             String transactionKey = "20260622:TR:a1b2c3";
 
             // Act
@@ -83,7 +83,7 @@ class PaymentServiceIntegrationTest {
         @Test
         void completesPayment_withSuccess() {
             // Arrange
-            Payment payment = paymentService.createPayment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            Payment payment = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             String transactionKey = "20260622:TR:a1b2c3";
             paymentService.inProgress(payment, transactionKey);
 
@@ -116,7 +116,7 @@ class PaymentServiceIntegrationTest {
         @Test
         void returnsTrue_whenSuccessPaymentExists() {
             // Arrange
-            Payment payment = paymentService.createPayment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            Payment payment = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             paymentService.inProgress(payment, "20260622:TR:a1b2c3");
             paymentService.complete("20260622:TR:a1b2c3", PaymentStatus.SUCCESS, "정상 승인되었습니다.");
 
@@ -140,11 +140,11 @@ class PaymentServiceIntegrationTest {
         @Test
         void returnsPayments_withPendingOrInProgressStatus() {
             // Arrange
-            Payment pending = paymentService.createPayment(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
-            Payment inProgress = paymentService.createPayment(2L, CardType.KB, "9876-5432-1098-7654", 30000L);
+            Payment pending = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            Payment inProgress = paymentService.createPayment(1L, 2L, CardType.KB, "9876-5432-1098-7654", 30000L);
             paymentService.inProgress(inProgress, "20260622:TR:a1b2c3");
 
-            Payment completed = paymentService.createPayment(3L, CardType.HYUNDAI, "1111-2222-3333-4444", 10000L);
+            Payment completed = paymentService.createPayment(1L, 3L, CardType.HYUNDAI, "1111-2222-3333-4444", 10000L);
             paymentService.inProgress(completed, "20260622:TR:b2c3d4");
             paymentService.complete("20260622:TR:b2c3d4", PaymentStatus.SUCCESS, "정상 승인되었습니다.");
 

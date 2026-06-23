@@ -21,7 +21,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public Payment save(Payment payment) {
         if (payment.getId() == null) {
             return paymentJpaRepository.save(
-                new PaymentEntity(payment.getOrderId(), payment.getCardType(), payment.getCardNo(), payment.getAmount())
+                new PaymentEntity(payment.getUserId(), payment.getOrderId(), payment.getCardType(), payment.getCardNo(), payment.getAmount())
             ).toDomain();
         }
         PaymentEntity entity = paymentJpaRepository.findById(payment.getId())

@@ -18,6 +18,9 @@ import java.time.ZonedDateTime;
 @Table(name = "payments")
 public class PaymentEntity extends BaseEntity {
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
@@ -51,7 +54,8 @@ public class PaymentEntity extends BaseEntity {
 
     protected PaymentEntity() {}
 
-    public PaymentEntity(Long orderId, CardType cardType, String cardNo, Long amount) {
+    public PaymentEntity(Long userId, Long orderId, CardType cardType, String cardNo, Long amount) {
+        this.userId = userId;
         this.orderId = orderId;
         this.cardType = cardType;
         this.cardNo = cardNo;
@@ -61,7 +65,7 @@ public class PaymentEntity extends BaseEntity {
     }
 
     public Payment toDomain() {
-        return new Payment(getId(), orderId, transactionKey, cardType, cardNo, amount,
+        return new Payment(getId(), userId, orderId, transactionKey, cardType, cardNo, amount,
             status, reason, pollingCount, lastPolledAt, completedAt,
             getCreatedAt(), getUpdatedAt(), getDeletedAt());
     }

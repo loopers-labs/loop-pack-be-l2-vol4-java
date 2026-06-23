@@ -10,6 +10,7 @@ import java.time.ZonedDateTime;
 @Getter
 public class Payment extends BaseDomain {
 
+    private final Long userId;
     private final Long orderId;
     private String transactionKey;
     private final CardType cardType;
@@ -21,7 +22,8 @@ public class Payment extends BaseDomain {
     private ZonedDateTime lastPolledAt;
     private ZonedDateTime completedAt;
 
-    public Payment(Long orderId, CardType cardType, String cardNo, Long amount) {
+    public Payment(Long userId, Long orderId, CardType cardType, String cardNo, Long amount) {
+        this.userId = userId;
         this.orderId = orderId;
         this.cardType = cardType;
         this.cardNo = cardNo;
@@ -30,10 +32,11 @@ public class Payment extends BaseDomain {
         this.pollingCount = 0;
     }
 
-    public Payment(Long id, Long orderId, String transactionKey, CardType cardType, String cardNo, Long amount,
+    public Payment(Long id, Long userId, Long orderId, String transactionKey, CardType cardType, String cardNo, Long amount,
                    PaymentStatus status, String reason, int pollingCount, ZonedDateTime lastPolledAt,
                    ZonedDateTime completedAt, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         this.id = id;
+        this.userId = userId;
         this.orderId = orderId;
         this.transactionKey = transactionKey;
         this.cardType = cardType;
