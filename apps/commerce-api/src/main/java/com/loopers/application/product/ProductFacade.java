@@ -5,10 +5,13 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductPage;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Component
@@ -47,13 +50,26 @@ public class ProductFacade {
 
     public ProductPageInfo searchProducts(Long brandId, String sort, String direction, Integer page, Integer size) {
         ProductPage productPage = productService.searchProducts(brandId, sort, direction, page, size);
+
+        // N+1 제거: 페이지 상품들의 brandId를 모아 브랜드를 한 번에 조회한 뒤 메모리에서 결합한다.
+        // (상품마다 brandService.getBrand()를 호출하면 20건 조회 시 1 + 20 쿼리가 발생)
+        List<Long> brandIds = productPage.products().stream()
+            .map(ProductModel::getBrandId)
+            .distinct()
+            .toList();
+        Map<Long, BrandModel> brandMap = brandService.getBrands(brandIds);
+
         List<ProductDisplayInfo> content = productPage.products().stream()
             .map(product -> {
-                BrandModel brand = brandService.getBrand(product.getBrandId());
+                BrandModel brand = brandMap.get(product.getBrandId());
+                if (brand == null) {
+                    throw new CoreException(ErrorType.NOT_FOUND,
+                        "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다.");
+                }
                 return ProductDisplayInfo.of(product, brand);
             })
             .toList();
-            
+
         return new ProductPageInfo(
             content,
             productPage.page(),

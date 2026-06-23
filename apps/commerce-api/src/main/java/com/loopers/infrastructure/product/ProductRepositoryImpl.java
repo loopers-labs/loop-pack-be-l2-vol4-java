@@ -41,6 +41,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public int increaseLikeCount(Long id) {
+        return productJpaRepository.increaseLikeCount(id);
+    }
+
+    @Override
+    public int decreaseLikeCount(Long id) {
+        return productJpaRepository.decreaseLikeCount(id);
+    }
+
+    @Override
     public List<ProductModel> findAll() {
         return queryFactory
             .selectFrom(product)
@@ -102,6 +112,12 @@ public class ProductRepositoryImpl implements ProductRepository {
                 direction == ProductSortDirection.ASC
                     ? product.getNumber("price", Long.class).asc()
                     : product.getNumber("price", Long.class).desc(),
+                product.getNumber("id", Long.class).desc()
+            );
+            case LIKE_COUNT -> query.orderBy(
+                direction == ProductSortDirection.ASC
+                    ? product.getNumber("likeCount", Long.class).asc()
+                    : product.getNumber("likeCount", Long.class).desc(),
                 product.getNumber("id", Long.class).desc()
             );
         };

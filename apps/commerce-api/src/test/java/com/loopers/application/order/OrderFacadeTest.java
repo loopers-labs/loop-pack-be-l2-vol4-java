@@ -4,8 +4,8 @@ import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.product.StockDeductionResult;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
@@ -24,11 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,12 +54,12 @@ class OrderFacadeTest {
         void createsOrder_andDeductsStock_whenRequestIsValid() {
             // arrange
             UserModel user = new UserModel("user1", "pw1");
-            ProductModel product = new ProductModel(1L, "에어맥스 90", "편한 신발", 159000L, 10);
             OrderModel order = new OrderModel(user.getId(), 318000L, 0L, 318000L, null);
-            OrderItemModel item = new OrderItemModel(order.getId(), product.getId(), "에어맥스 90", 159000L, 2);
+            OrderItemModel item = new OrderItemModel(order.getId(), 1L, "에어맥스 90", 159000L, 2);
 
             when(userService.getUser("user1", "pw1")).thenReturn(user);
-            when(productService.getProduct(anyLong())).thenReturn(product);
+            when(productService.deductStocks(any()))
+                .thenReturn(List.of(new StockDeductionResult(1L, "에어맥스 90", 159000L, 2)));
             when(orderService.createOrder(anyLong(), anyLong(), anyLong(), anyLong(), nullable(Long.class), any())).thenReturn(order);
             when(orderService.getOrderItems(anyLong())).thenReturn(List.of(item));
 
@@ -76,7 +73,7 @@ class OrderFacadeTest {
                 () -> assertThat(result.originalPrice()).isEqualTo(318000L),
                 () -> assertThat(result.items()).hasSize(1)
             );
-            verify(productService).deductStock(anyLong(), eq(2));
+            verify(productService).deductStocks(any());
         }
 
         @DisplayName("유저가 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
@@ -94,7 +91,7 @@ class OrderFacadeTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            verify(productService, never()).deductStock(anyLong(), anyInt());
+            verify(productService, never()).deductStocks(any());
         }
 
         @DisplayName("상품이 존재하지 않으면, NOT_FOUND 예외가 발생한다.")
@@ -103,7 +100,7 @@ class OrderFacadeTest {
             // arrange
             UserModel user = new UserModel("user1", "pw1");
             when(userService.getUser("user1", "pw1")).thenReturn(user);
-            when(productService.getProduct(anyLong()))
+            when(productService.deductStocks(any()))
                 .thenThrow(new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
 
             // act
@@ -122,11 +119,9 @@ class OrderFacadeTest {
         void throwsBadRequest_andDoesNotCreateOrder_whenStockIsInsufficient() {
             // arrange
             UserModel user = new UserModel("user1", "pw1");
-            ProductModel product = new ProductModel(1L, "에어맥스 90", "편한 신발", 159000L, 1);
             when(userService.getUser("user1", "pw1")).thenReturn(user);
-            when(productService.getProduct(anyLong())).thenReturn(product);
-            doThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다."))
-                .when(productService).deductStock(anyLong(), anyInt());
+            when(productService.deductStocks(any()))
+                .thenThrow(new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다."));
 
             // act
             CoreException result = assertThrows(CoreException.class, () ->

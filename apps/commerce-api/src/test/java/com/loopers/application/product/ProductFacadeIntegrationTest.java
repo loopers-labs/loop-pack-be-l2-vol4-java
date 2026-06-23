@@ -5,6 +5,9 @@ import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,6 +27,9 @@ class ProductFacadeIntegrationTest {
 
     @Autowired
     private BrandJpaRepository brandJpaRepository;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -93,6 +99,41 @@ class ProductFacadeIntegrationTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("상품 목록을 조회할 때,")
+    @Nested
+    class SearchProducts {
+
+        @DisplayName("상품마다 브랜드를 개별 조회하지 않고, 브랜드를 한 번에 조회한다. (N+1 제거)")
+        @Test
+        void doesNotFetchBrandPerProduct() {
+            // arrange: 브랜드 2개에 상품 10개를 분산 생성
+            BrandModel nike = brandJpaRepository.save(new BrandModel("나이키", "스포츠", null));
+            BrandModel adidas = brandJpaRepository.save(new BrandModel("아디다스", "스포츠", null));
+            for (int i = 0; i < 10; i++) {
+                BrandModel brand = (i % 2 == 0) ? nike : adidas;
+                productFacade.createProduct(brand.getId(), "상품" + i, "설명" + i, 1000L + i, 10);
+            }
+
+            Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+            statistics.setStatisticsEnabled(true);
+            statistics.clear();
+
+            // act
+            ProductPageInfo result = productFacade.searchProducts(null, "latest", "desc", 0, 20);
+
+            // assert
+            assertAll(
+                () -> assertThat(result.content()).hasSize(10),
+                // 상품마다 브랜드를 조회했다면 10건 이상의 쿼리가 나간다.
+                // 배치 조회면 (상품 검색 + count + 브랜드 1회) 수준으로 일정하게 유지된다.
+                () -> assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(4),
+                () -> assertThat(result.content())
+                    .extracting(ProductDisplayInfo::brandName)
+                    .containsOnly("나이키", "아디다스")
+            );
         }
     }
 }
