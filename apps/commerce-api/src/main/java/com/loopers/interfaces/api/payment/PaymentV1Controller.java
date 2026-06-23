@@ -32,4 +32,17 @@ public class PaymentV1Controller {
             loginId, loginPw, request.orderId(), request.cardType(), request.cardNo());
         return ApiResponse.success(PaymentV1Dto.PayResponse.from(info));
     }
+
+    /**
+     * pg-simulator 콜백 수신(03 §3.4). 비동기 결제 결과를 받아 결제·주문을 최종 확정한다.
+     * 인증 헤더 없는 외부 통지이며, transactionKey로 우리 결제 레코드를 찾아 처리한다(멱등).
+     */
+    @PostMapping("/callback")
+    public ApiResponse<PaymentV1Dto.PayResponse> callback(
+        @RequestBody PaymentV1Dto.CallbackRequest request
+    ) {
+        PaymentInfo info = paymentFacade.handleCallback(
+            request.transactionKey(), request.status(), request.reason());
+        return ApiResponse.success(PaymentV1Dto.PayResponse.from(info));
+    }
 }

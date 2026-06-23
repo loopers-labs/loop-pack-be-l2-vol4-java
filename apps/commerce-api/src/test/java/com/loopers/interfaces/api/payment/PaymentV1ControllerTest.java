@@ -64,4 +64,24 @@ class PaymentV1ControllerTest {
         verify(paymentFacade).pay(eq("buyer"), eq("testPw1234"), eq(7L), cardTypeCaptor.capture(), any());
         assertThat(cardTypeCaptor.getValue()).isEqualTo(CardType.SAMSUNG);
     }
+
+    @DisplayName("POST /api/v1/payments/callback — 콜백 페이로드의 transactionKey/status/reason을 Facade에 위임한다.")
+    @Test
+    void callback_delegatesToFacade() throws Exception {
+        PaymentInfo info = new PaymentInfo(10L, 7L, "20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+        when(paymentFacade.handleCallback(eq("20260623:TR:abc123"), eq(PaymentStatus.SUCCESS), any()))
+                .thenReturn(info);
+
+        PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest(
+                "20260623:TR:abc123", "000010", CardType.SAMSUNG, "1234-****-****-3456",
+                5000L, PaymentStatus.SUCCESS, null);
+
+        mockMvc.perform(post("/api/v1/payments/callback")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(callback)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCESS"));
+
+        verify(paymentFacade).handleCallback(eq("20260623:TR:abc123"), eq(PaymentStatus.SUCCESS), any());
+    }
 }

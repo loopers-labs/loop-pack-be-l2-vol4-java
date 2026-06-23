@@ -16,6 +16,21 @@ public class PaymentV1Dto {
         String cardNo
     ) {}
 
+    /**
+     * pg-simulator 콜백 페이로드(TransactionInfo). ApiResponse 래퍼 없이 raw JSON으로 전달된다.
+     * 주문 확정은 transactionKey로 찾은 우리 결제 레코드의 orderId를 신뢰하므로, 여기서는
+     * transactionKey/status/reason만 사용한다(나머지 필드는 계약 호환을 위해 수신만).
+     */
+    public record CallbackRequest(
+        String transactionKey,
+        String orderId,
+        CardType cardType,
+        String cardNo,
+        Long amount,
+        PaymentStatus status,
+        String reason
+    ) {}
+
     public record PayResponse(
         Long id,
         Long orderId,

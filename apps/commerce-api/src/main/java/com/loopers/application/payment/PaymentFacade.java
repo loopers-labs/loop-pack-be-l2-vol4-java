@@ -15,6 +15,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -65,6 +66,57 @@ public class PaymentFacade {
         PaymentModel saved = paymentRepository.save(payment);
 
         return PaymentInfo.from(saved);
+    }
+
+    /**
+     * PG 콜백 수신 처리 (03 §3.4). pg-simulator가 비동기 처리(1~5초) 후 callbackUrl로 통지하는
+     * {@code TransactionInfo}를 받아 결제와 주문을 최종 확정한다.
+     * <p>
+     * - 멱등: 이미 확정(SUCCESS/FAILED)된 결제는 중복 콜백이므로 재반영하지 않고 현재 상태를 반환한다.
+     * - 결제 행은 비관락(findByTransactionKeyForUpdate)으로 잠가 동시 확정(콜백/Reconcile)을 직렬화한다.
+     * - 주문 확정(markPaid/markFailed)이 이미 다른 경로로 끝났으면 CONFLICT를 멱등 skip 한다.
+     */
+    @Transactional
+    public PaymentInfo handleCallback(String transactionKey, PaymentStatus resultStatus, String reason) {
+        PaymentModel payment = paymentRepository.findByTransactionKeyForUpdate(transactionKey)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
+                        "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
+
+        // 이미 확정된 결제 → 중복 콜백. 재반영 없이 현재 상태 반환(멱등).
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            return PaymentInfo.from(payment);
+        }
+
+        if (resultStatus == PaymentStatus.SUCCESS) {
+            payment.markSuccess();
+            PaymentModel saved = paymentRepository.save(payment);
+            confirmOrder(payment.getOrderId(), true, null);
+            return PaymentInfo.from(saved);
+        }
+        if (resultStatus == PaymentStatus.FAILED) {
+            payment.markFailed(reason);
+            PaymentModel saved = paymentRepository.save(payment);
+            confirmOrder(payment.getOrderId(), false, reason);
+            return PaymentInfo.from(saved);
+        }
+        // PENDING 상태 콜백(비정상) — 확정 정보가 없으므로 그대로 둔다.
+        return PaymentInfo.from(payment);
+    }
+
+    /** 주문 확정 연계. 이미 다른 경로(Reconcile 등)로 확정된 주문은 CONFLICT를 멱등 skip 한다. */
+    private void confirmOrder(Long orderId, boolean success, String reason) {
+        try {
+            if (success) {
+                orderService.markPaid(orderId);
+            } else {
+                orderService.markFailed(orderId, reason);
+            }
+        } catch (CoreException e) {
+            if (e.getErrorType() != ErrorType.CONFLICT) {
+                throw e;
+            }
+            // 이미 확정된 주문 — 멱등 skip
+        }
     }
 
     /** (orderId)에 진행 중(PENDING) 또는 이미 성공(SUCCESS)한 결제가 있으면 중복 결제 차단. */

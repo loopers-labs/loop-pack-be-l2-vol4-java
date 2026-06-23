@@ -123,4 +123,77 @@ class PaymentFacadeTest {
                 .extracting("errorType").isEqualTo(ErrorType.CONFLICT);
         verify(pgClient, never()).requestPayment(any());
     }
+
+    private PaymentModel pendingPaymentFor(long orderId) {
+        PaymentModel payment = new PaymentModel(orderId, 1L, CardType.SAMSUNG, RAW_CARD, 5000L); // PENDING
+        payment.assignTransactionKey("20260623:TR:abc123");
+        return payment;
+    }
+
+    @Test
+    @DisplayName("콜백 SUCCESS: 결제를 SUCCESS로 확정하고 주문을 markPaid 한다")
+    void given_successCallback_when_handle_then_marksPaid() {
+        PaymentModel payment = pendingPaymentFor(10L);
+        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+
+        assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(orderService).markPaid(10L);
+        verify(orderService, never()).markFailed(any(), any());
+    }
+
+    @Test
+    @DisplayName("콜백 FAILED: 결제를 FAILED로 확정하고 주문을 markFailed(원복) 한다")
+    void given_failedCallback_when_handle_then_marksFailed() {
+        PaymentModel payment = pendingPaymentFor(10L);
+        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.FAILED, "한도 초과");
+
+        assertThat(info.status()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(info.reason()).isEqualTo("한도 초과");
+        verify(orderService).markFailed(10L, "한도 초과");
+        verify(orderService, never()).markPaid(any());
+    }
+
+    @Test
+    @DisplayName("중복 콜백(이미 SUCCESS): 멱등 — 주문을 다시 확정하지 않는다")
+    void given_duplicateCallback_when_handle_then_idempotentSkip() {
+        PaymentModel payment = pendingPaymentFor(10L);
+        payment.markSuccess(); // 이미 확정된 상태
+        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
+
+        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+
+        assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(orderService, never()).markPaid(any());
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("이미 확정된 주문이면 markPaid CONFLICT를 멱등 skip 한다")
+    void given_orderAlreadyConfirmed_when_successCallback_then_skipsConflict() {
+        PaymentModel payment = pendingPaymentFor(10L);
+        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderService.markPaid(10L)).thenThrow(new CoreException(ErrorType.CONFLICT, "이미 확정"));
+
+        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+
+        // 결제는 SUCCESS로 확정되고, 주문 CONFLICT는 삼켜진다(예외 전파 없음).
+        assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 transactionKey 콜백은 NOT_FOUND")
+    void given_unknownKey_when_handle_then_notFound() {
+        when(paymentRepository.findByTransactionKeyForUpdate("nope")).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> facade.handleCallback("nope", PaymentStatus.SUCCESS, null))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType").isEqualTo(ErrorType.NOT_FOUND);
+    }
 }
