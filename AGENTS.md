@@ -19,6 +19,7 @@
 | 새 기능 구조 / 책임 분배 / 인터페이스·패턴 도입 | `/design` | 단순 설계 우선, SOLID 적용 기준, Strategy/Factory/Template Method 사용 시점, **Repository port-adapter 예외** |
 | 테스트 작성 / TDD 사이클 | `/tdd` | 실전형 Red-Green-Refactor 기준 + 일반 테스트 룰 (AAA, 명명, 한 상황만, mock 남용 금지, 단위/통합/E2E 구분) |
 | 트랜잭션 / JPA / QueryDSL 흐름 분석 | `/analyze-query` | 사용자 관점의 일관성, 트랜잭션 범위, readOnly, 영속성 컨텍스트, flush/지연 로딩, 조회/쓰기 혼합 리스크 |
+| 외부 시스템 연동 설계 분석 | `/analyze-external-integration` | 결제/재고/메시징/서드파티 API 연동의 트랜잭션 경계, 상태 일관성, 실패/재시도/중복 실행 리스크 |
 
 ## Stack & Tooling
 
