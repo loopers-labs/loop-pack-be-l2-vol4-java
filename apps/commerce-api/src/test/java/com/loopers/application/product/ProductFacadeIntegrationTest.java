@@ -10,6 +10,7 @@ import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,7 @@ class ProductFacadeIntegrationTest {
     private final StockJpaRepository stockJpaRepository;
     private final BrandJpaRepository brandJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     private final AtomicLong likeUserIdSeq = new AtomicLong(1L);
 
@@ -50,7 +52,8 @@ class ProductFacadeIntegrationTest {
         ProductJpaRepository productJpaRepository,
         StockJpaRepository stockJpaRepository,
         BrandJpaRepository brandJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.productFacade = productFacade;
         this.brandFacade = brandFacade;
@@ -59,6 +62,7 @@ class ProductFacadeIntegrationTest {
         this.stockJpaRepository = stockJpaRepository;
         this.brandJpaRepository = brandJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @BeforeEach
@@ -69,6 +73,7 @@ class ProductFacadeIntegrationTest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private void softDeleteBrand(Long id) {
