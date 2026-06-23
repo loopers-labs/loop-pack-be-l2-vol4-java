@@ -27,7 +27,7 @@ public class PaymentFacade {
 
     @Transactional
     public PaymentInfo requestPayment(Long userId, String loginId, Long orderId, String cardType, String cardNo) {
-        OrderModel order = orderRepository.find(orderId)
+        OrderModel order = orderRepository.findWithLock(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
 
         if (!order.getUserId().equals(userId)) {
@@ -50,6 +50,36 @@ public class PaymentFacade {
 
         PaymentModel payment = new PaymentModel(orderId, pgResponse.transactionKey(), cardType, order.getFinalAmount());
         return PaymentInfo.from(paymentRepository.save(payment));
+    }
+
+    @Transactional
+    public void recoverPayment(Long orderId, String loginId) {
+        PaymentModel payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."));
+
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+
+        PgPaymentClientDto.TransactionResponse pgResponse = pgPaymentClient.getTransaction(loginId, payment.getTransactionKey());
+
+        if ("PENDING".equals(pgResponse.status())) {
+            return;
+        }
+
+        OrderModel order = orderRepository.find(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+
+        if ("SUCCESS".equals(pgResponse.status())) {
+            payment.confirm();
+            order.confirm();
+        } else {
+            payment.fail();
+            order.failPayment();
+        }
+
+        paymentRepository.save(payment);
+        orderRepository.save(order);
     }
 
     @Transactional

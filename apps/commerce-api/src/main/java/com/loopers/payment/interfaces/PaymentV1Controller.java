@@ -6,6 +6,7 @@ import com.loopers.support.auth.CurrentUser;
 import com.loopers.support.auth.LoginUser;
 import com.loopers.support.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +36,15 @@ public class PaymentV1Controller {
         @RequestBody PaymentV1Dto.CallbackRequest request
     ) {
         paymentFacade.handleCallback(request.transactionKey(), request.status());
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/{orderId}/recover")
+    public ApiResponse<Void> recoverPayment(
+        @CurrentUser LoginUser loginUser,
+        @PathVariable Long orderId
+    ) {
+        paymentFacade.recoverPayment(orderId, loginUser.loginId());
         return ApiResponse.success(null);
     }
 }

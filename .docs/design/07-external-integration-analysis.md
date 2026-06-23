@@ -363,3 +363,171 @@ PG는 재시도 시 동일한 결제건을 중복 생성할 수 있다.
 - PaymentFacade 구현 시 결정
 
 ---
+
+## 트레이드오프 분석 및 결정 (구현 후 기록)
+
+### 실패 케이스 분류
+
+구현 후 점검 과정에서 PG 연동의 실패 케이스를 다섯 가지로 분류했다.
+
+#### 케이스 A — PG 즉시 에러 (40% 확률)
+
+```
+[흐름]
+@Transactional {
+    order.startPayment()         → IN_PAYMENT (커밋 예정)
+    pgPaymentClient.request()    → 100~500ms 후 INTERNAL_ERROR 응답
+}
+→ 예외 발생 → 트랜잭션 롤백 → Order: PENDING_PAYMENT 복원
+```
+
+- PG가 즉시 실패를 반환하는 경우로, 트랜잭션 롤백으로 내부 상태가 깨끗하게 복원된다.
+- PG에 결제 건이 생성되지 않았으므로 추가 처리 없이 사용자가 재시도 가능.
+- **이미 처리되는 케이스 — 별도 대응 불필요.**
+
+#### 케이스 B — TimeLimiter 600ms 초과
+
+```
+[흐름]
+@Transactional {
+    order.startPayment()         → IN_PAYMENT
+    pgPaymentClient.request()    → 600ms 초과 → TimeoutException
+}
+→ 예외 발생 → 트랜잭션 롤백 → Order: PENDING_PAYMENT 복원
+→ 단, PG는 요청을 이미 수락하고 비동기 처리 중일 수 있음
+→ PG가 처리 완료 후 callbackUrl로 콜백 전송
+→ PaymentModel이 없으므로 NOT_FOUND → 콜백 무시됨
+```
+
+- Order는 PENDING_PAYMENT로 복원되어 사용자 재시도가 가능하다.
+- 사용자가 재시도하면 PG에 동일 주문에 대한 결제 건이 2개 생성될 수 있다.
+- **복구 API로 해결. 단, PaymentModel 자체가 없어 transactionKey를 알 수 없으므로 복구 API 범위 밖. Order가 PENDING_PAYMENT이므로 사용자 재결제로 진행.**
+
+> 타임아웃 후 PG가 처리한 첫 번째 건의 콜백은 NOT_FOUND로 무시되고,
+> 두 번째 결제 건의 콜백이 정상 처리된다. 실제 서비스라면 PG 측 첫 번째 건에 대한 환불 처리가 필요하지만 이 과제 범위 밖이다.
+
+#### 케이스 C — CircuitBreaker OPEN
+
+```
+[흐름]
+PG 실패율 50% 초과 → CircuitBreaker OPEN
+→ 이후 요청은 PgPaymentFallback 즉시 발동
+→ pgPaymentClient.request() 호출 자체가 일어나지 않음
+→ Fallback이 예외 던짐 → 롤백 → Order: PENDING_PAYMENT
+```
+
+- PG 호출이 아예 일어나지 않아 내부/외부 상태 불일치가 없는 가장 깔끔한 실패 케이스.
+- **설정 버그 수정으로 해결.** `spring.cloud.openfeign.circuitbreaker.enabled: true`가 local/test 프로파일에만 선언되어 있어 dev/qa/prd에서는 CB와 Fallback이 동작하지 않았다. 이를 전역 `spring:` 블록으로 이동하여 모든 프로파일에 적용했다.
+
+#### 케이스 D — PG 요청 성공, 내부 저장 실패
+
+```
+[흐름]
+@Transactional {
+    order.startPayment()         → IN_PAYMENT
+    pgPaymentClient.request()    → 성공, transactionKey 반환
+    paymentRepository.save()     → DB 일시 장애 등으로 실패
+}
+→ 예외 발생 → 트랜잭션 롤백 → Order: PENDING_PAYMENT, PaymentModel 없음
+→ PG는 PENDING → 처리 완료 → 콜백 전송 → NOT_FOUND → 무시됨
+```
+
+- 발생 확률은 매우 낮지만(DB 일시 장애), 케이스 B와 동일한 결말을 갖는다.
+- **케이스 B와 동일하게 사용자 재결제로 진행. 복구 API 범위 밖.**
+
+#### 케이스 E — 동시 결제 요청 (Race Condition)
+
+```
+[흐름 — 락 없는 경우]
+TX1: SELECT orders WHERE id=? → PENDING_PAYMENT (읽음)
+TX2: SELECT orders WHERE id=? → PENDING_PAYMENT (TX1 커밋 전, 동일 스냅샷)
+
+TX1: order.startPayment() → IN_PAYMENT (메모리), SQL은 아직 안 나감
+TX2: order.startPayment() → IN_PAYMENT (메모리, 체크 통과)
+
+TX1: pgPaymentClient.request() → PG 호출 성공
+TX2: pgPaymentClient.request() → PG 호출 성공 ← 두 번째 PG 호출 발생
+
+TX1: commit → UPDATE orders SET status='IN_PAYMENT' → 성공
+TX2: commit → UPDATE orders SET status='IN_PAYMENT' → 성공 (버전 체크 없음)
+
+결과: PG에 결제 건 2개, PaymentModel 2개 생성
+```
+
+- `order.startPayment()`의 PENDING_PAYMENT 체크는 메모리 레벨 검증이다. 두 트랜잭션이 같은 상태를 읽고 시작하면 둘 다 체크를 통과한다.
+- **비관적 락으로 해결.** `OrderJpaRepository`에 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 메서드를 추가하고, `PaymentFacade.requestPayment()`에서 결제 요청 시에만 이 메서드를 사용하도록 변경했다.
+
+```
+[흐름 — 비관적 락 적용 후]
+TX1: SELECT ... FOR UPDATE → 락 획득
+TX2: SELECT ... FOR UPDATE → TX1 커밋까지 대기
+
+TX1: startPayment() → PG 호출 → save → 커밋 → 락 해제
+TX2: 락 획득 → Order 읽음 → status: IN_PAYMENT → startPayment() BAD_REQUEST → 종료
+
+결과: PG 호출 한 번, PaymentModel 하나
+```
+
+---
+
+### 트레이드오프 결정 — 구조 선택
+
+#### 검토한 선택지
+
+**선택지 1: 현재 트랜잭션 구조 유지 + 비관적 락 + 복구 API**
+
+```
+@Transactional {
+    order.startPayment()      ← SELECT FOR UPDATE로 락 보유
+    pgPaymentClient.request() ← 락 보유 중 외부 호출 (최대 600ms)
+    paymentRepository.save()
+}
+```
+
+- 비관적 락이 PG 호출 중 DB 커넥션을 점유하는 단점이 있다.
+- 단, TimeLimiter 600ms가 상한선이므로 락 보유 시간은 최대 600ms로 제한된다.
+- PG 실패 시 자동 롤백으로 Order가 PENDING_PAYMENT로 복원된다.
+
+**선택지 2: 트랜잭션 경계 분리 + 명시적 복구 처리**
+
+```
+[TX A] order.startPayment() → 커밋 (락 해제)
+[트랜잭션 밖] pgPaymentClient.request()
+    성공 → [TX B] paymentRepository.save()
+    실패 → [TX C] order.revertToPendingPayment() ← 명시적 처리
+```
+
+- 락 보유 시간을 최소화하고 E, A, C 케이스를 구조적으로 해결한다.
+- 단, PG 실패 시 Order가 IN_PAYMENT에 고착되므로 TX C 명시적 복구가 필요하다.
+- TX C 자체가 실패할 경우 Order가 영구 고착된다.
+- B, D 케이스(타임아웃 후 PG 처리, 내부 저장 실패)는 catch 블록에서 PG 실제 처리 여부를 알 수 없으므로 여전히 복구 API가 필요하다.
+
+#### 최종 결정 — 선택지 1 (현재 구조 유지)
+
+선택지 2는 E 하나를 구조적으로 해결하기 위해 전체 트랜잭션 경계를 재설계하지만, B와 D는 어느 선택지에서도 복구 API 없이는 해결되지 않는다. 추가 복잡도 대비 실질적 이득이 없다고 판단해 선택지 1을 택했다.
+
+| 케이스 | 해결 방법 | 결과 |
+|--------|-----------|------|
+| A. PG 즉시 에러 | 기존 롤백 구조 | 자동 복원, 재시도 가능 |
+| B. TimeLimiter 초과 | 복구 API 범위 밖 | Order가 PENDING_PAYMENT로 복원되어 재결제로 진행 |
+| C. CircuitBreaker OPEN | application.yml 버그 수정 | 모든 프로파일에서 CB/Fallback 동작 |
+| D. 내부 저장 실패 | 복구 API 범위 밖 | B와 동일하게 재결제로 진행 |
+| E. 동시 요청 | 비관적 락 | TX2가 PG 호출 전에 차단됨 |
+
+---
+
+### 결정 4. 비관적 락 적용 범위
+
+- 결제 요청(`requestPayment`)에서만 `SELECT FOR UPDATE`를 사용한다.
+- 콜백 처리(`handleCallback`), 복구(`recoverPayment`) 등 다른 조회에는 일반 `find()`를 유지한다.
+- 이유: 결제 요청만이 동시 접근으로 인한 중복 PG 호출을 유발할 수 있는 경로이기 때문이다.
+
+### 결정 5. 복구 API — POST /api/v1/payments/{orderId}/recover
+
+- 콜백 미수신(B 케이스의 콜백 도달 실패 등)으로 IN_PAYMENT에 고착된 결제 건을 수동 복구한다.
+- `orderId`로 `PaymentModel`(PENDING 상태)을 찾고, PG `GET /api/v1/payments/{transactionKey}`로 실제 상태를 조회해 내부 상태를 보정한다.
+- PG가 아직 PENDING을 반환하면 상태를 변경하지 않는다 (아직 처리 중).
+- 이미 SUCCESS/FAILED 처리된 건은 멱등하게 무시한다.
+- 한계: PaymentModel이 저장되지 않은 B/D 케이스(타임아웃 롤백, 저장 실패)는 이 API로 복구할 수 없다. 해당 케이스는 Order가 PENDING_PAYMENT로 복원되어 있으므로 사용자 재결제로 해결한다.
+
+---

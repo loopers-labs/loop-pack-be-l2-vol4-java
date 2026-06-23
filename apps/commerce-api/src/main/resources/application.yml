@@ -23,6 +23,10 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
 
 springdoc:
   use-fqn: true
@@ -34,10 +38,6 @@ spring:
   config:
     activate:
       on-profile: local, test
-  cloud:
-    openfeign:
-      circuitbreaker:
-        enabled: true
 
 pg:
   url: http://localhost:8082

@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -226,6 +227,46 @@ class PaymentV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        }
+    }
+
+    @DisplayName("POST /api/v1/payments/{orderId}/recover")
+    @Nested
+    class RecoverPayment {
+
+        @DisplayName("IN_PAYMENT 주문이고 PG가 SUCCESS 반환하면, 200 OK를 반환하고 Order가 CONFIRMED된다.")
+        @Test
+        void returnsOk_andConfirmsOrder_whenPgReturnsSuccess() {
+            // arrange
+            Long orderId = savedOrderId();
+            when(pgPaymentClient.requestPayment(anyString(), any()))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-001234")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "SUCCESS", "정상 승인되었습니다."));
+
+            // act
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + orderId + "/recover", HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.CONFIRMED)
+            );
+        }
+
+        @DisplayName("존재하지 않는 orderId이면, 404를 반환한다.")
+        @Test
+        void returnsNotFound_whenPaymentNotExists() {
+            // act
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                ENDPOINT + "/999/recover", HttpMethod.POST, new HttpEntity<>(authHeaders()), Void.class);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }

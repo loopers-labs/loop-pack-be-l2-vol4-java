@@ -5,4 +5,5 @@ import java.util.Optional;
 public interface PaymentRepository {
     PaymentModel save(PaymentModel payment);
     Optional<PaymentModel> findByTransactionKey(String transactionKey);
+    Optional<PaymentModel> findByOrderId(Long orderId);
 }
