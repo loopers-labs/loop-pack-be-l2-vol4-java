@@ -25,8 +25,6 @@ public class PaymentV1Dto {
     }
 
     public record CallbackRequest(
-        String transactionKey,
-        String status,
-        String reason
+        String transactionKey
     ) {}
 }

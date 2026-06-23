@@ -35,7 +35,7 @@ public class PaymentV1Controller {
     public ApiResponse<Void> handleCallback(
         @RequestBody PaymentV1Dto.CallbackRequest request
     ) {
-        paymentFacade.handleCallback(request.transactionKey(), request.status());
+        paymentFacade.handleCallback(request.transactionKey());
         return ApiResponse.success(null);
     }
 
@@ -44,7 +44,7 @@ public class PaymentV1Controller {
         @CurrentUser LoginUser loginUser,
         @PathVariable Long orderId
     ) {
-        paymentFacade.recoverPayment(orderId, loginUser.loginId());
+        paymentFacade.recoverPayment(orderId, loginUser.id(), loginUser.loginId());
         return ApiResponse.success(null);
     }
 }

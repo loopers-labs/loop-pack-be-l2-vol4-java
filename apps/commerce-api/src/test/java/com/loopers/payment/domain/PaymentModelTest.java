@@ -21,7 +21,7 @@ class PaymentModelTest {
         void throwsBadRequest_whenOrderIdIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new PaymentModel(null, "TX-001234", "SAMSUNG", 10000L)
+                new PaymentModel(null, "TX-001234", "SAMSUNG", 10000L, "user1")
             );
 
             // assert
@@ -33,7 +33,7 @@ class PaymentModelTest {
         void throwsBadRequest_whenTransactionKeyIsNull() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new PaymentModel(1L, null, "SAMSUNG", 10000L)
+                new PaymentModel(1L, null, "SAMSUNG", 10000L, "user1")
             );
 
             // assert
@@ -45,7 +45,7 @@ class PaymentModelTest {
         void throwsBadRequest_whenTransactionKeyIsBlank() {
             // act
             CoreException result = assertThrows(CoreException.class, () ->
-                new PaymentModel(1L, " ", "SAMSUNG", 10000L)
+                new PaymentModel(1L, " ", "SAMSUNG", 10000L, "user1")
             );
 
             // assert
@@ -56,7 +56,7 @@ class PaymentModelTest {
         @Test
         void createsPayment_withPendingStatus_whenAllFieldsAreValid() {
             // arrange & act
-            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L);
+            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L, "user1");
 
             // assert
             assertAll(
@@ -75,7 +75,7 @@ class PaymentModelTest {
         @Test
         void changesStatusToSuccess_whenStatusIsPending() {
             // arrange
-            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L);
+            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L, "user1");
 
             // act
             payment.confirm();
@@ -88,7 +88,7 @@ class PaymentModelTest {
         @Test
         void doesNothing_whenStatusIsAlreadySuccess() {
             // arrange
-            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L);
+            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L, "user1");
             payment.confirm();
 
             // act & assert (예외 없이 실행)
@@ -105,7 +105,7 @@ class PaymentModelTest {
         @Test
         void changesStatusToFailed_whenStatusIsPending() {
             // arrange
-            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L);
+            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L, "user1");
 
             // act
             payment.fail();
@@ -118,7 +118,7 @@ class PaymentModelTest {
         @Test
         void doesNothing_whenStatusIsAlreadyFailed() {
             // arrange
-            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L);
+            PaymentModel payment = new PaymentModel(1L, "TX-001234", "SAMSUNG", 10000L, "user1");
             payment.fail();
 
             // act & assert (예외 없이 실행)

@@ -158,17 +158,19 @@ class PaymentV1ApiE2ETest {
     @Nested
     class HandleCallback {
 
-        @DisplayName("SUCCESS 콜백이면, 200 OK를 반환하고 주문이 CONFIRMED된다.")
+        @DisplayName("콜백 수신 시 PG 재조회 결과가 SUCCESS이면, 200 OK를 반환하고 주문이 CONFIRMED된다.")
         @Test
-        void returnsOk_andConfirmsOrder_whenSuccessCallback() {
+        void returnsOk_andConfirmsOrder_whenPgReturnsSuccess() {
             // arrange
             Long orderId = savedOrderId();
             when(pgPaymentClient.requestPayment(anyString(), any()))
                 .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
             testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
                 new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-001234")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "SUCCESS", "정상 승인되었습니다."));
 
-            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234", "SUCCESS", null);
+            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234");
 
             // act
             ResponseEntity<Void> response = testRestTemplate.exchange(
@@ -183,17 +185,19 @@ class PaymentV1ApiE2ETest {
             );
         }
 
-        @DisplayName("FAILED 콜백이면, 200 OK를 반환하고 주문이 PAYMENT_FAILED된다.")
+        @DisplayName("콜백 수신 시 PG 재조회 결과가 FAILED이면, 200 OK를 반환하고 주문이 PAYMENT_FAILED된다.")
         @Test
-        void returnsOk_andFailsOrder_whenFailedCallback() {
+        void returnsOk_andFailsOrder_whenPgReturnsFailed() {
             // arrange
             Long orderId = savedOrderId();
             when(pgPaymentClient.requestPayment(anyString(), any()))
                 .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
             testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
                 new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-001234")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "FAILED", "한도초과입니다."));
 
-            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234", "FAILED", null);
+            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234");
 
             // act
             ResponseEntity<Void> response = testRestTemplate.exchange(
@@ -208,6 +212,29 @@ class PaymentV1ApiE2ETest {
             );
         }
 
+        @DisplayName("콜백 바디의 status를 위조해도, PG 재조회 결과(FAILED)를 따른다.")
+        @Test
+        void followsPgResult_whenCallbackStatusIsForged() {
+            // arrange
+            Long orderId = savedOrderId();
+            when(pgPaymentClient.requestPayment(anyString(), any()))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+            // PG의 실제 상태는 FAILED이지만, 콜백 DTO에는 status 필드 자체가 없어 위조할 방법이 없다
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-001234")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "FAILED", "한도초과입니다."));
+
+            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234");
+
+            // act
+            testRestTemplate.exchange(ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(callback), Void.class);
+
+            // assert
+            assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_FAILED);
+        }
+
         @DisplayName("중복 콜백이면, 200 OK를 반환하고 무시된다.")
         @Test
         void returnsOk_andIgnores_whenDuplicateCallback() {
@@ -217,8 +244,10 @@ class PaymentV1ApiE2ETest {
                 .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
             testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
                 new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-001234")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "SUCCESS", "정상 승인되었습니다."));
 
-            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234", "SUCCESS", null);
+            PaymentV1Dto.CallbackRequest callback = new PaymentV1Dto.CallbackRequest("TX-001234");
             testRestTemplate.exchange(ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(callback), Void.class);
 
             // act (두 번째 콜백)
@@ -267,6 +296,34 @@ class PaymentV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("본인 주문이 아니면, 403을 반환한다.")
+        @Test
+        void returnsForbidden_whenNotOrderOwner() {
+            // arrange
+            Long orderId = savedOrderId();
+            when(pgPaymentClient.requestPayment(anyString(), any()))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-001234", "PENDING", null));
+            testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                new HttpEntity<>(new PaymentV1Dto.PaymentRequest(orderId, "SAMSUNG", "1234-5678-9012-3456"), authHeaders()), Void.class);
+
+            String otherLoginId = "user2";
+            testRestTemplate.exchange(
+                "/api/v1/users", HttpMethod.POST,
+                new HttpEntity<>(new UserV1Dto.SignUpRequest(otherLoginId, PASSWORD, "임꺽정", "test2@example.com", "2000-01-01", Gender.MALE)),
+                Void.class
+            );
+            HttpHeaders otherUserHeaders = new HttpHeaders();
+            otherUserHeaders.set("X-Loopers-LoginId", otherLoginId);
+            otherUserHeaders.set("X-Loopers-LoginPw", PASSWORD);
+
+            // act
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + orderId + "/recover", HttpMethod.POST, new HttpEntity<>(otherUserHeaders), Void.class);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         }
     }
 }

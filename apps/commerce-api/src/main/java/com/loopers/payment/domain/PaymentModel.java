@@ -29,9 +29,12 @@ public class PaymentModel extends BaseEntity {
     @Column(name = "amount", nullable = false)
     private Long amount;
 
+    @Column(name = "login_id", nullable = false)
+    private String loginId;
+
     protected PaymentModel() {}
 
-    public PaymentModel(Long orderId, String transactionKey, String cardType, Long amount) {
+    public PaymentModel(Long orderId, String transactionKey, String cardType, Long amount, String loginId) {
         if (orderId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "orderId는 비어있을 수 없습니다.");
         }
@@ -42,6 +45,7 @@ public class PaymentModel extends BaseEntity {
         this.transactionKey = transactionKey;
         this.cardType = cardType;
         this.amount = amount;
+        this.loginId = loginId;
         this.status = PaymentStatus.PENDING;
     }
 
@@ -60,4 +64,5 @@ public class PaymentModel extends BaseEntity {
     public PaymentStatus getStatus() { return status; }
     public String getCardType() { return cardType; }
     public Long getAmount() { return amount; }
+    public String getLoginId() { return loginId; }
 }
