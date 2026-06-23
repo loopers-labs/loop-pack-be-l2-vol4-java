@@ -11,4 +11,6 @@ public @interface ExternalSystemGuard {
     String value();
 
     String name() default "";
+
+    boolean retryable() default true;
 }

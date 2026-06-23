@@ -25,6 +25,10 @@ class PaymentApi(
     ): ApiResponse<PaymentDto.TransactionResponse> {
         request.validate()
 
+        paymentApplicationService.findTransactionByOrderId(userInfo.userId, request.orderId)
+            ?.let { PaymentDto.TransactionResponse.from(it) }
+            ?.let { return ApiResponse.success(it) }
+
         // 100ms ~ 500ms 지연
         Thread.sleep((100..500L).random())
 

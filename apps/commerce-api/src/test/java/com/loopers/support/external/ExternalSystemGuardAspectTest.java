@@ -4,6 +4,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +29,7 @@ class ExternalSystemGuardAspectTest {
     @Test
     void convertsFailureToServiceUnavailable_whenGuardedExternalCallFails() throws Throwable {
         // arrange
-        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.ofDefaults());
+        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.ofDefaults(), retryRegistry(1));
         Method method = GuardedClient.class.getDeclaredMethod("requestPayment");
         ExternalSystemGuard guard = method.getAnnotation(ExternalSystemGuard.class);
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
@@ -53,7 +55,7 @@ class ExternalSystemGuardAspectTest {
     @Test
     void convertsTimeoutToServiceUnavailable_whenGuardedExternalCallTimesOut() throws Throwable {
         // arrange
-        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.ofDefaults());
+        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.ofDefaults(), retryRegistry(1));
         Method method = GuardedClient.class.getDeclaredMethod("requestPayment");
         ExternalSystemGuard guard = method.getAnnotation(ExternalSystemGuard.class);
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
@@ -75,7 +77,32 @@ class ExternalSystemGuardAspectTest {
         assertThat(exception.getCustomMessage()).isEqualTo("일시적으로 결제를 사용할 수 없습니다.");
     }
 
-    @DisplayName("CircuitBreaker가 열린 상태에서는 외부 호출을 실행하지 않고 503 예외로 변환한다.")
+    @DisplayName("ExternalSystemGuard retries a transient external failure once.")
+    @Test
+    void retriesTransientFailure_whenRetryIsEnabled() throws Throwable {
+        // arrange
+        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.ofDefaults(), retryRegistry(2));
+        Method method = GuardedClient.class.getDeclaredMethod("requestPayment");
+        ExternalSystemGuard guard = method.getAnnotation(ExternalSystemGuard.class);
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        MethodSignature signature = mock(MethodSignature.class);
+
+        when(joinPoint.getSignature()).thenReturn(signature);
+        when(signature.getMethod()).thenReturn(method);
+        when(signature.getDeclaringTypeName()).thenReturn(GuardedClient.class.getName());
+        when(joinPoint.proceed())
+            .thenThrow(new ResourceAccessException("connection reset"))
+            .thenReturn("accepted");
+
+        // act
+        Object result = aspect.guard(joinPoint, guard);
+
+        // assert
+        assertThat(result).isEqualTo("accepted");
+        verify(joinPoint, times(2)).proceed();
+    }
+
+    @DisplayName("CircuitBreaker open returns fallback without executing external call.")
     @Test
     void doesNotProceedAndReturnsServiceUnavailable_whenCircuitBreakerIsOpen() throws Throwable {
         // arrange
@@ -85,7 +112,7 @@ class ExternalSystemGuardAspectTest {
             .slidingWindowSize(1)
             .waitDurationInOpenState(Duration.ofMinutes(1))
             .build();
-        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.of(config));
+        ExternalSystemGuardAspect aspect = new ExternalSystemGuardAspect(CircuitBreakerRegistry.of(config), retryRegistry(1));
         Method method = GuardedClient.class.getDeclaredMethod("requestPayment");
         ExternalSystemGuard guard = method.getAnnotation(ExternalSystemGuard.class);
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
@@ -109,6 +136,14 @@ class ExternalSystemGuardAspectTest {
         assertThat(exception.getErrorType()).isEqualTo(ErrorType.EXTERNAL_SYSTEM_UNAVAILABLE);
         assertThat(exception.getCustomMessage()).isEqualTo("일시적으로 결제를 사용할 수 없습니다.");
         verify(joinPoint, times(1)).proceed();
+    }
+
+    private RetryRegistry retryRegistry(int maxAttempts) {
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(maxAttempts)
+            .waitDuration(Duration.ZERO)
+            .build();
+        return RetryRegistry.of(config);
     }
 
     private static class GuardedClient {

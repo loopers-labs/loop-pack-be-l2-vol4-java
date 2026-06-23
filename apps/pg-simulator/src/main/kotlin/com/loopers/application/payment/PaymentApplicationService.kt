@@ -24,9 +24,19 @@ class PaymentApplicationService(
         private val RATE_INVALID_CARD = (21..30)
     }
 
+    @Transactional(readOnly = true)
+    fun findTransactionByOrderId(userId: String, orderId: String): TransactionInfo? {
+        return paymentRepository.findByOrderId(userId = userId, orderId = orderId)
+            .firstOrNull()
+            ?.let { TransactionInfo.from(it) }
+    }
+
     @Transactional
     fun createTransaction(command: PaymentCommand.CreateTransaction): TransactionInfo {
         command.validate()
+
+        findTransactionByOrderId(userId = command.userId, orderId = command.orderId)
+            ?.let { return it }
 
         val transactionKey = transactionKeyGenerator.generate()
         val payment = paymentRepository.save(
