@@ -362,19 +362,94 @@ class PaymentFacadeIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
 
-        @DisplayName("해당 orderId의 PaymentModel이 없으면, NOT_FOUND 예외가 발생한다.")
+        @DisplayName("로컬에 Payment가 없고 PG에도 거래 기록이 없으면, 변경 없이 종료된다.")
         @Test
-        void throwsNotFound_whenPaymentNotExists() {
+        void doesNothing_whenNoLocalPaymentAndPgHasNoRecord() {
             // arrange
             OrderModel order = savedOrder(1L);
+            when(pgPaymentClient.getTransactionsByOrder(anyString(), eq(order.getId().toString())))
+                .thenThrow(new CoreException(ErrorType.NOT_FOUND, "결제건이 존재하지 않습니다."));
 
-            // act
-            CoreException result = assertThrows(CoreException.class, () ->
-                paymentFacade.recoverPayment(order.getId(), 1L, "user1")
-            );
+            // act (예외 없이 실행)
+            paymentFacade.recoverPayment(order.getId(), 1L, "user1");
 
             // assert
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+            assertThat(paymentJpaRepository.findFirstByOrderIdOrderByIdDesc(order.getId())).isEmpty();
+        }
+
+        @DisplayName("로컬에 Payment가 없지만 PG에 거래가 있고 SUCCESS이면, Payment가 새로 생성되고 Order가 CONFIRMED로 변경된다.")
+        @Test
+        void createsPaymentAndConfirmsOrder_whenNoLocalPaymentButPgHasSuccess() {
+            // arrange
+            OrderModel order = savedOrder(1L);
+            when(pgPaymentClient.getTransactionsByOrder(anyString(), eq(order.getId().toString())))
+                .thenReturn(new PgPaymentClientDto.OrderTransactionsResponse(
+                    order.getId().toString(),
+                    List.of(new PgPaymentClientDto.TransactionResponse("TX-009999", "SUCCESS", "정상 승인되었습니다."))
+                ));
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-009999")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-009999", "SUCCESS", "정상 승인되었습니다."));
+
+            // act
+            paymentFacade.recoverPayment(order.getId(), 1L, "user1");
+
+            // assert
+            PaymentModel payment = paymentJpaRepository.findByTransactionKey("TX-009999").orElseThrow();
+            OrderModel updatedOrder = orderJpaRepository.findById(order.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.CONFIRMED)
+            );
+        }
+
+        @DisplayName("로컬에 Payment가 없지만 PG에 거래가 있고 FAILED이면, Payment가 새로 생성되고 Order가 PAYMENT_FAILED로 변경된다.")
+        @Test
+        void createsPaymentAndFailsOrder_whenNoLocalPaymentButPgHasFailed() {
+            // arrange
+            OrderModel order = savedOrder(1L);
+            when(pgPaymentClient.getTransactionsByOrder(anyString(), eq(order.getId().toString())))
+                .thenReturn(new PgPaymentClientDto.OrderTransactionsResponse(
+                    order.getId().toString(),
+                    List.of(new PgPaymentClientDto.TransactionResponse("TX-009999", "FAILED", "한도초과입니다."))
+                ));
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-009999")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-009999", "FAILED", "한도초과입니다."));
+
+            // act
+            paymentFacade.recoverPayment(order.getId(), 1L, "user1");
+
+            // assert
+            PaymentModel payment = paymentJpaRepository.findByTransactionKey("TX-009999").orElseThrow();
+            OrderModel updatedOrder = orderJpaRepository.findById(order.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
+            );
+        }
+
+        @DisplayName("로컬에 Payment가 없지만 PG에 거래가 있고 아직 PENDING이면, Payment는 PENDING으로 생성되고 Order는 변경되지 않는다.")
+        @Test
+        void createsPendingPayment_whenNoLocalPaymentButPgHasPending() {
+            // arrange
+            OrderModel order = savedOrder(1L);
+            when(pgPaymentClient.getTransactionsByOrder(anyString(), eq(order.getId().toString())))
+                .thenReturn(new PgPaymentClientDto.OrderTransactionsResponse(
+                    order.getId().toString(),
+                    List.of(new PgPaymentClientDto.TransactionResponse("TX-009999", "PENDING", null))
+                ));
+            when(pgPaymentClient.getTransaction(anyString(), eq("TX-009999")))
+                .thenReturn(new PgPaymentClientDto.TransactionResponse("TX-009999", "PENDING", null));
+
+            // act
+            paymentFacade.recoverPayment(order.getId(), 1L, "user1");
+
+            // assert
+            PaymentModel payment = paymentJpaRepository.findByTransactionKey("TX-009999").orElseThrow();
+            OrderModel updatedOrder = orderJpaRepository.findById(order.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT)
+            );
         }
 
         @DisplayName("이미 처리된 Payment이면, 변경 없이 무시된다.")

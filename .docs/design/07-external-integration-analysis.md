@@ -525,9 +525,9 @@ TX2: 락 획득 → Order 읽음 → status: IN_PAYMENT → startPayment() BAD_R
 | 케이스 | 해결 방법 | 결과 |
 |--------|-----------|------|
 | A. PG 즉시 에러 | 기존 롤백 구조 | 자동 복원, 재시도 가능 |
-| B. TimeLimiter 초과 | 복구 API 범위 밖 | Order가 PENDING_PAYMENT로 복원되어 재결제로 진행 |
+| B. TimeLimiter 초과 | 복구 API 확장(결정 6)으로 해결 | orderId 기반 PG 재조회로 동기화 |
 | C. CircuitBreaker OPEN | application.yml 버그 수정 | 모든 프로파일에서 CB/Fallback 동작 |
-| D. 내부 저장 실패 | 복구 API 범위 밖 | B와 동일하게 재결제로 진행 |
+| D. 내부 저장 실패 | 복구 API 확장(결정 6)으로 해결 | B와 동일하게 orderId 기반 재조회로 동기화 |
 | E. 동시 요청 | 비관적 락 | TX2가 PG 호출 전에 차단됨 |
 
 ---
@@ -544,7 +544,31 @@ TX2: 락 획득 → Order 읽음 → status: IN_PAYMENT → startPayment() BAD_R
 - `orderId`로 `PaymentModel`(PENDING 상태)을 찾고, PG `GET /api/v1/payments/{transactionKey}`로 실제 상태를 조회해 내부 상태를 보정한다.
 - PG가 아직 PENDING을 반환하면 상태를 변경하지 않는다 (아직 처리 중).
 - 이미 SUCCESS/FAILED 처리된 건은 멱등하게 무시한다.
-- 한계: PaymentModel이 저장되지 않은 B/D 케이스(타임아웃 롤백, 저장 실패)는 이 API로 복구할 수 없다. 해당 케이스는 Order가 PENDING_PAYMENT로 복원되어 있으므로 사용자 재결제로 해결한다.
+- ~~한계: PaymentModel이 저장되지 않은 B/D 케이스는 이 API로 복구할 수 없다~~ → 결정 6에서 해결.
+
+### 결정 6. 복구 API 확장 — orderId 기반 PG 재조회 (체크리스트: "타임아웃 실패 건도 결제 정보를 확인하여 반영")
+
+**문제.** 케이스 B/D(TimeLimiter 타임아웃, 내부 저장 실패)는 트랜잭션이 롤백돼 `PaymentModel` 자체가 로컬에 없다. 그래서 결정 5의 복구 API(`transactionKey` 기준 조회)는 이 케이스를 다룰 방법이 없어 "범위 밖, 사용자 재결제로 진행"이라고 덮어뒀었다. 그런데 과제 체크리스트가 "PG 요청이 타임아웃에 의해 실패되더라도 해당 결제건에 대한 정보를 확인하여 정상적으로 시스템에 반영한다"를 명시적으로 요구하고 있어, 이 부분을 다시 열었다.
+
+**해결.** PG는 `GET /api/v1/payments?orderId={orderId}` — `transactionKey`를 몰라도 주문 기준으로 PG에 실제 거래가 만들어졌는지 확인할 수 있는 API를 제공한다. `recoverPayment()`가 로컬에 `PaymentModel`이 없으면 이 API로 폴백하도록 확장했다.
+
+```
+로컬에 Payment 없음
+  → PG에 orderId로 조회
+    → PG에도 없음(404)        : 복구할 것 없음, 종료
+    → PG에 거래 있음(최신 1건) : 그 transactionKey로 단건 재조회 → PaymentModel을 새로 만들어 동기화
+```
+
+**선행 작업 — Fallback이 정상 응답을 가려버리는 문제.**
+
+Spring Cloud Circuit Breaker(Feign)는 보호된 호출에서 예외가 나면 종류를 가리지 않고 무조건 `fallback`을 거친다. 기존 `PgPaymentFallback`은 원인을 보지 않고 항상 `SERVICE_UNAVAILABLE`을 던지므로, PG가 "정말 없음(404)"이라고 정상 응답한 것까지 "서비스 장애"로 뭉개버려 — 위 폴백 로직의 "PG에도 없음" 분기를 구현할 수 없었다. 두 가지를 먼저 고쳤다.
+
+1. **`PgErrorDecoder` 추가** — PG의 HTTP 상태 코드(404/400 등)를 `CoreException(ErrorType)`으로 변환한다. 결정 1에서 "ErrorDecoder로 구현 필요"라고 적어놓고 실제로는 만든 적이 없었던 부분.
+2. **`PgPaymentFallback` → `PgPaymentFallbackFactory`로 교체** — 단순 `fallback`은 원인 예외(cause)에 접근할 수 없어 무조건 대체 응답만 가능하다. `FallbackFactory`로 바꿔 cause를 검사해, PG가 실제로 응답한 비즈니스 예외(`CoreException`, `INTERNAL_ERROR` 아닌 것)는 그대로 다시 던지고, 진짜 장애(타임아웃, CB OPEN 등)만 `SERVICE_UNAVAILABLE`로 대체한다.
+
+**한계.** PG의 주문 기준 조회는 `transactionKey/status/reason`만 주고 `cardType`/`amount`는 안 줘서, 새로 만드는 `PaymentModel`의 `cardType`은 알 수 없어 `"UNKNOWN"`으로 채운다. `amount`는 `Order.finalAmount`(우리가 PG에 요청했던 금액)를 그대로 쓴다. 둘 다 비즈니스 로직에 쓰이지 않는 메타데이터라 영향은 없다.
+
+**남은 follow-up(미구현).** Resilience4j 서킷브레이커의 실패율 통계는 이 cause 구분과 무관하게, `PgErrorDecoder`가 던진 404/400도 그대로 "실패"로 집계한다. 즉 정상적인 "없음" 응답이 반복되면 CB가 불필요하게 OPEN될 수 있다. `resilience4j.circuitbreaker.instances.pg-simulator.ignore-exceptions`로 비즈니스성 예외를 통계에서 제외하는 게 다음 단계지만, 현재 규모에서는 우선순위가 낮아 범위 밖으로 남긴다.
 
 ---
 
