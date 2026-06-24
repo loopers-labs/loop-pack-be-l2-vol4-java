@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.pg;
 
-import com.loopers.infrastructure.pg.PgApiResponse;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
@@ -8,7 +7,13 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import feign.Feign;
 import feign.Request;
 import feign.RetryableException;
+import feign.Retryer;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +41,7 @@ class PgFeignClientChaosTest {
         new WireMockServer(WireMockConfiguration.options().dynamicPort());
 
     private PgFeignClient pgFeignClient;
+    private Retry retry;
 
     @BeforeAll
     static void startWireMock() {
@@ -55,21 +61,33 @@ class PgFeignClientChaosTest {
         ObjectFactory<HttpMessageConverters> messageConverters =
             () -> new HttpMessageConverters(new MappingJackson2HttpMessageConverter());
 
-        // 실제 운영에서 사용하는 PgFeignClientConfig의 Retryer/ErrorDecoder를 그대로 사용
         pgFeignClient = Feign.builder()
             .contract(new SpringMvcContract())
             .encoder(new SpringEncoder(messageConverters))
             .decoder(config.decoder())
-            .retryer(config.retryer())
+            .retryer(Retryer.NEVER_RETRY)
             .errorDecoder(config.errorDecoder())
             .target(PgFeignClient.class, wireMockServer.baseUrl());
+
+        // 운영 설정과 동일한 구성 (단, 테스트에서는 대기 없이 즉시 재시도)
+        retry = Retry.of("pg-payment", RetryConfig.custom()
+            .maxAttempts(2)
+            .waitDuration(Duration.ZERO)
+            .retryExceptions(RetryableException.class, IOException.class)
+            .build());
+    }
+
+    private PgApiResponse.Payment requestPaymentWithRetry(PgPaymentRequest request) {
+        Supplier<PgApiResponse.Payment> supplier = Retry.decorateSupplier(retry,
+            () -> pgFeignClient.requestPayment("1", request));
+        return supplier.get();
     }
 
     @DisplayName("PG 서버가 500을 반환할 때")
     @Nested
     class When500Error {
 
-        @DisplayName("3회 연속 500이면 RetryableException이 발생하고 총 3번 요청한다.")
+        @DisplayName("2회 연속 500이면 RetryableException이 발생하고 총 2번 요청한다.")
         @Test
         void throws_afterMaxRetries_whenAllAttemptsFail() {
             // Arrange
@@ -77,39 +95,10 @@ class PgFeignClientChaosTest {
                 .willReturn(aResponse().withStatus(500)));
 
             // Act & Assert
-            assertThatThrownBy(() -> pgFeignClient.requestPayment("1", sampleRequest()))
+            assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
                 .isInstanceOf(RetryableException.class);
 
-            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
-        }
-
-        @DisplayName("500이 2번 후 3번째에 성공하면 총 3번 요청 후 정상 응답을 반환한다.")
-        @Test
-        void returns_success_onThirdAttempt() {
-            // Arrange
-            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .inScenario("retry-success")
-                .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse().withStatus(500))
-                .willSetStateTo("1st-fail"));
-
-            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .inScenario("retry-success")
-                .whenScenarioStateIs("1st-fail")
-                .willReturn(aResponse().withStatus(500))
-                .willSetStateTo("2nd-fail"));
-
-            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .inScenario("retry-success")
-                .whenScenarioStateIs("2nd-fail")
-                .willReturn(okJson("{\"data\":{\"transactionKey\":\"20260623:TR:abc123\",\"status\":\"PENDING\",\"reason\":null}}")));
-
-            // Act
-            PgApiResponse.Payment response = pgFeignClient.requestPayment("1", sampleRequest());
-
-            // Assert
-            assertThat(response.transactionKey()).isEqualTo("20260623:TR:abc123");
-            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
 
         @DisplayName("500이 1번 후 2번째에 성공하면 총 2번 요청 후 정상 응답을 반환한다.")
@@ -117,21 +106,21 @@ class PgFeignClientChaosTest {
         void returns_success_onSecondAttempt() {
             // Arrange
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .inScenario("early-retry-success")
+                .inScenario("retry-success")
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse().withStatus(500))
                 .willSetStateTo("1st-fail"));
 
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .inScenario("early-retry-success")
+                .inScenario("retry-success")
                 .whenScenarioStateIs("1st-fail")
-                .willReturn(okJson("{\"data\":{\"transactionKey\":\"20260623:TR:def456\",\"status\":\"PENDING\",\"reason\":null}}")));
+                .willReturn(okJson("{\"data\":{\"transactionKey\":\"20260623:TR:abc123\",\"status\":\"PENDING\",\"reason\":null}}")));
 
             // Act
-            PgApiResponse.Payment response = pgFeignClient.requestPayment("1", sampleRequest());
+            PgApiResponse.Payment response = requestPaymentWithRetry(sampleRequest());
 
             // Assert
-            assertThat(response.transactionKey()).isEqualTo("20260623:TR:def456");
+            assertThat(response.transactionKey()).isEqualTo("20260623:TR:abc123");
             wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
@@ -143,11 +132,14 @@ class PgFeignClientChaosTest {
         @DisplayName("1번만 요청하고 정상 응답을 반환한다.")
         @Test
         void returns_success_onFirstAttempt() {
+            // Arrange
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
                 .willReturn(okJson("{\"data\":{\"transactionKey\":\"20260623:TR:abc123\",\"status\":\"PENDING\",\"reason\":null}}")));
 
-            PgApiResponse.Payment response = pgFeignClient.requestPayment("1", sampleRequest());
+            // Act
+            PgApiResponse.Payment response = requestPaymentWithRetry(sampleRequest());
 
+            // Assert
             assertThat(response.transactionKey()).isEqualTo("20260623:TR:abc123");
             wireMockServer.verify(1, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
@@ -157,16 +149,18 @@ class PgFeignClientChaosTest {
     @Nested
     class WhenNetworkFault {
 
-        @DisplayName("3회 연속 연결 단절이면 RetryableException이 발생하고 총 3번 요청한다.")
+        @DisplayName("2회 연속 연결 단절이면 RetryableException이 발생하고 총 2번 요청한다.")
         @Test
         void throws_afterMaxRetries_whenConnectionReset() {
+            // Arrange
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
                 .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
 
-            assertThatThrownBy(() -> pgFeignClient.requestPayment("1", sampleRequest()))
+            // Act & Assert
+            assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
                 .isInstanceOf(RetryableException.class);
 
-            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
 
@@ -175,6 +169,7 @@ class PgFeignClientChaosTest {
     class WhenTimeout {
 
         private PgFeignClient pgFeignClientWithShortTimeout;
+        private Retry retryForTimeout;
 
         @BeforeEach
         void setUpWithShortTimeout() {
@@ -182,26 +177,38 @@ class PgFeignClientChaosTest {
             ObjectFactory<HttpMessageConverters> messageConverters =
                 () -> new HttpMessageConverters(new MappingJackson2HttpMessageConverter());
 
+            // 테스트 속도를 위해 read timeout을 200ms로 단축
             pgFeignClientWithShortTimeout = Feign.builder()
                 .contract(new SpringMvcContract())
                 .encoder(new SpringEncoder(messageConverters))
                 .decoder(config.decoder())
-                .retryer(config.retryer())
+                .retryer(Retryer.NEVER_RETRY)
                 .errorDecoder(config.errorDecoder())
-                .options(new Request.Options(3000, TimeUnit.MILLISECONDS, 5000, TimeUnit.MILLISECONDS, true))
+                .options(new Request.Options(200, TimeUnit.MILLISECONDS, 200, TimeUnit.MILLISECONDS, true))
                 .target(PgFeignClient.class, wireMockServer.baseUrl());
+
+            retryForTimeout = Retry.of("pg-payment-timeout", RetryConfig.custom()
+                .maxAttempts(2)
+                .waitDuration(Duration.ZERO)
+                .retryExceptions(RetryableException.class, IOException.class)
+                .build());
         }
 
-        @DisplayName("3회 모두 타임아웃이면 RetryableException이 발생하고 총 3번 요청한다.")
+        @DisplayName("2회 모두 타임아웃이면 RetryableException이 발생하고 총 2번 요청한다.")
         @Test
         void throws_afterMaxRetries_whenAllAttemptsTimeout() {
+            // Arrange
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
-                .willReturn(aResponse().withFixedDelay(6000)));
+                .willReturn(aResponse().withFixedDelay(500)));
 
-            assertThatThrownBy(() -> pgFeignClientWithShortTimeout.requestPayment("1", sampleRequest()))
+            Supplier<PgApiResponse.Payment> supplier = Retry.decorateSupplier(retryForTimeout,
+                () -> pgFeignClientWithShortTimeout.requestPayment("1", sampleRequest()));
+
+            // Act & Assert
+            assertThatThrownBy(supplier::get)
                 .isInstanceOf(RetryableException.class);
 
-            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
 

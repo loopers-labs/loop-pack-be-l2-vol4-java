@@ -18,8 +18,7 @@ public class PgFeignClientConfig {
 
     @Bean
     public Retryer retryer() {
-        // 초기 100ms 대기, 최대 500ms, 총 3번 시도 (최초 1회 + 재시도 2회)
-        return new Retryer.Default(100, 500, 3);
+        return Retryer.NEVER_RETRY;
     }
 
     @Bean

@@ -11,6 +11,7 @@ import com.loopers.infrastructure.pg.PgPaymentRequest;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +65,7 @@ public class PaymentFacade {
                     pgCallbackUrl
                 )
             );
-        } catch (FeignException e) {
+        } catch (FeignException | CallNotPermittedException e) {
             throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "PG 서버에 일시적인 오류가 발생했습니다.");
         }
 
