@@ -280,4 +280,6 @@ public class OrderTransactionService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "[productId = " + productId + "] 재고 정보를 찾을 수 없습니다."));
     }
+
 }
+

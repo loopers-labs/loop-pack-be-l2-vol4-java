@@ -10,10 +10,27 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
+/**
+ * <p><strong>인덱스 설계 (Round 5)</strong>:
+ * <ul>
+ *   <li>브랜드 필터 + 정렬: {@code (brand_id, created_at)}, {@code (brand_id, price)}, {@code (brand_id, like_count)}
+ *       — 선두 brand_id 로 거르고 다음 컬럼이 정렬을 커버해 filesort 를 제거.</li>
+ *   <li>전체(브랜드 무관) 정렬: {@code (created_at)}, {@code (price)}, {@code (like_count)}
+ *       — brand_id 선두 복합 인덱스는 brandId 가 없으면 못 쓰므로, 전체 정렬용 단일 인덱스를 별도로 둔다.</li>
+ * </ul>
+ */
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+    @Index(name = "idx_products_brand_created", columnList = "brand_id, created_at"),
+    @Index(name = "idx_products_brand_price", columnList = "brand_id, price"),
+    @Index(name = "idx_products_brand_likecount", columnList = "brand_id, like_count"),
+    @Index(name = "idx_products_created", columnList = "created_at"),
+    @Index(name = "idx_products_price", columnList = "price"),
+    @Index(name = "idx_products_likecount", columnList = "like_count")
+})
 public class ProductModel extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)
@@ -32,6 +49,13 @@ public class ProductModel extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProductStatus status;
+
+    /**
+     * 좋아요 수 (비정규화). 정렬·표시 성능을 위해 likes 테이블 집계 대신 이 컬럼을 사용한다.
+     * 좋아요 등록/취소 시 조건부 원자 UPDATE 로만 갱신되며, 엔티티 setter 는 두지 않는다.
+     */
+    @Column(name = "like_count", nullable = false)
+    private long likeCount = 0L;
 
     protected ProductModel() {}
 
@@ -96,5 +120,10 @@ public class ProductModel extends BaseEntity {
 
     public ProductStatus getStatus() {
         return status;
+    }
+
+    /** 좋아요 수 (비정규화 컬럼). */
+    public long getLikeCount() {
+        return likeCount;
     }
 }

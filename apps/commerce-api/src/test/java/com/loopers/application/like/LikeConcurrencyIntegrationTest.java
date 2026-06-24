@@ -1,6 +1,5 @@
 package com.loopers.application.like;
 
-import com.loopers.application.like.LikeApplicationService;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
@@ -22,8 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 좋아요 동시성 통합 테스트.
  *
- * <p>좋아요 수는 카운터 컬럼이 아니라 COUNT 집계로 산출하고 {@code (user_id, product_id)} UK 로
- * 멱등성을 보장하므로, 동시 요청에도 Lost Update 없이 정확히 반영되어야 한다.
+ * <p>좋아요 수는 비정규화 컬럼(products.like_count)에 조건부 원자 UPDATE 로 동기화된다.
+ * UK 로 멱등성을, 원자 UPDATE 로 동시성을 보장하므로 동시 요청에도 Lost Update 없이 정확히 반영되어야 한다.
  */
 @SpringBootTest
 class LikeConcurrencyIntegrationTest {
@@ -64,8 +63,9 @@ class LikeConcurrencyIntegrationTest {
         latch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
-        // assert — 좋아요 수는 정확히 유저 수만큼
-        assertThat(likeApplicationService.countByProductId(product.getId())).isEqualTo(threadCount);
+        // assert — like_count 가 정확히 유저 수만큼 (원자 UPDATE 로 Lost Update 없음)
+        ProductModel updated = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(updated.getLikeCount()).isEqualTo(threadCount);
     }
 
     @DisplayName("같은 유저가 동일 상품에 동시에 여러 번 좋아요해도, 좋아요는 1개만 반영된다 (멱등).")
@@ -96,7 +96,8 @@ class LikeConcurrencyIntegrationTest {
         latch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
-        // assert — 멱등: 좋아요는 1개만
-        assertThat(likeApplicationService.countByProductId(product.getId())).isEqualTo(1L);
+        // assert — 멱등: like_count 는 1 (중복 등록이 count 를 올리지 않음)
+        ProductModel updated = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(updated.getLikeCount()).isEqualTo(1L);
     }
 }

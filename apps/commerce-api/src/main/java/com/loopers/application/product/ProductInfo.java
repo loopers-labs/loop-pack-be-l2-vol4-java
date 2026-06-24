@@ -33,8 +33,8 @@ public record ProductInfo(
     Integer remainingStock,
     Long likeCount
 ) {
-    /** 사용자 상세 화면용 (브랜드명 + 재고 표시 정책 + 좋아요 수) */
-    public static ProductInfo forUser(ProductWithBrand pwb, StockModel stockModel, long likeCount) {
+    /** 사용자 상세 화면용 (브랜드명 + 재고 표시 정책 + 좋아요 수). 좋아요 수는 비정규화 컬럼 사용. */
+    public static ProductInfo forUser(ProductWithBrand pwb, StockModel stockModel) {
         ProductModel product = pwb.product();
         return new ProductInfo(
             product.getId(),
@@ -46,12 +46,12 @@ public record ProductInfo(
             null,
             stockModel.isAvailable(),
             stockModel.getDisplayQuantity(),
-            likeCount
+            product.getLikeCount()
         );
     }
 
-    /** 사용자 목록 화면용 (브랜드명 없이, 재고 표시 정책 + 좋아요 수) */
-    public static ProductInfo forUserList(ProductModel product, StockModel stockModel, long likeCount) {
+    /** 사용자 목록 화면용 (브랜드명 없이, 재고 표시 정책 + 좋아요 수). 좋아요 수는 비정규화 컬럼 사용. */
+    public static ProductInfo forUserList(ProductModel product, StockModel stockModel) {
         return new ProductInfo(
             product.getId(),
             product.getBrandId(),
@@ -62,7 +62,7 @@ public record ProductInfo(
             null,
             stockModel.isAvailable(),
             stockModel.getDisplayQuantity(),
-            likeCount
+            product.getLikeCount()
         );
     }
 
@@ -90,18 +90,21 @@ public record ProductInfo(
      */
     public static List<ProductInfo> assembleUserList(
         List<ProductModel> products,
-        List<StockModel> stocks,
-        Map<Long, Long> likeCountMap
+        List<StockModel> stocks
     ) {
         Map<Long, StockModel> stockMap = stocks.stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
         return products.stream()
-            .map(p -> forUserList(
-                p,
-                stockMap.get(p.getId()),
-                likeCountMap.getOrDefault(p.getId(), 0L)
-            ))
+            .map(p -> forUserList(p, stockMap.get(p.getId())))
             .toList();
+    }
+
+    /** 캐시된 상세 정보의 재고 필드만 최신 DB 값으로 교체한다. 재고는 캐시에서 분리되어 항상 실시간 조회된다. */
+    public ProductInfo withStock(StockModel stockModel) {
+        return new ProductInfo(
+            id, brandId, brandName, name, description, price,
+            stock, stockModel.isAvailable(), stockModel.getDisplayQuantity(), likeCount
+        );
     }
 
     /**
