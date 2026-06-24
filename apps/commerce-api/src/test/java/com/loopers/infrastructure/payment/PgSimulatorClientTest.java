@@ -35,13 +35,13 @@ class PgSimulatorClientTest {
     class RequestPayment {
 
         @Test
-        @DisplayName("orderId는 6자리로 제로패딩되고, 원본 카드번호와 X-USER-ID 헤더가 그대로 전달된다")
-        void given_request_when_pay_then_padsOrderIdAndForwardsRawCardNo() {
+        @DisplayName("orderId(TSID)는 패딩 없이 문자열로, 원본 카드번호와 X-USER-ID 헤더가 그대로 전달된다")
+        void given_request_when_pay_then_forwardsOrderIdAndRawCardNo() {
             when(feignClient.requestPayment(any(), any()))
                     .thenReturn(ApiResponse.success(new PgTransactionDto("20260622:TR:abc123", "PENDING", null)));
 
             client.requestPayment(new PgPaymentRequest(
-                    10L, 42L, CardType.SAMSUNG, "1234-5678-9814-1451", 5000L,
+                    1234567890123L, 42L, CardType.SAMSUNG, "1234-5678-9814-1451", 5000L,
                     "http://localhost:8080/api/v1/payments/callback"));
 
             ArgumentCaptor<String> userId = ArgumentCaptor.forClass(String.class);
@@ -49,7 +49,7 @@ class PgSimulatorClientTest {
             org.mockito.Mockito.verify(feignClient).requestPayment(userId.capture(), body.capture());
 
             assertThat(userId.getValue()).isEqualTo("42");
-            assertThat(body.getValue().orderId()).isEqualTo("000010");
+            assertThat(body.getValue().orderId()).isEqualTo("1234567890123");
             assertThat(body.getValue().cardType()).isEqualTo("SAMSUNG");
             assertThat(body.getValue().cardNo()).isEqualTo("1234-5678-9814-1451"); // 원본(마스킹 X)
             assertThat(body.getValue().amount()).isEqualTo(5000L);
@@ -77,8 +77,8 @@ class PgSimulatorClientTest {
         @Test
         @DisplayName("거래 목록을 도메인 VO 리스트로 매핑한다")
         void given_transactions_when_find_then_mapsList() {
-            when(feignClient.findTransactionsByOrder(eq("1"), eq("000001")))
-                    .thenReturn(ApiResponse.success(new PgOrderDto("000001", List.of(
+            when(feignClient.findTransactionsByOrder(eq("1"), eq("1")))
+                    .thenReturn(ApiResponse.success(new PgOrderDto("1", List.of(
                             new PgTransactionDto("k1", "FAILED", "한도초과"),
                             new PgTransactionDto("k2", "SUCCESS", null)
                     ))));

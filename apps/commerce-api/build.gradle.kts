@@ -17,6 +17,9 @@ dependencies {
     implementation("io.github.resilience4j:resilience4j-spring-boot3")
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
+    // 식별자 — 주문 PK를 앱 생성 TSID(Time-Sorted ID, 64bit Long)로 사용. 비순차+시간정렬.
+    implementation("io.hypersistence:hypersistence-tsid:2.1.4")
+
     // security (BCrypt 비밀번호 해싱 — 필터체인/자동설정 없이 crypto 유틸만)
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")

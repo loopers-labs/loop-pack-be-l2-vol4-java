@@ -19,6 +19,7 @@ public final class OrderEntityMapper {
                 .map(OrderEntityMapper::toItemEntity)
                 .toList();
         return new OrderEntity(
+                order.getId(),
                 order.getUserId(),
                 order.getStatus(),
                 order.getTotalAmount().getAmount(),

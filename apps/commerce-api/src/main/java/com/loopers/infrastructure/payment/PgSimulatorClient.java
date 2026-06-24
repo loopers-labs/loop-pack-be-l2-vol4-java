@@ -21,8 +21,8 @@ import java.util.List;
  * 회복성: pg-simulator는 동기 요청의 40%를 500으로 떨어뜨리므로 {@code @Retry}로 재시도하고,
  * 연속 실패가 누적되면 {@code @CircuitBreaker}가 열려 빠르게 차단한다(설정은 application.yml).
  * <p>
- * orderId 변환: 우리 도메인은 Long, pg-simulator는 "6자 이상 문자열"을 요구 → {@code %06d}로 제로패딩하고
- * 응답/콜백에서 받은 문자열은 {@link Long#parseLong}으로 되돌린다(선행 0 무시).
+ * orderId 변환: 우리 도메인은 Long(앱 생성 TSID, 13자리 이상)이라 pg-simulator의 "6자 이상 문자열" 조건을
+ * 그대로 충족 → 별도 패딩 없이 {@link String#valueOf(long)}로 문자열화한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -62,9 +62,9 @@ public class PgSimulatorClient implements PgClient {
                 .toList();
     }
 
-    /** Long orderId → pg-simulator가 요구하는 "6자 이상" 문자열. */
+    /** Long orderId(TSID) → pg-simulator 문자열. TSID는 13자리 이상이라 패딩 불필요. */
     static String toPgOrderId(Long orderId) {
-        return String.format("%06d", orderId);
+        return String.valueOf(orderId);
     }
 
     private static PgTransaction toTransaction(PgTransactionDto dto) {
