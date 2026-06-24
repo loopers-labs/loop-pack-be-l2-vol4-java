@@ -38,4 +38,66 @@ class OrderModelTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("applyPricing() 호출 시,")
+    @Nested
+    class ApplyPricing {
+
+        @DisplayName("유효한 금액으로 호출 시 totalAmount가 정확히 계산된다.")
+        @Test
+        void calculatesTotalAmount_whenValidAmountsProvided() {
+            // arrange
+            OrderModel order = new OrderModel(1L);
+
+            // act
+            order.applyPricing(100, 10);
+
+            // assert
+            assertThat(order.getOriginalAmount()).isEqualTo(100);
+            assertThat(order.getDiscountAmount()).isEqualTo(10);
+            assertThat(order.getTotalAmount()).isEqualTo(90);
+        }
+
+        @DisplayName("originalAmount가 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenOriginalAmountIsNegative() {
+            // arrange
+            OrderModel order = new OrderModel(1L);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> order.applyPricing(-1, 0));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("discountAmount가 음수이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenDiscountAmountIsNegative() {
+            // arrange
+            OrderModel order = new OrderModel(1L);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> order.applyPricing(100, -1));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("discountAmount가 originalAmount를 초과하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenDiscountExceedsOriginal() {
+            // arrange
+            OrderModel order = new OrderModel(1L);
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> order.applyPricing(100, 101));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import lombok.Getter;
 
@@ -21,7 +22,9 @@ import lombok.Getter;
  */
 @Getter
 @Entity
-@Table(name = "user_coupons")
+@Table(name = "user_coupons", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_user_coupons_user_coupon", columnNames = {"user_id", "coupon_id"})
+})
 public class UserCouponModel extends BaseEntity {
 
     @Column(name = "user_id", nullable = false, updatable = false)

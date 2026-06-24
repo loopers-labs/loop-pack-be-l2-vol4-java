@@ -18,7 +18,7 @@ public class CouponV1Dto {
         @NotBlank String name,
         @NotNull CouponType type,
         @Min(1) int value,
-        Integer minOrderAmount,
+        @Min(0) Integer minOrderAmount,
         @NotNull ZonedDateTime expiredAt
     ) {
         public CouponCreateCommand toCommand() {
@@ -30,7 +30,7 @@ public class CouponV1Dto {
         @NotBlank String name,
         @NotNull CouponType type,
         @Min(1) int value,
-        Integer minOrderAmount,
+        @Min(0) Integer minOrderAmount,
         @NotNull ZonedDateTime expiredAt
     ) {
         public CouponUpdateCommand toCommand() {

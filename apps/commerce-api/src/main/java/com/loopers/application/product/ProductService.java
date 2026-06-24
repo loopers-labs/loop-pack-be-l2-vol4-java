@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductDetail;
@@ -12,10 +13,18 @@ import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -32,8 +41,7 @@ public class ProductService {
             .orElseThrow(() -> new CoreException(ErrorType.BAD_REQUEST, "등록되지 않은 브랜드입니다."));
         brand.validateActive();
 
-        ProductModel product = new ProductModel(brand, command.name(), command.price());
-        productRepository.save(product);
+        ProductModel product = productRepository.save(new ProductModel(brand, command.name(), command.price()));
 
         StockModel stock = new StockModel(product, command.initialStock());
         stockRepository.save(stock);
@@ -42,6 +50,7 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Cacheable(value = CacheConfig.PRODUCT_DETAIL, key = "#id")
     @Transactional(readOnly = true)
     public ProductInfo getById(Long id) {
         ProductModel product = productRepository.findActiveById(id)
@@ -53,17 +62,33 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Cacheable(
+        value = CacheConfig.PRODUCT_LIST,
+        key   = "(#condition.brandId != null ? #condition.brandId : 'all') + ':' + #condition.sortType.name() + ':' + #pageable.pageNumber + ':' + #pageable.pageSize"
+    )
     @Transactional(readOnly = true)
     public Page<ProductInfo> getAll(Pageable pageable, ProductSearchCondition condition) {
-        return productRepository.findAllActive(pageable, condition)
-            .map(product -> {
-                StockModel stock = stockRepository.findByProductId(product.getId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));
-                ProductDetail detail = productDomainService.assembleDetail(product, stock);
-                return ProductInfo.from(detail);
-            });
+        Page<ProductModel> products = productRepository.findAllActive(pageable, condition);
+
+        List<Long> productIds = products.getContent().stream()
+            .map(ProductModel::getId)
+            .toList();
+
+        Map<Long, StockModel> stockByProductId = stockRepository.findAllByProductIds(productIds)
+            .stream()
+            .collect(Collectors.toMap(s -> s.getProduct().getId(), s -> s));
+
+        return products.map(product -> {
+            StockModel stock = Optional.ofNullable(stockByProductId.get(product.getId()))
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));
+            return ProductInfo.from(productDomainService.assembleDetail(product, stock));
+        });
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#id"),
+        @CacheEvict(value = CacheConfig.PRODUCT_LIST,   allEntries = true)
+    })
     @Transactional
     public ProductInfo update(Long id, ProductUpdateCommand command) {
         ProductModel product = productRepository.findActiveById(id)
@@ -78,6 +103,10 @@ public class ProductService {
         return ProductInfo.from(detail);
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#id"),
+        @CacheEvict(value = CacheConfig.PRODUCT_LIST,   allEntries = true)
+    })
     @Transactional
     public void delete(Long id) {
         ProductModel product = productRepository.findActiveById(id)

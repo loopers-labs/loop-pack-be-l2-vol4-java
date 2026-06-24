@@ -1,5 +1,6 @@
 package com.loopers.concurrency;
 
+import com.loopers.application.coupon.UserCouponService;
 import com.loopers.application.like.LikeService;
 import com.loopers.application.order.OrderCreateCommand;
 import com.loopers.application.order.OrderFacade;
@@ -16,7 +17,10 @@ import com.loopers.infrastructure.coupon.CouponJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.stock.StockJpaRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConcurrencyTest {
 
     @Autowired private LikeService likeService;
+    @Autowired private UserCouponService userCouponService;
     @Autowired private OrderFacade orderFacade;
     @Autowired private BrandJpaRepository brandJpaRepository;
     @Autowired private ProductJpaRepository productJpaRepository;
@@ -138,6 +143,50 @@ class ConcurrencyTest {
 
         UserCouponModel result = userCouponJpaRepository.findByIdWithCoupon(userCoupon.getId()).orElseThrow();
         assertThat(result.getStatus()).isEqualTo(UserCouponStatus.USED);
+    }
+
+    @DisplayName("동일 쿠폰을 동시에 발급 요청해도 단 1건만 성공하고 나머지는 CONFLICT 예외가 발생한다.")
+    @Test
+    void concurrentCouponIssuance_onlyOneSucceeds() throws InterruptedException {
+        CouponModel coupon = couponJpaRepository.save(
+            new CouponModel("동시발급테스트", CouponType.FIXED, 1_000, null, ZonedDateTime.now().plusDays(30))
+        );
+        long userId = 42L;
+
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger conflictCount = new AtomicInteger();
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    userCouponService.issue(userId, coupon.getId());
+                    successCount.incrementAndGet();
+                } catch (CoreException e) {
+                    if (e.getErrorType() == ErrorType.CONFLICT) {
+                        conflictCount.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        doneLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(conflictCount.get()).isEqualTo(threadCount - 1);
+        long dbCount = userCouponJpaRepository
+            .findAllByCouponId(coupon.getId(), PageRequest.of(0, 100))
+            .getTotalElements();
+        assertThat(dbCount).isEqualTo(1);
     }
 
     @DisplayName("동일한 상품에 여러 주문이 동시에 요청되어도 재고 이상으로 주문이 성공하지 않는다.")
