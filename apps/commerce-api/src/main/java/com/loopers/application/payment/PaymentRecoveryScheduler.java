@@ -19,5 +19,6 @@ public class PaymentRecoveryScheduler {
     @Scheduled(fixedDelayString = "${payment.recovery.fixed-delay-ms:30000}")
     public void recover() {
         paymentRecoveryService.reconcilePending();
+        paymentRecoveryService.recoverKeyless();
     }
 }

@@ -9,4 +9,7 @@ public interface PaymentGateway {
 
     /** 거래키로 PG의 현재 상태를 조회한다(복구용). PG가 응답하지 않으면 empty. */
     Optional<String> queryStatus(String transactionKey, Long userId);
+
+    /** 주문 기준으로 PG 거래 존재·상태를 조회한다(거래키 없는 건 복구용). FOUND/NOT_FOUND/UNREACHABLE로 구분. */
+    GatewayLookup queryByOrderId(Long orderId, Long userId);
 }

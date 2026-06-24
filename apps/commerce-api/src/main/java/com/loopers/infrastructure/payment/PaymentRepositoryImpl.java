@@ -6,6 +6,7 @@ import com.loopers.domain.payment.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,5 +34,10 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     @Override
     public List<PaymentModel> findAllByStatus(PaymentStatus status) {
         return paymentJpaRepository.findAllByStatusAndDeletedAtIsNull(status);
+    }
+
+    @Override
+    public List<PaymentModel> findKeylessPendingBefore(ZonedDateTime cutoff) {
+        return paymentJpaRepository.findAllByStatusAndTransactionKeyIsNullAndCreatedAtBeforeAndDeletedAtIsNull(PaymentStatus.PENDING, cutoff);
     }
 }

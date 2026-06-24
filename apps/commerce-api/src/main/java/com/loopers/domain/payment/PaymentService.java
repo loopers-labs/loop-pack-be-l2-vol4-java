@@ -69,4 +69,16 @@ public class PaymentService {
         return paymentRepository.findByTransactionKey(transactionKey)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
     }
+
+    /** 거래키 없는 결제를 주문 기준으로 실패 확정한다(PG 미접수 복구용). 이미 확정됐으면 멱등 no-op. */
+    @Transactional
+    public void failByOrderId(Long orderId, String reason) {
+        PaymentModel payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 결제를 찾을 수 없습니다."));
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+        payment.markFailed(reason);
+        eventPublisher.publishEvent(new PaymentFailed(orderId, reason));
+    }
 }

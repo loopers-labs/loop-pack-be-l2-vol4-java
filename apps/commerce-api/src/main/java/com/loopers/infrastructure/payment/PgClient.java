@@ -6,7 +6,10 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+
+import java.util.Optional;
 
 @Component
 public class PgClient {
@@ -66,5 +69,28 @@ public class PgClient {
             throw new IllegalStateException("PG 조회 응답이 비어 있습니다.");
         }
         return response.data().status();
+    }
+
+    /**
+     * 주문 기준으로 PG 거래를 조회한다(거래키 없는 건 복구용).
+     * 거래 있음 → 첫 거래 반환, PG가 404(거래 없음) → empty, 그 외 실패는 예외로 던진다.
+     */
+    public Optional<PgTransactionResponse> findByOrderId(Long orderId, Long userId) {
+        try {
+            PgApiResponse<PgOrderResponse> response = restClient.get()
+                .uri(uriBuilder -> uriBuilder.path(PAYMENTS_PATH)
+                    .queryParam("orderId", String.format("%06d", orderId))
+                    .build())
+                .header(USER_ID_HEADER, String.valueOf(userId))
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            if (response == null || response.data() == null
+                || response.data().transactions() == null || response.data().transactions().isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(response.data().transactions().get(0));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
     }
 }

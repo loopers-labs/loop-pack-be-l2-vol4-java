@@ -35,6 +35,9 @@ payment:
     callback-url: http://localhost:8080/api/v1/payments/callback
     connect-timeout-ms: 1000   # 연결 타임아웃
     read-timeout-ms: 2000      # 응답(접수) 타임아웃 — PG 요청지연 100~500ms 위 여유
+  recovery:
+    fixed-delay-ms: 30000      # 복구 스케줄러 주기
+    pending-timeout: PT5M      # 거래키 없는 PENDING을 미접수로 판단·취소하기까지의 유예
 
 resilience4j:
   circuitbreaker:

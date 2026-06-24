@@ -2,19 +2,21 @@ package com.loopers.application.payment;
 
 import com.loopers.domain.common.Money;
 import com.loopers.domain.payment.CardType;
+import com.loopers.domain.payment.GatewayLookup;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentService;
 import com.loopers.domain.payment.PaymentStatus;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,10 +37,14 @@ class PaymentRecoveryServiceTest {
     @Mock
     private PaymentService paymentService;
 
-    @InjectMocks
     private PaymentRecoveryService recoveryService;
 
-    private PaymentModel pending(String transactionKey) {
+    @BeforeEach
+    void setUp() {
+        recoveryService = new PaymentRecoveryService(paymentRepository, paymentGateway, paymentService, Duration.ofMinutes(5));
+    }
+
+    private PaymentModel payment(String transactionKey) {
         PaymentModel payment = new PaymentModel(1L, 10L, CardType.SAMSUNG, Money.of(5_000L));
         if (transactionKey != null) {
             payment.assignTransactionKey(transactionKey);
@@ -46,14 +52,14 @@ class PaymentRecoveryServiceTest {
         return payment;
     }
 
-    @DisplayName("PENDING 결제 복구 시")
+    @DisplayName("거래키 있는 PENDING 복구 시")
     @Nested
-    class Reconcile {
+    class ReconcilePending {
 
-        @DisplayName("PG 조회 결과가 SUCCESS이면 해당 결제를 성공으로 확정한다")
+        @DisplayName("PG 조회 결과가 SUCCESS이면 성공으로 확정한다")
         @Test
         void confirmsSuccess() {
-            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(pending("tx-1")));
+            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(payment("tx-1")));
             when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.of("SUCCESS"));
 
             recoveryService.reconcilePending();
@@ -61,37 +67,57 @@ class PaymentRecoveryServiceTest {
             verify(paymentService).confirm("tx-1", true, null);
         }
 
-        @DisplayName("PG 조회 결과가 FAILED이면 해당 결제를 실패로 확정한다")
-        @Test
-        void confirmsFailed() {
-            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(pending("tx-1")));
-            when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.of("FAILED"));
-
-            recoveryService.reconcilePending();
-
-            verify(paymentService).confirm(eq("tx-1"), eq(false), any());
-        }
-
         @DisplayName("PG가 응답하지 않으면(empty) 확정하지 않고 다음 주기로 미룬다")
         @Test
         void skipsWhenGatewayUnavailable() {
-            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(pending("tx-1")));
+            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(payment("tx-1")));
             when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.empty());
 
             recoveryService.reconcilePending();
 
             verify(paymentService, never()).confirm(any(), anyBoolean(), any());
         }
+    }
 
-        @DisplayName("거래키가 없는 결제는 PG 조회도 확정도 하지 않는다")
+    @DisplayName("거래키 없는 PENDING 복구(recoverKeyless) 시")
+    @Nested
+    class RecoverKeyless {
+
+        @DisplayName("PG에 거래가 있으면 거래키를 backfill하고 결과대로 확정한다")
         @Test
-        void skipsWhenNoTransactionKey() {
-            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(pending(null)));
+        void backfillsAndConfirms_whenFound() {
+            when(paymentRepository.findKeylessPendingBefore(any())).thenReturn(List.of(payment(null)));
+            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.found("tx-2", "SUCCESS"));
 
-            recoveryService.reconcilePending();
+            recoveryService.recoverKeyless();
 
-            verify(paymentGateway, never()).queryStatus(any(), any());
+            verify(paymentService).assignTransactionKey(1L, "tx-2");
+            verify(paymentService).confirm("tx-2", true, null);
+        }
+
+        @DisplayName("PG에 거래가 없으면(NOT_FOUND) 미접수로 보고 실패 처리(취소)한다")
+        @Test
+        void failsWhenNotFound() {
+            when(paymentRepository.findKeylessPendingBefore(any())).thenReturn(List.of(payment(null)));
+            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.notFound());
+
+            recoveryService.recoverKeyless();
+
+            verify(paymentService).failByOrderId(eq(1L), any());
             verify(paymentService, never()).confirm(any(), anyBoolean(), any());
+        }
+
+        @DisplayName("PG 장애(UNREACHABLE)면 취소하지 않고 다음 주기로 미룬다")
+        @Test
+        void skipsWhenUnreachable() {
+            when(paymentRepository.findKeylessPendingBefore(any())).thenReturn(List.of(payment(null)));
+            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.unreachable());
+
+            recoveryService.recoverKeyless();
+
+            verify(paymentService, never()).failByOrderId(any(), any());
+            verify(paymentService, never()).confirm(any(), anyBoolean(), any());
+            verify(paymentService, never()).assignTransactionKey(any(), any());
         }
     }
 }

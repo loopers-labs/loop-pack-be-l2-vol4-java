@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.GatewayCommand;
+import com.loopers.domain.payment.GatewayLookup;
 import com.loopers.domain.payment.GatewayResult;
 import com.loopers.domain.payment.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -39,5 +40,19 @@ public class PgPaymentGateway implements PaymentGateway {
     /** PG 조회 실패(장애 등) — 이번 복구 주기는 건너뛰고 다음 주기에 재시도. */
     private Optional<String> queryFallback(String transactionKey, Long userId, Throwable t) {
         return Optional.empty();
+    }
+
+    @CircuitBreaker(name = "pgCircuit", fallbackMethod = "queryByOrderIdFallback")
+    @Retry(name = "pgRetry")
+    @Override
+    public GatewayLookup queryByOrderId(Long orderId, Long userId) {
+        return pgClient.findByOrderId(orderId, userId)
+            .map(tx -> GatewayLookup.found(tx.transactionKey(), tx.status()))
+            .orElseGet(GatewayLookup::notFound);
+    }
+
+    /** PG 장애로 거래 유무를 알 수 없음 — UNREACHABLE로 보고 취소하지 않는다(다음 주기). */
+    private GatewayLookup queryByOrderIdFallback(Long orderId, Long userId, Throwable t) {
+        return GatewayLookup.unreachable();
     }
 }
