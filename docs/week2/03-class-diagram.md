@@ -162,7 +162,15 @@ classDiagram
 
     %% 파사드(Facade) 계층 (트랜잭션 및 흐름 제어)
     class OrderFacade {
-        +checkout(userId, request, method)
+        +createOrder(userId, request)
+    }
+    class PaymentFacade {
+        +processPayment(userId, orderId, method)
+        +handleCallback(paymentId, status)
+        +compensatePayment(paymentId)
+    }
+    class PaymentExpirationListener {
+        +onMessage(message, pattern)
     }
     class BrandAdminFacade {
         +deleteBrand(brandId)
@@ -190,9 +198,15 @@ classDiagram
     OrderFacade ..> ProductRepository
     OrderFacade ..> StockRepository
     OrderFacade ..> CouponRepository
-    OrderFacade ..> PaymentRepository
     OrderFacade ..> OrderDomainService
-    OrderFacade ..> PaymentGateway
+
+    PaymentFacade ..> PaymentRepository
+    PaymentFacade ..> OrderRepository
+    PaymentFacade ..> PaymentGateway
+    PaymentFacade ..> StockRepository
+    PaymentFacade ..> CouponRepository
+    
+    PaymentExpirationListener ..> PaymentFacade
     
     BrandAdminFacade ..> ProductRepository
     
