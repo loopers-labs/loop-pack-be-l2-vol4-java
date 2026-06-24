@@ -36,7 +36,8 @@
   - A (낙관적 락): version 컬럼으로 충돌 감지 → 충돌 시 재시도. 실패 후 예외가 사용자에게 노출될 수 있음.
   - B (비관적 락): `SELECT ... FOR UPDATE`로 먼저 온 요청이 락을 잡고, 뒤따라온 요청은 대기 후 IN_PAYMENT 상태를 확인해 BAD_REQUEST 반환.
 - 최종 결정: **B**
-- 트레이드오프: A는 충돌 시 `OptimisticLockingFailureException`이 발생하고 재시도하는데, 재시도 전에 이미 첫 번째 요청이 PG 호출까지 도달했을 수 있다. 두 번째 요청도 재시도에서 PG를 호출하면 같은 주문에 PG 거래가 2건 생긴다. B는 `SELECT FOR UPDATE`로 첫 번째 요청이 락을 잡는 순간 두 번째 요청은 DB 레벨에서 대기하다 커밋 이후 IN_PAYMENT 상태를 보고 `startPayment()` 검증에서 즉시 실패한다. PG 호출은 최대 1회로 보장된다. 락 경합 범위는 같은 `orderId`를 가진 요청끼리만이므로 전체 처리량에 미치는 영향은 미미하다.
+- 트레이드오프: A는 충돌이 감지되면 예외를 던지고 재시도하는데, 재시도 전에 이미 첫 번째 요청이 PG 호출까지 도달했을 수 있다. 두 번째 요청도 재시도에서 PG를 호출하면 같은 주문에 PG 거래가 2건 생긴다. B는 `SELECT FOR UPDATE`로 첫 번째 요청이 락을 잡는 순간 두 번째 요청은 DB에서 대기하다, 첫 번째 요청이 끝난 후 IN_PAYMENT 상태를 보고 `startPayment()` 검증에서 즉시 실패한다. PG 호출은 최대 1회로 보장된다. 락은 같은 `orderId`를 가진 요청끼리만 경합하므로 전체 처리량에 미치는 영향은 미미하다.
+- **후속 보완**: 복구 API(`recoverPayment`)에도 동일한 이유로 비관적 락을 추가했다. 복구 API와 타임아웃 직후 콜백이 동시에 들어오면 둘 다 `existingPayment.isEmpty() = true`를 읽어 PaymentModel을 중복 생성할 수 있다. 핵심은 **락 선점이 isEmpty 체크보다 반드시 앞이어야 한다는 점**이다. 순서가 반대면 두 요청 모두 isEmpty=true를 확인한 뒤 락을 잡으므로 여전히 중복이 발생한다.
 
 ---
 
@@ -46,7 +47,8 @@
   - A (PgPaymentFallback): 예외 종류에 관계없이 항상 "서비스 불가" 반환
   - B (PgPaymentFallbackFactory): PG가 실제로 응답한 에러(404, 400 등)는 그대로 전달. 진짜로 응답을 못 받았을 때(타임아웃, 서킷 브레이커 OPEN)만 "서비스 불가"로 대체.
 - 최종 결정: **B**
-- 트레이드오프: 복구 API는 "PG가 404를 반환하면 복구할 거래가 없으니 종료"라는 분기가 핵심이다. A는 예외 종류를 보지 않고 항상 `CoreException(SERVICE_UNAVAILABLE)`을 던지므로, PG가 정상적으로 404를 보냈을 때도 "장애"로 처리해 이 분기 자체가 불가능하다. B는 `cause`를 확인해 `CoreException`(PG가 직접 보낸 에러)이면 그대로 전파하고, `CallNotPermittedException`이나 `TimeoutException`처럼 PG와 통신 자체가 안 됐을 때만 `SERVICE_UNAVAILABLE`로 대체한다. `PgErrorDecoder`는 이 구조의 전제 조건으로, Feign이 4xx/5xx를 `FeignException`으로 뭉쳐버리는 것을 막고 HTTP 상태 코드를 `CoreException`으로 정확히 변환해준다.
+- 트레이드오프: 복구 API는 "PG가 404를 반환하면 복구할 거래가 없으니 종료"라는 분기가 핵심이다. A는 예외 종류를 보지 않고 항상 "서비스 불가"를 반환하므로, PG가 정상적으로 404를 보냈을 때도 "장애"로 처리해 이 분기 자체가 불가능하다. B는 실패 원인을 확인해 PG가 직접 보낸 에러(404, 400 등)면 그대로 전달하고, 타임아웃이나 서킷 브레이커 OPEN처럼 PG와 통신 자체가 안 됐을 때만 "서비스 불가"로 대체한다. `PgErrorDecoder`는 이 구조의 전제 조건으로, Feign이 4xx/5xx를 에러 종류 구분 없이 하나로 뭉쳐버리는 것을 막고 HTTP 상태 코드를 우리가 쓰는 에러 타입으로 정확히 변환해준다.
+- **후속 보완 (retry 도입 시)**: retry를 위해 FallbackFactory를 한 번 더 세분화했다. 기존에는 타임아웃·서킷 브레이커 OPEN·PG 500이 모두 "서비스 불가"로 수렴했는데, 서킷 브레이커 OPEN은 PG가 다운된 상태이므로 "서비스 불가"를 유지하고, 타임아웃·네트워크·PG 500은 일시적 실패이므로 `PgRetriableException`으로 분리했다. 이 구분이 없으면 재시도 코드에서 서킷 브레이커 OPEN인지 일시적 실패인지 알 수 없어 서킷 브레이커가 열린 상태에서도 retry가 발동되는 문제가 생긴다.
 
 ---
 
@@ -60,33 +62,15 @@
 
 ---
 
-**[결정 6] PAYMENT_FAILED 주문 재결제 허용**
+**[결정 6] 멱등키 도입 및 Retry — 일시적 PG 실패 자동 복구**
 
+- 배경: PG가 40% 확률로 즉시 실패를 반환하고 타임아웃도 발생하는 환경에서, 일시적 실패를 자동으로 재시도하면 사용자 경험이 개선된다. 단, retry는 중복 결제를 유발할 수 있어 같은 요청을 여러 번 보내도 PG가 한 번만 처리해주는 것이 보장되어야 한다.
 - 고려한 대안:
-  - A (실패 사유 구분): hard decline(한도초과/잘못된카드)은 재시도 차단, soft decline만 허용
-  - B (일괄 허용): 실패 사유에 관계없이 PAYMENT_FAILED → 재결제 허용, 카드 선택은 사용자에게 위임
+  - A (orderId 단독 멱등키): 단순하지만 재결제(PAYMENT_FAILED → 새 시도) 시 같은 키 → PG가 첫 실패 결과를 반환해 재결제 불가.
+  - B (타임스탬프 + UUID): `yyyyMMdd-HHmmss-UUID앞12자리` 형태. 발행 시각이 키에 포함되어 정렬·조회에 유리하고, UUID로 같은 초에 여러 요청이 와도 충돌 없음. 재결제 시 `startPayment()`가 다시 호출되어 새 키 생성, retry 시엔 OrderModel에 저장된 동일 키 재사용.
 - 최종 결정: **B**
-- 트레이드오프: A는 실패 사유를 코드로 구분할 수 있을 때만 의미가 있다. pg-simulator는 한도초과·잘못된카드(둘 다 hard decline) 두 가지만 반환하고, 일시적 장애 같은 soft decline 사유를 내려주지 않는다. 존재하지 않는 케이스를 처리하는 코드는 테스트할 수 없으므로 만들지 않는다. B는 PAYMENT_FAILED 상태에서 `startPayment()`를 허용하도록 조건을 추가하는 것만으로 구현이 끝난다. 같은 카드를 다시 시도해서 같은 결과가 나오는 건 사용자 선택의 문제이고, 실제 서비스에서 soft decline을 구분해 자동 재시도가 필요하다면 그때 A 방향으로 확장하면 된다.
-
----
-
-**[결정 7] 타임아웃 케이스 콜백 버그 수정 — handleCallback에 orderId 추가**
-
-- 고려한 대안:
-  - A (현행 유지): 타임아웃 케이스에서 콜백이 오면 NOT_FOUND 반환, 복구 API로 수동 보정
-  - B (orderId 추가 + 직접 복구): 콜백 바디의 orderId로 Order를 찾고, 이미 알고 있는 transactionKey로 PG에 직접 재조회해 PaymentModel 신규 생성
-- 최종 결정: **B**
-- 트레이드오프: A는 콜백 경로 자체가 타임아웃 케이스를 처리하지 못하는 설계 구멍이다. "복구 API로 나중에 고칠 수 있다"는 생각으로 방치했지만, 콜백이 유실되지 않는 한 복구 API를 호출하기 전에 콜백이 먼저 도달한다. pg-simulator는 콜백 전송 실패 시 재시도하지 않으므로, 콜백 경로가 NOT_FOUND를 반환하면 그 건은 복구 API를 수동으로 호출하지 않는 한 영구 누락된다. B는 orderId를 경로 탐색에만 사용하고 실제 상태는 PG에 재조회해 확인한다. orderId를 위조해 콜백을 보내도 얻을 수 있는 것은 "없는 Order에 대한 NOT_FOUND 유도"뿐이어서 보안 위협이 없다. 도메인 모델 변경은 OrderModel에 loginId 필드 추가뿐이며, PaymentModel이 이미 같은 이유(PG 호출 시 사용자 식별)로 loginId를 저장하므로 일관된 패턴이다.
-
----
-
-**[결정 8] recoverPayment 비관적 락 — 동시 복구 요청 시 PaymentModel 중복 생성 방지**
-
-- 고려한 대안:
-  - A (unique constraint): PaymentModel에 transactionKey unique 제약을 걸어 중복 삽입을 DB 레벨에서 차단
-  - B (비관적 락): Order에 SELECT FOR UPDATE로 락 선점 → isEmpty() 체크 → PaymentModel 생성 순으로 진행
-- 최종 결정: **B**
-- 트레이드오프: A는 중복 삽입 시 `DataIntegrityViolationException`이 발생하고 호출 측에서 예외를 잡아 멱등하게 처리하는 별도 핸들링이 필요하다. B는 DB 레벨 예외 없이 첫 번째 요청의 커밋 결과를 두 번째 요청이 자연스럽게 읽는다. 핵심은 **락 선점 위치가 isEmpty 체크보다 반드시 앞이어야 한다는 점**이다. 락을 isEmpty 이후에 잡으면 두 요청 모두 isEmpty()=true를 보고 중복 생성 경로로 진입한다. 복구 API와 타임아웃 직후 콜백이 겹치는 구간(PG 처리 완료 후 몇 초 이내)은 좁지만, 그 구간에서 중복이 발생하면 동일한 transactionKey를 가진 PaymentModel이 두 개 생겨 정합성이 영구히 깨진다.
+- 트레이드오프: 멱등키를 어디서 생성하고 어디에 저장하느냐가 핵심이다. `OrderModel.startPayment()`는 결제 시도마다 반드시 한 번 호출되는 진입점이므로 여기서 생성하고 TX1 커밋과 함께 DB에 저장하면, PG 호출 시에는 `order.getIdempotencyKey()`로 꺼내 쓰고 retry 시에도 동일한 키를 보장할 수 있다. PG 시뮬레이터 측에서는 동일 멱등키 수신 시 새 거래를 만들지 않고 기존 결과를 그대로 반환하도록 `findByIdempotencyKey` 조회를 추가했다.
+- **retry 횟수 결정 근거**: PG 즉시 실패 확률 40% 기준으로, 총 3회 시도(retry 2회) 시 누적 성공률은 `1-(0.4)³ = 93.6%`다. 4회(retry 3회)는 97.4%로 3.8%p 더 높지만 타임아웃 케이스 최악 응답 시간이 600ms 더 길어진다. 결제는 사용자가 대기하는 작업이므로 3회로 결정했다. retry 간격은 200ms 고정으로, PG 지연 범위(100~500ms)에서 일시적 부하 해소를 기다리기에 충분하다. 서킷 브레이커가 열려있을 때는 retry 없이 즉시 차단한다 — PG가 다운된 상태에서 retry는 의미가 없고, 서킷 브레이커가 "조금씩 요청을 허용해보며 PG가 회복됐는지 확인"하는 과정을 방해한다.
 
 ---
 
@@ -114,7 +98,7 @@ warmup(20명의 가상 유저) / saturation(50명의 가상 유저) / overload(8
 
 ## 🤔 고민한 점 / 막혔던 부분
 
-`@Transactional`을 같은 클래스 안에서 여러 번 나누려 했을 때 문제가 생겼다. Spring AOP는 외부에서 들어오는 프록시 호출에만 적용되므로, `this.someMethod()` 같은 내부 호출에는 트랜잭션이 적용되지 않는다. 트랜잭션1·트랜잭션 C·트랜잭션2를 한 클래스 안에서 각각 독립된 트랜잭션으로 실행하려면 AOP가 아닌 프로그래밍 방식이 필요했다. `PlatformTransactionManager`를 주입받아 `@PostConstruct`에서 `TransactionTemplate`을 초기화하는 방식으로 해결했다.
+`@Transactional`을 같은 클래스 안에서 여러 번 나누려 했을 때 문제가 생겼다. Spring은 `@Transactional`을 외부에서 메서드를 호출할 때만 적용하는데, 같은 클래스 안에서 `this.다른메서드()`를 호출하면 트랜잭션이 적용되지 않는다. 트랜잭션1·트랜잭션C·트랜잭션2를 한 클래스 안에서 각각 독립된 트랜잭션으로 실행하려면 어노테이션 방식이 아닌 코드로 직접 트랜잭션을 제어해야 했다. `TransactionTemplate`을 사용해 해결했다.
 
 ---
 
