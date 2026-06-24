@@ -7,6 +7,7 @@ import com.loopers.payment.domain.Payment;
 import com.loopers.payment.domain.PaymentErrorCode;
 import com.loopers.payment.domain.PaymentRepository;
 import com.loopers.payment.domain.PaymentStatus;
+import com.loopers.payment.domain.PgProvider;
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ class PaymentServiceTest {
 
     private static final Long ORDER_ID = 100L;
     private static final long FINAL_AMOUNT = 55_000L;
+    private static final Long PAYMENT_ID = 1L;
+    private static final String TRANSACTION_KEY = "tx-0001";
 
     private final OrderReader orderReader = mock(OrderReader.class);
     private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
@@ -89,5 +92,29 @@ class PaymentServiceTest {
                 .isInstanceOf(CoreException.class)
                 .extracting("errorCode")
                 .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("assignTransaction 은 PENDING 결제에 거래키와 provider 를 채우고 상태는 PENDING 을 유지한다")
+    void givenPendingPayment_whenAssignTransaction_thenFillsKeyAndProvider() {
+        Payment pending = Payment.create(ORDER_ID, Money.of(FINAL_AMOUNT));
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(pending));
+
+        paymentService.assignTransaction(PAYMENT_ID, TRANSACTION_KEY, PgProvider.TOSS);
+
+        assertAll(
+                () -> assertThat(pending.getTransactionKey()).isEqualTo(TRANSACTION_KEY),
+                () -> assertThat(pending.getPgProvider()).isEqualTo(PgProvider.TOSS),
+                () -> assertThat(pending.getStatus()).isEqualTo(PaymentStatus.PENDING)
+        );
+    }
+
+    @Test
+    @DisplayName("거래키를 확정할 결제가 없으면 예외가 발생한다")
+    void givenMissingPayment_whenAssignTransaction_thenThrows() {
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.assignTransaction(PAYMENT_ID, TRANSACTION_KEY, PgProvider.TOSS))
+                .isInstanceOf(CoreException.class);
     }
 }

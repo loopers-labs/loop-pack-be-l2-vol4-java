@@ -6,6 +6,7 @@ import com.loopers.order.application.OrderReader;
 import com.loopers.payment.domain.Payment;
 import com.loopers.payment.domain.PaymentErrorCode;
 import com.loopers.payment.domain.PaymentRepository;
+import com.loopers.payment.domain.PgProvider;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -35,5 +36,14 @@ public class PaymentService {
         Payment saved = paymentRepository.save(Payment.create(orderId, Money.of(order.finalAmount())));
         log.info("결제 PENDING 생성 orderId={} paymentId={} amount={}", orderId, saved.getId(), saved.getAmount().value());
         return saved;
+    }
+
+    @Transactional
+    public void assignTransaction(Long paymentId, String transactionKey, PgProvider pgProvider) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "거래키를 확정할 결제를 찾을 수 없습니다."));
+        payment.assignTransaction(transactionKey, pgProvider);
+        log.info("결제 거래키 확정 orderId={} paymentId={} transactionKey={} provider={}",
+                payment.getOrderId(), paymentId, transactionKey, pgProvider);
     }
 }
