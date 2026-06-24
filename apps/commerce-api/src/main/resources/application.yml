@@ -27,6 +27,11 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+      client:
+        config:
+          default:
+            connectTimeout: 1000  # TCP 연결 수립 대기 (ms)
+            readTimeout: 3000     # 응답 대기 (ms) — timelimiter(600ms)가 먼저 끊지만 소켓 정리 보장용
 
 resilience4j:
   circuitbreaker:

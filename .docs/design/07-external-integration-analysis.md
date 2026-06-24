@@ -420,3 +420,54 @@ if (this.status != OrderStatus.PENDING_PAYMENT && this.status != OrderStatus.PAY
 대신 시스템은 실패 사유를 따지지 않고 "재결제 가능" 상태로만 열어주고, 같은 카드를 쓸지 다른 카드를 쓸지는 사용자가 결정한다.
 
 > 참고: 실제 PG가 soft decline을 구분해서 알려준다면, 그 경우만 스케줄러로 자동 재시도하는 게 다음 단계가 된다. 지금은 범위 밖.
+
+### 결정 8. 외부 클라이언트 타임아웃 명시적 설정 — Feign / Redis
+
+TimeLimiter가 있어서 안전하다고 생각했지만, 클라이언트 레벨 타임아웃이 빠져 있으면 TimeLimiter가 스레드를 인터럽트해도 소켓은 여전히 대기 중인 채로 남을 수 있다. 각 클라이언트마다 독립적인 타임아웃을 추가했다.
+
+**Feign — connectTimeout / readTimeout 분리**
+
+HTTP 호출은 두 단계로 나뉜다.
+
+| 단계 | 타임아웃 | 걸리는 시점 | 설정값 |
+|------|---------|------------|--------|
+| TCP 연결 수립 | connectTimeout | PG 서버가 죽어있거나 네트워크가 막혔을 때 | 1,000ms |
+| 응답 대기 | readTimeout | 연결은 됐는데 PG가 응답을 보내지 않을 때 | 3,000ms |
+
+readTimeout을 3,000ms로 둔 이유: TimeLimiter(600ms)가 정상 경로에서는 먼저 끊어주지만, 인터럽트가 소켓 레벨까지 내려가지 않을 경우를 대비한 백스톱이다. TimeLimiter가 끊은 이후에도 소켓이 열려 있으면 최대 3초 뒤 Feign이 강제로 닫는다.
+
+```yaml
+# application.yml
+spring.cloud.openfeign.client.config.default:
+  connectTimeout: 1000
+  readTimeout: 3000
+```
+
+**Redis — Lettuce commandTimeout**
+
+`redis.yml`에는 `spring.data.redis.timeout` 대신 `RedisConfig`에서 `LettuceClientConfiguration`을 직접 빌드하는 구조라, yml 속성이 자동으로 반영되지 않는다. 코드에서 직접 설정해야 한다.
+
+설정 전에는 Redis 명령이 응답을 영원히 기다릴 수 있었다. Redis는 응답이 빠른 인메모리 저장소이므로, 500ms 안에 오지 않으면 장애로 판단하고 즉시 실패하는 게 맞다.
+
+```java
+// RedisConfig.java
+LettuceClientConfiguration.builder()
+    .commandTimeout(Duration.ofMillis(500))
+    ...
+```
+
+**JPA (HikariCP) — connection-timeout은 이미 설정되어 있었다**
+
+```yaml
+# jpa.yml
+connection-timeout: 3000  # 커넥션 풀에서 대기하는 최대 시간
+```
+
+**세 설정의 역할 요약**
+
+| 클라이언트 | 타임아웃 | 없으면 |
+|-----------|---------|-------|
+| Feign connectTimeout | 1,000ms | PG가 다운됐을 때 무기한 대기 |
+| Feign readTimeout | 3,000ms | TimeLimiter 인터럽트 후 소켓 좀비 |
+| Redis commandTimeout | 500ms | Redis 장애 시 요청 스레드 무기한 점유 |
+| HikariCP connection-timeout | 3,000ms | 커넥션 풀 고갈 시 요청 무기한 대기 |
