@@ -5,6 +5,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import com.loopers.support.page.PagePolicy;
+import com.loopers.support.page.ProductCursorCodec;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductCursorCodec cursorCodec;
 
     @Transactional
     public ProductModel createProduct(Long brandId, String name, String description, String imageUrl, Long price) {
@@ -43,11 +45,29 @@ public class ProductService {
         return productRepository.find(id).filter(ProductModel::isActive);
     }
 
-    /** 활성 상품 목록 — 브랜드 필터·정렬·페이지 (UC-03). */
+    /**
+     * 활성 상품 목록 — 브랜드 필터·정렬·키셋(커서) 페이지 (UC-03).
+     * 불투명 커서 문자열을 디코드해(요청 정렬과 일치 검증) 키셋 조회로 넘긴다. cursor가 비면 첫 페이지.
+     * hasNext 판별을 위해 size+1 건까지 반환될 수 있다(잘라내기는 상위에서).
+     */
     @Transactional(readOnly = true)
-    public List<ProductModel> getProducts(Long brandId, ProductSortType sort, int page, int size) {
-        PagePolicy.validate(page, size);
-        return productRepository.findActivePage(brandId, sort, page, size);
+    public List<ProductModel> getProducts(Long brandId, ProductSortType sort, String cursor, int size) {
+        PagePolicy.validateSize(size);
+        ProductSortType effectiveSort = (sort == null) ? ProductSortType.LATEST : sort;
+        ProductCursor decoded = decodeCursor(effectiveSort, cursor);
+        return productRepository.findActivePage(brandId, effectiveSort, decoded, size);
+    }
+
+    /** 빈 커서는 첫 페이지(null). 위조/손상 커서는 codec이 BAD_REQUEST로 막고, 정렬 불일치도 BAD_REQUEST. */
+    private ProductCursor decodeCursor(ProductSortType sort, String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+        ProductCursor decoded = cursorCodec.decode(cursor);
+        if (decoded.sort() != sort) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "커서의 정렬 기준이 요청 정렬과 일치하지 않습니다.");
+        }
+        return decoded;
     }
 
     /** 특정 브랜드의 활성 상품 전체 (Brand→Product cascade 전파용 — 01 §7.5). */

@@ -1,0 +1,43 @@
++-----------------------+---------+----------+----------+
+| Table                 | Op      | Msg_type | Msg_text |
++-----------------------+---------+----------+----------+
+| loopers_bench.product | analyze | status   | OK       |
++-----------------------+---------+----------+----------+
++-------------------------------------------------------------------------+
+|                                                                         |
++-------------------------------------------------------------------------+
+| === 인덱스별 크기 (테이블 vs 인덱스 트레이드오프) === |
++-------------------------------------------------------------------------+
++-----------------------------+---------+------------+
+| index_name                  | size_mb | leaf_pages |
++-----------------------------+---------+------------+
+| PRIMARY                     |    28.6 |       1828 |
+| idx_active_cover            |     8.5 |        547 |
+| idx_brand_cover             |     8.5 |        547 |
+| idx_brand_active_likes_desc |     4.5 |        289 |
+| idx_active_likes_desc       |     3.5 |        225 |
++-----------------------------+---------+------------+
++---------+------------+-----------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+
+| Table   | Non_unique | Key_name                    | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Visible | Expression |
++---------+------------+-----------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+
+| product |          0 | PRIMARY                     |            1 | id          | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes_desc |            1 | brand_id    | A         |          51 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes_desc |            2 | deleted_at  | A         |        6299 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes_desc |            3 | likes_count | D         |      101651 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes_desc |            4 | id          | D         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes_desc       |            1 | deleted_at  | A         |         365 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes_desc       |            2 | likes_count | D         |       44538 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes_desc       |            3 | id          | D         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            1 | brand_id    | A         |          51 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            2 | deleted_at  | A         |        7293 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            3 | likes_count | D         |       89585 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            4 | id          | D         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            5 | price       | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_cover             |            6 | name        | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            1 | deleted_at  | A         |         362 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            2 | likes_count | D         |       46194 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            3 | id          | D         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            4 | brand_id    | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            5 | price       | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_cover            |            6 | name        | A         |      118314 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
++---------+------------+-----------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+

@@ -1,0 +1,17 @@
++-----------------------+---------+----------+----------+
+| Table                 | Op      | Msg_type | Msg_text |
++-----------------------+---------+----------+----------+
+| loopers_bench.product | analyze | status   | OK       |
++-----------------------+---------+----------+----------+
++---------+------------+------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+
+| Table   | Non_unique | Key_name               | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Visible | Expression |
++---------+------------+------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+
+| product |          0 | PRIMARY                |            1 | id          | A         |      118404 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes |            1 | brand_id    | A         |          45 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes |            2 | deleted_at  | A         |        6603 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes |            3 | likes_count | A         |      101824 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_brand_active_likes |            4 | id          | A         |      112173 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes       |            1 | deleted_at  | A         |         365 |     NULL |   NULL | YES  | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes       |            2 | likes_count | A         |       45124 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
+| product |          1 | idx_active_likes       |            3 | id          | A         |      118404 |     NULL |   NULL |      | BTREE      |         |               | YES     | NULL       |
++---------+------------+------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+------------+

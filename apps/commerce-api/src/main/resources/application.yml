@@ -21,8 +21,14 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+
+# 좋아요 카운터 비동기 집계 토픽 (commerce-streamer가 컨슈머). key=productId 로 같은 상품은 같은 파티션.
+like-events:
+  topic: catalog.like-changed.v1
+  partitions: 3
 
 springdoc:
   use-fqn: true

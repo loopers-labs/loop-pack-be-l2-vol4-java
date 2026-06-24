@@ -17,6 +17,11 @@ public final class PagePolicy {
         if (page < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상이어야 합니다.");
         }
+        validateSize(size);
+    }
+
+    /** 키셋(커서) 페이지네이션은 page 오프셋이 없으므로 size 상한만 검증한다. */
+    public static void validateSize(int size) {
         if (size < 1 || size > MAX_SIZE) {
             throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 " + MAX_SIZE + " 이하여야 합니다.");
         }

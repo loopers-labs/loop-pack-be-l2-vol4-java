@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -29,41 +28,37 @@ public class ProductQueryService {
     private final LikeService likeService;
     private final StockService stockService;
 
-    /** 상품 상세 — 활성 Product + 활성 Brand + 재고 수량 조합. Product/Brand 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). */
+    /**
+     * 상품 상세 — 활성 Product + 활성 Brand + 재고 수량 조합 (<b>사용자 무관</b>, 캐시 가능).
+     * Product/Brand 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). 좋아요 여부는 Facade가 별도 조합한다.
+     */
     @Transactional(readOnly = true)
-    public ProductDetail getProductDetail(Long productId, Long userId) {
+    public ProductDetail getProductDetail(Long productId) {
         ProductModel product = productService.getActiveProduct(productId);
         BrandModel brand = brandService.getActiveBrand(product.getBrandId());
-        boolean liked = userId != null && likeService.isLiked(userId, productId);
         int stockQuantity = stockService.getQuantity(productId);
-        return new ProductDetail(product, brand, liked, stockQuantity);
+        return new ProductDetail(product, brand, stockQuantity);
     }
 
     /**
-     * 상품 목록 — 정렬·페이지·브랜드 필터 위에 브랜드명·좋아요 여부를 조합한다 (UC-03).
-     * 브랜드명과 좋아요 여부는 각각 한 번의 batch 조회(IN)로 채워 N+1을 피한다.
+     * 상품 목록 — 정렬·페이지·브랜드 필터 위에 브랜드명을 조합한다 (UC-03, <b>사용자 무관</b>, 캐시 가능).
+     * 브랜드명은 한 번의 batch 조회(IN)로 채워 N+1을 피한다. 좋아요 여부는 Facade가 별도 batch 조합한다.
      */
     @Transactional(readOnly = true)
-    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, int page, int size, Long userId) {
-        List<ProductModel> products = productService.getProducts(brandId, sort, page, size);
+    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, String cursor, int size) {
+        List<ProductModel> products = productService.getProducts(brandId, sort, cursor, size);
 
         List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
         Map<Long, String> brandNames = brandService.findByIds(brandIds).stream()
                 .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
 
         List<Long> productIds = products.stream().map(ProductModel::getId).toList();
-
-        Set<Long> likedIds = (userId == null)
-                ? Set.of()
-                : likeService.findLikedProductIds(userId, productIds);
-
         Map<Long, Integer> stocks = stockService.findQuantities(productIds);
 
         return products.stream()
                 .map(p -> new ProductListEntry(
                         p,
                         brandNames.get(p.getBrandId()),
-                        likedIds.contains(p.getId()),
                         stocks.getOrDefault(p.getId(), 0)))
                 .toList();
     }
