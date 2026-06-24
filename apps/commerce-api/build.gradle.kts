@@ -9,6 +9,9 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+    // openfeign (PG 연동 전송용 — resilience4j 는 게이트웨이에서 수동 조합, feign.circuitbreaker 미사용)
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     // security

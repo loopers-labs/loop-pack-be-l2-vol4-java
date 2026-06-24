@@ -34,6 +34,14 @@ decorator:
   datasource:
     enabled: false
 
+# PG(pg-simulator) 연동. callback-base-url=PG 가 결과를 통보할 우리 주소(공통),
+# 각 PG 의 요청 주소는 payment.pg.<provider>.base-url 로 둔다(멀티 PG 대비).
+payment:
+  pg:
+    callback-base-url: http://localhost:8080
+    toss:
+      base-url: http://localhost:8082
+
 ---
 spring:
   config:

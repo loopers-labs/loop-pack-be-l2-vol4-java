@@ -4,6 +4,6 @@ import com.loopers.payment.domain.CardType;
 
 public class PaymentCommand {
 
-    public record Pay(String orderNumber, CardType cardType, String cardNo) {
+    public record Pay(Long userId, String orderNumber, CardType cardType, String cardNo) {
     }
 }

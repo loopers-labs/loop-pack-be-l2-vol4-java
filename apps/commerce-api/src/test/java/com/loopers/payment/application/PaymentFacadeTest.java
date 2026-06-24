@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 
 class PaymentFacadeTest {
 
+    private static final Long USER_ID = 42L;
     private static final String ORDER_NUMBER = "20260624-000001";
     private static final long AMOUNT = 55_000L;
     private static final Long PAYMENT_ID = 1L;
@@ -39,7 +40,7 @@ class PaymentFacadeTest {
     }
 
     private PaymentCommand.Pay payCommand() {
-        return new PaymentCommand.Pay(ORDER_NUMBER, CardType.SAMSUNG, CARD_NO);
+        return new PaymentCommand.Pay(USER_ID, ORDER_NUMBER, CardType.SAMSUNG, CARD_NO);
     }
 
     @Test
@@ -71,6 +72,7 @@ class PaymentFacadeTest {
         verify(paymentGateway).request(captor.capture());
         PaymentGatewayCommand sent = captor.getValue();
         assertAll(
+                () -> assertThat(sent.userId()).isEqualTo(USER_ID),
                 () -> assertThat(sent.orderNumber()).isEqualTo(ORDER_NUMBER),
                 () -> assertThat(sent.amount()).isEqualTo(AMOUNT),
                 () -> assertThat(sent.cardType()).isEqualTo(CardType.SAMSUNG),
