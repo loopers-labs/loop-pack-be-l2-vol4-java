@@ -23,7 +23,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
 
     @Transactional
-    public Payment createPending(String orderNumber) {
+    public PaymentResult.Pending createPending(String orderNumber) {
         OrderInfo order = orderReader.findForPayment(orderNumber)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, PaymentErrorCode.PAYMENT_ORDER_NOT_FOUND));
         if (!order.payable()) {
@@ -35,7 +35,7 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(Payment.create(orderNumber, Money.of(order.finalAmount())));
         log.info("결제 PENDING 생성 orderNumber={} paymentId={} amount={}", orderNumber, saved.getId(), saved.getAmount().value());
-        return saved;
+        return new PaymentResult.Pending(saved.getId(), saved.getOrderNumber(), saved.getAmount().value());
     }
 
     @Transactional
