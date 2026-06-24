@@ -3,6 +3,7 @@ package com.loopers.infrastructure.payment;
 import com.loopers.domain.payment.GatewayCommand;
 import com.loopers.domain.payment.GatewayLookup;
 import com.loopers.domain.payment.GatewayResult;
+import com.loopers.domain.payment.GatewayStatus;
 import com.loopers.domain.payment.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -33,12 +34,13 @@ public class PgPaymentGateway implements PaymentGateway {
     @CircuitBreaker(name = "pgCircuit", fallbackMethod = "queryFallback")
     @Retry(name = "pgRetry")
     @Override
-    public Optional<String> queryStatus(String transactionKey, Long userId) {
-        return Optional.ofNullable(pgClient.getTransactionStatus(transactionKey, userId));
+    public Optional<GatewayStatus> queryStatus(String transactionKey, Long userId) {
+        PgTransactionResponse tx = pgClient.getTransactionStatus(transactionKey, userId);
+        return Optional.of(new GatewayStatus(tx.status(), tx.reason()));
     }
 
     /** PG 조회 실패(장애 등) — 이번 복구 주기는 건너뛰고 다음 주기에 재시도. */
-    private Optional<String> queryFallback(String transactionKey, Long userId, Throwable t) {
+    private Optional<GatewayStatus> queryFallback(String transactionKey, Long userId, Throwable t) {
         return Optional.empty();
     }
 
@@ -47,7 +49,7 @@ public class PgPaymentGateway implements PaymentGateway {
     @Override
     public GatewayLookup queryByOrderId(Long orderId, Long userId) {
         return pgClient.findByOrderId(orderId, userId)
-            .map(tx -> GatewayLookup.found(tx.transactionKey(), tx.status()))
+            .map(tx -> GatewayLookup.found(tx.transactionKey(), tx.status(), tx.reason()))
             .orElseGet(GatewayLookup::notFound);
     }
 

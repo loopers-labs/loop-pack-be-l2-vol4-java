@@ -6,6 +6,7 @@ import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
+import com.loopers.domain.payment.GatewayStatus;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
@@ -67,7 +68,7 @@ class PaymentCallbackSecurityIntegrationTest {
         @Test
         void confirmsByGatewayQuery() {
             Long orderId = givenPendingPayment("tx-cb");
-            when(paymentGateway.queryStatus(eq("tx-cb"), eq(USER_ID))).thenReturn(Optional.of("SUCCESS"));
+            when(paymentGateway.queryStatus(eq("tx-cb"), eq(USER_ID))).thenReturn(Optional.of(new GatewayStatus("SUCCESS", null)));
 
             paymentFacade.handleCallback("tx-cb");
 

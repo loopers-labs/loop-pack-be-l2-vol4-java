@@ -3,6 +3,7 @@ package com.loopers.application.payment;
 import com.loopers.domain.common.Money;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.GatewayLookup;
+import com.loopers.domain.payment.GatewayStatus;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
@@ -59,11 +60,11 @@ class PaymentRecoveryServiceTest {
         @Test
         void confirmsSuccess() {
             when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(payment("tx-1")));
-            when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.of("SUCCESS"));
+            when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.of(new GatewayStatus("SUCCESS", null)));
 
             recoveryService.reconcilePending();
 
-            verify(paymentService).confirmFromGatewayStatus("tx-1", "SUCCESS");
+            verify(paymentService).confirmFromGatewayStatus("tx-1", "SUCCESS", null);
         }
 
         @DisplayName("PG가 응답하지 않으면(empty) 확정하지 않고 다음 주기로 미룬다")
@@ -74,7 +75,7 @@ class PaymentRecoveryServiceTest {
 
             recoveryService.reconcilePending();
 
-            verify(paymentService, never()).confirmFromGatewayStatus(any(), any());
+            verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
         }
     }
 
@@ -86,12 +87,12 @@ class PaymentRecoveryServiceTest {
         @Test
         void backfillsAndConfirms_whenFound() {
             when(paymentRepository.findKeylessPendingBefore(any())).thenReturn(List.of(payment(null)));
-            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.found("tx-2", "SUCCESS"));
+            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.found("tx-2", "SUCCESS", null));
 
             recoveryService.recoverKeyless();
 
             verify(paymentService).assignTransactionKey(1L, "tx-2");
-            verify(paymentService).confirmFromGatewayStatus("tx-2", "SUCCESS");
+            verify(paymentService).confirmFromGatewayStatus("tx-2", "SUCCESS", null);
         }
 
         @DisplayName("PG에 거래가 없으면(NOT_FOUND) 미접수로 보고 실패 처리(취소)한다")
@@ -103,7 +104,7 @@ class PaymentRecoveryServiceTest {
             recoveryService.recoverKeyless();
 
             verify(paymentService).failByOrderId(eq(1L), any());
-            verify(paymentService, never()).confirmFromGatewayStatus(any(), any());
+            verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
         }
 
         @DisplayName("PG 장애(UNREACHABLE)면 취소하지 않고 다음 주기로 미룬다")
@@ -115,7 +116,7 @@ class PaymentRecoveryServiceTest {
             recoveryService.recoverKeyless();
 
             verify(paymentService, never()).failByOrderId(any(), any());
-            verify(paymentService, never()).confirmFromGatewayStatus(any(), any());
+            verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
             verify(paymentService, never()).assignTransactionKey(any(), any());
         }
     }

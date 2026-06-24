@@ -51,7 +51,7 @@ public class PaymentFacade {
         }
         try {
             paymentGateway.queryStatus(transactionKey, payment.getUserId())
-                .ifPresent(status -> paymentService.confirmFromGatewayStatus(transactionKey, status));
+                .ifPresent(s -> paymentService.confirmFromGatewayStatus(transactionKey, s.status(), s.reason()));
         } catch (ObjectOptimisticLockingFailureException alreadyConfirmed) {
             // 콜백·복구가 동시에 확정 — 승자가 이미 반영했으므로 no-op
         }

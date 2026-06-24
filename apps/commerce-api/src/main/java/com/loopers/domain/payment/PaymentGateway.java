@@ -7,7 +7,7 @@ public interface PaymentGateway {
     GatewayResult requestPayment(GatewayCommand command);
 
     /** PG가 응답하지 않으면 empty. */
-    Optional<String> queryStatus(String transactionKey, Long userId);
+    Optional<GatewayStatus> queryStatus(String transactionKey, Long userId);
 
     GatewayLookup queryByOrderId(Long orderId, Long userId);
 }

@@ -57,7 +57,7 @@ public class PgClient {
         return response.data().transactionKey();
     }
 
-    public String getTransactionStatus(String transactionKey, Long userId) {
+    public PgTransactionResponse getTransactionStatus(String transactionKey, Long userId) {
         PgApiResponse<PgTransactionResponse> response = restClient.get()
             .uri(PAYMENTS_PATH + "/{transactionKey}", transactionKey)
             .header(USER_ID_HEADER, String.valueOf(userId))
@@ -66,7 +66,7 @@ public class PgClient {
         if (response == null || response.data() == null) {
             throw new IllegalStateException("PG 조회 응답이 비어 있습니다.");
         }
-        return response.data().status();
+        return response.data();
     }
 
     /** PG가 404(거래 없음)면 empty, 그 외 실패는 예외로 던진다. */

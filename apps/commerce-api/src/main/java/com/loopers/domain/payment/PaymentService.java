@@ -54,11 +54,11 @@ public class PaymentService {
 
     /** PG 조회 상태를 확정으로 매핑한다(콜백·복구 공용). 확정 불가 상태(처리 중 등)는 무시. */
     @Transactional
-    public void confirmFromGatewayStatus(String transactionKey, String gatewayStatus) {
+    public void confirmFromGatewayStatus(String transactionKey, String gatewayStatus, String reason) {
         if ("SUCCESS".equals(gatewayStatus)) {
             confirm(transactionKey, true, null);
         } else if ("FAILED".equals(gatewayStatus)) {
-            confirm(transactionKey, false, "PG 조회 결과 실패");
+            confirm(transactionKey, false, reason != null ? reason : "PG 조회 결과 실패");
         }
     }
 

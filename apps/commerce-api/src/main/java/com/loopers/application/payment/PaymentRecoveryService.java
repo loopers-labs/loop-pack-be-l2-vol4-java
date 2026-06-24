@@ -40,7 +40,7 @@ public class PaymentRecoveryService {
             }
             try {
                 paymentGateway.queryStatus(payment.getTransactionKey(), payment.getUserId())
-                    .ifPresent(status -> paymentService.confirmFromGatewayStatus(payment.getTransactionKey(), status));
+                    .ifPresent(s -> paymentService.confirmFromGatewayStatus(payment.getTransactionKey(), s.status(), s.reason()));
             } catch (ObjectOptimisticLockingFailureException alreadyConfirmed) {
                 // 콜백·다른 인스턴스가 동시에 확정 — no-op, 다음 건으로 진행
             }
@@ -56,7 +56,7 @@ public class PaymentRecoveryService {
                 switch (lookup.result()) {
                     case FOUND -> {
                         paymentService.assignTransactionKey(payment.getOrderId(), lookup.transactionKey());
-                        paymentService.confirmFromGatewayStatus(lookup.transactionKey(), lookup.status());
+                        paymentService.confirmFromGatewayStatus(lookup.transactionKey(), lookup.status(), lookup.reason());
                     }
                     case NOT_FOUND -> paymentService.failByOrderId(payment.getOrderId(), "PG 미접수 (유예시간 경과)");
                     case UNREACHABLE -> {
