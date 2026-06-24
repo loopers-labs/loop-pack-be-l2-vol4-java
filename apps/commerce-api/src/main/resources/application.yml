@@ -41,6 +41,7 @@ payment:
 
 resilience4j:
   circuitbreaker:
+    circuit-breaker-aspect-order: 1   # Retry보다 바깥(order 낮을수록 바깥) — 재시도 끝난 최종 결과만 서킷에 집계
     instances:
       pgCircuit:
         sliding-window-type: COUNT_BASED
@@ -55,6 +56,7 @@ resilience4j:
         ignore-exceptions:
           - com.loopers.support.error.CoreException   # 도메인/검증 실패는 서킷 집계 제외
   retry:
+    retry-aspect-order: 2            # CircuitBreaker 안쪽 — 재시도는 서킷 내부에서 수행
     instances:
       pgRetry:
         max-attempts: 3

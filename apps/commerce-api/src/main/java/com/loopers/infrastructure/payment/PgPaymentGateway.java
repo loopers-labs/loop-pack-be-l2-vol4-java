@@ -34,7 +34,7 @@ public class PgPaymentGateway implements PaymentGateway {
     @Retry(name = "pgRetry")
     @Override
     public Optional<String> queryStatus(String transactionKey, Long userId) {
-        return Optional.of(pgClient.getTransactionStatus(transactionKey, userId));
+        return Optional.ofNullable(pgClient.getTransactionStatus(transactionKey, userId));
     }
 
     /** PG 조회 실패(장애 등) — 이번 복구 주기는 건너뛰고 다음 주기에 재시도. */
