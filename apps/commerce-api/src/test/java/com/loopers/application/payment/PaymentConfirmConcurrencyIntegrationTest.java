@@ -59,7 +59,7 @@ class PaymentConfirmConcurrencyIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("같은 결제를 여러 스레드가 동시에 실패 확정해도 재고는 한 번만 복원되고 주문은 한 번만 취소된다")
+    @DisplayName("같은 결제에 실패 확정이 동시에 여러 번 요청될 시 확정을 처리하면 재고는 한 번만 복원되고 주문은 한 번만 취소된다")
     @Test
     void compensatesOnce_whenConfirmedConcurrently() throws InterruptedException {
         // given

@@ -53,7 +53,7 @@ class OrderCompensationConcurrencyIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("같은 주문에 실패 보상이 여러 번 동시에 들어와도 재고는 한 번만 복원되고 주문은 한 번만 취소된다")
+    @DisplayName("같은 주문에 실패 보상이 동시에 여러 번 호출될 시 보상을 처리하면 재고는 한 번만 복원되고 주문은 한 번만 취소된다")
     @Test
     void restoresStockOnce_whenOnFailedConcurrently() throws InterruptedException {
         // given
