@@ -54,6 +54,13 @@ public class OrderEntity extends BaseEntity {
         return this.userId.equals(userId);
     }
 
+    public void pay() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 가능한 주문 상태가 아닙니다.");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
     private void validateUserId(Long userId) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "유저 ID는 필수입니다.");

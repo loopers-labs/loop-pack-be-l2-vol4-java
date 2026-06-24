@@ -140,4 +140,33 @@ public class OrderEntityTest {
             assertFalse(order.isOwnedBy(null));
         }
     }
+
+    @DisplayName("결제 완료 처리")
+    @Nested
+    class Pay {
+
+        @DisplayName("PENDING 상태에서 pay()를 호출하면 PAID가 된다.")
+        @Test
+        void pay_changeStatusToPaid_whenStatusIsPending() {
+            // arrange
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
+
+            // act
+            order.pay();
+
+            // assert
+            assertEquals(OrderStatus.PAID, order.getStatus());
+        }
+
+        @DisplayName("PENDING이 아닌 상태에서 pay()를 호출하면 예외가 발생한다.")
+        @Test
+        void pay_throwsException_whenStatusIsNotPending() {
+            // arrange
+            OrderEntity order = new OrderEntity(VALID_USER_ID, validSnapshot(1L));
+            order.pay();
+
+            // act & assert
+            assertThrows(CoreException.class, order::pay);
+        }
+    }
 }
