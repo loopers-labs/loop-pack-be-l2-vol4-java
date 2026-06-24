@@ -58,8 +58,18 @@ public class PaymentFacade {
                 new PaymentModel(orderId, userId, cardType, cardNo, amount));
 
         // 2) PG 요청 (DB 트랜잭션 밖, 재시도/서킷 적용) — PG로는 원본 카드번호를 보낸다.
-        PgTransaction tx = pgClient.requestPayment(
-                new PgPaymentRequest(orderId, userId, cardType, cardNo, amount, CALLBACK_URL));
+        //    재시도 소진/서킷 OPEN이면 어댑터 폴백이 CoreException(503)을 던진다. 이때 방금 만든 PENDING 결제를
+        //    FAILED로 정리해 거래키 없는 고아 PENDING이 남지 않게 한다(없으면 멱등 가드에 걸려 재결제 불가).
+        //    주문은 PENDING 그대로 둬 사용자가 다시 결제할 수 있게 한다.
+        PgTransaction tx;
+        try {
+            tx = pgClient.requestPayment(
+                    new PgPaymentRequest(orderId, userId, cardType, cardNo, amount, CALLBACK_URL));
+        } catch (RuntimeException e) {
+            payment.markFailed("PG 요청 실패: " + e.getMessage());
+            paymentRepository.save(payment);
+            throw e;
+        }
 
         // 3) 발급받은 거래키 저장. 최종 상태(SUCCESS/FAILED)는 콜백/Reconcile에서 확정.
         payment.assignTransactionKey(tx.transactionKey());

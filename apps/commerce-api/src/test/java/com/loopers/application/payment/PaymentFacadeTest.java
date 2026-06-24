@@ -24,6 +24,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -82,6 +83,32 @@ class PaymentFacadeTest {
         ArgumentCaptor<PaymentModel> saved = ArgumentCaptor.forClass(PaymentModel.class);
         verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
         assertThat(saved.getAllValues().get(0).getCardNo()).isEqualTo("1234-****-****-1451");
+    }
+
+    @Test
+    @DisplayName("PG 요청 실패(서킷 OPEN/재시도 소진): PENDING 결제를 FAILED로 정리하고 예외를 전파한다(주문 미변경)")
+    void given_pgUnavailable_when_pay_then_marksPaymentFailedAndPropagates() {
+        OrderModel order = pendingOrderOwnedBy(1L, 5000L);
+        when(orderService.getOrder(10L)).thenReturn(order);
+        when(paymentRepository.findByOrderId(10L)).thenReturn(List.of());
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(pgClient.requestPayment(any()))
+                .thenThrow(new CoreException(ErrorType.SERVICE_UNAVAILABLE, "PG 결제 요청을 처리할 수 없습니다."));
+
+        assertThatThrownBy(() -> facade.pay("loginId", "pw", 10L, CardType.SAMSUNG, RAW_CARD))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType").isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
+
+        // PENDING 저장 후 FAILED로 정리되어 다시 저장된다(최소 2회) — 최종 상태는 FAILED, 거래키 없음
+        ArgumentCaptor<PaymentModel> saved = ArgumentCaptor.forClass(PaymentModel.class);
+        verify(paymentRepository, atLeast(2)).save(saved.capture());
+        PaymentModel last = saved.getAllValues().get(saved.getAllValues().size() - 1);
+        assertThat(last.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(last.getTransactionKey()).isNull();
+
+        // 주문 상태는 건드리지 않아 재결제가 가능하다
+        verify(orderService, never()).markPaid(any());
+        verify(orderService, never()).markFailed(any(), any());
     }
 
     @Test
