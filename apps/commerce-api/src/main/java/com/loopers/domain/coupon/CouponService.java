@@ -60,4 +60,11 @@ public class CouponService {
         coupon.use();
         return template.calculateDiscount(orderAmount);
     }
+
+    @Transactional
+    public void cancel(Long couponId) {
+        IssuedCoupon coupon = issuedCouponRepository.findById(couponId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponId + "] 쿠폰을 찾을 수 없습니다."));
+        coupon.cancel();
+    }
 }

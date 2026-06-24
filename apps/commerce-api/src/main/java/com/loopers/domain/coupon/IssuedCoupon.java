@@ -53,6 +53,13 @@ public class IssuedCoupon extends BaseEntity {
         this.status = CouponStatus.USED;
     }
 
+    /** 결제 실패 보상 시 사용 취소(USED → AVAILABLE). 이미 AVAILABLE이면 멱등 no-op. */
+    public void cancel() {
+        if (this.status == CouponStatus.USED) {
+            this.status = CouponStatus.AVAILABLE;
+        }
+    }
+
     public boolean isOwnedBy(Long userId) {
         return this.userId.equals(userId);
     }
