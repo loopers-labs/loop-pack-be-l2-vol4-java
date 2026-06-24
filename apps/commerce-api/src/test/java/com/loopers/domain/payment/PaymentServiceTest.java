@@ -83,4 +83,60 @@ class PaymentServiceTest {
             verify(paymentRepository, never()).save(any(PaymentModel.class));
         }
     }
+
+    @DisplayName("결제 성공을 반영할 때(by transactionKey), ")
+    @Nested
+    class MarkSuccess {
+
+        @DisplayName("PENDING 결제를 키로 찾아 SUCCESS 로 전이하고 reason 을 기록한다.")
+        @Test
+        void marksSuccessByKey() {
+            // given
+            PaymentModel payment = PaymentModel.createPending(1L, 100L, 50_000L);
+            given(paymentRepository.findByTransactionKey("20260624:TR:abc123")).willReturn(Optional.of(payment));
+            given(paymentRepository.save(any(PaymentModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentModel result = paymentService.markSuccess("20260624:TR:abc123", "정상 승인");
+
+            // then
+            assertThat(result.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(result.getReason()).isEqualTo("정상 승인");
+        }
+
+        @DisplayName("키로 결제를 찾지 못하면, PAYMENT_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsPaymentNotFound_whenKeyMissing() {
+            // given
+            given(paymentRepository.findByTransactionKey("unknown")).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> paymentService.markSuccess("unknown", "정상 승인"));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.PAYMENT_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("결제 실패를 반영할 때(by transactionKey), ")
+    @Nested
+    class MarkFailed {
+
+        @DisplayName("PENDING 결제를 키로 찾아 FAILED 로 전이하고 reason 을 기록한다.")
+        @Test
+        void marksFailedByKey() {
+            // given
+            PaymentModel payment = PaymentModel.createPending(1L, 100L, 50_000L);
+            given(paymentRepository.findByTransactionKey("20260624:TR:abc123")).willReturn(Optional.of(payment));
+            given(paymentRepository.save(any(PaymentModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentModel result = paymentService.markFailed("20260624:TR:abc123", "한도초과");
+
+            // then
+            assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
+            assertThat(result.getReason()).isEqualTo("한도초과");
+        }
+    }
 }

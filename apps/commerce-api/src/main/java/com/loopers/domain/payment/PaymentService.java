@@ -32,8 +32,34 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
+    /**
+     * PG 결과(SUCCESS)를 결제에 반영한다. 콜백·폴링이 transactionKey 로 디스패치한다.
+     * markSuccess 가 멱등이라 중복/순서뒤바뀜 수신에도 안전하다.
+     */
+    @Transactional
+    public PaymentModel markSuccess(String transactionKey, String reason) {
+        PaymentModel payment = loadByTransactionKey(transactionKey);
+        payment.markSuccess(reason);
+        return paymentRepository.save(payment);
+    }
+
+    /**
+     * PG 결과(FAILED)를 결제에 반영한다. markFailed 가 멱등이라 중복/순서뒤바뀜 수신에도 안전하다.
+     */
+    @Transactional
+    public PaymentModel markFailed(String transactionKey, String reason) {
+        PaymentModel payment = loadByTransactionKey(transactionKey);
+        payment.markFailed(reason);
+        return paymentRepository.save(payment);
+    }
+
     private PaymentModel loadPayment(Long paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_NOT_FOUND, "결제건을 찾을 수 없습니다. [paymentId = " + paymentId + "]"));
+    }
+
+    private PaymentModel loadByTransactionKey(String transactionKey) {
+        return paymentRepository.findByTransactionKey(transactionKey)
+            .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_NOT_FOUND, "결제건을 찾을 수 없습니다. [transactionKey = " + transactionKey + "]"));
     }
 }

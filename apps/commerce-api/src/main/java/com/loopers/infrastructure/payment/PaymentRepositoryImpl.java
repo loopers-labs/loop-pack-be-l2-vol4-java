@@ -22,4 +22,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public Optional<PaymentModel> findById(Long id) {
         return paymentJpaRepository.findById(id);
     }
+
+    @Override
+    public Optional<PaymentModel> findByTransactionKey(String transactionKey) {
+        return paymentJpaRepository.findByTransactionKey(transactionKey);
+    }
 }

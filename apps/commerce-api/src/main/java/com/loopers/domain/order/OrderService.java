@@ -53,6 +53,28 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    /**
+     * 결제 성공을 주문에 반영한다. 콜백·폴링이 PG 결과로 호출하며 markPaid 가 멱등이라 중복 수렴에 안전하다.
+     */
+    @Transactional
+    public void markPaid(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND, "주문을 찾을 수 없습니다."));
+        order.markPaid();
+        orderRepository.save(order);
+    }
+
+    /**
+     * 결제 실패를 주문에 반영한다. markPaymentFailed 가 멱등이라 중복 수렴에 안전하다.
+     */
+    @Transactional
+    public void markPaymentFailed(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND, "주문을 찾을 수 없습니다."));
+        order.markPaymentFailed();
+        orderRepository.save(order);
+    }
+
     @Transactional(readOnly = true)
     public List<OrderResult> findMine(Long userId, OrderPeriod period) {
         List<OrderModel> orders = orderRepository.findByUserIdAndCreatedAtBetween(
