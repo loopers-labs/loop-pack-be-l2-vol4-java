@@ -10,8 +10,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.client.HttpServerErrorException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,8 +33,8 @@ import static org.mockito.Mockito.when;
     "resilience4j.circuitbreaker.instances.pgCircuit.minimum-number-of-calls=2",
     "resilience4j.circuitbreaker.instances.pgCircuit.failure-rate-threshold=50",
     "resilience4j.circuitbreaker.instances.pgCircuit.wait-duration-in-open-state=60s",
-    "resilience4j.retry.instances.pgRetry.max-attempts=2",
-    "resilience4j.retry.instances.pgRetry.wait-duration=1ms"
+    "resilience4j.retry.instances.pgRequestRetry.max-attempts=2",
+    "resilience4j.retry.instances.pgRequestRetry.wait-duration=1ms"
 })
 class PgGatewayAspectOrderTest {
 
@@ -54,7 +56,8 @@ class PgGatewayAspectOrderTest {
     @DisplayName("한 번의 결제 요청이 여러 번 재시도될 시 서킷은 호출 1건만 집계하고 닫힌 상태를 유지한다")
     @Test
     void circuitRecordsOnce_whenSingleRequestRetried() {
-        when(pgClient.requestPayment(any())).thenThrow(new RuntimeException("일시적 오류"));
+        // 5xx는 거래 생성 前 거절이라 pgRequestRetry가 재시도하는 유일한 케이스
+        when(pgClient.requestPayment(any())).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR));
 
         paymentGateway.requestPayment(CMD); // 재시도 소진 후 Fallback → pending (예외 전파 X)
 

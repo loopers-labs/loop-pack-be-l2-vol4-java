@@ -22,7 +22,7 @@ public class PgPaymentGateway implements PaymentGateway {
     private final PgClient pgClient;
 
     @CircuitBreaker(name = "pgCircuit", fallbackMethod = "requestFallback")
-    @Retry(name = "pgRetry")
+    @Retry(name = "pgRequestRetry")
     @Override
     public GatewayResult requestPayment(GatewayCommand command) {
         String transactionKey = pgClient.requestPayment(command);

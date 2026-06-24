@@ -58,7 +58,7 @@ resilience4j:
   retry:
     retry-aspect-order: 2            # CircuitBreaker 안쪽 — 재시도는 서킷 내부에서 수행
     instances:
-      pgRetry:
+      pgRetry:                              # 조회(거래키·orderId) 전용 — 멱등이라 응답유실에도 재시도 안전
         max-attempts: 3
         wait-duration: 200ms
         enable-exponential-backoff: true    # 200ms → 400ms → 800ms — 실패 누적 시 더 물러나 부하 완화
@@ -67,6 +67,15 @@ resilience4j:
         randomized-wait-factor: 0.5
         ignore-exceptions:
           - com.loopers.support.error.CoreException
+      pgRequestRetry:                       # 결제 접수(POST) 전용 — 쓰기라 응답유실 시 재전송하면 이중 접수 위험
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exceptions:                   # 5xx(거래 생성 前 거절)만 재시도 — IO오류(응답유실)는 재시도 X, 폴링이 orderId로 메꿈
+          - org.springframework.web.client.HttpServerErrorException
 
 ---
 spring:
