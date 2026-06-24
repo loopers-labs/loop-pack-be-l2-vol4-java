@@ -3,18 +3,21 @@ package com.loopers.infrastructure.pg;
 import com.loopers.config.PgProperties;
 import com.loopers.domain.pg.PgGateway;
 import com.loopers.domain.pg.PgTransactionResult;
+import com.loopers.domain.pg.PgTransactionStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -50,7 +53,7 @@ public class PgSimulatorGateway implements PgGateway {
             Map<String, Object> data = (Map<String, Object>) response.get("data");
             return new PgTransactionResult(
                 (String) data.get("transactionKey"),
-                (String) data.get("status"),
+                PgTransactionStatus.valueOf((String) data.get("status")),
                 (String) data.get("reason")
             );
         } catch (HttpClientErrorException e) {
@@ -62,5 +65,30 @@ public class PgSimulatorGateway implements PgGateway {
 
     public PgTransactionResult fallback(String userId, String orderId, String cardType, String cardNo, Long amount, String callbackUrl, Throwable t) {
         throw new CoreException(ErrorType.INTERNAL_ERROR, "잠시 후 다시 시도해주세요");
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<PgTransactionResult> findByOrderId(String userId, String orderId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", userId);
+
+        Map<String, Object> response = pgRestTemplate.exchange(
+            pgProperties.getSimulatorUrl() + "/api/v1/payments?orderId=" + orderId,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            Map.class
+        ).getBody();
+
+        Map<String, Object> data = (Map<String, Object>) response.get("data");
+        List<Map<String, Object>> transactions = (List<Map<String, Object>>) data.get("transactions");
+
+        return transactions.stream()
+            .map(tx -> new PgTransactionResult(
+                (String) tx.get("transactionKey"),
+                PgTransactionStatus.valueOf((String) tx.get("status")),
+                (String) tx.get("reason")
+            ))
+            .toList();
     }
 }

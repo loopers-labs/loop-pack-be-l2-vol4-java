@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.pg.PgGateway;
 import com.loopers.domain.pg.PgTransactionResult;
+import com.loopers.domain.pg.PgTransactionStatus;
 import com.loopers.fixture.BrandFixture;
 import com.loopers.fixture.ProductFixture;
 import com.loopers.fixture.UserFixture;
@@ -142,8 +143,9 @@ class PaymentV1ApiE2ETest {
         void requestsPayment_whenOrderIsPending() {
             // arrange
             String expectedKey = "20260624:TR:abc123";
+            given(pgGateway.findByOrderId(any(), any())).willReturn(List.of());
             given(pgGateway.request(any(), any(), any(), any(), any(), any()))
-                .willReturn(new PgTransactionResult(expectedKey, "PENDING", null));
+                .willReturn(new PgTransactionResult(expectedKey, PgTransactionStatus.PENDING, null));
             UUID orderId = createOrder();
 
             // act

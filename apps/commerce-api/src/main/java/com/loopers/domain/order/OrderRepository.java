@@ -26,6 +26,9 @@ public interface OrderRepository {
     /** 만료 배치용 — 대상 PENDING 주문 비관적 락 */
     List<OrderModel> findPendingBeforeForUpdate(ZonedDateTime before);
 
+    /** PG 동기화 배치용 — 락 없음, 처리 시 개별 락 */
+    List<OrderModel> findPendingBefore(ZonedDateTime before);
+
     /** 유저 주문 목록 — 기간 필터, 페이징 */
     Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable);
 
