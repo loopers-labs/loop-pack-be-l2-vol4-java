@@ -10,4 +10,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class PgProperties {
     private String simulatorUrl;
     private String callbackUrl;
+    private int connectTimeout;
+    private int readTimeout;
 }

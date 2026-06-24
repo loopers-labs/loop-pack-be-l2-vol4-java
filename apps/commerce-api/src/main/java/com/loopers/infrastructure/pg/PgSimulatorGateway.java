@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -19,8 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PgSimulatorGateway implements PgGateway {
 
-    private static final RestTemplate restTemplate = new RestTemplate();
-
+    private final RestTemplate pgRestTemplate;
     private final PgProperties pgProperties;
 
     @Override
@@ -39,7 +39,7 @@ public class PgSimulatorGateway implements PgGateway {
         );
 
         try {
-            Map<String, Object> response = restTemplate.postForObject(
+            Map<String, Object> response = pgRestTemplate.postForObject(
                 pgProperties.getSimulatorUrl() + "/api/v1/payments",
                 new HttpEntity<>(body, headers),
                 Map.class
@@ -52,6 +52,8 @@ public class PgSimulatorGateway implements PgGateway {
             );
         } catch (HttpStatusCodeException e) {
             throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 요청 실패: " + e.getResponseBodyAsString());
+        } catch (ResourceAccessException e) {
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 요청 시간 초과");
         }
     }
 }

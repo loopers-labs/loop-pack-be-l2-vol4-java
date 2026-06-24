@@ -32,6 +32,8 @@ springdoc:
 pg:
   simulator-url: http://localhost:8082
   callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 1000
+  read-timeout: 3000
 
 ---
 spring:
@@ -42,6 +44,8 @@ spring:
 pg:
   simulator-url: http://localhost:8082
   callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 1000
+  read-timeout: 3000
 
 ---
 spring:
