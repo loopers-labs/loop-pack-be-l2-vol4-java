@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Optional;
+
 @Slf4j
 @Component
 public class PgRestClient implements PgClient {
@@ -34,14 +36,16 @@ public class PgRestClient implements PgClient {
     @Override
     public PgTransactionResponse requestPayment(PgPaymentRequest request) {
         String url = pgBaseUrl + "/api/v1/payments";
-        return pgRequestRestTemplate.postForObject(url, request, PgTransactionResponse.class);
+        return Optional.ofNullable(pgRequestRestTemplate.postForObject(url, request, PgTransactionResponse.class))
+            .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "PG 응답이 비어있습니다."));
     }
 
     @CircuitBreaker(name = "pgClient", fallbackMethod = "getTransactionFallback")
     @Override
     public PgTransactionResponse getTransaction(String transactionKey) {
         String url = pgBaseUrl + "/api/v1/payments/" + transactionKey;
-        return pgQueryRestTemplate.getForObject(url, PgTransactionResponse.class);
+        return Optional.ofNullable(pgQueryRestTemplate.getForObject(url, PgTransactionResponse.class))
+            .orElseThrow(() -> new CoreException(ErrorType.PG_QUERY_ERROR, "PG 조회 응답이 비어있습니다."));
     }
 
     private PgTransactionResponse requestPaymentFallback(PgPaymentRequest request, Throwable t) {
