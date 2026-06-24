@@ -44,6 +44,24 @@ class UserModelTest {
             assertThat(userModel.getGender()).isEqualTo(gender);
         }
 
+        @DisplayName("userNumber가 타임스탬프(14자) + 난수(6자) 형식으로 생성된다.")
+        @Test
+        void generatesUserNumber_withTimestampAndRandomSuffix() {
+            // given
+            String loginId = "user01";
+            String password = "Password1!";
+            String name = "홍길동";
+            String birthDate = "1990-01-01";
+            String email = "user@example.com";
+            Gender gender = Gender.MALE;
+
+            // when
+            UserModel userModel = new UserModel(loginId, password, name, birthDate, email, gender, passwordEncryptor);
+
+            // then
+            assertThat(userModel.getUserNumber()).matches("\\d{20}");
+        }
+
         @DisplayName("이름이 null 이거나 빈 문자열이면, BAD_REQUEST 예외가 발생한다")
         @NullAndEmptySource
         @ParameterizedTest

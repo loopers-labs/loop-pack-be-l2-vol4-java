@@ -1,9 +1,11 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.NumberGenerator;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -21,6 +23,9 @@ import java.util.List;
 @Table(name = "orders")
 @SQLRestriction("deleted_at IS NULL")
 public class OrderModel extends BaseEntity {
+
+    @Column(unique = true)
+    private String orderNumber;
 
     private Long userId;
 
@@ -68,7 +73,9 @@ public class OrderModel extends BaseEntity {
         BigDecimal originalPrice = items.stream()
                 .map(OrderItemModel::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new OrderModel(userId, originalPrice, discountAmount, items);
+        OrderModel order = new OrderModel(userId, originalPrice, discountAmount, items);
+        order.orderNumber = NumberGenerator.generate();
+        return order;
     }
 
     public void validateOwner(Long userId) {

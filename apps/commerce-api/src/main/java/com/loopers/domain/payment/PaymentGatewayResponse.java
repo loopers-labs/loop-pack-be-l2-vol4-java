@@ -1,6 +1,6 @@
 package com.loopers.domain.payment;
 
-public record PgPaymentResult(
+public record PaymentGatewayResponse(
         String transactionKey,
         PaymentStatus status
 ) {

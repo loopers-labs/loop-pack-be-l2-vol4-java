@@ -103,6 +103,62 @@ class OrderServiceTest {
         }
     }
 
+    @DisplayName("주문을 조회하고 소유자를 검증할 때,")
+    @Nested
+    class GetByIdAndValidateOwner {
+
+        @DisplayName("소유자가 일치하면 OrderModel이 반환된다.")
+        @Test
+        void returnsOrderModel_whenOwnerMatches() {
+            // given
+            Long orderId = 1L;
+            Long userId = 1L;
+            OrderModel order = new OrderModel(userId, BigDecimal.valueOf(10000), BigDecimal.ZERO,
+                    List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            // when
+            OrderModel result = orderService.getByIdAndValidateOwner(orderId, userId);
+
+            // then
+            assertThat(result).isSameAs(order);
+        }
+
+        @DisplayName("소유자가 일치하지 않으면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbiddenException_whenOwnerDoesNotMatch() {
+            // given
+            Long orderId = 1L;
+            Long ownerId = 1L;
+            Long otherUserId = 2L;
+            OrderModel order = new OrderModel(ownerId, BigDecimal.valueOf(10000), BigDecimal.ZERO,
+                    List.of(new OrderItemModel(1L, "상품", BigDecimal.valueOf(10000), 1L)));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderService.getByIdAndValidateOwner(orderId, otherUserId));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+
+        @DisplayName("존재하지 않는 ID이면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFoundException_whenOrderDoesNotExist() {
+            // given
+            Long orderId = 999L;
+            when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderService.getByIdAndValidateOwner(orderId, 1L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("유저 ID로 기간별 주문 목록을 조회할 때,")
     @Nested
     class GetOrdersByUserIdBetween {

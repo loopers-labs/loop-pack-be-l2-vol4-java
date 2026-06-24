@@ -28,6 +28,12 @@ public class OrderService {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
     }
 
+    public OrderModel getByIdAndValidateOwner(Long orderId, Long userId) {
+        OrderModel order = getById(orderId);
+        order.validateOwner(userId);
+        return order;
+    }
+
     public OrderModel getByIdWithItems(Long orderId) {
         return orderRepository.findByIdWithItems(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));

@@ -10,13 +10,16 @@ import java.math.BigDecimal;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentGateway paymentGateway;
 
-    public PaymentModel create(Long orderId, CardType cardType, String cardNo, BigDecimal amount) {
-        return paymentRepository.save(new PaymentModel(orderId, cardType, cardNo, amount));
-    }
+    public PaymentModel pay(String userNumber, Long orderId, String orderNumber, CardType cardType, String cardNo, BigDecimal amount) {
+        PaymentModel payment = paymentRepository.save(new PaymentModel(orderId, cardType, cardNo, amount));
 
-    public PaymentModel applyPgResult(PaymentModel payment, String transactionKey, PaymentStatus status) {
-        payment.applyPgResult(transactionKey, status);
+        PaymentGatewayResponse response = paymentGateway.requestPayment(
+                new PaymentGatewayRequest(userNumber, orderNumber, cardType, cardNo, amount)
+        );
+        payment.updateTransactionKey(response.transactionKey());
+
         return paymentRepository.save(payment);
     }
 }

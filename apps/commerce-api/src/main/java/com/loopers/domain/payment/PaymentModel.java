@@ -55,8 +55,7 @@ public class PaymentModel extends BaseEntity {
         this.status = PaymentStatus.PENDING;
     }
 
-    public void applyPgResult(String transactionKey, PaymentStatus status) {
+    public void updateTransactionKey(String transactionKey) {
         this.transactionKey = transactionKey;
-        this.status = status;
     }
 }

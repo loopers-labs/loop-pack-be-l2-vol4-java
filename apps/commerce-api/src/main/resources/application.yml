@@ -29,7 +29,7 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-pg-simulator:
+payment-gateway:
   url: http://localhost:8082
   callback-url: http://localhost:8080/api/v1/payments/callback
 
