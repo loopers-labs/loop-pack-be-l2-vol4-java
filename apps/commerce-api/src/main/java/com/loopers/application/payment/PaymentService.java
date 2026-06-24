@@ -50,6 +50,12 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
+    public Payment getByTransactionKey(String transactionKey) {
+        return paymentRepository.findByTransactionKey(transactionKey)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 결제입니다."));
+    }
+
+    @Transactional(readOnly = true)
     public boolean hasSuccessPayment(Long orderId) {
         return paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.SUCCESS);
     }

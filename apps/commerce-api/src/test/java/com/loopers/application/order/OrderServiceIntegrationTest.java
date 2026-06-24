@@ -103,4 +103,29 @@ class OrderServiceIntegrationTest {
             assertThat(result).hasSize(2);
         }
     }
+
+    @DisplayName("주문을 확정할 때,")
+    @Nested
+    class Confirm {
+
+        @DisplayName("PENDING 상태의 주문을 확정하면 CONFIRMED로 전환된다.")
+        @Test
+        void confirmsOrder_whenStatusIsPending() {
+            Order order = orderService.createOrder(1L, null, BigDecimal.valueOf(50000), BigDecimal.ZERO,
+                List.of(new OrderItem(1L, "청바지", BigDecimal.valueOf(50000), 1)));
+
+            orderService.confirm(order.getId());
+
+            Order result = orderService.getOrder(order.getId());
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        }
+
+        @DisplayName("존재하지 않는 주문 ID를 주면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenOrderDoesNotExist() {
+            CoreException ex = assertThrows(CoreException.class,
+                () -> orderService.confirm(9999L));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }

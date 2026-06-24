@@ -2,9 +2,12 @@ package com.loopers.infrastructure.pg;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import feign.Feign;
+import feign.Request;
 import feign.RetryableException;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -130,6 +133,75 @@ class PgFeignClientChaosTest {
             // Assert
             assertThat(response.transactionKey()).isEqualTo("20260623:TR:def456");
             wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
+        }
+    }
+
+    @DisplayName("PG 서버가 첫 번째 시도에 성공할 때")
+    @Nested
+    class WhenSuccess {
+
+        @DisplayName("1번만 요청하고 정상 응답을 반환한다.")
+        @Test
+        void returns_success_onFirstAttempt() {
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .willReturn(okJson("{\"transactionKey\":\"20260623:TR:abc123\",\"status\":\"PENDING\",\"reason\":null}")));
+
+            PgPaymentResponse response = pgFeignClient.requestPayment("1", sampleRequest());
+
+            assertThat(response.transactionKey()).isEqualTo("20260623:TR:abc123");
+            wireMockServer.verify(1, postRequestedFor(urlEqualTo("/api/v1/payments")));
+        }
+    }
+
+    @DisplayName("PG 서버와 네트워크 연결이 끊어질 때")
+    @Nested
+    class WhenNetworkFault {
+
+        @DisplayName("3회 연속 연결 단절이면 RetryableException이 발생하고 총 3번 요청한다.")
+        @Test
+        void throws_afterMaxRetries_whenConnectionReset() {
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
+            assertThatThrownBy(() -> pgFeignClient.requestPayment("1", sampleRequest()))
+                .isInstanceOf(RetryableException.class);
+
+            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
+        }
+    }
+
+    @DisplayName("PG 서버가 응답하지 않을 때 (타임아웃)")
+    @Nested
+    class WhenTimeout {
+
+        private PgFeignClient pgFeignClientWithShortTimeout;
+
+        @BeforeEach
+        void setUpWithShortTimeout() {
+            PgFeignClientConfig config = new PgFeignClientConfig();
+            ObjectFactory<HttpMessageConverters> messageConverters =
+                () -> new HttpMessageConverters(new MappingJackson2HttpMessageConverter());
+
+            pgFeignClientWithShortTimeout = Feign.builder()
+                .contract(new SpringMvcContract())
+                .encoder(new SpringEncoder(messageConverters))
+                .decoder(new SpringDecoder(messageConverters))
+                .retryer(config.retryer())
+                .errorDecoder(config.errorDecoder())
+                .options(new Request.Options(3000, TimeUnit.MILLISECONDS, 5000, TimeUnit.MILLISECONDS, true))
+                .target(PgFeignClient.class, wireMockServer.baseUrl());
+        }
+
+        @DisplayName("3회 모두 타임아웃이면 RetryableException이 발생하고 총 3번 요청한다.")
+        @Test
+        void throws_afterMaxRetries_whenAllAttemptsTimeout() {
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .willReturn(aResponse().withFixedDelay(6000)));
+
+            assertThatThrownBy(() -> pgFeignClientWithShortTimeout.requestPayment("1", sampleRequest()))
+                .isInstanceOf(RetryableException.class);
+
+            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
 

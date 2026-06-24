@@ -4,6 +4,7 @@ import com.loopers.application.order.OrderService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.Payment;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.infrastructure.pg.PgFeignClient;
 import com.loopers.infrastructure.pg.PgPaymentRequest;
 import com.loopers.infrastructure.pg.PgPaymentResponse;
@@ -55,7 +56,7 @@ public class PaymentFacade {
             pgResponse = pgFeignClient.requestPayment(
                 String.valueOf(command.userId()),
                 new PgPaymentRequest(
-                    String.valueOf(command.orderId()),
+                    String.format("%06d", command.orderId()),
                     command.cardType().name(),
                     command.cardNo(),
                     order.getTotalPrice().longValue(),
@@ -68,5 +69,19 @@ public class PaymentFacade {
 
         paymentService.inProgress(payment, pgResponse.transactionKey());
         return new PaymentInfo.Create(pgResponse.transactionKey());
+    }
+
+    public void receiveCallback(PaymentCommand.Callback command) {
+        Payment payment = paymentService.getByTransactionKey(command.transactionKey());
+
+        if (payment.getStatus() == PaymentStatus.SUCCESS || payment.getStatus() == PaymentStatus.FAILED) {
+            return;
+        }
+
+        paymentService.complete(command.transactionKey(), command.status(), command.reason());
+
+        if (command.status() == PaymentStatus.SUCCESS) {
+            orderService.confirm(payment.getOrderId());
+        }
     }
 }

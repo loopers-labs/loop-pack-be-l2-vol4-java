@@ -132,6 +132,31 @@ class PaymentServiceIntegrationTest {
         }
     }
 
+    @DisplayName("transactionKey로 결제를 조회할 때,")
+    @Nested
+    class GetByTransactionKey {
+
+        @DisplayName("존재하는 transactionKey를 주면 Payment를 반환한다.")
+        @Test
+        void returnsPayment_whenTransactionKeyExists() {
+            Payment payment = paymentService.createPayment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            String transactionKey = "20260622:TR:a1b2c3";
+            paymentService.inProgress(payment, transactionKey);
+
+            Payment result = paymentService.getByTransactionKey(transactionKey);
+
+            assertThat(result.getTransactionKey()).isEqualTo(transactionKey);
+        }
+
+        @DisplayName("존재하지 않는 transactionKey를 주면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenTransactionKeyDoesNotExist() {
+            CoreException ex = assertThrows(CoreException.class,
+                () -> paymentService.getByTransactionKey("unknown:TR:000000"));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("PENDING/IN_PROGRESS Payment를 조회할 때,")
     @Nested
     class FindAllPendingOrInProgress {

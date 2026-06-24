@@ -1,11 +1,18 @@
 package com.loopers.infrastructure.pg;
 
+import feign.Request;
 import feign.RetryableException;
 import feign.Retryer;
 import feign.codec.ErrorDecoder;
 import org.springframework.context.annotation.Bean;
+import java.util.concurrent.TimeUnit;
 
 public class PgFeignClientConfig {
+
+    @Bean
+    public Request.Options options() {
+        return new Request.Options(3000, TimeUnit.MILLISECONDS, 5000, TimeUnit.MILLISECONDS, true);
+    }
 
     @Bean
     public Retryer retryer() {

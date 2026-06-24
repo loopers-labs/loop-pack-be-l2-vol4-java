@@ -52,4 +52,12 @@ public class OrderService {
     public Page<Order> getOrdersForAdmin(Pageable pageable) {
         return orderRepository.findAll(pageable);
     }
+
+    @Transactional
+    public void confirm(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 주문입니다."));
+        order.confirm();
+        orderRepository.save(order);
+    }
 }

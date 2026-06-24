@@ -6,6 +6,7 @@ import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.Payment;
 import com.loopers.domain.payment.PaymentStatus;
+import org.mockito.Mockito;
 import com.loopers.infrastructure.pg.PgFeignClient;
 import com.loopers.infrastructure.pg.PgPaymentResponse;
 import com.loopers.support.error.CoreException;
@@ -152,6 +153,73 @@ class PaymentFacadeUnitTest {
         }
     }
 
+    @DisplayName("콜백을 수신할 때,")
+    @Nested
+    class ReceiveCallback {
+
+        private static final String TRANSACTION_KEY = "20260623:TR:abc123";
+
+        @DisplayName("SUCCESS 콜백이면 결제를 SUCCESS로 완료하고 주문을 확정한다.")
+        @Test
+        void completesSuccessAndConfirmsOrder_whenCallbackIsSuccess() {
+            Payment inProgressPayment = inProgressPayment();
+            given(paymentService.getByTransactionKey(TRANSACTION_KEY)).willReturn(inProgressPayment);
+
+            paymentFacade.receiveCallback(new PaymentCommand.Callback(TRANSACTION_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다."));
+
+            then(paymentService).should().complete(TRANSACTION_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다.");
+            then(orderService).should().confirm(ORDER_ID);
+        }
+
+        @DisplayName("FAILED 콜백이면 결제만 FAILED로 완료하고 주문은 건드리지 않는다.")
+        @Test
+        void completesFailedOnly_whenCallbackIsFailed() {
+            Payment inProgressPayment = inProgressPayment();
+            given(paymentService.getByTransactionKey(TRANSACTION_KEY)).willReturn(inProgressPayment);
+
+            paymentFacade.receiveCallback(new PaymentCommand.Callback(TRANSACTION_KEY, PaymentStatus.FAILED, "한도초과입니다."));
+
+            then(paymentService).should().complete(TRANSACTION_KEY, PaymentStatus.FAILED, "한도초과입니다.");
+            then(orderService).should(Mockito.never()).confirm(ORDER_ID);
+        }
+
+        @DisplayName("이미 SUCCESS 상태의 결제면 아무것도 하지 않는다.")
+        @Test
+        void doesNothing_whenPaymentAlreadySuccess() {
+            Payment successPayment = completedPayment(PaymentStatus.SUCCESS);
+            given(paymentService.getByTransactionKey(TRANSACTION_KEY)).willReturn(successPayment);
+
+            paymentFacade.receiveCallback(new PaymentCommand.Callback(TRANSACTION_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다."));
+
+            then(paymentService).should(Mockito.never()).complete(any(), any(), any());
+            then(orderService).should(Mockito.never()).confirm(any());
+        }
+
+        @DisplayName("이미 FAILED 상태의 결제면 아무것도 하지 않는다.")
+        @Test
+        void doesNothing_whenPaymentAlreadyFailed() {
+            Payment failedPayment = completedPayment(PaymentStatus.FAILED);
+            given(paymentService.getByTransactionKey(TRANSACTION_KEY)).willReturn(failedPayment);
+
+            paymentFacade.receiveCallback(new PaymentCommand.Callback(TRANSACTION_KEY, PaymentStatus.FAILED, "한도초과입니다."));
+
+            then(paymentService).should(Mockito.never()).complete(any(), any(), any());
+            then(orderService).should(Mockito.never()).confirm(any());
+        }
+
+        @DisplayName("존재하지 않는 transactionKey면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenTransactionKeyDoesNotExist() {
+            given(paymentService.getByTransactionKey(TRANSACTION_KEY))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 결제입니다."));
+
+            assertThatThrownBy(() -> paymentFacade.receiveCallback(
+                new PaymentCommand.Callback(TRANSACTION_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다.")))
+                .isInstanceOf(CoreException.class)
+                .satisfies(e -> assertThat(((CoreException) e).getErrorType()).isEqualTo(ErrorType.NOT_FOUND));
+        }
+    }
+
     private Order pendingOrder(Long userId) {
         return orderWithStatus(userId, OrderStatus.PENDING);
     }
@@ -165,5 +233,15 @@ class PaymentFacadeUnitTest {
     private Payment pendingPayment() {
         return new Payment(1L, USER_ID, ORDER_ID, null, CardType.SAMSUNG, "1234-5678-9012-3456",
             50000L, PaymentStatus.PENDING, null, 0, null, null, null, null, null);
+    }
+
+    private Payment inProgressPayment() {
+        return new Payment(1L, USER_ID, ORDER_ID, "20260623:TR:abc123", CardType.SAMSUNG, "1234-5678-9012-3456",
+            50000L, PaymentStatus.IN_PROGRESS, null, 0, null, null, null, null, null);
+    }
+
+    private Payment completedPayment(PaymentStatus status) {
+        return new Payment(1L, USER_ID, ORDER_ID, "20260623:TR:abc123", CardType.SAMSUNG, "1234-5678-9012-3456",
+            50000L, status, null, 0, null, null, null, null, null);
     }
 }
