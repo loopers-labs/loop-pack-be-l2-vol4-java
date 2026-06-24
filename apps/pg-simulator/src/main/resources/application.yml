@@ -47,6 +47,11 @@ management:
   server:
     port: 8083
 
+datasource:
+  mysql-jpa:
+    main:
+      jdbc-url: jdbc:mysql://localhost:3306/paymentgateway
+
 ---
 spring:
   config:
