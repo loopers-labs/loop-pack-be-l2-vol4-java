@@ -61,6 +61,10 @@ resilience4j:
       pgRetry:
         max-attempts: 3
         wait-duration: 200ms
+        enable-exponential-backoff: true    # 200ms → 400ms → 800ms — 실패 누적 시 더 물러나 부하 완화
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true        # jitter — 다중 인스턴스의 동시 재시도(thundering herd) 분산
+        randomized-wait-factor: 0.5
         ignore-exceptions:
           - com.loopers.support.error.CoreException
 

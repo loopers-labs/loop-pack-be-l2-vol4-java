@@ -8,10 +8,13 @@ import com.loopers.domain.payment.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class PgPaymentGateway implements PaymentGateway {
@@ -48,9 +51,38 @@ public class PgPaymentGateway implements PaymentGateway {
     @Retry(name = "pgRetry")
     @Override
     public GatewayLookup queryByOrderId(Long orderId, Long userId) {
-        return pgClient.findByOrderId(orderId, userId)
-            .map(tx -> GatewayLookup.found(tx.transactionKey(), tx.status(), tx.reason()))
-            .orElseGet(GatewayLookup::notFound);
+        List<PgTransactionResponse> transactions = pgClient.findByOrderId(orderId, userId);
+        if (transactions.isEmpty()) {
+            return GatewayLookup.notFound();
+        }
+        return selectRepresentative(transactions);
+    }
+
+    /**
+     * 한 주문에 거래가 여러 개일 수 있어(요청 재시도로 인한 이중 접수 등) 결정적으로 하나를 고른다.
+     * SUCCESS 우선(돈이 빠진 거래) → 없으면 PENDING(처리 중, 다음 주기 대기) → 전부 FAILED면 실패.
+     * SUCCESS가 둘 이상이면 이중 청구이므로 격리 로그를 남긴다(사람이 환불 점검).
+     */
+    private GatewayLookup selectRepresentative(List<PgTransactionResponse> transactions) {
+        List<PgTransactionResponse> success = transactions.stream()
+            .filter(tx -> "SUCCESS".equals(tx.status()))
+            .toList();
+        if (!success.isEmpty()) {
+            if (success.size() > 1) {
+                log.error("PG 이중 결제 감지 — 한 주문에 SUCCESS 거래 {}건. 수동 환불 점검 필요: {}",
+                    success.size(), success.stream().map(PgTransactionResponse::transactionKey).toList());
+            }
+            return toFound(success.get(0));
+        }
+        return transactions.stream()
+            .filter(tx -> "PENDING".equals(tx.status()))
+            .findFirst()
+            .map(this::toFound)
+            .orElseGet(() -> toFound(transactions.get(0)));
+    }
+
+    private GatewayLookup toFound(PgTransactionResponse tx) {
+        return GatewayLookup.found(tx.transactionKey(), tx.status(), tx.reason());
     }
 
     /** PG 장애로 거래 유무를 알 수 없음 — UNREACHABLE로 보고 취소하지 않는다(다음 주기). */

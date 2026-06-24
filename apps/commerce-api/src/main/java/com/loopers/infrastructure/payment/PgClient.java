@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
-import java.util.Optional;
+import java.util.List;
 
 @Component
 public class PgClient {
@@ -69,8 +69,8 @@ public class PgClient {
         return response.data();
     }
 
-    /** PG가 404(거래 없음)면 empty, 그 외 실패는 예외로 던진다. */
-    public Optional<PgTransactionResponse> findByOrderId(Long orderId, Long userId) {
+    /** PG가 404(거래 없음)면 빈 리스트, 그 외 실패는 예외로 던진다. 한 주문에 거래가 여러 개일 수 있다(이중 접수). */
+    public List<PgTransactionResponse> findByOrderId(Long orderId, Long userId) {
         try {
             PgApiResponse<PgOrderResponse> response = restClient.get()
                 .uri(uriBuilder -> uriBuilder.path(PAYMENTS_PATH)
@@ -79,13 +79,12 @@ public class PgClient {
                 .header(USER_ID_HEADER, String.valueOf(userId))
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
-            if (response == null || response.data() == null
-                || response.data().transactions() == null || response.data().transactions().isEmpty()) {
-                return Optional.empty();
+            if (response == null || response.data() == null || response.data().transactions() == null) {
+                return List.of();
             }
-            return Optional.of(response.data().transactions().get(0));
+            return response.data().transactions();
         } catch (HttpClientErrorException.NotFound e) {
-            return Optional.empty();
+            return List.of();
         }
     }
 }
