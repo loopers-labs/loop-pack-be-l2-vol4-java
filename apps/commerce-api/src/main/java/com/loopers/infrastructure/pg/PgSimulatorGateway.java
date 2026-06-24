@@ -10,8 +10,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.ResourceAccessException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -23,6 +24,8 @@ public class PgSimulatorGateway implements PgGateway {
     private final RestTemplate pgRestTemplate;
     private final PgProperties pgProperties;
 
+    @CircuitBreaker(name = "pgCircuit", fallbackMethod = "fallback")
+    @Retry(name = "pgRetry")
     @Override
     @SuppressWarnings("unchecked")
     public PgTransactionResult request(String userId, String orderId, String cardType, String cardNo, Long amount, String callbackUrl) {
@@ -50,10 +53,14 @@ public class PgSimulatorGateway implements PgGateway {
                 (String) data.get("status"),
                 (String) data.get("reason")
             );
-        } catch (HttpStatusCodeException e) {
+        } catch (HttpClientErrorException e) {
+            // 4xx — 재시도/CB 대상 아님, 즉시 실패
             throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 요청 실패: " + e.getResponseBodyAsString());
-        } catch (ResourceAccessException e) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 요청 시간 초과");
         }
+        // 5xx(HttpServerErrorException), 네트워크 오류(ResourceAccessException) → Retry → CB → fallback
+    }
+
+    public PgTransactionResult fallback(String userId, String orderId, String cardType, String cardNo, Long amount, String callbackUrl, Throwable t) {
+        throw new CoreException(ErrorType.INTERNAL_ERROR, "잠시 후 다시 시도해주세요");
     }
 }
