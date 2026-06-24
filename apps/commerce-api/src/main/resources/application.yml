@@ -35,6 +35,10 @@ pg-client:
   connect-timeout: 1s
   read-timeout: 1s
 
+payment-recovery:
+  pending-threshold: 10s
+  scan-interval: 30s
+
 ---
 spring:
   config:

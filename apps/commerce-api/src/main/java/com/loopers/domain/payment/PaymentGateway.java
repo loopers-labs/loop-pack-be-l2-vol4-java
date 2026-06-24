@@ -9,4 +9,9 @@ public interface PaymentGateway {
      * PG 에 결제를 접수 요청하고 transactionKey 를 받는다. (동기 응답 = 접수증, 최종 결과 아님)
      */
     PaymentGatewayResult requestPayment(PaymentGatewayCommand command);
+
+    /**
+     * transactionKey 로 PG 에 결제의 확정 상태를 직접 조회한다.
+     */
+    PaymentGatewayTransaction getTransaction(Long userId, String transactionKey);
 }

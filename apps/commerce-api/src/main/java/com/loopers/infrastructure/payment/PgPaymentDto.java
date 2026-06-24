@@ -34,4 +34,10 @@ final class PgPaymentDto {
         String reason
     ) {
     }
+
+    record TransactionDetail(
+        String status,
+        String reason
+    ) {
+    }
 }

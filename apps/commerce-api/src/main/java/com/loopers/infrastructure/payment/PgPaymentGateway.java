@@ -3,6 +3,7 @@ package com.loopers.infrastructure.payment;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentGatewayCommand;
 import com.loopers.domain.payment.PaymentGatewayResult;
+import com.loopers.domain.payment.PaymentGatewayTransaction;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -51,11 +52,27 @@ public class PgPaymentGateway implements PaymentGateway {
         return new PaymentGatewayResult(data.transactionKey(), PaymentStatus.valueOf(data.status()));
     }
 
+    @Override
+    public PaymentGatewayTransaction getTransaction(Long userId, String transactionKey) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(USER_ID_HEADER, String.valueOf(userId));
+
+        ResponseEntity<PgPaymentDto.ApiResponse<PgPaymentDto.TransactionDetail>> response = pgRestTemplate.exchange(
+            properties.baseUrl() + PAYMENTS_PATH + "/" + transactionKey,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            new ParameterizedTypeReference<PgPaymentDto.ApiResponse<PgPaymentDto.TransactionDetail>>() {}
+        );
+
+        PgPaymentDto.TransactionDetail data = extractData(response.getBody());
+        return new PaymentGatewayTransaction(PaymentStatus.valueOf(data.status()), data.reason());
+    }
+
     private String encodeOrderId(Long orderId) {
         return String.format("%06d", orderId);
     }
 
-    private PgPaymentDto.Response extractData(PgPaymentDto.ApiResponse<PgPaymentDto.Response> body) {
+    private <T> T extractData(PgPaymentDto.ApiResponse<T> body) {
         if (body == null || body.data() == null) {
             throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 응답 본문이 비어있습니다.");
         }

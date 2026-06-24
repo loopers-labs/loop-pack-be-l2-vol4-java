@@ -2,6 +2,7 @@ package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.PaymentGatewayCommand;
 import com.loopers.domain.payment.PaymentGatewayResult;
+import com.loopers.domain.payment.PaymentGatewayTransaction;
 import com.loopers.domain.payment.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,6 +85,44 @@ class PgPaymentGatewayTest {
         }
     }
 
+    @DisplayName("결제 상태를 조회할 때, ")
+    @Nested
+    class GetTransaction {
+
+        private static final String TRANSACTION_KEY = "20260624:TR:abc123";
+
+        @DisplayName("transactionKey 로 PG 에 X-USER-ID 헤더를 담아 GET 한다.")
+        @Test
+        void sendsGet_withUserIdHeader() {
+            // given
+            server.expect(requestTo(BASE_URL + "/api/v1/payments/" + TRANSACTION_KEY))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-USER-ID", "1"))
+                .andRespond(withSuccess(detailResponseJson("SUCCESS", "정상 승인되었습니다."), MediaType.APPLICATION_JSON));
+
+            // when
+            gateway.getTransaction(1L, TRANSACTION_KEY);
+
+            // then
+            server.verify();
+        }
+
+        @DisplayName("PG 가 확정 상태(status·reason)를 응답하면, 그 값을 조회 결과로 반환한다.")
+        @Test
+        void returnsStatusAndReason_whenPgResponds() {
+            // given
+            server.expect(requestTo(BASE_URL + "/api/v1/payments/" + TRANSACTION_KEY))
+                .andRespond(withSuccess(detailResponseJson("SUCCESS", "정상 승인되었습니다."), MediaType.APPLICATION_JSON));
+
+            // when
+            PaymentGatewayTransaction transaction = gateway.getTransaction(1L, TRANSACTION_KEY);
+
+            // then
+            assertThat(transaction.status()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(transaction.reason()).isEqualTo("정상 승인되었습니다.");
+        }
+    }
+
     private String pendingResponseJson() {
         return """
             {
@@ -91,5 +130,22 @@ class PgPaymentGatewayTest {
               "data": { "transactionKey": "20260624:TR:abc123", "status": "PENDING", "reason": null }
             }
             """;
+    }
+
+    private String detailResponseJson(String status, String reason) {
+        return """
+            {
+              "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+              "data": {
+                "transactionKey": "20260624:TR:abc123",
+                "orderId": "000100",
+                "cardType": "SAMSUNG",
+                "cardNo": "1234-5678-9814-1451",
+                "amount": 50000,
+                "status": "%s",
+                "reason": "%s"
+              }
+            }
+            """.formatted(status, reason);
     }
 }
