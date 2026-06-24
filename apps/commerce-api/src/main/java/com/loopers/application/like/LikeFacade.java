@@ -1,6 +1,7 @@
 package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.like.ProductLikeService;
@@ -11,6 +12,7 @@ import com.loopers.domain.user.UserModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,7 @@ public class LikeFacade {
 
     /** 좋아요 등록 — 멱등: 이미 좋아요 시 likeCount 변경 없이 반환. 원자적 카운트 갱신 후 재조회 */
     @Transactional
+    @CacheEvict(value = CacheConfig.PRODUCT_CACHE, key = "#productId")
     public LikeInfo like(UUID productId, UserModel user) {
         productService.getActive(productId); // 존재(활성) 검증 — 404
         productLikeService.like(user.getId(), productId);
@@ -41,6 +44,7 @@ public class LikeFacade {
 
     /** 좋아요 취소 — 멱등: 없는 좋아요 취소 시 likeCount 변경 없이 반환. 원자적 카운트 갱신 후 재조회 */
     @Transactional
+    @CacheEvict(value = CacheConfig.PRODUCT_CACHE, key = "#productId")
     public LikeInfo unlike(UUID productId, UserModel user) {
         productService.getActive(productId); // 존재(활성) 검증 — 404
         productLikeService.unlike(user.getId(), productId);

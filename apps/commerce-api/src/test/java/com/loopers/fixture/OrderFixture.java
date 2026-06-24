@@ -17,7 +17,7 @@ public class OrderFixture {
     public static final String DETAIL_ADDRESS = "101호";
 
     public static OrderModel createModel(UUID userId) {
-        return new OrderModel(userId, RECEIVER_NAME, RECEIVER_PHONE, ZIP_CODE, ADDRESS, DETAIL_ADDRESS);
+        return new OrderModel(userId, UUID.randomUUID().toString(), RECEIVER_NAME, RECEIVER_PHONE, ZIP_CODE, ADDRESS, DETAIL_ADDRESS);
     }
 
     public static OrderItemModel createItem(UUID productId) {

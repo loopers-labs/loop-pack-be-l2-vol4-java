@@ -63,7 +63,7 @@ class OrderServiceIntegrationTest {
     }
 
     private OrderModel createOrder(UUID userId) {
-        return orderService.create(userId, OrderFixture.RECEIVER_NAME, OrderFixture.RECEIVER_PHONE,
+        return orderService.create(userId, UUID.randomUUID().toString(), OrderFixture.RECEIVER_NAME, OrderFixture.RECEIVER_PHONE,
             OrderFixture.ZIP_CODE, OrderFixture.ADDRESS, OrderFixture.DETAIL_ADDRESS);
     }
 

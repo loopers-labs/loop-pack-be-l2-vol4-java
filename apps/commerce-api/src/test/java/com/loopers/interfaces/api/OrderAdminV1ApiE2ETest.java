@@ -91,6 +91,12 @@ class OrderAdminV1ApiE2ETest {
         return headers;
     }
 
+    private HttpHeaders orderHeaders() {
+        HttpHeaders headers = authHeaders();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        return headers;
+    }
+
     private void createOrder() {
         OrderV1Dto.ShippingInfoRequest shipping = new OrderV1Dto.ShippingInfoRequest(
             "홍길동", "010-1234-5678", "12345", "서울시 강남구 테헤란로 1", "101호"
@@ -100,7 +106,7 @@ class OrderAdminV1ApiE2ETest {
         );
         testRestTemplate.exchange(
             ORDERS_URL, HttpMethod.POST,
-            new HttpEntity<>(req, authHeaders()),
+            new HttpEntity<>(req, orderHeaders()),
             new ParameterizedTypeReference<>() {}
         );
     }

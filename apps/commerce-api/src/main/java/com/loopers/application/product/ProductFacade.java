@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.ProductCacheDto;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockModel;
@@ -39,11 +40,11 @@ public class ProductFacade {
         return ProductInfo.from(product, stock);
     }
 
-    /** 고객용 — 활성 상품만 */
+    /** 고객용 — product 캐시 사용, stock은 항상 DB 조회 */
     public ProductInfo getActive(UUID id) {
-        ProductModel product = productService.getActive(id);
+        ProductCacheDto snapshot = productService.getActiveSnapshot(id);
         StockModel stock = stockService.getByProductId(id);
-        return ProductInfo.from(product, stock);
+        return ProductInfo.from(snapshot, stock);
     }
 
     /** 어드민 목록 — 삭제된 상품 포함, brandId null이면 전체 */

@@ -69,7 +69,7 @@ public class UserServiceIntegrationTest {
 
             userService.register(userModel);
 
-            verify(userRepository).save(any(UserModel.class));
+            verify(userRepository).saveAndFlush(any(UserModel.class));
         }
 
         @DisplayName("같은 loginId 로 가입 시도 시, CONFLICT 예외가 발생한다.")

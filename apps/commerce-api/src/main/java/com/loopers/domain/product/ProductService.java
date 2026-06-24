@@ -1,12 +1,15 @@
 package com.loopers.domain.product;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +33,18 @@ public class ProductService {
     public ProductModel getActive(UUID id) {
         return productRepository.findActive(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+    }
+
+    /**
+     * 고객 상세 조회 캐시용 — 캐시 HIT 시 TX 미개방, MISS 시 TX 안에서 brand LAZY 로드.
+     * Cache AOP(OUTER) → TX AOP(INNER) 순서 보장 (CacheConfig.order = LOWEST_PRECEDENCE - 1).
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.PRODUCT_CACHE, key = "#id")
+    public ProductCacheDto getActiveSnapshot(UUID id) {
+        ProductModel product = productRepository.findActive(id)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+        return ProductCacheDto.from(product);
     }
 
     /** 어드민 목록 — brandId null이면 전체, 있으면 브랜드 필터 */
