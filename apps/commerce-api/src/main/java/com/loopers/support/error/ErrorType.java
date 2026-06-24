@@ -38,6 +38,7 @@ public enum ErrorType {
 
     /** 결제 도메인 */
     INVALID_PAYMENT_AMOUNT(HttpStatus.BAD_REQUEST, "INVALID_PAYMENT_AMOUNT", "결제 금액은 0 보다 커야 합니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "결제건을 찾을 수 없습니다."),
 
     /** 쿠폰 도메인 */
     INVALID_COUPON_VALUE(HttpStatus.BAD_REQUEST, "INVALID_COUPON_VALUE", "쿠폰 할인 값이 유효하지 않습니다."),

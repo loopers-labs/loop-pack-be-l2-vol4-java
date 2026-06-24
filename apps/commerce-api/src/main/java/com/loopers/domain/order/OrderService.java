@@ -44,6 +44,15 @@ public class OrderService {
         return new OrderResult(saved, savedItems);
     }
 
+    @Transactional
+    public OrderModel startPayment(Long userId, Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .filter(it -> it.getUserId().equals(userId))
+            .orElseThrow(() -> new CoreException(ErrorType.ORDER_NOT_FOUND, "주문을 찾을 수 없습니다."));
+        order.startPayment();
+        return orderRepository.save(order);
+    }
+
     @Transactional(readOnly = true)
     public List<OrderResult> findMine(Long userId, OrderPeriod period) {
         List<OrderModel> orders = orderRepository.findByUserIdAndCreatedAtBetween(
