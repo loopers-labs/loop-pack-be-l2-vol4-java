@@ -10,6 +10,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
@@ -38,6 +40,10 @@ public class Order extends BaseEntity {
     @Column(name = "applied_user_coupon_id")
     private Long appliedUserCouponId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrderStatus status;
+
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(
         name = "order_id",
@@ -56,6 +62,7 @@ public class Order extends BaseEntity {
         this.items = new ArrayList<>(items.values());
         this.appliedUserCouponId = userCouponId;
         this.amountSnapshot = requireAmountSnapshot(items.calculateTotalPrice(), amountSnapshot);
+        this.status = OrderStatus.PAYMENT_PENDING;
     }
 
     public static Order create(Long userId, OrderItems items) {
@@ -93,6 +100,33 @@ public class Order extends BaseEntity {
 
     public long getPaymentAmount() {
         return amountSnapshot.paymentAmount();
+    }
+
+    public boolean isPayable() {
+        return status == OrderStatus.PAYMENT_PENDING;
+    }
+
+    public void validatePayable() {
+        if (!isPayable()) {
+            throw new CoreException(ErrorType.CONFLICT, "결제할 수 없는 주문입니다.");
+        }
+    }
+
+    public void completePayment() {
+        if (status == OrderStatus.PAID) {
+            return;
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void failPayment() {
+        if (status == OrderStatus.PAYMENT_FAILED) {
+            return;
+        }
+        if (status == OrderStatus.PAID) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 결제 완료된 주문입니다.");
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
     }
 
     private static OrderAmountSnapshot requireAmountSnapshot(long totalPrice, OrderAmountSnapshot amountSnapshot) {

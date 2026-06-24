@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -65,9 +66,81 @@ class OrderTest {
             () -> assertThat(order.getUserId()).isEqualTo(userId),
             () -> assertThat(order.getItems()).containsExactly(iphone, iphoneMax),
             () -> assertThat(order.getOrderTotalPrice()).isEqualTo(5_000_000L),
+            () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING),
+            () -> assertThat(order.isPayable()).isTrue(),
             () -> assertThat(order.isOrderedBy(userId)).isTrue(),
             () -> assertThat(order.isOrderedBy(2L)).isFalse()
         );
+    }
+
+    @DisplayName("결제 성공을 반영하면, 주문은 결제 완료 상태가 된다.")
+    @Test
+    void completesPayment_whenPaymentSucceeds() {
+        // arrange
+        Order order = createOrder();
+
+        // act
+        order.completePayment();
+
+        // assert
+        assertAll(
+            () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID),
+            () -> assertThat(order.isPayable()).isFalse()
+        );
+    }
+
+    @DisplayName("결제 실패를 반영하면, 주문은 결제 실패 상태가 된다.")
+    @Test
+    void failsPayment_whenPaymentFails() {
+        // arrange
+        Order order = createOrder();
+
+        // act
+        order.failPayment();
+
+        // assert
+        assertAll(
+            () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED),
+            () -> assertThat(order.isPayable()).isFalse()
+        );
+    }
+
+    @DisplayName("이미 결제 완료된 주문에 결제 실패를 반영하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenPaidOrderIsMarkedPaymentFailed() {
+        // arrange
+        Order order = createOrder();
+        order.completePayment();
+
+        // act & assert
+        assertThatThrownBy(order::failPayment)
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
+    @DisplayName("결제할 수 없는 주문의 결제를 검증하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenOrderIsNotPayable() {
+        // arrange
+        Order order = createOrder();
+        order.completePayment();
+
+        // act & assert
+        assertThatThrownBy(order::validatePayable)
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
+    @DisplayName("결제 대기 주문의 결제를 검증하면, 예외를 던지지 않는다.")
+    @Test
+    void doesNotThrow_whenOrderIsPayable() {
+        // arrange
+        Order order = createOrder();
+
+        // act & assert
+        assertThatCode(order::validatePayable).doesNotThrowAnyException();
     }
 
     @DisplayName("사용자 ID가 없으면, BAD_REQUEST 예외를 던진다.")
@@ -81,5 +154,10 @@ class OrderTest {
             .isInstanceOf(CoreException.class)
             .extracting("errorType")
             .isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+    private Order createOrder() {
+        OrderItem item = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 1);
+        return Order.create(1L, OrderItems.of(List.of(item)));
     }
 }
