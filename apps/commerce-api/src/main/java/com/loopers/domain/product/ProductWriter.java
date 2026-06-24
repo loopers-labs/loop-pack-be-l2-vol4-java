@@ -26,6 +26,10 @@ public class ProductWriter {
         products.forEach(productRepository::save);
     }
 
+    public void updateLikeCountSnapshot(Long productId, Integer likeCount) {
+        productRepository.updateLikeCount(productId, likeCount);
+    }
+
     public void deleteProduct(Long id) {
         Product product = productReader.getProductById(id);
         product.delete();

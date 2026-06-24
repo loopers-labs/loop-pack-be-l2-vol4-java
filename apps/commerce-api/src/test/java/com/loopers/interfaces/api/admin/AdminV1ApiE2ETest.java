@@ -20,6 +20,7 @@ import com.loopers.interfaces.api.coupon.CouponDto;
 import com.loopers.interfaces.api.order.OrderDto;
 import com.loopers.interfaces.api.product.ProductDto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,14 +29,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.List;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -54,6 +56,8 @@ class AdminV1ApiE2ETest {
     private final ProductJpaRepository productJpaRepository;
     private final OrderJpaRepository orderJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     AdminV1ApiE2ETest(
@@ -62,7 +66,9 @@ class AdminV1ApiE2ETest {
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
         OrderJpaRepository orderJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp,
+        RedisTemplate<String, String> redisTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.couponFacade = couponFacade;
@@ -70,6 +76,8 @@ class AdminV1ApiE2ETest {
         this.productJpaRepository = productJpaRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
+        this.redisTemplate = redisTemplate;
     }
 
     @DisplayName("Coupon Admin API")
@@ -198,6 +206,7 @@ class AdminV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("Admin LDAP 인증")
@@ -309,6 +318,51 @@ class AdminV1ApiE2ETest {
                     .contains(brandId),
                 () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(deletedBrand.getDeletedAt()).isNotNull()
+            );
+        }
+
+        @DisplayName("브랜드를 삭제하면 관련 상품 조회 캐시를 무효화한다.")
+        @Test
+        void evictsProductCaches_whenBrandIsDeleted() {
+            // arrange
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            String productDetailKey = "product:detail:" + product.getId();
+            String productListKey = "product:list:brand:" + brand.getId() + ":sort:likes_desc:page:0:size:20";
+
+            testRestTemplate.exchange(
+                ENDPOINT_ADMIN_PRODUCTS + "/" + product.getId(),
+                HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()),
+                productGetResponseType()
+            );
+            testRestTemplate.exchange(
+                ENDPOINT_ADMIN_PRODUCTS + "?brandId=" + brand.getId() + "&sort=likes_desc&page=0&size=20",
+                HttpMethod.GET,
+                new HttpEntity<>(adminHeaders()),
+                productListResponseType()
+            );
+            assertAll(
+                () -> assertThat(redisTemplate.opsForValue().get(productDetailKey)).isNotNull(),
+                () -> assertThat(redisTemplate.opsForValue().get(productListKey)).isNotNull()
+            );
+
+            // act
+            ResponseEntity<ApiResponse<Void>> deleteResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ADMIN_BRANDS + "/" + brand.getId(),
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(adminHeaders()),
+                    voidResponseType()
+                );
+
+            // assert
+            ProductJpaEntity deletedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+            assertAll(
+                () -> assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(deletedProduct.getDeletedAt()).isNotNull(),
+                () -> assertThat(redisTemplate.opsForValue().get(productDetailKey)).isNull(),
+                () -> assertThat(redisTemplate.opsForValue().get(productListKey)).isNull()
             );
         }
     }

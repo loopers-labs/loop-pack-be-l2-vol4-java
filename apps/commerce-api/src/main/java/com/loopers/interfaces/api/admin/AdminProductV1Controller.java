@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.admin;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
-import com.loopers.domain.product.ProductService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.product.ProductDto;
 import jakarta.validation.Valid;
@@ -25,7 +24,6 @@ import java.util.List;
 public class AdminProductV1Controller {
 
     private final ProductFacade productFacade;
-    private final ProductService productService;
 
     @GetMapping
     public ApiResponse<List<ProductDto.List.V1.Response>> getProducts(
@@ -81,7 +79,7 @@ public class AdminProductV1Controller {
     public ApiResponse<Void> deleteProduct(
         @PathVariable(value = "productId") Long productId
     ) {
-        productService.deleteProduct(productId);
+        productFacade.deleteProduct(productId);
         return ApiResponse.success(null);
     }
 }

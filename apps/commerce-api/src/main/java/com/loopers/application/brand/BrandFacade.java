@@ -1,6 +1,9 @@
 package com.loopers.application.brand;
 
+import com.loopers.application.product.ProductCacheRepository;
 import com.loopers.domain.brand.Brand;
+import com.loopers.domain.brand.BrandProductDeleteResult;
+import com.loopers.domain.brand.BrandProductDeleteService;
 import com.loopers.domain.brand.BrandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,6 +16,8 @@ import java.util.List;
 public class BrandFacade {
 
     private final BrandService brandService;
+    private final BrandProductDeleteService brandProductDeleteService;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional
     public BrandInfo createBrand(String name, String description) {
@@ -35,6 +40,14 @@ public class BrandFacade {
     public BrandInfo updateBrand(Long id, String name, String description) {
         Brand brand = brandService.updateBrand(id, name, description);
         return BrandInfo.from(brand);
+    }
+
+    @Transactional
+    public void deleteBrand(Long id) {
+        BrandProductDeleteResult result = brandProductDeleteService.deleteBrand(id);
+        result.products()
+            .forEach(product -> productCacheRepository.evictProduct(product.getId()));
+        productCacheRepository.evictProductLists();
     }
 
 }

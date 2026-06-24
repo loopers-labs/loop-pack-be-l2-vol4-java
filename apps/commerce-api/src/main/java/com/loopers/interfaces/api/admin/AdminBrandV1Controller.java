@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.admin;
 
 import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.brand.BrandInfo;
-import com.loopers.domain.brand.BrandProductDeleteService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.brand.BrandDto;
 import jakarta.validation.Valid;
@@ -25,7 +24,6 @@ import java.util.List;
 public class AdminBrandV1Controller {
 
     private final BrandFacade brandFacade;
-    private final BrandProductDeleteService brandProductDeleteService;
 
     @GetMapping
     public ApiResponse<List<BrandDto.List.V1.Response>> getBrands(
@@ -67,7 +65,7 @@ public class AdminBrandV1Controller {
     public ApiResponse<Void> deleteBrand(
         @PathVariable(value = "brandId") Long brandId
     ) {
-        brandProductDeleteService.deleteBrand(brandId);
+        brandFacade.deleteBrand(brandId);
         return ApiResponse.success(null);
     }
 }
