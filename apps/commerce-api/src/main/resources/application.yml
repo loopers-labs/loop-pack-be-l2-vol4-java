@@ -43,8 +43,9 @@ resilience4j:
         wait-duration: 500ms              # 재시도 간격 (fixed)
         retry-exceptions:
           - org.springframework.web.client.HttpServerErrorException  # 5xx — PG 서버 오류, 재시도 가치 있음
-          - org.springframework.web.client.ResourceAccessException   # 네트워크 오류/타임아웃
-        # 목록에 없는 예외(CoreException 등)는 재시도 없이 즉시 전파
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException  # CB Open 시 재시도 없이 즉시 fallback
+        # retry-exceptions 화이트리스트 외 예외는 재시도 없이 전파 (4xx 등)
   circuitbreaker:
     instances:
       pgCircuit:

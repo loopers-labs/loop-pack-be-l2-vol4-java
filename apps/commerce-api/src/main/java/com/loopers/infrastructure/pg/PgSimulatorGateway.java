@@ -24,8 +24,8 @@ public class PgSimulatorGateway implements PgGateway {
     private final RestTemplate pgRestTemplate;
     private final PgProperties pgProperties;
 
-    @CircuitBreaker(name = "pgCircuit", fallbackMethod = "fallback")
-    @Retry(name = "pgRetry")
+    @CircuitBreaker(name = "pgCircuit")
+    @Retry(name = "pgRetry", fallbackMethod = "fallback")
     @Override
     @SuppressWarnings("unchecked")
     public PgTransactionResult request(String userId, String orderId, String cardType, String cardNo, Long amount, String callbackUrl) {
