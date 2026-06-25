@@ -24,4 +24,7 @@ dependencies {
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
+
+    // external call test (PG 연동 - 지연/에러 결정적 시뮬레이션)
+    testImplementation("org.wiremock:wiremock-standalone:3.9.2")
 }
