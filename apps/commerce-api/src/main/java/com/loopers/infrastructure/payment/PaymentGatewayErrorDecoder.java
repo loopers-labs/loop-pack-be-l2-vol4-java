@@ -18,6 +18,11 @@ public class PaymentGatewayErrorDecoder implements ErrorDecoder {
 
     @Override
     public Exception decode(String methodKey, Response response) {
+        // 404는 우리 도메인 의미(BAD_REQUEST)로 단정하지 않고, Feign이 제공하는 타입(FeignException.NotFound)으로 그대로 흘려보낸다.
+        if (response.status() == 404) {
+            return new ErrorDecoder.Default().decode(methodKey, response);
+        }
+
         String message = extractMessage(response);
 
         if (response.status() >= 400 && response.status() < 500) {
