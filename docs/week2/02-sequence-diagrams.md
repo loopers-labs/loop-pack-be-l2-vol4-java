@@ -26,7 +26,7 @@ sequenceDiagram
         User->>PaymentAPI: 2. 결제 요청 (orderId, cardNo)
         PaymentAPI->>Facade: processPayment()
         Facade->>DB: 결제 READY 저장
-        Facade->>Redis: TTL 5분 Key 생성 (payment_check)
+        Facade->>Redis: TTL 10초 Key 생성 (payment_retry, count=0)
     end
     
     Note over Facade, PG: DB 락 없이 외부 API 비동기 대기
@@ -69,31 +69,41 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    title 누락된 콜백 보정 (Redis TTL 이벤트)
+    title 결제 지연 보정 및 Retry (연쇄 Redis TTL)
+    actor User
     participant Redis
     participant Listener as PaymentExpirationListener
     participant Facade as Facade
     participant PG as PG Simulator
     participant DB
 
-    Note over Redis, Listener: 5분 뒤 TTL 만료 시 이벤트 자동 발생
-    Redis->>Listener: KeyExpiredEvent (payment_check:{id})
-    Listener->>Facade: compensatePayment(paymentId)
+    Note over Redis, Listener: 10초 뒤 TTL 만료 시 이벤트 발생
+    Redis->>Listener: KeyExpiredEvent (payment_retry:{id})
+    Listener->>Facade: retryOrCompensatePayment(paymentId)
 
     Facade->>DB: 결제 상태 조회
     alt 상태가 READY가 아님 (이미 처리됨)
         Facade-->>Listener: 무시 (종료)
-    else 상태가 READY임 (콜백 누락)
-        Facade->>PG: GET /payments/{paymentId}
+    else 상태가 READY임
+        Facade->>PG: GET /payments/{paymentId} (상태 조회)
         PG-->>Facade: 실제 상태 응답
         
-        rect rgba(255, 0, 0, 0.1)
-            Note over Facade, DB: 트랜잭션: 지연된 결과 반영
-            alt 결제 성공
+        alt 결제 성공
+            rect rgba(0, 128, 0, 0.1)
                 Facade->>DB: APPROVED / COMPLETED 갱신
-            else 결제 실패 / 내역 없음
-                Facade->>DB: FAILED / CANCELED 갱신
-                Facade->>DB: 재고 복구 (보상 트랜잭션)
+            end
+        else 미결제 / 응답 없음 (Retry 진행)
+            alt 재시도 횟수 < 3
+                Note right of Facade: 아직 3회가 안 됨, TTL 연장
+                Facade->>Redis: TTL 10초 재설정 (count + 1)
+            else 재시도 횟수 >= 3 (최종 실패)
+                rect rgba(255, 0, 0, 0.1)
+                    Note over Facade, DB: 트랜잭션: 최종 실패 및 보상
+                    Facade->>DB: FAILED / CANCELED 갱신
+                    Facade->>DB: 재고 복구 및 쿠폰 AVAILABLE 처리
+                end
+                Note right of Facade: 사용자에게 실패 알림 (개념적)
+                Facade-->>User: [알림] 결제 시간 초과, 재시도 안내
             end
         end
     end

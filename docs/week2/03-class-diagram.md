@@ -167,7 +167,7 @@ classDiagram
     class PaymentFacade {
         +processPayment(userId, orderId, method)
         +handleCallback(paymentId, status)
-        +compensatePayment(paymentId)
+        +retryOrCompensatePayment(paymentId)
     }
     class PaymentExpirationListener {
         +onMessage(message, pattern)
