@@ -111,6 +111,10 @@ public class PaymentModel extends BaseEntity {
      * SUCCESS/FAILED 최종 상태는 변경하지 않는다 (멱등성 보장).
      * PG 응답이 PENDING/IN_PROGRESS면 아직 처리 중이므로 변경 없음.
      */
+    public boolean hasPgTransactionRecord() {
+        return pgTransactionId != null;
+    }
+
     public void applyPgResult(String transactionKey, String pgStatus, String reason) {
         if (this.status == PaymentStatus.SUCCESS || this.status == PaymentStatus.FAILED) {
             return;
