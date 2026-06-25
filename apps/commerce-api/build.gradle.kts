@@ -11,6 +11,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // external client
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+
     // security
     implementation("org.springframework.security:spring-security-crypto")
 
