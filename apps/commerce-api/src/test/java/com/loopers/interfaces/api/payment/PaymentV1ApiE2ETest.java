@@ -9,6 +9,7 @@ import com.loopers.domain.payment.PaymentPendingReason;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.infrastructure.order.OrderJpaEntity;
 import com.loopers.infrastructure.order.OrderJpaRepository;
+import com.loopers.infrastructure.payment.PaymentJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -31,6 +32,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -43,21 +45,28 @@ class PaymentV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final OrderJpaRepository orderJpaRepository;
+    private final PaymentJpaRepository paymentJpaRepository;
+    private final CountingPaymentGateway paymentGateway;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
     PaymentV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         OrderJpaRepository orderJpaRepository,
+        PaymentJpaRepository paymentJpaRepository,
+        CountingPaymentGateway paymentGateway,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.orderJpaRepository = orderJpaRepository;
+        this.paymentJpaRepository = paymentJpaRepository;
+        this.paymentGateway = paymentGateway;
         this.databaseCleanUp = databaseCleanUp;
     }
 
     @AfterEach
     void tearDown() {
+        paymentGateway.reset();
         databaseCleanUp.truncateAllTables();
     }
 
@@ -96,6 +105,91 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(data.status()).isEqualTo(PaymentStatus.PENDING),
                 () -> assertThat(data.pendingReason()).isEqualTo(PaymentPendingReason.WAITING_CALLBACK),
                 () -> assertThat(data.transactionKey()).isEqualTo("20260625:TR:test")
+            );
+        }
+
+        @DisplayName("같은 주문으로 결제 요청을 다시 보내면, PG 결제 생성 요청을 반복하지 않고 기존 결제를 반환한다.")
+        @Test
+        void returnsExistingPayment_withoutRequestingPgAgain_whenSameOrderPaymentIsRetried() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> firstResponse =
+                requestPayment("user1234", "abc123!?", request);
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> retryResponse =
+                requestPayment("user1234", "abc123!?", request);
+
+            // assert
+            PaymentDto.RequestPayment.V1.Response firstData = firstResponse.getBody().data();
+            PaymentDto.RequestPayment.V1.Response retryData = retryResponse.getBody().data();
+            assertAll(
+                () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(retryResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(firstData.id()).isEqualTo(retryData.id()),
+                () -> assertThat(firstData.transactionKey()).isEqualTo(retryData.transactionKey()),
+                () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
+                () -> assertThat(paymentGateway.getByOrderCount()).isZero(),
+                () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("PG 생성 요청 결과를 확정하지 못한 주문도 POST 재시도로 PG 생성을 반복하지 않고, 상태 조회로 복구한다.")
+        @Test
+        void recoversByStatusLookup_withoutRetryingPaymentCreation_whenInitialRequestIsUnknown() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            paymentGateway.setRequestResult(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.TIMEOUT_UNKNOWN,
+                "PG 요청 결과를 확인하지 못했습니다: Read timed out"
+            ));
+            paymentGateway.setLookupResult(PaymentGatewayResult.success(
+                "20260625:TR:recovered",
+                "정상 승인되었습니다."
+            ));
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> firstResponse =
+                requestPayment("user1234", "abc123!?", request);
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> retryResponse =
+                requestPayment("user1234", "abc123!?", request);
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> lookupResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_PAYMENTS + "/orders/" + order.getId(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(authHeaders("user1234", "abc123!?")),
+                    paymentResponseType()
+                );
+
+            // assert
+            PaymentDto.RequestPayment.V1.Response firstData = firstResponse.getBody().data();
+            PaymentDto.RequestPayment.V1.Response retryData = retryResponse.getBody().data();
+            PaymentDto.RequestPayment.V1.Response lookupData = lookupResponse.getBody().data();
+            assertAll(
+                () -> assertThat(firstData.status()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(firstData.pendingReason()).isEqualTo(PaymentPendingReason.TIMEOUT_UNKNOWN),
+                () -> assertThat(retryData.id()).isEqualTo(firstData.id()),
+                () -> assertThat(retryData.pendingReason()).isEqualTo(PaymentPendingReason.TIMEOUT_UNKNOWN),
+                () -> assertThat(lookupResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(lookupData.status()).isEqualTo(PaymentStatus.PAID),
+                () -> assertThat(lookupData.pendingReason()).isNull(),
+                () -> assertThat(lookupData.transactionKey()).isEqualTo("20260625:TR:recovered"),
+                () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
+                () -> assertThat(paymentGateway.getByOrderCount()).isEqualTo(1),
+                () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
             );
         }
     }
@@ -152,10 +246,18 @@ class PaymentV1ApiE2ETest {
             com.loopers.domain.payment.PaymentCardType.SAMSUNG,
             "1234-5678-9814-1451"
         );
-        testRestTemplate.exchange(
+        requestPayment("user1234", "abc123!?", request);
+    }
+
+    private ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> requestPayment(
+        String loginId,
+        String password,
+        PaymentDto.RequestPayment.V1.Request request
+    ) {
+        return testRestTemplate.exchange(
             ENDPOINT_PAYMENTS,
             HttpMethod.POST,
-            new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+            new HttpEntity<>(request, authHeaders(loginId, password)),
             paymentResponseType()
         );
     }
@@ -187,18 +289,51 @@ class PaymentV1ApiE2ETest {
 
         @Bean
         @Primary
-        PaymentGateway paymentGateway() {
-            return new PaymentGateway() {
-                @Override
-                public PaymentGatewayResult request(PaymentGatewayCommand command) {
-                    return PaymentGatewayResult.pending("20260625:TR:test", null);
-                }
+        CountingPaymentGateway paymentGateway() {
+            return new CountingPaymentGateway();
+        }
+    }
 
-                @Override
-                public PaymentGatewayResult getByOrder(String userLoginId, Long orderId) {
-                    return PaymentGatewayResult.pending("20260625:TR:test", null);
-                }
-            };
+    static class CountingPaymentGateway implements PaymentGateway {
+
+        private final AtomicInteger requestCount = new AtomicInteger();
+        private final AtomicInteger getByOrderCount = new AtomicInteger();
+        private PaymentGatewayResult requestResult = PaymentGatewayResult.pending("20260625:TR:test", null);
+        private PaymentGatewayResult lookupResult = PaymentGatewayResult.pending("20260625:TR:test", null);
+
+        @Override
+        public PaymentGatewayResult request(PaymentGatewayCommand command) {
+            requestCount.incrementAndGet();
+            return requestResult;
+        }
+
+        @Override
+        public PaymentGatewayResult getByOrder(String userLoginId, Long orderId) {
+            getByOrderCount.incrementAndGet();
+            return lookupResult;
+        }
+
+        void setRequestResult(PaymentGatewayResult requestResult) {
+            this.requestResult = requestResult;
+        }
+
+        void setLookupResult(PaymentGatewayResult lookupResult) {
+            this.lookupResult = lookupResult;
+        }
+
+        int requestCount() {
+            return requestCount.get();
+        }
+
+        int getByOrderCount() {
+            return getByOrderCount.get();
+        }
+
+        void reset() {
+            requestCount.set(0);
+            getByOrderCount.set(0);
+            requestResult = PaymentGatewayResult.pending("20260625:TR:test", null);
+            lookupResult = PaymentGatewayResult.pending("20260625:TR:test", null);
         }
     }
 }
