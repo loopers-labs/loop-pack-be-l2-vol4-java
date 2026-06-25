@@ -14,6 +14,10 @@ dependencies {
     // security (crypto only)
     implementation("org.springframework.security:spring-security-crypto")
 
+    // resilience (CircuitBreaker / Retry — 어노테이션 구동에 aop 필요)
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
