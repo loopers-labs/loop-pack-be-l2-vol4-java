@@ -8,7 +8,7 @@ import lombok.Getter;
 import java.time.ZonedDateTime;
 
 @Entity
-@Table(name = "payments")
+@Table(name = "payment")
 @Getter
 public class PaymentJpaEntity extends BaseJpaEntity {
 
