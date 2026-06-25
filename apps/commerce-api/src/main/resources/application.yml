@@ -39,6 +39,21 @@ payment-recovery:
   pending-threshold: 10s
   scan-interval: 30s
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50         # 요청 40% 실패 환경에서 임계 근처 관찰 (가용성 ↔ 보호 트레이드오프)
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:                 # transient 인프라 실패만 집계 (business 는 비동기 콜백이라 동기 서킷엔 안 잡힘)
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+
 ---
 spring:
   config:
