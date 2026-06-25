@@ -1,5 +1,6 @@
 package com.loopers.application.payment;
 
+import com.loopers.application.order.OrderApplicationService;
 import com.loopers.domain.member.model.Member;
 import com.loopers.domain.member.service.MemberService;
 import com.loopers.domain.order.model.Order;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -27,6 +29,7 @@ public class PaymentApplicationService {
 
     private final MemberService memberService;
     private final OrderRepository orderRepository;
+    private final OrderApplicationService orderApplicationService;
     private final PaymentService paymentService;
     private final PaymentGateway paymentGateway;
 
@@ -63,9 +66,13 @@ public class PaymentApplicationService {
         return new PaymentInfo(payment.getId(), result.status());
     }
 
+    @Transactional
     public void confirmPayment(String transactionKey, PaymentStatus status, String reason) {
         Payment confirmed = paymentService.confirmResult(transactionKey, status, reason);
-        // TODO(9단계): confirmed 가 FAILED 로 새로 확정되면 주문 취소 + 재고/쿠폰 보상
+        // 결제가 FAILED 로 새로 확정되면 주문 취소 + 재고/쿠폰 보상
+        if (confirmed != null && confirmed.getStatus() == PaymentStatus.FAILED) {
+            orderApplicationService.compensateOrder(confirmed.getOrderId());
+        }
     }
 
     /**

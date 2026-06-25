@@ -39,6 +39,11 @@ public class StockRepositoryImpl implements StockRepository {
     }
 
     @Override
+    public int restoreStock(Long productId, int quantity) {
+        return stockJpaRepository.restoreStock(productId, quantity);
+    }
+
+    @Override
     public Stock save(Stock stock) {
         return stockJpaRepository.save(stock);
     }
