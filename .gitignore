@@ -38,3 +38,10 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Claude Code (local) ###
+.claude/skills/
+.aider*
+
+### Local reference docs ###
+docs/

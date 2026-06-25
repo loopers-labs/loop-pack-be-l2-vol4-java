@@ -29,11 +29,82 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+commerce:
+  product-like-summary:
+    sync-fixed-delay-ms: 5000
+    sync-chunk-size: 1000
+    sync-max-chunks-per-run: 3
+  product-detail-cache:
+    ttl-seconds: 30
+    jitter-seconds: 5
+    negative-ttl-seconds: 10
+    lock-ttl-seconds: 3
+    lock-wait-millis: 80
+    lock-wait-attempts: 3
+  product-list-cache:
+    ttl-seconds: 30
+    jitter-seconds: 3
+    lock-ttl-seconds: 3
+    lock-wait-millis: 80
+    lock-wait-attempts: 3
+    cacheable-max-size: 50
+    cacheable-max-items: 200
+  pg-simulator:
+    base-url: http://localhost:8082
+    callback-url: http://localhost:8080/api/v1/payments/callback
+    connect-timeout-millis: 1000 # PG 서버 연결을 기다리는 최대 시간 (1초)
+    read-timeout-millis: 10000 # PG 응답 수신을 기다리는 최대 시간 (10초)
+  payment:
+    recovery:
+      fixed-delay-ms: 5000
+      chunk-size: 100
+      retry-delay-seconds: 30
+      requesting-timeout-seconds: 15
+      pending-timeout-seconds: 30
+      not-found-grace-seconds: 120
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgSimulatorPaymentRequest:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 70
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+      pgSimulatorPaymentQuery:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 70
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+
 ---
 spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+commerce:
+  product-like-summary:
+    sync-enabled: false
+  payment:
+    recovery:
+      enabled: false
 
 ---
 spring:

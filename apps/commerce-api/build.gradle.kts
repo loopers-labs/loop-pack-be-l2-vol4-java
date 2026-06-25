@@ -9,10 +9,14 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // security
+    implementation("org.springframework.boot:spring-boot-starter-security")
+
     // querydsl
-    annotationProcessor("com.querydsl:querydsl-apt::jakarta")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["querydslVersion"]}:jpa")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 
