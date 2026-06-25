@@ -31,6 +31,7 @@ springdoc:
 
 pg:
   base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
 
 spring.cloud.openfeign.client.config:
   pgClient:
