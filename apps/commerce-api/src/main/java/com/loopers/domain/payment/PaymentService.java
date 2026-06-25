@@ -26,6 +26,40 @@ public class PaymentService {
     private final PaymentGateway paymentGateway;
 
     /**
+     * 비동기 PG 결제 요청용 — REQUESTED 상태의 결제 기록을 생성한다.
+     *
+     * <p>pg-simulator 처럼 transactionKey 를 즉시 받고 결과는 콜백으로 수신하는 방식에서 사용.
+     * 결제 시도 자체를 남기기 위해 PG 호출 전 먼저 저장한다.
+     */
+    @Transactional
+    public void createRequested(Long orderId, Long amount) {
+        paymentRepository.save(new PaymentModel(orderId, amount));
+    }
+
+    /**
+     * PG 즉시 응답으로 받은 transactionKey 를 PaymentModel 에 저장한다.
+     *
+     * <p>비동기 결제에서 PG 가 PENDING 상태와 함께 즉시 반환하는 TID.
+     * 콜백 미수신 시 스케줄러가 이 TID 로 직접 PG 조회할 수 있도록 보존한다.
+     */
+    @Transactional
+    public void storePendingTransactionKey(Long orderId, String transactionKey) {
+        paymentRepository.findByOrderId(orderId)
+            .ifPresent(p -> p.storePendingTransactionKey(transactionKey));
+    }
+
+    /**
+     * PG 요청 자체가 실패했을 때 REQUESTED → FAILED 전이.
+     *
+     * <p>FeignException, CB open, fallback 등 PG 호출 예외 시 호출한다.
+     */
+    @Transactional
+    public void markFailedOnRequest(Long orderId, String reason) {
+        paymentRepository.findByOrderId(orderId)
+            .ifPresent(p -> p.markFailed(reason));
+    }
+
+    /**
      * 결제 승인을 수행한다 (인증 → 승인 2단계 중 승인 단계).
      *
      * <ul>

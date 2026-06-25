@@ -23,11 +23,34 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-simulator:
+            connect-timeout: 2000
+            read-timeout: 1000
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg:
+  base-url: http://localhost:8082
+  callback-base-url: http://localhost:8080
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg-simulator:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  # retry: PgSimulatorGateway 에서 orderId 사전 조회 기반 수동 재시도로 대체
+  #   (@Retry 는 멱등성 전제 필요 — pg-simulator 멱등키 미지원이므로 직접 제어)
 
 ---
 spring:
