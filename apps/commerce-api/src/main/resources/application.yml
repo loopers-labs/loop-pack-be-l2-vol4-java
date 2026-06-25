@@ -49,6 +49,11 @@ commerce:
     lock-wait-attempts: 3
     cacheable-max-size: 50
     cacheable-max-items: 200
+  pg-simulator:
+    base-url: http://localhost:8082
+    callback-url: http://localhost:8080/api/v1/payments/callback
+    connect-timeout-millis: 1000 # PG 서버 연결을 기다리는 최대 시간 (1초)
+    read-timeout-millis: 10000 # PG 응답 수신을 기다리는 최대 시간 (10초)
 
 ---
 spring:
