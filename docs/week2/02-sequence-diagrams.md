@@ -286,3 +286,27 @@ sequenceDiagram
     Controller-->>User: 상품 정보/목록 반환
     deactivate Controller
 ```
+
+```mermaid
+sequenceDiagram
+    title 결제 유실 보정 (Fallback Scheduler - 30분 주기)
+    participant Scheduler as PaymentFallbackScheduler
+    participant Facade as PaymentFacade
+    participant PG as PG Simulator
+    participant DB
+    participant Notification as NotificationService
+
+    Scheduler->>Facade: 30분 경과 READY 건 보정 실행 (isFallback=true)
+    Facade->>PG: 결제 상태 조회 (GET /payments/{orderId})
+    PG-->>Facade: 실제 상태 응답
+    
+    alt 결제 성공 (APPROVED)
+        Note over Facade, PG: 30분 지연 건이므로 물리적 결제 취소 연동
+        Facade->>PG: 결제 취소 API 호출 (환불)
+        Facade->>Notification: 환불 완료 알림 발송 (sendPaymentRefund)
+        Facade->>DB: FAILED / CANCELED 갱신 및 보상 트랜잭션 (재고/쿠폰 복구)
+    else 미결제 / 실패 (PENDING / FAILED)
+        Facade->>DB: FAILED / CANCELED 갱신 및 보상 트랜잭션 (재고/쿠폰 복구)
+        Note over Facade: 스팸 방지를 위해 일반 타임아웃 알림 미발송
+    end
+```

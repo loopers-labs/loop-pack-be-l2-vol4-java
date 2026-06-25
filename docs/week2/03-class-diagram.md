@@ -141,6 +141,16 @@ classDiagram
         +LocalDateTime approvedAt
     }
 
+    class NotificationService {
+        <<interface>>
+        +sendPaymentTimeout(userId, paymentId)
+        +sendPaymentRefund(userId, paymentId)
+    }
+
+    class PaymentFallbackScheduler {
+        +run()
+    }
+
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains
     User "1" -- "*" Order : places
@@ -205,8 +215,10 @@ classDiagram
     PaymentFacade ..> PaymentGateway
     PaymentFacade ..> StockRepository
     PaymentFacade ..> CouponRepository
+    PaymentFacade ..> NotificationService
     
     PaymentExpirationListener ..> PaymentFacade
+    PaymentFallbackScheduler ..> PaymentFacade
     
     BrandAdminFacade ..> ProductRepository
     
