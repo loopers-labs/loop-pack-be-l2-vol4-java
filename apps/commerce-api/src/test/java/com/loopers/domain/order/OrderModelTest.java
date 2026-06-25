@@ -63,4 +63,45 @@ class OrderModelTest {
             );
         }
     }
+
+    @DisplayName("결제 결과로 주문 상태를 전이할 때,")
+    @Nested
+    class TransitByPaymentResult {
+
+        private OrderModel order() {
+            return OrderModel.builder()
+                .userId(1L)
+                .orderedAt(ZonedDateTime.now())
+                .originalAmount(35_000)
+                .discountAmount(0)
+                .finalAmount(35_000)
+                .build();
+        }
+
+        @DisplayName("markPaid를 호출하면 CREATED에서 PAID로 전이한다.")
+        @Test
+        void marksPaid() {
+            // arrange
+            OrderModel order = order();
+
+            // act
+            order.markPaid();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("markPaymentFailed를 호출하면 CREATED에서 PAYMENT_FAILED로 전이한다.")
+        @Test
+        void marksPaymentFailed() {
+            // arrange
+            OrderModel order = order();
+
+            // act
+            order.markPaymentFailed();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        }
+    }
 }

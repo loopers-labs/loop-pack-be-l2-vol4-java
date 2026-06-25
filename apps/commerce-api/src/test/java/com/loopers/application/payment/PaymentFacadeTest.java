@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
@@ -143,6 +145,108 @@ class PaymentFacadeTest {
                 () -> assertThat(sentPayment.getCardType()).isEqualTo(CardType.SAMSUNG),
                 () -> assertThat(sentPayment.getCardNo().value()).isEqualTo(CARD_NO)
             );
+        }
+    }
+
+    @DisplayName("결제 결과 콜백을 처리할 때,")
+    @Nested
+    class HandleCallback {
+
+        private PaymentModel pendingPayment() {
+            return PaymentModel.builder()
+                .orderId(ORDER_ID)
+                .userId(USER_ID)
+                .amount(78_000)
+                .cardType(CardType.SAMSUNG)
+                .rawCardNo(CARD_NO)
+                .requestedAt(ZonedDateTime.now())
+                .build();
+        }
+
+        @DisplayName("성공 콜백이면 결제를 SUCCESS로 확정하고 주문을 PAID로 전이한다.")
+        @Test
+        void confirmsSuccess_andMarksOrderPaid() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            OrderModel order = order(78_000);
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+            given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
+
+            // act
+            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.SUCCESS, null);
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("실패 콜백이면 결제를 FAILED로 확정하고 사유를 기록하며 주문을 PAYMENT_FAILED로 전이한다.")
+        @Test
+        void confirmsFailure_andMarksOrderPaymentFailed() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            OrderModel order = order(78_000);
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+            given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
+
+            // act
+            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.FAILED, "한도 초과");
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getReason()).isEqualTo("한도 초과"),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
+            );
+        }
+
+        @DisplayName("이미 확정된 결제면 상태를 바꾸지 않고 주문을 전이하지 않는다.")
+        @Test
+        void ignoresCallback_whenAlreadyTerminal() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            payment.succeed();
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+
+            // act
+            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.FAILED, "한도 초과");
+
+            // assert
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            then(orderRepository).should(never()).getActiveById(anyLong());
+        }
+
+        @DisplayName("예상치 못한 PENDING 콜백이면 결제·주문 상태를 바꾸지 않고 주문을 조회하지 않는다.")
+        @Test
+        void ignoresCallback_whenResultIsPending() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+
+            // act
+            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.PENDING, null);
+
+            // assert
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+            then(orderRepository).should(never()).getActiveById(anyLong());
+        }
+
+        @DisplayName("콜백이 가리키는 결제가 없으면 NOT_FOUND 예외가 발생하고 주문을 전이하지 않는다.")
+        @Test
+        void throwsNotFound_whenPaymentAbsent() {
+            // arrange
+            given(paymentRepository.getByOrderId(ORDER_ID))
+                .willThrow(new CoreException(ErrorType.NOT_FOUND, "결제가 존재하지 않습니다."));
+
+            // act & assert
+            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, PaymentStatus.SUCCESS, null))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+
+            then(orderRepository).should(never()).getActiveById(anyLong());
         }
     }
 }

@@ -78,4 +78,73 @@ class PaymentModelTest {
             assertThat(payment.getTransactionKey()).isEqualTo("TX-0001");
         }
     }
+
+    @DisplayName("결제를 확정할 때,")
+    @Nested
+    class Confirm {
+
+        @DisplayName("PENDING이면 succeed로 SUCCESS로 전이한다.")
+        @Test
+        void succeeds_whenPending() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.succeed();
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(payment.isTerminal()).isTrue()
+            );
+        }
+
+        @DisplayName("PENDING이면 fail로 FAILED로 전이하고 사유를 기록한다.")
+        @Test
+        void fails_whenPending() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.fail("한도 초과");
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getReason()).isEqualTo("한도 초과"),
+                () -> assertThat(payment.isTerminal()).isTrue()
+            );
+        }
+
+        @DisplayName("이미 SUCCESS면 fail을 호출해도 상태와 사유가 바뀌지 않는다.")
+        @Test
+        void ignoresFail_whenAlreadySuccess() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.succeed();
+
+            // act
+            payment.fail("한도 초과");
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(payment.getReason()).isNull()
+            );
+        }
+
+        @DisplayName("이미 FAILED면 succeed를 호출해도 SUCCESS로 바뀌지 않는다.")
+        @Test
+        void ignoresSucceed_whenAlreadyFailed() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.fail("한도 초과");
+
+            // act
+            payment.succeed();
+
+            // assert
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        }
+    }
 }

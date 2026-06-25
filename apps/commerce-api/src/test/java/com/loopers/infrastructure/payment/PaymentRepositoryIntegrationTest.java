@@ -17,6 +17,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 
 @SpringBootTest
@@ -78,6 +80,34 @@ class PaymentRepositoryIntegrationTest {
             // act & assert
             assertThatThrownBy(() -> paymentJpaRepository.saveAndFlush(payment(1L, 3L)))
                 .isInstanceOf(DataIntegrityViolationException.class);
+        }
+    }
+
+    @DisplayName("주문 식별자로 결제를 조회할 때,")
+    @Nested
+    class GetByOrderId {
+
+        @DisplayName("결제가 있으면 해당 결제를 반환한다.")
+        @Test
+        void returnsPayment_whenExists() {
+            // arrange
+            PaymentModel saved = paymentRepository.save(payment(1L, 2L));
+
+            // act
+            PaymentModel found = paymentRepository.getByOrderId(1L);
+
+            // assert
+            assertThat(found.getId()).isEqualTo(saved.getId());
+        }
+
+        @DisplayName("결제가 없으면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenAbsent() {
+            // act & assert
+            assertThatThrownBy(() -> paymentRepository.getByOrderId(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 

@@ -26,9 +26,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.order.OrderJpaRepository;
@@ -109,6 +111,17 @@ class PaymentV1ApiE2ETest {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         return new HttpEntity<>(body, headers);
+    }
+
+    private PaymentModel savePendingPayment(Long orderId, Long userId) {
+        return paymentJpaRepository.save(PaymentModel.builder()
+            .orderId(orderId)
+            .userId(userId)
+            .amount(78_000)
+            .cardType(CardType.SAMSUNG)
+            .rawCardNo(CARD_NO)
+            .requestedAt(ZonedDateTime.now())
+            .build());
     }
 
     @DisplayName("결제 요청 - POST /api/v1/payments")
@@ -246,6 +259,109 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
                 () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
                 () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.BAD_REQUEST.getCode())
+            );
+        }
+    }
+
+    @DisplayName("결제 결과 콜백 - POST /api/v1/payments/callback")
+    @Nested
+    class HandleCallback {
+
+        private static final String CALLBACK_ENDPOINT = "/api/v1/payments/callback";
+
+        @DisplayName("성공 콜백이면, 200 OK와 함께 결제가 SUCCESS·주문이 PAID로 확정된다.")
+        @Test
+        void confirmsSuccess_andMarksOrderPaid() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            OrderModel order = saveOrder(user.getId(), 78_000);
+            PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            PaymentV1Dto.CallbackRequest callback =
+                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.SUCCESS, null);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(callback), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(paymentJpaRepository.findById(payment.getId()).orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(orderJpaRepository.findById(order.getId()).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("실패 콜백이면, 200 OK와 함께 결제가 FAILED·주문이 PAYMENT_FAILED로 확정된다.")
+        @Test
+        void confirmsFailure_andMarksOrderPaymentFailed() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            OrderModel order = saveOrder(user.getId(), 78_000);
+            PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            PaymentV1Dto.CallbackRequest callback =
+                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.FAILED, "한도 초과");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(callback), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(paymentJpaRepository.findById(payment.getId()).orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(orderJpaRepository.findById(order.getId()).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAYMENT_FAILED)
+            );
+        }
+
+        @DisplayName("이미 확정된 결제에 콜백이 중복 도착해도, 200 OK이고 상태가 바뀌지 않는다(멱등).")
+        @Test
+        void isIdempotent_whenAlreadyConfirmed() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            OrderModel order = saveOrder(user.getId(), 78_000);
+            PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            PaymentV1Dto.CallbackRequest success =
+                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.SUCCESS, null);
+            testRestTemplate.exchange(CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(success), MAP_RESPONSE);
+            PaymentV1Dto.CallbackRequest duplicateFailure =
+                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.FAILED, "한도 초과");
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(duplicateFailure), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(paymentJpaRepository.findById(payment.getId()).orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(orderJpaRepository.findById(order.getId()).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("콜백이 가리키는 결제가 없으면, 404 Not Found로 거절된다.")
+        @Test
+        void returnsNotFound_whenPaymentAbsent() {
+            // arrange
+            PaymentV1Dto.CallbackRequest callback =
+                new PaymentV1Dto.CallbackRequest("999999", PaymentStatus.SUCCESS, null);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(callback), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.NOT_FOUND.getCode())
             );
         }
     }
