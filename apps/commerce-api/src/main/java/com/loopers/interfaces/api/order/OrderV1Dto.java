@@ -5,6 +5,15 @@ import java.util.List;
 
 public class OrderV1Dto {
 
+    public record OrderCreateRequest(
+        List<ItemRequest> items,
+        Long couponIssueId
+    ) {}
+
+    public record OrderCreateResponse(
+        Long orderId
+    ) {}
+
     public record CheckoutRequest(
         List<ItemRequest> items,
         Long couponIssueId,
