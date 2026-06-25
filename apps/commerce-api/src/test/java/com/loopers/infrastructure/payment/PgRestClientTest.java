@@ -63,6 +63,29 @@ class PgRestClientTest {
         requestServer.verify();
     }
 
+    @DisplayName("requestPayment 는 PG 의 ApiResponse 봉투에서 data 를 풀어 transactionKey/status 를 매핑한다.")
+    @Test
+    void requestPayment_unwrapsEnvelopeData() {
+        // Arrange — 실제 PG 시뮬레이터는 {meta, data} 봉투로 응답한다.
+        requestServer.expect(requestTo(BASE_URL + "/api/v1/payments"))
+            .andExpect(method(POST))
+            .andRespond(withSuccess(
+                "{\"meta\":{\"result\":\"SUCCESS\",\"errorCode\":null,\"message\":null},"
+                    + "\"data\":{\"transactionKey\":\"20250816:TR:9577c5\",\"status\":\"PENDING\",\"reason\":null}}",
+                MediaType.APPLICATION_JSON));
+
+        var request = new PgPaymentRequest("1", CardType.SAMSUNG, "1234-5678-9814-1451", 10000L,
+            "http://localhost:8080/api/v1/payments/callback");
+
+        // Act
+        PgTransactionResponse response = pgRestClient.requestPayment(request, USER_ID);
+
+        // Assert
+        assertThat(response.transactionKey()).isEqualTo("20250816:TR:9577c5");
+        assertThat(response.status()).isEqualTo(PgTransactionStatus.PENDING);
+        requestServer.verify();
+    }
+
     @DisplayName("getTransaction 호출 시 X-USER-ID 헤더에 userId가 담겨 전송된다.")
     @Test
     void getTransaction_sendsUserIdHeader() {
