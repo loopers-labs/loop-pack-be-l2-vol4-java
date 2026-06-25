@@ -11,7 +11,7 @@ public enum PaymentFailureReason {
     UNKNOWN;
 
     public boolean isRequestFailure() {
-        return this == PG_REQUEST_FAILED || this == PG_UNAVAILABLE;
+        return this == PG_REQUEST_FAILED || this == PG_UNAVAILABLE || this == PG_TRANSACTION_NOT_FOUND;
     }
 
     public boolean isUnknownFailure() {

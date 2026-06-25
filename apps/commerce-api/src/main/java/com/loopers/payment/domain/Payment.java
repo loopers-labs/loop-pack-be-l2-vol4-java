@@ -15,6 +15,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 
 @Getter
@@ -24,7 +25,8 @@ import java.time.ZonedDateTime;
     name = "payment",
     indexes = {
         @Index(name = "idx_payment_order", columnList = "order_id"),
-        @Index(name = "idx_payment_pg_transaction", columnList = "pg_transaction_key")
+        @Index(name = "idx_payment_pg_transaction", columnList = "pg_transaction_key"),
+        @Index(name = "idx_payment_recovery", columnList = "status, next_recovery_at, requested_at")
     },
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_payment_active_order", columnNames = {"order_id", "active_marker"})
@@ -72,6 +74,12 @@ public class Payment extends BaseEntity {
 
     @Column(name = "completed_at")
     private ZonedDateTime completedAt;
+
+    @Column(name = "next_recovery_at")
+    private ZonedDateTime nextRecoveryAt;
+
+    @Column(name = "last_recovery_reason")
+    private String lastRecoveryReason;
 
     private Payment(
         Long userId,
@@ -226,7 +234,7 @@ public class Payment extends BaseEntity {
         if (status == PaymentStatus.PENDING) {
             return;
         }
-        validateRequesting();
+        validatePendingConfirmable();
 
         this.status = PaymentStatus.PENDING;
         this.activeMarker = activeMarker(status);
@@ -235,6 +243,7 @@ public class Payment extends BaseEntity {
         this.pgStatus = PgPaymentStatus.PENDING;
         this.pgReason = null;
         this.completedAt = null;
+        clearRecovery();
     }
 
     public void markRequestFailed(
@@ -245,7 +254,7 @@ public class Payment extends BaseEntity {
         if (status == PaymentStatus.REQUEST_FAILED) {
             return;
         }
-        validateRequesting();
+        validateRequestFailureConfirmable();
 
         this.status = PaymentStatus.REQUEST_FAILED;
         this.activeMarker = activeMarker(status);
@@ -254,6 +263,7 @@ public class Payment extends BaseEntity {
         this.pgStatus = null;
         this.pgReason = pgReason;
         this.completedAt = requireCompletedAt(completedAt);
+        clearRecovery();
     }
 
     public void markUnknown(PaymentFailureReason failureReason, String pgReason) {
@@ -269,6 +279,7 @@ public class Payment extends BaseEntity {
         this.pgStatus = null;
         this.pgReason = pgReason;
         this.completedAt = null;
+        clearRecovery();
     }
 
     public void applyGatewayResult(PaymentGatewayResult result, ZonedDateTime completedAt) {
@@ -292,6 +303,7 @@ public class Payment extends BaseEntity {
         this.pgStatus = PgPaymentStatus.SUCCESS;
         this.pgReason = pgReason;
         this.completedAt = requireCompletedAt(completedAt);
+        clearRecovery();
     }
 
     public void markFailed(
@@ -312,6 +324,25 @@ public class Payment extends BaseEntity {
         this.pgStatus = PgPaymentStatus.FAILED;
         this.pgReason = pgReason;
         this.completedAt = requireCompletedAt(completedAt);
+        clearRecovery();
+    }
+
+    public void scheduleRecovery(ZonedDateTime nextRecoveryAt, String reason) {
+        if (!isInProgress()) {
+            return;
+        }
+        this.nextRecoveryAt = requireNextRecoveryAt(nextRecoveryAt);
+        this.lastRecoveryReason = reason;
+    }
+
+    public boolean isRecoveryGraceExpired(ZonedDateTime now, Duration gracePeriod) {
+        if (now == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복구 확인 시각은 비어있을 수 없습니다.");
+        }
+        if (gracePeriod == null || gracePeriod.isNegative() || gracePeriod.isZero()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복구 유예 시간은 0보다 커야 합니다.");
+        }
+        return !requestedAt.plus(gracePeriod).isAfter(now);
     }
 
     @Override
@@ -349,6 +380,16 @@ public class Payment extends BaseEntity {
         }
     }
 
+    public boolean isSamePayment(Long orderId, long amount, CardType cardType) {
+        return this.orderId.equals(orderId)
+            && this.amount == amount
+            && getCardType() == cardType;
+    }
+
+    public boolean canConfirmRequestFailure() {
+        return status == PaymentStatus.REQUESTING || status == PaymentStatus.UNKNOWN;
+    }
+
     private void validateNotFinalized() {
         if (status == PaymentStatus.REQUEST_FAILED) {
             throw new CoreException(ErrorType.CONFLICT, "이미 요청 실패로 종료된 결제입니다.");
@@ -362,6 +403,23 @@ public class Payment extends BaseEntity {
         if (status != PaymentStatus.REQUESTING) {
             throw new CoreException(ErrorType.CONFLICT, "결제 요청 중인 결제가 아닙니다.");
         }
+    }
+
+    private void validatePendingConfirmable() {
+        if (status != PaymentStatus.REQUESTING && status != PaymentStatus.UNKNOWN) {
+            throw new CoreException(ErrorType.CONFLICT, "PG 대기 상태로 확정할 수 없는 결제입니다.");
+        }
+    }
+
+    private void validateRequestFailureConfirmable() {
+        if (status != PaymentStatus.REQUESTING && status != PaymentStatus.UNKNOWN) {
+            throw new CoreException(ErrorType.CONFLICT, "PG 요청 실패로 확정할 수 없는 결제입니다.");
+        }
+    }
+
+    private void clearRecovery() {
+        this.nextRecoveryAt = null;
+        this.lastRecoveryReason = null;
     }
 
     private static Integer activeMarker(PaymentStatus status) {
@@ -453,5 +511,12 @@ public class Payment extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "결제 완료 일시는 비어있을 수 없습니다.");
         }
         return completedAt;
+    }
+
+    private static ZonedDateTime requireNextRecoveryAt(ZonedDateTime nextRecoveryAt) {
+        if (nextRecoveryAt == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "다음 복구 확인 시각은 비어있을 수 없습니다.");
+        }
+        return nextRecoveryAt;
     }
 }

@@ -54,6 +54,14 @@ commerce:
     callback-url: http://localhost:8080/api/v1/payments/callback
     connect-timeout-millis: 1000 # PG 서버 연결을 기다리는 최대 시간 (1초)
     read-timeout-millis: 10000 # PG 응답 수신을 기다리는 최대 시간 (10초)
+  payment:
+    recovery:
+      fixed-delay-ms: 5000
+      chunk-size: 100
+      retry-delay-seconds: 30
+      requesting-timeout-seconds: 15
+      pending-timeout-seconds: 30
+      not-found-grace-seconds: 120
 
 ---
 spring:
@@ -70,6 +78,9 @@ spring:
 commerce:
   product-like-summary:
     sync-enabled: false
+  payment:
+    recovery:
+      enabled: false
 
 ---
 spring:

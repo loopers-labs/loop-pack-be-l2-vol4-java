@@ -5,6 +5,7 @@ import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,6 +98,121 @@ class PaymentTest {
             () -> assertThat(payment.getFailureReason()).isEqualTo(PaymentFailureReason.PG_TIMEOUT),
             () -> assertThat(payment.getPgReason()).isEqualTo("read timed out"),
             () -> assertThat(payment.getCompletedAt()).isNull()
+        );
+    }
+
+    @DisplayName("확인 필요 상태에서 PG 거래를 찾으면, 결제는 PENDING 상태가 된다.")
+    @Test
+    void marksPending_whenUnknownPaymentIsFoundInPg() {
+        // arrange
+        Payment payment = Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            REQUESTED_AT
+        );
+
+        // act
+        payment.markPending(TRANSACTION_KEY);
+
+        // assert
+        assertAll(
+            () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+            () -> assertThat(payment.getPgTransactionKey()).isEqualTo(TRANSACTION_KEY),
+            () -> assertThat(payment.getFailureReason()).isNull()
+        );
+    }
+
+    @DisplayName("복구 시점에 아직 확정할 수 없으면, 다음 확인 시각을 예약한다.")
+    @Test
+    void schedulesRecovery_whenPaymentNeedsAnotherCheck() {
+        // arrange
+        Payment payment = Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            REQUESTED_AT
+        );
+        ZonedDateTime nextRecoveryAt = REQUESTED_AT.plusSeconds(30);
+
+        // act
+        payment.scheduleRecovery(nextRecoveryAt, "PG 조회 실패");
+
+        // assert
+        assertAll(
+            () -> assertThat(payment.getNextRecoveryAt()).isEqualTo(nextRecoveryAt),
+            () -> assertThat(payment.getLastRecoveryReason()).isEqualTo("PG 조회 실패")
+        );
+    }
+
+    @DisplayName("PG 거래를 찾지 못한 상태가 유예 시간을 넘기면, 복구 유예 시간이 만료된 것으로 판단한다.")
+    @Test
+    void returnsTrue_whenRecoveryGracePeriodIsExpired() {
+        // arrange
+        Payment payment = Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            REQUESTED_AT
+        );
+
+        // act
+        boolean expired = payment.isRecoveryGraceExpired(REQUESTED_AT.plusMinutes(2), Duration.ofMinutes(2));
+
+        // assert
+        assertThat(expired).isTrue();
+    }
+
+    @DisplayName("PG 거래 없음이 유예 시간을 넘기면, 확인 필요 결제를 요청 실패로 확정한다.")
+    @Test
+    void marksRequestFailed_whenUnknownPaymentIsNotFoundAfterGracePeriod() {
+        // arrange
+        Payment payment = Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            REQUESTED_AT
+        );
+
+        // act
+        payment.markRequestFailed(PaymentFailureReason.PG_TRANSACTION_NOT_FOUND, "transaction not found", COMPLETED_AT);
+
+        // assert
+        assertAll(
+            () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REQUEST_FAILED),
+            () -> assertThat(payment.getFailureReason()).isEqualTo(PaymentFailureReason.PG_TRANSACTION_NOT_FOUND),
+            () -> assertThat(payment.getCompletedAt()).isEqualTo(COMPLETED_AT)
+        );
+    }
+
+    @DisplayName("요청 중이거나 확인 필요 상태인 결제만 요청 실패로 확정할 수 있다.")
+    @Test
+    void returnsTrue_whenPaymentCanConfirmRequestFailure() {
+        // arrange
+        Payment requesting = createRequestingPayment();
+        Payment unknown = Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            REQUESTED_AT
+        );
+        Payment pending = createPendingPayment();
+
+        // act & assert
+        assertAll(
+            () -> assertThat(requesting.canConfirmRequestFailure()).isTrue(),
+            () -> assertThat(unknown.canConfirmRequestFailure()).isTrue(),
+            () -> assertThat(pending.canConfirmRequestFailure()).isFalse()
         );
     }
 

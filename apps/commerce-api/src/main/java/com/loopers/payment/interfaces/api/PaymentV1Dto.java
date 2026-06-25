@@ -2,6 +2,7 @@ package com.loopers.payment.interfaces.api;
 
 import com.loopers.payment.application.PaymentInfo;
 import com.loopers.payment.application.PaymentCallbackCommand;
+import com.loopers.payment.application.PgPaymentFailureReason;
 import com.loopers.payment.application.RequestPaymentCommand;
 import com.loopers.payment.domain.CardType;
 import com.loopers.payment.domain.PaymentFailureReason;
@@ -94,16 +95,7 @@ public class PaymentV1Dto {
             if (status != PgPaymentStatus.FAILED) {
                 return null;
             }
-            if (reason == null) {
-                return PaymentFailureReason.PG_TRANSACTION_FAILED;
-            }
-            if (reason.contains("한도")) {
-                return PaymentFailureReason.LIMIT_EXCEEDED;
-            }
-            if (reason.contains("카드")) {
-                return PaymentFailureReason.INVALID_CARD;
-            }
-            return PaymentFailureReason.PG_TRANSACTION_FAILED;
+            return PgPaymentFailureReason.resolve(reason);
         }
     }
 }

@@ -2,9 +2,13 @@ package com.loopers.payment.infrastructure;
 
 import com.loopers.payment.domain.Payment;
 import com.loopers.payment.domain.PaymentRepository;
+import com.loopers.payment.domain.PaymentStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -36,5 +40,23 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     @Override
     public Optional<Payment> findLatestByOrderId(Long orderId) {
         return paymentJpaRepository.findFirstByOrderIdOrderByIdDesc(orderId);
+    }
+
+    @Override
+    public List<Payment> findRecoverablePayments(
+        ZonedDateTime now,
+        ZonedDateTime requestingDeadline,
+        ZonedDateTime pendingDeadline,
+        int limit
+    ) {
+        return paymentJpaRepository.findRecoverablePayments(
+            now,
+            PaymentStatus.REQUESTING,
+            requestingDeadline,
+            PaymentStatus.PENDING,
+            pendingDeadline,
+            PaymentStatus.UNKNOWN,
+            PageRequest.of(0, limit)
+        );
     }
 }

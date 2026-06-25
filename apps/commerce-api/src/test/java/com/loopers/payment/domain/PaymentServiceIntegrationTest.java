@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -221,6 +222,70 @@ class PaymentServiceIntegrationTest {
 
             // act & assert
             assertThatCode(() -> paymentService.startPayment(createRequestingPayment(ORDER_ID))).doesNotThrowAnyException();
+        }
+    }
+
+    @DisplayName("복구 대상 결제를 조회할 때")
+    @Nested
+    class FindRecoverablePayments {
+
+        @DisplayName("확인 시점이 지난 진행 중 결제만 오래된 순서로 반환한다.")
+        @Test
+        void returnsRecoverablePayments_whenPaymentsAreDue() {
+            // arrange
+            ZonedDateTime now = REQUESTED_AT.plusMinutes(3);
+            Payment requesting = paymentService.savePayment(createRequestingPayment(ORDER_ID));
+            Payment pending = paymentService.savePayment(createPendingPayment(OTHER_ORDER_ID, TRANSACTION_KEY));
+            Payment unknown = Payment.unknown(
+                USER_ID,
+                1_351_039_137L,
+                AMOUNT,
+                CardType.SAMSUNG,
+                CARD_NO,
+                REQUESTED_AT
+            );
+            unknown = paymentService.savePayment(unknown);
+
+            Payment notDuePending = createPendingPayment(1_351_039_138L, "20250816:TR:not-due");
+            notDuePending.scheduleRecovery(now.plusSeconds(30), "retry later");
+            paymentService.savePayment(notDuePending);
+
+            Payment failed = createRequestingPayment(1_351_039_139L);
+            failed.markRequestFailed(PaymentFailureReason.PG_UNAVAILABLE, "connect refused", REQUESTED_AT.plusSeconds(1));
+            paymentService.savePayment(failed);
+
+            // act
+            List<Payment> payments = paymentService.findRecoverablePayments(
+                now,
+                now.minusSeconds(15),
+                now.minusSeconds(30),
+                10
+            );
+
+            // assert
+            assertThat(payments)
+                .extracting(Payment::getId)
+                .containsExactly(requesting.getId(), pending.getId(), unknown.getId());
+        }
+
+        @DisplayName("요청한 청크 크기만큼만 반환한다.")
+        @Test
+        void returnsPaymentsWithinLimit() {
+            // arrange
+            ZonedDateTime now = REQUESTED_AT.plusMinutes(3);
+            paymentService.savePayment(createRequestingPayment(ORDER_ID));
+            paymentService.savePayment(createRequestingPayment(OTHER_ORDER_ID));
+
+            // act
+            List<Payment> payments = paymentService.findRecoverablePayments(
+                now,
+                now.minusSeconds(15),
+                now.minusSeconds(30),
+                1
+            );
+
+            // assert
+            assertThat(payments).hasSize(1);
         }
     }
 

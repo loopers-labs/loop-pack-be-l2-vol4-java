@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -44,6 +46,16 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Optional<Payment> findLatestPaymentByOrderId(Long orderId) {
         return paymentRepository.findLatestByOrderId(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Payment> findRecoverablePayments(
+        ZonedDateTime now,
+        ZonedDateTime requestingDeadline,
+        ZonedDateTime pendingDeadline,
+        int limit
+    ) {
+        return paymentRepository.findRecoverablePayments(now, requestingDeadline, pendingDeadline, limit);
     }
 
     @Transactional(readOnly = true)

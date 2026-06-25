@@ -1,5 +1,7 @@
 package com.loopers.payment.domain;
 
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface PaymentRepository {
@@ -13,4 +15,11 @@ public interface PaymentRepository {
     Optional<Payment> findByPgTransactionKey(String pgTransactionKey);
 
     Optional<Payment> findLatestByOrderId(Long orderId);
+
+    List<Payment> findRecoverablePayments(
+        ZonedDateTime now,
+        ZonedDateTime requestingDeadline,
+        ZonedDateTime pendingDeadline,
+        int limit
+    );
 }
