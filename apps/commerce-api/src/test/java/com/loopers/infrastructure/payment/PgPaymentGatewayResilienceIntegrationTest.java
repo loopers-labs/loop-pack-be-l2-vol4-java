@@ -116,16 +116,29 @@ class PgPaymentGatewayResilienceIntegrationTest {
             assertThat(stub.count()).isEqualTo(1);
         }
 
-        @DisplayName("4xx(결정론적 실패)는 재시도하지 않는다.")
+        @DisplayName("4xx(결정론적 실패)는 재시도하지 않고, in-doubt 와 구분되도록 BAD_REQUEST 로 표면화한다.")
         @Test
         void clientError4xx_singleAttemptNoRetry() {
             stub.mode(StubPgInterceptor.Mode.CLIENT_ERROR);
 
             assertThatThrownBy(() -> paymentGateway.request(command()))
-                    .isInstanceOf(CoreException.class);
+                    .isInstanceOf(CoreException.class)
+                    .satisfies(e -> assertThat(((CoreException) e).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST));
 
             assertThat(stub.count()).isEqualTo(1);
         }
+    }
+
+    @DisplayName("PG 계약(orderId ≥ 6자)에 맞춰 짧은 주문 PK 는 0 패딩으로 전송한다.")
+    @Test
+    void shortOrderId_isZeroPaddedToSixChars() {
+        stub.mode(StubPgInterceptor.Mode.CLIENT_ERROR); // 응답은 무관 — 전송된 바디만 검증
+
+        PaymentGateway.Command shortOrder = new PaymentGateway.Command(
+                "1", "100", CardType.SAMSUNG, "1234-5678-9814-1451", 5_000L, "http://localhost/callback");
+        assertThatThrownBy(() -> paymentGateway.request(shortOrder)).isInstanceOf(CoreException.class);
+
+        assertThat(stub.lastBody()).contains("\"orderId\":\"000100\"");
     }
 
     @TestConfiguration
@@ -154,6 +167,7 @@ class PgPaymentGatewayResilienceIntegrationTest {
 
         private volatile Mode mode = Mode.SERVER_ERROR;
         private final AtomicInteger count = new AtomicInteger();
+        private volatile String lastBody = "";
 
         void mode(Mode mode) {
             this.mode = mode;
@@ -161,16 +175,22 @@ class PgPaymentGatewayResilienceIntegrationTest {
 
         void reset() {
             count.set(0);
+            lastBody = "";
         }
 
         int count() {
             return count.get();
         }
 
+        String lastBody() {
+            return lastBody;
+        }
+
         @Override
         public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution)
                 throws IOException {
             count.incrementAndGet();
+            lastBody = new String(body, java.nio.charset.StandardCharsets.UTF_8);
             return switch (mode) {
                 case SERVER_ERROR -> new MockClientHttpResponse(new byte[0], HttpStatus.INTERNAL_SERVER_ERROR);
                 case CLIENT_ERROR -> new MockClientHttpResponse(new byte[0], HttpStatus.BAD_REQUEST);

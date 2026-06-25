@@ -41,23 +41,35 @@ public class PaymentApplicationService {
         // 1) 예약(잠금 구간): 주문 잠금 → 중복 차단 → PENDING 저장 → 커밋(락 해제).
         Payment payment = paymentReserver.reserve(criteria);
 
-        // 2) PG 요청(락/TX 밖). 실패/지연은 "모름" → PENDING 유지하고 정상 응답.
+        // 2) PG 요청(락/TX 밖). 실패는 두 갈래로 나눠 다룬다:
+        //    - in-doubt(타임아웃/CB-open/재시도 소진 = SERVICE_UNAVAILABLE): 청구 여부가 "모름" → 함부로 단정하지
+        //      않고 PENDING 유지, 결과는 콜백/정산으로 확정한다.
+        //    - 결정론적 거절(4xx = BAD_REQUEST): 요청이 PG 에 닿았으나 청구는 일어나지 않음이 확실 → PENDING 으로
+        //      숨기면 영원히 안 풀리는 좀비가 되므로 FAILED 로 확정한다(가드가 정정 후 재시도를 허용).
+        PaymentGateway.Result result;
         try {
-            PaymentGateway.Result result = paymentGateway.request(new PaymentGateway.Command(
+            result = paymentGateway.request(new PaymentGateway.Command(
                     String.valueOf(criteria.userId()),
                     String.valueOf(criteria.orderId()),
                     criteria.cardType(),
                     criteria.cardNo(),
                     payment.getAmount().getAmount(),
                     callbackUrl));
-            // 3) 접수 확인 — transactionKey 보관(자체 커밋). 상태는 여전히 PENDING.
-            payment.assignTransactionKey(result.transactionKey());
-            payment = paymentRepository.save(payment);
-        } catch (RuntimeException e) {
-            log.warn("PG 결제 요청 실패/지연 — PENDING 유지 후 정산 대상. paymentId={}, orderId={}, cause={}",
-                    payment.getId(), criteria.orderId(), e.toString());
+        } catch (CoreException e) {
+            if (e.getErrorType() == ErrorType.SERVICE_UNAVAILABLE) {
+                log.warn("PG 결제 요청 지연/불가(in-doubt) — PENDING 유지 후 정산 대상. paymentId={}, orderId={}, cause={}",
+                        payment.getId(), criteria.orderId(), e.getMessage());
+                return PaymentInfo.Requested.from(payment);
+            }
+            log.warn("PG 결제 요청 거절(결정론적) — FAILED 확정. paymentId={}, orderId={}, cause={}",
+                    payment.getId(), criteria.orderId(), e.getMessage());
+            payment.markFailed(e.getMessage());
+            return PaymentInfo.Requested.from(paymentRepository.save(payment));
         }
 
+        // 3) 접수 확인 — transactionKey 보관(자체 커밋). 상태는 여전히 PENDING.
+        payment.assignTransactionKey(result.transactionKey());
+        payment = paymentRepository.save(payment);
         return PaymentInfo.Requested.from(payment);
     }
 

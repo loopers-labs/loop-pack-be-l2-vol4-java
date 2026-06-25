@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -42,6 +43,7 @@ public class PgPaymentGateway implements PaymentGateway {
 
     private static final String USER_ID_HEADER = "X-USER-ID";
     private static final String CB_NAME = "pg";
+    private static final int PG_ORDER_ID_MIN_LENGTH = 6;
 
     private final RestClient pgRestClient;
 
@@ -50,7 +52,7 @@ public class PgPaymentGateway implements PaymentGateway {
     @CircuitBreaker(name = CB_NAME)
     public Result request(Command command) {
         PgPaymentDto.Request body = new PgPaymentDto.Request(
-                command.orderId(),
+                toPgOrderId(command.orderId()),
                 command.cardType().name(),
                 command.cardNo(),
                 command.amount(),
@@ -98,6 +100,14 @@ public class PgPaymentGateway implements PaymentGateway {
      */
     @SuppressWarnings("unused")
     private Result requestFallback(Command command, Throwable t) {
+        // 결정론적 거절(4xx): 요청이 PG 에 닿았으나 청구는 일어나지 않았다(not in-doubt). SERVICE_UNAVAILABLE 로
+        // 뭉개면 응용이 PENDING 으로 숨겨 영원히 안 풀리는 좀비가 되므로, BAD_REQUEST 로 구분해 표면화한다.
+        if (t instanceof HttpClientErrorException ce) {
+            log.warn("PG 결제요청 거절(4xx) — 결정론적 실패. orderId={}, status={}, cause={}",
+                    command.orderId(), ce.getStatusCode(), t.toString());
+            throw new CoreException(ErrorType.BAD_REQUEST,
+                    "PG 가 결제 요청을 거절했습니다. (status=" + ce.getStatusCode().value() + ")");
+        }
         log.warn("PG 결제요청 불가(CB/실패) — PENDING 유지 대상. orderId={}, cause={}", command.orderId(), t.toString());
         throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "결제 시스템이 일시적으로 응답하지 않습니다.");
     }
@@ -110,6 +120,18 @@ public class PgPaymentGateway implements PaymentGateway {
     private Optional<Result> findFallback(String transactionKey, String userId, Throwable t) {
         log.warn("PG 결제조회 불가(CB/실패). transactionKey={}, cause={}", transactionKey, t.toString());
         throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "결제 시스템이 일시적으로 응답하지 않습니다.");
+    }
+
+    /**
+     * pg-simulator 계약: orderId 는 6자 이상 문자열이어야 한다(미만이면 400). 내부 주문 PK(예: {@code "1"})를
+     * 그대로 보내면 거절되므로 0 패딩으로 최소 길이를 보장한다(이미 6자 이상이면 그대로). 콜백 echo 도 같은 포맷이라
+     * 역상관(orderId → Long)이 필요하면 {@code Long.parseLong} 으로 복원할 수 있다.
+     */
+    private static String toPgOrderId(String orderId) {
+        if (orderId.length() >= PG_ORDER_ID_MIN_LENGTH) {
+            return orderId;
+        }
+        return "0".repeat(PG_ORDER_ID_MIN_LENGTH - orderId.length()) + orderId;
     }
 
     private static <T> T requireData(PgPaymentDto.Envelope<T> response) {
