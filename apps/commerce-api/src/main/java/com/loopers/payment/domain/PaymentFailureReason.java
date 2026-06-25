@@ -3,6 +3,7 @@ package com.loopers.payment.domain;
 public enum PaymentFailureReason {
     LIMIT_EXCEEDED,
     INVALID_CARD,
+    PG_TRANSACTION_FAILED,
     PG_REQUEST_FAILED,
     PG_TIMEOUT,
     PG_UNAVAILABLE,
@@ -18,6 +19,6 @@ public enum PaymentFailureReason {
     }
 
     public boolean isTransactionFailure() {
-        return this == LIMIT_EXCEEDED || this == INVALID_CARD;
+        return this == LIMIT_EXCEEDED || this == INVALID_CARD || this == PG_TRANSACTION_FAILED;
     }
 }

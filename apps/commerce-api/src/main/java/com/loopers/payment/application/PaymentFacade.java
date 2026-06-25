@@ -11,6 +11,7 @@ import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 
@@ -25,8 +26,14 @@ public class PaymentFacade {
     public PaymentInfo requestPayment(RequestPaymentCommand command) {
         Order order = orderService.getOrder(command.orderId());
         validateOrder(command.userId(), order);
-        validatePaymentAmount(order);
-        validateNoPaymentInProgress(command.orderId());
+        Payment payment = paymentService.startPayment(Payment.requesting(
+            command.userId(),
+            command.orderId(),
+            order.getPaymentAmount(),
+            command.cardType(),
+            command.cardNo(),
+            ZonedDateTime.now()
+        ));
 
         PaymentGatewayResult result = paymentGateway.requestPayment(new PaymentGatewayPaymentCommand(
             command.userId(),
@@ -35,9 +42,31 @@ public class PaymentFacade {
             command.cardNo(),
             order.getPaymentAmount()
         ));
-        Payment payment = createPayment(command, order.getPaymentAmount(), result, ZonedDateTime.now());
+        payment.applyGatewayResult(result, ZonedDateTime.now());
 
         return PaymentInfo.from(paymentService.savePayment(payment));
+    }
+
+    @Transactional
+    public void handleCallback(PaymentCallbackCommand command) {
+        Payment payment = paymentService.getPaymentByPgTransactionKey(command.transactionKey());
+        payment.validateSamePayment(command.orderId(), command.amount(), command.cardType());
+
+        if (command.isPending()) {
+            return;
+        }
+
+        Order order = orderService.getOrder(payment.getOrderId());
+        ZonedDateTime completedAt = ZonedDateTime.now();
+
+        if (command.isSucceeded()) {
+            payment.markSucceeded(command.transactionKey(), command.reason(), completedAt);
+            order.completePayment();
+            return;
+        }
+
+        payment.markFailed(command.transactionKey(), command.failureReason(), command.reason(), completedAt);
+        order.failPayment();
     }
 
     private void validateOrder(Long userId, Order order) {
@@ -45,56 +74,7 @@ public class PaymentFacade {
             throw new CoreException(ErrorType.FORBIDDEN, "다른 사용자의 주문은 결제할 수 없습니다.");
         }
         order.validatePayable();
+        order.validatePaymentRequired();
     }
 
-    private void validatePaymentAmount(Order order) {
-        if (order.getPaymentAmount() <= 0) {
-            throw new CoreException(ErrorType.CONFLICT, "결제 금액이 없는 주문은 PG 결제를 요청할 수 없습니다.");
-        }
-    }
-
-    private void validateNoPaymentInProgress(Long orderId) {
-        paymentService.findLatestPaymentByOrderId(orderId)
-            .filter(Payment::isInProgress)
-            .ifPresent(payment -> {
-                throw new CoreException(ErrorType.CONFLICT, "이미 결제 확인 중인 주문입니다.");
-            });
-    }
-
-    private Payment createPayment(
-        RequestPaymentCommand command,
-        long amount,
-        PaymentGatewayResult result,
-        ZonedDateTime requestedAt
-    ) {
-        return switch (result.status()) {
-            case ACCEPTED -> Payment.pending(
-                command.userId(),
-                command.orderId(),
-                amount,
-                command.cardType(),
-                command.cardNo(),
-                result.transaction().transactionKey(),
-                requestedAt
-            );
-            case FAILED -> Payment.requestFailed(
-                command.userId(),
-                command.orderId(),
-                amount,
-                command.cardType(),
-                command.cardNo(),
-                result.failureReason(),
-                requestedAt
-            );
-            case UNKNOWN -> Payment.unknown(
-                command.userId(),
-                command.orderId(),
-                amount,
-                command.cardType(),
-                command.cardNo(),
-                result.failureReason(),
-                requestedAt
-            );
-        };
-    }
 }

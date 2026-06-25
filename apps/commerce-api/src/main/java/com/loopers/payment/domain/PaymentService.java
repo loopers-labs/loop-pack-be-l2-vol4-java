@@ -3,6 +3,7 @@ package com.loopers.payment.domain;
 import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,15 @@ public class PaymentService {
     @Transactional
     public Payment savePayment(Payment payment) {
         return paymentRepository.save(payment);
+    }
+
+    @Transactional
+    public Payment startPayment(Payment payment) {
+        try {
+            return paymentRepository.saveAndFlush(payment);
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 결제 확인 중인 주문입니다.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -34,5 +44,14 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Optional<Payment> findLatestPaymentByOrderId(Long orderId) {
         return paymentRepository.findLatestByOrderId(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public void validatePaymentRequestable(Long orderId) {
+        paymentRepository.findLatestByOrderId(orderId)
+            .filter(Payment::isInProgress)
+            .ifPresent(payment -> {
+                throw new CoreException(ErrorType.CONFLICT, "이미 결제 확인 중인 주문입니다.");
+            });
     }
 }

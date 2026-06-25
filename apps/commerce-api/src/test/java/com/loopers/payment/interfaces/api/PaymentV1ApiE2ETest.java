@@ -4,10 +4,13 @@ import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItems;
 import com.loopers.order.domain.OrderService;
+import com.loopers.order.domain.OrderStatus;
 import com.loopers.payment.domain.CardType;
+import com.loopers.payment.domain.Payment;
 import com.loopers.payment.domain.PaymentGateway;
 import com.loopers.payment.domain.PaymentGatewayResult;
 import com.loopers.payment.domain.PaymentGatewayTransaction;
+import com.loopers.payment.domain.PaymentService;
 import com.loopers.payment.domain.PaymentStatus;
 import com.loopers.payment.domain.PgPaymentStatus;
 import com.loopers.shared.presentation.ApiResponse;
@@ -30,6 +33,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -41,6 +45,7 @@ class PaymentV1ApiE2ETest {
 
     private static final String ENDPOINT_USERS = "/api/v1/users";
     private static final String ENDPOINT_PAYMENTS = "/api/v1/payments";
+    private static final String ENDPOINT_PAYMENT_CALLBACK = "/api/v1/payments/callback";
     private static final String HEADER_LOGIN_ID = "X-Loopers-LoginId";
     private static final String HEADER_LOGIN_PW = "X-Loopers-LoginPw";
     private static final String LOGIN_ID = "loopers01";
@@ -49,6 +54,7 @@ class PaymentV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final OrderService orderService;
+    private final PaymentService paymentService;
     private final DatabaseCleanUp databaseCleanUp;
 
     @MockitoBean
@@ -58,10 +64,12 @@ class PaymentV1ApiE2ETest {
     PaymentV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         OrderService orderService,
+        PaymentService paymentService,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.orderService = orderService;
+        this.paymentService = paymentService;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -126,6 +134,53 @@ class PaymentV1ApiE2ETest {
         }
     }
 
+    @DisplayName("POST /api/v1/payments/callback")
+    @Nested
+    class HandleCallback {
+
+        @DisplayName("PG 성공 콜백이 도착하면 인증 없이도 200 OK를 반환하고 결제와 주문을 완료한다.")
+        @Test
+        void returnsOkAndCompletesPayment_whenSuccessCallbackArrives() {
+            // arrange
+            Long userId = signUpUser();
+            Order order = createOrder(userId);
+            PaymentV1Dto.PaymentRequest paymentRequest = new PaymentV1Dto.PaymentRequest(
+                order.getId(),
+                CardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+            when(paymentGateway.requestPayment(any()))
+                .thenReturn(PaymentGatewayResult.accepted(new PaymentGatewayTransaction(
+                    TRANSACTION_KEY,
+                    PgPaymentStatus.PENDING,
+                    null
+                )));
+            requestPayment(paymentRequest, authHeaders());
+
+            Map<String, Object> callbackRequest = Map.of(
+                "transactionKey", TRANSACTION_KEY,
+                "orderId", order.getId().toString(),
+                "cardType", CardType.SAMSUNG.name(),
+                "amount", 1_550_000L,
+                "status", PgPaymentStatus.SUCCESS.name(),
+                "reason", "정상 승인되었습니다."
+            );
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = handleCallback(callbackRequest);
+
+            // assert
+            Payment payment = paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY);
+            Order foundOrder = orderService.getOrder(order.getId());
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED),
+                () -> assertThat(payment.getPgStatus()).isEqualTo(PgPaymentStatus.SUCCESS),
+                () -> assertThat(foundOrder.getStatus()).isEqualTo(OrderStatus.PAID)
+            );
+        }
+    }
+
     private Long signUpUser() {
         UserV1Dto.SignUpRequest request = new UserV1Dto.SignUpRequest(
             LOGIN_ID,
@@ -171,6 +226,16 @@ class PaymentV1ApiE2ETest {
             ENDPOINT_PAYMENTS,
             HttpMethod.POST,
             new HttpEntity<>(request, headers),
+            responseType
+        );
+    }
+
+    private ResponseEntity<ApiResponse<Object>> handleCallback(Map<String, Object> request) {
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT_PAYMENT_CALLBACK,
+            HttpMethod.POST,
+            new HttpEntity<>(request),
             responseType
         );
     }

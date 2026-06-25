@@ -112,9 +112,18 @@ public class Order extends BaseEntity {
         }
     }
 
+    public void validatePaymentRequired() {
+        if (getPaymentAmount() <= 0) {
+            throw new CoreException(ErrorType.CONFLICT, "결제 금액이 없는 주문은 결제를 요청할 수 없습니다.");
+        }
+    }
+
     public void completePayment() {
         if (status == OrderStatus.PAID) {
             return;
+        }
+        if (status == OrderStatus.PAYMENT_FAILED) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 결제 실패한 주문입니다.");
         }
         this.status = OrderStatus.PAID;
     }

@@ -14,6 +14,7 @@ import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -108,7 +109,9 @@ class PaymentServiceIntegrationTest {
         @Test
         void returnsLatestPayment_whenPaymentsExist() {
             // arrange
-            paymentService.savePayment(createPendingPayment(ORDER_ID, "20250816:TR:first"));
+            Payment first = createPendingPayment(ORDER_ID, "20250816:TR:first");
+            first.markFailed("20250816:TR:first", PaymentFailureReason.LIMIT_EXCEEDED, "한도초과입니다.", REQUESTED_AT.plusSeconds(5));
+            paymentService.savePayment(first);
             Payment latest = paymentService.savePayment(createPendingPayment(ORDER_ID, "20250816:TR:second"));
             paymentService.savePayment(createPendingPayment(OTHER_ORDER_ID, "20250816:TR:other"));
 
@@ -136,7 +139,96 @@ class PaymentServiceIntegrationTest {
         }
     }
 
+    @DisplayName("결제 요청 가능 여부를 검증할 때")
+    @Nested
+    class ValidatePaymentRequestable {
+
+        @DisplayName("진행 중인 결제가 있으면, CONFLICT 예외를 던진다.")
+        @Test
+        void throwsConflict_whenPaymentIsInProgress() {
+            // arrange
+            paymentService.savePayment(createPendingPayment(ORDER_ID, TRANSACTION_KEY));
+
+            // act & assert
+            assertThatThrownBy(() -> paymentService.validatePaymentRequestable(ORDER_ID))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("주문에 결제가 없으면, 예외를 던지지 않는다.")
+        @Test
+        void doesNotThrow_whenPaymentDoesNotExist() {
+            // act & assert
+            assertThatCode(() -> paymentService.validatePaymentRequestable(ORDER_ID)).doesNotThrowAnyException();
+        }
+
+        @DisplayName("최신 결제가 종료된 결제이면, 예외를 던지지 않는다.")
+        @Test
+        void doesNotThrow_whenLatestPaymentIsFinalized() {
+            // arrange
+            Payment payment = createPendingPayment(ORDER_ID, TRANSACTION_KEY);
+            payment.markSucceeded(TRANSACTION_KEY, "정상 승인되었습니다.", REQUESTED_AT.plusSeconds(5));
+            paymentService.savePayment(payment);
+
+            // act & assert
+            assertThatCode(() -> paymentService.validatePaymentRequestable(ORDER_ID)).doesNotThrowAnyException();
+        }
+    }
+
+    @DisplayName("결제 요청을 시작할 때")
+    @Nested
+    class StartPayment {
+
+        @DisplayName("결제 요청권을 확보하면, REQUESTING 결제를 저장한다.")
+        @Test
+        void savesRequestingPayment_whenPaymentCanStart() {
+            // arrange
+            Payment payment = createRequestingPayment(ORDER_ID);
+
+            // act
+            Payment saved = paymentService.startPayment(payment);
+            Payment found = paymentService.getPayment(saved.getId());
+
+            // assert
+            assertAll(
+                () -> assertThat(found.getStatus()).isEqualTo(PaymentStatus.REQUESTING),
+                () -> assertThat(found.getOrderId()).isEqualTo(ORDER_ID),
+                () -> assertThat(found.getPgTransactionKey()).isNull()
+            );
+        }
+
+        @DisplayName("진행 중인 결제가 있으면, 새 결제 요청권을 확보할 수 없다.")
+        @Test
+        void throwsConflict_whenActivePaymentExists() {
+            // arrange
+            paymentService.startPayment(createRequestingPayment(ORDER_ID));
+
+            // act & assert
+            assertThatThrownBy(() -> paymentService.startPayment(createRequestingPayment(ORDER_ID)))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("기존 결제가 종료된 결제이면, 새 결제 요청권을 확보할 수 있다.")
+        @Test
+        void startsPayment_whenLatestPaymentIsFinalized() {
+            // arrange
+            Payment payment = createPendingPayment(ORDER_ID, TRANSACTION_KEY);
+            payment.markFailed(TRANSACTION_KEY, PaymentFailureReason.LIMIT_EXCEEDED, "한도초과입니다.", REQUESTED_AT.plusSeconds(5));
+            paymentService.savePayment(payment);
+
+            // act & assert
+            assertThatCode(() -> paymentService.startPayment(createRequestingPayment(ORDER_ID))).doesNotThrowAnyException();
+        }
+    }
+
     private Payment createPendingPayment(Long orderId, String transactionKey) {
         return Payment.pending(USER_ID, orderId, AMOUNT, CardType.SAMSUNG, CARD_NO, transactionKey, REQUESTED_AT);
+    }
+
+    private Payment createRequestingPayment(Long orderId) {
+        return Payment.requesting(USER_ID, orderId, AMOUNT, CardType.SAMSUNG, CARD_NO, REQUESTED_AT);
     }
 }

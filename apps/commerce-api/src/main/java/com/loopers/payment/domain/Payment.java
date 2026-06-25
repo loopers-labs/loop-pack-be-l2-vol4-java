@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,9 +25,14 @@ import java.time.ZonedDateTime;
     indexes = {
         @Index(name = "idx_payment_order", columnList = "order_id"),
         @Index(name = "idx_payment_pg_transaction", columnList = "pg_transaction_key")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payment_active_order", columnNames = {"order_id", "active_marker"})
     }
 )
 public class Payment extends BaseEntity {
+
+    private static final int ACTIVE_MARKER = 1;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -43,6 +49,9 @@ public class Payment extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status;
+
+    @Column(name = "active_marker")
+    private Integer activeMarker;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "failure_reason")
@@ -83,12 +92,37 @@ public class Payment extends BaseEntity {
         this.amount = requireAmount(amount);
         this.card = PaymentCard.of(cardType, cardNo);
         this.status = requireStatus(status);
+        this.activeMarker = activeMarker(status);
         this.failureReason = failureReason;
         this.pgTransactionKey = pgTransactionKey;
         this.pgStatus = pgStatus;
         this.pgReason = pgReason;
         this.requestedAt = requireRequestedAt(requestedAt);
         this.completedAt = completedAt;
+    }
+
+    public static Payment requesting(
+        Long userId,
+        Long orderId,
+        long amount,
+        CardType cardType,
+        String cardNo,
+        ZonedDateTime requestedAt
+    ) {
+        return new Payment(
+            userId,
+            orderId,
+            amount,
+            cardType,
+            cardNo,
+            PaymentStatus.REQUESTING,
+            null,
+            null,
+            null,
+            null,
+            requestedAt,
+            null
+        );
     }
 
     public static Payment pending(
@@ -188,6 +222,63 @@ public class Payment extends BaseEntity {
         );
     }
 
+    public void markPending(String pgTransactionKey) {
+        if (status == PaymentStatus.PENDING) {
+            return;
+        }
+        validateRequesting();
+
+        this.status = PaymentStatus.PENDING;
+        this.activeMarker = activeMarker(status);
+        this.failureReason = null;
+        this.pgTransactionKey = requirePgTransactionKey(pgTransactionKey);
+        this.pgStatus = PgPaymentStatus.PENDING;
+        this.pgReason = null;
+        this.completedAt = null;
+    }
+
+    public void markRequestFailed(
+        PaymentFailureReason failureReason,
+        String pgReason,
+        ZonedDateTime completedAt
+    ) {
+        if (status == PaymentStatus.REQUEST_FAILED) {
+            return;
+        }
+        validateRequesting();
+
+        this.status = PaymentStatus.REQUEST_FAILED;
+        this.activeMarker = activeMarker(status);
+        this.failureReason = requireRequestFailureReason(failureReason);
+        this.pgTransactionKey = null;
+        this.pgStatus = null;
+        this.pgReason = pgReason;
+        this.completedAt = requireCompletedAt(completedAt);
+    }
+
+    public void markUnknown(PaymentFailureReason failureReason, String pgReason) {
+        if (status == PaymentStatus.UNKNOWN) {
+            return;
+        }
+        validateRequesting();
+
+        this.status = PaymentStatus.UNKNOWN;
+        this.activeMarker = activeMarker(status);
+        this.failureReason = requireUnknownFailureReason(failureReason);
+        this.pgTransactionKey = null;
+        this.pgStatus = null;
+        this.pgReason = pgReason;
+        this.completedAt = null;
+    }
+
+    public void applyGatewayResult(PaymentGatewayResult result, ZonedDateTime completedAt) {
+        switch (result.status()) {
+            case ACCEPTED -> markPending(result.transaction().transactionKey());
+            case FAILED -> markRequestFailed(result.failureReason(), result.reason(), completedAt);
+            case UNKNOWN -> markUnknown(result.failureReason(), result.reason());
+        }
+    }
+
     public void markSucceeded(String pgTransactionKey, String pgReason, ZonedDateTime completedAt) {
         if (status == PaymentStatus.SUCCEEDED) {
             return;
@@ -195,6 +286,7 @@ public class Payment extends BaseEntity {
         validateNotFinalized();
 
         this.status = PaymentStatus.SUCCEEDED;
+        this.activeMarker = activeMarker(status);
         this.failureReason = null;
         this.pgTransactionKey = requirePgTransactionKey(pgTransactionKey);
         this.pgStatus = PgPaymentStatus.SUCCESS;
@@ -214,6 +306,7 @@ public class Payment extends BaseEntity {
         validateNotFinalized();
 
         this.status = PaymentStatus.FAILED;
+        this.activeMarker = activeMarker(status);
         this.failureReason = requireTransactionFailureReason(failureReason);
         this.pgTransactionKey = requirePgTransactionKey(pgTransactionKey);
         this.pgStatus = PgPaymentStatus.FAILED;
@@ -229,6 +322,7 @@ public class Payment extends BaseEntity {
         requireCard(card);
         requireStatus(status);
         requireRequestedAt(requestedAt);
+        this.activeMarker = activeMarker(status);
     }
 
     public CardType getCardType() {
@@ -240,7 +334,19 @@ public class Payment extends BaseEntity {
     }
 
     public boolean isInProgress() {
-        return status == PaymentStatus.PENDING || status == PaymentStatus.UNKNOWN;
+        return status.isActive();
+    }
+
+    public void validateSamePayment(Long orderId, long amount, CardType cardType) {
+        if (!this.orderId.equals(orderId)) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "PG 콜백의 주문 ID가 결제 정보와 일치하지 않습니다.");
+        }
+        if (this.amount != amount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "PG 콜백의 결제 금액이 결제 정보와 일치하지 않습니다.");
+        }
+        if (getCardType() != cardType) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "PG 콜백의 카드 타입이 결제 정보와 일치하지 않습니다.");
+        }
     }
 
     private void validateNotFinalized() {
@@ -250,6 +356,16 @@ public class Payment extends BaseEntity {
         if (status == PaymentStatus.SUCCEEDED || status == PaymentStatus.FAILED) {
             throw new CoreException(ErrorType.CONFLICT, "이미 종료된 결제입니다.");
         }
+    }
+
+    private void validateRequesting() {
+        if (status != PaymentStatus.REQUESTING) {
+            throw new CoreException(ErrorType.CONFLICT, "결제 요청 중인 결제가 아닙니다.");
+        }
+    }
+
+    private static Integer activeMarker(PaymentStatus status) {
+        return status.isActive() ? ACTIVE_MARKER : null;
     }
 
     private static Long requireUserId(Long userId) {

@@ -29,4 +29,12 @@ public class PaymentV1Controller {
         PaymentInfo info = paymentFacade.requestPayment(request.toCommand(userId));
         return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(info));
     }
+
+    @PostMapping("/callback")
+    public ApiResponse<Object> handleCallback(
+        @Valid @RequestBody PaymentV1Dto.PaymentCallbackRequest request
+    ) {
+        paymentFacade.handleCallback(request.toCommand());
+        return ApiResponse.success();
+    }
 }

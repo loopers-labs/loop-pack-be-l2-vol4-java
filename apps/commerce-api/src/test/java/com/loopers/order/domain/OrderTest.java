@@ -119,6 +119,20 @@ class OrderTest {
             .isEqualTo(ErrorType.CONFLICT);
     }
 
+    @DisplayName("이미 결제 실패한 주문에 결제 성공을 반영하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenFailedOrderIsCompleted() {
+        // arrange
+        Order order = createOrder();
+        order.failPayment();
+
+        // act & assert
+        assertThatThrownBy(order::completePayment)
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
+    }
+
     @DisplayName("결제할 수 없는 주문의 결제를 검증하면, CONFLICT 예외를 던진다.")
     @Test
     void throwsConflict_whenOrderIsNotPayable() {
@@ -141,6 +155,31 @@ class OrderTest {
 
         // act & assert
         assertThatCode(order::validatePayable).doesNotThrowAnyException();
+    }
+
+    @DisplayName("결제 금액이 있는 주문의 결제 금액을 검증하면, 예외를 던지지 않는다.")
+    @Test
+    void doesNotThrow_whenOrderRequiresPayment() {
+        // arrange
+        Order order = createOrder();
+
+        // act & assert
+        assertThatCode(order::validatePaymentRequired).doesNotThrowAnyException();
+    }
+
+    @DisplayName("결제 금액이 없는 주문의 결제 금액을 검증하면, CONFLICT 예외를 던진다.")
+    @Test
+    void throwsConflict_whenOrderDoesNotRequirePayment() {
+        // arrange
+        OrderItem item = OrderItem.create(1L, "애플", 1L, "아이폰 16 Pro", 1_550_000L, 1);
+        OrderAmountSnapshot amountSnapshot = OrderAmountSnapshot.withDiscount(1_550_000L, 1_550_000L);
+        Order order = Order.create(1L, OrderItems.of(List.of(item)), 10L, amountSnapshot);
+
+        // act & assert
+        assertThatThrownBy(order::validatePaymentRequired)
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.CONFLICT);
     }
 
     @DisplayName("사용자 ID가 없으면, BAD_REQUEST 예외를 던진다.")

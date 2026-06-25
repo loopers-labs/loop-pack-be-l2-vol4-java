@@ -28,13 +28,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -49,6 +49,9 @@ class PaymentFacadeTest {
     private static final long AMOUNT = 1_550_000L;
     private static final String CARD_NO = "1234-5678-9814-1451";
     private static final String TRANSACTION_KEY = "20250816:TR:9577c5";
+    private static final String UNKNOWN_FAILED_REASON = "PG rejected payment.";
+    private static final String SUCCESS_REASON = "정상 승인되었습니다.";
+    private static final String LIMIT_EXCEEDED_REASON = "한도초과입니다. 다른 카드를 선택해주세요.";
 
     @Mock
     private OrderService orderService;
@@ -73,7 +76,8 @@ class PaymentFacadeTest {
             Order order = createOrder();
             RequestPaymentCommand command = createCommand();
             when(orderService.getOrder(ORDER_ID)).thenReturn(order);
-            when(paymentService.findLatestPaymentByOrderId(ORDER_ID)).thenReturn(Optional.empty());
+            when(paymentService.startPayment(argThat(payment -> payment.getStatus() == PaymentStatus.REQUESTING)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
             when(paymentGateway.requestPayment(argThat(request -> request.amount() == AMOUNT)))
                 .thenReturn(PaymentGatewayResult.accepted(new PaymentGatewayTransaction(
                     TRANSACTION_KEY,
@@ -109,7 +113,8 @@ class PaymentFacadeTest {
             Order order = createOrder();
             RequestPaymentCommand command = createCommand();
             when(orderService.getOrder(ORDER_ID)).thenReturn(order);
-            when(paymentService.findLatestPaymentByOrderId(ORDER_ID)).thenReturn(Optional.empty());
+            when(paymentService.startPayment(argThat(payment -> payment.getStatus() == PaymentStatus.REQUESTING)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
             when(paymentGateway.requestPayment(any()))
                 .thenReturn(PaymentGatewayResult.failed(PaymentFailureReason.PG_UNAVAILABLE, "connect refused"));
             when(paymentService.savePayment(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -134,7 +139,8 @@ class PaymentFacadeTest {
             Order order = createOrder();
             RequestPaymentCommand command = createCommand();
             when(orderService.getOrder(ORDER_ID)).thenReturn(order);
-            when(paymentService.findLatestPaymentByOrderId(ORDER_ID)).thenReturn(Optional.empty());
+            when(paymentService.startPayment(argThat(payment -> payment.getStatus() == PaymentStatus.REQUESTING)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
             when(paymentGateway.requestPayment(any()))
                 .thenReturn(PaymentGatewayResult.unknown(PaymentFailureReason.PG_TIMEOUT, "read timed out"));
             when(paymentService.savePayment(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -175,17 +181,9 @@ class PaymentFacadeTest {
             // arrange
             Order order = createOrder();
             RequestPaymentCommand command = createCommand();
-            Payment payment = Payment.pending(
-                USER_ID,
-                ORDER_ID,
-                AMOUNT,
-                CardType.SAMSUNG,
-                CARD_NO,
-                TRANSACTION_KEY,
-                ZonedDateTime.now()
-            );
             when(orderService.getOrder(ORDER_ID)).thenReturn(order);
-            when(paymentService.findLatestPaymentByOrderId(ORDER_ID)).thenReturn(Optional.of(payment));
+            doThrow(new CoreException(ErrorType.CONFLICT, "이미 결제 확인 중인 주문입니다."))
+                .when(paymentService).startPayment(any(Payment.class));
 
             // act & assert
             assertThatThrownBy(() -> paymentFacade.requestPayment(command))
@@ -214,8 +212,165 @@ class PaymentFacadeTest {
         }
     }
 
+    @DisplayName("PG 콜백을 처리할 때")
+    @Nested
+    class HandleCallback {
+
+        @DisplayName("성공 콜백이 도착하면 결제와 주문을 완료 상태로 바꾼다.")
+        @Test
+        void completesPaymentAndOrder_whenSuccessCallbackArrives() {
+            // arrange
+            Payment payment = createPendingPayment();
+            Order order = createOrder();
+            PaymentCallbackCommand command = new PaymentCallbackCommand(
+                TRANSACTION_KEY,
+                ORDER_ID,
+                AMOUNT,
+                CardType.SAMSUNG,
+                PgPaymentStatus.SUCCESS,
+                null,
+                SUCCESS_REASON
+            );
+            when(paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY)).thenReturn(payment);
+            when(orderService.getOrder(ORDER_ID)).thenReturn(order);
+
+            // act
+            paymentFacade.handleCallback(command);
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED),
+                () -> assertThat(payment.getPgStatus()).isEqualTo(PgPaymentStatus.SUCCESS),
+                () -> assertThat(payment.getPgReason()).isEqualTo(SUCCESS_REASON),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("실패 콜백이 도착하면 결제와 주문을 실패 상태로 바꾼다.")
+        @Test
+        void failsPaymentAndOrder_whenFailedCallbackArrives() {
+            // arrange
+            Payment payment = createPendingPayment();
+            Order order = createOrder();
+            PaymentCallbackCommand command = new PaymentCallbackCommand(
+                TRANSACTION_KEY,
+                ORDER_ID,
+                AMOUNT,
+                CardType.SAMSUNG,
+                PgPaymentStatus.FAILED,
+                PaymentFailureReason.LIMIT_EXCEEDED,
+                LIMIT_EXCEEDED_REASON
+            );
+            when(paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY)).thenReturn(payment);
+            when(orderService.getOrder(ORDER_ID)).thenReturn(order);
+
+            // act
+            paymentFacade.handleCallback(command);
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getFailureReason()).isEqualTo(PaymentFailureReason.LIMIT_EXCEEDED),
+                () -> assertThat(payment.getPgStatus()).isEqualTo(PgPaymentStatus.FAILED),
+                () -> assertThat(payment.getPgReason()).isEqualTo(LIMIT_EXCEEDED_REASON),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
+            );
+        }
+
+        @DisplayName("PG 실패 사유를 분류할 수 없어도 최종 실패 상태로 기록한다.")
+        @Test
+        void failsPaymentWithGenericReason_whenFailedCallbackReasonIsUnknown() {
+            // arrange
+            Payment payment = createPendingPayment();
+            Order order = createOrder();
+            PaymentCallbackCommand command = new PaymentCallbackCommand(
+                TRANSACTION_KEY,
+                ORDER_ID,
+                AMOUNT,
+                CardType.SAMSUNG,
+                PgPaymentStatus.FAILED,
+                PaymentFailureReason.PG_TRANSACTION_FAILED,
+                UNKNOWN_FAILED_REASON
+            );
+            when(paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY)).thenReturn(payment);
+            when(orderService.getOrder(ORDER_ID)).thenReturn(order);
+
+            // act
+            paymentFacade.handleCallback(command);
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getFailureReason()).isEqualTo(PaymentFailureReason.PG_TRANSACTION_FAILED),
+                () -> assertThat(payment.getPgReason()).isEqualTo(UNKNOWN_FAILED_REASON),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
+            );
+        }
+
+        @DisplayName("PG 콜백의 카드 타입이 결제 정보와 다르면 상태를 변경하지 않는다.")
+        @Test
+        void throwsBadRequest_whenCallbackCardTypeDoesNotMatchPayment() {
+            // arrange
+            Payment payment = createPendingPayment();
+            PaymentCallbackCommand command = new PaymentCallbackCommand(
+                TRANSACTION_KEY,
+                ORDER_ID,
+                AMOUNT,
+                CardType.HYUNDAI,
+                PgPaymentStatus.SUCCESS,
+                null,
+                SUCCESS_REASON
+            );
+            when(paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY)).thenReturn(payment);
+
+            // act & assert
+            assertThatThrownBy(() -> paymentFacade.handleCallback(command))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+            verifyNoInteractions(orderService);
+        }
+
+        @DisplayName("PG 대기 콜백이 도착하면 현재 결제 상태를 그대로 둔다.")
+        @Test
+        void keepsPaymentPending_whenPendingCallbackArrives() {
+            // arrange
+            Payment payment = createPendingPayment();
+            PaymentCallbackCommand command = new PaymentCallbackCommand(
+                TRANSACTION_KEY,
+                ORDER_ID,
+                AMOUNT,
+                CardType.SAMSUNG,
+                PgPaymentStatus.PENDING,
+                null,
+                null
+            );
+            when(paymentService.getPaymentByPgTransactionKey(TRANSACTION_KEY)).thenReturn(payment);
+
+            // act
+            paymentFacade.handleCallback(command);
+
+            // assert
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+            verifyNoInteractions(orderService);
+        }
+    }
+
     private RequestPaymentCommand createCommand() {
         return new RequestPaymentCommand(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO);
+    }
+
+    private Payment createPendingPayment() {
+        return Payment.pending(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            TRANSACTION_KEY,
+            ZonedDateTime.now()
+        );
     }
 
     private Order createOrder() {
