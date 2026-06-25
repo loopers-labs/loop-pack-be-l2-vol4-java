@@ -65,6 +65,43 @@ public class OrderModel extends BaseEntity {
         return new OrderModel(userId, total, discountAmount, total - discountAmount, usedCouponId, OrderStatus.CREATED);
     }
 
+    /**
+     * 결제를 시작한다. 최초 결제(CREATED)와 재결제(PAYMENT_FAILED)에서만 PAYMENT_PENDING 으로 전이한다.
+     * 이미 결제가 진행 중이거나(PAYMENT_PENDING) 완료된(PAID) 주문은 결제를 시작할 수 없다.
+     */
+    public void startPayment() {
+        if (status != OrderStatus.CREATED && status != OrderStatus.PAYMENT_FAILED) {
+            throw new CoreException(ErrorType.ORDER_NOT_PAYABLE, "결제를 시작할 수 없는 주문 상태입니다. [status = " + status + "]");
+        }
+        this.status = OrderStatus.PAYMENT_PENDING;
+    }
+
+    /**
+     * 결제 완료를 반영한다. 웹훅·배치가 중복 수렴해도 안전하도록 이미 PAID 면 멱등하게 no-op 한다.
+     */
+    public void markPaid() {
+        if (status == OrderStatus.PAID) {
+            return;
+        }
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new CoreException(ErrorType.INVALID_ORDER_STATUS, "결제 대기 상태에서만 결제 완료할 수 있습니다. [status = " + status + "]");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    /**
+     * 결제 실패를 반영한다. 웹훅·배치가 중복 수렴해도 안전하도록 이미 PAYMENT_FAILED 면 멱등하게 no-op 한다.
+     */
+    public void markPaymentFailed() {
+        if (status == OrderStatus.PAYMENT_FAILED) {
+            return;
+        }
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new CoreException(ErrorType.INVALID_ORDER_STATUS, "결제 대기 상태에서만 결제 실패를 반영할 수 있습니다. [status = " + status + "]");
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
+    }
+
     public Long getUserId() {
         return userId;
     }

@@ -11,6 +11,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // resilience (CircuitBreaker / Fallback) — 어노테이션 AOP 기반
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // security (password encoding)
     implementation("org.springframework.security:spring-security-crypto")
 
