@@ -24,4 +24,11 @@ public class RedisPaymentTempStorage implements PaymentTempStorage {
         String key = "payment_retry:" + paymentId;
         defaultRedisTemplate.delete(key);
     }
+
+    @Override
+    public Integer getRetryCount(Long paymentId) {
+        String key = "payment_retry:" + paymentId;
+        String val = defaultRedisTemplate.opsForValue().get(key);
+        return val != null ? Integer.parseInt(val) : null;
+    }
 }

@@ -1,5 +1,8 @@
 package com.loopers.application.payment;
 
+import com.loopers.application.coupon.CouponRepository;
+import com.loopers.application.order.OrderRepository;
+import com.loopers.application.product.ProductFacade;
 import com.loopers.domain.payment.PaymentMethod;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentGateway;
@@ -10,6 +13,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -22,6 +26,10 @@ public class PaymentFacade {
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PaymentTempStorage paymentTempStorage;
+    private final OrderRepository orderRepository;
+    private final ProductFacade productFacade;
+    private final CouponRepository couponRepository;
+    private final NotificationService notificationService;
 
     public PaymentStatus getPaymentStatus(Long paymentId) {
         return paymentRepository.findById(paymentId)
@@ -61,7 +69,69 @@ public class PaymentFacade {
         return paymentId;
     }
 
+    @Transactional
     public void retryOrCompensatePayment(Long paymentId) {
-        // Step 3/4에서 상세 로직 구현 예정
+        PaymentModel payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 내역을 찾을 수 없습니다."));
+
+        if (payment.getStatus() != PaymentStatus.READY) {
+            return;
+        }
+
+        PaymentGateway.PaymentGatewayQueryResult queryResult = paymentGateway.queryPaymentStatus(payment.getOrderId());
+
+        if (queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.APPROVED) {
+            payment.approve(queryResult.transactionId(), queryResult.approvedAt());
+            paymentRepository.save(payment);
+
+            com.loopers.domain.order.OrderModel order = orderRepository.findById(payment.getOrderId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문 내역을 찾을 수 없습니다."));
+            order.complete();
+            orderRepository.save(order);
+
+            paymentTempStorage.deleteRetryKey(paymentId);
+        } else {
+            Integer count = paymentTempStorage.getRetryCount(paymentId);
+            if (count == null) {
+                count = 0;
+            }
+
+            if (queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.PENDING && count < 2) {
+                paymentTempStorage.setRetryCount(paymentId, count + 1, Duration.ofSeconds(10));
+            } else {
+                payment.fail();
+                paymentRepository.save(payment);
+
+                com.loopers.domain.order.OrderModel order = orderRepository.findById(payment.getOrderId())
+                        .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문 내역을 찾을 수 없습니다."));
+                order.cancel();
+                orderRepository.save(order);
+
+                // 1. 재고 복구 (롤백)
+                if (order.getItems() != null && !order.getItems().isEmpty()) {
+                    java.util.List<com.loopers.application.product.ProductFacade.StockRequest> stockRequests = order.getItems().stream()
+                            .map(item -> new com.loopers.application.product.ProductFacade.StockRequest(item.getProductId(), item.getQuantity()))
+                            .toList();
+                    productFacade.increaseStocks(stockRequests);
+                }
+
+                // 2. 쿠폰 복구 (롤백)
+                if (order.getCouponIssueId() != null) {
+                    com.loopers.domain.coupon.CouponIssue couponIssue = couponRepository.findIssueById(order.getCouponIssueId())
+                            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 발급 내역을 찾을 수 없습니다."));
+                    couponIssue.restore();
+                    couponRepository.saveIssue(couponIssue);
+                }
+
+                // 3. 알림 서비스 호출
+                try {
+                    notificationService.sendPaymentTimeout(order.getUserId(), paymentId);
+                } catch (Exception e) {
+                    log.error("Failed to send payment timeout notification for user: {}, payment: {}", order.getUserId(), paymentId, e);
+                }
+
+                paymentTempStorage.deleteRetryKey(paymentId);
+            }
+        }
     }
 }

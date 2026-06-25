@@ -112,4 +112,8 @@ public class CouponIssue extends BaseTimeEntity {
         }
         this.status = CouponStatus.USED;
     }
+
+    public void restore() {
+        this.status = CouponStatus.AVAILABLE;
+    }
 }
