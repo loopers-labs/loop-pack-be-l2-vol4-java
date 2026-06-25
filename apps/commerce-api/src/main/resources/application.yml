@@ -74,7 +74,7 @@ resilience4j:
         slow-call-rate-threshold: 50
         slow-call-duration-threshold: 2s
         wait-duration-in-open-state: 10s
-        permitted-number-of-calls-in-half-open-state: 3
+        permitted-number-of-calls-in-half-open-state: 5
         automatic-transition-from-open-to-half-open-enabled: true
       pgSimulatorPaymentQuery:
         sliding-window-type: COUNT_BASED
@@ -84,7 +84,7 @@ resilience4j:
         slow-call-rate-threshold: 50
         slow-call-duration-threshold: 2s
         wait-duration-in-open-state: 10s
-        permitted-number-of-calls-in-half-open-state: 3
+        permitted-number-of-calls-in-half-open-state: 5
         automatic-transition-from-open-to-half-open-enabled: true
 
 ---
