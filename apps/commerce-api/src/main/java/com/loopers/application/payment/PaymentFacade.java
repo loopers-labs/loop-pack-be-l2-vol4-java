@@ -71,6 +71,11 @@ public class PaymentFacade {
 
     @Transactional
     public void retryOrCompensatePayment(Long paymentId) {
+        retryOrCompensatePayment(paymentId, false);
+    }
+
+    @Transactional
+    public void retryOrCompensatePayment(Long paymentId, boolean isFallback) {
         PaymentModel payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 내역을 찾을 수 없습니다."));
 
@@ -80,7 +85,7 @@ public class PaymentFacade {
 
         PaymentGateway.PaymentGatewayQueryResult queryResult = paymentGateway.queryPaymentStatus(payment.getOrderId());
 
-        if (queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.APPROVED) {
+        if (!isFallback && queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.APPROVED) {
             payment.approve(queryResult.transactionId(), queryResult.approvedAt());
             paymentRepository.save(payment);
 
@@ -96,14 +101,30 @@ public class PaymentFacade {
                 count = 0;
             }
 
-            if (queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.PENDING && count < 2) {
+            if (!isFallback && queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.PENDING && count < 2) {
                 paymentTempStorage.setRetryCount(paymentId, count + 1, Duration.ofSeconds(10));
             } else {
+                com.loopers.domain.order.OrderModel order = orderRepository.findById(payment.getOrderId())
+                        .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문 내역을 찾을 수 없습니다."));
+
+                // Fallback 보정이면서 PG 결과가 APPROVED(결제성공)라면 즉시 결제 취소 API를 연동한다.
+                if (isFallback && queryResult.status() == com.loopers.domain.payment.PaymentGatewayStatus.APPROVED) {
+                    try {
+                        log.info("Fallback correction: Canceling actual PG payment for payment: {}", paymentId);
+                        paymentGateway.cancelPayment(queryResult.transactionId(), payment.getAmount());
+                        try {
+                            notificationService.sendPaymentRefund(order.getUserId(), paymentId);
+                        } catch (Exception ne) {
+                            log.error("Failed to send payment refund notification for user: {}, payment: {}", order.getUserId(), paymentId, ne);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to cancel PG payment for payment: {}", paymentId, e);
+                    }
+                }
+
                 payment.fail();
                 paymentRepository.save(payment);
 
-                com.loopers.domain.order.OrderModel order = orderRepository.findById(payment.getOrderId())
-                        .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문 내역을 찾을 수 없습니다."));
                 order.cancel();
                 orderRepository.save(order);
 
@@ -123,11 +144,13 @@ public class PaymentFacade {
                     couponRepository.saveIssue(couponIssue);
                 }
 
-                // 3. 알림 서비스 호출
-                try {
-                    notificationService.sendPaymentTimeout(order.getUserId(), paymentId);
-                } catch (Exception e) {
-                    log.error("Failed to send payment timeout notification for user: {}, payment: {}", order.getUserId(), paymentId, e);
+                // 3. 알림 서비스 호출 (Fallback 스케줄러 보정이 아닐 때만 발송)
+                if (!isFallback) {
+                    try {
+                        notificationService.sendPaymentTimeout(order.getUserId(), paymentId);
+                    } catch (Exception e) {
+                        log.error("Failed to send payment timeout notification for user: {}, payment: {}", order.getUserId(), paymentId, e);
+                    }
                 }
 
                 paymentTempStorage.deleteRetryKey(paymentId);

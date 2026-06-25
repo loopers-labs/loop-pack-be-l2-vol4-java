@@ -6,4 +6,5 @@ import java.util.Optional;
 public interface PaymentRepository {
     PaymentModel save(PaymentModel payment);
     Optional<PaymentModel> findById(Long id);
+    java.util.List<PaymentModel> findAllByStatusAndCreatedAtBefore(com.loopers.domain.payment.PaymentStatus status, java.time.ZonedDateTime time);
 }

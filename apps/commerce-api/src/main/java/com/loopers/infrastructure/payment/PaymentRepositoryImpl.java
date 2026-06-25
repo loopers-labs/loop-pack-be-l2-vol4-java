@@ -21,4 +21,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public Optional<PaymentModel> findById(Long id) {
         return paymentJpaRepository.findById(id);
     }
+
+    @Override
+    public java.util.List<PaymentModel> findAllByStatusAndCreatedAtBefore(com.loopers.domain.payment.PaymentStatus status, java.time.ZonedDateTime time) {
+        return paymentJpaRepository.findAllByStatusAndCreatedAtBefore(status, time);
+    }
 }

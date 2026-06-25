@@ -11,4 +11,10 @@ public class ConsoleNotificationService implements NotificationService {
     public void sendPaymentTimeout(Long userId, Long paymentId) {
         log.info("Sending payment timeout notification to user {}: payment {} canceled", userId, paymentId);
     }
+
+    @Override
+    public void sendPaymentRefund(Long userId, Long paymentId) {
+        log.info("Sending payment refund notification to user {}: payment {} refunded", userId, paymentId);
+    }
 }
+
