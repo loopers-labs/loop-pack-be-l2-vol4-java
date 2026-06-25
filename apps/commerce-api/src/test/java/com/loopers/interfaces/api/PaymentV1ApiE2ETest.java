@@ -48,6 +48,7 @@ class PaymentV1ApiE2ETest {
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
     private static final String RAW_PASSWORD = "Kyle!2030";
     private static final String CARD_NO = "1234-5678-9012-3456";
+    private static final String TRANSACTION_KEY = "TX-0001";
     private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> MAP_RESPONSE = new ParameterizedTypeReference<>() {};
 
     @Autowired
@@ -114,14 +115,16 @@ class PaymentV1ApiE2ETest {
     }
 
     private PaymentModel savePendingPayment(Long orderId, Long userId) {
-        return paymentJpaRepository.save(PaymentModel.builder()
+        PaymentModel payment = PaymentModel.builder()
             .orderId(orderId)
             .userId(userId)
             .amount(78_000)
             .cardType(CardType.SAMSUNG)
             .rawCardNo(CARD_NO)
             .requestedAt(ZonedDateTime.now())
-            .build());
+            .build();
+        payment.recordTransactionKey(TRANSACTION_KEY);
+        return paymentJpaRepository.save(payment);
     }
 
     @DisplayName("결제 요청 - POST /api/v1/payments")
@@ -277,7 +280,7 @@ class PaymentV1ApiE2ETest {
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
             PaymentV1Dto.CallbackRequest callback =
-                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.SUCCESS, null);
+                new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.SUCCESS, null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -302,7 +305,7 @@ class PaymentV1ApiE2ETest {
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
             PaymentV1Dto.CallbackRequest callback =
-                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.FAILED, "한도 초과");
+                new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.FAILED, "한도 초과");
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -327,10 +330,10 @@ class PaymentV1ApiE2ETest {
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
             PaymentV1Dto.CallbackRequest success =
-                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.SUCCESS, null);
+                new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.SUCCESS, null);
             testRestTemplate.exchange(CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(success), MAP_RESPONSE);
             PaymentV1Dto.CallbackRequest duplicateFailure =
-                new PaymentV1Dto.CallbackRequest(String.valueOf(order.getId()), PaymentStatus.FAILED, "한도 초과");
+                new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.FAILED, "한도 초과");
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
@@ -346,12 +349,38 @@ class PaymentV1ApiE2ETest {
             );
         }
 
+        @DisplayName("콜백의 거래 식별자가 결제와 일치하지 않으면, 403 Forbidden으로 거절되고 상태가 바뀌지 않는다.")
+        @Test
+        void returnsForbidden_whenTransactionKeyMismatch() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            OrderModel order = saveOrder(user.getId(), 78_000);
+            PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            PaymentV1Dto.CallbackRequest callback =
+                new PaymentV1Dto.CallbackRequest(order.getId(), "TX-FORGED", PaymentStatus.SUCCESS, null);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(callback), MAP_RESPONSE);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.FORBIDDEN.getCode()),
+                () -> assertThat(paymentJpaRepository.findById(payment.getId()).orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(orderJpaRepository.findById(order.getId()).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.CREATED)
+            );
+        }
+
         @DisplayName("콜백이 가리키는 결제가 없으면, 404 Not Found로 거절된다.")
         @Test
         void returnsNotFound_whenPaymentAbsent() {
             // arrange
             PaymentV1Dto.CallbackRequest callback =
-                new PaymentV1Dto.CallbackRequest("999999", PaymentStatus.SUCCESS, null);
+                new PaymentV1Dto.CallbackRequest(999999L, TRANSACTION_KEY, PaymentStatus.SUCCESS, null);
 
             // act
             ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(

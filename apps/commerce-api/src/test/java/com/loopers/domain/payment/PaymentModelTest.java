@@ -79,6 +79,43 @@ class PaymentModelTest {
         }
     }
 
+    @DisplayName("거래 식별자 일치를 검증할 때,")
+    @Nested
+    class MatchesTransactionKey {
+
+        @DisplayName("기록된 거래 식별자와 같으면 참이다.")
+        @Test
+        void returnsTrue_whenSame() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.recordTransactionKey("TX-0001");
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-0001")).isTrue();
+        }
+
+        @DisplayName("다른 거래 식별자이면 거짓이다.")
+        @Test
+        void returnsFalse_whenDifferent() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.recordTransactionKey("TX-0001");
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-FORGED")).isFalse();
+        }
+
+        @DisplayName("거래 식별자가 아직 없으면 어떤 값과도 일치하지 않는다.")
+        @Test
+        void returnsFalse_whenKeyAbsent() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-0001")).isFalse();
+        }
+    }
+
     @DisplayName("결제를 확정할 때,")
     @Nested
     class Confirm {

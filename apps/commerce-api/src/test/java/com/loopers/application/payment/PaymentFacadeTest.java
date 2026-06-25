@@ -152,8 +152,10 @@ class PaymentFacadeTest {
     @Nested
     class HandleCallback {
 
+        private static final String TX_KEY = "TX-0001";
+
         private PaymentModel pendingPayment() {
-            return PaymentModel.builder()
+            PaymentModel payment = PaymentModel.builder()
                 .orderId(ORDER_ID)
                 .userId(USER_ID)
                 .amount(78_000)
@@ -161,6 +163,8 @@ class PaymentFacadeTest {
                 .rawCardNo(CARD_NO)
                 .requestedAt(ZonedDateTime.now())
                 .build();
+            payment.recordTransactionKey(TX_KEY);
+            return payment;
         }
 
         @DisplayName("성공 콜백이면 결제를 SUCCESS로 확정하고 주문을 PAID로 전이한다.")
@@ -173,7 +177,7 @@ class PaymentFacadeTest {
             given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.SUCCESS, null);
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.SUCCESS, null);
 
             // assert
             assertAll(
@@ -192,7 +196,7 @@ class PaymentFacadeTest {
             given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.FAILED, "한도 초과");
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.FAILED, "한도 초과");
 
             // assert
             assertAll(
@@ -200,6 +204,23 @@ class PaymentFacadeTest {
                 () -> assertThat(payment.getReason()).isEqualTo("한도 초과"),
                 () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
             );
+        }
+
+        @DisplayName("콜백의 거래 식별자가 결제와 일치하지 않으면 FORBIDDEN 예외가 발생하고 상태를 바꾸지 않는다.")
+        @Test
+        void throwsForbidden_whenTransactionKeyMismatch() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+
+            // act & assert
+            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, "TX-FORGED", PaymentStatus.SUCCESS, null))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.FORBIDDEN);
+
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+            then(orderRepository).should(never()).getActiveById(anyLong());
         }
 
         @DisplayName("이미 확정된 결제면 상태를 바꾸지 않고 주문을 전이하지 않는다.")
@@ -211,7 +232,7 @@ class PaymentFacadeTest {
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.FAILED, "한도 초과");
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.FAILED, "한도 초과");
 
             // assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
@@ -226,7 +247,7 @@ class PaymentFacadeTest {
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, PaymentStatus.PENDING, null);
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.PENDING, null);
 
             // assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
@@ -241,7 +262,7 @@ class PaymentFacadeTest {
                 .willThrow(new CoreException(ErrorType.NOT_FOUND, "결제가 존재하지 않습니다."));
 
             // act & assert
-            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, PaymentStatus.SUCCESS, null))
+            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.SUCCESS, null))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
