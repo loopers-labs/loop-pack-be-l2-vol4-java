@@ -14,8 +14,8 @@
 **[결정 1] PG 외부 호출 방식 — FeignClient vs RestTemplate**
 
 - 고려한 대안:
-  - A (RestTemplate): 직접 구현. 서킷 브레이커·Timeout·Fallback을 모두 코드로 붙여야 함
-  - B (FeignClient): `spring.cloud.openfeign.circuitbreaker.enabled: true` + yml 설정만으로 Resilience4j 서킷 브레이커·TimeLimiter·Fallback 연동
+  - A (RestTemplate): 직접 구현. 서킷브레이커(이하 CB)·Timeout·Fallback을 모두 코드로 붙여야 함
+  - B (FeignClient): `spring.cloud.openfeign.circuitbreaker.enabled: true` + yml 설정만으로 Resilience4j CB·TimeLimiter·Fallback 연동
 - 최종 결정: **B**
 - 트레이드오프: A는 `RestTemplate` 호출 코드 외에 `@CircuitBreaker`, `@TimeLimiter`, fallback 메서드, 에러 응답 파싱을 모두 직접 붙여야 한다. B는 `sliding-window-size`, `failure-rate-threshold`, `timeout-duration` 등 Resilience4j 설정을 yml에만 작성하면 FeignClient가 자동으로 연동한다. 단, PG가 4xx/5xx를 반환할 때 Feign은 기본적으로 `FeignException` 하나로 뭉쳐버리므로, 에러 종류(404 없음 / 400 검증 실패 등)를 구분하려면 `ErrorDecoder`를 별도로 구현해야 한다. 이 부분은 복구 API 확장(결정 4) 시점에 실제로 필요해져서 그때 추가했다.
 
@@ -35,10 +35,10 @@
 
 - 고려한 대안:
   - A (PgPaymentFallback): 예외 종류에 관계없이 항상 "서비스 불가" 반환
-  - B (PgPaymentFallbackFactory): PG가 실제로 응답한 에러(404, 400 등)는 그대로 전달. 진짜로 응답을 못 받았을 때(타임아웃, 서킷 브레이커 OPEN)만 "서비스 불가"로 대체.
+  - B (PgPaymentFallbackFactory): PG가 실제로 응답한 에러(404, 400 등)는 그대로 전달. 진짜로 응답을 못 받았을 때(타임아웃, CB OPEN)만 "서비스 불가"로 대체.
 - 최종 결정: **B**
-- 트레이드오프: 복구 API는 "PG가 404를 반환하면 복구할 거래가 없으니 종료"라는 분기가 핵심이다. A는 예외 종류를 보지 않고 항상 "서비스 불가"를 반환하므로, PG가 정상적으로 404를 보냈을 때도 "장애"로 처리해 이 분기 자체가 불가능하다. B는 실패 원인을 확인해 PG가 직접 보낸 에러(404, 400 등)면 그대로 전달하고, 타임아웃이나 서킷 브레이커 OPEN처럼 PG와 통신 자체가 안 됐을 때만 "서비스 불가"로 대체한다. `PgErrorDecoder`는 이 구조의 전제 조건으로, Feign이 4xx/5xx를 에러 종류 구분 없이 하나로 뭉쳐버리는 것을 막고 HTTP 상태 코드를 우리가 쓰는 에러 타입으로 정확히 변환해준다.
-- **후속 보완 (retry 도입 시)**: retry를 위해 FallbackFactory를 한 번 더 세분화했다. 기존에는 타임아웃·서킷 브레이커 OPEN·PG 500이 모두 "서비스 불가"로 수렴했는데, 서킷 브레이커 OPEN은 PG가 다운된 상태이므로 "서비스 불가"를 유지하고, 타임아웃·네트워크·PG 500은 일시적 실패이므로 `PgRetriableException`으로 분리했다. 이 구분이 없으면 재시도 코드에서 서킷 브레이커 OPEN인지 일시적 실패인지 알 수 없어 서킷 브레이커가 열린 상태에서도 retry가 발동되는 문제가 생긴다.
+- 트레이드오프: 복구 API는 "PG가 404를 반환하면 복구할 거래가 없으니 종료"라는 분기가 핵심이다. A는 예외 종류를 보지 않고 항상 "서비스 불가"를 반환하므로, PG가 정상적으로 404를 보냈을 때도 "장애"로 처리해 이 분기 자체가 불가능하다. B는 실패 원인을 확인해 PG가 직접 보낸 에러(404, 400 등)면 그대로 전달하고, 타임아웃이나 CB OPEN처럼 PG와 통신 자체가 안 됐을 때만 "서비스 불가"로 대체한다. `PgErrorDecoder`는 이 구조의 전제 조건으로, Feign이 4xx/5xx를 에러 종류 구분 없이 하나로 뭉쳐버리는 것을 막고 HTTP 상태 코드를 우리가 쓰는 에러 타입으로 정확히 변환해준다.
+- **후속 보완 (retry 도입 시)**: retry를 위해 FallbackFactory를 한 번 더 세분화했다. 기존에는 타임아웃·CB OPEN·PG 500이 모두 "서비스 불가"로 수렴했는데, CB OPEN은 PG가 다운된 상태이므로 "서비스 불가"를 유지하고, 타임아웃·네트워크·PG 500은 일시적 실패이므로 `PgRetriableException`으로 분리했다. 이 구분이 없으면 재시도 코드에서 CB OPEN인지 일시적 실패인지 알 수 없어 CB가 열린 상태에서도 retry가 발동되는 문제가 생긴다.
 
 ---
 
@@ -60,7 +60,7 @@
   - B (타임스탬프 + UUID): `yyyyMMdd-HHmmss-UUID앞12자리` 형태. 발행 시각이 키에 포함되어 정렬·조회에 유리하고, UUID로 같은 초에 여러 요청이 와도 충돌 없음. 재결제 시 `startPayment()`가 다시 호출되어 새 키 생성, retry 시엔 OrderModel에 저장된 동일 키 재사용.
 - 최종 결정: **B**
 - 트레이드오프: 멱등키를 어디서 생성하고 어디에 저장하느냐가 핵심이다. `OrderModel.startPayment()`는 결제 시도마다 반드시 한 번 호출되는 진입점이므로 여기서 생성하고 TX1 커밋과 함께 DB에 저장하면, PG 호출 시에는 `order.getIdempotencyKey()`로 꺼내 쓰고 retry 시에도 동일한 키를 보장할 수 있다. PG 시뮬레이터 측에서는 동일 멱등키 수신 시 새 거래를 만들지 않고 기존 결과를 그대로 반환하도록 `findByIdempotencyKey` 조회를 추가했다.
-- **retry 횟수 결정 근거**: PG 즉시 실패 확률 40% 기준으로, 총 3회 시도(retry 2회) 시 누적 성공률은 `1-(0.4)³ = 93.6%`다. 4회(retry 3회)는 97.4%로 3.8%p 더 높지만 타임아웃 케이스 최악 응답 시간이 600ms 더 길어진다. 결제는 사용자가 대기하는 작업이므로 3회로 결정했다. retry 간격은 200ms 고정으로, PG 지연 범위(100~500ms)에서 일시적 부하 해소를 기다리기에 충분하다. 서킷 브레이커가 열려있을 때는 retry 없이 즉시 차단한다 — PG가 다운된 상태에서 retry는 의미가 없고, 서킷 브레이커가 "조금씩 요청을 허용해보며 PG가 회복됐는지 확인"하는 과정을 방해한다.
+- **retry 횟수 결정 근거**: PG 즉시 실패 확률 40% 기준으로, 총 3회 시도(retry 2회) 시 누적 성공률은 `1-(0.4)³ = 93.6%`다. 4회(retry 3회)는 97.4%로 3.8%p 더 높지만 타임아웃 케이스 최악 응답 시간이 600ms 더 길어진다. 결제는 사용자가 대기하는 작업이므로 3회로 결정했다. retry 간격은 200ms 고정으로, PG 지연 범위(100~500ms)에서 일시적 부하 해소를 기다리기에 충분하다. CB가 열려있을 때는 retry 없이 즉시 차단한다 — PG가 다운된 상태에서 retry는 의미가 없고, CB가 "조금씩 요청을 허용해보며 PG가 회복됐는지 확인"하는 과정을 방해한다.
 
 ---
 
@@ -121,12 +121,12 @@ TIME_BASED는 10초 윈도우가 중단 중 만료되어 창이 비워진다. Ph
 
 가상 유저 1명이 순차적으로 실행하며 "몇 번째 결제 요청에서 CB가 최초로 열리는가"를 측정했다. `pg.retry-max-attempts` 설정으로 retry 횟수를 전환해 두 번 실행했다.
 
-| 구분 | CB 최초 OPEN 결제 요청 |
-|------|----------------------|
-| retry=3 | **#14** |
-| retry=1 | **#21** |
+| 구분 | CB가 처음 열린 시점 |
+|------|-------------------|
+| retry=3 | 14번째 결제 요청 |
+| retry=1 | 21번째 결제 요청 |
 
-retry=3에서 결제 요청 1건이 CB 윈도우에 평균 1.56건으로 기록되기 때문이다(실패 시 재시도마다 독립된 CB 호출로 집계). `sliding-window-size=20`을 채우는 데 필요한 결제 요청 수가 `20 ÷ 1.56 ≈ 13`으로 줄어든다. 이론값(#13~14, #20~21)과 실측값이 일치했다.
+retry=3에서 결제 요청 1건이 CB 윈도우에 평균 1.56건으로 기록되기 때문이다(실패 시 재시도마다 독립된 CB 호출로 집계). `sliding-window-size=20`을 채우는 데 필요한 결제 요청 수가 `20 ÷ 1.56 ≈ 13`으로 줄어들어, retry=3은 retry=1보다 약 1.5배 빠르게 CB를 열었다.
 
 > retry 횟수를 늘릴 때는 `sliding-window-size`와 함께 고려해야 한다. CB OPEN 상태에서는 retry를 발동하지 않도록 설정하지 않으면, HALF-OPEN 프로브 슬롯을 retry가 소진해 CB 회복을 방해한다.
 

@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Resilience4j CB를 PG 연동에 붙이면서 "설정만 하면 될 줄 알았던" 두 가지 함정을 발견했다. ① `slowCallDurationThreshold` 실험에서 PG 응답이 TimeLimiter(600ms)를 초과하는 순간 slow call이 아닌 failure로 집계되어 실험 전제 자체가 무너졌다. ② retry가 활성화된 상태에서 CB 슬라이딩 윈도우는 결제 요청이 아닌 PG 호출 단위로 채워지기 때문에, 예상보다 빠르게 CB가 열렸다. 두 현상 모두 k6로 직접 측정해 수치로 확인했다.
+Resilience4j 서킷브레이커(이하 CB)를 PG 연동에 붙이면서 "설정만 하면 될 줄 알았던" 두 가지 함정을 발견했다. ① `slowCallDurationThreshold` 실험에서 PG 응답이 TimeLimiter(600ms)를 초과하는 순간 slow call이 아닌 failure로 집계되어 실험 전제 자체가 무너졌다. ② retry가 활성화된 상태에서 CB 슬라이딩 윈도우는 결제 요청이 아닌 PG 호출 단위로 채워지기 때문에, 예상보다 빠르게 CB가 열렸다. 두 현상 모두 k6로 직접 측정해 수치로 확인했다.
 
 ---
 
