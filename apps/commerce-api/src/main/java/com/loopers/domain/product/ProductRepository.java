@@ -11,5 +11,9 @@ public interface ProductRepository {
 
     Optional<ProductModel> find(Long id);
 
-    Page<ProductModel> search(Long brandId, ProductSortType sort, Pageable pageable);
+    Page<ProductModel> search(Long brandId, ProductStatus status, ProductSortType sort, Pageable pageable);
+
+    void increaseLikeCount(Long productId);
+
+    void decreaseLikeCount(Long productId);
 }

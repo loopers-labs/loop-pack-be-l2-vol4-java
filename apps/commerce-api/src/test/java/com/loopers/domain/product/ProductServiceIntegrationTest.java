@@ -41,6 +41,16 @@ class ProductServiceIntegrationTest {
         ));
     }
 
+    private ProductModel saveProduct(Long brandId, String name, Long price, ProductStatus status) {
+        return productRepository.save(ProductModel.of(
+                brandId,
+                ProductName.of(name),
+                ProductDescription.of(name + " 설명"),
+                ProductPrice.of(price),
+                status
+        ));
+    }
+
     @DisplayName("상품 단건 조회할 때")
     @Nested
     class GetProduct {
@@ -98,7 +108,7 @@ class ProductServiceIntegrationTest {
             ProductModel last = saveProduct(1L, "C", 3000L);
 
             // when
-            Page<ProductModel> result = productService.getProducts(null, null, PageRequest.of(0, 10));
+            Page<ProductModel> result = productService.getProducts(null, null, null, PageRequest.of(0, 10));
 
             // then
             assertThat(result.getContent()).hasSize(3);
@@ -114,7 +124,7 @@ class ProductServiceIntegrationTest {
             saveProduct(1L, "A", 1000L);
 
             // when
-            Page<ProductModel> result = productService.getProducts(null, ProductSortType.PRICE_ASC, PageRequest.of(0, 10));
+            Page<ProductModel> result = productService.getProducts(null, null, ProductSortType.PRICE_ASC, PageRequest.of(0, 10));
 
             // then
             assertThat(result.getContent()).extracting(p -> p.getPrice().value())
@@ -130,7 +140,7 @@ class ProductServiceIntegrationTest {
             saveProduct(1L, "A", 1000L);
 
             // when
-            Page<ProductModel> result = productService.getProducts(null, ProductSortType.PRICE_DESC, PageRequest.of(0, 10));
+            Page<ProductModel> result = productService.getProducts(null, null, ProductSortType.PRICE_DESC, PageRequest.of(0, 10));
 
             // then
             assertThat(result.getContent()).extracting(p -> p.getPrice().value())
@@ -146,11 +156,65 @@ class ProductServiceIntegrationTest {
             saveProduct(2L, "B2상품A", 3000L);
 
             // when
-            Page<ProductModel> result = productService.getProducts(2L, null, PageRequest.of(0, 10));
+            Page<ProductModel> result = productService.getProducts(2L, null, null, PageRequest.of(0, 10));
 
             // then
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().get(0).getBrandId()).isEqualTo(2L);
+        }
+
+        @DisplayName("sort가 LIKES_DESC면, 좋아요 수 내림차순으로 반환한다.")
+        @Test
+        void returnsByLikesDesc() {
+            // given
+            ProductModel a = saveProduct(1L, "A", 1000L);
+            ProductModel b = saveProduct(1L, "B", 2000L);
+            ProductModel c = saveProduct(1L, "C", 3000L);
+            // 좋아요 수: b=3, c=2, a=1
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(b.getId());
+            productService.increaseLikeCount(c.getId());
+            productService.increaseLikeCount(c.getId());
+            productService.increaseLikeCount(a.getId());
+
+            // when
+            Page<ProductModel> result = productService.getProducts(null, null, ProductSortType.LIKES_DESC, PageRequest.of(0, 10));
+
+            // then
+            assertThat(result.getContent()).extracting(ProductModel::getId)
+                    .containsExactly(b.getId(), c.getId(), a.getId());
+        }
+
+        @DisplayName("status가 주어지면, 해당 상태의 상품만 반환한다.")
+        @Test
+        void filtersByStatus() {
+            // given
+            saveProduct(1L, "판매중A", 1000L, ProductStatus.ON_SALE);
+            saveProduct(1L, "판매중B", 2000L, ProductStatus.ON_SALE);
+            saveProduct(1L, "미판매", 3000L, ProductStatus.OFF_SALE);
+
+            // when
+            Page<ProductModel> result = productService.getProducts(null, ProductStatus.OFF_SALE, null, PageRequest.of(0, 10));
+
+            // then
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).getName().value()).isEqualTo("미판매");
+            assertThat(result.getContent().get(0).getStatus()).isEqualTo(ProductStatus.OFF_SALE);
+        }
+
+        @DisplayName("status가 null이면, 상태와 무관하게 모두 반환한다.")
+        @Test
+        void returnsAllStatuses_whenStatusIsNull() {
+            // given
+            saveProduct(1L, "판매중", 1000L, ProductStatus.ON_SALE);
+            saveProduct(1L, "미판매", 2000L, ProductStatus.OFF_SALE);
+
+            // when
+            Page<ProductModel> result = productService.getProducts(null, null, null, PageRequest.of(0, 10));
+
+            // then
+            assertThat(result.getContent()).hasSize(2);
         }
 
         @DisplayName("삭제된 상품은 목록에서 제외한다.")
@@ -163,7 +227,7 @@ class ProductServiceIntegrationTest {
             productRepository.save(deleted);
 
             // when
-            Page<ProductModel> result = productService.getProducts(null, null, PageRequest.of(0, 10));
+            Page<ProductModel> result = productService.getProducts(null, null, null, PageRequest.of(0, 10));
 
             // then
             assertThat(result.getContent()).hasSize(1);

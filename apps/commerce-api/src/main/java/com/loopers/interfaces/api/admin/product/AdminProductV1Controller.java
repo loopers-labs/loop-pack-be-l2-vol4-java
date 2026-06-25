@@ -30,7 +30,8 @@ public class AdminProductV1Controller {
                 request.name(),
                 request.description(),
                 request.price(),
-                request.stock()
+                request.stock(),
+                request.status()
         );
         return ApiResponse.success(AdminProductV1Dto.ProductResponse.from(info));
     }
@@ -54,7 +55,8 @@ public class AdminProductV1Controller {
                 request.name(),
                 request.description(),
                 request.price(),
-                request.stock()
+                request.stock(),
+                request.status()
         );
         return ApiResponse.success(AdminProductV1Dto.ProductResponse.from(info));
     }

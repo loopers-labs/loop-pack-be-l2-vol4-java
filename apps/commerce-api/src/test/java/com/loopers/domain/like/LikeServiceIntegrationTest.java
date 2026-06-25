@@ -1,5 +1,11 @@
 package com.loopers.domain.like;
 
+import com.loopers.domain.product.ProductDescription;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductName;
+import com.loopers.domain.product.ProductPrice;
+import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductService;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,11 +28,27 @@ class LikeServiceIntegrationTest {
     private LikeRepository likeRepository;
 
     @Autowired
+    private ProductService productService;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+    }
+
+    private Long saveProduct() {
+        ProductModel product = productRepository.save(ProductModel.of(
+                1L,
+                ProductName.of("티셔츠"),
+                ProductDescription.of("면 100%"),
+                ProductPrice.of(10000L)
+        ));
+        return product.getId();
     }
 
     @DisplayName("좋아요 등록할 때")
@@ -117,6 +139,80 @@ class LikeServiceIntegrationTest {
 
             // then
             assertThat(likeRepository.find(LikeId.of(1L, 2L))).isEmpty();
+        }
+    }
+
+    @DisplayName("좋아요 수(like_count) 동기화는")
+    @Nested
+    class LikeCountSync {
+
+        @DisplayName("신규 좋아요 등록 시, 상품의 like_count가 1 증가한다.")
+        @Test
+        void increases_whenNewLike() {
+            // given
+            Long productId = saveProduct();
+
+            // when
+            likeService.like(1L, productId);
+
+            // then
+            assertThat(productService.getProduct(productId).getLikeCount()).isEqualTo(1L);
+        }
+
+        @DisplayName("이미 좋아요 상태에서 다시 등록해도, like_count는 그대로다.")
+        @Test
+        void keepsCount_whenAlreadyLiked() {
+            // given
+            Long productId = saveProduct();
+            likeService.like(1L, productId);
+
+            // when
+            likeService.like(1L, productId);
+
+            // then
+            assertThat(productService.getProduct(productId).getLikeCount()).isEqualTo(1L);
+        }
+
+        @DisplayName("좋아요 취소 시, 상품의 like_count가 1 감소한다.")
+        @Test
+        void decreases_whenUnlike() {
+            // given
+            Long productId = saveProduct();
+            likeService.like(1L, productId);
+
+            // when
+            likeService.unlike(1L, productId);
+
+            // then
+            assertThat(productService.getProduct(productId).getLikeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("좋아요가 없는 상태에서 취소해도, like_count는 음수가 되지 않는다.")
+        @Test
+        void neverNegative_whenUnlikeWithoutLike() {
+            // given
+            Long productId = saveProduct();
+
+            // when
+            likeService.unlike(1L, productId);
+
+            // then
+            assertThat(productService.getProduct(productId).getLikeCount()).isEqualTo(0L);
+        }
+
+        @DisplayName("서로 다른 유저가 좋아요하면, like_count가 각각 누적된다.")
+        @Test
+        void accumulates_acrossUsers() {
+            // given
+            Long productId = saveProduct();
+
+            // when
+            likeService.like(1L, productId);
+            likeService.like(2L, productId);
+            likeService.like(3L, productId);
+
+            // then
+            assertThat(productService.getProduct(productId).getLikeCount()).isEqualTo(3L);
         }
     }
 }

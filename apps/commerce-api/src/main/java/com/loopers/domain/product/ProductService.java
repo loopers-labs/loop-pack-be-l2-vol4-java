@@ -1,8 +1,10 @@
 package com.loopers.domain.product;
 
+import com.loopers.support.config.CacheConfig;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,11 +19,17 @@ public class ProductService {
 
     @Transactional
     public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock) {
+        return createProduct(brandId, name, description, price, stock, ProductStatus.ON_SALE);
+    }
+
+    @Transactional
+    public ProductModel createProduct(Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
         ProductModel product = ProductModel.of(
                 brandId,
                 ProductName.of(name),
                 ProductDescription.of(description),
-                ProductPrice.of(price)
+                ProductPrice.of(price),
+                status
         );
         ProductModel productModel = productRepository.save(product);
         productStockService.createStock(productModel.getId(), stock);
@@ -37,24 +45,39 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductModel> getProducts(Long brandId, ProductSortType sort, Pageable pageable) {
-        return productRepository.search(brandId, sort, pageable);
+    public Page<ProductModel> getProducts(Long brandId, ProductStatus status, ProductSortType sort, Pageable pageable) {
+        return productRepository.search(brandId, status, sort, pageable);
     }
 
     @Transactional
-    public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock) {
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#id")
+    public ProductModel updateProduct(Long id, Long brandId, String name, String description, Long price, Integer stock, ProductStatus status) {
         ProductModel product = getProduct(id);
         product.update(
                 brandId,
                 ProductName.of(name),
                 ProductDescription.of(description),
-                ProductPrice.of(price)
+                ProductPrice.of(price),
+                status
         );
         productStockService.changeStock(id, stock);
         return product;
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
+    public void increaseLikeCount(Long productId) {
+        productRepository.increaseLikeCount(productId);
+    }
+
+    @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#productId")
+    public void decreaseLikeCount(Long productId) {
+        productRepository.decreaseLikeCount(productId);
+    }
+
+    @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCT_DETAIL, key = "#id")
     public void deleteProduct(Long id) {
         ProductModel product = getProduct(id);
         product.delete();

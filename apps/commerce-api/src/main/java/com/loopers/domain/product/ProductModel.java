@@ -1,10 +1,15 @@
 package com.loopers.domain.product;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -13,7 +18,12 @@ import lombok.NoArgsConstructor;
 import java.util.Objects;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_status_like_count", columnList = "status, like_count"),
+        @Index(name = "idx_products_status_brand_like_count", columnList = "status, brand_id, like_count"),
+        @Index(name = "idx_products_status_price", columnList = "status, price"),
+        @Index(name = "idx_products_status_brand_price", columnList = "status, brand_id, price")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductModel extends BaseEntity {
@@ -33,22 +43,43 @@ public class ProductModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
     private ProductPrice price;
 
-    private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private ProductStatus status;
+
+    @Column(name = "like_count", nullable = false)
+    private Long likeCount;
+
+    private ProductModel(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.status = status;
+        this.likeCount = 0L;
     }
 
     public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
-        return new ProductModel(brandId, name, description, price);
+        return new ProductModel(brandId, name, description, price, ProductStatus.ON_SALE);
     }
 
-    public void update(Long brandId, ProductName name, ProductDescription description, ProductPrice price) {
+    public static ProductModel of(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
+        return new ProductModel(brandId, name, description, price, status == null ? ProductStatus.ON_SALE : status);
+    }
+
+    public void update(Long brandId, ProductName name, ProductDescription description, ProductPrice price, ProductStatus status) {
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.status = status == null ? ProductStatus.ON_SALE : status;
+    }
+
+    public void changeStatus(ProductStatus status) {
+        if (status == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 상태는 비어있을 수 없습니다.");
+        }
+        this.status = status;
     }
 
     @Override

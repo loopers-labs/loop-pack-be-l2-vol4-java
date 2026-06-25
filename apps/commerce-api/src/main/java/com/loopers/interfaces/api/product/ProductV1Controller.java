@@ -4,6 +4,7 @@ import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductSummaryInfo;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.ProductStatus;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,10 +26,11 @@ public class ProductV1Controller {
     @GetMapping
     public ApiResponse<Page<ProductV1Dto.ProductSummaryResponse>> getProducts(
             @RequestParam(value = "brandId", required = false) Long brandId,
+            @RequestParam(value = "status", required = false) ProductStatus status,
             @RequestParam(value = "sort", required = false) ProductSortType sort,
             @PageableDefault(size = 20) final Pageable pageable
     ) {
-        Page<ProductSummaryInfo> infos = productFacade.getProducts(brandId, sort, pageable);
+        Page<ProductSummaryInfo> infos = productFacade.getProducts(brandId, status, sort, pageable);
         Page<ProductV1Dto.ProductSummaryResponse> response = infos.map(ProductV1Dto.ProductSummaryResponse::from);
         return ApiResponse.success(response);
     }
