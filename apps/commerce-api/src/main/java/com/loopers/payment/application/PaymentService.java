@@ -52,7 +52,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "포기할 결제를 찾을 수 없습니다."));
         payment.markAbandoned(reason);
-        log.error("결제 포기(ABANDONED) — 수동 확인 필요 paymentId={} orderNumber={} reason={}",
+        log.error("ABANDONED 전환 paymentId={} orderNumber={} reason={}",
                 paymentId, payment.getOrderNumber(), reason);
     }
 }

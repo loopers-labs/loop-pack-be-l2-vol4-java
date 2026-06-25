@@ -51,17 +51,17 @@ public class PaymentReconciler {
                 paymentResultHandler.handle(new PaymentCommand.Confirm(
                         payment.getTransactionKey(), payment.getOrderNumber(), payment.getAmount().value(),
                         result.status(), result.reason()));
-                log.info("정합성 보정(키 보유) 확정 orderNumber={} transactionKey={} status={}",
+                log.info("대사 확정 orderNumber={} transactionKey={} status={}",
                         payment.getOrderNumber(), payment.getTransactionKey(), result.status());
             } catch (Exception e) {
                 // 조회 실패: 충분히 오래됐으면 포기(ABANDONED)+알림, 아니면 다음 주기로 재시도(일시 장애일 수 있음).
                 if (payment.getCreatedAt() != null
                         && payment.getCreatedAt().isBefore(ZonedDateTime.now().minus(ABANDON_THRESHOLD))) {
                     // 상세 예외는 로그로만 남기고, reason 컬럼에는 짧은 사유만 저장(컬럼 길이 초과 방지).
-                    log.error("정합성 보정 포기(ABANDONED) orderNumber={} cause={}", payment.getOrderNumber(), e.toString());
+                    log.error("대사 실패로 ABANDONED 전환 orderNumber={} cause={}", payment.getOrderNumber(), e.toString());
                     paymentService.abandon(payment.getId(), "PG 조회 불가로 정합성 보정 회수 실패");
                 } else {
-                    log.warn("정합성 보정(키 보유) skip orderNumber={} 사유={}", payment.getOrderNumber(), e.getMessage());
+                    log.warn("대사 보류 orderNumber={} 사유={}", payment.getOrderNumber(), e.getMessage());
                 }
             }
         }
