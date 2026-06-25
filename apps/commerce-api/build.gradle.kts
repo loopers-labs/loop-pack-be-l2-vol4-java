@@ -9,6 +9,9 @@ dependencies {
     // security-crypto: BCryptPasswordEncoder only (no HTTP security auto-config)
     implementation("org.springframework.security:spring-security-crypto")
 
+    // resilience
+    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
+
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")

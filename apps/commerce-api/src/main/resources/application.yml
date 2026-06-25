@@ -29,6 +29,21 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg-payment:
+        sliding-window-size: 10                       # 최근 10회 호출 기준
+        failure-rate-threshold: 50                    # 50% 이상 실패 시 OPEN
+        slow-call-duration-threshold: 800ms           # 800ms 초과 시 느린 호출로 간주
+        slow-call-rate-threshold: 80                  # 느린 호출 80% 이상 시 OPEN
+        wait-duration-in-open-state: 10s              # OPEN 후 10초 대기
+        permitted-number-of-calls-in-half-open-state: 3  # HALF_OPEN 시 3회 테스트
+
 ---
 spring:
   config:
