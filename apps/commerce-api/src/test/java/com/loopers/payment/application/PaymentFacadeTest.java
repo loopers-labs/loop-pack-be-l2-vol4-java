@@ -33,7 +33,7 @@ class PaymentFacadeTest {
     private final PaymentFacade paymentFacade = new PaymentFacade(paymentService, paymentGateway);
 
     private void stubHappyPath() {
-        when(paymentService.createPending(ORDER_NUMBER))
+        when(paymentService.createPending(USER_ID, ORDER_NUMBER))
                 .thenReturn(new PaymentResult.Pending(PAYMENT_ID, ORDER_NUMBER, AMOUNT));
         when(paymentGateway.request(any()))
                 .thenReturn(new PaymentGatewayResult(TRANSACTION_KEY, PgProvider.TOSS, PaymentStatus.PENDING, null));
@@ -51,7 +51,7 @@ class PaymentFacadeTest {
         PaymentResult.Accepted accepted = paymentFacade.pay(payCommand());
 
         InOrder inOrder = inOrder(paymentService, paymentGateway);
-        inOrder.verify(paymentService).createPending(ORDER_NUMBER);
+        inOrder.verify(paymentService).createPending(USER_ID, ORDER_NUMBER);
         inOrder.verify(paymentGateway).request(any());
         inOrder.verify(paymentService).assignTransaction(PAYMENT_ID, TRANSACTION_KEY, PgProvider.TOSS);
         assertAll(

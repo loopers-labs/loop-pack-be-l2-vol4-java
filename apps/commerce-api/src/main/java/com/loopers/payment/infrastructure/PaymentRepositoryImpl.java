@@ -6,6 +6,7 @@ import com.loopers.payment.domain.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,5 +36,10 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     @Override
     public Optional<Payment> findActiveByOrderNumber(String orderNumber) {
         return paymentJpaRepository.findFirstByOrderNumberAndStatusInOrderByIdDesc(orderNumber, ACTIVE_STATUSES);
+    }
+
+    @Override
+    public List<Payment> findStalePendingWithKey(ZonedDateTime before) {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNullAndCreatedAtBefore(PaymentStatus.PENDING, before);
     }
 }

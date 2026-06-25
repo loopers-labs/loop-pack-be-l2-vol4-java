@@ -23,7 +23,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
 
     @Transactional
-    public PaymentResult.Pending createPending(String orderNumber) {
+    public PaymentResult.Pending createPending(Long userId, String orderNumber) {
         OrderInfo order = orderReader.findForPayment(orderNumber)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, PaymentErrorCode.PAYMENT_ORDER_NOT_FOUND));
         if (!order.payable()) {
@@ -33,7 +33,7 @@ public class PaymentService {
             throw new CoreException(ErrorType.CONFLICT, PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
         }
 
-        Payment saved = paymentRepository.save(Payment.create(orderNumber, Money.of(order.finalAmount())));
+        Payment saved = paymentRepository.save(Payment.create(userId, orderNumber, Money.of(order.finalAmount())));
         log.info("결제 PENDING 생성 orderNumber={} paymentId={} amount={}", orderNumber, saved.getId(), saved.getAmount().value());
         return new PaymentResult.Pending(saved.getId(), saved.getOrderNumber(), saved.getAmount().value());
     }
@@ -45,5 +45,14 @@ public class PaymentService {
         payment.assignTransaction(transactionKey, pgProvider);
         log.info("결제 거래키 확정 orderNumber={} paymentId={} transactionKey={} provider={}",
                 payment.getOrderNumber(), paymentId, transactionKey, pgProvider);
+    }
+
+    @Transactional
+    public void abandon(Long paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new CoreException(ErrorType.INTERNAL_ERROR, "포기할 결제를 찾을 수 없습니다."));
+        payment.markAbandoned(reason);
+        log.error("결제 포기(ABANDONED) — 수동 확인 필요 paymentId={} orderNumber={} reason={}",
+                paymentId, payment.getOrderNumber(), reason);
     }
 }

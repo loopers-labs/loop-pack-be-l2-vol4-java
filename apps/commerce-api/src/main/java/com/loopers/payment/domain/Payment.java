@@ -22,6 +22,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "order_number", nullable = false)
     private String orderNumber;
 
@@ -47,14 +50,15 @@ public class Payment extends BaseEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
-    private Payment(String orderNumber, Money amount) {
+    private Payment(Long userId, String orderNumber, Money amount) {
+        this.userId = userId;
         this.orderNumber = orderNumber;
         this.amount = amount;
         this.status = PaymentStatus.PENDING;
     }
 
-    public static Payment create(String orderNumber, Money amount) {
-        return new Payment(orderNumber, amount);
+    public static Payment create(Long userId, String orderNumber, Money amount) {
+        return new Payment(userId, orderNumber, amount);
     }
 
     public void assignTransaction(String transactionKey, PgProvider pgProvider) {
@@ -86,7 +90,15 @@ public class Payment extends BaseEntity {
         this.reason = reason;
     }
 
+    public void markAbandoned(String reason) {
+        if (isTerminal()) {
+            return;
+        }
+        this.status = PaymentStatus.ABANDONED;
+        this.reason = reason;
+    }
+
     public boolean isTerminal() {
-        return status == PaymentStatus.SUCCESS || status == PaymentStatus.FAILED;
+        return status == PaymentStatus.SUCCESS || status == PaymentStatus.FAILED || status == PaymentStatus.ABANDONED;
     }
 }

@@ -22,7 +22,7 @@ public class PaymentFacade {
     private final PaymentGateway paymentGateway;
 
     public PaymentResult.Accepted pay(PaymentCommand.Pay command) {
-        PaymentResult.Pending pending = paymentService.createPending(command.orderNumber());
+        PaymentResult.Pending pending = paymentService.createPending(command.userId(), command.orderNumber());
 
         PaymentGatewayResult result = paymentGateway.request(new PaymentGatewayCommand(
                 command.userId(), pending.orderNumber(), pending.amount(), command.cardType(), command.cardNo()));

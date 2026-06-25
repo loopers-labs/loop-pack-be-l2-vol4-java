@@ -67,4 +67,11 @@ public class PgPaymentGateway implements PaymentGateway {
                 PaymentStatus.valueOf(data.status()),
                 data.reason());
     }
+
+    @Override
+    public PaymentGatewayResult inquire(Long userId, String transactionKey) {
+        PgTransactionDetail detail = tossPgClient.getTransaction(String.valueOf(userId), transactionKey).data();
+        return new PaymentGatewayResult(
+                detail.transactionKey(), PROVIDER, PaymentStatus.valueOf(detail.status()), detail.reason());
+    }
 }

@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 
 class PaymentResultHandlerTest {
 
+    private static final Long USER_ID = 1L;
     private static final String TRANSACTION_KEY = "20260625:TR:7466dd";
     private static final String ORDER_NUMBER = "20260625-000032";
     private static final long AMOUNT = 58_000L;
@@ -32,7 +33,7 @@ class PaymentResultHandlerTest {
     private final PaymentResultHandler handler = new PaymentResultHandler(paymentRepository, orderPaymentService);
 
     private Payment pendingPaymentWithKey() {
-        Payment payment = Payment.create(ORDER_NUMBER, Money.of(AMOUNT));
+        Payment payment = Payment.create(USER_ID, ORDER_NUMBER, Money.of(AMOUNT));
         payment.assignTransaction(TRANSACTION_KEY, PgProvider.TOSS);
         return payment;
     }

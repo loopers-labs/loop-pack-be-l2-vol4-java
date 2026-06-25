@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 class PaymentServiceTest {
 
+    private static final Long USER_ID = 1L;
     private static final String ORDER_NUMBER = "20260624-000001";
     private static final long FINAL_AMOUNT = 55_000L;
     private static final Long PAYMENT_ID = 1L;
@@ -45,7 +46,7 @@ class PaymentServiceTest {
         when(paymentRepository.findActiveByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.empty());
         when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        paymentService.createPending(ORDER_NUMBER);
+        paymentService.createPending(USER_ID, ORDER_NUMBER);
 
         ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(captor.capture());
@@ -64,7 +65,7 @@ class PaymentServiceTest {
     void givenMissingOrder_whenCreatePending_thenThrowsOrderNotFound() {
         when(orderReader.findForPayment(ORDER_NUMBER)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentService.createPending(ORDER_NUMBER))
+        assertThatThrownBy(() -> paymentService.createPending(USER_ID, ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorCode")
                 .isEqualTo(PaymentErrorCode.PAYMENT_ORDER_NOT_FOUND);
@@ -75,7 +76,7 @@ class PaymentServiceTest {
     void givenNotPayableOrder_whenCreatePending_thenThrowsNotPayable() {
         when(orderReader.findForPayment(ORDER_NUMBER)).thenReturn(Optional.of(new OrderInfo(ORDER_NUMBER, false, FINAL_AMOUNT)));
 
-        assertThatThrownBy(() -> paymentService.createPending(ORDER_NUMBER))
+        assertThatThrownBy(() -> paymentService.createPending(USER_ID, ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorCode")
                 .isEqualTo(PaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
@@ -86,9 +87,9 @@ class PaymentServiceTest {
     void givenActivePaymentExists_whenCreatePending_thenThrowsAlreadyInProgress() {
         when(orderReader.findForPayment(ORDER_NUMBER)).thenReturn(Optional.of(payableOrder()));
         when(paymentRepository.findActiveByOrderNumber(ORDER_NUMBER))
-                .thenReturn(Optional.of(Payment.create(ORDER_NUMBER, Money.of(FINAL_AMOUNT))));
+                .thenReturn(Optional.of(Payment.create(USER_ID, ORDER_NUMBER, Money.of(FINAL_AMOUNT))));
 
-        assertThatThrownBy(() -> paymentService.createPending(ORDER_NUMBER))
+        assertThatThrownBy(() -> paymentService.createPending(USER_ID, ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorCode")
                 .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
@@ -97,7 +98,7 @@ class PaymentServiceTest {
     @Test
     @DisplayName("assignTransaction 은 PENDING 결제에 거래키와 provider 를 채우고 상태는 PENDING 을 유지한다")
     void givenPendingPayment_whenAssignTransaction_thenFillsKeyAndProvider() {
-        Payment pending = Payment.create(ORDER_NUMBER, Money.of(FINAL_AMOUNT));
+        Payment pending = Payment.create(USER_ID, ORDER_NUMBER, Money.of(FINAL_AMOUNT));
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(pending));
 
         paymentService.assignTransaction(PAYMENT_ID, TRANSACTION_KEY, PgProvider.TOSS);
