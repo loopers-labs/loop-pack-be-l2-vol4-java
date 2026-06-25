@@ -14,6 +14,9 @@
 | SD-02 | 주문 취소 | 재고 복구 + 상태 변경 단일 트랜잭션, 본인 확인 |
 | SD-03 | 좋아요 등록 | likeCount 동기화, 중복 방지 |
 | SD-04 | 브랜드 삭제 | 연쇄 Soft Delete (브랜드 → 상품 → 재고), 좋아요 Hard Delete |
+| SD-05 | 결제 요청 | 트랜잭션 분리, FeignClient, CircuitBreaker, 비동기 콜백 |
+| SD-06 | 콜백 수신 | Payment/Order 상태 업데이트, 단일 트랜잭션 |
+| SD-07 | PENDING 복구 배치 | 30초 주기, PG 상태 확인 API, 정합성 복구 |
 
 ---
 
@@ -72,36 +75,18 @@ sequenceDiagram
     OrderService-->>OrderController: OrderResponse (status: PENDING)
     OrderController-->>Client: 201 Created (PENDING)
 
-    Note over Client,PGClient: 트랜잭션 외부 - PG 결제 흐름 (별도 요청)
+    OrderService-->>OrderController: OrderResponse (status: PENDING)
+    OrderController-->>Client: 201 Created (PENDING)
 
-    Client->>PGClient: 결제 요청 (외부 PG API)
-
-    alt 결제 성공
-        PGClient-->>Client: 결제 성공 응답
-        Client->>OrderController: PATCH /api/v1/orders/{id}/confirm
-        Note over OrderService: @Transactional\nstatus: PENDING → CONFIRMED
-        OrderController-->>Client: 200 OK (CONFIRMED)
-    else 결제 실패 / 취소
-        PGClient-->>Client: 결제 실패 응답
-        Client->>OrderController: DELETE /api/v1/orders/{id}
-        Note over OrderService,StockRepository: @Transactional\n재고 복구 + status: CANCELLED
-        OrderController-->>Client: 200 OK (CANCELLED)
-    end
+    Note over Client,PGClient: 이후 클라이언트가 별도로 POST /api/v1/payments 결제 요청
 ```
 
 ### 읽는 포인트
 1. 트랜잭션 범위는 재고 차감 + 주문 생성으로만 묶었습니다. PG 호출은 트랜잭션 밖이라 PG가 느려도 DB 락을 잡지 않습니다.
-2. 주문 생성(PENDING)과 결제 확정(CONFIRMED)은 완전히 분리된 요청입니다. 비즈니스적으로는 하나의 흐름이지만 트랜잭션은 두 개입니다.
-3. 결제 실패 시 주문 취소 API를 호출해 재고를 복구합니다. SAGA 패턴의 보상 트랜잭션입니다.
-4. 재고 조회 시점에 SELECT FOR UPDATE로 락을 잡아 동시 주문 시 정합성을 보장합니다.
+2. 주문 생성(PENDING)과 결제는 완전히 분리된 요청입니다. Round 6부터 결제는 우리 서버가 PG를 호출하는 방식으로 처리합니다 (SD-05 참고).
+3. 재고 조회 시점에 SELECT FOR UPDATE로 락을 잡아 동시 주문 시 정합성을 보장합니다.
 
 ### 잠재 리스크
-- 결제 성공 후 클라이언트가 confirm API를 호출하지 않으면 재고 차감된 채 PENDING으로 영구 방치 → 일정 시간 후 자동 취소 배치 처리로 해결 필요
-- 결제 실패 후 클라이언트가 취소 API를 호출하지 않으면 재고가 영구 차감된 채 PENDING으로 남음 → 동일하게 배치 처리로 해결
-- 현재 B 방식(Client가 confirm 호출)은 클라이언트 신뢰에 의존 → 추후 실제 PG 연동 시 아래 Webhook 방식으로 교체 예정
-  - PG가 결제 성공/실패 시 `POST /api/v1/payments/webhook` 자동 호출
-  - 서버가 Webhook 수신 후 주문 상태 자동 변경 (Client 개입 없음)
-  - Webhook 유실 대비 PENDING 자동 취소 배치는 동일하게 유지
 - 상품 수가 많을수록 락 보유 시간이 길어져 동시성 저하 가능
 - 여러 상품 주문 시 락 획득 순서가 다르면 데드락 발생 가능 → productId 오름차순 정렬 후 순서대로 락 획득으로 방지
 
@@ -287,3 +272,216 @@ sequenceDiagram
 ### 잠재 리스크
 - 연결된 상품이 매우 많을 경우 트랜잭션이 길어져 성능 저하 가능 → 배치 처리나 비동기 이벤트 방식으로 전환 가능 (현재 범위에서는 단일 트랜잭션으로 충분)
 - Like Hard Delete로 인해 브랜드 재입점 시 기존 좋아요 이력 복구 불가 (의도된 정책)
+
+---
+
+## SD-05. 결제 요청
+
+### 왜 이 다이어그램이 필요한가?
+결제는 외부 PG(비동기)와 연동하는 가장 복잡한 흐름입니다.
+- DB 커넥션을 PG 응답 대기 중에 점유하지 않도록 **트랜잭션을 분리**해야 하고
+- PG 장애 시 **CircuitBreaker**가 어느 시점에 개입하는지
+- **타임아웃**과 **Fallback** 처리 위치를 확인합니다.
+
+### 검증 포인트
+- Payment 저장 트랜잭션과 PG 호출이 분리되어 있는가?
+- 타임아웃/CircuitBreaker 발생 시 Payment가 FAILED가 아닌 PENDING으로 유지되는가?
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant PaymentController
+    participant PaymentFacade
+    participant PaymentService
+    participant PgClient
+    participant PG
+
+    Client->>PaymentController: POST /api/v1/payments\n{ orderId, cardType, cardNo }
+    PaymentController->>PaymentController: 헤더 인증 검증
+
+    PaymentController->>PaymentFacade: requestPayment(memberId, orderId, cardType, cardNo)
+    Note over PaymentFacade: @Transactional 없음
+
+    Note over PaymentService: [TX 1] 시작
+    PaymentFacade->>PaymentService: create(orderId, cardType, cardNo, amount)
+    PaymentService-->>PaymentFacade: Payment(PENDING)
+    Note over PaymentService: [TX 1] 커밋 & DB 커넥션 반환
+
+    Note over PgClient,PG: [TX 외부] PG 호출 — DB 커넥션 없는 상태
+    PaymentFacade->>PgClient: requestPayment(orderId="ORDER-{id}", callbackUrl, ...)
+
+    alt PG 요청 성공 (60%)
+        PG-->>PgClient: 200 OK { transactionKey, status: PENDING }
+        PgClient-->>PaymentFacade: 성공
+        PaymentFacade-->>PaymentController: PaymentInfo(PENDING)
+        PaymentController-->>Client: 200 OK\n{ status: PENDING, message: "결제가 진행중입니다." }
+
+    else PG 500 에러 (40%)
+        PG-->>PgClient: 500 Internal Server Error
+        Note over PgClient: @Retry — 최대 3회 재시도\n(createTransaction 이전 실패 → 중복 결제 없음)
+        alt 재시도 후에도 실패
+            Note over PaymentFacade,OrderService: [TX 2]
+            PaymentFacade->>PaymentService: failByOrderId(orderId, reason)
+            PaymentFacade->>OrderService: cancelBySystem(orderId)
+            Note over PaymentFacade,OrderService: [TX 2] 커밋
+            PaymentFacade-->>PaymentController: PaymentInfo(FAILED)
+            PaymentController-->>Client: 200 OK\n{ status: FAILED }
+        end
+
+    else Timeout (readTimeout 400ms 초과)
+        Note over PgClient: Timeout — PG 처리 여부 불명확\nRetry 없음
+        Note over PaymentFacade: Payment PENDING 유지\n배치가 30초 후 PG 조회로 복구
+        PaymentFacade-->>PaymentController: PaymentInfo(PENDING)
+        PaymentController-->>Client: 200 OK\n{ status: PENDING, message: "결제가 진행중입니다." }
+
+    else CircuitBreaker Open (Fallback)
+        Note over PgClient: PG 호출 차단\nPayment PENDING 유지
+        PaymentFacade-->>PaymentController: PaymentInfo(PENDING)
+        PaymentController-->>Client: 200 OK\n{ status: PENDING, message: "결제가 진행중입니다." }
+    end
+
+    Note over PG,Client: 이후 PG가 비동기로 콜백 전송 (SD-06 참고)
+    Note over PG,Client: 콜백 미수신 시 배치가 30초 후 복구 (SD-07 참고)
+```
+
+### 읽는 포인트
+1. `PaymentFacade`에 `@Transactional`이 없습니다. Payment 저장(TX 1)과 PG 호출을 분리하기 위함입니다.
+2. TX 1이 커밋되면 DB 커넥션이 반환됩니다. 이후 PG 호출이 느려도 커넥션 풀에 영향을 주지 않습니다.
+3. **500 에러**는 PG가 `createTransaction` 이전에 실패한 것이므로 중복 결제 위험 없이 Retry 가능합니다. 3회 소진 시 즉시 FAILED 처리합니다.
+4. **Timeout**은 PG가 처리 중일 수 있으므로 FAILED로 바꾸지 않고 PENDING 유지합니다. 배치가 30초 후 PG orderId 조회로 실제 상태를 확인합니다.
+5. **CircuitBreaker Fallback**도 PENDING 유지합니다. Open 상태에서는 PG에 요청을 보내지 않으므로 배치 조회 시 PG에 기록이 없음 → FAILED 처리됩니다.
+
+### 잠재 리스크
+- Timeout 후 PG가 콜백을 늦게 보내고, 배치도 같은 건을 동시에 처리하면 중복 처리 가능 → Payment 상태 변경 시 PENDING 체크(도메인 레벨)로 방지
+- CircuitBreaker Open 상태에서 PG가 이미 결제를 처리했을 수 있음 → 배치가 PG 조회 후 정합성 복구
+
+---
+
+## SD-06. 콜백 수신
+
+### 왜 이 다이어그램이 필요한가?
+PG 콜백은 우리가 제어하지 못하는 외부 이벤트입니다.
+- Payment와 Order 상태 업데이트가 **같은 트랜잭션**인지
+- **중복 콜백** 수신 시 안전하게 처리되는지 확인합니다.
+
+### 검증 포인트
+- Payment SUCCESS → Order CONFIRMED가 단일 트랜잭션인가?
+- 이미 SUCCESS/FAILED인 Payment에 콜백이 다시 오면 어떻게 처리하는가?
+
+```mermaid
+sequenceDiagram
+    participant PG
+    participant PaymentController
+    participant PaymentFacade
+    participant PaymentService
+    participant OrderService
+
+    PG->>PaymentController: POST /api/v1/payments/callback\n{ transactionKey, status, reason }
+
+    PaymentController->>PaymentFacade: handleCallback(transactionKey, status, reason)
+
+    Note over PaymentService,OrderService: [TX] 시작
+
+    PaymentFacade->>PaymentService: getByTransactionKey(transactionKey)
+    PaymentService-->>PaymentFacade: Payment(PENDING)
+
+    alt status = SUCCESS
+        PaymentFacade->>PaymentService: success(paymentId)
+        Note over PaymentService: Payment PENDING → SUCCESS
+        PaymentFacade->>OrderService: confirm(orderId)
+        Note over OrderService: Order PENDING → CONFIRMED
+    else status = FAILED
+        PaymentFacade->>PaymentService: fail(paymentId, reason)
+        Note over PaymentService: Payment PENDING → FAILED
+    end
+
+    Note over PaymentService,OrderService: [TX] 커밋
+
+    PaymentFacade-->>PaymentController: 성공
+    PaymentController-->>PG: 200 OK
+```
+
+### 읽는 포인트
+1. Payment 상태 변경과 Order 상태 변경이 단일 트랜잭션입니다. 둘 중 하나 실패 시 전체 롤백됩니다.
+2. 이미 SUCCESS/FAILED 상태인 Payment에 콜백이 재수신되면 도메인 레벨에서 예외를 던져 멱등성을 보장합니다.
+3. Order confirm은 Payment SUCCESS 시에만 실행됩니다.
+
+### 잠재 리스크
+- 콜백이 아예 오지 않는 경우 → SD-07 배치가 복구
+- 콜백 처리 중 장애로 200을 못 보내면 PG가 재전송할 수 있음 → 멱등성 처리 필수
+
+---
+
+## SD-07. PENDING 복구 배치
+
+### 왜 이 다이어그램이 필요한가?
+타임아웃, CircuitBreaker, 콜백 유실 등으로 Payment가 PENDING에 머무는 경우를 자동으로 복구합니다.
+- **30초 이상 지난 PENDING**만 대상으로 하여 정상 처리 중인 건을 건드리지 않고
+- PG 응답에 따라 상태를 반영하거나 다음 사이클에 재시도합니다.
+
+### 검증 포인트
+- 방금 생성된 PENDING이 배치 대상에서 제외되는가? (created_at 30초 필터)
+- PG PENDING이면 건드리지 않고 넘기는가?
+- PG SUCCESS인데 주문이 이미 CANCELLED인 엣지 케이스를 처리하는가?
+
+```mermaid
+sequenceDiagram
+    participant Scheduler
+    participant PaymentBatchService
+    participant PaymentRepository
+    participant PgClient
+    participant PG
+    participant OrderService
+
+    Note over Scheduler: @Scheduled(fixedDelay=30000)\n30초마다 자동 실행
+
+    Scheduler->>PaymentBatchService: syncPendingPayments()
+
+    PaymentBatchService->>PaymentRepository: findAllByStatusAndCreatedAtBefore\n(PENDING, now - 30s)
+    PaymentRepository-->>PaymentBatchService: List<Payment>
+
+    loop 각 PENDING Payment 처리
+        PaymentBatchService->>PgClient: getTransactionsByOrderId\n(GET /api/v1/payments?orderId={orderId})
+        PG-->>PgClient: 결제 목록 응답
+
+        alt PG에서 SUCCESS 확인
+            PaymentBatchService->>OrderService: findById(orderId)
+            OrderService-->>PaymentBatchService: Order
+
+            alt 주문이 PENDING 상태
+                Note over PaymentBatchService,OrderService: [TX]
+                PaymentBatchService->>PaymentService: success(transactionKey)
+                PaymentBatchService->>OrderService: confirm(orderId)
+                Note over PaymentBatchService,OrderService: [TX] 커밋
+            else 주문이 이미 CANCELLED 상태
+                Note over PaymentBatchService: ⚠️ 정합성 불일치\nPG에 돈은 빠져나갔으나 주문 취소됨\npg-simulator 취소 API 미지원\n→ 로그 기록 후 수동 처리 대상 표시
+            end
+
+        else PG에서 FAILED 확인
+            Note over PaymentBatchService,OrderService: [TX]
+            PaymentBatchService->>PaymentService: failByTransactionKey(transactionKey, reason)
+            PaymentBatchService->>OrderService: cancelBySystem(orderId)
+            Note over PaymentBatchService,OrderService: [TX] 커밋
+
+        else PG에 기록 없음 (Timeout으로 PG가 미처리)
+            Note over PaymentBatchService,OrderService: [TX]
+            PaymentBatchService->>PaymentService: failByOrderId(orderId, "PG 미처리")
+            PaymentBatchService->>OrderService: cancelBySystem(orderId)
+            Note over PaymentBatchService,OrderService: [TX] 커밋
+
+        else PG에서 PENDING (PG 처리 진행 중)
+            Note over PaymentBatchService: 건드리지 않음\n다음 30초 사이클에 재시도
+        end
+    end
+```
+
+### 읽는 포인트
+1. `created_at < now() - 30초` 조건으로 정상 처리 중인 건(PG 콜백 최대 5초)을 제외합니다.
+2. orderId로 PG를 조회하므로 transactionKey가 없어도 처리 가능합니다 (Timeout 케이스 포함).
+3. PG SUCCESS + 주문 CANCELLED는 수동 처리가 필요한 예외 케이스입니다. pg-simulator에 취소 API가 없어 자동화 불가입니다.
+4. PG FAILED와 PG 기록 없음 모두 `cancelBySystem`으로 재고를 복구합니다.
+
+### 잠재 리스크
+- PENDING 건수가 많으면 배치 실행 시간이 길어질 수 있음 → 건수 제한(페이징) 처리 가능
+- 배치와 콜백이 동시에 같은 Payment를 처리하면 상태 불일치 가능 → Payment 상태 변경 시 PENDING 상태 체크로 방지 (도메인 레벨 검증)
+- PG SUCCESS + 주문 CANCELLED 케이스는 수동 처리가 필요하며, 실무에서는 PG 취소 API 호출로 자동화 가능
