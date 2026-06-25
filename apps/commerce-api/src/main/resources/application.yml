@@ -35,6 +35,18 @@ payment-gateway:
   connect-timeout-millis: 1000 # TCP 연결 타임아웃(ms) - 로컬 네트워크 기준, 이 이상 걸리면 PG 다운으로 간주
   read-timeout-millis: 2000 # 응답 대기 타임아웃(ms) - PG 요청 지연 스펙(100~500ms)의 약 4배 여유
 
+resilience4j:
+  retry:
+    instances:
+      paymentGateway:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        exponential-max-wait-duration: 300ms
+        retry-exceptions:
+          - feign.RetryableException
+
 ---
 spring:
   config:

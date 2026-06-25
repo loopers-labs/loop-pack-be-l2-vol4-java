@@ -55,7 +55,20 @@ public class PaymentModel extends BaseEntity {
         this.status = PaymentStatus.PENDING;
     }
 
-    public void updateTransactionKey(String transactionKey) {
+    public void update(String transactionKey, TransactionStatus status) {
         this.transactionKey = transactionKey;
+        switch (status) {
+            case SUCCESS -> this.status = PaymentStatus.PAID;
+            case FAILED -> this.status = PaymentStatus.FAILED;
+            case PENDING -> this.status = PaymentStatus.PENDING;
+        }
+    }
+
+    public void markAsFailed() {
+        this.status = PaymentStatus.FAILED;
+    }
+
+    public void markAsUnknown() {
+        this.status = PaymentStatus.UNKNOWN;
     }
 }

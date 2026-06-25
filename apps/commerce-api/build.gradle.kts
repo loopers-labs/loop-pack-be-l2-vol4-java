@@ -17,6 +17,9 @@ dependencies {
     // feign
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
+    // resilience
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
+
     // querydsl
     annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["openFeignQuerydslVersion"]}:jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
