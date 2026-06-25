@@ -43,6 +43,11 @@ public class PaymentService {
         return paymentRepository.findPendingWithTransactionKey();
     }
 
+    @Transactional(readOnly = true)
+    public List<Payment> findUnconfirmedRequests() {
+        return paymentRepository.findPendingWithoutTransactionKey();
+    }
+
     /**
      * PG 결과(콜백/폴링)를 반영한다. 이미 확정된 결제는 무시한다(멱등).
      *

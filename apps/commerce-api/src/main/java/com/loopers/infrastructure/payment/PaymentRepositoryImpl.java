@@ -40,4 +40,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public List<Payment> findPendingWithTransactionKey() {
         return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNull(PaymentStatus.PENDING);
     }
+
+    @Override
+    public List<Payment> findPendingWithoutTransactionKey() {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNull(PaymentStatus.PENDING);
+    }
 }

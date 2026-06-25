@@ -33,6 +33,11 @@ class PgPaymentGatewayResilienceTest {
                 public PgApiResponse<PgPaymentResponse> getTransaction(String userId, String transactionKey) {
                     throw new RuntimeException("PG 장애 시뮬레이션");
                 }
+
+                @Override
+                public PgApiResponse<PgOrderResponse> getTransactionsByOrder(String userId, String orderId) {
+                    throw new RuntimeException("PG 장애 시뮬레이션");
+                }
             };
         }
     }

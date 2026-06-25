@@ -93,4 +93,32 @@ public class PaymentApplicationService {
             }
         }
     }
+
+    /**
+     * 요청이 fallback/타임아웃으로 트랜잭션 키를 받지 못한 PENDING 결제를,
+     * 주문번호(orderCode)로 PG에 조회해 실제로 접수됐는지 확인하고 키/상태를 복구한다.
+     */
+    public void recoverUnconfirmedRequests() {
+        List<Payment> targets = paymentService.findUnconfirmedRequests();
+        for (Payment payment : targets) {
+            try {
+                Order order = orderRepository.findById(payment.getOrderId()).orElse(null);
+                if (order == null) {
+                    continue;
+                }
+                List<PaymentGatewayResult> results = paymentGateway.findTransactionsByOrder(
+                    String.valueOf(payment.getMemberId()), String.valueOf(order.getOrderCode()));
+                if (results.isEmpty()) {
+                    continue; // PG에 아직 없음 -> 다음 주기에 재확인
+                }
+                PaymentGatewayResult result = results.get(0);
+                paymentService.assignTransactionKey(payment.getId(), result.transactionKey());
+                if (result.status() != PaymentStatus.PENDING) {
+                    confirmPayment(result.transactionKey(), result.status(), result.reason());
+                }
+            } catch (Exception e) {
+                log.warn("미접수 결제 복구 실패. paymentId={}, cause={}", payment.getId(), e.toString());
+            }
+        }
+    }
 }

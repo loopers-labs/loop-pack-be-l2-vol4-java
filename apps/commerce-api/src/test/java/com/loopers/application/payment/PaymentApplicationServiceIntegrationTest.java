@@ -46,6 +46,11 @@ class PaymentApplicationServiceIntegrationTest {
                 public PaymentGatewayResult findTransaction(String userId, String transactionKey) {
                     return new PaymentGatewayResult(transactionKey, PaymentStatus.PENDING, null);
                 }
+
+                @Override
+                public java.util.List<PaymentGatewayResult> findTransactionsByOrder(String userId, String orderId) {
+                    return java.util.List.of();
+                }
             };
         }
     }

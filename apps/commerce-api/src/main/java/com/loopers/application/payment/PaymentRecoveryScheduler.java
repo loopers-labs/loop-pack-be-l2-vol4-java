@@ -13,5 +13,6 @@ public class PaymentRecoveryScheduler {
     @Scheduled(fixedDelayString = "${pg.recovery.fixed-delay:30000}")
     public void recover() {
         paymentApplicationService.recoverPendingPayments();
+        paymentApplicationService.recoverUnconfirmedRequests();
     }
 }

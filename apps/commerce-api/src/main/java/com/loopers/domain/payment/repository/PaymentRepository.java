@@ -11,4 +11,5 @@ public interface PaymentRepository {
     Optional<Payment> findByTransactionKey(String transactionKey);
     boolean existsActiveByOrderId(Long orderId);
     List<Payment> findPendingWithTransactionKey();
+    List<Payment> findPendingWithoutTransactionKey();
 }

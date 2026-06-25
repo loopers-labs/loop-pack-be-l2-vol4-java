@@ -12,4 +12,5 @@ public interface PaymentJpaRepository extends JpaRepository<Payment, Long> {
     boolean existsByOrderIdAndStatusIn(Long orderId, Collection<PaymentStatus> statuses);
     Optional<Payment> findByTransactionKey(String transactionKey);
     List<Payment> findByStatusAndTransactionKeyIsNotNull(PaymentStatus status);
+    List<Payment> findByStatusAndTransactionKeyIsNull(PaymentStatus status);
 }
