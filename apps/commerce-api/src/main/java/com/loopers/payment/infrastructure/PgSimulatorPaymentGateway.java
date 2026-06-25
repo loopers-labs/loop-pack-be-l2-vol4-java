@@ -7,6 +7,9 @@ import com.loopers.payment.domain.PaymentGatewayPaymentCommand;
 import com.loopers.payment.domain.PaymentGatewayQueryResult;
 import com.loopers.payment.domain.PaymentGatewayResult;
 import com.loopers.payment.domain.PaymentGatewayTransactionDetail;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,10 +29,13 @@ import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @Component
 public class PgSimulatorPaymentGateway implements PaymentGateway {
 
+    private static final String PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME = "pgSimulatorPaymentRequest";
+    private static final String PAYMENT_QUERY_CIRCUIT_BREAKER_NAME = "pgSimulatorPaymentQuery";
     private static final String USER_ID_HEADER = "X-USER-ID";
     private static final String PAYMENT_PATH = "/api/v1/payments";
     private static final ParameterizedTypeReference<PgSimulatorApiResponse<PgSimulatorPaymentResponse>> PAYMENT_RESPONSE_TYPE = new ParameterizedTypeReference<>() {};
@@ -38,59 +44,126 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
 
     private final PgSimulatorProperties properties;
     private final RestTemplate restTemplate;
+    private final CircuitBreaker paymentRequestCircuitBreaker;
+    private final CircuitBreaker paymentQueryCircuitBreaker;
 
     @Autowired
-    public PgSimulatorPaymentGateway(PgSimulatorProperties properties, RestTemplateBuilder restTemplateBuilder) {
+    public PgSimulatorPaymentGateway(
+        PgSimulatorProperties properties,
+        RestTemplateBuilder restTemplateBuilder,
+        CircuitBreakerRegistry circuitBreakerRegistry
+    ) {
         this(
             properties,
             restTemplateBuilder
                 .connectTimeout(Duration.ofMillis(properties.connectTimeoutMillis()))
                 .readTimeout(Duration.ofMillis(properties.readTimeoutMillis()))
-                .build()
+                .build(),
+            circuitBreakerRegistry.circuitBreaker(PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME),
+            circuitBreakerRegistry.circuitBreaker(PAYMENT_QUERY_CIRCUIT_BREAKER_NAME)
         );
     }
 
     PgSimulatorPaymentGateway(PgSimulatorProperties properties, RestTemplate restTemplate) {
+        this(
+            properties,
+            restTemplate,
+            CircuitBreaker.ofDefaults(PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME),
+            CircuitBreaker.ofDefaults(PAYMENT_QUERY_CIRCUIT_BREAKER_NAME)
+        );
+    }
+
+    PgSimulatorPaymentGateway(
+        PgSimulatorProperties properties,
+        RestTemplate restTemplate,
+        CircuitBreaker paymentRequestCircuitBreaker,
+        CircuitBreaker paymentQueryCircuitBreaker
+    ) {
         this.properties = properties;
         this.restTemplate = restTemplate;
+        this.paymentRequestCircuitBreaker = paymentRequestCircuitBreaker;
+        this.paymentQueryCircuitBreaker = paymentQueryCircuitBreaker;
     }
 
     @Override
     public PaymentGatewayResult requestPayment(PaymentGatewayPaymentCommand command) {
-        try {
-            return toResult(sendPaymentRequest(command));
-        } catch (ResourceAccessException e) {
-            return toAccessFailureResult(e);
-        } catch (RestClientResponseException e) {
-            return PaymentGatewayResult.failed(PaymentFailureReason.PG_REQUEST_FAILED, e.getResponseBodyAsString());
-        } catch (RestClientException e) {
-            return PaymentGatewayResult.failed(PaymentFailureReason.PG_UNAVAILABLE, e.getMessage());
-        }
+        return callPaymentGateway(() -> requestPaymentByPg(command));
     }
 
     @Override
     public PaymentGatewayQueryResult<PaymentGatewayTransactionDetail> getTransaction(Long userId, String transactionKey) {
+        return queryPaymentGateway(() -> getTransactionByPg(userId, transactionKey));
+    }
+
+    @Override
+    public PaymentGatewayQueryResult<PaymentGatewayOrderTransactions> getTransactionsByOrderId(Long userId, Long orderId) {
+        return queryPaymentGateway(() -> getTransactionsByOrderIdFromPg(userId, orderId));
+    }
+
+    private PaymentGatewayResult requestPaymentByPg(PaymentGatewayPaymentCommand command) {
+        try {
+            return toResult(sendPaymentRequest(command));
+        } catch (RestClientResponseException e) {
+            if (isClientError(e)) {
+                return PaymentGatewayResult.failed(PaymentFailureReason.PG_REQUEST_FAILED, e.getResponseBodyAsString());
+            }
+            throw e;
+        }
+    }
+
+    private PaymentGatewayQueryResult<PaymentGatewayTransactionDetail> getTransactionByPg(
+        Long userId,
+        String transactionKey
+    ) {
         try {
             return toQueryResult(
                 sendTransactionRequest(userId, transactionKey),
                 PgSimulatorPaymentDetailResponse::toTransactionDetail
             );
-        } catch (ResourceAccessException e) {
-            return toQueryAccessFailureResult(e);
         } catch (RestClientResponseException e) {
-            return toQueryFailureResult(e);
-        } catch (RestClientException e) {
-            return PaymentGatewayQueryResult.failed(PaymentFailureReason.PG_UNAVAILABLE, e.getMessage());
+            if (isClientError(e)) {
+                return toQueryFailureResult(e);
+            }
+            throw e;
         }
     }
 
-    @Override
-    public PaymentGatewayQueryResult<PaymentGatewayOrderTransactions> getTransactionsByOrderId(Long userId, Long orderId) {
+    private PaymentGatewayQueryResult<PaymentGatewayOrderTransactions> getTransactionsByOrderIdFromPg(
+        Long userId,
+        Long orderId
+    ) {
         try {
             return toQueryResult(
                 sendOrderPaymentRequest(userId, orderId),
                 PgSimulatorOrderPaymentResponse::toOrderTransactions
             );
+        } catch (RestClientResponseException e) {
+            if (isClientError(e)) {
+                return toQueryFailureResult(e);
+            }
+            throw e;
+        }
+    }
+
+    private PaymentGatewayResult callPaymentGateway(Supplier<PaymentGatewayResult> supplier) {
+        try {
+            return paymentRequestCircuitBreaker.executeSupplier(supplier);
+        } catch (ResourceAccessException e) {
+            return toAccessFailureResult(e);
+        } catch (RestClientResponseException e) {
+            return PaymentGatewayResult.failed(PaymentFailureReason.PG_REQUEST_FAILED, e.getResponseBodyAsString());
+        } catch (CallNotPermittedException | RestClientException e) {
+            return PaymentGatewayResult.failed(PaymentFailureReason.PG_UNAVAILABLE, e.getMessage());
+        }
+    }
+
+    private <T> PaymentGatewayQueryResult<T> queryPaymentGateway(
+        Supplier<PaymentGatewayQueryResult<T>> supplier
+    ) {
+        try {
+            return paymentQueryCircuitBreaker.executeSupplier(supplier);
+        } catch (CallNotPermittedException e) {
+            return PaymentGatewayQueryResult.failed(PaymentFailureReason.PG_UNAVAILABLE, e.getMessage());
         } catch (ResourceAccessException e) {
             return toQueryAccessFailureResult(e);
         } catch (RestClientResponseException e) {
@@ -187,10 +260,18 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
     }
 
     private <T> PaymentGatewayQueryResult<T> toQueryFailureResult(RestClientResponseException e) {
-        if (e.getStatusCode().value() == 404) {
+        if (isNotFound(e)) {
             return PaymentGatewayQueryResult.notFound(e.getResponseBodyAsString());
         }
         return PaymentGatewayQueryResult.failed(PaymentFailureReason.PG_REQUEST_FAILED, e.getResponseBodyAsString());
+    }
+
+    private boolean isClientError(RestClientResponseException e) {
+        return e.getStatusCode().is4xxClientError();
+    }
+
+    private boolean isNotFound(RestClientResponseException e) {
+        return e.getStatusCode().value() == 404;
     }
 
     private URI paymentUri() {

@@ -10,6 +10,8 @@ import com.loopers.payment.domain.PaymentGatewayResult;
 import com.loopers.payment.domain.PaymentGatewayRequestStatus;
 import com.loopers.payment.domain.PaymentGatewayTransactionDetail;
 import com.loopers.payment.domain.PgPaymentStatus;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.SocketTimeoutException;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -224,6 +227,45 @@ class PgSimulatorPaymentGatewayTest {
         server.verify();
     }
 
+    @DisplayName("PG 거래 조회 결과가 404이면, circuit breaker 실패로 기록하지 않는다.")
+    @Test
+    void keepsCircuitClosed_whenTransactionDoesNotExist() {
+        // arrange
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer notFoundServer = MockRestServiceServer.bindTo(restTemplate).build();
+        CircuitBreaker circuitBreaker = CircuitBreaker.of("pg-simulator-test", strictCircuitBreakerConfig());
+        PgSimulatorPaymentGateway gateway = gatewayWith(
+            restTemplate,
+            circuitBreaker("pg-payment-request-test"),
+            circuitBreaker
+        );
+        notFoundServer.expect(once(), requestTo(BASE_URL + "/api/v1/payments/20250816:TR:unknown"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                    {
+                      "meta": {
+                        "result": "FAIL",
+                        "errorCode": "NOT_FOUND",
+                        "message": "transaction not found"
+                      },
+                      "data": null
+                    }
+                    """));
+
+        // act
+        PaymentGatewayQueryResult<PaymentGatewayTransactionDetail> result = gateway.getTransaction(1L, "20250816:TR:unknown");
+
+        // assert
+        assertAll(
+            () -> assertThat(result.status()).isEqualTo(PaymentGatewayQueryStatus.NOT_FOUND),
+            () -> assertThat(result.failureReason()).isEqualTo(PaymentFailureReason.PG_TRANSACTION_NOT_FOUND),
+            () -> assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED)
+        );
+        notFoundServer.verify();
+    }
+
     @DisplayName("PG 거래 키 조회가 5xx로 실패하면, 조회 실패 결과를 반환한다.")
     @Test
     void returnsFailed_whenTransactionQueryReturnsServerError() {
@@ -321,7 +363,141 @@ class PgSimulatorPaymentGatewayTest {
         server.verify();
     }
 
+    @DisplayName("circuit breaker가 open 상태면, PG 결제 요청을 보내지 않고 사용 불가 결과를 반환한다.")
+    @Test
+    void returnsUnavailableWithoutCallingPg_whenPaymentCircuitIsOpen() {
+        // arrange
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer openServer = MockRestServiceServer.bindTo(restTemplate).build();
+        CircuitBreaker circuitBreaker = openCircuitBreaker("pg-simulator-test");
+        PgSimulatorPaymentGateway openGateway = gatewayWith(
+            restTemplate,
+            circuitBreaker,
+            circuitBreaker("pg-payment-query-test")
+        );
+
+        // act
+        PaymentGatewayResult result = openGateway.requestPayment(COMMAND);
+
+        // assert
+        assertAll(
+            () -> assertThat(result.isRequestAccepted()).isFalse(),
+            () -> assertThat(result.status()).isEqualTo(PaymentGatewayRequestStatus.FAILED),
+            () -> assertThat(result.transaction()).isNull(),
+            () -> assertThat(result.failureReason()).isEqualTo(PaymentFailureReason.PG_UNAVAILABLE)
+        );
+        openServer.verify();
+    }
+
+    @DisplayName("circuit breaker가 open 상태면, PG 거래 조회를 보내지 않고 조회 실패 결과를 반환한다.")
+    @Test
+    void returnsFailedWithoutCallingPg_whenQueryCircuitIsOpen() {
+        // arrange
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer openServer = MockRestServiceServer.bindTo(restTemplate).build();
+        CircuitBreaker circuitBreaker = openCircuitBreaker("pg-simulator-test");
+        PgSimulatorPaymentGateway openGateway = gatewayWith(
+            restTemplate,
+            circuitBreaker("pg-payment-request-test"),
+            circuitBreaker
+        );
+
+        // act
+        PaymentGatewayQueryResult<PaymentGatewayTransactionDetail> result = openGateway.getTransaction(
+            1L,
+            "20250816:TR:9577c5"
+        );
+
+        // assert
+        assertAll(
+            () -> assertThat(result.status()).isEqualTo(PaymentGatewayQueryStatus.FAILED),
+            () -> assertThat(result.data()).isNull(),
+            () -> assertThat(result.failureReason()).isEqualTo(PaymentFailureReason.PG_UNAVAILABLE)
+        );
+        openServer.verify();
+    }
+
+    @DisplayName("결제 요청 circuit breaker가 open 상태여도, PG 거래 조회는 별도 circuit breaker로 요청한다.")
+    @Test
+    void queriesTransaction_whenOnlyPaymentRequestCircuitIsOpen() {
+        // arrange
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer queryServer = MockRestServiceServer.bindTo(restTemplate).build();
+        CircuitBreaker requestCircuitBreaker = openCircuitBreaker("pg-payment-request-test");
+        PgSimulatorPaymentGateway gateway = gatewayWith(
+            restTemplate,
+            requestCircuitBreaker,
+            circuitBreaker("pg-payment-query-test")
+        );
+        queryServer.expect(once(), requestTo(BASE_URL + "/api/v1/payments/20250816:TR:9577c5"))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header("X-USER-ID", "1"))
+            .andRespond(withSuccess("""
+                {
+                  "meta": {
+                    "result": "SUCCESS",
+                    "errorCode": null,
+                    "message": null
+                  },
+                  "data": {
+                    "transactionKey": "20250816:TR:9577c5",
+                    "orderId": "1351039135",
+                    "cardType": "SAMSUNG",
+                    "cardNo": "1234-5678-9814-1451",
+                    "amount": 5000,
+                    "status": "SUCCESS",
+                    "reason": null
+                  }
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        // act
+        PaymentGatewayQueryResult<PaymentGatewayTransactionDetail> result = gateway.getTransaction(
+            1L,
+            "20250816:TR:9577c5"
+        );
+
+        // assert
+        assertAll(
+            () -> assertThat(result.isFound()).isTrue(),
+            () -> assertThat(result.status()).isEqualTo(PaymentGatewayQueryStatus.FOUND)
+        );
+        queryServer.verify();
+    }
+
     private PgSimulatorProperties properties() {
         return new PgSimulatorProperties(BASE_URL, "http://localhost:8080/api/v1/payments/callback", 1_000L, 10_000L);
+    }
+
+    private PgSimulatorPaymentGateway gatewayWith(
+        RestTemplate restTemplate,
+        CircuitBreaker paymentRequestCircuitBreaker,
+        CircuitBreaker paymentQueryCircuitBreaker
+    ) {
+        return new PgSimulatorPaymentGateway(
+            properties(),
+            restTemplate,
+            paymentRequestCircuitBreaker,
+            paymentQueryCircuitBreaker
+        );
+    }
+
+    private CircuitBreaker circuitBreaker(String name) {
+        return CircuitBreaker.ofDefaults(name);
+    }
+
+    private CircuitBreaker openCircuitBreaker(String name) {
+        CircuitBreaker circuitBreaker = circuitBreaker(name);
+        circuitBreaker.transitionToOpenState();
+        return circuitBreaker;
+    }
+
+    private CircuitBreakerConfig strictCircuitBreakerConfig() {
+        return CircuitBreakerConfig.custom()
+            .slidingWindowSize(1)
+            .minimumNumberOfCalls(1)
+            .failureRateThreshold(1)
+            .waitDurationInOpenState(Duration.ofMinutes(1))
+            .build();
     }
 }
