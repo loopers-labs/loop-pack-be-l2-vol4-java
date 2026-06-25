@@ -20,7 +20,7 @@ import jakarta.persistence.Table;
         @Index(name = "idx_product_brand_created", columnList = "brand_id, created_at")
     }
 )
-public class ProductModel extends BaseEntity {
+public class Product extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)
     private Long brandId;
@@ -36,9 +36,9 @@ public class ProductModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "stock", nullable = false))
     private Quantity stock;
 
-    protected ProductModel() {}
+    protected Product() {}
 
-    public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
+    public Product(Long brandId, String name, String description, Long price, Integer stock) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
         }

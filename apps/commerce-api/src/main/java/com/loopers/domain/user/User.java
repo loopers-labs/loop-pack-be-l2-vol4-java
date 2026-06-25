@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 @Entity
 @Table(name = "users")
 @Getter
-public class UserModel extends BaseEntity {
+public class User extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]{1,10}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -58,9 +58,9 @@ public class UserModel extends BaseEntity {
     @Column(nullable = false)
     private Gender gender;
 
-    protected UserModel() {}
+    protected User() {}
 
-    public UserModel(String loginId, String password, String name, String birthDate, String email, Gender gender) {
+    public User(String loginId, String password, String name, String birthDate, String email, Gender gender) {
         validateLoginId(loginId);
         validateName(name);
         validateBirthDate(birthDate);

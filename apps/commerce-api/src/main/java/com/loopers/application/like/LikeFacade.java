@@ -1,7 +1,7 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.like.LikeCountRepository;
-import com.loopers.domain.like.LikeModel;
+import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.user.UserRepository;
@@ -29,7 +29,7 @@ public class LikeFacade {
         productRepository.find(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
 
-        likeRepository.save(new LikeModel(userId, productId));
+        likeRepository.save(new Like(userId, productId));
         likeCountRepository.increase(productId); // 원자적 UPDATE — product 행을 건드리지 않음
     }
 

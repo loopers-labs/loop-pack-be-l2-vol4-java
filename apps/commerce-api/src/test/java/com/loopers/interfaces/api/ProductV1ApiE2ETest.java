@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.product.ProductV1Dto;
@@ -52,9 +52,9 @@ class ProductV1ApiE2ETest {
         redisCleanUp.truncateAll();
     }
 
-    private ProductModel persistProduct() {
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
-        return productJpaRepository.save(new ProductModel(brand.getId(), "에어맥스", "운동화", 1000L, 10));
+    private Product persistProduct() {
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
+        return productJpaRepository.save(new Product(brand.getId(), "에어맥스", "운동화", 1000L, 10));
     }
 
     @DisplayName("GET /api/v1/products/{productId}")
@@ -65,7 +65,7 @@ class ProductV1ApiE2ETest {
         @Test
         void returnsDetailWithBrandAndLikeCount() {
             // arrange
-            ProductModel product = persistProduct();
+            Product product = persistProduct();
 
             // act
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductDetailResponse>> responseType =

@@ -1,7 +1,7 @@
 package com.loopers.application.user;
 
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 
 public record UserInfo(
     Long id,
@@ -12,7 +12,7 @@ public record UserInfo(
     String email,
     Gender gender
 ) {
-    public static UserInfo from(UserModel model) {
+    public static UserInfo from(User model) {
         return new UserInfo(
             model.getId(),
             model.getLoginId(),

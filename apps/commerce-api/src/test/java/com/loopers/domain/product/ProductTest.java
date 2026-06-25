@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class ProductModelTest {
+class ProductTest {
 
     private static final Long VALID_BRAND_ID = 1L;
     private static final String VALID_NAME = "에어맥스";
@@ -22,8 +22,8 @@ class ProductModelTest {
     private static final Long VALID_PRICE = 1000L;
     private static final Integer VALID_STOCK = 10;
 
-    private ProductModel product() {
-        return new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK);
+    private Product product() {
+        return new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK);
     }
 
     @DisplayName("Product 를 생성할 때, ")
@@ -34,7 +34,7 @@ class ProductModelTest {
         @Test
         void createsProduct_whenAllInputsAreValid() {
             // act
-            ProductModel product = product();
+            Product product = product();
 
             // assert
             assertAll(
@@ -50,7 +50,7 @@ class ProductModelTest {
         @Test
         void createsProduct_whenPriceAndStockAreZero() {
             // act
-            ProductModel product = new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 0L, 0);
+            Product product = new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, 0L, 0);
 
             // assert
             assertAll(
@@ -64,7 +64,7 @@ class ProductModelTest {
         void throwsBadRequest_whenBrandIdIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(null, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK));
+                () -> new Product(null, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -77,7 +77,7 @@ class ProductModelTest {
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, invalidName, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK));
+                () -> new Product(VALID_BRAND_ID, invalidName, VALID_DESCRIPTION, VALID_PRICE, VALID_STOCK));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -90,7 +90,7 @@ class ProductModelTest {
         void throwsBadRequest_whenDescriptionIsBlank(String invalidDescription) {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, VALID_NAME, invalidDescription, VALID_PRICE, VALID_STOCK));
+                () -> new Product(VALID_BRAND_ID, VALID_NAME, invalidDescription, VALID_PRICE, VALID_STOCK));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -101,7 +101,7 @@ class ProductModelTest {
         void throwsBadRequest_whenPriceIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, null, VALID_STOCK));
+                () -> new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, null, VALID_STOCK));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -112,7 +112,7 @@ class ProductModelTest {
         void throwsBadRequest_whenStockIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, null));
+                () -> new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, null));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -123,7 +123,7 @@ class ProductModelTest {
         void throwsBadRequest_whenPriceIsNegative() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, -1L, VALID_STOCK));
+                () -> new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, -1L, VALID_STOCK));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -134,7 +134,7 @@ class ProductModelTest {
         void throwsBadRequest_whenStockIsNegative() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new ProductModel(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, -1));
+                () -> new Product(VALID_BRAND_ID, VALID_NAME, VALID_DESCRIPTION, VALID_PRICE, -1));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -149,7 +149,7 @@ class ProductModelTest {
         @Test
         void decreasesStock_whenEnough() {
             // arrange
-            ProductModel product = product(); // stock 10
+            Product product = product(); // stock 10
 
             // act
             product.decreaseStock(Quantity.of(3));
@@ -162,7 +162,7 @@ class ProductModelTest {
         @Test
         void decreasesToZero_whenEqual() {
             // arrange
-            ProductModel product = product(); // stock 10
+            Product product = product(); // stock 10
 
             // act
             product.decreaseStock(Quantity.of(10));
@@ -175,7 +175,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequest_whenNotEnough() {
             // arrange
-            ProductModel product = product(); // stock 10
+            Product product = product(); // stock 10
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -189,7 +189,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequest_whenQuantityIsNull() {
             // arrange
-            ProductModel product = product();
+            Product product = product();
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -208,7 +208,7 @@ class ProductModelTest {
         @Test
         void updatesFields_whenValid() {
             // arrange
-            ProductModel product = product();
+            Product product = product();
 
             // act
             product.update("줌플라이", "런닝화", 2000L, 5);
@@ -229,7 +229,7 @@ class ProductModelTest {
         @ValueSource(strings = {"", " "})
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // arrange
-            ProductModel product = product();
+            Product product = product();
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -243,7 +243,7 @@ class ProductModelTest {
         @Test
         void throwsBadRequest_whenPriceIsNull() {
             // arrange
-            ProductModel product = product();
+            Product product = product();
 
             // act
             CoreException ex = assertThrows(CoreException.class,

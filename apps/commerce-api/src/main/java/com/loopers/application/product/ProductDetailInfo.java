@@ -1,7 +1,7 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 
 public record ProductDetailInfo(
     Long id,
@@ -13,7 +13,7 @@ public record ProductDetailInfo(
     Integer stock,
     long likeCount
 ) {
-    public static ProductDetailInfo from(ProductModel product, BrandModel brand, long likeCount) {
+    public static ProductDetailInfo from(Product product, Brand brand, long likeCount) {
         return new ProductDetailInfo(
             product.getId(),
             product.getBrandId(),

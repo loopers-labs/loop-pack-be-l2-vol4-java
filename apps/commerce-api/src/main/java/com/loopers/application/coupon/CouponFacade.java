@@ -5,7 +5,7 @@ import com.loopers.domain.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -26,7 +26,7 @@ public class CouponFacade {
 
     @Transactional
     public UserCouponInfo issueCoupon(String loginId, Long couponId) {
-        UserModel user = loadUser(loginId);
+        User user = loadUser(loginId);
         Coupon coupon = couponRepository.find(couponId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponId + "] 쿠폰을 찾을 수 없습니다."));
         ZonedDateTime now = ZonedDateTime.now();
@@ -36,7 +36,7 @@ public class CouponFacade {
 
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getMyCoupons(String loginId) {
-        UserModel user = loadUser(loginId);
+        User user = loadUser(loginId);
         ZonedDateTime now = ZonedDateTime.now();
         return userCouponRepository.findAllByUserId(user.getId()).stream()
             .map(userCoupon -> UserCouponInfo.from(userCoupon, now))
@@ -95,7 +95,7 @@ public class CouponFacade {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + couponId + "] 쿠폰을 찾을 수 없습니다."));
     }
 
-    private UserModel loadUser(String loginId) {
+    private User loadUser(String loginId) {
         return userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
     }

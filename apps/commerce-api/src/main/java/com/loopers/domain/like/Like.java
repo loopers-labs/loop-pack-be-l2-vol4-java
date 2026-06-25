@@ -13,7 +13,7 @@ import jakarta.persistence.UniqueConstraint;
     name = "likes",
     uniqueConstraints = @UniqueConstraint(name = "uk_likes_user_product", columnNames = {"user_id", "product_id"})
 )
-public class LikeModel extends BaseEntity {
+public class Like extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -21,9 +21,9 @@ public class LikeModel extends BaseEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    protected LikeModel() {}
+    protected Like() {}
 
-    public LikeModel(Long userId, Long productId) {
+    public Like(Long userId, Long productId) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "유저 ID는 필수입니다.");
         }

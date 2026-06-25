@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class UserModelTest {
+class UserTest {
 
     private static final String VALID_LOGIN_ID = "tester01";
     private static final String VALID_PASSWORD = "Password1!";
@@ -29,7 +29,7 @@ class UserModelTest {
         @Test
         void createsUser_whenAllInputsAreValid() {
             // act
-            UserModel user = new UserModel(
+            User user = new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             );
 
@@ -47,7 +47,7 @@ class UserModelTest {
         @Test
         void storesPasswordAsHash() {
             // act
-            UserModel user = new UserModel(
+            User user = new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             );
 
@@ -63,7 +63,7 @@ class UserModelTest {
         @ValueSource(strings = {"abcd1234567", "tester!", "테스터01", "with space"})
         void throwsBadRequest_whenLoginIdFormatIsInvalid(String invalidLoginId) {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new UserModel(
+            CoreException ex = assertThrows(CoreException.class, () -> new User(
                 invalidLoginId, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             ));
 
@@ -76,7 +76,7 @@ class UserModelTest {
         @ValueSource(strings = {"plainaddress", "no-at-sign.com", "@missing-local.com", "no-domain@", "no-tld@example"})
         void throwsBadRequest_whenEmailFormatIsInvalid(String invalidEmail) {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new UserModel(
+            CoreException ex = assertThrows(CoreException.class, () -> new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, invalidEmail, VALID_GENDER
             ));
 
@@ -89,7 +89,7 @@ class UserModelTest {
         @ValueSource(strings = {"1990/05/14", "90-05-14", "1990-5-14", "1990-13-01", "not-a-date"})
         void throwsBadRequest_whenBirthDateFormatIsInvalid(String invalidBirthDate) {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new UserModel(
+            CoreException ex = assertThrows(CoreException.class, () -> new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, invalidBirthDate, VALID_EMAIL, VALID_GENDER
             ));
 
@@ -110,7 +110,7 @@ class UserModelTest {
         })
         void throwsBadRequest_whenPasswordFormatIsInvalid(String invalidPassword) {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new UserModel(
+            CoreException ex = assertThrows(CoreException.class, () -> new User(
                 VALID_LOGIN_ID, invalidPassword, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             ));
 
@@ -126,7 +126,7 @@ class UserModelTest {
             String passwordWithBirthDate = "Aa1!19900514";
 
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new UserModel(
+            CoreException ex = assertThrows(CoreException.class, () -> new User(
                 VALID_LOGIN_ID, passwordWithBirthDate, VALID_NAME, birthDate, VALID_EMAIL, VALID_GENDER
             ));
 
@@ -143,7 +143,7 @@ class UserModelTest {
         @Test
         void masksLastChar_whenNameHasTwoOrMoreChars() {
             // arrange
-            UserModel user = new UserModel(
+            User user = new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, "홍길동", VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             );
 
@@ -155,7 +155,7 @@ class UserModelTest {
         @Test
         void masksSingleChar_whenNameHasOneChar() {
             // arrange
-            UserModel user = new UserModel(
+            User user = new User(
                 VALID_LOGIN_ID, VALID_PASSWORD, "박", VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER
             );
 
@@ -172,7 +172,7 @@ class UserModelTest {
         @Test
         void throwsBadRequest_whenCurrentPasswordDoesNotMatch() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            User user = new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -187,7 +187,7 @@ class UserModelTest {
         @ValueSource(strings = {"Aa1!", "abcdefgh", "12345678", "abc12345", "abcdefg!"})
         void throwsBadRequest_whenNewPasswordFormatIsInvalid(String invalidNewPassword) {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            User user = new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -201,7 +201,7 @@ class UserModelTest {
         @Test
         void throwsBadRequest_whenNewPasswordEqualsCurrent() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            User user = new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -215,7 +215,7 @@ class UserModelTest {
         @Test
         void throwsBadRequest_whenNewPasswordContainsBirthDate() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            User user = new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
             String newPasswordWithBirthDate = "Aa1!19900514";
 
             // act
@@ -230,7 +230,7 @@ class UserModelTest {
         @Test
         void changesPassword_whenInputIsValid() {
             // arrange
-            UserModel user = new UserModel(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
+            User user = new User(VALID_LOGIN_ID, VALID_PASSWORD, VALID_NAME, VALID_BIRTH_DATE, VALID_EMAIL, VALID_GENDER);
             String newPassword = "NewPass2@";
 
             // act

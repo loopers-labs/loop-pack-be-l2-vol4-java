@@ -14,12 +14,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class OrderModelTest {
+class OrderTest {
 
     private static final Long USER_ID = 1L;
 
-    private OrderItemModel item(Long productId, long price, int qty) {
-        return new OrderItemModel(productId, "상품" + productId, Money.of(price), Quantity.of(qty));
+    private OrderItem item(Long productId, long price, int qty) {
+        return new OrderItem(productId, "상품" + productId, Money.of(price), Quantity.of(qty));
     }
 
     @DisplayName("Order 를 생성할 때, ")
@@ -30,7 +30,7 @@ class OrderModelTest {
         @Test
         void createsOrder_whenValid() {
             // act
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2)));
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 2)));
 
             // assert
             assertAll(
@@ -45,7 +45,7 @@ class OrderModelTest {
         @Test
         void totalAmount_isSumOfSubtotals() {
             // act
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2), item(20L, 500L, 3)));
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 2), item(20L, 500L, 3)));
 
             // assert
             assertThat(order.getTotalAmount()).isEqualTo(3500L); // 2000 + 1500
@@ -56,7 +56,7 @@ class OrderModelTest {
         void throwsBadRequest_whenUserIdIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(null, List.of(item(10L, 1000L, 1))));
+                () -> new Order(null, List.of(item(10L, 1000L, 1))));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -67,7 +67,7 @@ class OrderModelTest {
         void throwsBadRequest_whenItemsIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(USER_ID, null));
+                () -> new Order(USER_ID, null));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -78,7 +78,7 @@ class OrderModelTest {
         void throwsBadRequest_whenItemsAreEmpty() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderModel(USER_ID, List.of()));
+                () -> new Order(USER_ID, List.of()));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -93,7 +93,7 @@ class OrderModelTest {
         @Test
         void recordsAmounts_withDiscount() {
             // act
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2)), Money.of(500L), 42L);
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 2)), Money.of(500L), 42L);
 
             // assert
             assertAll(
@@ -108,7 +108,7 @@ class OrderModelTest {
         @Test
         void capsDiscountAtTotal() {
             // act
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 1)), Money.of(5000L), 42L);
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 1)), Money.of(5000L), 42L);
 
             // assert
             assertAll(
@@ -121,7 +121,7 @@ class OrderModelTest {
         @Test
         void noCoupon_meansZeroDiscount() {
             // act
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 2)));
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 2)));
 
             // assert
             assertAll(
@@ -140,7 +140,7 @@ class OrderModelTest {
         @Test
         void checksOwnership() {
             // arrange
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 1)));
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 1)));
 
             // act + assert
             assertAll(
@@ -159,7 +159,7 @@ class OrderModelTest {
         @Test
         void isUnmodifiable() {
             // arrange
-            OrderModel order = new OrderModel(USER_ID, List.of(item(10L, 1000L, 1)));
+            Order order = new Order(USER_ID, List.of(item(10L, 1000L, 1)));
 
             // act + assert
             assertThrows(UnsupportedOperationException.class, () -> order.getItems().clear());

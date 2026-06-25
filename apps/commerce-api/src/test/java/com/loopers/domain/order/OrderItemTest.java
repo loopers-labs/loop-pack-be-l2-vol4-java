@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class OrderItemModelTest {
+class OrderItemTest {
 
     private static final Long PRODUCT_ID = 100L;
     private static final String NAME = "에어맥스";
@@ -25,7 +25,7 @@ class OrderItemModelTest {
         @Test
         void createsItem_whenValid() {
             // act
-            OrderItemModel item = new OrderItemModel(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(2));
+            OrderItem item = new OrderItem(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(2));
 
             // assert
             assertAll(
@@ -40,7 +40,7 @@ class OrderItemModelTest {
         @Test
         void createsItem_whenQuantityIsOne() {
             // act
-            OrderItemModel item = new OrderItemModel(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(1));
+            OrderItem item = new OrderItem(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(1));
 
             // assert
             assertThat(item.getQuantity()).isEqualTo(1);
@@ -51,7 +51,7 @@ class OrderItemModelTest {
         void throwsBadRequest_whenQuantityIsZero() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItemModel(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(0)));
+                () -> new OrderItem(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(0)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -62,7 +62,7 @@ class OrderItemModelTest {
         void throwsBadRequest_whenProductIdIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItemModel(null, NAME, Money.of(1000L), Quantity.of(1)));
+                () -> new OrderItem(null, NAME, Money.of(1000L), Quantity.of(1)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -73,7 +73,7 @@ class OrderItemModelTest {
         void throwsBadRequest_whenNameBlank() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItemModel(PRODUCT_ID, " ", Money.of(1000L), Quantity.of(1)));
+                () -> new OrderItem(PRODUCT_ID, " ", Money.of(1000L), Quantity.of(1)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -84,7 +84,7 @@ class OrderItemModelTest {
         void throwsBadRequest_whenPriceSnapshotIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItemModel(PRODUCT_ID, NAME, null, Quantity.of(1)));
+                () -> new OrderItem(PRODUCT_ID, NAME, null, Quantity.of(1)));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -95,7 +95,7 @@ class OrderItemModelTest {
         void throwsBadRequest_whenQuantityIsNull() {
             // act
             CoreException ex = assertThrows(CoreException.class,
-                () -> new OrderItemModel(PRODUCT_ID, NAME, Money.of(1000L), null));
+                () -> new OrderItem(PRODUCT_ID, NAME, Money.of(1000L), null));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -110,7 +110,7 @@ class OrderItemModelTest {
         @Test
         void returnsPriceTimesQuantity() {
             // arrange
-            OrderItemModel item = new OrderItemModel(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(3));
+            OrderItem item = new OrderItem(PRODUCT_ID, NAME, Money.of(1000L), Quantity.of(3));
 
             // act + assert
             assertThat(item.subtotal().getAmount()).isEqualTo(3000L);

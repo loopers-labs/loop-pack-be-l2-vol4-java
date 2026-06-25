@@ -10,7 +10,7 @@ import java.util.Optional;
  * 상품 캐시 포트. application 이 소유하고 infrastructure 어댑터가 구현한다(ports & adapters).
  * Facade 는 Redis 를 모르고 이 포트만 의존한다(seam) — 캐시 교체·제거가 Facade 에 안 번진다.
  */
-public interface ProductCachePort {
+public interface ProductCache {
 
     Optional<ProductDetailInfo> getDetail(Long id);
 

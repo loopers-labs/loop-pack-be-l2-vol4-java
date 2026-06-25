@@ -9,16 +9,16 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "brands")
-public class BrandModel extends BaseEntity {
+public class Brand extends BaseEntity {
 
     @Column(nullable = false)
     private String name;
 
     private String description;
 
-    protected BrandModel() {}
+    protected Brand() {}
 
-    public BrandModel(String name, String description) {
+    public Brand(String name, String description) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드명은 비어있을 수 없습니다.");
         }

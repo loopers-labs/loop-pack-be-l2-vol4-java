@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class BrandModelTest {
+class BrandTest {
 
     private static final String VALID_NAME = "나이키";
     private static final String VALID_DESCRIPTION = "Just Do It";
@@ -26,7 +26,7 @@ class BrandModelTest {
         @Test
         void createsBrand_whenInputsAreValid() {
             // act
-            BrandModel brand = new BrandModel(VALID_NAME, VALID_DESCRIPTION);
+            Brand brand = new Brand(VALID_NAME, VALID_DESCRIPTION);
 
             // assert
             assertAll(
@@ -39,7 +39,7 @@ class BrandModelTest {
         @Test
         void createsBrand_whenDescriptionIsNull() {
             // act
-            BrandModel brand = new BrandModel(VALID_NAME, null);
+            Brand brand = new Brand(VALID_NAME, null);
 
             // assert
             assertAll(
@@ -54,7 +54,7 @@ class BrandModelTest {
         @ValueSource(strings = {"", " ", "   "})
         void throwsBadRequest_whenNameIsBlank(String invalidName) {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new BrandModel(invalidName, VALID_DESCRIPTION));
+            CoreException ex = assertThrows(CoreException.class, () -> new Brand(invalidName, VALID_DESCRIPTION));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

@@ -1,11 +1,11 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.like.ProductLikeCount;
 import com.loopers.domain.product.LikesCursor;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.productrank.ProductRankRepository;
@@ -31,7 +31,7 @@ public class ProductFacade {
     private final BrandRepository brandRepository;
     private final LikeCountRepository likeCountRepository;
     private final ProductRankRepository productRankRepository;
-    private final ProductCachePort productCache;
+    private final ProductCache productCache;
 
     private static final int OVER_FETCH = 2; // 삭제/누락 보정용 여유분 배수
     private static final int BLOB_SIZE = 100; // 첫 페이지 hot 경로용 top-N 블롭 크기
@@ -40,7 +40,7 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
-        ProductModel product = productRepository.save(new ProductModel(brandId, name, description, price, stock));
+        Product product = productRepository.save(new Product(brandId, name, description, price, stock));
         return ProductInfo.from(product, 0L);
     }
 
@@ -55,8 +55,8 @@ public class ProductFacade {
         if (cached.isPresent()) {
             return cached.get(); // 캐시 히트
         }
-        ProductModel product = loadProduct(id);
-        BrandModel brand = brandRepository.find(product.getBrandId())
+        Product product = loadProduct(id);
+        Brand brand = brandRepository.find(product.getBrandId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
         ProductDetailInfo info = ProductDetailInfo.from(product, brand, likeCountOf(id));
@@ -69,8 +69,8 @@ public class ProductFacade {
         if (page < 0 || size <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "페이지 정보가 올바르지 않습니다.");
         }
-        List<ProductModel> products = productRepository.findAll(brandId, ProductSortType.from(sort), page, size);
-        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        List<Product> products = productRepository.findAll(brandId, ProductSortType.from(sort), page, size);
+        List<Long> productIds = products.stream().map(Product::getId).toList();
         Map<Long, Long> counts = likeCountRepository.findAllByProductIds(productIds).stream()
             .collect(Collectors.toMap(ProductLikeCount::getProductId, ProductLikeCount::getCount));
         return products.stream()
@@ -94,14 +94,14 @@ public class ProductFacade {
 
         // 배치 조회로 N+1 제거 — rank 의 productId 들을 한 번에(미삭제만).
         List<Long> ids = ranked.stream().map(RankedProduct::productId).toList();
-        Map<Long, ProductModel> products = productRepository.findAllByIds(ids).stream()
-            .collect(Collectors.toMap(ProductModel::getId, p -> p));
+        Map<Long, Product> products = productRepository.findAllByIds(ids).stream()
+            .collect(Collectors.toMap(Product::getId, p -> p));
 
         List<ProductInfo> items = new ArrayList<>(size);
         RankedProduct lastRanked = null;
         for (RankedProduct r : ranked) {
             lastRanked = r;
-            ProductModel product = products.get(r.productId());
+            Product product = products.get(r.productId());
             if (product == null) {
                 continue; // 삭제/누락 필터
             }
@@ -121,7 +121,7 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo updateProduct(Long id, String name, String description, Long price, Integer stock) {
-        ProductModel product = loadProduct(id);
+        Product product = loadProduct(id);
         product.update(name, description, price, stock);
         ProductInfo result = ProductInfo.from(productRepository.save(product), likeCountOf(id));
         productCache.evictDetail(id); // 상품 수정 시 상세 캐시 정밀 evict
@@ -130,7 +130,7 @@ public class ProductFacade {
 
     @Transactional
     public void deleteProduct(Long id) {
-        ProductModel product = loadProduct(id);
+        Product product = loadProduct(id);
         product.delete(); // soft delete
         productRepository.save(product);
         productCache.evictDetail(id);
@@ -155,7 +155,7 @@ public class ProductFacade {
     /** 키셋 윈도 결과. full 이면 요청 한도만큼 꽉 차 뒤에 더 있을 수 있음. */
     private record RankedWindow(List<RankedProduct> ranked, boolean full) {}
 
-    private ProductModel loadProduct(Long id) {
+    private Product loadProduct(Long id) {
         return productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }

@@ -1,6 +1,6 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.Order;
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ public record OrderInfo(
     Long finalAmount,
     List<OrderItemInfo> items
 ) {
-    public static OrderInfo from(OrderModel order) {
+    public static OrderInfo from(Order order) {
         return new OrderInfo(
             order.getId(),
             order.getUserId(),

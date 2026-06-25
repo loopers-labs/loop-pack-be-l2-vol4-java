@@ -1,7 +1,7 @@
 package com.loopers.application.user;
 
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -55,7 +55,7 @@ class UserFacadeIntegrationTest {
 
             // assert
             assertAll(
-                () -> verify(userRepository).save(any(UserModel.class)),
+                () -> verify(userRepository).save(any(User.class)),
                 () -> assertThat(info.id()).isPositive(),
                 () -> assertThat(info.loginId()).isEqualTo("tester01")
             );
@@ -82,7 +82,7 @@ class UserFacadeIntegrationTest {
             userFacade.signUp(command("tester01"));
 
             // assert
-            UserModel reloaded = userRepository.findByLoginId("tester01").orElseThrow();
+            User reloaded = userRepository.findByLoginId("tester01").orElseThrow();
             assertAll(
                 () -> assertThat(reloaded.getPassword()).isNotEqualTo("Password1!"),
                 () -> assertThat(reloaded.matchesPassword("Password1!")).isTrue()
@@ -136,7 +136,7 @@ class UserFacadeIntegrationTest {
             userFacade.changePassword("tester01", "Password1!", "NewPass2@");
 
             // assert
-            UserModel reloaded = userRepository.findByLoginId("tester01").orElseThrow();
+            User reloaded = userRepository.findByLoginId("tester01").orElseThrow();
             assertAll(
                 () -> assertThat(reloaded.matchesPassword("NewPass2@")).isTrue(),
                 () -> assertThat(reloaded.matchesPassword("Password1!")).isFalse()

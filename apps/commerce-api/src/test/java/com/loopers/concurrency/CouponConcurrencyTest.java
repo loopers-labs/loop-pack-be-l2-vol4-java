@@ -2,14 +2,14 @@ package com.loopers.concurrency;
 
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.PlaceOrderCommand;
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.coupon.Coupon;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
@@ -82,14 +82,14 @@ class CouponConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        UserModel user = userJpaRepository.save(new UserModel(
+        User user = userJpaRepository.save(new User(
             "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
 
         productIds = new ArrayList<>();
         for (int i = 0; i < ATTEMPTS; i++) {
             productIds.add(productJpaRepository.save(
-                new ProductModel(brand.getId(), "상품" + i, "설명", 10000L, STOCK_PER_PRODUCT)).getId());
+                new Product(brand.getId(), "상품" + i, "설명", 10000L, STOCK_PER_PRODUCT)).getId());
         }
 
         Coupon coupon = couponJpaRepository.save(
@@ -136,7 +136,7 @@ class CouponConcurrencyTest {
 
         // assert
         long totalRemainingStock = productJpaRepository.findAll().stream()
-            .mapToLong(ProductModel::getStock)
+            .mapToLong(Product::getStock)
             .sum();
         assertAll(
             () -> assertThat(success.get()).isEqualTo(1),

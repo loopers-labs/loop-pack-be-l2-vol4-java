@@ -13,7 +13,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "order_items")
-public class OrderItemModel extends BaseEntity {
+public class OrderItem extends BaseEntity {
 
     @Column(name = "product_id", nullable = false)
     private Long productId;
@@ -29,9 +29,9 @@ public class OrderItemModel extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "quantity", nullable = false))
     private Quantity quantity;
 
-    protected OrderItemModel() {}
+    protected OrderItem() {}
 
-    public OrderItemModel(Long productId, String productNameSnapshot, Money priceSnapshot, Quantity quantity) {
+    public OrderItem(Long productId, String productNameSnapshot, Money priceSnapshot, Quantity quantity) {
         if (productId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 필수입니다.");
         }

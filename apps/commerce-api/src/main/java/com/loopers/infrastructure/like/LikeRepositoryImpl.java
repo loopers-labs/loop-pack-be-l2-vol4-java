@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.like;
 
-import com.loopers.domain.like.LikeModel;
+import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
-    public LikeModel save(LikeModel like) {
+    public Like save(Like like) {
         return likeJpaRepository.save(like);
     }
 

@@ -22,7 +22,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "orders")
-public class OrderModel extends BaseEntity {
+public class Order extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -48,15 +48,15 @@ public class OrderModel extends BaseEntity {
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "order_id", nullable = false)
-    private List<OrderItemModel> items = new ArrayList<>();
+    private List<OrderItem> items = new ArrayList<>();
 
-    protected OrderModel() {}
+    protected Order() {}
 
-    public OrderModel(Long userId, List<OrderItemModel> items) {
+    public Order(Long userId, List<OrderItem> items) {
         this(userId, items, Money.ZERO, null);
     }
 
-    public OrderModel(Long userId, List<OrderItemModel> items, Money discountAmount, Long userCouponId) {
+    public Order(Long userId, List<OrderItem> items, Money discountAmount, Long userCouponId) {
         if (userId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "유저 ID는 필수입니다.");
         }
@@ -67,7 +67,7 @@ public class OrderModel extends BaseEntity {
         this.items = new ArrayList<>(items);
         this.status = OrderStatus.PENDING;
         this.totalAmount = this.items.stream()
-            .map(OrderItemModel::subtotal)
+            .map(OrderItem::subtotal)
             .reduce(Money.ZERO, Money::plus);
         Money discount = (discountAmount != null) ? discountAmount : Money.ZERO;
         // 할인은 총액을 상한으로 한다 (최종 금액 음수 방지)
@@ -104,7 +104,7 @@ public class OrderModel extends BaseEntity {
         return userCouponId;
     }
 
-    public List<OrderItemModel> getItems() {
+    public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
     }
 }

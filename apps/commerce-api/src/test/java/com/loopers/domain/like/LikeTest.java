@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class LikeModelTest {
+class LikeTest {
 
     private static final Long VALID_USER_ID = 1L;
     private static final Long VALID_PRODUCT_ID = 100L;
@@ -23,7 +23,7 @@ class LikeModelTest {
         @Test
         void createsLike_whenInputsAreValid() {
             // act
-            LikeModel like = new LikeModel(VALID_USER_ID, VALID_PRODUCT_ID);
+            Like like = new Like(VALID_USER_ID, VALID_PRODUCT_ID);
 
             // assert
             assertAll(
@@ -36,7 +36,7 @@ class LikeModelTest {
         @Test
         void throwsBadRequest_whenUserIdIsNull() {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new LikeModel(null, VALID_PRODUCT_ID));
+            CoreException ex = assertThrows(CoreException.class, () -> new Like(null, VALID_PRODUCT_ID));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -46,7 +46,7 @@ class LikeModelTest {
         @Test
         void throwsBadRequest_whenProductIdIsNull() {
             // act
-            CoreException ex = assertThrows(CoreException.class, () -> new LikeModel(VALID_USER_ID, null));
+            CoreException ex = assertThrows(CoreException.class, () -> new Like(VALID_USER_ID, null));
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);

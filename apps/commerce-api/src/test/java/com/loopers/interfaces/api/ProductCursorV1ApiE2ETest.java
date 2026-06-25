@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.productrank.ProductRank;
 import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
@@ -63,10 +63,10 @@ class ProductCursorV1ApiE2ETest {
     @DisplayName("GET /api/v1/products/cursor 는 좋아요순으로 페이지를 주고 nextCursor 로 이어진다")
     @Test
     void cursor_endpoint_paginates_by_likes_desc() {
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
-        ProductModel p1 = productJpaRepository.save(new ProductModel(brand.getId(), "p1", "d", 1000L, 10));
-        ProductModel p2 = productJpaRepository.save(new ProductModel(brand.getId(), "p2", "d", 1000L, 10));
-        ProductModel p3 = productJpaRepository.save(new ProductModel(brand.getId(), "p3", "d", 1000L, 10));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
+        Product p1 = productJpaRepository.save(new Product(brand.getId(), "p1", "d", 1000L, 10));
+        Product p2 = productJpaRepository.save(new Product(brand.getId(), "p2", "d", 1000L, 10));
+        Product p3 = productJpaRepository.save(new Product(brand.getId(), "p3", "d", 1000L, 10));
         productRankRepository.replaceAll(List.of(
             new ProductRank(p1.getId(), brand.getId(), 50L),
             new ProductRank(p2.getId(), brand.getId(), 30L),

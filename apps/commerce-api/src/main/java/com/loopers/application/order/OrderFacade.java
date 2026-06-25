@@ -3,12 +3,12 @@ package com.loopers.application.order;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderLine;
-import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -34,7 +34,7 @@ public class OrderFacade {
 
     @Transactional
     public OrderInfo createOrder(String loginId, PlaceOrderCommand command) {
-        UserModel user = userRepository.findByLoginId(loginId)
+        User user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
         // 쿠폰 조회는 상품 락 획득 "이전"에 — FOR UPDATE 보유 시간을 줄이고, 무효 쿠폰이면 락 없이 조기 실패
@@ -49,12 +49,12 @@ public class OrderFacade {
             .distinct()
             .sorted()
             .toList();
-        Map<Long, ProductModel> products = productRepository.findAllForUpdate(productIds).stream()
-            .collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+        Map<Long, Product> products = productRepository.findAllForUpdate(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         List<OrderLine> lines = command.items().stream()
             .map(item -> {
-                ProductModel product = products.get(item.productId());
+                Product product = products.get(item.productId());
                 if (product == null) {
                     throw new CoreException(ErrorType.NOT_FOUND,
                         "[id = " + item.productId() + "] 상품을 찾을 수 없습니다.");
@@ -63,21 +63,21 @@ public class OrderFacade {
             })
             .toList();
 
-        OrderModel order = orderService.place(user.getId(), lines, userCoupon, ZonedDateTime.now());
+        Order order = orderService.place(user.getId(), lines, userCoupon, ZonedDateTime.now());
 
         lines.forEach(line -> productRepository.save(line.product())); // 재고 차감 반영
         if (userCoupon != null) {
             userCouponRepository.save(userCoupon); // USED 반영 — 커밋 시점 @Version 검증
         }
-        OrderModel saved = orderRepository.save(order);
+        Order saved = orderRepository.save(order);
         return OrderInfo.from(saved);
     }
 
     @Transactional(readOnly = true)
     public OrderInfo getOrder(String loginId, Long orderId) {
-        UserModel user = userRepository.findByLoginId(loginId)
+        User user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
-        OrderModel order = orderRepository.find(orderId)
+        Order order = orderRepository.find(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
         if (!order.isOwnedBy(user.getId())) {
             // 타 유저 주문은 존재를 드러내지 않고 NOT_FOUND
