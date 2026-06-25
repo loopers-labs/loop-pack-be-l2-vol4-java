@@ -107,7 +107,7 @@ class OrderServiceTest {
             Map<Long, Integer> quantities = Map.of(product.getId(), 2);
 
             // act
-            OrderModel result = orderService.createOrder(1L, List.of(product), quantities);
+            OrderModel result = orderService.createOrder(1L, "user1", List.of(product), quantities);
 
             // assert
             assertAll(
@@ -129,7 +129,7 @@ class OrderServiceTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderService.createOrder(1L, List.of(product), quantities)
+                orderService.createOrder(1L, "user1", List.of(product), quantities)
             );
 
             // assert
@@ -146,7 +146,7 @@ class OrderServiceTest {
             CouponModel coupon = new CouponModel("10% 쿠폰", CouponType.RATE, 10L, null, ZonedDateTime.now().plusDays(1));
 
             // act
-            OrderModel result = orderService.createOrder(1L, List.of(product), quantities, coupon, 99L);
+            OrderModel result = orderService.createOrder(1L, "user1", List.of(product), quantities, coupon, 99L);
 
             // assert
             assertAll(
@@ -166,7 +166,7 @@ class OrderServiceTest {
             CouponModel coupon = new CouponModel("5000원 쿠폰", CouponType.FIXED, 5000L, null, ZonedDateTime.now().plusDays(1));
 
             // act
-            OrderModel result = orderService.createOrder(1L, List.of(product), quantities, coupon, 99L);
+            OrderModel result = orderService.createOrder(1L, "user1", List.of(product), quantities, coupon, 99L);
 
             // assert
             assertAll(
@@ -187,7 +187,7 @@ class OrderServiceTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderService.createOrder(1L, List.of(product), quantities, coupon, 99L)
+                orderService.createOrder(1L, "user1", List.of(product), quantities, coupon, 99L)
             );
 
             // assert

@@ -26,6 +26,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findWithLock(Long id) {
+        return orderJpaRepository.findWithLockByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
     public List<OrderModel> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt);
     }

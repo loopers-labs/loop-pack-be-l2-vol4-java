@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 
 import java.util.List;
 
@@ -45,9 +46,15 @@ class ProductFacadeIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        // [fix] DB 초기화 후 캐시가 남으면 동일 ID로 재생성된 엔티티에 스테일 캐시가 히트됨
+        cacheManager.getCacheNames()
+            .forEach(name -> cacheManager.getCache(name).clear());
     }
 
     private ProductModel savedProduct(String name, int stock) {

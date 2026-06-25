@@ -38,12 +38,12 @@ public class OrderFacade {
     private final CouponIssueRepository couponIssueRepository;
 
     @Transactional
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands) {
-        return createOrder(userId, commands, null);
+    public OrderInfo createOrder(Long userId, String loginId, List<OrderItemCommand> commands) {
+        return createOrder(userId, loginId, commands, null);
     }
 
     @Transactional
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands, Long couponId) {
+    public OrderInfo createOrder(Long userId, String loginId, List<OrderItemCommand> commands, Long couponId) {
         if (commands == null || commands.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 비어있을 수 없습니다.");
         }
@@ -84,7 +84,7 @@ public class OrderFacade {
             couponIssueId = couponIssue.getId();
         }
 
-        OrderModel order = orderService.createOrder(userId, products, quantities, coupon, couponIssueId);
+        OrderModel order = orderService.createOrder(userId, loginId, products, quantities, coupon, couponIssueId);
         // [fix] save() 반환값을 사용해야 JPA가 부여한 ID가 반영됨
         OrderModel savedOrder = orderRepository.save(order);
         stocks.forEach(stockRepository::save);

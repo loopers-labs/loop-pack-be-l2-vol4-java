@@ -1,90 +1,149 @@
+# PG 결제 연동 및 장애 대응 설계
+
 ## 🧭 Context & Decision
 
 ### 문제 정의
-- **현재 동작/제약**: 10만 건 이상의 데이터에서 브랜드 필터 + 정렬 조합 조회 시 풀스캔 + filesort 발생. 좋아요순 정렬을 위해 매번 `COUNT(*)` 집계가 필요하고, 동일 조건의 반복 요청에도 매번 DB를 조회하는 구조.
-- **문제(리스크)**: EXPLAIN 기준 `type: ALL`, rows: 99,516, `Using filesort`. 트래픽이 몰릴수록 DB 부하가 선형으로 증가.
-- **성공 기준**: 인덱스 스캔으로 전환되어 rows가 LIMIT에 근접하고 filesort가 제거됨. 동일 조건 반복 요청 시 DB를 조회하지 않음.
+- **현재 동작/제약**: 기존 결제 흐름에 실제 PG 연동을 추가한다. 로컬에서 실행 가능한 `pg-simulator`를 외부 결제 시스템으로 사용하며, 비동기 결제 방식(요청 수락 → 콜백으로 결과 수신)으로 동작한다.
+- **문제(리스크)**: PG를 어디서 호출하고, 실패했을 때 내부 상태를 어떻게 보정할 것인가. 외부 HTTP 호출은 DB 트랜잭션의 ACID 보장 범위 밖에 있어, 합치면 커넥션 점유·롤백 불일치·락 보유 시간 증가가 동시에 발생한다.
+- **성공 기준**: PG 장애·지연 시에도 내부 상태가 일관되게 유지되고, commerce-api 전체가 다운되지 않으며, 타임아웃으로 누락된 결제건도 복구할 수 있다.
 
 ---
 
 ### 선택지와 결정
 
-**[결정 1] OR 조건 제거 — 쿼리 분리 vs Null Object Pattern**
+**[결정 1] PG 외부 호출 방식 — FeignClient vs RestTemplate**
 
 - 고려한 대안:
-  - A (기존): `WHERE brand_id = :brandId OR :brandId IS NULL` 단일 메서드
-  - B (쿼리 분리): `findAllActive` / `findAllActiveByBrandId` 두 메서드로 분리, 호출부에서 brandId null 여부로 분기
-  - C (Null Object Pattern): 노브랜드 전용 브랜드 레코드를 삽입해 `brand_id = NULL`을 없앰
+  - A (RestTemplate): 직접 구현. 서킷브레이커(이하 CB)·Timeout·Fallback을 모두 코드로 붙여야 함
+  - B (FeignClient): `spring.cloud.openfeign.circuitbreaker.enabled: true` + yml 설정만으로 Resilience4j CB·TimeLimiter·Fallback 연동
 - 최종 결정: **B**
-- 트레이드오프: OR 조건이 있으면 옵티마이저가 "brandId가 null일 수도 있다"고 판단해 인덱스를 타지 않고 풀스캔을 선택한다. 쿼리 분리로 OR 조건 자체를 없애면 이 문제가 해결된다. C는 데이터 모델 변경을 수반하는데, 쿼리 분리만으로 해결된 시점에서 오버엔지니어링이다.
+- 트레이드오프: A는 `RestTemplate` 호출 코드 외에 `@CircuitBreaker`, `@TimeLimiter`, fallback 메서드, 에러 응답 파싱을 모두 직접 붙여야 한다. B는 `sliding-window-size`, `failure-rate-threshold`, `timeout-duration` 등 Resilience4j 설정을 yml에만 작성하면 FeignClient가 자동으로 연동한다. 단, PG가 4xx/5xx를 반환할 때 Feign은 기본적으로 `FeignException` 하나로 뭉쳐버리므로, 에러 종류(404 없음 / 400 검증 실패 등)를 구분하려면 `ErrorDecoder`를 별도로 구현해야 한다. 이 부분은 복구 API 확장(결정 4) 시점에 실제로 필요해져서 그때 추가했다.
 
 ---
 
-**[결정 2] 좋아요 수 정렬 구조 — 반정규화 vs Materialized View**
+**[결정 2] 트랜잭션 구조 — 단일 트랜잭션 유지 vs 트랜잭션 경계 분리**
 
 - 고려한 대안:
-  - A (반정규화): `products.like_count` 컬럼에 좋아요 수를 미리 집계해두고 등록/취소 시 원자 UPDATE로 동기화
-  - B (Materialized View): 별도 snapshot 테이블을 만들고 스케줄러로 주기적 재계산
-- 최종 결정: **A**
-- 트레이드오프: B는 좋아요가 등록/취소될 때마다 갱신되지 않아 배치 주기만큼 stale이 발생한다. 좋아요 수는 "대략적인 인기순"이 목적이므로 순간적인 불일치는 허용되지만, 반정규화는 원자 UPDATE(`like_count = like_count ± 1`)로 훨씬 가까운 시점에 동기화된다. 운영 복잡도(스케줄러 관리)도 낮다.
+  - A (단일 트랜잭션): `@Transactional` 하나가 `startPayment` + PG 호출 + `paymentRepository.save` 전체를 감쌈. PG 실패 시 자동 롤백으로 Order가 PENDING_PAYMENT로 복원됨.
+  - B (트랜잭션 분리): `[트랜잭션1] startPayment → 커밋` → `PG 호출(커넥션 없음)` → `[트랜잭션2] 저장`. PG 실패 시 트랜잭션 C(명시적 보정)로 Order를 PAYMENT_FAILED로 전이.
+- 최종 결정: **초기에는 A, k6 부하 테스트 후 B로 전환**
+- 트레이드오프: A는 구조가 단순하고 PG 실패 시 롤백으로 자동 복원되지만, 80명의 가상 유저 부하 테스트에서 `pool_timeout_rate` 7.02%가 실측됐다. PG 응답을 기다리는 100~600ms 동안 커넥션을 점유하는 구조가 실제로 풀 고갈을 일으킨다는 걸 수치로 확인했다. B로 전환 후 동일 조건에서 2.37%로 66% 감소. B의 단점은 PG 호출이 실패했을 때 상태를 되돌리는 보정 트랜잭션(트랜잭션 C)이 추가로 필요하다는 점이다. 이 보정 자체가 실패하면 주문이 결제 진행 중 상태에 멈춰 사용자가 재결제를 시도할 수 없게 된다. 발생 가능성은 매우 낮지만, 이런 상황이 생기더라도 복구 API(결정 4)로 수동으로 상태를 바로잡을 수 있다.
 
 ---
 
-**[결정 3] like_count 인덱스 유지 여부**
+**[결정 3] Fallback — 무조건 대체 응답 vs 원인 판별**
 
 - 고려한 대안:
-  - A (인덱스 유지): 좋아요 등록/취소마다 B-Tree 갱신 비용 발생
-  - B (인덱스 제거): 쓰기 비용 절감. 대신 캐시 미스 시 filesort(99K rows) 발생
-- 최종 결정: **A**
-- 트레이드오프: 좋아요는 결제·재고처럼 정합성이 엄격하지 않아 쓰기 경합이 크리티컬하지 않다. Redis 캐시가 읽기 경로를 흡수하므로 캐시 히트 시에는 DB를 전혀 조회하지 않아 인덱스가 사용되지 않는다. 캐시 미스 시에는 인덱스가 없으면 rows 99K filesort가 발생하고, 있으면 rows 20으로 끝난다. 쓰기 경합의 실질 원인은 인덱스가 아니라 row lock 자체이므로 인덱스를 제거해도 해결되지 않는다.
-
----
-
-**[결정 4] inStock 필터 구현 방식 — EXISTS vs JOIN vs 반정규화**
-
-- 고려한 대안:
-  - A (JOIN): `products JOIN stocks ON ...` 추가
-  - B (반정규화): `products.available_stock` 컬럼 추가
-  - C (EXISTS 서브쿼리): `WHERE EXISTS (SELECT 1 FROM stocks WHERE product_id = p.id AND total_stock - reserved_stock > 0)`
-- 최종 결정: **C**
-- 트레이드오프: A는 옵티마이저가 stocks를 드라이빙 테이블로 선택하면 products의 정렬 인덱스가 무력화되고 filesort가 재발한다. B는 재고는 정합성이 중요한 데이터라 쓰기마다 동기화 부담이 크다(재고 부족/선점 상황에서 불일치 발생 시 잘못된 필터 결과를 낸다). C는 products 인덱스를 드라이빙으로 유지하면서 재고 조건을 정확하게 표현한다. Redis 캐시와 조합해 EXISTS 실행 빈도를 줄인다.
-
----
-
-**[결정 5] Redis 캐시 evict 전략**
-
-- 고려한 대안:
-  - A: 수정된 상품이 포함된 페이지만 선택적으로 evict
-  - B: 상품 수정/삭제/좋아요 이벤트 시 `products` 목록 캐시 전체 evict (`allEntries = true`)
+  - A (PgPaymentFallback): 예외 종류에 관계없이 항상 "서비스 불가" 반환
+  - B (PgPaymentFallbackFactory): PG가 실제로 응답한 에러(404, 400 등)는 그대로 전달. 진짜로 응답을 못 받았을 때(타임아웃, CB OPEN)만 "서비스 불가"로 대체.
 - 최종 결정: **B**
-- 트레이드오프: 어떤 파라미터 조합의 캐시 엔트리에 해당 상품이 포함되어 있는지 런타임에 알 수 없다. 선택적 evict를 구현하려면 상품 ID → 캐시 키 역방향 매핑이 필요하고, 구현 복잡도 대비 이득이 작다. 전체 evict는 공격적이지만, 좋아요처럼 빈번한 이벤트에서는 캐시 히트율이 낮아지는 부작용이 있다.
+- 트레이드오프: 복구 API는 "PG가 404를 반환하면 복구할 거래가 없으니 종료"라는 분기가 핵심이다. A는 예외 종류를 보지 않고 항상 "서비스 불가"를 반환하므로, PG가 정상적으로 404를 보냈을 때도 "장애"로 처리해 이 분기 자체가 불가능하다. B는 실패 원인을 확인해 PG가 직접 보낸 에러(404, 400 등)면 그대로 전달하고, 타임아웃이나 CB OPEN처럼 PG와 통신 자체가 안 됐을 때만 "서비스 불가"로 대체한다. `PgErrorDecoder`는 이 구조의 전제 조건으로, Feign이 4xx/5xx를 에러 종류 구분 없이 하나로 뭉쳐버리는 것을 막고 HTTP 상태 코드를 우리가 쓰는 에러 타입으로 정확히 변환해준다.
+- **후속 보완 (retry 도입 시)**: retry를 위해 FallbackFactory를 한 번 더 세분화했다. 기존에는 타임아웃·CB OPEN·PG 500이 모두 "서비스 불가"로 수렴했는데, CB OPEN은 PG가 다운된 상태이므로 "서비스 불가"를 유지하고, 타임아웃·네트워크·PG 500은 일시적 실패이므로 `PgRetriableException`으로 분리했다. 이 구분이 없으면 재시도 코드에서 CB OPEN인지 일시적 실패인지 알 수 없어 CB가 열린 상태에서도 retry가 발동되는 문제가 생긴다.
 
 ---
 
-**[결정 6] 상품 상세 재고 — 캐시 포함 vs 실시간 조회**
+**[결정 4] 복구 API 범위 — transactionKey 기반 vs orderId 기반 확장**
 
 - 고려한 대안:
-  - A: `OrderFacade`에 `@CacheEvict` 추가 — 재고 변경 시 product 캐시를 무효화
-  - B (실시간 조회): 재고를 캐시에서 제외하고, 상세 조회 시 항상 DB에서 직접 조회
-  - C: TTL을 짧게 조정 — stale 허용 범위만 줄이는 것
+  - A (transactionKey 기반): 로컬에 PaymentModel(PENDING)이 있을 때만 PG에 재조회해 상태 보정
+  - B (orderId 기반 확장): 로컬에 PaymentModel이 없을 때 orderId로 PG에 먼저 물어보고, 거래가 있으면 그 transactionKey로 단건 재조회 후 동기화
 - 최종 결정: **B**
-- 트레이드오프: A는 주문이 빈번한 환경에서 캐시 히트율을 급격히 낮춘다. C는 stale 문제를 구조적으로 해결하지 못한다. 재고는 구매 결정에 직접 사용되는 정보라 항상 정확해야 한다. 목록 화면의 재고(참고용)와 달리 상세 화면의 재고는 실시간 조회가 적합하다고 판단했다. `ProductCacheService`를 별도 bean으로 분리해 self-invocation 없이 상품 데이터만 캐싱하고, 재고는 `ProductFacade`에서 후처리로 조합한다.
+- 트레이드오프: 타임아웃 케이스에서는 트랜잭션 C가 실행된 후 PaymentModel이 로컬에 없는 상태다. A는 `transactionKey`를 알아야 PG에 조회할 수 있는데, `transactionKey`는 PaymentModel에만 있으므로 해당 건에 접근할 방법 자체가 없다. 복구 API를 호출해도 "결제 정보 없음" 에러로 끝난다. B는 PG의 `GET /api/v1/payments?orderId=` API를 이용해 `transactionKey` 없이도 접근한다. PG가 404를 반환하면 거래 자체가 없는 것이므로 종료, 거래가 있으면 최신 1건의 `transactionKey`로 단건 재조회 후 PaymentModel을 새로 생성해 동기화한다. 추가 PG 호출이 생기지만 복구 API는 수동 호출이라 빈도가 낮다. 단, orderId 기반 조회 응답에는 카드 종류 정보가 없어 `"UNKNOWN"`으로 채우는데, 이 값은 결제 처리 로직에 사용되지 않는 부수 정보라 실질적 문제는 없다.
+
+---
+
+**[결정 5] 멱등키 도입 및 Retry — 일시적 PG 실패 자동 복구**
+
+- 배경: PG가 40% 확률로 즉시 실패를 반환하고 타임아웃도 발생하는 환경에서, 일시적 실패를 자동으로 재시도하면 사용자 경험이 개선된다. 단, retry는 중복 결제를 유발할 수 있어 같은 요청을 여러 번 보내도 PG가 한 번만 처리해주는 것이 보장되어야 한다.
+- 고려한 대안:
+  - A (orderId 단독 멱등키): 단순하지만 재결제(PAYMENT_FAILED → 새 시도) 시 같은 키 → PG가 첫 실패 결과를 반환해 재결제 불가.
+  - B (타임스탬프 + UUID): `yyyyMMdd-HHmmss-UUID앞12자리` 형태. 발행 시각이 키에 포함되어 정렬·조회에 유리하고, UUID로 같은 초에 여러 요청이 와도 충돌 없음. 재결제 시 `startPayment()`가 다시 호출되어 새 키 생성, retry 시엔 OrderModel에 저장된 동일 키 재사용.
+- 최종 결정: **B**
+- 트레이드오프: 멱등키를 어디서 생성하고 어디에 저장하느냐가 핵심이다. `OrderModel.startPayment()`는 결제 시도마다 반드시 한 번 호출되는 진입점이므로 여기서 생성하고 TX1 커밋과 함께 DB에 저장하면, PG 호출 시에는 `order.getIdempotencyKey()`로 꺼내 쓰고 retry 시에도 동일한 키를 보장할 수 있다. PG 시뮬레이터 측에서는 동일 멱등키 수신 시 새 거래를 만들지 않고 기존 결과를 그대로 반환하도록 `findByIdempotencyKey` 조회를 추가했다.
+- **retry 횟수 결정 근거**: PG 즉시 실패 확률 40% 기준으로, 총 3회 시도(retry 2회) 시 누적 성공률은 `1-(0.4)³ = 93.6%`다. 4회(retry 3회)는 97.4%로 3.8%p 더 높지만 타임아웃 케이스 최악 응답 시간이 600ms 더 길어진다. 결제는 사용자가 대기하는 작업이므로 3회로 결정했다. retry 간격은 200ms 고정으로, PG 지연 범위(100~500ms)에서 일시적 부하 해소를 기다리기에 충분하다. CB가 열려있을 때는 retry 없이 즉시 차단한다 — PG가 다운된 상태에서 retry는 의미가 없고, CB가 "조금씩 요청을 허용해보며 PG가 회복됐는지 확인"하는 과정을 방해한다.
+
+---
+
+## 📊 k6 부하 테스트 — 설계 검증
+
+설계 단계에서 이론으로만 판단한 것들이 실제 부하에서도 동일하게 동작하는지 k6로 검증했다.
+
+**시나리오 1 — Race Condition (비관적 락 검증)**
+
+동일한 주문에 10명의 가상 유저가 동시에 결제를 요청했을 때 중복 결제가 발생하지 않는지 확인했다. 결과: `race_blocked_count = 10`, `checks 100%`. 10건 모두 400으로 차단됐다 — 락을 먼저 획득한 트랜잭션1이 커밋된 후 나머지 9건이 IN_PAYMENT 상태를 읽어 `startPayment()` 검증에서 실패한 것이다.
+
+**시나리오 2 — 커넥션 풀 포화 (트랜잭션 분리 효과 측정)**
+
+warmup(20명의 가상 유저) / saturation(50명의 가상 유저) / overload(80명의 가상 유저) 3단계로 데이터베이스 커넥션 풀 한계를 측정했다.
+
+| 지표 | 트랜잭션 분리 전 | 트랜잭션 분리 후 |
+|------|-----------|-----------|
+| pool_timeout_rate | 7.02% (48 / 683건) | **2.37% (16 / 674건)** |
+| payment_duration p(95) | 3.57s | **2.55s** |
+| payment_duration max | 5.52s | **3.94s** |
+
+`pool_timeout_rate` 66% 감소가 핵심 수치다. 트랜잭션1(~50ms) + 트랜잭션2(~20ms)로 커넥션 점유 시간이 대폭 단축된 직접적인 효과다. warmup/saturation p(95)는 소폭 상승(1.07s → 1.35~1.52s)했는데, minimum-idle 30→10 조정으로 초기 커넥션 생성 비용이 추가되고 요청당 커넥션 획득 횟수가 1→2회로 늘어난 영향이다. "개별 요청이 수백 ms 느려지는 대신 풀 고갈로 3초를 기다리다 503을 받는 요청이 66% 줄었다"는 트레이드오프로 판단했다.
+
+**시나리오 3 — Resilience4j 설정값 변경 실험**
+
+부하 테스트 이후 CB 동작을 더 깊이 이해하기 위해 설정값을 바꿔가며 세 가지 실험을 진행했다.
+
+**실험 1 — slowCallDurationThreshold: 에러 없이 느려도 CB가 열리는가**
+
+pg-simulator에 slow mode(150~300ms 지연, 에러 없음)를 켜고, `slow-call-duration-threshold: 100ms` / `slow-call-rate-threshold: 50`을 설정한 뒤 k6(15 req/s, 40초)로 실행했다.
+
+초반 ~20건은 200 OK, 3초 이후부터 CB가 열리며 503으로 전환됐다. PG가 에러를 반환하지 않았는데도 CB가 열린 것이다 — slow call rate 100%가 threshold(50%)를 넘었기 때문이다.
+
+단, 실험 과정에서 함정이 하나 있었다. 처음에는 timelimiter가 600ms로 설정돼 있어, PG 응답(150~300ms) + DB 오버헤드가 600ms를 초과하는 케이스에서 TimeLimiter가 먼저 끊어버렸다. TimeLimiter가 끊은 호출은 slow call이 아닌 failure로 집계되어, 실험 전제("에러 없이 느리기만 할 때")가 성립하지 않았다. timelimiter를 1000ms로 올린 후에야 slowCallRate만으로 CB가 열리는 것을 확인할 수 있었다.
+
+> **timelimiter 타임아웃은 slowCallRate가 아닌 failureRate에 집계된다.** 두 경로의 집계 채널이 다르다.
+
+---
+
+**실험 2 — COUNT_BASED vs TIME_BASED: 트래픽 중단이 CB 복구에 영향을 주는가**
+
+Phase1(15 req/s, 5초 burst) → Phase2(15초 완전 중단) → Phase3(5 req/s 재개) 시나리오로 두 타입을 비교했다.
+
+| 지표 | COUNT_BASED (size=20) | TIME_BASED (size=10초) |
+|------|----------------------|----------------------|
+| cb_open_rate | 94.90% | 6.12% |
+| phase3_success | **8.00%** | **96.03%** |
+
+COUNT_BASED는 15초 중단 동안 Phase1의 실패 기록이 윈도우에 그대로 유지된다. Phase3 재개 시 CB가 여전히 OPEN이라 8%만 성공했다.
+
+TIME_BASED는 10초 윈도우가 중단 중 만료되어 창이 비워진다. Phase3 시작 시 CB는 CLOSED 상태에서 재개되어 96%가 성공했다.
+
+다만 TIME_BASED는 저트래픽 환경에서 창이 비어 CB가 예기치 않게 CLOSED로 판단할 수 있다. COUNT_BASED가 기본값인 이유다.
+
+---
+
+**실험 3 — Retry × CB: retry 횟수가 CB 민감도에 영향을 주는가**
+
+가상 유저 1명이 순차적으로 실행하며 "몇 번째 결제 요청에서 CB가 최초로 열리는가"를 측정했다. `pg.retry-max-attempts` 설정으로 retry 횟수를 전환해 두 번 실행했다.
+
+| 구분 | CB가 처음 열린 시점 |
+|------|-------------------|
+| retry=3 | 14번째 결제 요청 |
+| retry=1 | 21번째 결제 요청 |
+
+retry=3에서 결제 요청 1건이 CB 윈도우에 평균 1.56건으로 기록되기 때문이다(실패 시 재시도마다 독립된 CB 호출로 집계). `sliding-window-size=20`을 채우는 데 필요한 결제 요청 수가 `20 ÷ 1.56 ≈ 13`으로 줄어들어, retry=3은 retry=1보다 약 1.5배 빠르게 CB를 열었다.
+
+> retry 횟수를 늘릴 때는 `sliding-window-size`와 함께 고려해야 한다. CB OPEN 상태에서는 retry를 발동하지 않도록 설정하지 않으면, HALF-OPEN 프로브 슬롯을 retry가 소진해 CB 회복을 방해한다.
 
 ---
 
 ## 🤔 고민한 점 / 막혔던 부분
 
-`deleted_at IS NULL` 조건을 인덱스에 포함할지 처음에 고민했다. selectivity가 낮은 컬럼을 선두에 두면 오히려 인덱스 효율이 떨어진다는 이유로 제외했는데, "그러면 LIMIT이 있는 쿼리에서도 인덱스가 비효율적인가"라는 의문이 남았다.
-
-EXPLAIN으로 확인해보니 `LIMIT 20`이 있으면 인덱스를 순서대로 읽다가 조건에 맞는 20개를 찾는 즉시 멈춘다(`type: index`). selectivity가 낮아도 LIMIT이 조기 종료 조건으로 작동해 실질 읽기 비용이 작았다. selectivity 문제는 LIMIT 없는 전체 스캔에서만 인덱스를 무력화한다는 결론에 도달했다.
+`@Transactional`을 같은 클래스 안에서 여러 번 나누려 했을 때 문제가 생겼다. Spring은 `@Transactional`을 외부에서 메서드를 호출할 때만 적용하는데, 같은 클래스 안에서 `this.다른메서드()`를 호출하면 트랜잭션이 적용되지 않는다. 트랜잭션1·트랜잭션C·트랜잭션2를 한 클래스 안에서 각각 독립된 트랜잭션으로 실행하려면 어노테이션 방식이 아닌 코드로 직접 트랜잭션을 제어해야 했다. `TransactionTemplate`을 사용해 해결했다.
 
 ---
 
-OFFSET 페이지네이션의 한계를 인덱스 분석 중에 확인했다. 1페이지(OFFSET 0)는 rows = 20으로 끝나지만, OFFSET 50,000이면 rows = 50,020이 된다. rows가 OFFSET에 정비례해 선형 증가하고, 브랜드 + 최신순 조합에서는 OFFSET 1,000부터 옵티마이저가 인덱스 전략을 바꾸면서 filesort까지 재등장했다.
-
-커버링 인덱스로 row lookup을 줄이면 딥 페이지에서 I/O를 절반으로 줄일 수 있다. 그런데 `name` 컬럼이 인덱스에 없어서 row lookup이 반드시 발생하고, `name`을 6개 인덱스에 추가하면 varchar로 인한 인덱스 크기 증가와 쓰기 비용이 부담이다. 커버링 인덱스 효과가 가장 큰 구간이 offset 페이지네이션의 구조적 한계 구간과 겹친다는 점도 아이러니였다.
-
-이 문제를 구조적으로 해결하려면 OFFSET 자체를 없애는 방향이 맞는 것 같다. 커서 기반 페이지네이션(`WHERE id < :lastId LIMIT 20`)이 그 방법 중 하나라고 생각하는데, 페이지 깊이와 무관하게 항상 rows = 20으로 고정되기 때문이다. 다만 정렬 기준이 `like_count`처럼 중복 가능한 컬럼이면 커서 설계가 복잡해지는 만큼, 도입 시 정렬 조건별 커서 전략을 별도로 고민해야 할 것 같다.
+retry를 도입하면서 FallbackFactory를 두 번 고쳐야 했다. 처음에는 PG 호출이 어떤 이유로 실패하든 `SERVICE_UNAVAILABLE`을 던지면 그만이었다. retry 코드를 추가하면서 "재시도할 수 있는 실패인가, 아닌가"를 구분해야 한다는 걸 알았다. CB가 열린 상태(`CallNotPermittedException`)는 PG 자체가 다운된 것이므로 재시도해도 CB가 또 막는다. 타임아웃·네트워크·PG 500은 일시적 실패라 기다렸다가 재시도하면 성공할 수 있다. 두 경우를 모두 `SERVICE_UNAVAILABLE`로 뭉쳐두면 retry 코드에서 구분할 방법이 없어서, 일시적 실패만 `PgRetriableException`으로 분리하고 CB OPEN은 즉시 차단하도록 바꿨다.
 
 ---
+
+콜백을 받을 때 바디의 `status` 필드를 그대로 믿었다가 위조 가능성이 있다는 걸 뒤늦게 인식했다. PG 콜백에는 서명이나 인증 헤더가 없어 발신지를 검증할 방법이 없다. 해결책으로 콜백 바디의 status를 사용하지 않고, 콜백 수신 즉시 `transactionKey`로 PG에 재조회해 실제 상태를 가져오는 방식으로 바꿨다. 조회 비용이 추가되지만 위조된 콜백에 의해 주문 상태가 잘못 전이되는 리스크를 없앴다.
+
+---
+
 ## 🙋 기타
