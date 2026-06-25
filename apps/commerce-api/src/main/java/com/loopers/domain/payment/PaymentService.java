@@ -36,7 +36,7 @@ public class PaymentService {
     /** TX2: transactionKey 저장 + PG 즉시 SUCCESS/FAILED 반영 */
     @Transactional
     public void applyPgResponse(Long paymentId, PgTransactionResponse pgResponse) {
-        PaymentEntity payment = getOrThrow(paymentId);
+        PaymentEntity payment = findPaymentOrThrow(paymentId);
         payment.registerTransactionKey(pgResponse.transactionKey());
         if (pgResponse.status() == PgTransactionStatus.SUCCESS) {
             approveAndPayOrder(payment);
@@ -49,7 +49,7 @@ public class PaymentService {
     /** PG 요청 자체 실패 시 FAILED 확정 */
     @Transactional
     public void markFailed(Long paymentId, String reason) {
-        PaymentEntity payment = getOrThrow(paymentId);
+        PaymentEntity payment = findPaymentOrThrow(paymentId);
         payment.fail(reason);
         paymentRepository.save(payment);
     }
@@ -73,6 +73,10 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public PaymentEntity getOrThrow(Long paymentId) {
+        return findPaymentOrThrow(paymentId);
+    }
+
+    private PaymentEntity findPaymentOrThrow(Long paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."));
     }

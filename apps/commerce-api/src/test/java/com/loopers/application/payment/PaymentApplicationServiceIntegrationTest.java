@@ -5,6 +5,7 @@ import com.loopers.application.order.OrderApplicationService;
 import com.loopers.application.order.OrderItemCommand;
 import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.user.UserApplicationService;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.payment.PgClient;
@@ -195,6 +196,9 @@ class PaymentApplicationServiceIntegrationTest {
             PaymentInfo payment = paymentApplicationService.getPayment(userId,
                 getPaymentIdByTransactionKey("TX-001"));
             assertThat(payment.status()).isEqualTo(PaymentStatus.SUCCESS);
+
+            var order = orderApplicationService.getOrder(userId, orderId);
+            assertThat(order.status()).isEqualTo(OrderStatus.PAID);
         }
 
         @DisplayName("FAILED 콜백 수신 시 PaymentEntity가 FAILED가 된다.")

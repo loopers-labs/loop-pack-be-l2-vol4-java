@@ -25,20 +25,20 @@ public class PaymentApplicationService {
     private final PgClient pgClient;
     private final PaymentWaitingRegistry registry;
     private final String callbackUrl;
-
-    @Value("${pg.callback-timeout-seconds:10}")
-    private long callbackTimeoutSeconds;
+    private final long callbackTimeoutSeconds;
 
     public PaymentApplicationService(
         PaymentService paymentService,
         PgClient pgClient,
         PaymentWaitingRegistry registry,
-        @Value("${pg.callback-url:http://localhost:8080/api/v1/payments/callback}") String callbackUrl
+        @Value("${pg.callback-url:http://localhost:8080/api/v1/payments/callback}") String callbackUrl,
+        @Value("${pg.callback-timeout-seconds:10}") long callbackTimeoutSeconds
     ) {
         this.paymentService = paymentService;
         this.pgClient = pgClient;
         this.registry = registry;
         this.callbackUrl = callbackUrl;
+        this.callbackTimeoutSeconds = callbackTimeoutSeconds;
     }
 
     public CompletableFuture<PaymentInfo> initiate(Long userId, Long orderId, CardType cardType, String cardNo) {
