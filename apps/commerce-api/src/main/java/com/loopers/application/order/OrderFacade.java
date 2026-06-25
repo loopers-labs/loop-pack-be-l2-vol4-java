@@ -37,43 +37,13 @@ public class OrderFacade {
 
     @Transactional
     public Long createOrder(Long userId, OrderCreateRequest request) {
+        List<StockRequest> stockRequests = request.items().stream()
+                .map(item -> new StockRequest(item.productId(), item.quantity()))
+                .toList();
+        productFacade.decreaseStocks(stockRequests);
+
         List<Long> productIds = request.items().stream()
                 .map(OrderCreateRequest.Item::productId)
-                .toList();
-
-        List<ProductModel> products = productRepository.findByIds(productIds);
-        if (products.size() != productIds.size()) {
-            throw new CoreException(ErrorType.PRODUCT_NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
-        }
-
-        Map<Long, ProductModel> productMap = products.stream()
-                .collect(Collectors.toMap(ProductModel::getId, p -> p));
-
-        List<StockRequest> stockRequests = request.items().stream()
-                .map(item -> new StockRequest(item.productId(), item.quantity()))
-                .toList();
-        productFacade.decreaseStocks(stockRequests);
-
-        OrderModel order = new OrderModel(userId);
-        for (OrderCreateRequest.Item item : request.items()) {
-            ProductModel product = productMap.get(item.productId());
-            ProductSnapshot snapshot = new ProductSnapshot(product.getName(), product.getPrice(), "Brand Placeholder");
-            OrderItemModel orderItem = new OrderItemModel(order, product.getId(), snapshot, item.quantity());
-            order.addItem(orderItem);
-        }
-
-        return orderRepository.save(order).getId();
-    }
-
-    @Transactional
-    public Long checkout(Long userId, OrderCheckoutRequest request) {
-        List<StockRequest> stockRequests = request.items().stream()
-                .map(item -> new StockRequest(item.productId(), item.quantity()))
-                .toList();
-        productFacade.decreaseStocks(stockRequests);
-
-        List<Long> productIds = request.items().stream()
-                .map(OrderCheckoutRequest.Item::productId)
                 .toList();
 
         List<ProductModel> products = productRepository.findByIds(productIds);
@@ -102,29 +72,18 @@ public class OrderFacade {
         java.math.BigDecimal totalPaymentAmount = totalOriginalAmount.subtract(discount);
 
         OrderModel order = new OrderModel(userId, request.couponIssueId(), totalOriginalAmount, discount, totalPaymentAmount);
-        for (OrderCheckoutRequest.Item item : request.items()) {
+        for (OrderCreateRequest.Item item : request.items()) {
             ProductModel product = productMap.get(item.productId());
             ProductSnapshot snapshot = new ProductSnapshot(product.getName(), product.getPrice(), "Brand Placeholder");
             OrderItemModel orderItem = new OrderItemModel(order, product.getId(), snapshot, item.quantity());
             order.addItem(orderItem);
         }
-        Long orderId = orderRepository.save(order).getId();
 
-        Long paymentId = paymentFacade.processPayment(orderId, request.paymentMethod(), totalPaymentAmount);
-        PaymentStatus paymentStatus = paymentFacade.getPaymentStatus(paymentId);
-
-        if (paymentStatus == PaymentStatus.APPROVED) {
-            order.complete();
-            orderRepository.save(order);
-            
-            if (couponIssue != null) {
-                couponIssue.markUsed();
-                couponRepository.saveIssue(couponIssue);
-            }
-        } else {
-            orderRepository.save(order);
+        if (couponIssue != null) {
+            couponIssue.markUsed();
+            couponRepository.saveIssue(couponIssue);
         }
 
-        return orderId;
+        return orderRepository.save(order).getId();
     }
 }
