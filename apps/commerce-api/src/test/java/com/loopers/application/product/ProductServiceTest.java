@@ -1,5 +1,6 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
@@ -99,7 +100,7 @@ class ProductServiceTest {
             productService.create(new ProductModel("상품C", 30000L, 1L));
 
             // act
-            Page<ProductModel> result = productService.getAll(null, ProductSort.LATEST, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(null, null, null, null), ProductSort.LATEST, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent()).hasSize(3);
@@ -115,7 +116,7 @@ class ProductServiceTest {
             productService.create(new ProductModel("아디다스상품", 99000L, 2L));
 
             // act
-            Page<ProductModel> result = productService.getAll(1L, ProductSort.LATEST, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(1L, null, null, null), ProductSort.LATEST, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent()).hasSize(1);
@@ -131,7 +132,7 @@ class ProductServiceTest {
             productService.create(new ProductModel("상품C", 20000L, 1L));
 
             // act
-            Page<ProductModel> result = productService.getAll(null, ProductSort.PRICE_ASC, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(null, null, null, null), ProductSort.PRICE_ASC, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent().get(0).getPrice()).isEqualTo(10000L);
@@ -146,13 +147,11 @@ class ProductServiceTest {
             ProductModel a = productService.create(new ProductModel("상품A", 10000L, 1L));
             ProductModel b = productService.create(new ProductModel("상품B", 10000L, 1L));
             ProductModel c = productService.create(new ProductModel("상품C", 10000L, 1L));
-            a.increaseLikeCount();
-            a.increaseLikeCount();
-            a.increaseLikeCount();
-            b.increaseLikeCount();
+            fakeProductRepository.setLikeCount(a.getId(), 3);
+            fakeProductRepository.setLikeCount(b.getId(), 1);
 
             // act
-            Page<ProductModel> result = productService.getAll(null, ProductSort.LIKES_DESC, PageRequest.of(0, 20));
+            Page<ProductModel> result = productService.getAll(ProductFilter.of(null, null, null, null), ProductSort.LIKES_DESC, PageRequest.of(0, 20));
 
             // assert
             assertThat(result.getContent().get(0).getName()).isEqualTo("상품A");
@@ -234,6 +233,7 @@ class ProductServiceTest {
     private static class FakeProductRepository implements ProductRepository {
 
         private final Map<Long, ProductModel> store = new HashMap<>();
+        private final Map<Long, Integer> likeCountMap = new HashMap<>();
         private long sequence = 1L;
 
         @Override
@@ -260,10 +260,10 @@ class ProductServiceTest {
         }
 
         @Override
-        public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
+        public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
             List<ProductModel> filtered = store.values().stream()
                 .filter(p -> p.getDeletedAt() == null)
-                .filter(p -> brandId == null || p.getBrandId().equals(brandId))
+                .filter(p -> filter.brandId() == null || p.getBrandId().equals(filter.brandId()))
                 .sorted(comparatorFor(sort))
                 .toList();
 
@@ -274,6 +274,15 @@ class ProductServiceTest {
             return new org.springframework.data.domain.PageImpl<>(content, pageRequest, filtered.size());
         }
 
+        @Override
+        public List<ProductModel> findAllByIds(List<Long> ids) {
+            return ids.stream().map(store::get).filter(p -> p != null && p.getDeletedAt() == null).toList();
+        }
+
+        public void setLikeCount(Long productId, int count) {
+            likeCountMap.put(productId, count);
+        }
+
         /** soft delete 필터를 무시하고 조회 — 삭제 여부 검증용 */
         public Optional<ProductModel> findByIdIgnoringFilter(Long id) {
             return Optional.ofNullable(store.get(id));
@@ -282,7 +291,7 @@ class ProductServiceTest {
         private Comparator<ProductModel> comparatorFor(ProductSort sort) {
             return switch (sort) {
                 case PRICE_ASC -> Comparator.comparingLong(ProductModel::getPrice);
-                case LIKES_DESC -> Comparator.comparingInt(ProductModel::getLikeCount).reversed();
+                case LIKES_DESC -> Comparator.comparingInt((ProductModel p) -> likeCountMap.getOrDefault(p.getId(), 0)).reversed();
                 case LATEST -> Comparator.comparingLong(ProductModel::getId).reversed();
             };
         }

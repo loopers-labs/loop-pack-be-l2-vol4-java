@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
@@ -270,8 +271,13 @@ class OrderServiceTest {
         }
 
         @Override
-        public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
+        public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ProductModel> findAllByIds(List<Long> ids) {
+            return ids.stream().map(store::get).filter(p -> p != null && p.getDeletedAt() == null).toList();
         }
 
         private void setId(ProductModel product, long id) {

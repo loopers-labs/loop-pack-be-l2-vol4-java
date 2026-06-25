@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.domain.like.LikeSort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +20,7 @@ public class LikeFacade {
         likeService.unlike(memberId, productId);
     }
 
-    public List<LikeInfo> getLikes(Long memberId) {
-        return likeService.getLikeInfosByMemberId(memberId);
+    public List<LikeInfo> getLikes(Long memberId, LikeSort sort) {
+        return likeService.getLikeInfosByMemberId(memberId, sort);
     }
 }

@@ -26,7 +26,7 @@ class ProductDomainServiceTest {
         setId(brand, 1L);
 
         // act
-        ProductDetail detail = productDomainService.combineWithBrand(product, brand);
+        ProductDetail detail = productDomainService.combineWithBrand(product, brand, 0, 0);
 
         // assert
         assertThat(detail.id()).isEqualTo(1L);
@@ -37,19 +37,33 @@ class ProductDomainServiceTest {
         assertThat(detail.likeCount()).isZero();
     }
 
+    @DisplayName("stockQuantity를 포함해 조합하면, ProductDetail에 stockQuantity가 반영된다.")
+    @Test
+    void combineWithBrand_includesStockQuantity() {
+        // arrange
+        ProductModel product = new ProductModel("에어포스1", 139000L, 1L);
+        BrandModel brand = new BrandModel("나이키");
+        setId(product, 1L);
+        setId(brand, 1L);
+
+        // act
+        ProductDetail detail = productDomainService.combineWithBrand(product, brand, 0, 10);
+
+        // assert
+        assertThat(detail.stockQuantity()).isEqualTo(10);
+    }
+
     @DisplayName("좋아요가 있는 상품을 Brand와 조합하면, likeCount가 그대로 반영된다.")
     @Test
     void combineWithBrand_reflectsLikeCount() {
         // arrange
         ProductModel product = new ProductModel("에어맥스90", 159000L, 2L);
-        product.increaseLikeCount();
-        product.increaseLikeCount();
         BrandModel brand = new BrandModel("나이키");
         setId(product, 2L);
         setId(brand, 2L);
 
         // act
-        ProductDetail detail = productDomainService.combineWithBrand(product, brand);
+        ProductDetail detail = productDomainService.combineWithBrand(product, brand, 2, 0);
 
         // assert
         assertThat(detail.likeCount()).isEqualTo(2);

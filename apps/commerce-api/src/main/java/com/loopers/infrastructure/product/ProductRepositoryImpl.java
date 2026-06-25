@@ -1,11 +1,13 @@
 package com.loopers.infrastructure.product;
 
+import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
@@ -34,17 +36,16 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Page<ProductModel> findAll(Long brandId, ProductSort sort, PageRequest pageRequest) {
-        PageRequest sortedPage = PageRequest.of(
-            pageRequest.getPageNumber(),
-            pageRequest.getPageSize(),
-            toSort(sort)
-        );
-
-        if (brandId != null) {
-            return productJpaRepository.findAllByBrandId(brandId, sortedPage);
+    public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
+        if (sort == ProductSort.LIKES_DESC) {
+            Pageable unsorted = PageRequest.of(pageRequest.getPageNumber(), pageRequest.getPageSize());
+            return productJpaRepository.findAllWithFilterOrderByLikeCountDesc(
+                filter.brandId(), filter.minPrice(), filter.maxPrice(), filter.inStock(), unsorted);
         }
-        return productJpaRepository.findAll(sortedPage);
+
+        PageRequest sorted = PageRequest.of(pageRequest.getPageNumber(), pageRequest.getPageSize(), toSort(sort));
+        return productJpaRepository.findAllWithFilter(
+            filter.brandId(), filter.minPrice(), filter.maxPrice(), filter.inStock(), sorted);
     }
 
     @Override
@@ -52,11 +53,16 @@ public class ProductRepositoryImpl implements ProductRepository {
         return productJpaRepository.findAllByBrandId(brandId);
     }
 
+    @Override
+    public List<ProductModel> findAllByIds(List<Long> ids) {
+        return productJpaRepository.findAllById(ids);
+    }
+
     private Sort toSort(ProductSort sort) {
         return switch (sort) {
             case PRICE_ASC -> Sort.by(Sort.Order.asc("price"));
-            case LIKES_DESC -> Sort.by(Sort.Order.desc("likeCount"));
             case LATEST -> Sort.by(Sort.Order.desc("createdAt"));
+            case LIKES_DESC -> throw new IllegalStateException("LIKES_DESC는 별도 쿼리로 처리됩니다.");
         };
     }
 }

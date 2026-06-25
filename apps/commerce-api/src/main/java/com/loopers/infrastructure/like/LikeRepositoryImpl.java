@@ -30,6 +30,11 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
+    public List<LikeModel> findAllByMemberIdOrderByCreatedAtDesc(Long memberId) {
+        return likeJpaRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId);
+    }
+
+    @Override
     public void delete(LikeModel like) {
         likeJpaRepository.delete(like);
     }
