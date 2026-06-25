@@ -21,4 +21,15 @@ public class PaymentV1Dto {
             return new PaymentResponse(info.paymentId(), info.status());
         }
     }
+
+    public record CallbackRequest(
+        String transactionKey,
+        String orderId,
+        String cardType,
+        String cardNo,
+        Long amount,
+        PaymentStatus status,
+        String reason
+    ) {
+    }
 }

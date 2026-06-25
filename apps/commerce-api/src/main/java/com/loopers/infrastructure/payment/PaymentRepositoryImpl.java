@@ -26,6 +26,11 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByTransactionKey(String transactionKey) {
+        return paymentJpaRepository.findByTransactionKey(transactionKey);
+    }
+
+    @Override
     public boolean existsActiveByOrderId(Long orderId) {
         return paymentJpaRepository.existsByOrderIdAndStatusIn(
             orderId, List.of(PaymentStatus.PENDING, PaymentStatus.SUCCESS));

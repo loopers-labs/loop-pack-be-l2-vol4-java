@@ -9,6 +9,7 @@ import com.loopers.domain.payment.PaymentGatewayCommand;
 import com.loopers.domain.payment.PaymentGatewayResult;
 import com.loopers.domain.payment.model.CardType;
 import com.loopers.domain.payment.model.Payment;
+import com.loopers.domain.payment.model.PaymentStatus;
 import com.loopers.domain.payment.service.PaymentService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -56,5 +57,10 @@ public class PaymentApplicationService {
         }
 
         return new PaymentInfo(payment.getId(), result.status());
+    }
+
+    public void confirmPayment(String transactionKey, PaymentStatus status, String reason) {
+        Payment confirmed = paymentService.confirmResult(transactionKey, status, reason);
+        // TODO(9단계): confirmed 가 FAILED 로 새로 확정되면 주문 취소 + 재고/쿠폰 보상
     }
 }
