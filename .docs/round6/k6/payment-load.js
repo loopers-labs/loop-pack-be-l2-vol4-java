@@ -26,8 +26,8 @@ export const options = {
 const BASE = 'http://localhost:8080';
 const HEADERS = {
   'Content-Type': 'application/json',
-  'X-Loopers-LoginId': 'loopers01',
-  'X-Loopers-LoginPw': 'Loopers123!',
+  'X-Loopers-LoginId': __ENV.LOGIN_ID || 'loopers01',
+  'X-Loopers-LoginPw': __ENV.LOGIN_PW || 'Loopers123!',
 };
 
 export default function () {
