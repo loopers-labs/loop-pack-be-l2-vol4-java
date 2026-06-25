@@ -7,9 +7,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "Product V1 API (Admin)", description = "어드민용 상품 관리 API. X-Loopers-Ldap: loopers.admin 헤더 필요.")
+@SecurityRequirement(name = "X-Loopers-Ldap")
 public interface ProductAdminV1ApiSpec {
 
     @Operation(summary = "상품 등록", description = "새 상품을 등록합니다. brandId로 브랜드 존재 여부를 검증합니다. 재고(Inventory)도 함께 생성됩니다.")

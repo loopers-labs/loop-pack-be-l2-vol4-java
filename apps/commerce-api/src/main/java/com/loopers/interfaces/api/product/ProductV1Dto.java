@@ -1,24 +1,25 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.ZonedDateTime;
 
 public class ProductV1Dto {
 
     public record CreateProductRequest(
-        Long brandId,
-        String name,
-        String description,
-        Long price,
-        Integer quantity
+        @Schema(example = "1") Long brandId,
+        @Schema(example = "에어맥스 90") String name,
+        @Schema(example = "나이키의 대표 클래식 운동화") String description,
+        @Schema(example = "159000") Long price,
+        @Schema(example = "100") Integer quantity
     ) {}
 
     public record UpdateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer quantity
+        @Schema(example = "에어맥스 90 리미티드") String name,
+        @Schema(example = "한정판 에어맥스 90") String description,
+        @Schema(example = "199000") Long price,
+        @Schema(example = "30") Integer quantity
     ) {}
 
     public record CreateProductResponse(Long id) {}

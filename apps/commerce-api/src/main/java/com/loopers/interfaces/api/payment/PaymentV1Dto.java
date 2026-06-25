@@ -3,22 +3,23 @@ package com.loopers.interfaces.api.payment;
 import com.loopers.application.payment.PaymentInfo;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PgTransactionStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public class PaymentV1Dto {
 
     public record PaymentRequest(
-        Long orderId,
-        CardType cardType,
-        String cardNo
+        @Schema(example = "1") Long orderId,
+        @Schema(example = "SAMSUNG") CardType cardType,
+        @Schema(example = "1234-5678-9814-1451") String cardNo
     ) {}
 
     public record CallbackRequest(
-        String transactionKey,
-        String orderId,
-        CardType cardType,
-        String cardNo,
-        Long amount,
-        PgTransactionStatus status,
+        @Schema(example = "TX-001") String transactionKey,
+        @Schema(example = "1") String orderId,
+        @Schema(example = "SAMSUNG") CardType cardType,
+        @Schema(example = "1234-5678-9814-1451") String cardNo,
+        @Schema(example = "100000") Long amount,
+        @Schema(example = "SUCCESS") PgTransactionStatus status,
         String reason
     ) {}
 

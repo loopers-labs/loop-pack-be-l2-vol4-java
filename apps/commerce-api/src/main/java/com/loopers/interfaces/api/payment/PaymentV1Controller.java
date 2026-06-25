@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/payments")
-public class PaymentV1Controller {
+public class PaymentV1Controller implements PaymentV1ApiSpec {
 
     private final PaymentApplicationService paymentApplicationService;
     private final PaymentWaitingRegistry registry;

@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.order;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderItemCommand;
 import com.loopers.domain.order.OrderStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -18,8 +19,8 @@ public class OrderV1Dto {
             Long couponId
     ) {
         public record OrderItemRequest(
-                @NotNull Long productId,
-                @Min(1) int quantity
+                @NotNull @Schema(example = "1") Long productId,
+                @Min(1) @Schema(example = "2") int quantity
         ) {}
 
         public List<OrderItemCommand> toCommands() {
