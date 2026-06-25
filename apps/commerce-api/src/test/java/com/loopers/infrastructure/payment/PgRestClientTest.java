@@ -48,7 +48,8 @@ class PgRestClientTest {
             .andExpect(method(POST))
             .andExpect(header("X-USER-ID", String.valueOf(USER_ID)))
             .andRespond(withSuccess(
-                "{\"transactionKey\":\"TX-1\",\"status\":\"PENDING\",\"reason\":null}",
+                "{\"meta\":{\"result\":\"SUCCESS\",\"errorCode\":null,\"message\":null},"
+                    + "\"data\":{\"transactionKey\":\"TX-1\",\"status\":\"PENDING\",\"reason\":null}}",
                 MediaType.APPLICATION_JSON));
 
         var request = new PgPaymentRequest("1", CardType.SAMSUNG, "1234-5678-9814-1451", 10000L,
@@ -94,7 +95,8 @@ class PgRestClientTest {
             .andExpect(method(GET))
             .andExpect(header("X-USER-ID", String.valueOf(USER_ID)))
             .andRespond(withSuccess(
-                "{\"transactionKey\":\"TX-1\",\"status\":\"SUCCESS\",\"reason\":null}",
+                "{\"meta\":{\"result\":\"SUCCESS\",\"errorCode\":null,\"message\":null},"
+                    + "\"data\":{\"transactionKey\":\"TX-1\",\"status\":\"SUCCESS\",\"reason\":null}}",
                 MediaType.APPLICATION_JSON));
 
         // Act

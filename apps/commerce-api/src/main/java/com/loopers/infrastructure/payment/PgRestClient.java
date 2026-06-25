@@ -9,6 +9,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -43,10 +44,9 @@ public class PgRestClient implements PgClient {
     public PgTransactionResponse requestPayment(PgPaymentRequest request, String userId) {
         String url = pgBaseUrl + "/api/v1/payments";
         HttpEntity<PgPaymentRequest> entity = new HttpEntity<>(request, userIdHeaders(userId));
-        ResponseEntity<PgTransactionResponse> response =
-            pgRequestRestTemplate.exchange(url, HttpMethod.POST, entity, PgTransactionResponse.class);
-        return Optional.ofNullable(response.getBody())
-            .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "PG 응답이 비어있습니다."));
+        ResponseEntity<PgApiResponse<PgTransactionResponse>> response =
+            pgRequestRestTemplate.exchange(url, HttpMethod.POST, entity, transactionResponseType());
+        return unwrap(response, ErrorType.PAYMENT_GATEWAY_ERROR, "PG 응답이 비어있습니다.");
     }
 
     @CircuitBreaker(name = "pgClient", fallbackMethod = "getTransactionFallback")
@@ -54,10 +54,22 @@ public class PgRestClient implements PgClient {
     public PgTransactionResponse getTransaction(String transactionKey, String userId) {
         String url = pgBaseUrl + "/api/v1/payments/" + transactionKey;
         HttpEntity<Void> entity = new HttpEntity<>(userIdHeaders(userId));
-        ResponseEntity<PgTransactionResponse> response =
-            pgQueryRestTemplate.exchange(url, HttpMethod.GET, entity, PgTransactionResponse.class);
+        ResponseEntity<PgApiResponse<PgTransactionResponse>> response =
+            pgQueryRestTemplate.exchange(url, HttpMethod.GET, entity, transactionResponseType());
+        return unwrap(response, ErrorType.PG_QUERY_ERROR, "PG 조회 응답이 비어있습니다.");
+    }
+
+    /** PG 의 {meta, data} 봉투에서 data 를 꺼낸다. 봉투/페이로드가 비면 예외. */
+    private PgTransactionResponse unwrap(
+        ResponseEntity<PgApiResponse<PgTransactionResponse>> response, ErrorType errorType, String message
+    ) {
         return Optional.ofNullable(response.getBody())
-            .orElseThrow(() -> new CoreException(ErrorType.PG_QUERY_ERROR, "PG 조회 응답이 비어있습니다."));
+            .map(PgApiResponse::data)
+            .orElseThrow(() -> new CoreException(errorType, message));
+    }
+
+    private ParameterizedTypeReference<PgApiResponse<PgTransactionResponse>> transactionResponseType() {
+        return new ParameterizedTypeReference<>() {};
     }
 
     private HttpHeaders userIdHeaders(String userId) {
