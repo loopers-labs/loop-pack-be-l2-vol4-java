@@ -21,4 +21,12 @@ public interface PaymentV1ApiSpec {
         PaymentV1Dto.CreateRequest request,
         @Parameter(hidden = true) @LoginUser AuthenticatedUser loginUser
     );
+
+    @Operation(
+        summary = "결제 결과 콜백",
+        description = "외부 결제 시스템이 비동기 처리 결과(성공/실패와 사유)를 통보한다. 주문 식별자로 결제를 찾아 PENDING이면 "
+            + "성공(SUCCESS)/실패(FAILED)로 확정하고 주문을 결제 완료(PAID)/결제 실패(PAYMENT_FAILED)로 전이한다. "
+            + "이미 확정된 결제면 상태를 바꾸지 않고 정상 수신으로 응답한다. 회원 인증이 아닌 외부 시스템 호출이다."
+    )
+    ApiResponse<Void> handleCallback(PaymentV1Dto.CallbackRequest request);
 }

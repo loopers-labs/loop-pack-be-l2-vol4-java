@@ -26,6 +26,12 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
+    public PaymentModel getByOrderId(Long orderId) {
+        return paymentJpaRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제가 존재하지 않습니다."));
+    }
+
+    @Override
     public boolean existsByOrderId(Long orderId) {
         return paymentJpaRepository.existsByOrderId(orderId);
     }

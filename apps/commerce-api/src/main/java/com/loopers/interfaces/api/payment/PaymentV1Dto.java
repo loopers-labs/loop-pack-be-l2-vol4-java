@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.payment;
 
 import com.loopers.application.payment.PaymentInfo;
 import com.loopers.domain.payment.CardType;
+import com.loopers.domain.payment.PaymentStatus;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,6 +18,13 @@ public class PaymentV1Dto {
 
         @NotBlank(message = "카드 번호는 비어 있을 수 없습니다.")
         String cardNo
+    ) {
+    }
+
+    public record CallbackRequest(
+        String orderId,
+        PaymentStatus status,
+        String reason
     ) {
     }
 

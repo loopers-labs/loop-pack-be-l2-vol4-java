@@ -72,6 +72,14 @@ public class PaymentModel extends BaseEntity {
         this.transactionKey = transactionKey;
     }
 
+    public void confirm(PaymentStatus result, String reason) {
+        if (result == PaymentStatus.SUCCESS) {
+            succeed();
+        } else if (result == PaymentStatus.FAILED) {
+            fail(reason);
+        }
+    }
+
     public void succeed() {
         if (isTerminal()) {
             return;
@@ -93,7 +101,15 @@ public class PaymentModel extends BaseEntity {
         return this.status == PaymentStatus.PENDING;
     }
 
+    public boolean isSuccess() {
+        return this.status == PaymentStatus.SUCCESS;
+    }
+
+    public boolean isFailed() {
+        return this.status == PaymentStatus.FAILED;
+    }
+
     public boolean isTerminal() {
-        return this.status == PaymentStatus.SUCCESS || this.status == PaymentStatus.FAILED;
+        return isSuccess() || isFailed();
     }
 }

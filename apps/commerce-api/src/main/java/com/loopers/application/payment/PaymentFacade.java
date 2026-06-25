@@ -11,6 +11,7 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -46,5 +47,21 @@ public class PaymentFacade {
         savedPayment.recordTransactionKey(transactionKey);
 
         return PaymentInfo.from(savedPayment);
+    }
+
+    public void handleCallback(Long orderId, PaymentStatus result, String reason) {
+        PaymentModel payment = paymentRepository.getByOrderId(orderId);
+
+        if (payment.isTerminal()) {
+            return;
+        }
+
+        payment.confirm(result, reason);
+
+        if (payment.isSuccess()) {
+            orderRepository.getActiveById(orderId).markPaid();
+        } else if (payment.isFailed()) {
+            orderRepository.getActiveById(orderId).markPaymentFailed();
+        }
     }
 }
