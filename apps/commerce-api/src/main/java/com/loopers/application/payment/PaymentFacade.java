@@ -60,4 +60,8 @@ public class PaymentFacade {
 
         return paymentId;
     }
+
+    public void retryOrCompensatePayment(Long paymentId) {
+        // Step 3/4에서 상세 로직 구현 예정
+    }
 }

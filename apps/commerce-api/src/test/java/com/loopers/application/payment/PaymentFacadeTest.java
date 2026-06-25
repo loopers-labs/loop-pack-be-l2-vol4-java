@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @org.springframework.test.context.ContextConfiguration(initializers = com.loopers.testcontainers.RedisTestContainersConfig.class)
+@org.springframework.context.annotation.Import(com.loopers.config.RedisListenerConfig.class)
 class PaymentFacadeTest {
 
     @Autowired
