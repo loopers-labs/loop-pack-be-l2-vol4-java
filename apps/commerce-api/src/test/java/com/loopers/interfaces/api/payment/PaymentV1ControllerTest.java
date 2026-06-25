@@ -1,7 +1,7 @@
-package com.loopers.interfaces.api.order;
+package com.loopers.interfaces.api.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.application.order.OrderFacade;
+import com.loopers.application.payment.PaymentFacade;
 import com.loopers.domain.payment.PaymentMethod;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +11,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,8 +20,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(OrderV1Controller.class)
-class OrderV1ControllerTest {
+@WebMvcTest(PaymentV1Controller.class)
+class PaymentV1ControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -30,27 +30,27 @@ class OrderV1ControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private OrderFacade orderFacade;
+    private PaymentFacade paymentFacade;
 
     @Test
-    @DisplayName("주문 생성(orders) 요청 시 HTTP 200과 orderId가 반환된다.")
-    void createOrder_ApiSuccess() throws Exception {
+    @DisplayName("결제 요청(payments) 시 HTTP 200과 paymentId가 반환된다.")
+    void processPayment_ApiSuccess() throws Exception {
         // given
-        Long userId = 1L;
-        OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
-                List.of(new OrderV1Dto.ItemRequest(10L, 2)),
-                42L
+        PaymentV1Dto.PaymentRequest request = new PaymentV1Dto.PaymentRequest(
+                100L,
+                PaymentMethod.CARD,
+                new BigDecimal("50000")
         );
 
-        given(orderFacade.createOrder(eq(userId), any())).willReturn(100L);
+        given(paymentFacade.processPayment(eq(100L), eq(PaymentMethod.CARD), any(BigDecimal.class)))
+                .willReturn(500L);
 
         // when & then
-        mockMvc.perform(post("/api/v1/orders")
-                        .header("X-Loopers-UserId", userId)
+        mockMvc.perform(post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meta.result").value("SUCCESS"))
-                .andExpect(jsonPath("$.data.orderId").value(100));
+                .andExpect(jsonPath("$.data.paymentId").value(500));
     }
 }

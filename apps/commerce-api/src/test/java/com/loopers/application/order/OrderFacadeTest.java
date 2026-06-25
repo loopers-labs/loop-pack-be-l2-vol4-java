@@ -55,13 +55,13 @@ class OrderFacadeTest {
     private com.loopers.application.payment.PaymentFacade paymentFacade;
 
     @Test
-    @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다.")
-    void createOrder_Success_ShouldCallServices() {
+    @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다. (쿠폰 없음)")
+    void createOrder_Success_WithoutCoupon() {
         // given
         Long userId = 1L;
         Long productId = 10L;
         int quantity = 2;
-        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)));
+        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)), null);
         
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
@@ -83,18 +83,16 @@ class OrderFacadeTest {
     }
 
     @Test
-    @DisplayName("단일 트랜잭션 기반 통합 주문/결제(checkout)가 모든 단계 성공 시 정상 종료된다.")
-    void checkout_Success() {
+    @DisplayName("주문 요청 시 쿠폰이 있는 경우 정상적으로 할인이 계산되어 주문이 생성된다.")
+    void createOrder_Success_WithCoupon() {
         // given
         Long userId = 1L;
         Long productId = 10L;
         Long couponIssueId = 42L;
         int quantity = 2;
-        PaymentMethod method = PaymentMethod.CARD;
-        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                List.of(new OrderCheckoutRequest.Item(productId, quantity)),
-                couponIssueId,
-                method
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderCreateRequest.Item(productId, quantity)),
+                couponIssueId
         );
 
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
@@ -112,17 +110,13 @@ class OrderFacadeTest {
             return order;
         });
 
-        given(paymentFacade.processPayment(eq(100L), eq(method), eq(new BigDecimal("360000"))))
-                .willReturn(500L);
-        given(paymentFacade.getPaymentStatus(eq(500L))).willReturn(com.loopers.domain.payment.PaymentStatus.APPROVED);
-
         // when
-        Long resultOrderId = orderFacade.checkout(userId, request);
+        Long orderId = orderFacade.createOrder(userId, request);
 
         // then
-        assertThat(resultOrderId).isEqualTo(100L);
+        assertThat(orderId).isEqualTo(100L);
         verify(productFacade).decreaseStocks(anyList());
-        verify(paymentFacade).processPayment(eq(100L), eq(method), eq(new BigDecimal("360000")));
-        verify(couponRepository).saveIssue(couponIssue);
+        verify(couponRepository).findIssueById(couponIssueId);
+        verify(orderRepository).save(any(OrderModel.class));
     }
 }
