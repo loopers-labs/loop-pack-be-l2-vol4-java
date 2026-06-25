@@ -1,0 +1,121 @@
+package com.loopers.infrastructure.payment;
+
+import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+import java.util.Optional;
+
+/**
+ * pg-simulator 호출 어댑터({@link PaymentGateway} 구현).
+ *
+ * <p>PG 는 {@code X-USER-ID} 헤더로 사용자를 식별하므로 조회 시 동일한 userId 를 전달해야 한다.</p>
+ *
+ * <p>Resilience: 두 호출 모두 {@code @Retry → @CircuitBreaker} 순으로 감싼다(Retry 가 바깥).
+ * timeout(RestClient 전송레벨)이 "한 호출을 빨리 끊는" 도구라면, CB 는 PG 가 망가졌을 때 "호출 자체를 중단"해
+ * 스레드 고갈·장애 확산을 막고 slow-call 을 감지한다. Retry 는 그 사이에서 <b>안전한 실패만</b>(5xx·연결거부)
+ * 짧게 재시도한다({@link PgRetryPredicate}) — read 타임아웃(in-doubt)·4xx·CB-open 은 재시도하지 않는다.</p>
+ *
+ * <p>fallback 은 바깥 {@code @Retry} 에 둔다: CB 에 두면 CB 가 예외를 먼저 복구해 버려 Retry 가 재시도할 기회를
+ * 잃기 때문이다. 재시도까지 소진된 실패와 CB-open({@code CallNotPermittedException})은 모두 fallback 한 곳으로
+ * 수렴해 {@link ErrorType#SERVICE_UNAVAILABLE} 단일 예외로 표면화된다. (CB 는 fallback 없이 실패를 집계만 하고
+ * 그대로 전파한다.)</p>
+ *
+ * <p>호출자별 정책 차이: {@code request}(사용자 흐름)의 fallback 예외는 응용 서비스가 삼켜 PENDING 을 유지하고,
+ * {@code find}(운영자 수동 정산)의 fallback 예외는 그대로 전파돼 503 으로 "PG 다운"을 알린다.
+ * 특히 {@code find} 의 fallback 은 절대 {@code empty} 를 돌려주지 않는다 — {@code empty} 는 이미
+ * "PG 에 해당 키 없음(404)" 의 의미라 CB-open 과 뭉개면 정산이 오판하기 때문이다.</p>
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class PgPaymentGateway implements PaymentGateway {
+
+    private static final String USER_ID_HEADER = "X-USER-ID";
+    private static final String CB_NAME = "pg";
+
+    private final RestClient pgRestClient;
+
+    @Override
+    @Retry(name = CB_NAME, fallbackMethod = "requestFallback")
+    @CircuitBreaker(name = CB_NAME)
+    public Result request(Command command) {
+        PgPaymentDto.Request body = new PgPaymentDto.Request(
+                command.orderId(),
+                command.cardType().name(),
+                command.cardNo(),
+                command.amount(),
+                command.callbackUrl()
+        );
+
+        PgPaymentDto.Envelope<PgPaymentDto.TransactionResponse> response = pgRestClient.post()
+                .uri("/api/v1/payments")
+                .header(USER_ID_HEADER, command.userId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        PgPaymentDto.TransactionResponse data = requireData(response);
+        return new Result(data.transactionKey(), data.toStatus(), data.reason());
+    }
+
+    @Override
+    @Retry(name = CB_NAME, fallbackMethod = "findFallback")
+    @CircuitBreaker(name = CB_NAME)
+    public Optional<Result> find(String transactionKey, String userId) {
+        try {
+            PgPaymentDto.Envelope<PgPaymentDto.TransactionDetailResponse> response = pgRestClient.get()
+                    .uri("/api/v1/payments/{transactionKey}", transactionKey)
+                    .header(USER_ID_HEADER, userId)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+
+            PgPaymentDto.TransactionDetailResponse data = requireData(response);
+            return Optional.of(new Result(data.transactionKey(), data.toStatus(), data.reason()));
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * 결제 요청 fallback. 모든 실패·CB-open 이 여기로 수렴한다. 던진 예외는 응용 서비스가 삼켜
+     * 결제를 PENDING 으로 유지하므로(사용자에겐 정상 응답), 결과는 콜백/정산으로 확정된다.
+     */
+    @SuppressWarnings("unused")
+    private Result requestFallback(Command command, Throwable t) {
+        log.warn("PG 결제요청 불가(CB/실패) — PENDING 유지 대상. orderId={}, cause={}", command.orderId(), t.toString());
+        throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "결제 시스템이 일시적으로 응답하지 않습니다.");
+    }
+
+    /**
+     * 결제 조회 fallback. {@code empty}(=404, 키 없음)와 혼동되지 않도록 반드시 예외로 표면화한다.
+     * 수동 정산 호출자(운영자)는 503 으로 "PG 다운"을 인지하고 재시도한다.
+     */
+    @SuppressWarnings("unused")
+    private Optional<Result> findFallback(String transactionKey, String userId, Throwable t) {
+        log.warn("PG 결제조회 불가(CB/실패). transactionKey={}, cause={}", transactionKey, t.toString());
+        throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "결제 시스템이 일시적으로 응답하지 않습니다.");
+    }
+
+    private static <T> T requireData(PgPaymentDto.Envelope<T> response) {
+        if (response == null || response.data() == null) {
+            throw new IllegalStateException("PG 응답 본문(data)이 비어 있습니다.");
+        }
+        return response.data();
+    }
+}

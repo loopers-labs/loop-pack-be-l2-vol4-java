@@ -29,6 +29,47 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# PG(pg-simulator) 연동. read-timeout 은 PG 동기 응답(100~500ms)보다 충분히 위로 둔다.
+pg:
+  base-url: http://localhost:8082
+  connect-timeout-ms: 1000
+  read-timeout-ms: 2000
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+# Resilience: PG 어댑터(request/find)를 감싸는 CircuitBreaker.
+#  - 임계치는 PG 의 정상 baseline(실패 ~40%, 동기 지연 100~500ms) '바깥'에 둬야 정상을 장애로 오인하지 않는다.
+#  - COUNT 기반 슬라이딩 윈도우 10건 중 실패율 60%(>baseline 40%) 또는 slow-call(>1s) 50% 면 OPEN.
+#  - slow 기준 1s 는 정상 상한(500ms) 위·read-timeout(2s) 아래 → 스펙을 넘어 진짜 느려진 호출만 집계.
+#  - OPEN 후 10s 뒤 HALF_OPEN 으로 자동 전환, 3건 시험 통과 시 CLOSE.
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 60
+        slow-call-duration-threshold: 1s
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+  # Retry: 안전한 실패만 짧게 재시도(5xx·연결거부 = 빠른 실패). PgRetryPredicate 가 판별한다.
+  #  - read 타임아웃(in-doubt)·4xx·CB-open 은 재시도 X → 즉시 fallback.
+  #  - max-attempts=3 = 최초 1 + 재시도 2. 동기 사용자 요청이라 지연 누적을 막기 위해 적게 둔다.
+  #  - exponential backoff(100ms→200ms) + jitter(±50%)로 동시 재시도 쏠림(thundering herd) 방지.
+  retry:
+    instances:
+      pg:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exception-predicate: com.loopers.infrastructure.payment.PgRetryPredicate
+
 ---
 spring:
   config:

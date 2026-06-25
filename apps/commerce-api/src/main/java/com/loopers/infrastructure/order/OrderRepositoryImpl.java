@@ -34,6 +34,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<Order> findForUpdate(Long id) {
+        return orderJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
     public PageResult<Order> findAllByUser(OrderCommand.MySearch search) {
         ZonedDateTime from = search.from() == null ? null : search.from().atStartOfDay(ZONE);
         ZonedDateTime to = search.to() == null ? null : search.to().plusDays(1).atStartOfDay(ZONE);
