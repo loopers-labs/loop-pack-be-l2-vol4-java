@@ -23,6 +23,13 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          tossPgClient:
+            connect-timeout: 2000   # PG 동기 호출은 서브초 — 멈춘 PG 가 스레드를 오래 잡지 않게
+            read-timeout: 2000
 
 springdoc:
   use-fqn: true
@@ -48,9 +55,13 @@ resilience4j:
     instances:
       toss:
         sliding-window-size: 20
+        minimum-number-of-calls: 20           # window 이하여야 실패율이 평가됨(미설정 기본 100 > 20 이면 브레이커가 안 열림)
         failure-rate-threshold: 50            # 실패율 50% 초과 시 OPEN
         wait-duration-in-open-state: 10s      # 10초 차단 후 HALF_OPEN
         permitted-number-of-calls-in-half-open-state: 3
+        ignore-exceptions:                    # throttle(RateLimiter 거절)·차단은 PG 실패로 집계하지 않는다
+          - io.github.resilience4j.ratelimiter.RequestNotPermitted
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
   retry:
     instances:
       toss:
