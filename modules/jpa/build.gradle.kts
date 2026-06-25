@@ -13,6 +13,8 @@ dependencies {
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
     // jdbc-mysql
     runtimeOnly("com.mysql:mysql-connector-j")
+    // ULID (entity id 생성)
+    api("com.github.f4b6a3:ulid-creator:${project.properties["ulidCreatorVersion"]}")
 
     testImplementation("org.testcontainers:mysql")
 
