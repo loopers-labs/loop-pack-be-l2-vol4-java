@@ -6,9 +6,11 @@ import com.loopers.domain.order.OrderStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class PaymentService {
@@ -61,6 +63,10 @@ public class PaymentService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."));
         if (payment.getStatus() != PaymentStatus.PENDING) {
             // 이미 확정 → 첫 결정 유지. 중복/지연 콜백(at-least-once 재전송)을 멱등하게 무시.
+            return;
+        }
+        if (status == PgTransactionStatus.PENDING) {
+            log.info("settle no-op: transactionKey={} is still PENDING, skipping confirmation.", transactionKey);
             return;
         }
         if (status == PgTransactionStatus.SUCCESS) {

@@ -11,7 +11,6 @@ import com.loopers.domain.payment.PgTransactionStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.payment.PaymentWaitingRegistry;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -68,6 +67,9 @@ public class PaymentApplicationService {
         }
 
         // 콜백 대기 future 구성
+        // NOTE: TX2 커밋 후 여기까지 오는 사이에 PG 콜백이 먼저 도착하면 해당 콜백은
+        // registry에 future가 없어 complete를 건너뛴다. 이 경우 timeout→poll 경로가
+        // safety-net / source-of-truth 역할을 한다 (known latency trade-off, follow-up 예정).
         CompletableFuture<PaymentInfo> innerFuture = new CompletableFuture<>();
         registry.register(transactionKey, innerFuture);
         return innerFuture
