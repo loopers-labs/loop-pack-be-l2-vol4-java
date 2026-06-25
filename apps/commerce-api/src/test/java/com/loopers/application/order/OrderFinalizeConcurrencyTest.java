@@ -5,11 +5,9 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.PaymentMethod;
-import com.loopers.domain.payment.PgStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
-import com.loopers.infrastructure.payment.FakePaymentGateway;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +41,6 @@ public class OrderFinalizeConcurrencyTest {
     @Autowired BrandService brandService;
     @Autowired ProductService productService;
     @Autowired StockService stockService;
-    @Autowired FakePaymentGateway fakePaymentGateway;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     private static final Long USER_ID = 100L;
@@ -51,7 +48,6 @@ public class OrderFinalizeConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        fakePaymentGateway.reset();
         BrandModel brand = brandService.register("나이키", "스포츠");
         ProductModel product = productService.createProduct(brand.getId(), "에어맥스", "러닝화", null, 10000L);
         productId = product.getId();
@@ -63,9 +59,8 @@ public class OrderFinalizeConcurrencyTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    /** PG 타임아웃으로 PENDING에 남은 주문 1건(재고 10 → 8). */
-    private Long placeTimedOutOrder() {
-        fakePaymentGateway.setForcedStatus(PgStatus.TIMEOUT);
+    /** 결제 전 PENDING 주문 1건(재고 10 → 8). */
+    private Long placePendingOrder() {
         OrderInfo info = orderFacade.placeOrder(USER_ID, PaymentMethod.CARD,
                 List.of(new OrderLine(productId, 2)));
         assertThat(info.status()).isEqualTo("PENDING");
@@ -75,7 +70,7 @@ public class OrderFinalizeConcurrencyTest {
     @DisplayName("같은 PENDING 주문을 두 스레드가 동시에 실패 처리해도 재고는 정확히 한 번만 원복된다")
     @Test
     void given_pendingOrder_when_concurrentMarkFailed_then_stockRestoredOnce() throws InterruptedException {
-        Long orderId = placeTimedOutOrder();
+        Long orderId = placePendingOrder();
         assertThat(stockService.getQuantity(productId)).isEqualTo(8);
 
         int threads = 2;
@@ -117,7 +112,7 @@ public class OrderFinalizeConcurrencyTest {
     @DisplayName("같은 PENDING 주문을 두 스레드가 동시에 확정(성공)해도 한 건만 PAID로 처리된다")
     @Test
     void given_pendingOrder_when_concurrentMarkPaid_then_paidOnce() throws InterruptedException {
-        Long orderId = placeTimedOutOrder();
+        Long orderId = placePendingOrder();
 
         int threads = 2;
         ExecutorService pool = Executors.newFixedThreadPool(threads);

@@ -9,11 +9,9 @@ import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.PaymentMethod;
-import com.loopers.domain.payment.PgStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
-import com.loopers.infrastructure.payment.FakePaymentGateway;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +46,6 @@ public class OrderCouponConcurrencyTest {
     @Autowired UserCouponService userCouponService;
     @Autowired UserCouponRepository userCouponRepository;
     @Autowired StockService stockService;
-    @Autowired FakePaymentGateway fakePaymentGateway;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     private static final Long USER_ID = 100L;
@@ -62,8 +59,6 @@ public class OrderCouponConcurrencyTest {
     @Test
     void given_sameCoupon_when_concurrentOrders_then_onlyOneSucceeds() throws InterruptedException {
         // Arrange — 재고 넉넉, 쿠폰 1장 발급
-        fakePaymentGateway.reset();
-        fakePaymentGateway.setForcedStatus(PgStatus.SUCCESS);
         BrandModel brand = brandService.register("나이키", "스포츠");
         ProductModel product = productService.createProduct(brand.getId(), "에어맥스", "러닝화", null, 10000L);
         stockService.initialize(product.getId(), 100);

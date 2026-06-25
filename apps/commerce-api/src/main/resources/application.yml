@@ -1,4 +1,7 @@
 server:
+  # pg-simulator는 결제 callbackUrl이 http://localhost:8080 으로 시작할 것을 요구한다(03 §3.8).
+  # PaymentFacade.CALLBACK_URL과 일치해야 콜백 수신이 동작하므로 기본값에 의존하지 않고 명시한다.
+  port: 8080
   shutdown: graceful
   tomcat:
     threads:

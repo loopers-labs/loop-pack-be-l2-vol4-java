@@ -96,14 +96,14 @@ class OrderV1ApiE2ETest {
     @Nested
     class PlaceOrder {
 
-        @DisplayName("주문하면, 200과 PAID 상태·합계 금액을 반환한다. (FakePG 기본 성공)")
+        @DisplayName("주문하면, 200과 PENDING 상태·합계 금액을 반환한다. (결제는 분리 — 03 §3.7)")
         @Test
-        void returnsPaidOrder_whenPlaced() {
+        void returnsPendingOrder_whenPlaced() {
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = placeOrder("buyer", 2);
 
             assertAll(
                     () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
-                    () -> assertThat(response.getBody().data().status()).isEqualTo("PAID"),
+                    () -> assertThat(response.getBody().data().status()).isEqualTo("PENDING"),
                     () -> assertThat(response.getBody().data().totalAmount()).isEqualTo(278000L),
                     () -> assertThat(response.getBody().data().items()).hasSize(1)
             );
