@@ -14,6 +14,6 @@ public record PaymentCallbackCommand(
     String reason
 ) {
     public PaymentGatewayResult toGatewayResult() {
-        return new PaymentGatewayResult(transactionKey, status, reason);
+        return new PaymentGatewayResult(transactionKey, status, null, reason);
     }
 }

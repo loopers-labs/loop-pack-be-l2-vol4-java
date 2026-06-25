@@ -5,6 +5,7 @@ import com.loopers.application.payment.PaymentGatewayCommand;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.payment.PaymentGatewayResult;
+import com.loopers.domain.payment.PaymentPendingReason;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.infrastructure.order.OrderJpaEntity;
 import com.loopers.infrastructure.order.OrderJpaRepository;
@@ -93,6 +94,7 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(data.orderId()).isEqualTo(order.getId()),
                 () -> assertThat(data.amount()).isEqualTo(5_000L),
                 () -> assertThat(data.status()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(data.pendingReason()).isEqualTo(PaymentPendingReason.WAITING_CALLBACK),
                 () -> assertThat(data.transactionKey()).isEqualTo("20260625:TR:test")
             );
         }
@@ -133,6 +135,7 @@ class PaymentV1ApiE2ETest {
             assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(data.status()).isEqualTo(PaymentStatus.PAID),
+                () -> assertThat(data.pendingReason()).isNull(),
                 () -> assertThat(data.transactionKey()).isEqualTo("20260625:TR:test")
             );
         }

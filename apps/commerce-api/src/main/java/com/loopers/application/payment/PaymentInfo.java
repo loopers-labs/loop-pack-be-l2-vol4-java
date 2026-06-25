@@ -2,6 +2,7 @@ package com.loopers.application.payment;
 
 import com.loopers.domain.payment.Payment;
 import com.loopers.domain.payment.PaymentCardType;
+import com.loopers.domain.payment.PaymentPendingReason;
 import com.loopers.domain.payment.PaymentStatus;
 
 public record PaymentInfo(
@@ -11,6 +12,7 @@ public record PaymentInfo(
     PaymentCardType cardType,
     Long amount,
     PaymentStatus status,
+    PaymentPendingReason pendingReason,
     String transactionKey,
     String reason
 ) {
@@ -22,6 +24,7 @@ public record PaymentInfo(
             payment.getCardType(),
             payment.getAmount(),
             payment.getStatus(),
+            payment.getPendingReason(),
             payment.getTransactionKey(),
             payment.getReason()
         );

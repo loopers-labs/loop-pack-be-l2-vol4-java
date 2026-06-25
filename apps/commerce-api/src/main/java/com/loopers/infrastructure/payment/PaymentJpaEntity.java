@@ -3,6 +3,7 @@ package com.loopers.infrastructure.payment;
 import com.loopers.domain.BaseEntity;
 import com.loopers.domain.payment.Payment;
 import com.loopers.domain.payment.PaymentCardType;
+import com.loopers.domain.payment.PaymentPendingReason;
 import com.loopers.domain.payment.PaymentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,6 +42,10 @@ public class PaymentJpaEntity extends BaseEntity {
     @Column(nullable = false)
     private PaymentStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pending_reason")
+    private PaymentPendingReason pendingReason;
+
     @Column(name = "transaction_key")
     private String transactionKey;
 
@@ -57,6 +62,7 @@ public class PaymentJpaEntity extends BaseEntity {
         String cardNo,
         Long amount,
         PaymentStatus status,
+        PaymentPendingReason pendingReason,
         String transactionKey,
         String reason
     ) {
@@ -66,6 +72,7 @@ public class PaymentJpaEntity extends BaseEntity {
         this.cardNo = cardNo;
         this.amount = amount;
         this.status = status;
+        this.pendingReason = pendingReason;
         this.transactionKey = transactionKey;
         this.reason = reason;
     }
@@ -78,6 +85,7 @@ public class PaymentJpaEntity extends BaseEntity {
             payment.getCardNo(),
             payment.getAmount(),
             payment.getStatus(),
+            payment.getPendingReason(),
             payment.getTransactionKey(),
             payment.getReason()
         );
@@ -92,6 +100,7 @@ public class PaymentJpaEntity extends BaseEntity {
             cardNo,
             amount,
             status,
+            pendingReason,
             transactionKey,
             reason,
             getCreatedAt()
@@ -105,6 +114,7 @@ public class PaymentJpaEntity extends BaseEntity {
         this.cardNo = payment.getCardNo();
         this.amount = payment.getAmount();
         this.status = payment.getStatus();
+        this.pendingReason = payment.getPendingReason();
         this.transactionKey = payment.getTransactionKey();
         this.reason = payment.getReason();
     }

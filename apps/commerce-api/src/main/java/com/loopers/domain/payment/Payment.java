@@ -14,12 +14,13 @@ public class Payment {
     private String cardNo;
     private Long amount;
     private PaymentStatus status;
+    private PaymentPendingReason pendingReason;
     private String transactionKey;
     private String reason;
     private ZonedDateTime createdAt;
 
     public Payment(String userLoginId, Long orderId, PaymentCardType cardType, String cardNo, Long amount) {
-        this(null, userLoginId, orderId, cardType, cardNo, amount, PaymentStatus.PENDING, null, null, null);
+        this(null, userLoginId, orderId, cardType, cardNo, amount, PaymentStatus.PENDING, null, null, null, null);
     }
 
     private Payment(
@@ -30,6 +31,7 @@ public class Payment {
         String cardNo,
         Long amount,
         PaymentStatus status,
+        PaymentPendingReason pendingReason,
         String transactionKey,
         String reason,
         ZonedDateTime createdAt
@@ -42,6 +44,7 @@ public class Payment {
         this.cardNo = cardNo;
         this.amount = amount;
         this.status = status;
+        this.pendingReason = pendingReason;
         this.transactionKey = transactionKey;
         this.reason = reason;
         this.createdAt = createdAt;
@@ -55,11 +58,24 @@ public class Payment {
         String cardNo,
         Long amount,
         PaymentStatus status,
+        PaymentPendingReason pendingReason,
         String transactionKey,
         String reason,
         ZonedDateTime createdAt
     ) {
-        return new Payment(id, userLoginId, orderId, cardType, cardNo, amount, status, transactionKey, reason, createdAt);
+        return new Payment(
+            id,
+            userLoginId,
+            orderId,
+            cardType,
+            cardNo,
+            amount,
+            status,
+            pendingReason,
+            transactionKey,
+            reason,
+            createdAt
+        );
     }
 
     public void applyGatewayResult(PaymentGatewayResult result) {
@@ -72,13 +88,16 @@ public class Payment {
         if (result.transactionKey() != null && !result.transactionKey().isBlank()) {
             this.transactionKey = result.transactionKey();
         }
+        this.pendingReason = result.pendingReason();
         this.reason = result.reason();
 
         if (result.status() == PaymentGatewayStatus.SUCCESS) {
             this.status = PaymentStatus.PAID;
+            this.pendingReason = null;
         }
         if (result.status() == PaymentGatewayStatus.FAILED) {
             this.status = PaymentStatus.FAILED;
+            this.pendingReason = null;
         }
     }
 
@@ -108,6 +127,10 @@ public class Payment {
 
     public PaymentStatus getStatus() {
         return status;
+    }
+
+    public PaymentPendingReason getPendingReason() {
+        return pendingReason;
     }
 
     public String getTransactionKey() {

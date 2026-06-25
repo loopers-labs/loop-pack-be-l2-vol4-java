@@ -27,6 +27,7 @@ class PaymentTest {
                 () -> assertThat(payment.getUserLoginId()).isEqualTo("user1234"),
                 () -> assertThat(payment.getOrderId()).isEqualTo(1L),
                 () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(payment.getPendingReason()).isNull(),
                 () -> assertThat(payment.getTransactionKey()).isNull()
             );
         }
@@ -60,6 +61,7 @@ class PaymentTest {
             // assert
             assertAll(
                 () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID),
+                () -> assertThat(payment.getPendingReason()).isNull(),
                 () -> assertThat(payment.getTransactionKey()).isEqualTo("20260625:TR:success"),
                 () -> assertThat(payment.getReason()).isEqualTo("정상 승인되었습니다.")
             );
@@ -72,11 +74,16 @@ class PaymentTest {
             Payment payment = new Payment("user1234", 1L, PaymentCardType.SAMSUNG, "1234-5678-9814-1451", 5_000L);
 
             // act
-            payment.applyGatewayResult(PaymentGatewayResult.pending(null, "PG 요청 결과를 확인하지 못했습니다."));
+            payment.applyGatewayResult(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.PG_REQUEST_FAILED,
+                "PG 요청 결과를 확인하지 못했습니다."
+            ));
 
             // assert
             assertAll(
                 () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(payment.getPendingReason()).isEqualTo(PaymentPendingReason.PG_REQUEST_FAILED),
                 () -> assertThat(payment.getTransactionKey()).isNull(),
                 () -> assertThat(payment.getReason()).isEqualTo("PG 요청 결과를 확인하지 못했습니다.")
             );

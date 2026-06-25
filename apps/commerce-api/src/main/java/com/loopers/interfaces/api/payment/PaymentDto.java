@@ -6,6 +6,7 @@ import com.loopers.application.payment.PaymentInfo;
 import com.loopers.application.payment.PaymentOrderIdMapper;
 import com.loopers.domain.payment.PaymentCardType;
 import com.loopers.domain.payment.PaymentGatewayStatus;
+import com.loopers.domain.payment.PaymentPendingReason;
 import com.loopers.domain.payment.PaymentStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -44,6 +45,7 @@ public final class PaymentDto {
                 PaymentCardType cardType,
                 Long amount,
                 PaymentStatus status,
+                PaymentPendingReason pendingReason,
                 String transactionKey,
                 String reason
             ) {
@@ -55,6 +57,7 @@ public final class PaymentDto {
                         info.cardType(),
                         info.amount(),
                         info.status(),
+                        info.pendingReason(),
                         info.transactionKey(),
                         info.reason()
                     );

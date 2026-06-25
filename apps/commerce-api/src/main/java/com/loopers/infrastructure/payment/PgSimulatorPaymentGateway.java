@@ -6,10 +6,13 @@ import com.loopers.application.payment.PaymentOrderIdMapper;
 import com.loopers.domain.payment.PaymentCardType;
 import com.loopers.domain.payment.PaymentGatewayResult;
 import com.loopers.domain.payment.PaymentGatewayStatus;
+import com.loopers.domain.payment.PaymentPendingReason;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.util.Comparator;
@@ -62,15 +65,47 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
         return response.transactions().stream()
             .max(Comparator.comparing(PgTransactionResponse::transactionKey))
             .map(PgTransactionResponse::toGatewayResult)
-            .orElse(PaymentGatewayResult.pending(null, "PG 결제 조회 결과가 비어있습니다."));
+            .orElse(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.PG_LOOKUP_EMPTY,
+                "PG 결제 조회 결과가 비어있습니다."
+            ));
     }
 
     private PaymentGatewayResult requestFallback(PaymentGatewayCommand command, Throwable throwable) {
-        return PaymentGatewayResult.pending(null, "PG 요청 결과를 확인하지 못했습니다: " + throwable.getClass().getSimpleName());
+        return PaymentGatewayResult.pending(
+            null,
+            pendingReasonOfRequestFailure(throwable),
+            "PG 요청 결과를 확인하지 못했습니다: " + throwable.getClass().getSimpleName()
+        );
     }
 
     private PaymentGatewayResult getByOrderFallback(String userLoginId, Long orderId, Throwable throwable) {
-        return PaymentGatewayResult.pending(null, "PG 조회 결과를 확인하지 못했습니다: " + throwable.getClass().getSimpleName());
+        return PaymentGatewayResult.pending(
+            null,
+            pendingReasonOfLookupFailure(throwable),
+            "PG 조회 결과를 확인하지 못했습니다: " + throwable.getClass().getSimpleName()
+        );
+    }
+
+    private PaymentPendingReason pendingReasonOfRequestFailure(Throwable throwable) {
+        if (throwable instanceof CallNotPermittedException) {
+            return PaymentPendingReason.CB_OPEN;
+        }
+        if (throwable instanceof ResourceAccessException) {
+            return PaymentPendingReason.TIMEOUT_UNKNOWN;
+        }
+        return PaymentPendingReason.PG_REQUEST_FAILED;
+    }
+
+    private PaymentPendingReason pendingReasonOfLookupFailure(Throwable throwable) {
+        if (throwable instanceof CallNotPermittedException) {
+            return PaymentPendingReason.CB_OPEN;
+        }
+        if (throwable instanceof ResourceAccessException) {
+            return PaymentPendingReason.TIMEOUT_UNKNOWN;
+        }
+        return PaymentPendingReason.PG_LOOKUP_FAILED;
     }
 
     private record PgPaymentRequest(
