@@ -50,8 +50,10 @@ public class PaymentApplicationService {
             callbackUrl
         ));
 
-        // Tx2: PG 트랜잭션 키 반영
-        paymentService.assignTransactionKey(payment.getId(), result.transactionKey());
+        // Tx2: PG 트랜잭션 키 반영 (fallback 시 키가 없을 수 있음 -> 폴링 복구가 처리)
+        if (result.transactionKey() != null) {
+            paymentService.assignTransactionKey(payment.getId(), result.transactionKey());
+        }
 
         return new PaymentInfo(payment.getId(), result.status());
     }

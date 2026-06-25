@@ -38,6 +38,17 @@ spring.cloud.openfeign.client.config:
     connect-timeout: 1000
     read-timeout: 2000
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgPayment:
+        sliding-window-size: 10
+        failure-rate-threshold: 50          # 실패율 50% 넘으면 Open
+        slow-call-duration-threshold: 2s    # 2초 넘는 호출은 느린 호출로 간주
+        slow-call-rate-threshold: 50        # 느린 호출 50% 넘어도 Open
+        wait-duration-in-open-state: 10s    # Open 유지 시간
+        permitted-number-of-calls-in-half-open-state: 3
+
 ---
 spring:
   config:

@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "pgClient", url = "${pg.base-url}")
+@FeignClient(name = "pgClient", url = "${pg.base-url}", primary = false)
 public interface PgClient {
 
     @PostMapping("/api/v1/payments")
