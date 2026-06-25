@@ -38,9 +38,9 @@ class PgSimulatorPaymentGatewayTest {
         5_000L
     );
 
-    @DisplayName("PG 결제 요청이 성공하면, PG 거래 정보를 반환한다.")
+    @DisplayName("PG 결제 요청이 접수되면, PG 거래 정보를 반환한다.")
     @Test
-    void returnsTransaction_whenPgRequestSucceeds() {
+    void returnsTransaction_whenPgRequestIsAccepted() {
         // arrange
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
@@ -75,8 +75,8 @@ class PgSimulatorPaymentGatewayTest {
 
         // assert
         assertAll(
-            () -> assertThat(result.isRequestSucceeded()).isTrue(),
-            () -> assertThat(result.status()).isEqualTo(PaymentGatewayRequestStatus.SUCCEEDED),
+            () -> assertThat(result.isRequestAccepted()).isTrue(),
+            () -> assertThat(result.status()).isEqualTo(PaymentGatewayRequestStatus.ACCEPTED),
             () -> assertThat(result.transaction().transactionKey()).isEqualTo("20250816:TR:9577c5"),
             () -> assertThat(result.transaction().status()).isEqualTo(PgPaymentStatus.PENDING),
             () -> assertThat(result.failureReason()).isNull()
@@ -112,7 +112,7 @@ class PgSimulatorPaymentGatewayTest {
 
         // assert
         assertAll(
-            () -> assertThat(result.isRequestSucceeded()).isFalse(),
+            () -> assertThat(result.isRequestAccepted()).isFalse(),
             () -> assertThat(result.status()).isEqualTo(PaymentGatewayRequestStatus.FAILED),
             () -> assertThat(result.transaction()).isNull(),
             () -> assertThat(result.failureReason()).isEqualTo(PaymentFailureReason.PG_REQUEST_FAILED)
@@ -137,7 +137,7 @@ class PgSimulatorPaymentGatewayTest {
 
         // assert
         assertAll(
-            () -> assertThat(result.isRequestSucceeded()).isFalse(),
+            () -> assertThat(result.isRequestAccepted()).isFalse(),
             () -> assertThat(result.status()).isEqualTo(PaymentGatewayRequestStatus.UNKNOWN),
             () -> assertThat(result.transaction()).isNull(),
             () -> assertThat(result.failureReason()).isEqualTo(PaymentFailureReason.PG_TIMEOUT)

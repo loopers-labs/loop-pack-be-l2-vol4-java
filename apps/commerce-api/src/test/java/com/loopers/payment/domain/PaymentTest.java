@@ -1,11 +1,14 @@
 package com.loopers.payment.domain;
 
+import com.loopers.shared.error.CoreException;
+import com.loopers.shared.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 class PaymentTest {
@@ -21,9 +24,9 @@ class PaymentTest {
     private static final ZonedDateTime REQUESTED_AT = ZonedDateTime.parse("2026-06-24T10:00:00+09:00");
     private static final ZonedDateTime COMPLETED_AT = ZonedDateTime.parse("2026-06-24T10:00:05+09:00");
 
-    @DisplayName("PG 요청이 성공하면, 결제는 PENDING 상태와 PG 거래 정보를 가진다.")
+    @DisplayName("PG 요청이 접수되면, 결제는 PENDING 상태와 PG 거래 정보를 가진다.")
     @Test
-    void createsPendingPayment_whenPgRequestSucceeds() {
+    void createsPendingPayment_whenPgRequestIsAccepted() {
         // arrange & act
         Payment payment = createPendingPayment();
 
@@ -81,6 +84,24 @@ class PaymentTest {
         );
     }
 
+    @DisplayName("PG 실패 결과에는 최종 실패 사유만 사용할 수 있다.")
+    @Test
+    void throwsBadRequest_whenPgResultFailureReasonIsNotFinalFailureReason() {
+        // arrange
+        Payment payment = createPendingPayment();
+
+        // act & assert
+        assertThatThrownBy(() -> payment.markFailed(
+            TRANSACTION_KEY,
+            PaymentFailureReason.PG_TIMEOUT,
+            FAILED_REASON,
+            COMPLETED_AT
+        ))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
     @DisplayName("PG 요청 타임아웃이 발생하면, 결제는 UNKNOWN 상태로 기록된다.")
     @Test
     void createsUnknownPayment_whenPgRequestTimesOut() {
@@ -112,6 +133,42 @@ class PaymentTest {
             () -> assertThat(payment.getPgStatus()).isNull(),
             () -> assertThat(payment.getPgReason()).isNull()
         );
+    }
+
+    @DisplayName("요청 실패 결제에는 PG 요청 실패 사유만 사용할 수 있다.")
+    @Test
+    void throwsBadRequest_whenRequestFailedReasonIsPaymentFailureReason() {
+        // act & assert
+        assertThatThrownBy(() -> Payment.requestFailed(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            PaymentFailureReason.LIMIT_EXCEEDED,
+            REQUESTED_AT
+        ))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+    @DisplayName("확인이 필요한 결제에는 확인 필요 사유만 사용할 수 있다.")
+    @Test
+    void throwsBadRequest_whenUnknownReasonIsRequestFailureReason() {
+        // act & assert
+        assertThatThrownBy(() -> Payment.unknown(
+            USER_ID,
+            ORDER_ID,
+            AMOUNT,
+            CardType.SAMSUNG,
+            CARD_NO,
+            PaymentFailureReason.PG_REQUEST_FAILED,
+            REQUESTED_AT
+        ))
+            .isInstanceOf(CoreException.class)
+            .extracting("errorType")
+            .isEqualTo(ErrorType.BAD_REQUEST);
     }
 
     @DisplayName("이미 성공한 결제에 중복 성공 결과가 오면, 기존 성공 상태를 유지한다.")

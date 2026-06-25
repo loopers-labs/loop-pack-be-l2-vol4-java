@@ -124,6 +124,18 @@ public class Payment extends BaseEntity {
         String cardNo,
         ZonedDateTime requestedAt
     ) {
+        return unknown(userId, orderId, amount, cardType, cardNo, PaymentFailureReason.PG_TIMEOUT, requestedAt);
+    }
+
+    public static Payment unknown(
+        Long userId,
+        Long orderId,
+        long amount,
+        CardType cardType,
+        String cardNo,
+        PaymentFailureReason failureReason,
+        ZonedDateTime requestedAt
+    ) {
         return new Payment(
             userId,
             orderId,
@@ -131,7 +143,7 @@ public class Payment extends BaseEntity {
             cardType,
             cardNo,
             PaymentStatus.UNKNOWN,
-            PaymentFailureReason.PG_TIMEOUT,
+            requireUnknownFailureReason(failureReason),
             null,
             null,
             null,
@@ -148,6 +160,18 @@ public class Payment extends BaseEntity {
         String cardNo,
         ZonedDateTime requestedAt
     ) {
+        return requestFailed(userId, orderId, amount, cardType, cardNo, PaymentFailureReason.PG_REQUEST_FAILED, requestedAt);
+    }
+
+    public static Payment requestFailed(
+        Long userId,
+        Long orderId,
+        long amount,
+        CardType cardType,
+        String cardNo,
+        PaymentFailureReason failureReason,
+        ZonedDateTime requestedAt
+    ) {
         return new Payment(
             userId,
             orderId,
@@ -155,7 +179,7 @@ public class Payment extends BaseEntity {
             cardType,
             cardNo,
             PaymentStatus.REQUEST_FAILED,
-            PaymentFailureReason.PG_REQUEST_FAILED,
+            requireRequestFailureReason(failureReason),
             null,
             null,
             null,
@@ -190,7 +214,7 @@ public class Payment extends BaseEntity {
         validateNotFinalized();
 
         this.status = PaymentStatus.FAILED;
-        this.failureReason = requireFailureReason(failureReason);
+        this.failureReason = requireTransactionFailureReason(failureReason);
         this.pgTransactionKey = requirePgTransactionKey(pgTransactionKey);
         this.pgStatus = PgPaymentStatus.FAILED;
         this.pgReason = pgReason;
@@ -213,6 +237,10 @@ public class Payment extends BaseEntity {
 
     public String getMaskedCardNo() {
         return card.getMaskedNo();
+    }
+
+    public boolean isInProgress() {
+        return status == PaymentStatus.PENDING || status == PaymentStatus.UNKNOWN;
     }
 
     private void validateNotFinalized() {
@@ -264,6 +292,30 @@ public class Payment extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "결제 실패 사유는 비어있을 수 없습니다.");
         }
         return failureReason;
+    }
+
+    private static PaymentFailureReason requireRequestFailureReason(PaymentFailureReason failureReason) {
+        PaymentFailureReason required = requireFailureReason(failureReason);
+        if (!required.isRequestFailure()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 요청 실패에는 PG 요청 실패 사유만 사용할 수 있습니다.");
+        }
+        return required;
+    }
+
+    private static PaymentFailureReason requireUnknownFailureReason(PaymentFailureReason failureReason) {
+        PaymentFailureReason required = requireFailureReason(failureReason);
+        if (!required.isUnknownFailure()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "확인이 필요한 결제에는 확인 필요 사유만 사용할 수 있습니다.");
+        }
+        return required;
+    }
+
+    private static PaymentFailureReason requireTransactionFailureReason(PaymentFailureReason failureReason) {
+        PaymentFailureReason required = requireFailureReason(failureReason);
+        if (!required.isTransactionFailure()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "실패한 결제에는 PG 처리 실패 사유만 사용할 수 있습니다.");
+        }
+        return required;
     }
 
     private static String requirePgTransactionKey(String pgTransactionKey) {

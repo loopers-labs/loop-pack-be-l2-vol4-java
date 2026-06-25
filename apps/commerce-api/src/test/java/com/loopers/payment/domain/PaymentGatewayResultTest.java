@@ -16,11 +16,11 @@ class PaymentGatewayResultTest {
         null
     );
 
-    @DisplayName("성공한 PG 요청 결과는 PG 거래 정보가 있어야 한다.")
+    @DisplayName("접수된 PG 요청 결과는 PG 거래 정보가 있어야 한다.")
     @Test
-    void requiresTransaction_whenRequestSucceeded() {
+    void requiresTransaction_whenRequestAccepted() {
         // act & assert
-        assertThatThrownBy(() -> PaymentGatewayResult.succeeded(null))
+        assertThatThrownBy(() -> PaymentGatewayResult.accepted(null))
             .isInstanceOf(CoreException.class)
             .extracting("errorType").isEqualTo(ErrorType.BAD_REQUEST);
     }
@@ -43,9 +43,9 @@ class PaymentGatewayResultTest {
             .extracting("errorType").isEqualTo(ErrorType.BAD_REQUEST);
     }
 
-    @DisplayName("실패하거나 확인이 필요한 PG 요청 결과는 PG 거래 정보를 가질 수 없다.")
+    @DisplayName("접수되지 않았거나 확인이 필요한 PG 요청 결과는 PG 거래 정보를 가질 수 없다.")
     @Test
-    void rejectsTransaction_whenRequestDidNotSucceed() {
+    void rejectsTransaction_whenRequestWasNotAccepted() {
         // act & assert
         assertAll(
             () -> assertThatThrownBy(() -> new PaymentGatewayResult(

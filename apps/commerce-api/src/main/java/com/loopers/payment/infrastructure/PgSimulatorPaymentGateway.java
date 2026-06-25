@@ -75,7 +75,7 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
             String message = response == null ? null : response.message();
             return PaymentGatewayResult.failed(PaymentFailureReason.PG_REQUEST_FAILED, message);
         }
-        return PaymentGatewayResult.succeeded(response.data().toTransaction());
+        return PaymentGatewayResult.accepted(response.data().toTransaction());
     }
 
     private HttpHeaders headers(Long userId) {
