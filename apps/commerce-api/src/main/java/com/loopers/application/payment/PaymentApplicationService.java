@@ -14,9 +14,13 @@ import com.loopers.domain.payment.service.PaymentService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentApplicationService {
@@ -62,5 +66,24 @@ public class PaymentApplicationService {
     public void confirmPayment(String transactionKey, PaymentStatus status, String reason) {
         Payment confirmed = paymentService.confirmResult(transactionKey, status, reason);
         // TODO(9단계): confirmed 가 FAILED 로 새로 확정되면 주문 취소 + 재고/쿠폰 보상
+    }
+
+    /**
+     * 콜백이 유실됐을 수 있는 PENDING 결제를, PG에 직접 조회해 상태를 확정한다.
+     * 개별 결제 조회가 실패해도 나머지 결제 복구는 계속한다.
+     */
+    public void recoverPendingPayments() {
+        List<Payment> pendings = paymentService.findRecoverablePayments();
+        for (Payment payment : pendings) {
+            try {
+                PaymentGatewayResult result = paymentGateway.findTransaction(
+                    String.valueOf(payment.getMemberId()), payment.getTransactionKey());
+                if (result.status() != PaymentStatus.PENDING) {
+                    confirmPayment(payment.getTransactionKey(), result.status(), result.reason());
+                }
+            } catch (Exception e) {
+                log.warn("결제 복구 조회 실패. paymentId={}, cause={}", payment.getId(), e.toString());
+            }
+        }
     }
 }

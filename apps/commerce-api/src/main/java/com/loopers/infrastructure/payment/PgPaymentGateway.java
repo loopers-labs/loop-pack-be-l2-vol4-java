@@ -42,4 +42,14 @@ public class PgPaymentGateway implements PaymentGateway {
         // 결과 미확정(PENDING)으로 두고, 트랜잭션 키 없이 반환 -> 폴링 복구가 PG 실제 상태를 확인
         return new PaymentGatewayResult(null, PaymentStatus.PENDING, "결제 처리 중입니다. 잠시 후 확인됩니다.");
     }
+
+    @Override
+    public PaymentGatewayResult findTransaction(String userId, String transactionKey) {
+        PgPaymentResponse data = pgClient.getTransaction(userId, transactionKey).data();
+        return new PaymentGatewayResult(
+            data.transactionKey(),
+            PaymentStatus.valueOf(data.status()),
+            data.reason()
+        );
+    }
 }

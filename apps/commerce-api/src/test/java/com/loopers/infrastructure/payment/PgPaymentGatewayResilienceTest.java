@@ -23,8 +23,16 @@ class PgPaymentGatewayResilienceTest {
         @Bean
         @Primary
         PgClient failingPgClient() {
-            return (userId, request) -> {
-                throw new RuntimeException("PG 장애 시뮬레이션");
+            return new PgClient() {
+                @Override
+                public PgApiResponse<PgPaymentResponse> requestPayment(String userId, PgPaymentRequest request) {
+                    throw new RuntimeException("PG 장애 시뮬레이션");
+                }
+
+                @Override
+                public PgApiResponse<PgPaymentResponse> getTransaction(String userId, String transactionKey) {
+                    throw new RuntimeException("PG 장애 시뮬레이션");
+                }
             };
         }
     }

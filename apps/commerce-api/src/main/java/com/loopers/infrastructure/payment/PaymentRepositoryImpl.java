@@ -35,4 +35,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
         return paymentJpaRepository.existsByOrderIdAndStatusIn(
             orderId, List.of(PaymentStatus.PENDING, PaymentStatus.SUCCESS));
     }
+
+    @Override
+    public List<Payment> findPendingWithTransactionKey() {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNull(PaymentStatus.PENDING);
+    }
 }

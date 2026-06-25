@@ -36,8 +36,17 @@ class PaymentApplicationServiceIntegrationTest {
         @Bean
         @Primary
         PaymentGateway fakePaymentGateway() {
-            return (PaymentGatewayCommand command) ->
-                new PaymentGatewayResult(FAKE_TRANSACTION_KEY, PaymentStatus.PENDING, null);
+            return new PaymentGateway() {
+                @Override
+                public PaymentGatewayResult requestPayment(PaymentGatewayCommand command) {
+                    return new PaymentGatewayResult(FAKE_TRANSACTION_KEY, PaymentStatus.PENDING, null);
+                }
+
+                @Override
+                public PaymentGatewayResult findTransaction(String userId, String transactionKey) {
+                    return new PaymentGatewayResult(transactionKey, PaymentStatus.PENDING, null);
+                }
+            };
         }
     }
 
