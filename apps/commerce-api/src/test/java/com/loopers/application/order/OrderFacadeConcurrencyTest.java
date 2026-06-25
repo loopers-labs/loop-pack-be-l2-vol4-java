@@ -6,6 +6,7 @@ import com.loopers.domain.coupon.*;
 import com.loopers.application.coupon.CouponRepository;
 import com.loopers.application.order.OrderRepository;
 import com.loopers.domain.payment.PaymentMethod;
+import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.application.payment.PaymentRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.application.product.ProductRepository;
