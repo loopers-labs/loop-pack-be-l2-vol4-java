@@ -16,7 +16,7 @@ import java.util.function.Supplier;
  *
  * <p>CB OPEN / RateLimiter 거절(= PG 에 안 닿음)은 {@code CallNotPermittedException}/{@code RequestNotPermitted} 로
  * <b>그대로 전파</b>한다. 그 신호를 어떻게 처리할지(불가 응답 vs failover)는 호출자(게이트웨이/라우터)의 정책이라
- * 여기서 번역하지 않는다. 이 분리 덕에 멀티 PG failover 가 추가돼도 이 실행기는 그대로 재사용된다.
+ * 여기서 번역하지 않는다. 이 분리 덕에 멀티 PG failover 가 추가돼도 재사용된다.
  */
 @RequiredArgsConstructor
 @Component

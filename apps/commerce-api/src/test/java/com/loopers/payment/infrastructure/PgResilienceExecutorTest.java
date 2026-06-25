@@ -1,6 +1,7 @@
 package com.loopers.payment.infrastructure;
 
 import feign.FeignException;
+import feign.RetryableException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.RetryConfig;
@@ -21,19 +22,19 @@ class PgResilienceExecutorTest {
     private final RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom()
             .maxAttempts(3)
             .waitDuration(Duration.ofMillis(10))
-            .retryExceptions(FeignException.InternalServerError.class)
+            .retryExceptions(RetryableException.class)
             .build());
     private final PgResilienceExecutor executor = new PgResilienceExecutor(
             CircuitBreakerRegistry.ofDefaults(), retryRegistry, RateLimiterRegistry.ofDefaults());
 
     @Test
-    @DisplayName("5xx 로 실패하면 설정(max-attempts=3)대로 재시도해서 성공한다")
-    void given5xxThenSuccess_whenCall_thenRetriesAndSucceeds() {
-        FeignException.InternalServerError serverError = mock(FeignException.InternalServerError.class);
+    @DisplayName("전송 실패(RetryableException)면 설정(max-attempts=3)대로 재시도해서 성공한다")
+    void givenRetryableThenSuccess_whenCall_thenRetriesAndSucceeds() {
+        RetryableException transportError = mock(RetryableException.class);
         AtomicInteger attempts = new AtomicInteger();
         Supplier<String> flaky = () -> {
             if (attempts.incrementAndGet() < 3) {
-                throw serverError;
+                throw transportError;
             }
             return "ok";
         };
@@ -47,13 +48,13 @@ class PgResilienceExecutorTest {
     }
 
     @Test
-    @DisplayName("retry 대상이 아닌 예외(4xx)는 재시도하지 않고 즉시 전파한다")
-    void givenNonRetryable4xx_whenCall_thenNoRetry() {
-        FeignException.BadRequest badRequest = mock(FeignException.BadRequest.class);
+    @DisplayName("응답을 받은 실패(500)는 닿은 요청이라 재시도하지 않고 즉시 전파한다")
+    void givenResponseError500_whenCall_thenNoRetry() {
+        FeignException.InternalServerError serverError = mock(FeignException.InternalServerError.class);
         AtomicInteger attempts = new AtomicInteger();
         Supplier<String> failing = () -> {
             attempts.incrementAndGet();
-            throw badRequest;
+            throw serverError;
         };
 
         try {

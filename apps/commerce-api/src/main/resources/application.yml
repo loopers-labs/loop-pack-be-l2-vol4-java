@@ -57,7 +57,8 @@ resilience4j:
         max-attempts: 3
         wait-duration: 200ms
         retry-exceptions:
-          - feign.FeignException$InternalServerError   # 5xx(전송 불안정)만 재시도, 4xx·모호 실패 제외
+          # 전송 계층 실패(RetryableException = connect 실패·timeout)만 재시도.
+          - feign.RetryableException
   ratelimiter:
     instances:
       toss:
