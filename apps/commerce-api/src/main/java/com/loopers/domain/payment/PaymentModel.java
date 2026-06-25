@@ -72,6 +72,10 @@ public class PaymentModel extends BaseEntity {
         this.transactionKey = transactionKey;
     }
 
+    public boolean matchesTransactionKey(String transactionKey) {
+        return this.transactionKey != null && this.transactionKey.equals(transactionKey);
+    }
+
     public void confirm(PaymentStatus result, String reason) {
         if (result == PaymentStatus.SUCCESS) {
             succeed();

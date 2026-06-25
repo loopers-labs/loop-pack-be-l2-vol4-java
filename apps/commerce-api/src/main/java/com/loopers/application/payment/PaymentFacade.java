@@ -49,8 +49,12 @@ public class PaymentFacade {
         return PaymentInfo.from(savedPayment);
     }
 
-    public void handleCallback(Long orderId, PaymentStatus result, String reason) {
+    public void handleCallback(Long orderId, String transactionKey, PaymentStatus result, String reason) {
         PaymentModel payment = paymentRepository.getByOrderId(orderId);
+
+        if (!payment.matchesTransactionKey(transactionKey)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "콜백의 거래 식별자가 결제와 일치하지 않습니다.");
+        }
 
         if (payment.isTerminal()) {
             return;

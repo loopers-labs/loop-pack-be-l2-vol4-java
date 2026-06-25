@@ -89,6 +89,17 @@ Content-Type: application/json
   "reason": null
 }
 
+### 결제 콜백 - 거래 식별자 불일치 위조 (403 Forbidden)
+POST http://localhost:8080/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "TX-FORGED",
+  "orderId": "000001",
+  "status": "SUCCESS",
+  "reason": null
+}
+
 ### 결제 콜백 - 결제 미존재 (404 Not Found)
 POST http://localhost:8080/api/v1/payments/callback
 Content-Type: application/json

@@ -22,8 +22,15 @@ public class PaymentV1Dto {
     }
 
     public record CallbackRequest(
-        String orderId,
+        @NotNull(message = "주문 식별자는 null일 수 없습니다.")
+        Long orderId,
+
+        @NotBlank(message = "거래 식별자는 비어 있을 수 없습니다.")
+        String transactionKey,
+
+        @NotNull(message = "결제 결과 상태는 null일 수 없습니다.")
         PaymentStatus status,
+
         String reason
     ) {
     }
