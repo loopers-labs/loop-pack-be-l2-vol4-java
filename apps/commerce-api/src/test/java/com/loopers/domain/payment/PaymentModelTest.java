@@ -125,6 +125,19 @@ class PaymentModelTest {
             // then
             assertThat(payment.getTransactionKey()).isNull();
         }
+
+        @DisplayName("부여할 키가 null 이면(PG 미접수로 흡수할 key 가 없음), 흡수하지 않고 key 없이 유지한다.")
+        @Test
+        void doesNotAssignKey_whenKeyIsNull() {
+            // given
+            PaymentModel payment = pendingPayment();
+
+            // when
+            payment.assignTransactionKey(null);
+
+            // then
+            assertThat(payment.getTransactionKey()).isNull();
+        }
     }
 
     @DisplayName("결제 성공을 반영할 때, ")

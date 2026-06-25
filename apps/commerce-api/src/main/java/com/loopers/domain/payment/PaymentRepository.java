@@ -16,4 +16,10 @@ public interface PaymentRepository {
      * key 가 있어야 PG 에 조회할 수 있으므로 key 없는 건은 제외한다.
      */
     List<PaymentModel> findStuckPending(ZonedDateTime threshold);
+
+    /**
+     * by-order 복구 대상 = 동기 타임아웃/서킷 강등으로 transactionKey 를 못 받은 채 threshold 보다 오래 PENDING 인 결제.
+     * key 가 없어 단건 조회가 불가하므로 이후 orderId 로 PG 에 되물어 수렴시킨다.
+     */
+    List<PaymentModel> findStuckPendingWithoutKey(ZonedDateTime threshold);
 }

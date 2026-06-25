@@ -36,4 +36,10 @@ public class PaymentRepositoryImpl implements PaymentRepository {
         return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNullAndCreatedAtBefore(
             PaymentStatus.PENDING, threshold);
     }
+
+    @Override
+    public List<PaymentModel> findStuckPendingWithoutKey(ZonedDateTime threshold) {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNullAndCreatedAtBefore(
+            PaymentStatus.PENDING, threshold);
+    }
 }

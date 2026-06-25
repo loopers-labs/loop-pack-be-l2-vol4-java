@@ -15,7 +15,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -65,7 +68,29 @@ public class PgPaymentGateway implements PaymentGateway {
         );
 
         PgPaymentDto.TransactionDetail data = extractData(response.getBody());
-        return new PaymentGatewayTransaction(PaymentStatus.valueOf(data.status()), data.reason());
+        return new PaymentGatewayTransaction(transactionKey, PaymentStatus.valueOf(data.status()), data.reason());
+    }
+
+    @Override
+    public List<PaymentGatewayTransaction> getTransactionsByOrder(Long userId, Long orderId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(USER_ID_HEADER, String.valueOf(userId));
+
+        try {
+            ResponseEntity<PgPaymentDto.ApiResponse<PgPaymentDto.OrderResponse>> response = pgRestTemplate.exchange(
+                properties.baseUrl() + PAYMENTS_PATH + "?orderId=" + encodeOrderId(orderId),
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                new ParameterizedTypeReference<PgPaymentDto.ApiResponse<PgPaymentDto.OrderResponse>>() {}
+            );
+
+            return extractData(response.getBody()).transactions().stream()
+                .map(t -> new PaymentGatewayTransaction(t.transactionKey(), PaymentStatus.valueOf(t.status()), t.reason()))
+                .toList();
+        } catch (HttpClientErrorException.NotFound e) {
+            // PG 가 이 주문에 트랜잭션이 없다고 응답(404) = 미접수 → 도메인 어휘 "빈 목록"으로 번역
+            return List.of();
+        }
     }
 
     private String encodeOrderId(Long orderId) {

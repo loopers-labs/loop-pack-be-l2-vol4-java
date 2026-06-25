@@ -59,6 +59,9 @@ public class PaymentModel extends BaseEntity {
      * 이미 키가 있거나 종착 상태이면 재시도/중복 수신에도 안전하도록 멱등하게 무시한다.
      */
     public void assignTransactionKey(String transactionKey) {
+        if (transactionKey == null) {
+            return;
+        }
         if (status != PaymentStatus.PENDING) {
             return;
         }

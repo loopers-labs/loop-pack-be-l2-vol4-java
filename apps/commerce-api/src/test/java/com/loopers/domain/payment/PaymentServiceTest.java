@@ -84,24 +84,22 @@ class PaymentServiceTest {
         }
     }
 
-    @DisplayName("결제 성공을 반영할 때(by transactionKey), ")
+    @DisplayName("transactionKey 로 결제를 조회할 때, ")
     @Nested
-    class MarkSuccess {
+    class GetByTransactionKey {
 
-        @DisplayName("PENDING 결제를 키로 찾아 SUCCESS 로 전이하고 reason 을 기록한다.")
+        @DisplayName("키로 결제를 찾으면, 그 결제를 반환한다.")
         @Test
-        void marksSuccessByKey() {
+        void returnsPayment_whenFound() {
             // given
             PaymentModel payment = PaymentModel.createPending(1L, 100L, 50_000L);
             given(paymentRepository.findByTransactionKey("20260624:TR:abc123")).willReturn(Optional.of(payment));
-            given(paymentRepository.save(any(PaymentModel.class))).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
-            PaymentModel result = paymentService.markSuccess("20260624:TR:abc123", "정상 승인");
+            PaymentModel result = paymentService.getByTransactionKey("20260624:TR:abc123");
 
             // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-            assertThat(result.getReason()).isEqualTo("정상 승인");
+            assertThat(result).isSameAs(payment);
         }
 
         @DisplayName("키로 결제를 찾지 못하면, PAYMENT_NOT_FOUND 예외가 발생한다.")
@@ -112,31 +110,10 @@ class PaymentServiceTest {
 
             // when
             CoreException exception = assertThrows(CoreException.class,
-                () -> paymentService.markSuccess("unknown", "정상 승인"));
+                () -> paymentService.getByTransactionKey("unknown"));
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.PAYMENT_NOT_FOUND);
-        }
-    }
-
-    @DisplayName("결제 실패를 반영할 때(by transactionKey), ")
-    @Nested
-    class MarkFailed {
-
-        @DisplayName("PENDING 결제를 키로 찾아 FAILED 로 전이하고 reason 을 기록한다.")
-        @Test
-        void marksFailedByKey() {
-            // given
-            PaymentModel payment = PaymentModel.createPending(1L, 100L, 50_000L);
-            given(paymentRepository.findByTransactionKey("20260624:TR:abc123")).willReturn(Optional.of(payment));
-            given(paymentRepository.save(any(PaymentModel.class))).willAnswer(invocation -> invocation.getArgument(0));
-
-            // when
-            PaymentModel result = paymentService.markFailed("20260624:TR:abc123", "한도초과");
-
-            // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
-            assertThat(result.getReason()).isEqualTo("한도초과");
         }
     }
 }

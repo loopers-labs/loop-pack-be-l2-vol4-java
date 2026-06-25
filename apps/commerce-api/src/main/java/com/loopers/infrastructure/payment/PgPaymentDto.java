@@ -1,5 +1,7 @@
 package com.loopers.infrastructure.payment;
 
+import java.util.List;
+
 /**
  * PG 시뮬레이터의 JSON 계약과 1:1 로 대응하는 infrastructure 전용 DTO. 도메인은 이 타입들을 모른다.
  */
@@ -39,5 +41,17 @@ final class PgPaymentDto {
         String status,
         String reason
     ) {
+    }
+
+    record OrderResponse(
+        String orderId,
+        List<Transaction> transactions
+    ) {
+        record Transaction(
+            String transactionKey,
+            String status,
+            String reason
+        ) {
+        }
     }
 }

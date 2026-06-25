@@ -27,39 +27,34 @@ public class PaymentService {
      */
     @Transactional
     public PaymentModel assignTransactionKey(Long paymentId, String transactionKey) {
-        PaymentModel payment = loadPayment(paymentId);
+        PaymentModel payment = getById(paymentId);
         payment.assignTransactionKey(transactionKey);
         return paymentRepository.save(payment);
     }
 
     /**
-     * PG 결과(SUCCESS)를 결제에 반영한다. 콜백·폴링이 transactionKey 로 디스패치한다.
-     * markSuccess 가 멱등이라 중복/순서뒤바뀜 수신에도 안전하다.
+     * transactionKey 로 결제를 조회한다. (콜백·keyed 복구가 결과를 수렴시킬 결제를 확보하는 진입)
      */
-    @Transactional
-    public PaymentModel markSuccess(String transactionKey, String reason) {
-        PaymentModel payment = loadByTransactionKey(transactionKey);
-        payment.markSuccess(reason);
-        return paymentRepository.save(payment);
+    @Transactional(readOnly = true)
+    public PaymentModel getByTransactionKey(String transactionKey) {
+        return paymentRepository.findByTransactionKey(transactionKey)
+            .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_NOT_FOUND, "결제건을 찾을 수 없습니다. [transactionKey = " + transactionKey + "]"));
     }
 
     /**
-     * PG 결과(FAILED)를 결제에 반영한다. markFailed 가 멱등이라 중복/순서뒤바뀜 수신에도 안전하다.
+     * paymentId 로 결제를 조회한다. (keyless 복구가 key 없이 결제를 확보하는 진입)
      */
-    @Transactional
-    public PaymentModel markFailed(String transactionKey, String reason) {
-        PaymentModel payment = loadByTransactionKey(transactionKey);
-        payment.markFailed(reason);
-        return paymentRepository.save(payment);
-    }
-
-    private PaymentModel loadPayment(Long paymentId) {
+    @Transactional(readOnly = true)
+    public PaymentModel getById(Long paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_NOT_FOUND, "결제건을 찾을 수 없습니다. [paymentId = " + paymentId + "]"));
     }
 
-    private PaymentModel loadByTransactionKey(String transactionKey) {
-        return paymentRepository.findByTransactionKey(transactionKey)
-            .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_NOT_FOUND, "결제건을 찾을 수 없습니다. [transactionKey = " + transactionKey + "]"));
+    /**
+     * 결제 전이 결과를 영속한다. (공유 수렴점이 도메인 메서드로 전이시킨 뒤 저장)
+     */
+    @Transactional
+    public PaymentModel save(PaymentModel payment) {
+        return paymentRepository.save(payment);
     }
 }
