@@ -1,10 +1,12 @@
 package com.loopers.infrastructure.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import feign.Retryer;
+import feign.Request;
 import feign.codec.ErrorDecoder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class PaymentGatewayFeignConfig {
@@ -15,7 +17,11 @@ public class PaymentGatewayFeignConfig {
     }
 
     @Bean
-    public Retryer retryer() {
-        return new Retryer.Default(100, 300, 3);
+    public Request.Options options(PaymentGatewayProperties properties) {
+        return new Request.Options(
+                properties.connectTimeoutMillis(), TimeUnit.MILLISECONDS,
+                properties.readTimeoutMillis(), TimeUnit.MILLISECONDS,
+                true
+        );
     }
 }
