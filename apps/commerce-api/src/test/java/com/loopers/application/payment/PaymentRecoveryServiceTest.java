@@ -1,5 +1,6 @@
 package com.loopers.application.payment;
 
+import com.loopers.application.order.OrderPaymentResultHandler;
 import com.loopers.domain.common.Money;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.GatewayLookup;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,12 +38,14 @@ class PaymentRecoveryServiceTest {
     private PaymentGateway paymentGateway;
     @Mock
     private PaymentService paymentService;
+    @Mock
+    private OrderPaymentResultHandler orderResultHandler;
 
     private PaymentRecoveryService recoveryService;
 
     @BeforeEach
     void setUp() {
-        recoveryService = new PaymentRecoveryService(paymentRepository, paymentGateway, paymentService, Duration.ofSeconds(30), Duration.ofMinutes(10));
+        recoveryService = new PaymentRecoveryService(paymentRepository, paymentGateway, paymentService, orderResultHandler, Duration.ofSeconds(30), Duration.ofMinutes(10));
     }
 
     private PaymentModel payment(String transactionKey) {
@@ -118,6 +122,35 @@ class PaymentRecoveryServiceTest {
             verify(paymentService, never()).failByOrderId(any(), any());
             verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
             verify(paymentService, never()).assignTransactionKey(any(), any());
+        }
+    }
+
+    @DisplayName("주문 미반영 SUCCESS 결제 재구동(reapplySuccess) 시")
+    @Nested
+    class ReapplySuccess {
+
+        @DisplayName("최근 SUCCESS 결제가 있으면 주문 반영(onPaid)을 멱등 재구동한다")
+        @Test
+        void redrivesOnPaid() {
+            when(paymentRepository.findSuccessfulSince(any())).thenReturn(List.of(payment("tx-9")));
+
+            recoveryService.reapplySuccess();
+
+            verify(orderResultHandler).onPaid(1L);
+        }
+
+        @DisplayName("한 건이 실패해도 예외를 전파하지 않고 다음 건을 계속 재구동한다")
+        @Test
+        void continuesWhenOneFails() {
+            PaymentModel first = new PaymentModel(1L, 10L, CardType.SAMSUNG, Money.of(5_000L));
+            PaymentModel second = new PaymentModel(2L, 10L, CardType.SAMSUNG, Money.of(5_000L));
+            when(paymentRepository.findSuccessfulSince(any())).thenReturn(List.of(first, second));
+            doThrow(new RuntimeException("일시 오류")).when(orderResultHandler).onPaid(1L);
+
+            recoveryService.reapplySuccess();
+
+            verify(orderResultHandler).onPaid(1L);
+            verify(orderResultHandler).onPaid(2L);
         }
     }
 

@@ -29,6 +29,11 @@ public class PaymentRecoveryScheduler {
             log.error("결제 복구 실패: recoverKeyless", e);
         }
         try {
+            paymentRecoveryService.reapplySuccess();
+        } catch (Exception e) {
+            log.error("결제 복구 실패: reapplySuccess", e);
+        }
+        try {
             paymentRecoveryService.flagStuck();
         } catch (Exception e) {
             log.error("결제 복구 실패: flagStuck", e);

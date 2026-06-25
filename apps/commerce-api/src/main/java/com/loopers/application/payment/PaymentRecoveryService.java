@@ -1,5 +1,6 @@
 package com.loopers.application.payment;
 
+import com.loopers.application.order.OrderPaymentResultHandler;
 import com.loopers.domain.payment.GatewayLookup;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
@@ -22,6 +23,7 @@ public class PaymentRecoveryService {
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PaymentService paymentService;
+    private final OrderPaymentResultHandler orderResultHandler;
     private final Duration pendingGrace;
     private final Duration stuckThreshold;
 
@@ -29,12 +31,14 @@ public class PaymentRecoveryService {
         PaymentRepository paymentRepository,
         PaymentGateway paymentGateway,
         PaymentService paymentService,
+        OrderPaymentResultHandler orderResultHandler,
         @Value("${payment.recovery.pending-grace:PT30S}") Duration pendingGrace,
         @Value("${payment.recovery.stuck-threshold:PT10M}") Duration stuckThreshold
     ) {
         this.paymentRepository = paymentRepository;
         this.paymentGateway = paymentGateway;
         this.paymentService = paymentService;
+        this.orderResultHandler = orderResultHandler;
         this.pendingGrace = pendingGrace;
         this.stuckThreshold = stuckThreshold;
     }
@@ -71,6 +75,24 @@ public class PaymentRecoveryService {
                 }
             } catch (ObjectOptimisticLockingFailureException alreadyConfirmed) {
                 // 콜백·다른 인스턴스가 동시에 확정 — no-op, 다음 건으로 진행
+            }
+        }
+    }
+
+    /**
+     * 결제는 SUCCESS인데 주문이 아직 반영되지 않은 건을 주문 반영으로 재구동한다.
+     * (콜백·확정 직후 onPaid가 DB 장애·재배포 등으로 실패하면 결제 SUCCESS·주문 CREATED로 어긋나는데,
+     *  PENDING만 보는 다른 복구가 못 줍는 사각지대다.) onPaid는 멱등이라 이미 PAID면 no-op.
+     * 스캔 범위는 stuck-threshold 이내 최근 SUCCESS로 제한한다.
+     * TODO(Round 7): in-process 이벤트의 한계 — Outbox + Kafka 재발행으로 이 backstop을 대체한다.
+     */
+    public void reapplySuccess() {
+        ZonedDateTime since = ZonedDateTime.now().minus(stuckThreshold);
+        for (PaymentModel payment : paymentRepository.findSuccessfulSince(since)) {
+            try {
+                orderResultHandler.onPaid(payment.getOrderId());
+            } catch (Exception e) {
+                log.warn("주문 반영 재구동 실패 — orderId={}", payment.getOrderId(), e);
             }
         }
     }

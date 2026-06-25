@@ -36,6 +36,8 @@ class PaymentEventFlowIntegrationTest {
     @Autowired
     private PaymentService paymentService;
     @Autowired
+    private PaymentRecoveryService recoveryService;
+    @Autowired
     private OrderRepository orderRepository;
     @Autowired
     private PaymentRepository paymentRepository;
@@ -72,6 +74,25 @@ class PaymentEventFlowIntegrationTest {
             pendingPayment(order.getId(), order.getFinalAmount(), "tx-success");
 
             paymentService.confirm("tx-success", true, null);
+
+            assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+    }
+
+    @DisplayName("결제는 SUCCESS인데 주문이 미반영(CREATED)으로 남은 경우")
+    @Nested
+    class ReapplySuccess {
+
+        @DisplayName("복구가 주문을 PAID로 재반영한다")
+        @Test
+        void reappliesOrderPaid() {
+            OrderModel order = orderRepository.save(new OrderModel(USER_ID, List.of(item(100L, 1_000L, 1)), null, Money.ZERO));
+            PaymentModel payment = new PaymentModel(order.getId(), USER_ID, CardType.SAMSUNG, order.getFinalAmount());
+            payment.assignTransactionKey("tx-reapply");
+            payment.markSuccess(); // 이벤트 핸들러가 실패해 주문은 CREATED로 남은 상황 재현
+            paymentRepository.save(payment);
+
+            recoveryService.reapplySuccess();
 
             assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
         }

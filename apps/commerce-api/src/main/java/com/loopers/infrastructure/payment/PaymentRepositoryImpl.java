@@ -45,4 +45,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public List<PaymentModel> findStuckPending(ZonedDateTime cutoff) {
         return paymentJpaRepository.findAllByStatusAndCreatedAtBeforeAndDeletedAtIsNull(PaymentStatus.PENDING, cutoff);
     }
+
+    @Override
+    public List<PaymentModel> findSuccessfulSince(ZonedDateTime since) {
+        return paymentJpaRepository.findAllByStatusAndUpdatedAtAfterAndDeletedAtIsNull(PaymentStatus.SUCCESS, since);
+    }
 }
