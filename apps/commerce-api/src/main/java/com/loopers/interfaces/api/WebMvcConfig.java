@@ -21,7 +21,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
             .addPathPatterns("/api/**")
-            .excludePathPatterns("/api/v1/users"); // 회원가입은 인증 불필요
+            .excludePathPatterns("/api/v1/users")           // 회원가입은 인증 불필요
+            .excludePathPatterns("/api/v1/payments/callback"); // PG 콜백은 인증 헤더 없이 수신
     }
 
     @Override
