@@ -1,6 +1,7 @@
 package com.loopers.payment.infrastructure;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.SlidingWindowType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.junit.jupiter.api.DisplayName;
@@ -27,12 +28,12 @@ class PgCircuitBreakerConfigTest {
     }
 
     @Test
-    @DisplayName("toss 브레이커는 min-calls 가 window 이하라 실패율을 평가할 수 있다(안 열리는 오설정 방지)")
-    void givenTossConfig_thenMinCallsNotGreaterThanWindow() {
+    @DisplayName("toss 브레이커는 불규칙 트래픽용 time-based(60s)·min-calls 10 으로 평가한다(저트래픽서도 평가 가능)")
+    void givenTossConfig_thenTimeBasedWindowWithReachableMinCalls() {
         assertAll(
-                () -> assertThat(config.getSlidingWindowSize()).isEqualTo(20),
-                () -> assertThat(config.getMinimumNumberOfCalls()).isEqualTo(20),
-                () -> assertThat(config.getMinimumNumberOfCalls()).isLessThanOrEqualTo(config.getSlidingWindowSize())
+                () -> assertThat(config.getSlidingWindowType()).isEqualTo(SlidingWindowType.TIME_BASED),
+                () -> assertThat(config.getSlidingWindowSize()).isEqualTo(60),
+                () -> assertThat(config.getMinimumNumberOfCalls()).isEqualTo(10)
         );
     }
 
