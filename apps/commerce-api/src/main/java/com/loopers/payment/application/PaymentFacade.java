@@ -32,6 +32,9 @@ public class PaymentFacade {
     @Value("${pg.callback-url}")
     private String callbackUrl;
 
+    @Value("${pg.retry-max-attempts:3}")
+    private int retryMaxAttempts;
+
     private TransactionTemplate transactionTemplate;
 
     @PostConstruct
@@ -79,9 +82,8 @@ public class PaymentFacade {
     private PgPaymentClientDto.TransactionResponse requestPaymentWithRetry(
         String loginId, OrderModel order, Long orderId, String cardType, String cardNo
     ) {
-        int maxAttempts = 3;
         int waitMillis = 200;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (int attempt = 1; attempt <= retryMaxAttempts; attempt++) {
             try {
                 return pgPaymentClient.requestPayment(
                     loginId,
@@ -95,7 +97,7 @@ public class PaymentFacade {
                     )
                 );
             } catch (PgRetriableException e) {
-                if (attempt == maxAttempts) {
+                if (attempt == retryMaxAttempts) {
                     throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "결제 시스템이 일시적으로 불가합니다.");
                 }
                 try {

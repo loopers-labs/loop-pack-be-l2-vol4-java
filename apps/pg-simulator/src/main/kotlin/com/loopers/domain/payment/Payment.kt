@@ -13,7 +13,7 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(
-    name = "payments",
+    name = "pg_payments",
     indexes = [
         Index(name = "idx_user_transaction", columnList = "user_id, transaction_key"),
         Index(name = "idx_user_order", columnList = "user_id, order_id"),

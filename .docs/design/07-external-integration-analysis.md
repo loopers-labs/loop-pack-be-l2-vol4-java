@@ -809,3 +809,283 @@ permitted-number-of-calls-in-half-open-state: 5
 **pool_timeout이 완전히 0이 되지 않은 이유**
 
 overload(80 VU) 구간에서 여전히 16건이 3,000ms를 초과했다. TX C(PG 실패 시 Order 복구)도 커넥션을 필요로 하고, overload 구간에서는 주문 생성(`/orders`) 자체도 커넥션을 쓰기 때문에 총 수요가 여전히 풀(40)을 초과하는 순간이 존재한다. 이 구간을 완전히 없애려면 풀 크기를 늘리거나 트래픽을 제한(rate limiting)해야 한다.
+
+---
+
+## Resilience4j 설정 실험 — slowCallDurationThreshold
+
+### 실험 목적
+
+CB는 에러율(failureRateThreshold)뿐 아니라 응답 지연만으로도 열릴 수 있다. `slowCallDurationThreshold` + `slowCallRateThreshold`를 직접 켜고 k6로 동작을 확인했다.
+
+### 적용한 설정 변경
+
+**① `instances` → `configs.default` 로 변경**
+
+```yaml
+# 변경 전
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg-simulator:
+        sliding-window-size: 20
+        failure-rate-threshold: 60
+  timelimiter:
+    instances:
+      pg-simulator:
+        timeout-duration: 600ms
+
+# 변경 후
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 20
+        failure-rate-threshold: 60
+        slow-call-duration-threshold: 100ms
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 1000ms
+```
+
+`instances.pg-simulator`로 설정하면 실제 적용이 안 된다. Spring Cloud OpenFeign이 CB를 자동 생성할 때 이름을 `PgPaymentClient#requestPayment(String,PaymentRequest)` 형식으로 만들기 때문에 `pg-simulator`라는 이름과 매칭되지 않는다. `configs.default`는 이름 무관하게 모든 CB 인스턴스에 기본값으로 적용된다.
+
+**② `slow-call-duration-threshold: 100ms` / `slow-call-rate-threshold: 50` 추가**
+
+이 두 설정이 없으면 Resilience4j는 느린 호출을 별도로 추적하지 않는다. 명시적으로 켜야만 작동하는 기능이다.
+
+**③ timelimiter 600ms → 1000ms**
+
+PG slow mode(150~300ms sleep) + DB 오버헤드가 기존 600ms 제한을 넘어, slow call이 아닌 timelimiter 타임아웃 에러로 집계됐다. 타임아웃 에러는 `failureRate`에 반영되고 `slowCallRate`에는 집계되지 않으므로, slowCall 실험이 성립하지 않았다. 1000ms로 올려 PG 응답이 timelimiter에 걸리지 않도록 했다.
+
+### PG 설정 (pg-simulator)
+
+```yaml
+# pg-simulator/application.yml
+pg:
+  slow-mode: true  # 150~300ms 지연, 에러 없음
+```
+
+```kotlin
+// PaymentApi.kt
+if (slowMode) {
+    Thread.sleep((150..300L).random())  // 에러 없이 느리기만 함
+}
+```
+
+### k6 테스트 결과
+
+스크립트: `k6/slow-call-cb-test.js` (15 req/s, 40초)
+
+| 구간 | 응답 시간 | HTTP 상태 | 설명 |
+|------|----------|-----------|------|
+| 0~3초 (첫 ~20건) | 380~900ms | 200 | CB가 sliding window를 채우는 중 |
+| 3초 이후 | 300~500ms | 503 | slowCallRate 100% → 50% 임계값 초과 → CB OPEN |
+
+**핵심 관찰:** PG가 아무 에러 없이 200 OK를 반환했지만 CB가 열렸다. 모든 PG 응답이 100ms(slowCallDurationThreshold)를 초과했고, 20건(sliding-window-size)이 쌓이자 slowCallRate 100% > 50%(slowCallRateThreshold) 조건을 만족해 CB가 OPEN 상태로 전환됐다.
+
+**CB OPEN 후 응답 시간이 0ms가 아닌 이유:** k6는 commerce-api 전체 응답 시간을 측정한다. CB가 열려 PG 호출 자체는 즉시 차단되지만, commerce-api 내부에서 TX1(주문 상태 업데이트) + TX C(주문 실패 처리) DB 트랜잭션이 실행되므로 503 응답도 300~500ms가 소요된다.
+
+### 얻은 것
+
+> **에러 없이 느리기만 해도 CB가 열린다.**
+
+`failureRateThreshold`만 설정한 상태에서는 절대 감지하지 못했을 상황이다. DB 슬로우 쿼리, 외부 API 지연처럼 "에러는 없지만 느린" 장애 유형을 CB로 차단하려면 `slowCallDurationThreshold`를 명시적으로 설정해야 한다.
+
+---
+
+## Resilience4j 설정 실험 — COUNT_BASED vs TIME_BASED 슬라이딩 윈도우
+
+### 실험 목적
+
+Resilience4j의 `sliding-window-type`에는 두 가지 모드가 있다.
+
+| 타입 | 윈도우 기준 | 특징 |
+|------|-----------|------|
+| `COUNT_BASED` | 최근 N건 | 시간이 지나도 창 내 데이터가 유지됨 |
+| `TIME_BASED` | 최근 N초 | 오래된 호출이 자동으로 만료되어 창에서 제거됨 |
+
+"장애 발생 후 트래픽을 중단했다가 재개하면 CB가 어떻게 반응하는가"를 두 타입으로 직접 비교했다.
+
+### 테스트 시나리오
+
+스크립트: `k6/sliding-window-type-test.js`
+
+```
+Phase 1 (0~5s)  : 15 req/s — PG 에러 40% 상태에서 실패 누적, CB OPEN 유도
+Phase 2 (5~20s) : 0 req/s  — 15초 완전 중단 (트래픽 없음)
+Phase 3 (20~40s): 5 req/s  — 재개
+```
+
+### 적용한 설정
+
+**COUNT_BASED (기준값)**
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED   # 기본값이므로 생략해도 동일
+        sliding-window-size: 20
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+```
+
+**TIME_BASED (비교값)**
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: TIME_BASED
+        sliding-window-size: 10            # 최근 10초
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+```
+
+### k6 테스트 결과
+
+| 지표 | COUNT_BASED | TIME_BASED |
+|------|-------------|------------|
+| `cb_open_rate` | **94.90%** (149 / 157건) | **6.12%** (9 / 147건) |
+| `phase1_success` | **0.00%** (0 / 57건) | **89.13%** (41 / 46건) |
+| `phase3_success` | **8.00%** (8 / 100건) | **96.03%** (97 / 101건) |
+
+### 동작 분석
+
+**COUNT_BASED:**
+
+```
+Phase 1: 실패가 누적되어 CB OPEN → 이후 Phase 1 모든 요청이 CB 차단
+Phase 2: 트래픽 없음 → 윈도우 내 실패 기록 그대로 유지
+Phase 3: 재개 직후 CB가 여전히 OPEN
+         → wait-duration(10s) 경과 후 HALF-OPEN 전환
+         → permitted 5건 통과 → 일부 성공(8%)
+         → 나머지는 즉시 다시 OPEN
+```
+
+COUNT_BASED에서 15초 중단은 CB 상태에 아무 영향이 없다. "마지막 20건의 실패율"이 기준이고, 새로운 요청이 들어오지 않으면 그 20건이 창에 그대로 남아있다.
+
+**TIME_BASED:**
+
+```
+Phase 1: 실패가 누적되어 CB OPEN → 일부 요청 차단
+Phase 2: 트래픽 없음 → 10초짜리 윈도우가 실시간으로 흐르면서 Phase 1 호출들이 만료
+Phase 3: 재개 시점(20s)에 창이 완전히 비어있음 → CB CLOSED에서 시작
+         → Phase 3에서 새로 실패가 쌓일 때만 간헐적으로 CB OPEN (6.12%)
+```
+
+TIME_BASED에서는 15초 중단이 "자연적인 윈도우 만료"로 작동한다. Phase 3 시작 시 창이 비어 있으므로 CB가 CLOSED 상태에서 재개된다. Phase 3 로그를 보면 첫 번째 호출부터 `[200] 531ms`로 정상 응답한다.
+
+### 얻은 것
+
+> **COUNT_BASED는 트래픽 중단이 CB를 복구시키지 않는다. TIME_BASED는 윈도우 시간이 지나면 자동으로 리셋된다.**
+
+| 상황 | COUNT_BASED | TIME_BASED |
+|------|-------------|------------|
+| 점검·재배포 후 재개 | CB가 이전 실패를 기억해 즉시 차단 | 재배포 시간만큼 윈도우가 흐르면 CLOSED로 시작 |
+| 일시적 트래픽 스파이크 | 스파이크 이후 오래 CB 영향이 지속 | 윈도우 이후 자연 소멸 |
+| 안정적인 실패율 측정 | 최근 N건 기준으로 일관됨 | 트래픽이 낮으면 창이 비어 실패율 계산이 불안정할 수 있음 |
+
+실무에서 COUNT_BASED가 기본값인 이유도 여기 있다 — 트래픽이 낮아 창이 비어있을 때 CB가 예기치 않게 CLOSED로 판단하는 문제를 피하기 위함이다.
+
+---
+
+## Resilience4j 설정 실험 — Retry × CB 상호작용
+
+### 실험 목적
+
+Retry가 활성화되어 있으면 논리 요청(logical request) 1건이 CB 슬라이딩 윈도우에 여러 번 기록된다.
+"Retry가 CB를 더 빨리 열리게 만드는가"를 논리 요청 기준으로 직접 측정했다.
+
+### 원리
+
+PG 호출이 실패하면 `PgRetriableException`이 던져지고 재시도한다. 각 시도(attempt)는 CB 윈도우에 독립적으로 기록된다.
+
+```
+retry=3, PG 실패율 40% 기준
+  성공 첫 번째: 1 CB 호출 (60%)
+  실패→성공:   2 CB 호출 (40% × 60% = 24%)
+  실패→실패→성공: 3 CB 호출 (40% × 40% × 60% = 9.6%)
+  실패→실패→실패: 3 CB 호출 (40% × 40% × 40% = 6.4%)
+
+  논리 요청 1건당 평균 CB 호출 수 = 1×0.60 + 2×0.24 + 3×0.096 + 3×0.064 = 1.56
+
+  sliding-window-size=20을 채우는 데 필요한 논리 요청 수: 20 ÷ 1.56 ≈ 13
+```
+
+### 테스트 설정
+
+스크립트: `k6/retry-cb-test.js` (1 VU, 40 iterations, 순차 실행)
+
+- 1 VU 순차 실행으로 "몇 번째 논리 요청에서 CB가 열리는가"를 선형으로 추적
+- 재시도 횟수는 `pg.retry-max-attempts` 설정으로 전환
+- CB 설정: `sliding-window-size=20`, `slow-call-rate-threshold=50%`, `slow-call-duration-threshold=100ms`
+  - PG 응답이 100~500ms라 모든 PG 호출이 slow call로 집계됨 → slow call rate 100% → 20 CB 호출 후 CB OPEN
+
+```yaml
+# retry=3 (기본값)
+# application.yml에 pg.retry-max-attempts 없으면 3으로 동작
+
+# retry=1 (재시도 없음)
+pg:
+  retry-max-attempts: 1
+```
+
+### 결과 — 로그 패턴 비교
+
+**retry=3:**
+```
+#1~#13: [200] ← 13건 정상 응답
+#14:    [CB 최초 OPEN] ← CB 열림
+#15~#40: [CB OPEN] ← 이후 전부 차단
+```
+
+**retry=1:**
+```
+#1, #3, #4: [503] ← PG 에러 즉시 503 (CB 아직 OPEN 아님)
+#5~#11:     [200]
+#12, #15, #18: [503] ← PG 에러
+#19~#20:    [200]
+#21~#40:    [503] ← 연속 503 → CB 진짜 OPEN
+```
+
+> **주의:** retry=1에서는 PG 에러(40% 확률) 발생 시 재시도 없이 즉시 `SERVICE_UNAVAILABLE(503)`을 반환한다.
+> k6 지표 `first_cb_open_at_logical_req=1`은 이 PG 에러 503을 CB OPEN으로 오인한 것이다.
+> 실제 CB OPEN 시점은 로그의 "연속 503 시작 지점"으로 판별해야 한다.
+
+### 수치 비교
+
+| 구분 | CB 최초 OPEN 논리 요청 | HTTP 요청 수 / 40 논리 요청 |
+|------|----------------------|-----------------------------|
+| retry=3 | **#14** | 80건 (논리 요청당 평균 2.0 HTTP 호출) |
+| retry=1 | **#21** | 80건 (논리 요청당 정확히 2.0 HTTP 호출) |
+
+retry=3에서도 HTTP 요청 수가 80건인 이유: `orders + payments` 2번 호출이 기본이고, retry 시 동일한 `orderId`에 대해 새 주문을 만들지 않으므로 결제 API 재시도는 k6 입장에서는 서버 내부 처리다. k6가 세는 HTTP 요청은 commerce-api로 가는 요청이고, 재시도는 commerce-api → pg-simulator 내부 호출이라 k6에 잡히지 않는다.
+
+### 이론값과의 비교
+
+```
+sliding-window-size = 20
+slow call threshold = 100ms (모든 PG 호출이 해당)
+slow call rate threshold = 50%
+
+retry=3: 20 ÷ 1.56 ≈ 13 논리 요청 → #14에서 OPEN ✓
+retry=1: 20 ÷ 1.00 = 20 논리 요청 → #21에서 OPEN ✓
+```
+
+### 얻은 것
+
+> **Retry는 CB 슬라이딩 윈도우를 더 빠르게 채운다. retry=3이면 retry=1 대비 약 1.5배 빠르게 CB가 열린다.**
+
+실무 함의:
+- retry 횟수가 많을수록 CB가 더 민감하게 반응한다. 이를 보정하려면 `sliding-window-size`나 `failure-rate-threshold`를 함께 조정해야 한다.
+- retry 대상 예외를 좁게 설정하는 것이 중요하다. 현재 구현처럼 CB OPEN(`CallNotPermittedException`) 상태에서는 retry하지 않아야 CB의 회복 판단을 방해하지 않는다.

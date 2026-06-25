@@ -82,6 +82,52 @@ warmup(20명의 가상 유저) / saturation(50명의 가상 유저) / overload(8
 
 `pool_timeout_rate` 66% 감소가 핵심 수치다. 트랜잭션1(~50ms) + 트랜잭션2(~20ms)로 커넥션 점유 시간이 대폭 단축된 직접적인 효과다. warmup/saturation p(95)는 소폭 상승(1.07s → 1.35~1.52s)했는데, minimum-idle 30→10 조정으로 초기 커넥션 생성 비용이 추가되고 요청당 커넥션 획득 횟수가 1→2회로 늘어난 영향이다. "개별 요청이 수백 ms 느려지는 대신 풀 고갈로 3초를 기다리다 503을 받는 요청이 66% 줄었다"는 트레이드오프로 판단했다.
 
+**시나리오 3 — Resilience4j 설정값 변경 실험**
+
+부하 테스트 이후 CB 동작을 더 깊이 이해하기 위해 설정값을 바꿔가며 세 가지 실험을 진행했다.
+
+**실험 1 — slowCallDurationThreshold: 에러 없이 느려도 CB가 열리는가**
+
+pg-simulator에 slow mode(150~300ms 지연, 에러 없음)를 켜고, `slow-call-duration-threshold: 100ms` / `slow-call-rate-threshold: 50`을 설정한 뒤 k6(15 req/s, 40초)로 실행했다.
+
+초반 ~20건은 200 OK, 3초 이후부터 CB가 열리며 503으로 전환됐다. PG가 에러를 반환하지 않았는데도 CB가 열린 것이다 — slow call rate 100%가 threshold(50%)를 넘었기 때문이다.
+
+단, 실험 과정에서 함정이 하나 있었다. 처음에는 timelimiter가 600ms로 설정돼 있어, PG 응답(150~300ms) + DB 오버헤드가 600ms를 초과하는 케이스에서 TimeLimiter가 먼저 끊어버렸다. TimeLimiter가 끊은 호출은 slow call이 아닌 failure로 집계되어, 실험 전제("에러 없이 느리기만 할 때")가 성립하지 않았다. timelimiter를 1000ms로 올린 후에야 slowCallRate만으로 CB가 열리는 것을 확인할 수 있었다.
+
+> **timelimiter 타임아웃은 slowCallRate가 아닌 failureRate에 집계된다.** 두 경로의 집계 채널이 다르다.
+
+---
+
+**실험 2 — COUNT_BASED vs TIME_BASED: 트래픽 중단이 CB 복구에 영향을 주는가**
+
+Phase1(15 req/s, 5초 burst) → Phase2(15초 완전 중단) → Phase3(5 req/s 재개) 시나리오로 두 타입을 비교했다.
+
+| 지표 | COUNT_BASED (size=20) | TIME_BASED (size=10초) |
+|------|----------------------|----------------------|
+| cb_open_rate | 94.90% | 6.12% |
+| phase3_success | **8.00%** | **96.03%** |
+
+COUNT_BASED는 15초 중단 동안 Phase1의 실패 기록이 윈도우에 그대로 유지된다. Phase3 재개 시 CB가 여전히 OPEN이라 8%만 성공했다.
+
+TIME_BASED는 10초 윈도우가 중단 중 만료되어 창이 비워진다. Phase3 시작 시 CB는 CLOSED 상태에서 재개되어 96%가 성공했다.
+
+다만 TIME_BASED는 저트래픽 환경에서 창이 비어 CB가 예기치 않게 CLOSED로 판단할 수 있다. COUNT_BASED가 기본값인 이유다.
+
+---
+
+**실험 3 — Retry × CB: retry 횟수가 CB 민감도에 영향을 주는가**
+
+1 VU 순차 실행으로 "몇 번째 논리 요청에서 CB가 최초로 열리는가"를 측정했다. `pg.retry-max-attempts` 설정으로 retry 횟수를 전환해 두 번 실행했다.
+
+| 구분 | CB 최초 OPEN 논리 요청 |
+|------|----------------------|
+| retry=3 | **#14** |
+| retry=1 | **#21** |
+
+retry=3에서 논리 요청 1건이 CB 윈도우에 평균 1.56건으로 기록되기 때문이다(실패 시 재시도마다 독립된 CB 호출로 집계). `sliding-window-size=20`을 채우는 데 필요한 논리 요청 수가 `20 ÷ 1.56 ≈ 13`으로 줄어든다. 이론값(#13~14, #20~21)과 실측값이 일치했다.
+
+> retry 횟수를 늘릴 때는 `sliding-window-size`와 함께 고려해야 한다. CB OPEN 상태에서는 retry를 발동하지 않도록 설정하지 않으면, HALF-OPEN 프로브 슬롯을 retry가 소진해 CB 회복을 방해한다.
+
 ---
 
 ## 🤔 고민한 점 / 막혔던 부분

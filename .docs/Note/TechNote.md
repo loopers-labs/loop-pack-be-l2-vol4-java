@@ -1,177 +1,268 @@
-# [Challenge Story] 타임아웃 이후 도착한 콜백은 어디로 가는가 (6주차 · 6팀 · 변승진)
+# [Challenge Story] 설정했는데 왜 CB가 이렇게 동작하지? — Resilience4j 함정 2가지 (6주차 · 6팀 · 변승진)
 
 ## TL;DR
 
-타임아웃(600ms)이 나면 내부에서는 결제를 실패로 처리하고 결제 기록(PaymentModel)을 남기지 않는다. 그런데 PG는 그 이후에도 계속 처리 중이어서 성공 콜백이 도착할 수 있다. 콜백 처리 코드는 PaymentModel을 먼저 찾고 없으면 NOT_FOUND 예외를 던졌기 때문에, 이 케이스에서 콜백이 조용히 버려졌다. 복구 API가 있어도 콜백 경로 자체가 이 케이스를 처리하지 못하는 설계 구멍이었다. 콜백에 orderId를 추가하고, PaymentModel이 없을 때 orderId로 주문을 찾아 직접 복구하는 흐름으로 수정했다.
+Resilience4j CB를 PG 연동에 붙이면서 "설정만 하면 될 줄 알았던" 두 가지 함정을 발견했다. ① `slowCallDurationThreshold` 실험에서 PG 응답이 TimeLimiter(600ms)를 초과하는 순간 slow call이 아닌 failure로 집계되어 실험 전제 자체가 무너졌다. ② retry가 활성화된 상태에서 CB 슬라이딩 윈도우는 논리 요청이 아닌 PG 호출 단위로 채워지기 때문에, 예상보다 빠르게 CB가 열렸다. 두 현상 모두 k6로 직접 측정해 수치로 확인했다.
 
 ---
 
 ## Context (배경 및 목표)
 
-- **어떤 시스템을 만드는가**: PG 비동기 결제 연동. pg-simulator는 결제 요청을 수락하면 1~5초 안에 처리 결과를 콜백으로 전달한다. 내부 시스템에는 600ms 타임아웃이 걸려 있어, PG 응답이 늦으면 결제를 실패로 처리하고 PaymentModel을 저장하지 않은 채 종료한다.
+- **어떤 시스템을 만드는가**: PG(Payment Gateway) 외부 연동. pg-simulator는 40% 확률로 즉시 에러를 반환하고, 60%는 100~500ms 후 성공한다. PG가 불안정할 때 그 장애가 commerce-api 전체로 번지지 않도록 Resilience4j CB + TimeLimiter + Retry를 조합해 붙였다.
 
-- **가장 큰 기술적 도전 과제**: 타임아웃이 발생한 이후 PG가 보내는 콜백을 올바르게 처리하는가. 이 시점에는 PaymentModel이 없는 상태라, 콜백 경로가 이 케이스를 처리할 수 있어야 한다. 나아가 복구 API와 콜백이 동시에 들어올 때 PaymentModel이 중복 생성되지 않아야 한다.
+- **가장 큰 기술적 도전 과제**: CB가 "설정대로" 동작하는지 확인하는 것. 설정값을 바꿔가며 실험하는 과정에서 예상과 다른 동작이 두 차례 발견됐다. 두 경우 모두 원인을 모르면 CB가 올바르게 동작한다고 착각하게 만드는 함정이었다.
 
 ---
 
 ## Design & Implementation (설계 및 구현)
 
-### 핵심 기술 선택
+### Resilience4j 핵심 개념 — CB가 OPEN되는 두 가지 경로
 
-**[선택 1] 콜백에 orderId 추가**
-
-콜백에서 PaymentModel이 없을 때 Order를 찾으려면 orderId가 필요하다. pg-simulator는 원래부터 콜백 바디에 orderId를 포함해 전송하고 있었다 — `CallbackRequest`가 `transactionKey`만 역직렬화하고 orderId를 버리고 있었을 뿐이다.
-
-| 옵션 | Pros | Cons |
-|------|------|------|
-| A. orderId를 콜백 바디에서 읽기 | 추가 PG 호출 없음, PG가 원래 보내는 값 활용 | 콜백 바디를 신뢰하는 것 (orderId 위조 가능성) |
-| **선택: B. orderId를 바디에서 읽되, 실제 상태는 PG 재조회** | orderId는 경로 탐색에만 사용, 상태는 PG 직접 확인 | PG 호출 1회 추가 |
-
-**선택 근거**: orderId를 위조해 콜백을 보내도, 실제 상태 반영은 `pgClient.getTransaction(transactionKey)`로 PG에서 직접 가져온 값만 사용한다. orderId 위조로 얻을 수 있는 것은 "존재하지 않는 Order에 대한 NOT_FOUND 에러 유도" 뿐이어서 실질적 위협이 없다.
-
----
-
-**[선택 2] loginId를 OrderModel에 추가**
-
-PG 재조회(`pgClient.getTransaction`)에는 `X-USER-ID` 헤더(loginId)가 필요하다. 콜백 처리는 인증 없는 엔드포인트라 요청에서 loginId를 꺼낼 수 없고, PaymentModel도 없는 케이스이므로 다른 경로로 loginId를 구해야 한다.
-
-| 옵션 | Pros | Cons |
-|------|------|------|
-| A. UserRepository.findById로 User 조회 | OrderModel 변경 없음 | PaymentFacade에 User 도메인 의존성 추가 |
-| **선택: B. OrderModel에 loginId 필드 추가** | 단일 조회로 loginId 확보, 도메인 간 결합 없음 | OrderModel 생성자·테스트 수정 필요 |
-
-**선택 근거**: PaymentModel이 이미 `loginId`를 저장하는 이유와 동일하다 — PG 호출 시 사용자 식별이 필요하기 때문이다. Order도 특정 사용자의 것이므로 loginId를 함께 저장하는 것이 자연스럽다. UserRepository를 주입하면 Payment 도메인이 User 도메인을 직접 참조하게 되어 의존 방향이 어긋난다.
-
-### Logic Flow
-
-**수정 전**
+Resilience4j CB는 슬라이딩 윈도우로 최근 N건의 호출 이력을 유지하면서, 두 가지 조건 중 하나라도 임계값을 초과하면 OPEN 상태로 전환한다.
 
 ```
-[타임아웃 케이스]
-TX1: Order → IN_PAYMENT
-PG 호출 시작
-600ms 후 TimeoutException 발생
-TX C: Order → PAYMENT_FAILED (PaymentModel 없음)
-
-이후 PG가 SUCCESS 처리 → 콜백 발송
-handleCallback(transactionKey)
-  → findByTransactionKey("TX-xxx") → 없음
-  → throw NOT_FOUND ← 콜백 버려짐
+경로 1 — failureRate:   최근 N 호출 중 '예외가 발생한 호출'의 비율이 threshold 초과
+경로 2 — slowCallRate:  최근 N 호출 중 '응답 시간이 X ms를 넘긴 호출'의 비율이 threshold 초과
 ```
 
-**수정 후**
+두 경로는 서로 독립적이다. 에러가 없어도 느리기만 하면 CB가 열릴 수 있고, 느리지 않아도 에러율이 높으면 열린다.
+
+### 최종 설정값
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 20           # 최근 20건 기준으로 평가
+        failure-rate-threshold: 60        # 60% 이상 실패 시 OPEN
+        slow-call-duration-threshold: 100ms  # 100ms 초과 응답을 'slow call'로 간주
+        slow-call-rate-threshold: 50      # slow call이 50% 이상이면 OPEN
+        wait-duration-in-open-state: 10s  # OPEN 후 10초 대기 → HALF-OPEN
+        permitted-number-of-calls-in-half-open-state: 5
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 600ms           # PG 응답이 600ms를 넘으면 강제 종료
+```
+
+> **왜 `instances.pg-simulator`가 아닌 `configs.default`인가**
+>
+> Spring Cloud OpenFeign이 CB를 자동 생성할 때 이름을 `PgPaymentClient#requestPayment(String,PaymentRequest)` 형식으로 만든다. `instances.pg-simulator` 키는 이 이름과 매칭되지 않아 설정 자체가 적용되지 않는다. `configs.default`는 이름에 관계없이 모든 CB 인스턴스의 기본값으로 적용된다.
+
+### PG 호출 전체 흐름
 
 ```
-[타임아웃 케이스]
-(동일)
-
-이후 PG가 SUCCESS 처리 → 콜백 발송
-handleCallback(transactionKey, orderId)  ← orderId 추가
-  → findByTransactionKey("TX-xxx") → 없음
-  → find(orderId) → Order 조회
-  → pgClient.getTransaction(order.loginId, transactionKey) → SUCCESS
-  → PaymentModel 신규 생성 + Order → CONFIRMED
+PaymentFacade.requestPaymentWithRetry()
+  └─ attempt 1: pgPaymentClient.requestPayment()  ← Resilience4j CB가 감싸고 있음
+       ├─ 성공 (60%)
+       │    → CB 윈도우에 'success' 1건 기록
+       │
+       ├─ PG 즉시 에러 (40%)
+       │    → CB 윈도우에 'failure' 1건 기록
+       │    → PgRetriableException → attempt 2 재시도
+       │         └─ attempt 2: pgPaymentClient.requestPayment()  ← 이것도 CB 호출
+       │
+       └─ PG 응답이 600ms 초과
+            → TimeLimiter가 TimeoutException을 던짐
+            → CB 윈도우에 'failure' 1건 기록  ← slow call이 아님!
 ```
-
-`recoverFromPgByTransactionKey`는 이미 transactionKey를 알고 있으므로, 복구 API의 `recoverFromPgByOrderId`(orderId로 목록 조회 후 최신 건 단건 재조회)와 달리 PG 호출 1회로 처리가 끝난다.
 
 ---
 
 ## Engineering Challenges (트러블슈팅 및 최적화)
 
-### 예상치 못한 현상
+### 함정 1 — TimeLimiter가 끊어낸 호출은 slowCallRate가 아닌 failureRate에 쌓인다
 
-타임아웃 케이스를 처음 분석했을 때 이미 복구 API(`POST /api/v1/payments/{orderId}/recover`)가 구현되어 있었다. "타임아웃으로 PaymentModel이 없어도 복구 API를 호출하면 된다" — 이 생각이 콜백 경로 자체를 검증하지 않게 만들었다.
+#### 예상치 못한 현상
 
-그런데 실제로 콜백 경로는 어떻게 동작하고 있었나?
+`slowCallDurationThreshold: 100ms` 실험이 목표였다. "에러 없이 느리기만 해도 CB가 열린다"는 것을 직접 확인하고 싶었다.
 
-```
-[타임아웃 후 PG가 SUCCESS 처리 → 콜백 발송]
-handleCallback(transactionKey)
-  → findByTransactionKey("TX-xxx") → 없음
-  → throw NOT_FOUND ← 그냥 버려짐
-```
+실험 설계는 간단했다. pg-simulator에 slow mode(150~300ms 지연, 에러 없음)를 켜면, 모든 PG 응답이 100ms를 초과해 slow call로 집계되고, slow-call-rate-threshold(50%)를 금방 넘어 CB가 열릴 것이라고 예상했다.
 
-pg-simulator는 콜백 전송 실패 시 재시도하지 않는다. 콜백이 한 번 버려지면 그걸로 끝이다. 복구 API는 **수동으로 호출해야** 작동한다 — 자동으로 고쳐지지 않는다. 복구 API의 존재가 콜백 경로의 버그를 가려온 것이었다.
+결과는? CB가 열리긴 했다. 그런데 Actuator 메트릭을 보니 `slow_call`이 아니라 `failure`가 쌓이고 있었다. PG는 에러를 반환하지 않는데, 어떻게 failure가 발생하고 있는 것인가?
 
-### 추론 및 검증
+#### 원인 분석
 
-**불일치 상태가 얼마나 오래 유지되는가**
+문제는 TimeLimiter와 slowCallRate의 집계 채널이 다르다는 것이었다.
 
 ```
-타임아웃 발생 (600ms)
-  → TX C: Order → PAYMENT_FAILED
-  → PG: 아직 처리 중... (최대 5초)
-  → PG: SUCCESS 처리 완료 → 콜백 발송
-  → 콜백 버려짐 → 불일치 상태 고착
+[slowCallRate로 집계되는 경우]
+PG 요청 발송 ──────────────────────── 250ms 후 PG 응답 도착
+                                      └─ 응답 시간 250ms > 100ms(threshold)
+                                      → CB: slowCall + 1
+
+[failureRate로 집계되는 경우]
+PG 요청 발송 ─── 600ms 후 TimeLimiter 발동 ──→ PG 아직 응답 안 옴
+                  └─ TimeoutException 발생
+                  → CB: failure + 1  ← 'slow'가 아니라 '예외'로 분류됨
 ```
 
-스케줄러가 있다면 IN_PAYMENT 상태가 일정 시간(PG 처리 최대 5초 + 네트워크 버퍼 = 10~30초 어딘가)을 넘기면 자동으로 감지해 복구를 시도할 수 있다. 그러나 현재 구현에는 스케줄러가 없다. 콜백이 올바르게 처리되는 것이 유일한 자동 복구 경로였던 것이다.
+slow mode PG(150~300ms) + DB 오버헤드를 합산하면 전체 처리 시간이 600ms TimeLimiter를 초과하는 케이스가 생긴다. TimeLimiter가 먼저 끊어버리면 Resilience4j는 그 호출이 "느렸다"는 것을 알 방법이 없다. 응답이 오지 않은 채 예외가 발생했으므로 단순히 failure로 기록한다.
 
-**검토했지만 구현하지 않은 것 — 실패 사유 구분**
+즉, slowCallRate로 열린 게 아니라 failureRate로 열린 것이었다. 실험 전제("에러 없이 느리기만 할 때")가 성립하지 않고 있었다.
 
-타임아웃 실패인지, PG 거절인지를 구분하면 재시도 전략을 다르게 가져갈 수 있다. hard decline(한도초과, 잘못된 카드)은 재시도가 의미 없고, soft decline(일시적 장애)은 자동 재시도가 가능하다.
+#### 해결 — TimeLimiter를 실험 기간만 1000ms로 올리기
 
-구현하지 않은 이유: pg-simulator가 내려주는 실패 사유는 "한도초과"와 "잘못된카드" 두 가지뿐이다 — 둘 다 hard decline이다. soft decline에 해당하는 사유를 내려주지 않는다. 시뮬레이터가 절대 만들지 않는 케이스를 처리하는 코드는 테스트할 수 없으니 만들지 않는다.
+PG 응답(최대 300ms) + 오버헤드가 TimeLimiter보다 확실히 아래에 있어야 slow call이 정확히 집계된다.
 
-**동시 복구 방어 — 잘못된 첫 번째 시도**
-
-복구 API와 콜백이 동시에 들어오면 두 요청이 모두 `existingPayment.isEmpty() = true`를 확인하고 PaymentModel을 중복 생성할 수 있다.
-
-처음 시도한 접근:
-
-```
-@Transactional
-recoverPayment() {
-    existingPayment = paymentRepository.findByOrderId(orderId)
-    if (existingPayment.isEmpty()) {
-        orderRepository.findWithLock(orderId)  ← 락을 isEmpty 이후에 추가
-        recoverFromPgByOrderId(order, loginId)
-    }
-}
+```yaml
+# 실험 중에만 적용, 이후 600ms로 복원
+timelimiter:
+  configs:
+    default:
+      timeout-duration: 1000ms
 ```
 
-이 방법은 동작하지 않는다. 락을 `isEmpty()` 체크 이후에 잡으면, 두 요청이 이미 같은 결론(`isEmpty()=true`)을 내린 상태에서 순서대로 락을 잡는다. 첫 번째 요청이 PaymentModel을 만들고 커밋한 뒤 락을 놓아도, 두 번째 요청은 isEmpty 체크 결과를 이미 true로 기억한 채 락을 잡으므로 여전히 PaymentModel 생성 경로로 진입한다.
-
-### 최종 해결
+이 상태에서 k6로 재실행하자 slow call만으로 CB가 열리는 것을 확인했다.
 
 ```
-[수정 전]
-요청 A: find(orderId) → 일반 SELECT
-요청 B: find(orderId) → 일반 SELECT (동시)
-요청 A: isEmpty() → true → PaymentModel 생성
-요청 B: isEmpty() → true → PaymentModel 또 생성 (중복!)
+[k6 스크립트: slow-call-cb-test.js — 15 req/s, 40초]
 
-[수정 후]
-요청 A: findWithLock(orderId) → SELECT FOR UPDATE, 락 획득
-요청 B: findWithLock(orderId) → 락 획득 대기
-요청 A: isEmpty() → true → PaymentModel 생성 후 커밋 → 락 해제
-요청 B: 락 획득 → isEmpty() → false (이미 생성됨) → 종료
+구간          응답 시간    HTTP 상태  설명
+0~3초 (~20건) 380~900ms   200        CB 윈도우 채우는 중
+3초 이후      300~500ms   503        slowCallRate 100% > 50% → CB OPEN
 ```
 
-핵심: **락 선점이 isEmpty 체크보다 반드시 앞에 있어야 한다.** 요청 B가 락을 획득하는 시점에 요청 A의 커밋 결과가 이미 DB에 반영되어 있어야 하기 때문이다. 락이 그 순서를 강제한다.
+503 응답 시간이 300~500ms인 이유: CB가 열려 PG 호출 자체는 차단됐지만, 내부에서 TX1(주문 상태 업데이트) + TX C(결제 실패 처리) 트랜잭션이 실행되기 때문이다.
+
+> **핵심**: PG가 에러를 전혀 반환하지 않았음에도 CB가 열렸다. TimeLimiter를 올리지 않았다면 "slowCallRate로 CB가 열렸다"고 잘못 해석했을 것이다.
+
+---
+
+### 함정 2 — Retry가 활성화되면 CB 윈도우는 논리 요청 수가 아니라 PG 호출 수 기준으로 채워진다
+
+#### 예상치 못한 현상
+
+`sliding-window-size: 20`이면 "사용자 입장에서 20번 결제를 시도한 후에 CB가 평가를 시작한다"고 생각했다.
+
+그런데 retry=3(현재 설정)에서 k6로 직접 세어보니 14번째 논리 요청에서 CB가 열렸다. 예상(20번)보다 6번 일찍 열린 것이다.
+
+#### 원인 분석
+
+retry는 PG 호출 실패 시 같은 논리 요청을 다시 시도한다. 이때 각 시도(attempt)는 CB 슬라이딩 윈도우에 독립적인 항목으로 기록된다. 즉, "논리 요청 1건 = CB 호출 1건"이 아니다.
+
+```
+[논리 요청 1건이 CB 윈도우에 남기는 기록 — PG 실패율 40%]
+
+케이스                              확률    CB 기록
+성공(1회만에)                       60%    success 1건
+실패 → 성공(2번째에)                24%    failure 1건 + success 1건 = 2건
+실패 → 실패 → 성공(3번째에)         9.6%   failure 2건 + success 1건 = 3건
+실패 → 실패 → 실패(전부 실패)        6.4%   failure 3건               = 3건
+
+논리 요청 1건당 평균 CB 호출 수:
+  1×0.60 + 2×0.24 + 3×0.096 + 3×0.064 = 1.56건
+```
+
+따라서 20-call 윈도우를 채우는 데 필요한 논리 요청 수는 `20 ÷ 1.56 ≈ 13건`이다.
+
+```
+retry=3: 논리 요청 ~13건 → 윈도우 20건 채워짐 → CB 평가 → OPEN
+retry=1: 논리 요청 ~20건 → 윈도우 20건 채워짐 → CB 평가 → OPEN
+```
+
+#### k6로 직접 측정
+
+1 VU 순차 실행으로 "몇 번째 논리 요청에서 CB가 처음 열리는가"를 추적했다. `pg.retry-max-attempts` 설정으로 retry 횟수를 전환해 두 번 실행했다.
+
+```
+[retry=3 로그]
+#1~#13:  [200] — 정상 응답
+#14:     [CB 최초 OPEN] — CB 열림
+#15~#40: [CB OPEN] — 이후 전부 차단
+
+[retry=1 로그]
+#1, #3, #4: [503] — PG 에러 즉시 503 (CB는 아직 OPEN 아님*)
+#5~#11:     [200]
+#12, #15, #18: [503] — PG 에러
+#19~#20:    [200]
+#21~#40:    [503] — 연속 503 시작 → CB 진짜 OPEN
+```
+
+> *retry=1에서 초반 503은 CB OPEN이 아니다. PG 에러 → 재시도 소진 → SERVICE_UNAVAILABLE(503)이다. "연속 503이 시작되는 지점"을 CB OPEN 시점으로 봐야 한다.
+
+**결과 비교**
+
+| 구분 | CB 최초 OPEN 논리 요청 | 이론값 |
+|------|----------------------|--------|
+| retry=3 | **#14** | 20 ÷ 1.56 ≈ 13 → **#14 ✓** |
+| retry=1 | **#21** | 20 ÷ 1.00 = 20 → **#21 ✓** |
+
+이론값과 실측값이 정확히 일치했다.
 
 ---
 
 ## Verification & Insight (검증)
 
-| 항목 | 수정 전 | 수정 후 |
-|------|---------|---------|
-| 타임아웃 케이스 콜백 처리 | NOT_FOUND 예외 → 콜백 버려짐 | orderId로 Order 조회 → 자동 복구 |
-| 동시 복구 요청 | PaymentModel 중복 생성 가능 | findWithLock 선점 → 두 번째 요청 종료 |
-| 콜백 유실 케이스 | 수동 복구 API 필요 | 동일 (자동 감지 수단 없음) |
+세 가지 k6 실험을 통해 CB 동작을 수치로 확인했다.
 
-- **불일치 창**: 타임아웃 ~ 콜백 도착까지 최대 약 5초 동안 PG와 내부 상태가 어긋난다. 이 구간에서 콜백 경로가 올바르게 처리하지 않으면 불일치는 수동 복구 전까지 영구히 유지된다.
-- **Security**: orderId는 경로 탐색에만 사용하고 상태는 PG에서 직접 확인한다. 콜백 위조 방지 원칙(바디의 status를 신뢰하지 않고 PG 재조회)이 이 케이스에도 동일하게 적용된다.
+### 실험 1 — slowCallDurationThreshold
+
+```
+스크립트: k6/slow-call-cb-test.js
+환경: pg.slow-mode=true (150~300ms, 에러 없음), timelimiter=1000ms
+```
+
+| 구간 | 응답 시간 | HTTP 상태 | 설명 |
+|------|----------|-----------|------|
+| 0~3초 (~20건) | 380~900ms | 200 | CB 윈도우 채우는 중 |
+| 3초 이후 | 300~500ms | 503 | slowCallRate 100% > 50% → CB OPEN |
+
+**얻은 것**: `slowCallDurationThreshold`를 설정하지 않으면 "에러는 없는데 느린" 장애를 CB가 전혀 감지하지 못한다. DB 슬로우 쿼리, 외부 API 지연처럼 예외 없이 느린 장애 유형이 여기에 해당한다.
+
+---
+
+### 실험 2 — COUNT_BASED vs TIME_BASED 슬라이딩 윈도우
+
+```
+스크립트: k6/sliding-window-type-test.js
+시나리오: Phase1(15 req/s, 5초 burst) → Phase2(15초 중단) → Phase3(5 req/s 재개)
+```
+
+두 타입의 핵심 차이는 "트래픽 중단이 윈도우에 영향을 주는가"다.
+
+- **COUNT_BASED**: 최근 N건 기준. 새 요청이 없으면 기존 이력이 그대로 유지된다. 15초 중단 동안 Phase1의 실패 기록이 창에 그대로 남아있다.
+- **TIME_BASED**: 최근 N초 기준. 시간이 흐르면 오래된 호출이 자동으로 만료된다. 10초 윈도우 설정이면 15초 중단 동안 창이 완전히 비워진다.
+
+| 지표 | COUNT_BASED (size=20) | TIME_BASED (size=10초) |
+|------|----------------------|----------------------|
+| `cb_open_rate` | 94.90% | 6.12% |
+| `phase1_success` | 0.00% | 89.13% |
+| `phase3_success` | **8.00%** | **96.03%** |
+
+Phase3 성공률 격차(8% vs 96%)가 핵심이다.
+
+COUNT_BASED에서 Phase3 성공률이 8%에 불과한 이유: 15초 중단 후 Phase3이 재개될 때 CB는 여전히 OPEN 상태다. `wait-duration-in-open-state: 10s`가 경과하면 HALF-OPEN으로 전환되어 `permitted-number-of-calls-in-half-open-state: 5`건만 통과시키는데, 그 5건 중 일부가 성공해도 실패율이 여전히 threshold를 넘어 다시 OPEN으로 돌아간다. 40번 Phase3 요청 중 단 8번만 통과한 것이다.
+
+TIME_BASED에서 Phase3 성공률이 96%인 이유: 15초 중단 동안 10초 윈도우가 만료되어 창이 비어있다. Phase3 재개 시 CB는 CLOSED 상태에서 출발한다. Phase3 로그를 보면 첫 번째 요청부터 `[200] 531ms`로 정상 응답한다. Phase3 도중 새로운 실패가 쌓일 때만 간헐적으로 CB가 열리는(6.12%) 수준이다.
+
+**얻은 것**: COUNT_BASED는 "트래픽이 없어도 과거 이력을 기억"하고, TIME_BASED는 "트래픽이 없으면 윈도우가 자연스럽게 초기화"된다. 재배포·점검 후 재개 시에는 TIME_BASED가 유리하지만, 저트래픽 환경에서는 창이 비어 CB가 예기치 않게 CLOSED로 판단할 수 있다. COUNT_BASED가 기본값인 이유다.
+
+---
+
+### 실험 3 — Retry × CB 상호작용
+
+```
+스크립트: k6/retry-cb-test.js
+환경: 1 VU 순차, 40 iterations
+```
+
+| 구분 | CB 최초 OPEN 논리 요청 | HTTP 요청 / 40 논리 요청 |
+|------|----------------------|--------------------------|
+| retry=3 | **#14** | 80건 |
+| retry=1 | **#21** | 80건 |
+
+HTTP 요청 수가 동일한 이유: retry는 commerce-api → pg-simulator 사이의 내부 재시도다. k6가 측정하는 HTTP 요청은 k6 → commerce-api 구간이므로 retry 횟수와 무관하게 논리 요청당 2건(주문 생성 + 결제)이다.
+
+**얻은 것**: retry를 늘리면 CB가 더 민감해진다. retry=3이 retry=1보다 약 1.5배 빠르게 CB를 열었다. retry 횟수를 결정할 때 `sliding-window-size`와 함께 고려해야 한다.
 
 ---
 
 ## Lessons Learned
 
-1. **복구 API가 있다고 해서 기존 경로의 버그가 가려지지 않는다.** 콜백 경로와 복구 API는 각각 독립적으로 올바르게 동작해야 한다. "복구 API로 나중에 고칠 수 있다"는 생각이 콜백 경로를 검증하지 않게 만들었다. 복구 API는 수동 트리거이므로, 그걸 자동 보정 수단으로 전제하는 순간 자동 경로(콜백)의 버그가 보이지 않게 된다.
+1. **TimeLimiter와 slowCallRate는 집계 채널이 다르다.** TimeLimiter가 끊어낸 호출은 "응답이 느렸다"는 정보 없이 예외로만 처리되어 failure로 집계된다. `slowCallDurationThreshold` 실험을 하려면 TimeLimiter를 충분히 크게 잡아야 실험 전제가 성립한다. 더 일반적으로, CB 실험 전에 "어느 경로(failureRate vs slowCallRate)로 열리는가"를 Actuator 메트릭으로 먼저 확인하는 습관이 필요하다.
 
-2. **기존에 동작하던 정상 케이스만 테스트하면 실패 케이스의 버그를 놓친다.** 타임아웃으로 PaymentModel이 없는 상태에서 콜백이 오는 시나리오를 테스트했더라면 초기에 발견할 수 있었다.
+2. **Retry는 CB 민감도를 높인다.** retry 횟수를 늘리면 논리 요청 1건이 CB 윈도우에 여러 건으로 기록되어 CB가 예상보다 빨리 열린다. retry 횟수를 올릴 때는 `sliding-window-size`를 함께 키우거나, retry 대상 예외를 좁게 설정해야 한다. CB OPEN 상태에서 retry하면 HALF-OPEN 프로브 슬롯을 소진해 CB 회복을 방해하므로, CB OPEN 예외는 retry 대상에서 반드시 제외해야 한다.
 
-3. **락의 위치는 "어디서 잡느냐"가 아니라 "어떤 체크보다 앞에 잡느냐"가 핵심이다.** isEmpty 체크 이후에 락을 잡으면 두 요청이 이미 같은 결론을 내린 상태에서 순서만 조정하는 것이라 중복을 막지 못한다. 락을 먼저 잡아야 첫 번째 요청의 커밋 결과가 두 번째 요청에 보인다.
-
-4. **동시성 문제는 "발생할 가능성이 낮다"는 이유로 뒤로 미루기 쉽다.** 복구 API와 콜백이 동시에 들어오는 케이스는 타임아웃 이후 PG 처리가 완료되는 몇 초 안에만 발생하는 좁은 구간이다. 그러나 그 구간에서 중복 생성이 발생하면 정합성이 깨진다. 락은 "자주 발생하는 경우"가 아니라 "발생해서는 안 되는 경우"를 막기 위해 건다.
+3. **COUNT_BASED vs TIME_BASED는 "트래픽 중단이 CB를 복구시키는가"로 구분된다.** COUNT_BASED는 트래픽이 없어도 과거 실패를 기억하고, TIME_BASED는 윈도우 시간이 지나면 과거가 사라진다. 어느 쪽이 맞다는 게 아니라, 운영 패턴(재배포 빈도, 트래픽 특성)에 맞게 선택해야 한다.

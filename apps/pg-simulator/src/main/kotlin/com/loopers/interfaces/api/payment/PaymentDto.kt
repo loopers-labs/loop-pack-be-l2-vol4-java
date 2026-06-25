@@ -26,8 +26,8 @@ object PaymentDto {
             if (idempotencyKey.isBlank()) {
                 throw CoreException(ErrorType.BAD_REQUEST, "멱등키는 비어있을 수 없습니다.")
             }
-            if (orderId.isBlank() || orderId.length < 6) {
-                throw CoreException(ErrorType.BAD_REQUEST, "주문 ID는 6자리 이상 문자열이어야 합니다.")
+            if (orderId.isBlank()) {
+                throw CoreException(ErrorType.BAD_REQUEST, "주문 ID는 비어있을 수 없습니다.")
             }
             if (!REGEX_CARD_NO.matches(cardNo)) {
                 throw CoreException(ErrorType.BAD_REQUEST, "카드 번호는 xxxx-xxxx-xxxx-xxxx 형식이어야 합니다.")
