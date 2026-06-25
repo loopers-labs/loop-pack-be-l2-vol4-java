@@ -1,0 +1,57 @@
+### 결제 요청 - 정상 (201 Created, PENDING + transactionKey)
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### 결제 요청 - 회원 인증 헤더 누락 (401 Unauthorized)
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### 결제 요청 - 대상 주문 미존재/타인 소유 (404 Not Found)
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "orderId": 99999,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### 결제 요청 - 이미 결제 존재 (409 Conflict)
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### 결제 요청 - 카드 번호 형식 오류 (400 Bad Request)
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: Kyle!2030
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678"
+}
