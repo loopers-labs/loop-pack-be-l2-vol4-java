@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface PaymentJpaRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findFirstByOrderIdAndStatusInOrderByIdDesc(Long orderId, Collection<PaymentStatus> statuses);
+
+    Optional<Payment> findByTransactionKey(String transactionKey);
 }

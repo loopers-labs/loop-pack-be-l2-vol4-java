@@ -8,6 +8,8 @@ public interface PaymentRepository {
 
     Optional<Payment> find(Long id);
 
+    Optional<Payment> findByTransactionKey(String transactionKey);
+
     /** 해당 주문의 '활성' 결제(PENDING 또는 SUCCESS). 멱등 가드 — 한 주문에 활성 결제는 하나뿐. */
     Optional<Payment> findActiveByOrderId(Long orderId);
 }

@@ -253,4 +253,36 @@ class ProductTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("재고를 복원할 때, ")
+    @Nested
+    class IncreaseStock {
+
+        @DisplayName("복원 수량만큼 재고가 증가한다. (결제 실패 보상)")
+        @Test
+        void increasesStock() {
+            // arrange
+            Product product = product(); // stock 10
+
+            // act
+            product.increaseStock(Quantity.of(3));
+
+            // assert
+            assertThat(product.getStock()).isEqualTo(13);
+        }
+
+        @DisplayName("복원 수량이 null 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQuantityIsNull() {
+            // arrange
+            Product product = product();
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> product.increaseStock(null));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.loopers.application.payment;
 
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.Payment;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
@@ -41,6 +42,23 @@ public class PaymentFacade {
             payment = paymentService.attachTransactionKey(payment.getId(), response.data().transactionKey());
         }
         return PaymentInfo.from(payment);
+    }
+
+    /**
+     * PG 콜백 처리. status 를 우리 PaymentStatus 로 매핑해 결과를 반영한다(터미널만).
+     * 알 수 없거나 미확정(PENDING) 상태는 무시한다.
+     */
+    public void handleCallback(String transactionKey, String status, String reason) {
+        PaymentStatus result;
+        try {
+            result = PaymentStatus.valueOf(status);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return; // 알 수 없는 상태 — 무시
+        }
+        if (result == PaymentStatus.PENDING) {
+            return; // 아직 미확정 — 반영하지 않음
+        }
+        paymentService.applyResult(transactionKey, result, reason);
     }
 
     /** 우리 Order id(Long) → PG orderId(문자열, 6자 이상 규칙). */

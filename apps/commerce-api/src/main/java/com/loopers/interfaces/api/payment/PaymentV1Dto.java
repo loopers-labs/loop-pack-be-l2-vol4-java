@@ -7,6 +7,17 @@ public class PaymentV1Dto {
 
     public record PaymentRequest(Long orderId, CardType cardType, String cardNo) {}
 
+    /** PG 콜백 본문 (pg-simulator 의 TransactionInfo). transactionKey/status/reason 만 사용. */
+    public record PgCallbackRequest(
+        String transactionKey,
+        String orderId,
+        String cardType,
+        String cardNo,
+        Long amount,
+        String status,
+        String reason
+    ) {}
+
     public record PaymentResponse(
         Long orderId,
         String transactionKey,

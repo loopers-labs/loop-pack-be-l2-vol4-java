@@ -13,4 +13,10 @@ public interface PaymentV1ApiSpec {
         description = "주문에 대해 PG 카드 결제를 요청합니다. 응답은 접수(PENDING)이며, 최종 결과는 콜백/상태조회로 확정됩니다."
     )
     ApiResponse<PaymentV1Dto.PaymentResponse> requestPayment(AuthHeaders auth, PaymentV1Dto.PaymentRequest request);
+
+    @Operation(
+        summary = "PG 결제 콜백",
+        description = "PG 가 결제 처리 결과(SUCCESS/FAILED)를 통보하는 콜백 엔드포인트입니다. (무인증, 멱등)"
+    )
+    ApiResponse<Object> handleCallback(PaymentV1Dto.PgCallbackRequest request);
 }

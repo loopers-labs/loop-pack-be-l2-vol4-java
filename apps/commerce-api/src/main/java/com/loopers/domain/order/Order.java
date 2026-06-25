@@ -80,6 +80,24 @@ public class Order extends BaseEntity {
         return this.userId.equals(userId);
     }
 
+    /** 결제 성공 확정. PENDING 에서만 가능(터미널 흡수). */
+    public void markPaid() {
+        requirePending();
+        this.status = OrderStatus.PAID;
+    }
+
+    /** 결제 실패 확정. PENDING 에서만 가능(터미널 흡수). */
+    public void markPaymentFailed() {
+        requirePending();
+        this.status = OrderStatus.FAILED;
+    }
+
+    private void requirePending() {
+        if (status != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 처리할 수 없는 주문 상태입니다. (status=" + status + ")");
+        }
+    }
+
     public Long getUserId() {
         return userId;
     }

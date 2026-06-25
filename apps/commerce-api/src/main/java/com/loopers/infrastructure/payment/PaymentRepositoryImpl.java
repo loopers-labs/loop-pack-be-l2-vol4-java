@@ -26,6 +26,11 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByTransactionKey(String transactionKey) {
+        return paymentJpaRepository.findByTransactionKey(transactionKey);
+    }
+
+    @Override
     public Optional<Payment> findActiveByOrderId(Long orderId) {
         // 활성 = PENDING 또는 SUCCESS (한 주문에 활성 결제는 하나)
         return paymentJpaRepository.findFirstByOrderIdAndStatusInOrderByIdDesc(

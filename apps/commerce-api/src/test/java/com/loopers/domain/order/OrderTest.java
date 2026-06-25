@@ -165,4 +165,55 @@ class OrderTest {
             assertThrows(UnsupportedOperationException.class, () -> order.getItems().clear());
         }
     }
+
+    @DisplayName("결제 결과로 상태를 전이할 때, ")
+    @Nested
+    class StatusTransition {
+
+        private Order pendingOrder() {
+            return new Order(USER_ID, List.of(item(10L, 1000L, 1)));
+        }
+
+        @DisplayName("PENDING 에서 결제 성공 처리하면, PAID 가 된다.")
+        @Test
+        void markPaid_fromPending() {
+            // arrange
+            Order order = pendingOrder();
+
+            // act
+            order.markPaid();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("PENDING 에서 결제 실패 처리하면, FAILED 가 된다.")
+        @Test
+        void markPaymentFailed_fromPending() {
+            // arrange
+            Order order = pendingOrder();
+
+            // act
+            order.markPaymentFailed();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        }
+
+        @DisplayName("이미 터미널(PAID) 상태면, 재전이 시 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenAlreadyTerminal() {
+            // arrange
+            Order order = pendingOrder();
+            order.markPaid();
+
+            // act + assert
+            assertAll(
+                () -> assertThat(assertThrows(CoreException.class, order::markPaid).getErrorType())
+                    .isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(assertThrows(CoreException.class, order::markPaymentFailed).getErrorType())
+                    .isEqualTo(ErrorType.BAD_REQUEST)
+            );
+        }
+    }
 }

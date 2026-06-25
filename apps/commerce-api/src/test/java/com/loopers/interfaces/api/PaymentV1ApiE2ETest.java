@@ -4,6 +4,7 @@ import com.loopers.application.payment.PgDto;
 import com.loopers.application.payment.PgPaymentClient;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.Payment;
 import com.loopers.domain.payment.PaymentStatus;
@@ -118,6 +119,20 @@ class PaymentV1ApiE2ETest {
             orderId, List.of(PaymentStatus.PENDING, PaymentStatus.SUCCESS)).orElseThrow();
     }
 
+    private void persistPendingPayment(Long orderId, String transactionKey) {
+        Payment payment = Payment.pending(userId, orderId, Money.of(5000L), CardType.SAMSUNG);
+        payment.assignTransactionKey(transactionKey);
+        paymentJpaRepository.save(payment);
+    }
+
+    private ResponseEntity<ApiResponse<Object>> postCallback(String transactionKey, String status, String reason) {
+        PaymentV1Dto.PgCallbackRequest body = new PaymentV1Dto.PgCallbackRequest(
+            transactionKey, "000001", "SAMSUNG", "1234-5678-9814-1451", 5000L, status, reason);
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(
+            ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(body), responseType);
+    }
+
     @DisplayName("POST /api/v1/payments")
     @Nested
     class RequestPayment {
@@ -169,6 +184,72 @@ class PaymentV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("POST /api/v1/payments/callback (PG 콜백)")
+    @Nested
+    class Callback {
+
+        @DisplayName("SUCCESS 콜백이면, 결제 SUCCESS·주문 PAID 로 반영된다.")
+        @Test
+        void successCallback() {
+            // arrange
+            Long orderId = persistPendingOrder(5000L);
+            persistPendingPayment(orderId, "TKEY-CB-1");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = postCallback("TKEY-CB-1", "SUCCESS", null);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(paymentJpaRepository.findByTransactionKey("TKEY-CB-1").orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("FAILED 콜백이면, 결제·주문 FAILED 로 반영된다.")
+        @Test
+        void failedCallback() {
+            // arrange
+            Long orderId = persistPendingOrder(5000L);
+            persistPendingPayment(orderId, "TKEY-CB-2");
+
+            // act
+            ResponseEntity<ApiResponse<Object>> response = postCallback("TKEY-CB-2", "FAILED", "한도 초과");
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(paymentJpaRepository.findByTransactionKey("TKEY-CB-2").orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.FAILED)
+            );
+        }
+
+        @DisplayName("중복 콜백이 와도, 상태는 한 번만 확정된다. (멱등)")
+        @Test
+        void duplicateCallback_isIdempotent() {
+            // arrange
+            Long orderId = persistPendingOrder(5000L);
+            persistPendingPayment(orderId, "TKEY-CB-3");
+
+            // act
+            postCallback("TKEY-CB-3", "SUCCESS", null);
+            ResponseEntity<ApiResponse<Object>> second = postCallback("TKEY-CB-3", "FAILED", "뒤늦은 실패");
+
+            // assert — 두 번째(상충) 콜백은 무시되고 SUCCESS/PAID 유지
+            assertAll(
+                () -> assertThat(second.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(paymentJpaRepository.findByTransactionKey("TKEY-CB-3").orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAID)
+            );
         }
     }
 }

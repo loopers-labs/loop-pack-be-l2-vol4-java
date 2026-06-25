@@ -94,4 +94,36 @@ class UserCouponTest {
             () -> assertThat(used.statusFor(NOW.plusDays(31))).isEqualTo(UserCouponStatus.USED)
         );
     }
+
+    @DisplayName("결제 실패로 복원 시, ")
+    @Nested
+    class Restore {
+
+        @DisplayName("USED 쿠폰을 복원하면 다시 AVAILABLE 이 된다.")
+        @Test
+        void restore_fromUsed() {
+            // arrange
+            UserCoupon userCoupon = coupon();
+            userCoupon.use(OWNER, NOW);
+
+            // act
+            userCoupon.restore();
+
+            // assert
+            assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE);
+        }
+
+        @DisplayName("이미 AVAILABLE 이면 멱등하게 AVAILABLE 을 유지한다.")
+        @Test
+        void restore_isIdempotent() {
+            // arrange
+            UserCoupon userCoupon = coupon();
+
+            // act
+            userCoupon.restore();
+
+            // assert
+            assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE);
+        }
+    }
 }

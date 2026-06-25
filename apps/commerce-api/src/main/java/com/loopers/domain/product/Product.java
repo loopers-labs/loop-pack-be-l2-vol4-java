@@ -92,6 +92,14 @@ public class Product extends BaseEntity {
         this.stock = this.stock.minus(quantity);
     }
 
+    /** 재고 복원 (결제 실패 보상). */
+    public void increaseStock(Quantity quantity) {
+        if (quantity == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복원 수량은 필수입니다.");
+        }
+        this.stock = Quantity.of(this.stock.getValue() + quantity.getValue());
+    }
+
     public void update(String newName, String newDescription, Long newPrice, Integer newStock) {
         if (newName == null || newName.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.");
