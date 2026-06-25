@@ -77,7 +77,7 @@ public class Order extends BaseEntity {
         this.totalAmount = items.stream().map(OrderItem::subtotal).reduce(Money.ZERO, Money::plus);
         this.discountAmount = Money.ZERO;
         this.finalAmount = this.totalAmount;
-        this.status = OrderStatus.PENDING;
+        this.status = OrderStatus.PENDING_PAYMENT;
         this.orderedAt = ZonedDateTime.now();
     }
 
@@ -97,12 +97,22 @@ public class Order extends BaseEntity {
         this.finalAmount = Money.of(totalAmount.value() - effectiveDiscount.value());
     }
 
-    public void markFailed() {
-        this.status = OrderStatus.FAILED;
+    public void markPaid() {
+        if (!isPayable()) {
+            return;
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void markPaymentFailed() {
+        if (!isPayable()) {
+            return;
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
     }
 
     public boolean isPayable() {
-        return status == OrderStatus.PENDING;
+        return status == OrderStatus.PENDING_PAYMENT;
     }
 
     private void validate(List<OrderItem> items) {

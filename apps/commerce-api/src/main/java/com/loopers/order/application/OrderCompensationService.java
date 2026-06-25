@@ -50,7 +50,7 @@ public class OrderCompensationService {
             couponUsageService.restore(order.getUserCouponId());
         }
 
-        order.markFailed();
-        log.info("보상 완료 orderId={} status=FAILED", orderId);
+        order.markPaymentFailed();
+        log.info("보상 완료 orderId={} status=PAYMENT_FAILED", orderId);
     }
 }

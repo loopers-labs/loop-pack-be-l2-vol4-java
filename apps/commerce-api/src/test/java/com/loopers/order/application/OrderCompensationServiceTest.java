@@ -64,7 +64,7 @@ class OrderCompensationServiceTest {
 
         assertAll(
                 () -> assertThat(stock.getQuantity()).isEqualTo(50),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED)
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
         );
         verify(couponUsageService).restore(50L);
     }
@@ -83,7 +83,7 @@ class OrderCompensationServiceTest {
 
         assertAll(
                 () -> assertThat(stock.getQuantity()).isEqualTo(50),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED)
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
         );
         verify(couponUsageService, never()).restore(any());
     }

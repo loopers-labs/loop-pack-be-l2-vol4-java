@@ -34,7 +34,7 @@ class PlaceOrderFacadeTest {
 
     private OrderResult.Detail pendingOrder() {
         return new OrderResult.Detail(
-                ORDER_ID, ORDER_NUMBER, OrderStatus.PENDING,
+                ORDER_ID, ORDER_NUMBER, OrderStatus.PENDING_PAYMENT,
                 58_000L, 3_000L, 55_000L, 50L,
                 ZonedDateTime.now(),
                 new OrderResult.Recipient("김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동"),
