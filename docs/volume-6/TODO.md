@@ -99,7 +99,7 @@ flowchart TD
 - [X] **`PaymentGateway` 포트 인터페이스**(도메인) — 결제 요청. 멀티 PG를 염두에 둔 추상화 경계 (PAY-1, *거래 단건/주문별 조회는 Stage 6 폴링에서 추가*)
 - [X] **`PaymentGateway` FeignClient 구현**(infra 어댑터) — `X-USER-ID` 헤더 주입. **타임아웃·재시도·서킷 없음(의도적)** (PAY-1)
 - [X] **결제 요청 API** `POST /api/v1/payments`(Controller/Dto/Facade) — `orderId`+`cardType`+`cardNo` 입력 → 주문/금액 확인 → PG 접수 요청 → `transactionKey` 매핑·`PENDING` 저장 → 접수 응답 (PAY-1)
-- [ ] **콜백 엔드포인트** `POST`(8080, PG가 `callbackUrl`로 통보) — 결과 수신 → 결제 상태 전이 + 주문 상태 전이(`PAID`/`PAYMENT_FAILED`) (PAY-2)
+- [X] **콜백 엔드포인트** `POST`(8080, PG가 `callbackUrl`로 통보) — 결과 수신 → 결제 상태 전이 + 주문 상태 전이(`PAID`/`PAYMENT_FAILED`) (PAY-2)
 - [ ] pg-simulator 실행 + `.http`로 happy path 수동 검증
 
 **의도적 결함(이후 단계에서 제거):** 타임아웃 X · 재시도 X · 서킷 X · fallback X · 폴링 X.
