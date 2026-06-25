@@ -1,8 +1,6 @@
 package com.loopers.interfaces.api.coupon;
 
-import com.loopers.application.coupon.CouponTemplateService;
-import com.loopers.application.coupon.UserCouponService;
-import com.loopers.domain.coupon.CouponTemplateModel;
+import com.loopers.application.coupon.CouponFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,16 +12,15 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 public class CouponAdminController {
 
-    private final CouponTemplateService couponTemplateService;
-    private final UserCouponService userCouponService;
+    private final CouponFacade couponFacade;
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api-admin/v1/coupons")
     public ApiResponse<CouponDto.TemplateResponse> createTemplate(
         @Valid @RequestBody CouponDto.TemplateCreateRequest request
     ) {
-        var template = couponTemplateService.create(
-            new CouponTemplateModel(request.name(), request.type(), request.value(), request.minOrderAmount(), request.expiredAt())
+        var template = couponFacade.createTemplate(
+            request.name(), request.type(), request.value(), request.minOrderAmount(), request.expiredAt()
         );
         return ApiResponse.success(CouponDto.TemplateResponse.from(template));
     }
@@ -33,14 +30,14 @@ public class CouponAdminController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        var result = couponTemplateService.getAll(PageRequest.of(page, size));
+        var result = couponFacade.getTemplates(PageRequest.of(page, size));
         var templates = result.getContent().stream().map(CouponDto.TemplateResponse::from).toList();
         return ApiResponse.success(new CouponDto.TemplatePageResponse(templates, result.getTotalElements(), result.getTotalPages()));
     }
 
     @GetMapping("/api-admin/v1/coupons/{templateId}")
     public ApiResponse<CouponDto.TemplateResponse> getTemplate(@PathVariable Long templateId) {
-        return ApiResponse.success(CouponDto.TemplateResponse.from(couponTemplateService.getById(templateId)));
+        return ApiResponse.success(CouponDto.TemplateResponse.from(couponFacade.getTemplate(templateId)));
     }
 
     @PutMapping("/api-admin/v1/coupons/{templateId}")
@@ -48,7 +45,7 @@ public class CouponAdminController {
         @PathVariable Long templateId,
         @Valid @RequestBody CouponDto.TemplateUpdateRequest request
     ) {
-        var template = couponTemplateService.update(templateId, request.name(), request.isActive());
+        var template = couponFacade.updateTemplate(templateId, request.name(), request.isActive());
         return ApiResponse.success(CouponDto.TemplateResponse.from(template));
     }
 
@@ -58,7 +55,7 @@ public class CouponAdminController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        var result = userCouponService.getIssuances(templateId, PageRequest.of(page, size));
+        var result = couponFacade.getIssuances(templateId, PageRequest.of(page, size));
         var issuances = result.getContent().stream()
             .map(uc -> new CouponDto.IssuanceResponse(uc.getId(), uc.getMemberId()))
             .toList();
@@ -68,7 +65,7 @@ public class CouponAdminController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/api-admin/v1/coupons/{templateId}")
     public ApiResponse<Void> deleteTemplate(@PathVariable Long templateId) {
-        couponTemplateService.delete(templateId);
+        couponFacade.deleteTemplate(templateId);
         return ApiResponse.success(null);
     }
 }
