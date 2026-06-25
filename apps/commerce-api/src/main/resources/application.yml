@@ -29,6 +29,42 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# 외부 PG(pg-simulator, 포트 8082) 연동 설정 — commerce-api 가 8082 를 호출하는 클라이언트 설정
+pg-simulator:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 1s   # 연결 자체가 안 되는 경우 빠르게 끊어 스레드/커넥션 점유 방지
+  read-timeout: 2s      # 요청 지연 100~500ms 대비 여유. 처리 지연(1~5s)은 콜백이므로 여기서 안 기다림
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgPayment:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED      # 최근 '호출 수' 기준 집계
+        sliding-window-size: 20               # 최근 20건으로 실패율 계산
+        minimum-number-of-calls: 10           # 최소 10건 모이기 전엔 Open 안 함
+        failure-rate-threshold: 50            # PG 정상 실패율 50%(성공 50%) 넘으면 Open.
+                                              #      -> 정상 transient에는 Closed 유지 (Open이면 호출이 PG로 가지 않고 즉시 실패처리
+                                              #      -> fallback 으로 빠져서 10초간 유지
+                                              #      -> 10초뒤 일부인 3건만 호출 시켜보고 성공하면 Closed, 실패하면 다시 Open))
+        slow-call-rate-threshold: 50          # 느린 호출 비율 50% 초과 시 Open
+        slow-call-duration-threshold: 1s      # 1초 이상 응답은 느린 호출로 집계
+        wait-duration-in-open-state: 10s      # ← Open 유지 시간(10초 뒤 Half-Open 시도)
+        permitted-number-of-calls-in-half-open-state: 3    # Half-Open 때 3건만 통과시켜 회복 판단
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      pgPayment:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # 5xx(거래 미생성 보장)만 재시도. read timeout(ResourceAccessException)은
+        # PG 도달 후 거래 생성됐을 수 있어 제외 — 재시도 시 이중 결제 위험.
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+
 ---
 spring:
   config:

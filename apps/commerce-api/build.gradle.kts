@@ -16,6 +16,10 @@ dependencies {
     // security (password encoding)
     implementation("org.springframework.security:spring-security-crypto")
 
+    // resilience4j (CircuitBreaker / Retry / TimeLimiter)
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // openfeign querydsl
     implementation("io.github.openfeign.querydsl:querydsl-jpa:${project.properties["queryDslVersion"]}")
     annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["queryDslVersion"]}:jpa")
