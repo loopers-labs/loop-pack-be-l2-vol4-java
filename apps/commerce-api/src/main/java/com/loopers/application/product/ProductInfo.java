@@ -46,4 +46,20 @@ public record ProductInfo(
             product.getUpdatedAt()
         );
     }
+
+    public static ProductInfo of(ProductDetailCache detail, int stockQuantity) {
+        return new ProductInfo(
+            detail.id(),
+            detail.brandId(),
+            detail.name(),
+            detail.description(),
+            detail.price(),
+            detail.likeCount(),
+            detail.brandName(),
+            stockQuantity > 0,
+            stockQuantity,
+            detail.createdAt(),
+            detail.updatedAt()
+        );
+    }
 }

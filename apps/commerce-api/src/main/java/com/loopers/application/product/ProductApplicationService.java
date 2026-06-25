@@ -33,11 +33,15 @@ public class ProductApplicationService {
     private final LikeRepository likeRepository;
 
     @Transactional(readOnly = true)
-    public ProductInfo getProduct(Long productId) {
+    public ProductDetailCache getProductDetailForCache(Long productId) {
         Product product = productDomainService.getProduct(productId);
         Brand brand = brandDomainService.getBrand(product.getBrandId());
-        Stock stock = stockDomainService.getStock(productId);
-        return ProductInfo.of(product, brand.getName(), stock.getQuantity());
+        return ProductDetailCache.of(product, brand.getName());
+    }
+
+    @Transactional(readOnly = true)
+    public int getStockQuantity(Long productId) {
+        return stockDomainService.getStock(productId).getQuantity();
     }
 
     @Transactional(readOnly = true)

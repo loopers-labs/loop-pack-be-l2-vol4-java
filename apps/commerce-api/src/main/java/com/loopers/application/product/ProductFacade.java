@@ -10,13 +10,28 @@ import org.springframework.stereotype.Component;
 public class ProductFacade {
 
     private final ProductApplicationService productApplicationService;
+    private final ProductCacheRepository productCacheRepository;
+    private final ProductListCacheRepository productListCacheRepository;
 
     public ProductInfo getProduct(Long productId) {
-        return productApplicationService.getProduct(productId);
+        ProductDetailCache detail = productCacheRepository.find(productId)
+            .orElseGet(() -> {
+                ProductDetailCache loaded = productApplicationService.getProductDetailForCache(productId);
+                productCacheRepository.save(productId, loaded);
+                return loaded;
+            });
+        int stockQuantity = productApplicationService.getStockQuantity(productId);
+        return ProductInfo.of(detail, stockQuantity);
     }
 
     public Page<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
-        return productApplicationService.getProducts(brandId, ProductSort.from(sort), page, size);
+        return productListCacheRepository.find(brandId, sort, page, size)
+            .map(ProductListCache::toPage)
+            .orElseGet(() -> {
+                Page<ProductInfo> result = productApplicationService.getProducts(brandId, ProductSort.from(sort), page, size);
+                productListCacheRepository.save(brandId, sort, page, size, ProductListCache.from(result));
+                return result;
+            });
     }
 
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, int initialQuantity) {
@@ -26,9 +41,11 @@ public class ProductFacade {
 
     public void updateProduct(Long productId, String name, String description, Long price) {
         productApplicationService.updateProduct(productId, name, description, price);
+        productCacheRepository.evict(productId);
     }
 
     public void deleteProduct(Long productId) {
         productApplicationService.deleteProduct(productId);
+        productCacheRepository.evict(productId);
     }
 }

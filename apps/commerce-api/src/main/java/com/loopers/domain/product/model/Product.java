@@ -5,12 +5,15 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_brand_like", columnList = "brand_id, like_count")
+})
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 public class Product extends BaseEntity {
