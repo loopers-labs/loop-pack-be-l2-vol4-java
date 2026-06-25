@@ -76,6 +76,14 @@ public class OrderModel extends BaseEntity {
         this.totalAmount = originalAmount - discountAmount;
     }
 
+    public void confirm() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST,
+                "현재 상태(%s)에서는 결제 확정할 수 없습니다.".formatted(this.status));
+        }
+        this.status = OrderStatus.CONFIRMED;
+    }
+
     public List<OrderItemModel> getItems() {
         return Collections.unmodifiableList(items);
     }
