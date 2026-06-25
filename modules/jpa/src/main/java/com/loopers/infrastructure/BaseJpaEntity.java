@@ -1,8 +1,6 @@
 package com.loopers.infrastructure;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
@@ -19,8 +17,8 @@ import java.time.ZonedDateTime;
 public abstract class BaseJpaEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 60, nullable = false, updatable = false)
+    private String id;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private ZonedDateTime createdAt;
@@ -33,21 +31,27 @@ public abstract class BaseJpaEntity {
 
     protected BaseJpaEntity() {}
 
-    protected BaseJpaEntity(Long id, ZonedDateTime deletedAt) {
+    protected BaseJpaEntity(String id, ZonedDateTime deletedAt) {
         if (id != null) this.id = id;
         this.deletedAt = deletedAt;
     }
 
-    protected void setId(Long id) {
+    protected void setId(String id) {
         this.id = id;
     }
 
     protected void guard() {}
 
+    /** 엔티티별 3글자 도메인 코드를 제공한다. (USR, BRD, PRD, ...) */
+    protected abstract String idCode();
+
     @PrePersist
     private void prePersist() {
         guard();
 
+        if (this.id == null) {
+            this.id = EntityId.generate(idCode());
+        }
         ZonedDateTime now = ZonedDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;

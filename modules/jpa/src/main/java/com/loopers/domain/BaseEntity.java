@@ -10,7 +10,7 @@ import java.time.ZonedDateTime;
 @Getter
 public abstract class BaseEntity {
 
-    private Long id;
+    private String id;
 
     private ZonedDateTime createdAt;
 
@@ -46,7 +46,7 @@ public abstract class BaseEntity {
         return this.deletedAt != null;
     }
 
-    protected void reconstruct(Long id, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
+    protected void reconstruct(String id, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         this.id = id;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
