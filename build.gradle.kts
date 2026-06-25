@@ -52,6 +52,8 @@ subprojects {
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+        //apache httpclient5
+        implementation("org.apache.httpcomponents.client5:httpclient5:5.4.3")
         // Lombok
         implementation("org.projectlombok:lombok")
         annotationProcessor("org.projectlombok:lombok")
@@ -67,6 +69,11 @@ subprojects {
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
         testImplementation("org.testcontainers:testcontainers")
         testImplementation("org.testcontainers:junit-jupiter")
+
+
+
+
+
     }
 
     tasks.withType(Jar::class) { enabled = true }
@@ -103,6 +110,15 @@ subprojects {
             )
         }
     }
+}
+
+dependencies {
+    //circuitbreaker
+    implementation("org.apache.httpcomponents.client5:httpclient5:5.4.3")
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
+    implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+    implementation("org.springframework.boot:spring-boot-starter-web")
 }
 
 // module-container 는 task 를 실행하지 않도록 한다.

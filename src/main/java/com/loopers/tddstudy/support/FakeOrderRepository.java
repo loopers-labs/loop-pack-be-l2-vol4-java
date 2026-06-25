@@ -62,4 +62,13 @@ public class FakeOrderRepository implements OrderRepository {
             throw new RuntimeException("Order id 설정 실패", e);
         }
     }
+
+
+    @Override
+    public List<Order> findAllByStatus(String status) {
+        return store.values().stream()
+                .filter(order -> status.equals(order.getStatus()))
+                .toList();
+    }
+
 }

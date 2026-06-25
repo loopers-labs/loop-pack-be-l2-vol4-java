@@ -127,10 +127,13 @@ public class OrderService {
         String paymentResult = paymentGateway.requestPayment(order.getId(), order.getTotalAmount());
 
         // 6. 결제 결과 처리
-        if ("SUCCESS".equals(paymentResult)) {
-            order.markPaid();
+        if ("CIRCUIT_OPEN".equals(paymentResult)) {
+            // 회로 OPEN: 시도조차 못함 → 트랜잭션 롤백(재고 복구) 후 재시도 안내
+            throw new PaymentUnavailableException("서비스 이상으로 잠시 후 다시 시도해주세요.");
+        } else if ("PENDING".equals(paymentResult)) {
+            // 비동기 처리중 - PENDING 유지 (콜백/스케줄러가 확정)
         } else {
-            // 보상 트랜잭션: 재고 복구
+            // 일반 실패(거절/타임아웃): 재고 복구 + FAILED
             for (OrderItemRequest item : items) {
                 Product product = productMap.get(item.productId());
                 product.restoreStock(item.quantity());

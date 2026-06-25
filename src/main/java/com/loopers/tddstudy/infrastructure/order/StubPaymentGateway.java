@@ -2,8 +2,9 @@ package com.loopers.tddstudy.infrastructure.order;
 
 import com.loopers.tddstudy.domain.order.PaymentGateway;
 import org.springframework.stereotype.Component;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 
-@Component
+
 public class StubPaymentGateway implements PaymentGateway {
 
     @Override

@@ -6,6 +6,7 @@ import com.loopers.tddstudy.domain.product.Product;
 import com.loopers.tddstudy.domain.product.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ public class LikeService {
         this.productRepository = productRepository;
     }
 
+    @CacheEvict(cacheNames = {"product", "products"}, allEntries = true)
     public void addLike(Long userId, Long productId) {
         Product product = productRepository.findByIdWithLock(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
@@ -35,7 +37,7 @@ public class LikeService {
         product.increaseLikeCount();
         productRepository.save(product);
     }
-
+    @CacheEvict(cacheNames = {"product", "products"}, allEntries = true)
     public void cancelLike(Long userId, Long productId) {
         // 멱등: 좋아요하지 않은 경우 아무 변경 없음
         likeRepository.findByUserIdAndProductId(userId, productId).ifPresent(like -> {
