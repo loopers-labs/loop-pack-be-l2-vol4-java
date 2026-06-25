@@ -1,8 +1,6 @@
 package com.loopers.interfaces.api.admin;
 
 import com.loopers.application.order.OrderFacade;
-import com.loopers.application.order.OrderInfo;
-import com.loopers.application.order.ReconcileResult;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.order.OrderV1Dto;
@@ -39,17 +37,5 @@ public class AdminOrderV1Controller {
             .map(OrderV1Dto.OrderResponse::from)
             .toList();
         return ApiResponse.success(responses);
-    }
-
-    /**
-     * PENDING 주문 정리(reconcile) 트리거 (운영/배치용). PG 응답 타임아웃으로 PENDING에 남은 주문을
-     * PG에 재조회해 PAID/FAILED로 확정한다. 한 회차에 size건씩 처리하며, 결과 집계를 반환한다.
-     */
-    @PostMapping("/reconcile")
-    public ApiResponse<ReconcileResult> reconcile(
-        @RequestParam(value = "page", defaultValue = "0") int page,
-        @RequestParam(value = "size", defaultValue = "100") int size
-    ) {
-        return ApiResponse.success(orderFacade.reconcilePending(page, size));
     }
 }

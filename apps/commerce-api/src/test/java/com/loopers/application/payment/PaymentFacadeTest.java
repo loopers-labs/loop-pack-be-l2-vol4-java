@@ -37,7 +37,9 @@ class PaymentFacadeTest {
     private final OrderService orderService = mock(OrderService.class);
     private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
     private final PgClient pgClient = mock(PgClient.class);
-    private final PaymentFacade facade = new PaymentFacade(userFacade, orderService, paymentRepository, pgClient);
+    private final PaymentConfirmer paymentConfirmer = mock(PaymentConfirmer.class);
+    private final PaymentFacade facade =
+            new PaymentFacade(userFacade, orderService, paymentRepository, pgClient, paymentConfirmer);
 
     private static final String RAW_CARD = "1234-5678-9814-1451";
 
@@ -151,76 +153,119 @@ class PaymentFacadeTest {
         verify(pgClient, never()).requestPayment(any());
     }
 
-    private PaymentModel pendingPaymentFor(long orderId) {
+    private PaymentModel pendingPaymentWithKey(long orderId, String transactionKey) {
         PaymentModel payment = new PaymentModel(orderId, 1L, CardType.SAMSUNG, RAW_CARD, 5000L); // PENDING
-        payment.assignTransactionKey("20260623:TR:abc123");
+        payment.assignTransactionKey(transactionKey);
         return payment;
     }
 
+    // ── §3.4 콜백: 확정 단위(PaymentConfirmer)로 위임 ──────────────────────────────
+    // 실제 확정 로직(비관락·멱등·주문 cascade)은 PaymentConfirmerTest에서 검증한다. 여기서는 위임만 확인.
+
     @Test
-    @DisplayName("콜백 SUCCESS: 결제를 SUCCESS로 확정하고 주문을 markPaid 한다")
-    void given_successCallback_when_handle_then_marksPaid() {
-        PaymentModel payment = pendingPaymentFor(10L);
-        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
-        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    @DisplayName("콜백 처리: PaymentConfirmer.confirm에 위임하고 그 결과를 반환한다")
+    void given_callback_when_handle_then_delegatesToConfirmer() {
+        PaymentModel confirmed = pendingPaymentWithKey(10L, "20260623:TR:abc123");
+        confirmed.markSuccess();
+        when(paymentConfirmer.confirm("20260623:TR:abc123", PaymentStatus.SUCCESS, null)).thenReturn(confirmed);
 
         PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
 
         assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
-        verify(orderService).markPaid(10L);
-        verify(orderService, never()).markFailed(any(), any());
+        verify(paymentConfirmer).confirm("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+    }
+
+    // ── §3.5 reconcile: PENDING 결제를 PG 진실원천으로 재확인해 확정 ───────────────────
+
+    private PgTransaction pgTx(String key, PaymentStatus status, String reason) {
+        return new PgTransaction(key, status, reason);
     }
 
     @Test
-    @DisplayName("콜백 FAILED: 결제를 FAILED로 확정하고 주문을 markFailed(원복) 한다")
-    void given_failedCallback_when_handle_then_marksFailed() {
-        PaymentModel payment = pendingPaymentFor(10L);
-        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
-        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    @DisplayName("reconcile: PG가 SUCCESS면 confirm으로 확정하고 paid로 집계한다")
+    void given_pendingPayment_when_reconcileWithPgSuccess_then_paid() {
+        PaymentModel pending = pendingPaymentWithKey(10L, "TX-1");
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(pending));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.SUCCESS, null)));
+        PaymentModel confirmed = pendingPaymentWithKey(10L, "TX-1");
+        confirmed.markSuccess();
+        when(paymentConfirmer.confirm("TX-1", PaymentStatus.SUCCESS, null)).thenReturn(confirmed);
 
-        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.FAILED, "한도 초과");
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
 
-        assertThat(info.status()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(info.reason()).isEqualTo("한도 초과");
-        verify(orderService).markFailed(10L, "한도 초과");
-        verify(orderService, never()).markPaid(any());
+        assertThat(result.scanned()).isEqualTo(1);
+        assertThat(result.paid()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+        verify(paymentConfirmer).confirm("TX-1", PaymentStatus.SUCCESS, null);
     }
 
     @Test
-    @DisplayName("중복 콜백(이미 SUCCESS): 멱등 — 주문을 다시 확정하지 않는다")
-    void given_duplicateCallback_when_handle_then_idempotentSkip() {
-        PaymentModel payment = pendingPaymentFor(10L);
-        payment.markSuccess(); // 이미 확정된 상태
-        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
+    @DisplayName("reconcile: PG가 FAILED면 confirm으로 실패 확정하고 failed로 집계한다")
+    void given_pendingPayment_when_reconcileWithPgFailed_then_failed() {
+        PaymentModel pending = pendingPaymentWithKey(10L, "TX-1");
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(pending));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.FAILED, "한도 초과")));
+        PaymentModel confirmed = pendingPaymentWithKey(10L, "TX-1");
+        confirmed.markFailed("한도 초과");
+        when(paymentConfirmer.confirm("TX-1", PaymentStatus.FAILED, "한도 초과")).thenReturn(confirmed);
 
-        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
 
-        assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
-        verify(orderService, never()).markPaid(any());
-        verify(paymentRepository, never()).save(any());
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.paid()).isZero();
     }
 
     @Test
-    @DisplayName("이미 확정된 주문이면 markPaid CONFLICT를 멱등 skip 한다")
-    void given_orderAlreadyConfirmed_when_successCallback_then_skipsConflict() {
-        PaymentModel payment = pendingPaymentFor(10L);
-        when(paymentRepository.findByTransactionKeyForUpdate("20260623:TR:abc123")).thenReturn(java.util.Optional.of(payment));
-        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(orderService.markPaid(10L)).thenThrow(new CoreException(ErrorType.CONFLICT, "이미 확정"));
+    @DisplayName("reconcile: PG도 아직 PENDING이면 확정하지 않고 stillPending으로 미룬다")
+    void given_pendingPayment_when_pgStillPending_then_stillPending() {
+        PaymentModel pending = pendingPaymentWithKey(10L, "TX-1");
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(pending));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.PENDING, null)));
 
-        PaymentInfo info = facade.handleCallback("20260623:TR:abc123", PaymentStatus.SUCCESS, null);
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
 
-        // 결제는 SUCCESS로 확정되고, 주문 CONFLICT는 삼켜진다(예외 전파 없음).
-        assertThat(info.status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(result.stillPending()).isEqualTo(1);
+        verify(paymentConfirmer, never()).confirm(any(), any(), any());
     }
 
     @Test
-    @DisplayName("알 수 없는 transactionKey 콜백은 NOT_FOUND")
-    void given_unknownKey_when_handle_then_notFound() {
-        when(paymentRepository.findByTransactionKeyForUpdate("nope")).thenReturn(java.util.Optional.empty());
+    @DisplayName("reconcile: PG에 해당 거래가 없으면 stillPending으로 미룬다")
+    void given_pendingPayment_when_pgHasNoMatchingTx_then_stillPending() {
+        PaymentModel pending = pendingPaymentWithKey(10L, "TX-1");
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(pending));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> facade.handleCallback("nope", PaymentStatus.SUCCESS, null))
-                .isInstanceOf(CoreException.class)
-                .extracting("errorType").isEqualTo(ErrorType.NOT_FOUND);
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.stillPending()).isEqualTo(1);
+        verify(paymentConfirmer, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reconcile: 거래키 없는 고아 PENDING은 PG 조회 없이 skip 한다")
+    void given_orphanPendingWithoutKey_when_reconcile_then_skipped() {
+        PaymentModel orphan = new PaymentModel(10L, 1L, CardType.SAMSUNG, RAW_CARD, 5000L); // 거래키 미발급
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(orphan));
+
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.skipped()).isEqualTo(1);
+        verify(pgClient, never()).findTransactionsByOrder(any());
+        verify(paymentConfirmer, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reconcile: 확정 중 다른 경로가 먼저 확정해 CONFLICT면 skip으로 집계한다")
+    void given_concurrentConfirm_when_reconcile_then_skipped() {
+        PaymentModel pending = pendingPaymentWithKey(10L, "TX-1");
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(pending));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.SUCCESS, null)));
+        when(paymentConfirmer.confirm("TX-1", PaymentStatus.SUCCESS, null))
+                .thenThrow(new CoreException(ErrorType.CONFLICT, "이미 확정"));
+
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.paid()).isZero();
     }
 }

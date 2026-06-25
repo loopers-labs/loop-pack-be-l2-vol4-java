@@ -15,7 +15,6 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -36,6 +35,7 @@ public class PaymentFacade {
     private final OrderService orderService;
     private final PaymentRepository paymentRepository;
     private final PgClient pgClient;
+    private final PaymentConfirmer paymentConfirmer;
 
     public PaymentInfo pay(String loginId, String loginPw, Long orderId, CardType cardType, String cardNo) {
         Long userId = userFacade.authenticate(loginId, loginPw);
@@ -80,53 +80,54 @@ public class PaymentFacade {
 
     /**
      * PG 콜백 수신 처리 (03 §3.4). pg-simulator가 비동기 처리(1~5초) 후 callbackUrl로 통지하는
-     * {@code TransactionInfo}를 받아 결제와 주문을 최종 확정한다.
-     * <p>
-     * - 멱등: 이미 확정(SUCCESS/FAILED)된 결제는 중복 콜백이므로 재반영하지 않고 현재 상태를 반환한다.
-     * - 결제 행은 비관락(findByTransactionKeyForUpdate)으로 잠가 동시 확정(콜백/Reconcile)을 직렬화한다.
-     * - 주문 확정(markPaid/markFailed)이 이미 다른 경로로 끝났으면 CONFLICT를 멱등 skip 한다.
+     * {@code TransactionInfo}를 받아 결제와 주문을 최종 확정한다. 확정 자체는 콜백·Reconcile이 공유하는
+     * {@link PaymentConfirmer#confirm}에 위임한다(비관락 + 멱등 + 주문 cascade를 한 트랜잭션으로).
      */
-    @Transactional
     public PaymentInfo handleCallback(String transactionKey, PaymentStatus resultStatus, String reason) {
-        PaymentModel payment = paymentRepository.findByTransactionKeyForUpdate(transactionKey)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
-                        "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
-
-        // 이미 확정된 결제 → 중복 콜백. 재반영 없이 현재 상태 반환(멱등).
-        if (payment.getStatus() != PaymentStatus.PENDING) {
-            return PaymentInfo.from(payment);
-        }
-
-        if (resultStatus == PaymentStatus.SUCCESS) {
-            payment.markSuccess();
-            PaymentModel saved = paymentRepository.save(payment);
-            confirmOrder(payment.getOrderId(), true, null);
-            return PaymentInfo.from(saved);
-        }
-        if (resultStatus == PaymentStatus.FAILED) {
-            payment.markFailed(reason);
-            PaymentModel saved = paymentRepository.save(payment);
-            confirmOrder(payment.getOrderId(), false, reason);
-            return PaymentInfo.from(saved);
-        }
-        // PENDING 상태 콜백(비정상) — 확정 정보가 없으므로 그대로 둔다.
-        return PaymentInfo.from(payment);
+        return PaymentInfo.from(paymentConfirmer.confirm(transactionKey, resultStatus, reason));
     }
 
-    /** 주문 확정 연계. 이미 다른 경로(Reconcile 등)로 확정된 주문은 CONFLICT를 멱등 skip 한다. */
-    private void confirmOrder(Long orderId, boolean success, String reason) {
-        try {
-            if (success) {
-                orderService.markPaid(orderId);
-            } else {
-                orderService.markFailed(orderId, reason);
+    /**
+     * PENDING 결제 정리(reconcile) (03 §3.5). 콜백 유실로 PENDING에 남은 결제를 PG 진실원천
+     * ({@code findTransactionsByOrder})으로 재확인해 최종 확정한다. 콜백이 영구 유실돼도 결제·주문이
+     * 끝내 확정되도록 하는 안전망이다.
+     * <p>
+     * 각 결제 확정은 {@link PaymentConfirmer#confirm}의 독립 트랜잭션으로 처리되며(콜백과 동일 경로),
+     * 한 건 실패가 배치 전체를 막지 않는다. PG 조회/확정은 DB 트랜잭션 밖에서 이뤄진다.
+     * 트리거는 운영/배치(AdminPaymentV1Controller) — 별도 스케줄러는 두지 않는다.
+     */
+    public PaymentReconcileResult reconcilePending(int page, int size) {
+        List<PaymentModel> pendings = paymentRepository.findByStatus(PaymentStatus.PENDING, page, size);
+        int paid = 0, failed = 0, stillPending = 0, skipped = 0;
+        for (PaymentModel payment : pendings) {
+            String transactionKey = payment.getTransactionKey();
+            // 거래키 없는 PENDING = PG 요청조차 못 한 고아(pay()가 이미 FAILED로 정리). 방어적 skip.
+            if (transactionKey == null) {
+                skipped++;
+                continue;
             }
-        } catch (CoreException e) {
-            if (e.getErrorType() != ErrorType.CONFLICT) {
-                throw e;
+            // PG 진실원천에서 이 거래의 최종 상태를 확인한다(DB tx 밖).
+            PgTransaction tx = pgClient.findTransactionsByOrder(payment.getOrderId()).stream()
+                    .filter(t -> transactionKey.equals(t.transactionKey()))
+                    .findFirst()
+                    .orElse(null);
+            if (tx == null || tx.isPending()) {
+                stillPending++;   // PG도 미확정 → 다음 회차로 미룸
+                continue;
             }
-            // 이미 확정된 주문 — 멱등 skip
+            try {
+                PaymentModel confirmed = paymentConfirmer.confirm(transactionKey, tx.status(), tx.reason());
+                switch (confirmed.getStatus()) {
+                    case SUCCESS -> paid++;
+                    case FAILED -> failed++;
+                    default -> stillPending++;
+                }
+            } catch (CoreException e) {
+                // 조회~확정 사이 다른 경로(콜백/동시 reconcile)가 먼저 확정 등 → 건너뜀(멱등)
+                skipped++;
+            }
         }
+        return new PaymentReconcileResult(pendings.size(), paid, failed, stillPending, skipped);
     }
 
     /** (orderId)에 진행 중(PENDING) 또는 이미 성공(SUCCESS)한 결제가 있으면 중복 결제 차단. */
