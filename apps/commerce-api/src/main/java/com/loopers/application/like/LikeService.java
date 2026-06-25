@@ -2,9 +2,6 @@ package com.loopers.application.like;
 
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
-import com.loopers.domain.like.LikeSort;
-import com.loopers.domain.product.ProductLikeViewModel;
-import com.loopers.domain.product.ProductLikeViewRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -13,10 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -24,11 +18,10 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
-    private final ProductLikeViewRepository productLikeViewRepository;
 
     @Transactional
     public void like(Long memberId, Long productId) {
-        productRepository.findById(productId)
+        ProductModel product = productRepository.findByIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품을 찾을 수 없습니다."));
 
         boolean alreadyLiked = likeRepository.findByMemberIdAndProductId(memberId, productId).isPresent();
@@ -37,9 +30,7 @@ public class LikeService {
         }
 
         likeRepository.save(new LikeModel(memberId, productId));
-        ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
-        view.increment();
+        product.increaseLikeCount();
     }
 
     @Transactional
@@ -47,13 +38,11 @@ public class LikeService {
         LikeModel like = likeRepository.findByMemberIdAndProductId(memberId, productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 정보를 찾을 수 없습니다."));
 
-        productRepository.findById(productId)
+        ProductModel product = productRepository.findByIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품을 찾을 수 없습니다."));
 
         likeRepository.delete(like);
-        ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
-        view.decrement();
+        product.decreaseLikeCount();
     }
 
     @Transactional(readOnly = true)
@@ -62,29 +51,13 @@ public class LikeService {
     }
 
     @Transactional(readOnly = true)
-    public List<LikeInfo> getLikeInfosByMemberId(Long memberId, LikeSort sort) {
-        List<LikeModel> likes = likeRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId);
-        if (likes.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> productIds = likes.stream().map(LikeModel::getProductId).toList();
-        Map<Long, ProductModel> productMap = productRepository.findAllByIds(productIds)
-            .stream()
-            .collect(Collectors.toMap(ProductModel::getId, p -> p));
-
-        List<LikeInfo> infos = likes.stream()
-            .filter(like -> productMap.containsKey(like.getProductId()))
-            .map(like -> LikeInfo.of(like, productMap.get(like.getProductId())))
-            .collect(Collectors.toList());
-
-        if (sort == LikeSort.LIKES_DESC) {
-            Map<Long, Integer> likeCountMap = productLikeViewRepository.findAllByProductIdIn(productIds)
-                .stream()
-                .collect(Collectors.toMap(ProductLikeViewModel::getProductId, ProductLikeViewModel::getLikeCount));
-            infos.sort(Comparator.comparingInt((LikeInfo info) -> likeCountMap.getOrDefault(info.productId(), 0)).reversed());
-        }
-
-        return infos;
+    public List<LikeInfo> getLikeInfosByMemberId(Long memberId) {
+        return likeRepository.findAllByMemberId(memberId).stream()
+            .map(like -> {
+                ProductModel product = productRepository.findById(like.getProductId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + like.getProductId() + "] 상품을 찾을 수 없습니다."));
+                return LikeInfo.of(like, product);
+            })
+            .toList();
     }
 }

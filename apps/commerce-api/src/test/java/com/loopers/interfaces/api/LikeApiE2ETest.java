@@ -1,11 +1,9 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.application.user.UserService;
-import com.loopers.domain.product.ProductLikeViewModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.product.ProductJpaRepository;
-import com.loopers.infrastructure.product.ProductLikeViewJpaRepository;
 import com.loopers.interfaces.api.like.LikeDto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -40,9 +38,6 @@ class LikeApiE2ETest {
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
-    private ProductLikeViewJpaRepository productLikeViewJpaRepository;
-
-    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     private UserModel savedUser;
@@ -56,7 +51,6 @@ class LikeApiE2ETest {
             LocalDate.of(1990, 1, 1), "user@example.com"
         ));
         savedProduct = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
-        productLikeViewJpaRepository.save(new ProductLikeViewModel(savedProduct.getId()));
 
         userHeaders = new HttpHeaders();
         userHeaders.set(LOGIN_ID_HEADER, "user01");

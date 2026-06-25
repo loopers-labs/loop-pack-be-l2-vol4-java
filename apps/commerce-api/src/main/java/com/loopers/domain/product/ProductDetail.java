@@ -6,6 +6,5 @@ public record ProductDetail(
     Long price,
     Long brandId,
     String brandName,
-    int likeCount,
-    int stockQuantity
+    int likeCount
 ) {}

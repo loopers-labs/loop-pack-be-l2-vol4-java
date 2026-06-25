@@ -22,6 +22,9 @@ public class ProductModel extends BaseEntity {
     @Column(name = "brand_id", nullable = false)
     private Long brandId;
 
+    @Column(name = "like_count", nullable = false)
+    private int likeCount = 0;
+
     protected ProductModel() {}
 
     public ProductModel(String name, Long price, Long brandId) {
@@ -40,6 +43,14 @@ public class ProductModel extends BaseEntity {
         this.price = price;
     }
 
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        this.likeCount--;
+    }
+
     public String getName() {
         return name;
     }
@@ -50,6 +61,10 @@ public class ProductModel extends BaseEntity {
 
     public Long getBrandId() {
         return brandId;
+    }
+
+    public int getLikeCount() {
+        return likeCount;
     }
 
     private void validateName(String name) {
