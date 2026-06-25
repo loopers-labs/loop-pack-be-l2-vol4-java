@@ -89,12 +89,11 @@ class LikeV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Object>> likeResponse = likeProduct(product.getId(), authHeaders());
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
 
             // assert
             assertAll(
                 () -> assertThat(likeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(detailResponse.getBody().data().likeCount()).isEqualTo(1)
+                () -> assertThat(likeService.countProductLikes(product.getId())).isEqualTo(1)
             );
         }
 
@@ -108,12 +107,11 @@ class LikeV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Object>> likeResponse = likeProduct(product.getId(), authHeaders());
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
 
             // assert
             assertAll(
                 () -> assertThat(likeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(detailResponse.getBody().data().likeCount()).isEqualTo(1)
+                () -> assertThat(likeService.countProductLikes(product.getId())).isEqualTo(1)
             );
         }
 
@@ -160,12 +158,11 @@ class LikeV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Object>> unlikeResponse = unlikeProduct(product.getId(), authHeaders());
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
 
             // assert
             assertAll(
                 () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(detailResponse.getBody().data().likeCount()).isZero()
+                () -> assertThat(likeService.countProductLikes(product.getId())).isZero()
             );
         }
 
@@ -178,12 +175,11 @@ class LikeV1ApiE2ETest {
 
             // act
             ResponseEntity<ApiResponse<Object>> unlikeResponse = unlikeProduct(product.getId(), authHeaders());
-            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> detailResponse = getProduct(product.getId());
 
             // assert
             assertAll(
                 () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
-                () -> assertThat(detailResponse.getBody().data().likeCount()).isZero()
+                () -> assertThat(likeService.countProductLikes(product.getId())).isZero()
             );
         }
 
