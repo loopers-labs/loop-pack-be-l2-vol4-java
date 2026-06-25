@@ -8,12 +8,10 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.application.product.ProductRepository;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductFacade.StockRequest;
-import com.loopers.application.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponIssue;
-import com.loopers.application.payment.PaymentRepository;
-import com.loopers.domain.payment.PaymentModel;
-import com.loopers.domain.payment.PaymentGateway;
-import com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult;
+import com.loopers.application.coupon.CouponRepository;
+import com.loopers.application.payment.PaymentFacade;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +33,7 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final ProductFacade productFacade;
     private final CouponRepository couponRepository;
-    private final PaymentRepository paymentRepository;
-    private final PaymentGateway paymentGateway;
+    private final PaymentFacade paymentFacade;
 
     @Transactional
     public Long createOrder(Long userId, OrderCreateRequest request) {
@@ -113,22 +110,19 @@ public class OrderFacade {
         }
         Long orderId = orderRepository.save(order).getId();
 
-        PaymentGatewayResult pgResult = null;
-        try {
-            pgResult = paymentGateway.requestPayment(orderId, totalPaymentAmount, request.paymentMethod());
-        } catch (Exception e) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인 요청 중 오류가 발생했습니다: " + e.getMessage());
-        }
+        Long paymentId = paymentFacade.processPayment(orderId, request.paymentMethod(), totalPaymentAmount);
+        PaymentStatus paymentStatus = paymentFacade.getPaymentStatus(paymentId);
 
-        PaymentModel payment = new PaymentModel(orderId, request.paymentMethod(), totalPaymentAmount, pgResult.transactionId(), pgResult.approvedAt());
-        paymentRepository.save(payment);
-        
-        order.complete();
-        orderRepository.save(order);
-        
-        if (couponIssue != null) {
-            couponIssue.markUsed();
-            couponRepository.saveIssue(couponIssue);
+        if (paymentStatus == PaymentStatus.APPROVED) {
+            order.complete();
+            orderRepository.save(order);
+            
+            if (couponIssue != null) {
+                couponIssue.markUsed();
+                couponRepository.saveIssue(couponIssue);
+            }
+        } else {
+            orderRepository.save(order);
         }
 
         return orderId;

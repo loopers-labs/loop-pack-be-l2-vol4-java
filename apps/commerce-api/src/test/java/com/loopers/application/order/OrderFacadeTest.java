@@ -52,10 +52,7 @@ class OrderFacadeTest {
     private CouponRepository couponRepository;
 
     @Mock
-    private PaymentRepository paymentRepository;
-
-    @Mock
-    private PaymentGateway paymentGateway;
+    private com.loopers.application.payment.PaymentFacade paymentFacade;
 
     @Test
     @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다.")
@@ -115,10 +112,9 @@ class OrderFacadeTest {
             return order;
         });
 
-        String transactionId = "tx_abc123";
-        LocalDateTime approvedAt = LocalDateTime.now();
-        given(paymentGateway.requestPayment(eq(100L), eq(new BigDecimal("360000")), eq(method)))
-                .willReturn(new PaymentGatewayResult(transactionId, approvedAt));
+        given(paymentFacade.processPayment(eq(100L), eq(method), eq(new BigDecimal("360000"))))
+                .willReturn(500L);
+        given(paymentFacade.getPaymentStatus(eq(500L))).willReturn(com.loopers.domain.payment.PaymentStatus.APPROVED);
 
         // when
         Long resultOrderId = orderFacade.checkout(userId, request);
@@ -126,8 +122,7 @@ class OrderFacadeTest {
         // then
         assertThat(resultOrderId).isEqualTo(100L);
         verify(productFacade).decreaseStocks(anyList());
-        verify(paymentGateway).requestPayment(eq(100L), eq(new BigDecimal("360000")), eq(method));
-        verify(paymentRepository).save(any(PaymentModel.class));
+        verify(paymentFacade).processPayment(eq(100L), eq(method), eq(new BigDecimal("360000")));
         verify(couponRepository).saveIssue(couponIssue);
     }
 }
