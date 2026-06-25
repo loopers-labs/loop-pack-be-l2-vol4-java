@@ -34,6 +34,6 @@ public interface OrderAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<OrderV1Dto.AdminOrderResponse> getOrder(
-            @Parameter(description = "주문 ID", required = true) Long orderId
+            @Parameter(description = "주문 ID", required = true) String orderId
     );
 }

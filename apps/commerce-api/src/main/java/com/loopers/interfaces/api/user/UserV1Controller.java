@@ -51,7 +51,7 @@ public class UserV1Controller implements UserV1ApiSpec {
 
     @GetMapping("/me/coupons")
     public ApiResponse<PageResult<CouponV1Dto.MyCouponResponse>> getMyCoupons(
-            @LoginUser Long userId,
+            @LoginUser String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

@@ -31,7 +31,7 @@ public interface PaymentV1ApiSpec {
     })
     CompletableFuture<ApiResponse<PaymentV1Dto.Response>> pay(
             PaymentV1Dto.PaymentRequest request,
-            @Parameter(hidden = true) Long userId
+            @Parameter(hidden = true) String userId
     );
 
     @Operation(summary = "결제 콜백 (PG 전용)",
@@ -54,7 +54,7 @@ public interface PaymentV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PaymentV1Dto.Response> getPayment(
-            @Parameter(description = "결제 ID", required = true) Long paymentId,
-            @Parameter(hidden = true) Long userId
+            @Parameter(description = "결제 ID", required = true) String paymentId,
+            @Parameter(hidden = true) String userId
     );
 }

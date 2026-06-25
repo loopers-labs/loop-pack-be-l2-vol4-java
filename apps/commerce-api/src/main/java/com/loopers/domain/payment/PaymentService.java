@@ -20,7 +20,7 @@ public class PaymentService {
 
     /** TX1: 주문 비관적 락 + 검증 + 중복 체크 + PENDING 저장 */
     @Transactional
-    public PaymentEntity prepare(Long userId, Long orderId, CardType cardType, String cardNo) {
+    public PaymentEntity prepare(String userId, String orderId, CardType cardType, String cardNo) {
         OrderEntity order = orderRepository.findByIdWithLock(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
         if (!order.isOwnedBy(userId)) {
@@ -37,7 +37,7 @@ public class PaymentService {
 
     /** TX2: transactionKey 저장 + PG 즉시 SUCCESS/FAILED 반영 */
     @Transactional
-    public void applyPgResponse(Long paymentId, PgTransactionResponse pgResponse) {
+    public void applyPgResponse(String paymentId, PgTransactionResponse pgResponse) {
         PaymentEntity payment = findPaymentOrThrow(paymentId);
         payment.registerTransactionKey(pgResponse.transactionKey());
         if (pgResponse.status() == PgTransactionStatus.SUCCESS) {
@@ -50,7 +50,7 @@ public class PaymentService {
 
     /** PG 요청 자체 실패 시 FAILED 확정 */
     @Transactional
-    public void markFailed(Long paymentId, String reason) {
+    public void markFailed(String paymentId, String reason) {
         PaymentEntity payment = findPaymentOrThrow(paymentId);
         payment.fail(reason);
         paymentRepository.save(payment);
@@ -78,11 +78,11 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public PaymentEntity getOrThrow(Long paymentId) {
+    public PaymentEntity getOrThrow(String paymentId) {
         return findPaymentOrThrow(paymentId);
     }
 
-    private PaymentEntity findPaymentOrThrow(Long paymentId) {
+    private PaymentEntity findPaymentOrThrow(String paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."));
     }

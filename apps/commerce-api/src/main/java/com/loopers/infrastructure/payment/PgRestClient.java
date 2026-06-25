@@ -9,6 +9,10 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,6 +21,8 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class PgRestClient implements PgClient {
+
+    private static final String USER_ID_HEADER = "X-USER-ID";
 
     private final RestTemplate pgRequestRestTemplate;
     private final RestTemplate pgQueryRestTemplate;
@@ -34,26 +40,41 @@ public class PgRestClient implements PgClient {
 
     @CircuitBreaker(name = "pgClient", fallbackMethod = "requestPaymentFallback")
     @Override
-    public PgTransactionResponse requestPayment(PgPaymentRequest request) {
+    public PgTransactionResponse requestPayment(PgPaymentRequest request, String userId) {
         String url = pgBaseUrl + "/api/v1/payments";
-        return Optional.ofNullable(pgRequestRestTemplate.postForObject(url, request, PgTransactionResponse.class))
+        HttpEntity<PgPaymentRequest> entity = new HttpEntity<>(request, userIdHeaders(userId));
+        ResponseEntity<PgTransactionResponse> response =
+            pgRequestRestTemplate.exchange(url, HttpMethod.POST, entity, PgTransactionResponse.class);
+        return Optional.ofNullable(response.getBody())
             .orElseThrow(() -> new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "PG 응답이 비어있습니다."));
     }
 
     @CircuitBreaker(name = "pgClient", fallbackMethod = "getTransactionFallback")
     @Override
-    public PgTransactionResponse getTransaction(String transactionKey) {
+    public PgTransactionResponse getTransaction(String transactionKey, String userId) {
         String url = pgBaseUrl + "/api/v1/payments/" + transactionKey;
-        return Optional.ofNullable(pgQueryRestTemplate.getForObject(url, PgTransactionResponse.class))
+        HttpEntity<Void> entity = new HttpEntity<>(userIdHeaders(userId));
+        ResponseEntity<PgTransactionResponse> response =
+            pgQueryRestTemplate.exchange(url, HttpMethod.GET, entity, PgTransactionResponse.class);
+        return Optional.ofNullable(response.getBody())
             .orElseThrow(() -> new CoreException(ErrorType.PG_QUERY_ERROR, "PG 조회 응답이 비어있습니다."));
     }
 
-    private PgTransactionResponse requestPaymentFallback(PgPaymentRequest request, Throwable t) {
+    private HttpHeaders userIdHeaders(String userId) {
+        if (userId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "PG 연동에는 유저 ID(X-USER-ID)가 필수입니다.");
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(USER_ID_HEADER, String.valueOf(userId));
+        return headers;
+    }
+
+    private PgTransactionResponse requestPaymentFallback(PgPaymentRequest request, String userId, Throwable t) {
         log.error("PG 결제 요청 실패. 서킷브레이커 fallback 실행. cause: {}", t.getMessage());
         throw new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "PG 결제 요청에 실패했습니다.");
     }
 
-    private PgTransactionResponse getTransactionFallback(String transactionKey, Throwable t) {
+    private PgTransactionResponse getTransactionFallback(String transactionKey, String userId, Throwable t) {
         log.error("PG 결제 조회 실패. transactionKey: {}, cause: {}", transactionKey, t.getMessage());
         throw new CoreException(ErrorType.PG_QUERY_ERROR, "PG 결제 조회에 실패했습니다.");
     }

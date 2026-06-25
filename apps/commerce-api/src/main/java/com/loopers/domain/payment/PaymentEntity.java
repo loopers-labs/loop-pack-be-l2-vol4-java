@@ -7,8 +7,8 @@ import java.time.ZonedDateTime;
 
 public class PaymentEntity extends BaseEntity {
 
-    private Long orderId;
-    private Long userId;
+    private String orderId;
+    private String userId;
     private String transactionKey;
     private CardType cardType;
     private String cardNo;
@@ -18,7 +18,7 @@ public class PaymentEntity extends BaseEntity {
 
     protected PaymentEntity() {}
 
-    public PaymentEntity(Long orderId, Long userId, CardType cardType, String cardNo, Long amount) {
+    public PaymentEntity(String orderId, String userId, CardType cardType, String cardNo, Long amount) {
         if (orderId == null) throw new CoreException(ErrorType.BAD_REQUEST, "주문 ID는 필수입니다.");
         if (userId == null) throw new CoreException(ErrorType.BAD_REQUEST, "유저 ID는 필수입니다.");
         if (cardType == null) throw new CoreException(ErrorType.BAD_REQUEST, "카드 종류는 필수입니다.");
@@ -32,7 +32,7 @@ public class PaymentEntity extends BaseEntity {
         this.status = PaymentStatus.PENDING;
     }
 
-    public static PaymentEntity of(Long id, Long orderId, Long userId, String transactionKey,
+    public static PaymentEntity of(String id, String orderId, String userId, String transactionKey,
             CardType cardType, String cardNo, Long amount, PaymentStatus status, String failureReason,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         PaymentEntity entity = new PaymentEntity();
@@ -69,12 +69,12 @@ public class PaymentEntity extends BaseEntity {
         this.failureReason = reason;
     }
 
-    public boolean isOwnedBy(Long userId) {
+    public boolean isOwnedBy(String userId) {
         return this.userId.equals(userId);
     }
 
-    public Long getOrderId() { return orderId; }
-    public Long getUserId() { return userId; }
+    public String getOrderId() { return orderId; }
+    public String getUserId() { return userId; }
     public String getTransactionKey() { return transactionKey; }
     public CardType getCardType() { return cardType; }
     public String getCardNo() { return cardNo; }

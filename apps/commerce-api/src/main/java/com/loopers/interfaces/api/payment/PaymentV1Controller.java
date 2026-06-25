@@ -22,7 +22,7 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
     @PostMapping
     public CompletableFuture<ApiResponse<PaymentV1Dto.Response>> pay(
         @RequestBody PaymentV1Dto.PaymentRequest request,
-        @LoginUser Long userId
+        @LoginUser String userId
     ) {
         return paymentApplicationService
             .initiate(userId, request.orderId(), request.cardType(), request.cardNo())
@@ -49,8 +49,8 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
 
     @GetMapping("/{paymentId}")
     public ApiResponse<PaymentV1Dto.Response> getPayment(
-        @PathVariable Long paymentId,
-        @LoginUser Long userId
+        @PathVariable String paymentId,
+        @LoginUser String userId
     ) {
         PaymentInfo info = paymentApplicationService.getPayment(userId, paymentId);
         return ApiResponse.success(PaymentV1Dto.Response.from(info));

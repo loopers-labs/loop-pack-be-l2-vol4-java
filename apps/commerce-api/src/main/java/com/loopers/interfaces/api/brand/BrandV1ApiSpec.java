@@ -18,6 +18,6 @@ public interface BrandV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<BrandV1Dto.BrandResponse> getBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId
+            @Parameter(description = "브랜드 ID", required = true) String brandId
     );
 }

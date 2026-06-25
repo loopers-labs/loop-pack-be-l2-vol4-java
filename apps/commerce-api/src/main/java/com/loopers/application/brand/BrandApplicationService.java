@@ -24,7 +24,7 @@ public class BrandApplicationService {
     private final InventoryRepository inventoryRepository;
     private final LikeRepository likeRepository;
 
-    public BrandInfo getBrand(Long brandId) {
+    public BrandInfo getBrand(String brandId) {
         BrandEntity brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
         return BrandInfo.from(brand);
@@ -41,7 +41,7 @@ public class BrandApplicationService {
         return BrandInfo.from(brandRepository.save(new BrandEntity(name, description)));
     }
 
-    public BrandInfo updateBrand(Long brandId, String name, String description) {
+    public BrandInfo updateBrand(String brandId, String name, String description) {
         BrandEntity brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
 
@@ -56,13 +56,13 @@ public class BrandApplicationService {
     }
 
     @Transactional
-    public void deleteBrand(Long brandId) {
+    public void deleteBrand(String brandId) {
         BrandEntity brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
         brand.delete();
         brandRepository.save(brand);
 
-        List<Long> productIds = productRepository.findIdsByBrandId(brandId);
+        List<String> productIds = productRepository.findIdsByBrandId(brandId);
         productRepository.findAllByIds(productIds).forEach(product -> {
             product.delete();
             productRepository.save(product);

@@ -17,7 +17,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     @GetMapping
     public ApiResponse<PageResult<ProductV1Dto.PlpResponse>> getAllProducts(
-            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String brandId,
             @RequestParam(required = false, defaultValue = "latest") String sort,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size
@@ -33,7 +33,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.PdpResponse> getProduct(
-            @PathVariable Long productId
+            @PathVariable String productId
     ) {
         return ApiResponse.success(ProductV1Dto.PdpResponse.from(productApplicationService.getProduct(productId)));
     }

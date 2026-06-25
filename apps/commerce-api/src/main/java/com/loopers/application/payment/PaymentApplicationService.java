@@ -40,10 +40,10 @@ public class PaymentApplicationService {
         this.callbackTimeoutSeconds = callbackTimeoutSeconds;
     }
 
-    public CompletableFuture<PaymentInfo> initiate(Long userId, Long orderId, CardType cardType, String cardNo) {
+    public CompletableFuture<PaymentInfo> initiate(String userId, String orderId, CardType cardType, String cardNo) {
         // TX1: 락 + 검증 + PENDING 저장
         PaymentEntity payment = paymentService.prepare(userId, orderId, cardType, cardNo);
-        Long paymentId = payment.getId();
+        String paymentId = payment.getId();
 
         // TX 외부: PG 호출
         PgPaymentRequest pgRequest = new PgPaymentRequest(
@@ -51,7 +51,7 @@ public class PaymentApplicationService {
         );
         PgTransactionResponse pgResponse;
         try {
-            pgResponse = pgClient.requestPayment(pgRequest);
+            pgResponse = pgClient.requestPayment(pgRequest, userId);
         } catch (Exception e) {
             paymentService.markFailed(paymentId, "PG 요청 실패");
             throw e;
@@ -77,7 +77,7 @@ public class PaymentApplicationService {
             .exceptionally(ex -> {
                 registry.pop(transactionKey);
                 try {
-                    PgTransactionResponse poll = pgClient.getTransaction(transactionKey); // 1차 Poll
+                    PgTransactionResponse poll = pgClient.getTransaction(transactionKey, userId); // 1차 Poll
                     if (poll.status() != PgTransactionStatus.PENDING) {
                         paymentService.settle(transactionKey, poll.status(), poll.reason()); // TX3
                     }
@@ -92,13 +92,13 @@ public class PaymentApplicationService {
         paymentService.settle(transactionKey, status, reason); // first-wins 멱등
     }
 
-    public PaymentInfo getPayment(Long userId, Long paymentId) {
+    public PaymentInfo getPayment(String userId, String paymentId) {
         PaymentEntity payment = paymentService.getOrThrow(paymentId);
         if (!payment.isOwnedBy(userId)) {
             throw new CoreException(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다.");
         }
         if (payment.getStatus() == PaymentStatus.PENDING && payment.getTransactionKey() != null) {
-            PgTransactionResponse poll = pgClient.getTransaction(payment.getTransactionKey());
+            PgTransactionResponse poll = pgClient.getTransaction(payment.getTransactionKey(), userId);
             if (poll.status() != PgTransactionStatus.PENDING) {
                 paymentService.settle(payment.getTransactionKey(), poll.status(), poll.reason());
                 return infoOf(payment.getTransactionKey());

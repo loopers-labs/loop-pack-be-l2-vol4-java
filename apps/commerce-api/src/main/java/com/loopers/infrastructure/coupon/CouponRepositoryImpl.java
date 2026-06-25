@@ -22,31 +22,31 @@ public class CouponRepositoryImpl implements CouponRepository {
     }
 
     @Override
-    public Optional<CouponEntity> findById(Long id) {
+    public Optional<CouponEntity> findById(String id) {
         return couponJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(CouponMapper::toDomain);
     }
 
     @Override
-    public Optional<CouponEntity> findByIdWithLock(Long id) {
+    public Optional<CouponEntity> findByIdWithLock(String id) {
         return couponJpaRepository.findByIdWithLock(id)
                 .map(CouponMapper::toDomain);
     }
 
     @Override
-    public Page<CouponEntity> findAllByUserId(Long userId, Pageable pageable) {
+    public Page<CouponEntity> findAllByUserId(String userId, Pageable pageable) {
         return couponJpaRepository.findAllByUserIdAndDeletedAtIsNull(userId, pageable)
                 .map(CouponMapper::toDomain);
     }
 
     @Override
-    public Page<CouponEntity> findAllByCouponTemplateId(Long couponTemplateId, Pageable pageable) {
+    public Page<CouponEntity> findAllByCouponTemplateId(String couponTemplateId, Pageable pageable) {
         return couponJpaRepository.findAllByCouponTemplateIdAndDeletedAtIsNull(couponTemplateId, pageable)
                 .map(CouponMapper::toDomain);
     }
 
     @Override
-    public void softDeleteAllByTemplateId(Long couponTemplateId) {
+    public void softDeleteAllByTemplateId(String couponTemplateId) {
         couponJpaRepository.softDeleteAllByTemplateId(couponTemplateId, ZonedDateTime.now());
     }
 }

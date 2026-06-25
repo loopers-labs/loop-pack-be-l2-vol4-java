@@ -235,6 +235,23 @@ transactionKey가 null이므로 `/sync`로 직접 조회 불가.
 
 ## 7. 핵심 컴포넌트
 
+### PG 연동 공통 헤더 (PgRestClient)
+
+PG 게이트웨이로 나가는 **모든 아웃바운드 호출**(`requestPayment`, `getTransaction`)은
+요청 주체를 식별하기 위해 `X-USER-ID` 헤더를 **필수**로 포함한다.
+
+```
+헤더: X-USER-ID: {userId}     // 결제를 요청한 유저 ID. 모든 PG 호출에 필수
+전달: PgClient 포트 메서드 시그니처에 userId 파라미터 포함
+      - requestPayment(PgPaymentRequest request, Long userId)
+      - getTransaction(String transactionKey, Long userId)
+구현: PgRestClient 에서 HttpHeaders 에 X-USER-ID 를 설정해 exchange 로 전송
+가드: userId == null 이면 BAD_REQUEST (PG 호출 전 차단)
+```
+
+> userId 는 body(JSON)가 아닌 **전송(헤더) 관심사**로 분리한다.
+> `getTransaction` 은 request body 가 없으므로 헤더 전달을 위해서도 메서드 파라미터가 필요하다.
+
 ### PaymentWaitingRegistry
 
 ```

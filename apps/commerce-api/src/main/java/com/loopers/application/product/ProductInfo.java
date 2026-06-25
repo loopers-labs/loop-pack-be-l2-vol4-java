@@ -7,8 +7,8 @@ import com.loopers.domain.product.ProductEntity;
 import java.time.ZonedDateTime;
 
 public record ProductInfo(
-    Long id,
-    Long brandId,
+    String id,
+    String brandId,
     String brandName,
     String name,
     String description,

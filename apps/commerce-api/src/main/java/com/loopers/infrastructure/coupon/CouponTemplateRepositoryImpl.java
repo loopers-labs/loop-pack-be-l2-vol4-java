@@ -22,7 +22,7 @@ public class CouponTemplateRepositoryImpl implements CouponTemplateRepository {
     }
 
     @Override
-    public Optional<CouponTemplateEntity> findById(Long id) {
+    public Optional<CouponTemplateEntity> findById(String id) {
         return couponTemplateJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(CouponTemplateMapper::toDomain);
     }

@@ -25,7 +25,7 @@ public class LikeApplicationService {
     private final BrandRepository brandRepository;
 
     @Transactional
-    public void addLike(Long userId, Long productId) {
+    public void addLike(String userId, String productId) {
         productRepository.find(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
 
@@ -44,7 +44,7 @@ public class LikeApplicationService {
     }
 
     @Transactional
-    public void removeLike(Long userId, Long productId) {
+    public void removeLike(String userId, String productId) {
         LikeEntity like = likeRepository.findActive(userId, productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 정보를 찾을 수 없습니다."));
         like.delete();
@@ -52,7 +52,7 @@ public class LikeApplicationService {
         productRepository.decrementLikeCount(productId);
     }
 
-    public Page<LikeInfo> getLikedProducts(Long userId, Pageable pageable) {
+    public Page<LikeInfo> getLikedProducts(String userId, Pageable pageable) {
         return likeRepository.findActiveByUserId(userId, pageable).map(like -> {
             ProductEntity product = productRepository.find(like.getProductId())
                     .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + like.getProductId() + "] 상품을 찾을 수 없습니다."));

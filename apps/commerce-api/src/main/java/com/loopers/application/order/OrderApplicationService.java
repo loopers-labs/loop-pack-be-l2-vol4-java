@@ -32,7 +32,7 @@ public class OrderApplicationService {
     private final CouponApplicationService couponApplicationService;
 
     @Transactional
-    public OrderInfo createOrder(Long userId, List<OrderItemCommand> commands, Long couponId) {
+    public OrderInfo createOrder(String userId, List<OrderItemCommand> commands, String couponId) {
         List<OrderSnapshotItem> snapshotItems = commands.stream()
                 .map(cmd -> {
                     ProductEntity product = productRepository.find(cmd.productId())
@@ -47,10 +47,10 @@ public class OrderApplicationService {
                 ? couponApplicationService.useCoupon(couponId, userId, originalAmount)
                 : 0L;
 
-        Map<Long, Integer> productQuantities = commands.stream()
+        Map<String, Integer> productQuantities = commands.stream()
                 .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
 
-        List<Long> productIds = productQuantities.keySet().stream().sorted().toList();
+        List<String> productIds = productQuantities.keySet().stream().sorted().toList();
         List<InventoryEntity> inventories = inventoryRepository.findAllByProductIdsWithLock(productIds);
         if (inventories.size() != productIds.size()) {
             throw new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 재고가 포함되어 있습니다.");
@@ -66,7 +66,7 @@ public class OrderApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public OrderInfo getOrder(Long authUserId, Long orderId) {
+    public OrderInfo getOrder(String authUserId, String orderId) {
         OrderEntity order = findOrderOrThrow(orderId);
         if (!order.isOwnedBy(authUserId)) {
             throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
@@ -75,7 +75,7 @@ public class OrderApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderInfo> getOrders(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
+    public Page<OrderInfo> getOrders(String userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderRepository.findAllByUserId(userId, startAt, endAt, pageable).map(OrderInfo::from);
     }
 
@@ -85,11 +85,11 @@ public class OrderApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public OrderInfo getAdminOrder(Long orderId) {
+    public OrderInfo getAdminOrder(String orderId) {
         return OrderInfo.from(findOrderOrThrow(orderId));
     }
 
-    private OrderEntity findOrderOrThrow(Long orderId) {
+    private OrderEntity findOrderOrThrow(String orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
     }

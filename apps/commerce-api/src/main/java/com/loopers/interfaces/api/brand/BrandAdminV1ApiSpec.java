@@ -32,7 +32,7 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<BrandV1Dto.BrandAdminResponse> getBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId
+            @Parameter(description = "브랜드 ID", required = true) String brandId
     );
 
     @Operation(summary = "브랜드 등록", description = "새 브랜드를 등록합니다. 브랜드명은 중복 불가입니다.")
@@ -56,7 +56,7 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<BrandV1Dto.BrandAdminResponse> updateBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId,
+            @Parameter(description = "브랜드 ID", required = true) String brandId,
             BrandV1Dto.UpdateBrandRequest request
     );
 
@@ -69,6 +69,6 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<Object> deleteBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId
+            @Parameter(description = "브랜드 ID", required = true) String brandId
     );
 }

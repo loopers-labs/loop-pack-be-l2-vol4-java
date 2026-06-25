@@ -5,8 +5,8 @@ import com.loopers.domain.payment.PaymentEntity;
 import com.loopers.domain.payment.PaymentStatus;
 
 public record PaymentInfo(
-    Long paymentId,
-    Long orderId,
+    String paymentId,
+    String orderId,
     String transactionKey,
     CardType cardType,
     Long amount,

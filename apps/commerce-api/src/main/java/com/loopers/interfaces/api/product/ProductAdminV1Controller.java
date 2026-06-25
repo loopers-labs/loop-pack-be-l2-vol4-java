@@ -33,7 +33,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
     @GetMapping
     public ApiResponse<PageResult<ProductV1Dto.AdminPlpResponse>> getAllProducts(
-            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String brandId,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size
     ) {
@@ -47,7 +47,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.AdminPdpResponse> getProduct(
-            @PathVariable Long productId
+            @PathVariable String productId
     ) {
         return ApiResponse.success(ProductV1Dto.AdminPdpResponse.from(productApplicationService.getProduct(productId)));
     }
@@ -55,7 +55,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     @PutMapping("/{productId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateProduct(
-            @PathVariable Long productId,
+            @PathVariable String productId,
             @RequestBody ProductV1Dto.UpdateProductRequest request
     ) {
         productApplicationService.updateProduct(
@@ -70,7 +70,7 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
     @DeleteMapping("/{productId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteProduct(
-            @PathVariable Long productId
+            @PathVariable String productId
     ) {
         productApplicationService.deleteProduct(productId);
     }

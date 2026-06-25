@@ -20,7 +20,7 @@ public class BrandEntity extends BaseEntity {
         this.description = description;
     }
 
-    public static BrandEntity of(Long id, String name, String description,
+    public static BrandEntity of(String id, String name, String description,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         BrandEntity model = new BrandEntity();
         model.name = name;

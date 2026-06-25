@@ -31,7 +31,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PageResult<ProductV1Dto.AdminPlpResponse>> getAllProducts(
-            @Parameter(description = "브랜드 ID 필터 (선택)") Long brandId,
+            @Parameter(description = "브랜드 ID 필터 (선택)") String brandId,
             @Parameter(description = "페이지 번호 (0-based, 기본값: 0)") int page,
             @Parameter(description = "페이지 크기 (기본값: 20)") int size
     );
@@ -45,7 +45,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<ProductV1Dto.AdminPdpResponse> getProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId
+            @Parameter(description = "상품 ID", required = true) String productId
     );
 
     @Operation(summary = "상품 수정", description = "상품 이름·설명·가격·재고 수량을 수정합니다. 브랜드는 변경할 수 없습니다.")
@@ -57,7 +57,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void updateProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId,
+            @Parameter(description = "상품 ID", required = true) String productId,
             ProductV1Dto.UpdateProductRequest request
     );
 
@@ -70,6 +70,6 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void deleteProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId
+            @Parameter(description = "상품 ID", required = true) String productId
     );
 }

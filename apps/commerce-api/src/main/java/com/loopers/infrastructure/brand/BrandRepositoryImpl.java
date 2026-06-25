@@ -22,14 +22,14 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     @Override
-    public Optional<BrandEntity> findById(Long id) {
+    public Optional<BrandEntity> findById(String id) {
         return brandJpaRepository.findById(id)
                 .map(BrandMapper::toDomain)
                 .filter(b -> !b.isDeleted());
     }
 
     @Override
-    public List<BrandEntity> findAllByIds(List<Long> ids) {
+    public List<BrandEntity> findAllByIds(List<String> ids) {
         return brandJpaRepository.findAllByIdInAndDeletedAtIsNull(ids).stream()
                 .map(BrandMapper::toDomain)
                 .toList();

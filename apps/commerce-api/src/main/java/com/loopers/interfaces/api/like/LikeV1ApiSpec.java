@@ -21,8 +21,8 @@ public interface LikeV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void addLike(
-            @Parameter(description = "상품 ID", required = true) Long productId,
-            @Parameter(hidden = true) Long userId
+            @Parameter(description = "상품 ID", required = true) String productId,
+            @Parameter(hidden = true) String userId
     );
 
     @Operation(summary = "좋아요 취소", description = "상품 좋아요를 취소합니다.")
@@ -34,8 +34,8 @@ public interface LikeV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void removeLike(
-            @Parameter(description = "상품 ID", required = true) Long productId,
-            @Parameter(hidden = true) Long userId
+            @Parameter(description = "상품 ID", required = true) String productId,
+            @Parameter(hidden = true) String userId
     );
 
     @Operation(summary = "좋아요 상품 목록 조회", description = "본인의 좋아요 상품 목록을 페이지네이션으로 조회합니다. 타인 조회 시 403을 반환합니다.")
@@ -47,8 +47,8 @@ public interface LikeV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PageResult<LikeV1Dto.LikeResponse>> getLikedProducts(
-            @Parameter(description = "유저 ID (본인만 조회 가능)", required = true) Long userId,
-            @Parameter(hidden = true) Long authUserId,
+            @Parameter(description = "유저 ID (본인만 조회 가능)", required = true) String userId,
+            @Parameter(hidden = true) String authUserId,
             @Parameter(description = "페이지 번호 (0-based, 기본값: 0)") int page,
             @Parameter(description = "페이지 크기 (기본값: 20)") int size
     );

@@ -8,7 +8,7 @@ import java.time.ZonedDateTime;
 public class BrandV1Dto {
 
     public record BrandResponse(
-            Long id,
+            String id,
             String name,
             String description
     ) {
@@ -18,7 +18,7 @@ public class BrandV1Dto {
     }
 
     public record BrandAdminResponse(
-            Long id,
+            String id,
             String name,
             String description,
             ZonedDateTime createdAt,

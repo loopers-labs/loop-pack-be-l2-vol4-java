@@ -1,7 +1,7 @@
 package com.loopers.domain.order;
 
 public record OrderSnapshotItem(
-        Long productId,
+        String productId,
         String productName,
         Long productPrice,
         Integer quantity,

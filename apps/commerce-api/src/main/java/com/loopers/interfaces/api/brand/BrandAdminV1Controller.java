@@ -27,7 +27,7 @@ public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
     }
 
     @GetMapping("/{brandId}")
-    public ApiResponse<BrandV1Dto.BrandAdminResponse> getBrand(@PathVariable Long brandId) {
+    public ApiResponse<BrandV1Dto.BrandAdminResponse> getBrand(@PathVariable String brandId) {
         return ApiResponse.success(BrandV1Dto.BrandAdminResponse.from(brandApplicationService.getBrand(brandId)));
     }
 
@@ -38,14 +38,14 @@ public class BrandAdminV1Controller implements BrandAdminV1ApiSpec {
 
     @PutMapping("/{brandId}")
     public ApiResponse<BrandV1Dto.BrandAdminResponse> updateBrand(
-            @PathVariable Long brandId,
+            @PathVariable String brandId,
             @RequestBody BrandV1Dto.UpdateBrandRequest request
     ) {
         return ApiResponse.success(BrandV1Dto.BrandAdminResponse.from(brandApplicationService.updateBrand(brandId, request.name(), request.description())));
     }
 
     @DeleteMapping("/{brandId}")
-    public ApiResponse<Object> deleteBrand(@PathVariable Long brandId) {
+    public ApiResponse<Object> deleteBrand(@PathVariable String brandId) {
         brandApplicationService.deleteBrand(brandId);
         return ApiResponse.success();
     }

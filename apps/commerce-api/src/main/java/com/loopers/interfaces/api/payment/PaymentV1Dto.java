@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public class PaymentV1Dto {
 
     public record PaymentRequest(
-        @Schema(example = "1") Long orderId,
+        @Schema(example = "1") String orderId,
         @Schema(example = "SAMSUNG") CardType cardType,
         @Schema(example = "1234-5678-9814-1451") String cardNo
     ) {}
@@ -24,7 +24,7 @@ public class PaymentV1Dto {
     ) {}
 
     public record Response(
-        Long paymentId,
+        String paymentId,
         String transactionKey,
         String status,
         String reason

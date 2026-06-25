@@ -29,7 +29,7 @@ public class CouponTemplateEntity extends BaseEntity {
         this.expiredAt = expiredAt;
     }
 
-    public static CouponTemplateEntity of(Long id, String name, CouponType type, Long value, Long minOrderAmount,
+    public static CouponTemplateEntity of(String id, String name, CouponType type, Long value, Long minOrderAmount,
             ZonedDateTime expiredAt, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         CouponTemplateEntity entity = new CouponTemplateEntity();
         entity.name = name;

@@ -19,7 +19,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
-    public Optional<PaymentEntity> findById(Long id) {
+    public Optional<PaymentEntity> findById(String id) {
         return paymentJpaRepository.findById(id).map(PaymentMapper::toDomain);
     }
 
@@ -29,7 +29,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
-    public boolean existsByOrderIdAndStatusIn(Long orderId, PaymentStatus... statuses) {
+    public boolean existsByOrderIdAndStatusIn(String orderId, PaymentStatus... statuses) {
         return paymentJpaRepository.existsByOrderIdAndStatusIn(orderId, statuses);
     }
 }

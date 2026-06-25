@@ -27,7 +27,7 @@ public interface OrderV1ApiSpec {
     })
     ApiResponse<OrderV1Dto.CreateOrderResponse> createOrder(
             OrderV1Dto.CreateOrderRequest request,
-            @Parameter(hidden = true) Long userId
+            @Parameter(hidden = true) String userId
     );
 
     @Operation(summary = "내 주문 목록 조회", description = "본인의 주문 목록을 페이지네이션으로 조회합니다. 날짜 필터(startAt/endAt) 선택 적용.")
@@ -37,7 +37,7 @@ public interface OrderV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PageResult<OrderV1Dto.OrderResponse>> getOrders(
-            @Parameter(hidden = true) Long userId,
+            @Parameter(hidden = true) String userId,
             @Parameter(description = "조회 시작 날짜 (YYYY-MM-DD, 예: 2024-01-01). 당일 00:00:00 KST 이후 포함.")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
             @Parameter(description = "조회 종료 날짜 (YYYY-MM-DD, 예: 2024-01-31). 당일 23:59:59 KST 이전 포함.")
@@ -55,7 +55,7 @@ public interface OrderV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<OrderV1Dto.OrderResponse> getOrder(
-            @Parameter(description = "주문 ID", required = true) Long orderId,
-            @Parameter(hidden = true) Long userId
+            @Parameter(description = "주문 ID", required = true) String orderId,
+            @Parameter(hidden = true) String userId
     );
 }

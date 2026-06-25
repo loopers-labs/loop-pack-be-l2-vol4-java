@@ -8,7 +8,7 @@ import com.loopers.domain.coupon.CouponType;
 import java.time.ZonedDateTime;
 
 public record CouponInfo(
-        Long couponId,
+        String couponId,
         String templateName,
         CouponType type,
         Long value,

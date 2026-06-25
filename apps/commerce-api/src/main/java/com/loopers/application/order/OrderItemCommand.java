@@ -1,4 +1,4 @@
 package com.loopers.application.order;
 
-public record OrderItemCommand(Long productId, Integer quantity) {
+public record OrderItemCommand(String productId, Integer quantity) {
 }
