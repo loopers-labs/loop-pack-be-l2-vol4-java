@@ -24,6 +24,7 @@ public class PaymentFacade {
     private final UserRepository userRepository;
     private final PaymentService paymentService;
     private final PgPaymentClient pgClient;
+    private final PaymentReconciler paymentReconciler;
 
     public PaymentInfo requestPayment(String loginId, Long orderId, CardType cardType, String cardNo) {
         User user = userRepository.findByLoginId(loginId)
@@ -42,6 +43,14 @@ public class PaymentFacade {
             payment = paymentService.attachTransactionKey(payment.getId(), response.data().transactionKey());
         }
         return PaymentInfo.from(payment);
+    }
+
+    /** 수동 복구: 본인 결제를 PG에 조회해 상태를 보정한다(콜백 누락 시 사용자/운영 트리거). */
+    public void reconcile(String loginId, Long paymentId) {
+        User user = userRepository.findByLoginId(loginId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        Payment payment = paymentService.findOwned(paymentId, user.getId());
+        paymentReconciler.reconcile(payment);
     }
 
     /**

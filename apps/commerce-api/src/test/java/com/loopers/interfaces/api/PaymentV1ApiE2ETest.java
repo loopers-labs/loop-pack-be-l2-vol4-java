@@ -38,6 +38,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -131,6 +133,12 @@ class PaymentV1ApiE2ETest {
         ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(body), responseType);
+    }
+
+    private PgDto.Envelope<PgDto.TransactionDetailResponse> detailSuccess(String transactionKey) {
+        return new PgDto.Envelope<>(new PgDto.Envelope.Meta("SUCCESS", null, null),
+            new PgDto.TransactionDetailResponse(
+                transactionKey, "000001", "SAMSUNG", "1234-5678-9814-1451", 5000L, "SUCCESS", null));
     }
 
     @DisplayName("POST /api/v1/payments")
@@ -250,6 +258,55 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
                     .isEqualTo(OrderStatus.PAID)
             );
+        }
+    }
+
+    @DisplayName("POST /api/v1/payments/{id}/reconcile (수동 복구)")
+    @Nested
+    class ManualReconcile {
+
+        @DisplayName("PENDING 결제를 PG에 조회해 SUCCESS면 결제 SUCCESS·주문 PAID 로 보정한다.")
+        @Test
+        void reconcilesPending() {
+            // arrange — 콜백이 안 와 PENDING 으로 남은 결제(거래키 보유)
+            Long orderId = persistPendingOrder(5000L);
+            persistPendingPayment(orderId, "TKEY-RC");
+            Long paymentId = activePaymentOf(orderId).getId();
+            when(pgPaymentClient.getTransaction(anyString(), eq("TKEY-RC"))).thenReturn(detailSuccess("TKEY-RC"));
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + paymentId + "/reconcile", HttpMethod.POST,
+                new HttpEntity<>(authHeaders("tester01")), responseType);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+                () -> assertThat(paymentJpaRepository.findByTransactionKey("TKEY-RC").orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.SUCCESS),
+                () -> assertThat(orderJpaRepository.findById(orderId).orElseThrow().getStatus())
+                    .isEqualTo(OrderStatus.PAID)
+            );
+        }
+
+        @DisplayName("타 유저의 결제를 복구 시도하면, 404 Not Found 를 반환한다.")
+        @Test
+        void returnsNotFound_whenNotOwner() {
+            // arrange
+            userJpaRepository.save(new User("tester02", "Password2!", "김철수", "1992-03-03", "o@example.com", Gender.M));
+            Long orderId = persistPendingOrder(5000L);
+            persistPendingPayment(orderId, "TKEY-RC2");
+            Long paymentId = activePaymentOf(orderId).getId();
+
+            // act
+            ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + paymentId + "/reconcile", HttpMethod.POST,
+                new HttpEntity<>(authHeaders("tester02")), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }

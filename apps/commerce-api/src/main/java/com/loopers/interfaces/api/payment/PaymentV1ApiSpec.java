@@ -19,4 +19,10 @@ public interface PaymentV1ApiSpec {
         description = "PG 가 결제 처리 결과(SUCCESS/FAILED)를 통보하는 콜백 엔드포인트입니다. (무인증, 멱등)"
     )
     ApiResponse<Object> handleCallback(PaymentV1Dto.PgCallbackRequest request);
+
+    @Operation(
+        summary = "결제 수동 복구",
+        description = "콜백 누락 등으로 PENDING 에 머문 결제를 PG에 조회해 상태를 보정합니다. (본인 소유만)"
+    )
+    ApiResponse<Object> reconcile(AuthHeaders auth, Long paymentId);
 }

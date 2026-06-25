@@ -5,6 +5,7 @@ import com.loopers.application.payment.PaymentInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.AuthHeaders;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +33,13 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
     @Override
     public ApiResponse<Object> handleCallback(@RequestBody PaymentV1Dto.PgCallbackRequest request) {
         paymentFacade.handleCallback(request.transactionKey(), request.status(), request.reason());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/{paymentId}/reconcile")
+    @Override
+    public ApiResponse<Object> reconcile(AuthHeaders auth, @PathVariable("paymentId") Long paymentId) {
+        paymentFacade.reconcile(auth.loginId(), paymentId);
         return ApiResponse.success();
     }
 }

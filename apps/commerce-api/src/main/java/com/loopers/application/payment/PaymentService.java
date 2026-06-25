@@ -59,6 +59,17 @@ public class PaymentService {
                 Payment.pending(userId, orderId, Money.of(order.getFinalAmount()), cardType)));
     }
 
+    /** 본인 소유 결제 조회 (수동 복구용). 타 유저 결제는 존재를 드러내지 않는다. */
+    @Transactional(readOnly = true)
+    public Payment findOwned(Long paymentId, Long userId) {
+        Payment payment = paymentRepository.find(paymentId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + paymentId + "] 결제건을 찾을 수 없습니다."));
+        if (!payment.getUserId().equals(userId)) {
+            throw new CoreException(ErrorType.NOT_FOUND, "[id = " + paymentId + "] 결제건을 찾을 수 없습니다.");
+        }
+        return payment;
+    }
+
     /** PG 가 접수해 발급한 거래키를 결제에 기록한다 (PG 호출 성공 직후, TX2). */
     @Transactional
     public Payment attachTransactionKey(Long paymentId, String transactionKey) {

@@ -36,7 +36,9 @@ class PaymentFacadeTest {
     private final UserRepository userRepository = mock(UserRepository.class);
     private final PaymentService paymentService = mock(PaymentService.class);
     private final PgPaymentClient pgClient = mock(PgPaymentClient.class);
-    private final PaymentFacade paymentFacade = new PaymentFacade(userRepository, paymentService, pgClient);
+    private final PaymentReconciler paymentReconciler = mock(PaymentReconciler.class);
+    private final PaymentFacade paymentFacade =
+        new PaymentFacade(userRepository, paymentService, pgClient, paymentReconciler);
 
     private void givenUser() {
         User user = mock(User.class);
