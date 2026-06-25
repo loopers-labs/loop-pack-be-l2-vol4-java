@@ -22,9 +22,11 @@ datasource:
     master:
       host: localhost
       port: 6379
+      timeout: 3000
     replicas:
       - host: localhost
         port: 6380
+        timeout: 3000
 
 ---
 spring.config.activate.on-profile: dev

@@ -3,9 +3,6 @@ package com.loopers.application.order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.order.PaymentCommand;
-import com.loopers.domain.order.PaymentGateway;
-import com.loopers.domain.order.PaymentResult;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
@@ -23,25 +20,18 @@ public class OrderFacade {
 
     private final OrderService orderService;
     private final UserService userService;
-    private final PaymentGateway paymentGateway;
 
+    /**
+     * 주문 생성. 재고·쿠폰 차감은 주문 생성 시점에 수행하고 PENDING 으로 둔다.
+     * 결제는 POST /api/v1/payments 로 별도 접수하며, 결과는 콜백/폴링으로 주문에 반영된다.
+     */
     public OrderInfo placeOrder(String loginId, OrderCommand command) {
         UserModel user = userService.getMyInfo(loginId);
         List<OrderLine> lines = normalize(command.items());
 
         OrderModel pendingOrderModel = orderService.createPendingOrder(user.getId(), lines, command.couponId());
 
-        PaymentResult result = paymentGateway.requestPayment(
-                PaymentCommand.of(pendingOrderModel.getId(), pendingOrderModel.getTotalAmount())
-        );
-
-        if (result.success()) {
-            OrderModel confirmed = orderService.confirm(pendingOrderModel.getId());
-            return OrderInfo.from(confirmed);
-        }
-
-        orderService.fail(pendingOrderModel.getId());
-        throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 승인에 실패했습니다: " + result.message());
+        return OrderInfo.from(pendingOrderModel);
     }
 
     private List<OrderLine> normalize(List<OrderCommand.Item> items) {
