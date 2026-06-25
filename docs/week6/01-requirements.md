@@ -115,18 +115,18 @@ catch  그 외(모호한 실패)                      →  throw → orderId 보
 
 콜백을 보장할 수 없으므로, 어긋난 상태는 PG에 조회해서 맞춘다. 새로 결제를 요청하는 게 아니라 기존 거래를 조회해 보정하는 방식이다. PG는 orderId로 멱등하지 않아서, 재요청하면 그대로 이중 결제가 되기 때문이다. 규모상 `@Scheduled` 주기 작업으로 충분하다. 대량 처리나 재시작 보장이 필요해지기 전까지는 Spring Batch까지 갈 필요가 없다.
 
-| sweep | 대상 | 조회 | 커버하는 장애 |
+| 보정 | 대상 | 조회 | 커버하는 장애 |
 | --- | --- | --- | --- |
-| 키 보유 sweep | `PENDING` + `transaction_key` 보유 + N초 경과 | `GET /payments/{key}` | 콜백 유실 |
-| 키 없음 sweep | `PENDING` + `transaction_key IS NULL` + N초 경과 | `GET /payments?orderId=` | TX2 전 크래시(키 유실) |
+| 키 기준 보정 | `PENDING` + `transaction_key` 보유 + N초 경과 | `GET /payments/{key}` | 콜백 유실 |
+| 주문 기준 보정 | `PENDING` + `transaction_key IS NULL` + N초 경과 | `GET /payments?orderId=` | TX2 전 크래시(키 유실) |
 
 ## 장애 시나리오 & 대응
 
 | 장애 | 남는 상태 | 대응 |
 | --- | --- | --- |
-| TX1 후 PG 호출 전 크래시 | Payment PENDING(키 없음), PG 모름 | 키 없음 sweep → PG에 거래 없음 확인 → 재처리/FAILED 정리 (돈 안 움직임, 안전) |
-| PG 성공 ~ TX2 전 크래시 | Payment PENDING(키 없음), PG엔 거래 존재 | 키 없음 sweep(orderId) → 거래 매칭 → 키 채움/확정 |
-| 콜백 유실 | Payment PENDING(키 보유), PG terminal | 키 보유 sweep(transactionKey) → 확정 |
+| TX1 후 PG 호출 전 크래시 | Payment PENDING(키 없음), PG 모름 | 주문 기준 보정 → PG에 거래 없음 확인 → 재처리/FAILED 정리 (돈 안 움직임, 안전) |
+| PG 성공 ~ TX2 전 크래시 | Payment PENDING(키 없음), PG엔 거래 존재 | 주문 기준 보정(orderId) → 거래 매칭 → 키 채움/확정 |
+| 콜백 유실 | Payment PENDING(키 보유), PG terminal | 키 기준 보정(transactionKey) → 확정 |
 | 콜백 처리 중 부분 실패 | (단일 TX 롤백) Payment PENDING 유지 | 보정 작업이 재처리(콜백·보정 공유 진입점) |
 | 요청 응답 유실 → retry | (모호) | retry 대상에서 제외 + orderId 멱등으로 흡수 |
 

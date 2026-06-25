@@ -8,8 +8,8 @@
 stateDiagram-v2
     [*] --> PENDING : TX1 생성(키 없음)
     PENDING --> PENDING : TX2 transactionKey/provider 채움
-    PENDING --> SUCCESS : 콜백/대사 = SUCCESS
-    PENDING --> FAILED : 콜백/대사 = FAILED (+보상)
+    PENDING --> SUCCESS : 콜백/정합성 보정 = SUCCESS
+    PENDING --> FAILED : 콜백/정합성 보정 = FAILED (+보상)
     SUCCESS --> [*]
     FAILED --> [*]
 
@@ -50,16 +50,16 @@ stateDiagram-v2
 
 | # | 내부 상태 | 외부 PG 상태 | 원인 | 회수 경로 |
 | --- | --- | --- | --- | --- |
-| G1 | Payment PENDING (키 없음) | 거래 없음 | TX1 후 PG 호출 전 크래시 | 키 없음 sweep(orderId) → 재처리/FAILED |
-| G2 | Payment PENDING (키 없음) | PG_SUCCESS/FAILED | PG 성공 ~ TX2 전 크래시 | 키 없음 sweep(orderId) → 키 채움 → 확정 |
-| G3 | Payment PENDING (키 보유) | PG terminal | 콜백 유실(무보증) | 키 보유 sweep(transactionKey) → 확정 |
-| G4 | Payment FAILED, 보상 미완 | PG_FAILED | 콜백 단일 TX 부분 실패 → 롤백 | PENDING 유지 → 대사 재처리(공유 진입점) |
-| G5 | Payment SUCCESS/FAILED (확정됨) | PG terminal | 콜백+대사 동시 도착 | 멱등 가드(PENDING일 때만) → 1회만 반영 |
+| G1 | Payment PENDING (키 없음) | 거래 없음 | TX1 후 PG 호출 전 크래시 | 주문 기준 보정(orderId) → 재처리/FAILED |
+| G2 | Payment PENDING (키 없음) | PG_SUCCESS/FAILED | PG 성공 ~ TX2 전 크래시 | 주문 기준 보정(orderId) → 키 채움 → 확정 |
+| G3 | Payment PENDING (키 보유) | PG terminal | 콜백 유실(무보증) | 키 기준 보정(transactionKey) → 확정 |
+| G4 | Payment FAILED, 보상 미완 | PG_FAILED | 콜백 단일 TX 부분 실패 → 롤백 | PENDING 유지 → 정합성 보정 재처리(공유 진입점) |
+| G5 | Payment SUCCESS/FAILED (확정됨) | PG terminal | 콜백+정합성 보정 동시 도착 | 멱등 가드(PENDING일 때만) → 1회만 반영 |
 
 **핵심 원칙**:
 1. 모든 갭의 회수는 **추측이 아니라 PG 조회**로 한다(재결제 금지 — PG는 orderId 멱등이 아님).
 2. 키 유무가 회수 경로를 가른다 — **키 있으면 transactionKey, 없으면 orderId**로 대조.
-3. terminal 전이는 멱등이라, 어느 경로(콜백/대사)로 와도 결과가 같다.
+3. terminal 전이는 멱등이라, 어느 경로(콜백/정합성 보정)로 와도 결과가 같다.
 
 ## 5. failover의 상태 안전성
 
@@ -70,11 +70,11 @@ stateDiagram-v2
     [*] --> 호출A
     호출A --> 접수 : transactionKey 수신
     호출A --> failoverB : CB OPEN / RateLimiter 거절 (A에 안 나감)
-    호출A --> 대사대기 : 모호 실패(read timeout 등, A에 닿았을 수 있음)
+    호출A --> 보정대기 : 모호 실패(read timeout 등, A에 닿았을 수 있음)
     failoverB --> 접수 : B transactionKey 수신
-    대사대기 --> [*] : orderId 대사가 진짜 상태 확정
+    보정대기 --> [*] : orderId 정합성 보정이 진짜 상태 확정
     접수 --> [*]
 ```
 
-- `failoverB`는 **"A에 안 나간 게 확실한"** 분기에서만 도달한다. `대사대기`(모호)에서는 B로 가지 않는다 — A가 처리했을 수 있어 이중 결제가 되기 때문이다.
+- `failoverB`는 **"A에 안 나간 게 확실한"** 분기에서만 도달한다. `보정대기`(모호)에서는 B로 가지 않는다 — A가 처리했을 수 있어 이중 결제가 되기 때문이다.
 - 이 안전성은 데코레이터 순서 `CircuitBreaker(Retry(RateLimiter(call)))`(CB 바깥)일 때 `CallNotPermitted = A에 안 닿음` 불변식으로 보장된다.
