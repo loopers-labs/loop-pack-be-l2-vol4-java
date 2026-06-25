@@ -1,0 +1,36 @@
+### [User] 결제 요청 (PG 콜백 대기, 최대 10초)
+POST {{commerce-api}}/api/v1/payments
+X-Loopers-LoginId: usertest123
+X-Loopers-LoginPw: abc123!@#
+Content-Type: application/json
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451"
+}
+
+###
+
+### [PG Simulator] 결제 콜백 (인증 불필요)
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "TX-001",
+  "orderId": "1",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 100000,
+  "status": "SUCCESS",
+  "reason": null
+}
+
+###
+
+### [User] 결제 상태 조회 (PENDING이면 PG Poll 후 반환)
+GET {{commerce-api}}/api/v1/payments/1
+X-Loopers-LoginId: usertest123
+X-Loopers-LoginPw: abc123!@#
+
+###
