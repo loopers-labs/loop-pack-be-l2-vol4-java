@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class PaymentEntityTest {
 
-    private static final Long USER_ID = 1L;
-    private static final Long ORDER_ID = 100L;
+    private static final String USER_ID = "1";
+    private static final String ORDER_ID = "100";
     private static final String CARD_NO = "1234-5678-9814-1451";
 
     private PaymentEntity validPayment() {
@@ -134,7 +134,7 @@ public class PaymentEntityTest {
         @DisplayName("다른 userId이면 false를 반환한다.")
         @Test
         void returnsFalse_whenUserIdDoesNotMatch() {
-            assertFalse(validPayment().isOwnedBy(999L));
+            assertFalse(validPayment().isOwnedBy("999"));
         }
     }
 }

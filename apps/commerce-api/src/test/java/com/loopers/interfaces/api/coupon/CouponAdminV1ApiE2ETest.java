@@ -281,7 +281,7 @@ class CouponAdminV1ApiE2ETest {
         void returnsIssueHistory_whenCouponsAreIssued() {
             // arrange
             CouponTemplateInfo template = createTemplate("발급 쿠폰");
-            Long userId = userApplicationService.signup("issueuser", "Test1234!", "홍길동",
+            String userId = userApplicationService.signup("issueuser", "Test1234!", "홍길동",
                     LocalDate.of(1995, 1, 1), "issue@test.com").id();
             couponApplicationService.issueCoupon(userId, template.templateId());
 

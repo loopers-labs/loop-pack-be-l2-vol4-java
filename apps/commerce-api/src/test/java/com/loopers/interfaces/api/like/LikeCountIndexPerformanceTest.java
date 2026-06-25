@@ -84,7 +84,7 @@ class LikeCountIndexPerformanceTest {
 
         for (int i = 0; i < USER_COUNT; i++) {
             final String userId = userIds.get(i);
-            final long productId = i + 1L;  // 서로 다른 상품
+            final String productId = String.valueOf(i + 1L);  // 서로 다른 상품
             futures.add(executor.submit(() -> {
                 long start = System.nanoTime();
                 like(userId, productId);
@@ -108,7 +108,7 @@ class LikeCountIndexPerformanceTest {
             final String userId = userIds.get(i);
             futures.add(executor.submit(() -> {
                 long start = System.nanoTime();
-                like(userId, 1L);  // 동일 상품에 집중
+                like(userId, "1");  // 동일 상품에 집중
                 return elapsed(start);
             }));
         }
@@ -146,7 +146,7 @@ class LikeCountIndexPerformanceTest {
             final int base = i * 10;
             executor.submit(() -> {
                 for (int j = 0; j < 10; j++) {
-                    like(userId, (long)(base + j + 1));
+                    like(userId, String.valueOf(base + j + 1));
                 }
             });
         }
@@ -170,7 +170,7 @@ class LikeCountIndexPerformanceTest {
             final String userId = userIds.get(i);
             executor.submit(() -> {
                 for (int j = 0; j < 10; j++) {
-                    like(userId, 1L);
+                    like(userId, "1");
                 }
             });
         }
@@ -217,7 +217,7 @@ class LikeCountIndexPerformanceTest {
         );
     }
 
-    private void like(String userId, Long productId) {
+    private void like(String userId, String productId) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Loopers-LoginId", userId);
         headers.set("X-Loopers-LoginPw", PASSWORD);

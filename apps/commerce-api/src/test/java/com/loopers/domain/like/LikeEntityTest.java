@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class LikeEntityTest {
 
-    private static final Long VALID_USER_ID = 1L;
-    private static final Long VALID_PRODUCT_ID = 1L;
+    private static final String VALID_USER_ID = "1";
+    private static final String VALID_PRODUCT_ID = "1";
 
     @DisplayName("좋아요 생성")
     @Nested

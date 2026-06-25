@@ -61,7 +61,7 @@ class CouponV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private Long createUser() {
+    private String createUser() {
         return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
                 LocalDate.of(1995, 1, 1), "coupon@test.com").id();
     }
@@ -73,7 +73,7 @@ class CouponV1ApiE2ETest {
         );
     }
 
-    private Long createExpiredTemplate() {
+    private String createExpiredTemplate() {
         CouponTemplateEntity expiredTemplate = CouponTemplateEntity.of(
                 null, "만료된 쿠폰", CouponType.FIXED, 1000L, null,
                 ZonedDateTime.now().minusDays(1),
@@ -160,7 +160,7 @@ class CouponV1ApiE2ETest {
         void returnsBadRequest_whenTemplateIsExpired() {
             // arrange
             createUser();
-            Long expiredTemplateId = createExpiredTemplate();
+            String expiredTemplateId = createExpiredTemplate();
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -187,7 +187,7 @@ class CouponV1ApiE2ETest {
         @Test
         void returnsMyCoupons_whenUserHasCoupons() {
             // arrange
-            Long userId = createUser();
+            String userId = createUser();
             CouponTemplateInfo template = createTemplate();
             couponApplicationService.issueCoupon(userId, template.templateId());
 

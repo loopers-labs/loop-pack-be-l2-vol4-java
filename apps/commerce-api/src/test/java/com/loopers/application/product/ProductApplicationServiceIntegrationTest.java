@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
@@ -92,7 +93,7 @@ class ProductApplicationServiceIntegrationTest {
         void throwsNotFound_whenBrandNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> productApplicationService.createProduct(999L, "에어맥스", "운동화 설명", 100_000L, 10));
+                    () -> productApplicationService.createProduct("999", "에어맥스", "운동화 설명", 100_000L, 10));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
@@ -144,7 +145,7 @@ class ProductApplicationServiceIntegrationTest {
         void throwsNotFound_whenProductNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> productApplicationService.getProduct(999L));
+                    () -> productApplicationService.getProduct("999"));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -226,7 +227,7 @@ class ProductApplicationServiceIntegrationTest {
         void throwsNotFound_whenProductNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> productApplicationService.updateProduct(999L, "에어포스", "새 설명", 90_000L, 20));
+                    () -> productApplicationService.updateProduct("999", "에어포스", "새 설명", 90_000L, 20));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -261,7 +262,7 @@ class ProductApplicationServiceIntegrationTest {
             // arrange
             BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo created = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            likeRepository.save(new LikeEntity(1L, created.id()));
+            likeRepository.save(new LikeEntity("1", created.id()));
 
             // act
             productApplicationService.deleteProduct(created.id());
@@ -270,7 +271,7 @@ class ProductApplicationServiceIntegrationTest {
             assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(created.id()))
                     .isEmpty();
 
-            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(1L, created.id()))
+            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull("1", created.id()))
                     .isEmpty();
         }
     }
@@ -305,7 +306,7 @@ class ProductApplicationServiceIntegrationTest {
             // arrange
             BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo created = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            doThrow(new RuntimeException("강제 실패")).when(inventoryRepository).findByProductId(anyLong());
+            doThrow(new RuntimeException("강제 실패")).when(inventoryRepository).findByProductId(anyString());
 
             // act
             assertThrows(RuntimeException.class,
@@ -326,7 +327,7 @@ class ProductApplicationServiceIntegrationTest {
             // arrange
             BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo created = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            doThrow(new RuntimeException("강제 실패")).when(inventoryRepository).deleteByProductId(anyLong());
+            doThrow(new RuntimeException("강제 실패")).when(inventoryRepository).deleteByProductId(anyString());
 
             // act
             assertThrows(RuntimeException.class, () -> productApplicationService.deleteProduct(created.id()));
@@ -342,7 +343,7 @@ class ProductApplicationServiceIntegrationTest {
             // arrange
             BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo created = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
-            doThrow(new RuntimeException("강제 실패")).when(likeRepository).deleteAllByProductId(anyLong());
+            doThrow(new RuntimeException("강제 실패")).when(likeRepository).deleteAllByProductId(anyString());
 
             // act
             assertThrows(RuntimeException.class, () -> productApplicationService.deleteProduct(created.id()));

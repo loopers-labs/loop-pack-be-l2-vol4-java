@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class CouponEntityTest {
 
-    private static final Long VALID_TEMPLATE_ID = 1L;
-    private static final Long VALID_USER_ID = 1L;
+    private static final String VALID_TEMPLATE_ID = "1";
+    private static final String VALID_USER_ID = "1";
     private static final ZonedDateTime FUTURE = ZonedDateTime.now().plusDays(30);
     private static final ZonedDateTime PAST = ZonedDateTime.now().minusDays(1);
 
@@ -79,7 +79,7 @@ public class CouponEntityTest {
         @Test
         void throwsException_whenCouponIsExpired() {
             // arrange
-            CouponEntity coupon = CouponEntity.of(1L, VALID_TEMPLATE_ID, VALID_USER_ID, CouponStatus.EXPIRED, null, null, null);
+            CouponEntity coupon = CouponEntity.of("1", VALID_TEMPLATE_ID, VALID_USER_ID, CouponStatus.EXPIRED, null, null, null);
 
             // act & assert
             assertThrows(CoreException.class, coupon::use);
@@ -152,7 +152,7 @@ public class CouponEntityTest {
             CouponEntity coupon = new CouponEntity(VALID_TEMPLATE_ID, VALID_USER_ID);
 
             // act & assert
-            assertFalse(coupon.isOwnedBy(2L));
+            assertFalse(coupon.isOwnedBy("2"));
         }
 
         @DisplayName("null이면 false를 반환한다.")

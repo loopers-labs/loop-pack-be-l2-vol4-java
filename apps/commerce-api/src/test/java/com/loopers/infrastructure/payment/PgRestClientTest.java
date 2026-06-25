@@ -1,0 +1,84 @@
+package com.loopers.infrastructure.payment;
+
+import com.loopers.domain.payment.CardType;
+import com.loopers.domain.payment.PgPaymentRequest;
+import com.loopers.domain.payment.PgTransactionResponse;
+import com.loopers.domain.payment.PgTransactionStatus;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+
+@DisplayName("PgRestClient — PG 연동 시 X-USER-ID 헤더를 항상 전송한다.")
+class PgRestClientTest {
+
+    private static final String BASE_URL = "http://localhost:8082";
+    private static final String USER_ID = "135135";
+
+    private RestTemplate requestRestTemplate;
+    private RestTemplate queryRestTemplate;
+    private MockRestServiceServer requestServer;
+    private MockRestServiceServer queryServer;
+    private PgRestClient pgRestClient;
+
+    @BeforeEach
+    void setUp() {
+        requestRestTemplate = new RestTemplate();
+        queryRestTemplate = new RestTemplate();
+        requestServer = MockRestServiceServer.createServer(requestRestTemplate);
+        queryServer = MockRestServiceServer.createServer(queryRestTemplate);
+        pgRestClient = new PgRestClient(requestRestTemplate, queryRestTemplate, BASE_URL);
+    }
+
+    @DisplayName("requestPayment 호출 시 X-USER-ID 헤더에 userId가 담겨 전송된다.")
+    @Test
+    void requestPayment_sendsUserIdHeader() {
+        // Arrange
+        requestServer.expect(requestTo(BASE_URL + "/api/v1/payments"))
+            .andExpect(method(POST))
+            .andExpect(header("X-USER-ID", String.valueOf(USER_ID)))
+            .andRespond(withSuccess(
+                "{\"transactionKey\":\"TX-1\",\"status\":\"PENDING\",\"reason\":null}",
+                MediaType.APPLICATION_JSON));
+
+        var request = new PgPaymentRequest("1", CardType.SAMSUNG, "1234-5678-9814-1451", 10000L,
+            "http://localhost:8080/api/v1/payments/callback");
+
+        // Act
+        PgTransactionResponse response = pgRestClient.requestPayment(request, USER_ID);
+
+        // Assert
+        assertThat(response.transactionKey()).isEqualTo("TX-1");
+        assertThat(response.status()).isEqualTo(PgTransactionStatus.PENDING);
+        requestServer.verify();
+    }
+
+    @DisplayName("getTransaction 호출 시 X-USER-ID 헤더에 userId가 담겨 전송된다.")
+    @Test
+    void getTransaction_sendsUserIdHeader() {
+        // Arrange
+        queryServer.expect(requestTo(BASE_URL + "/api/v1/payments/TX-1"))
+            .andExpect(method(GET))
+            .andExpect(header("X-USER-ID", String.valueOf(USER_ID)))
+            .andRespond(withSuccess(
+                "{\"transactionKey\":\"TX-1\",\"status\":\"SUCCESS\",\"reason\":null}",
+                MediaType.APPLICATION_JSON));
+
+        // Act
+        PgTransactionResponse response = pgRestClient.getTransaction("TX-1", USER_ID);
+
+        // Assert
+        assertThat(response.status()).isEqualTo(PgTransactionStatus.SUCCESS);
+        queryServer.verify();
+    }
+}

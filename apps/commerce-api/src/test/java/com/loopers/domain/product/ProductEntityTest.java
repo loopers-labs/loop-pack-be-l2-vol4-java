@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ProductEntityTest {
 
-    private static final Long VALID_BRAND_ID = 1L;
+    private static final String VALID_BRAND_ID = "1";
     private static final String VALID_NAME = "에어맥스 90";
     private static final String VALID_DESCRIPTION = "나이키 클래식 러닝화";
     private static final Long VALID_PRICE = 150000L;

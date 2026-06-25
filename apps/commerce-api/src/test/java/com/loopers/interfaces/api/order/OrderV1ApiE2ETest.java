@@ -65,7 +65,7 @@ class OrderV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private Long createUser() {
+    private String createUser() {
         return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
                 LocalDate.of(1995, 1, 1), "test@test.com").id();
     }
@@ -75,7 +75,7 @@ class OrderV1ApiE2ETest {
         return productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, quantity);
     }
 
-    private Long createOrderDirectly(Long userId, ProductInfo product, int quantity) {
+    private String createOrderDirectly(String userId, ProductInfo product, int quantity) {
         long subtotal = product.price() * quantity;
         OrderSnapshot snapshot = new OrderSnapshot(
                 List.of(new OrderSnapshotItem(product.id(), product.name(), product.price(), quantity, subtotal)),
@@ -110,7 +110,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsUnauthorized_whenAuthHeaderIsMissing() {
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(1L, 1)), null
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest("1", 1)), null
             );
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -165,7 +165,7 @@ class OrderV1ApiE2ETest {
             createUser();
 
             OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(
-                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest(999L, 1)), null
+                    List.of(new OrderV1Dto.CreateOrderRequest.OrderItemRequest("999", 1)), null
             );
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
@@ -208,7 +208,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("내 주문 목록을 조회하면 200과 주문 목록을 반환한다.")
         @Test
         void returnsOrders_whenRequestIsValid() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct(10);
             createOrderDirectly(userId, product, 1);
 
@@ -230,7 +230,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("startAt/endAt 날짜 필터로 내 주문 목록을 조회할 수 있다.")
         @Test
         void returnsFilteredOrders_whenDateFilterApplied() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct(10);
             createOrderDirectly(userId, product, 1);
 
@@ -258,9 +258,9 @@ class OrderV1ApiE2ETest {
         @DisplayName("내 주문을 단건 조회하면 200과 주문 상세를 반환한다.")
         @Test
         void returnsOrder_whenRequestIsValid() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct(10);
-            Long orderId = createOrderDirectly(userId, product, 2);
+            String orderId = createOrderDirectly(userId, product, 2);
 
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type =
                     new ParameterizedTypeReference<>() {};
@@ -281,10 +281,10 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsNotFound_whenAccessingOtherUserOrder() {
             createUser();
-            Long otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
+            String otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
                     LocalDate.of(1990, 5, 15), "other@test.com").id();
             ProductInfo product = createProduct(10);
-            Long otherOrderId = createOrderDirectly(otherUserId, product, 1);
+            String otherOrderId = createOrderDirectly(otherUserId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
@@ -307,7 +307,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("어드민이 전체 주문 목록을 조회하면 200과 userId가 포함된 주문 목록을 반환한다.")
         @Test
         void returnsAllOrders_whenAdminRequestIsValid() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct(10);
             createOrderDirectly(userId, product, 1);
 
@@ -337,9 +337,9 @@ class OrderV1ApiE2ETest {
         @DisplayName("어드민이 주문 단건 조회하면 200과 userId가 포함된 주문 상세를 반환한다.")
         @Test
         void returnsOrder_whenAdminRequestIsValid() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct(10);
-            Long orderId = createOrderDirectly(userId, product, 1);
+            String orderId = createOrderDirectly(userId, product, 1);
 
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.AdminOrderResponse>> type =
                     new ParameterizedTypeReference<>() {};

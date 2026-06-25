@@ -94,7 +94,7 @@ class BrandApplicationServiceIntegrationTest {
         void throwsNotFound_whenBrandNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandApplicationService.getBrand(999L));
+                    () -> brandApplicationService.getBrand("999"));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }
@@ -203,7 +203,7 @@ class BrandApplicationServiceIntegrationTest {
         void throwsNotFound_whenBrandNotExists() {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> brandApplicationService.updateBrand(999L, "나이키", "스포츠 브랜드"));
+                    () -> brandApplicationService.updateBrand("999", "나이키", "스포츠 브랜드"));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
@@ -266,7 +266,7 @@ class BrandApplicationServiceIntegrationTest {
             // arrange
             BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
             ProductInfo product = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화", 100_000L, 10);
-            likeRepository.save(new LikeEntity(1L, product.id()));
+            likeRepository.save(new LikeEntity("1", product.id()));
 
             // act
             brandApplicationService.deleteBrand(brand.id());
@@ -280,7 +280,7 @@ class BrandApplicationServiceIntegrationTest {
             assertThat(inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(product.id()))
                     .isEmpty();
 
-            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(1L, product.id()))
+            assertThat(likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull("1", product.id()))
                     .isEmpty();
         }
     }

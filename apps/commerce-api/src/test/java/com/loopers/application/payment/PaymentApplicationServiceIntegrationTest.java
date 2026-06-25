@@ -25,6 +25,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,8 +41,8 @@ class PaymentApplicationServiceIntegrationTest {
     @Autowired DatabaseCleanUp databaseCleanUp;
     @MockBean PgClient pgClient;
 
-    private Long userId;
-    private Long orderId;
+    private String userId;
+    private String orderId;
 
     @AfterEach
     void tearDown() {
@@ -67,7 +68,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("PG 요청 성공 시 PaymentEntity가 PENDING으로 저장된다.")
         @Test
         void initiate_savesPaymentAsPending_whenPgRequestSucceeds() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -79,7 +80,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("PG 요청 실패 시 PaymentEntity가 FAILED로 저장되고 예외가 발생한다.")
         @Test
         void initiate_savesPaymentAsFailed_whenPgRequestFails() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenThrow(new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "PG 오류"));
 
             assertThrows(CoreException.class,
@@ -89,7 +90,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("동일 orderId에 PENDING 결제가 이미 있으면 예외가 발생한다.")
         @Test
         void initiate_throwsConflict_whenDuplicatePaymentExists() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
 
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -103,7 +104,7 @@ class PaymentApplicationServiceIntegrationTest {
         void initiate_completesAsFailed_whenPgRespondsFailedImmediately() throws Exception {
             // PG가 PENDING이 아닌 FAILED를 즉시 응답하면 applyPgResponse가 즉시 FAILED로 확정하고
             // initiate는 콜백 대기 없이 completedFuture를 반환한다. (getTransaction 미호출)
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-IMM-FAIL", PgTransactionStatus.FAILED, "한도 초과"));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -124,9 +125,9 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("timeout 후 1차 Poll이 SUCCESS면 future가 SUCCESS로 완료되고 주문이 PAID가 된다.")
         @Test
         void timeout_pollSuccess_completesAsSuccess() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-T1", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-T1"))
+            when(pgClient.getTransaction(eq("TX-T1"), any()))
                 .thenReturn(new PgTransactionResponse("TX-T1", PgTransactionStatus.SUCCESS, null));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -139,9 +140,9 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("timeout 후 1차 Poll이 FAILED면 future가 FAILED로 완료된다.")
         @Test
         void timeout_pollFailed_completesAsFailed() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-T2", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-T2"))
+            when(pgClient.getTransaction(eq("TX-T2"), any()))
                 .thenReturn(new PgTransactionResponse("TX-T2", PgTransactionStatus.FAILED, "한도 초과"));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -154,9 +155,9 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("timeout 후 1차 Poll이 여전히 PENDING이면 future가 PENDING으로 완료된다. (Scheduler 후속 처리)")
         @Test
         void timeout_pollPending_completesAsPending() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-T3", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-T3"))
+            when(pgClient.getTransaction(eq("TX-T3"), any()))
                 .thenReturn(new PgTransactionResponse("TX-T3", PgTransactionStatus.PENDING, null));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -168,9 +169,9 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("timeout 후 1차 Poll 자체가 PG_QUERY_ERROR로 실패하면 예외를 삼키고 PENDING으로 완료된다.")
         @Test
         void timeout_pollThrows_completesAsPending() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-T4", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-T4"))
+            when(pgClient.getTransaction(eq("TX-T4"), any()))
                 .thenThrow(new CoreException(ErrorType.PG_QUERY_ERROR, "PG 조회 실패"));
 
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
@@ -187,7 +188,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("SUCCESS 콜백 수신 시 PaymentEntity가 SUCCESS, OrderEntity가 PAID가 된다.")
         @Test
         void processCallback_updatesStatusToSuccess_andPaysOrder() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
 
@@ -204,7 +205,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("FAILED 콜백 수신 시 PaymentEntity가 FAILED가 된다.")
         @Test
         void processCallback_updatesStatusToFailed_whenPgFails() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
 
@@ -219,7 +220,7 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("동일 transactionKey로 SUCCESS 콜백을 2회 수신해도 멱등하게 SUCCESS를 유지한다.")
         @Test
         void processCallback_isIdempotent_whenSuccessReceivedTwice() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-IDEM", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
 
@@ -234,9 +235,9 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("1차 Poll이 SUCCESS로 확정한 뒤 늦은 SUCCESS 콜백이 도착해도 멱등하게 SUCCESS를 유지한다.")
         @Test
         void processCallback_isIdempotent_whenLateCallbackAfterPoll() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-RACE", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-RACE"))
+            when(pgClient.getTransaction(eq("TX-RACE"), any()))
                 .thenReturn(new PgTransactionResponse("TX-RACE", PgTransactionStatus.SUCCESS, null));
 
             // 콜백 미수신 → timeout(2s) 후 1차 Poll이 SUCCESS로 확정
@@ -267,12 +268,12 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("DB가 PENDING이면 PgClient를 직접 조회하여 상태를 갱신한다.")
         @Test
         void getPayment_pollsPg_whenStatusIsPending() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
             var future = paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = getPaymentIdByTransactionKey("TX-001");
+            String paymentId = getPaymentIdByTransactionKey("TX-001");
 
-            when(pgClient.getTransaction("TX-001"))
+            when(pgClient.getTransaction(eq("TX-001"), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.SUCCESS, null));
 
             PaymentInfo result = paymentApplicationService.getPayment(userId, paymentId);
@@ -283,12 +284,12 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("DB가 PENDING이고 PG Poll이 FAILED면 FAILED로 갱신하여 반환한다.")
         @Test
         void getPayment_updatesToFailed_whenPollFailed() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-005", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = getPaymentIdByTransactionKey("TX-005");
+            String paymentId = getPaymentIdByTransactionKey("TX-005");
 
-            when(pgClient.getTransaction("TX-005"))
+            when(pgClient.getTransaction(eq("TX-005"), any()))
                 .thenReturn(new PgTransactionResponse("TX-005", PgTransactionStatus.FAILED, "한도 초과"));
 
             PaymentInfo result = paymentApplicationService.getPayment(userId, paymentId);
@@ -300,12 +301,12 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("DB가 PENDING이고 PG 조회가 PG_QUERY_ERROR로 실패하면 예외가 그대로 전파된다.")
         @Test
         void getPayment_throwsPgQueryError_whenPgQueryFails() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-006", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = getPaymentIdByTransactionKey("TX-006");
+            String paymentId = getPaymentIdByTransactionKey("TX-006");
 
-            when(pgClient.getTransaction("TX-006"))
+            when(pgClient.getTransaction(eq("TX-006"), any()))
                 .thenThrow(new CoreException(ErrorType.PG_QUERY_ERROR, "PG 조회 실패"));
 
             var exception = assertThrows(CoreException.class,
@@ -316,33 +317,33 @@ class PaymentApplicationServiceIntegrationTest {
         @DisplayName("소유자가 아닌 유저가 조회하면 NOT_FOUND 예외가 발생한다.")
         @Test
         void getPayment_throwsNotFound_whenNotOwner() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-001", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = getPaymentIdByTransactionKey("TX-001");
+            String paymentId = getPaymentIdByTransactionKey("TX-001");
 
             var exception = assertThrows(CoreException.class,
-                () -> paymentApplicationService.getPayment(999L, paymentId));
+                () -> paymentApplicationService.getPayment("999", paymentId));
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
         @DisplayName("DB가 이미 SUCCESS로 확정된 결제는 PG 조회 없이 그대로 반환한다.")
         @Test
         void getPayment_doesNotPollPg_whenAlreadyConfirmed() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-CONFIRMED", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
             paymentApplicationService.processCallback("TX-CONFIRMED", PgTransactionStatus.SUCCESS, null);
-            Long paymentId = getPaymentIdByTransactionKey("TX-CONFIRMED");
+            String paymentId = getPaymentIdByTransactionKey("TX-CONFIRMED");
 
             PaymentInfo result = paymentApplicationService.getPayment(userId, paymentId);
 
             assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
-            verify(pgClient, never()).getTransaction("TX-CONFIRMED");
+            verify(pgClient, never()).getTransaction(eq("TX-CONFIRMED"), any());
         }
     }
 
-    private Long getPaymentIdByTransactionKey(String transactionKey) {
+    private String getPaymentIdByTransactionKey(String transactionKey) {
         return paymentApplicationService.getPaymentByTransactionKey(transactionKey).paymentId();
     }
 }

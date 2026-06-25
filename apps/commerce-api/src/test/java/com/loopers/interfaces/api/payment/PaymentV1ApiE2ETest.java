@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -45,8 +46,8 @@ class PaymentV1ApiE2ETest {
     @Autowired DatabaseCleanUp databaseCleanUp;
     @MockBean PgClient pgClient;
 
-    private Long userId;
-    private Long orderId;
+    private String userId;
+    private String orderId;
     private final String loginId = "testuser";
     private final String loginPw = "Password1!";
 
@@ -82,9 +83,9 @@ class PaymentV1ApiE2ETest {
         @DisplayName("PG 콜백이 10초 내 도착하면 SUCCESS를 반환한다.")
         @Test
         void pay_returnsSuccess_whenCallbackArrives() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-001", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-E2E-001"))
+            when(pgClient.getTransaction(eq("TX-E2E-001"), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-001", PgTransactionStatus.SUCCESS, null));
 
             var executor = Executors.newSingleThreadExecutor();
@@ -107,7 +108,7 @@ class PaymentV1ApiE2ETest {
                 ENDPOINT,
                 HttpMethod.POST,
                 new HttpEntity<>(
-                    "{\"orderId\":" + orderId + ",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
+                    "{\"orderId\":\"" + orderId + "\",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
                     userHeaders()
                 ),
                 new ParameterizedTypeReference<ApiResponse<PaymentV1Dto.Response>>() {}
@@ -153,7 +154,7 @@ class PaymentV1ApiE2ETest {
                 ENDPOINT,
                 HttpMethod.POST,
                 new HttpEntity<>(
-                    "{\"orderId\":" + orderId + ",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
+                    "{\"orderId\":\"" + orderId + "\",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
                     otherHeaders
                 ),
                 new ParameterizedTypeReference<ApiResponse<PaymentV1Dto.Response>>() {}
@@ -165,9 +166,9 @@ class PaymentV1ApiE2ETest {
         @DisplayName("확정 이후 PG가 동일 SUCCESS 콜백을 재전송(at-least-once)해도 200으로 멱등 처리되고 상태가 유지된다.")
         @Test
         void pay_handlesDuplicateSuccessCallback_idempotently() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-DUP", PgTransactionStatus.PENDING, null));
-            when(pgClient.getTransaction("TX-DUP"))
+            when(pgClient.getTransaction(eq("TX-DUP"), any()))
                 .thenReturn(new PgTransactionResponse("TX-DUP", PgTransactionStatus.SUCCESS, null));
 
             // timeout(2s) 후 1차 Poll SUCCESS 확정
@@ -175,7 +176,7 @@ class PaymentV1ApiE2ETest {
                 ENDPOINT,
                 HttpMethod.POST,
                 new HttpEntity<>(
-                    "{\"orderId\":" + orderId + ",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
+                    "{\"orderId\":\"" + orderId + "\",\"cardType\":\"SAMSUNG\",\"cardNo\":\"1234-5678-9814-1451\"}",
                     userHeaders()
                 ),
                 new ParameterizedTypeReference<ApiResponse<PaymentV1Dto.Response>>() {}
@@ -196,7 +197,7 @@ class PaymentV1ApiE2ETest {
             );
             assertThat(callbackResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-            Long paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-DUP").paymentId();
+            String paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-DUP").paymentId();
             assertThat(paymentApplicationService.getPayment(userId, paymentId).status())
                 .isEqualTo(com.loopers.domain.payment.PaymentStatus.SUCCESS);
         }
@@ -209,7 +210,7 @@ class PaymentV1ApiE2ETest {
         @DisplayName("콜백 엔드포인트는 인증 없이 호출해도 200을 반환한다.")
         @Test
         void callback_returns200_withoutAuth() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-NOAUTH", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
 
@@ -236,14 +237,14 @@ class PaymentV1ApiE2ETest {
         @DisplayName("DB가 PENDING이면 PG 조회 후 SUCCESS를 반환한다.")
         @Test
         void getPayment_returnSuccess_afterPgPoll() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-002", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
 
-            when(pgClient.getTransaction("TX-E2E-002"))
+            when(pgClient.getTransaction(eq("TX-E2E-002"), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-002", PgTransactionStatus.SUCCESS, null));
 
-            Long paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-002").paymentId();
+            String paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-002").paymentId();
 
             var response = testRestTemplate.exchange(
                 ENDPOINT + "/" + paymentId,
@@ -259,10 +260,10 @@ class PaymentV1ApiE2ETest {
         @DisplayName("다른 유저가 타인의 결제를 조회하면 404를 반환한다.")
         @Test
         void getPayment_returns404_whenNotOwner() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-OWNER", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-OWNER").paymentId();
+            String paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-OWNER").paymentId();
 
             userApplicationService.signup("otheruser", "Password1!", "이몽룡",
                 LocalDate.of(1991, 2, 2), "other@test.com");
@@ -283,12 +284,12 @@ class PaymentV1ApiE2ETest {
         @DisplayName("DB가 PENDING이고 PG 조회가 PG_QUERY_ERROR로 실패하면 HTTP 500을 반환한다.")
         @Test
         void getPayment_returns500_whenPgQueryFails() {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-ERR", PgTransactionStatus.PENDING, null));
             paymentApplicationService.initiate(userId, orderId, CardType.SAMSUNG, "1234-5678-9814-1451");
-            Long paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-ERR").paymentId();
+            String paymentId = paymentApplicationService.getPaymentByTransactionKey("TX-E2E-ERR").paymentId();
 
-            when(pgClient.getTransaction("TX-E2E-ERR"))
+            when(pgClient.getTransaction(eq("TX-E2E-ERR"), any()))
                 .thenThrow(new com.loopers.support.error.CoreException(
                     com.loopers.support.error.ErrorType.PG_QUERY_ERROR, "PG 조회 실패"));
 
@@ -310,7 +311,7 @@ class PaymentV1ApiE2ETest {
         @DisplayName("동일 orderId에 initiate를 동시 2회 호출하면 하나만 성공하고 나머지는 CONFLICT가 된다.")
         @Test
         void initiate_allowsOnlyOne_whenCalledConcurrently() throws Exception {
-            when(pgClient.requestPayment(any()))
+            when(pgClient.requestPayment(any(), any()))
                 .thenReturn(new PgTransactionResponse("TX-CONCURRENT", PgTransactionStatus.PENDING, null));
 
             var executor = Executors.newFixedThreadPool(2);

@@ -31,6 +31,7 @@
 | JSON | Jackson (jsr310, kotlin module) | Spring Boot 관리 |
 | Observability | Micrometer Prometheus / Tracing(Brave) | Spring Boot 관리 |
 | Logging | Logback + `logback-slack-appender` | **1.6.1** |
+| Entity ID | ULID (`com.github.f4b6a3:ulid-creator`) | **5.2.3** |
 | Test - Core | JUnit 5 (junit-platform-launcher) | Spring Boot 관리 |
 | Test - Mock | Mockito | **5.14.0** |
 | Test - Mock(Kotlin) | springmockk | **4.0.2** |
@@ -148,6 +149,19 @@ com.loopers
 ```
 
 공통 엔티티는 `modules/jpa` 의 `com.loopers.domain.BaseEntity` 에서 제공되며, `createdAt / updatedAt / deletedAt` 자동 관리 + 멱등한 `delete()` / `restore()` 를 포함합니다.
+
+## Entity ID 전략
+
+모든 엔티티의 PK 는 **`{XXX}_{ULID}` 형식의 `String`** 입니다 (auto-increment 미사용).
+
+- **형식**: `XXX`(도메인 3글자 코드, 예: `USR`/`BRD`/`PRD`/`INV`/`LIK`/`ORD`/`PAY`/`CPN`/`CTP`) + `_` + 26자 ULID
+- **생성**: `modules/jpa` 의 `com.loopers.infrastructure.EntityId.generate(code)` — `UlidCreator.getMonotonicUlid()`(스레드 안전·시간정렬) 사용
+- **늦은 생성**: `BaseJpaEntity` 가 `@PrePersist` 에서 `id == null` 일 때만 생성 (reconstruct 경로 보존). 각 `*JpaEntity` 는 `idCode()` 를 오버라이드해 3글자 코드를 제공
+- **유일성**: 다중 인스턴스에서도 ULID(80bit 랜덤 + ms)로 사실상 보장 + **DB PK/복합 UNIQUE 제약**이 최종 보장. nodeId 세그먼트는 사용하지 않음
+- **FK 컬럼 네이밍**: 다른 테이블 PK 를 참조하는 FK 컬럼은 `ref_{xxx}_id` 로 명명 (예: `like.ref_user_id`, `like.ref_product_id`). `users.user_id` 는 로그인 ID 이므로 FK 가 아니며 제외
+- **동시성(비즈니스 중복)**: ID 포맷이 아니라 복합 UNIQUE 제약 + `DataIntegrityViolation` 처리로 방어 (예: `like(ref_user_id, ref_product_id)`). 단, `coupon` 은 동일 템플릿의 동일 유저 다중 발급을 허용하므로 복합 UNIQUE 를 두지 않음
+
+> follow-up: `docker/seed-data.sql` 은 숫자 PK 기반 성능 테스트 시드라 String PK 스킴 적용 시 갱신 필요.
 
 ## 채택된 개발 방법론
 

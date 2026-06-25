@@ -68,7 +68,7 @@ class OrderApplicationServiceIntegrationTest {
         return userApplicationService.signup(loginId, "Password1!", "홍길동", LocalDate.of(1990, 1, 1), loginId + "@test.com");
     }
 
-    private ProductInfo createProduct(Long brandId, String name, Long price, int quantity) {
+    private ProductInfo createProduct(String brandId, String name, Long price, int quantity) {
         return productApplicationService.createProduct(brandId, name, "상품 설명", price, quantity);
     }
 
@@ -140,7 +140,7 @@ class OrderApplicationServiceIntegrationTest {
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
                     () -> orderApplicationService.createOrder(user.id(),
-                            List.of(new OrderItemCommand(999L, 1)), null));
+                            List.of(new OrderItemCommand("999", 1)), null));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
 
@@ -268,7 +268,7 @@ class OrderApplicationServiceIntegrationTest {
 
             // act & assert
             CoreException exception = assertThrows(CoreException.class,
-                    () -> orderApplicationService.getOrder(user.id(), 999L));
+                    () -> orderApplicationService.getOrder(user.id(), "999"));
             assertEquals(ErrorType.NOT_FOUND, exception.getErrorType());
         }
     }

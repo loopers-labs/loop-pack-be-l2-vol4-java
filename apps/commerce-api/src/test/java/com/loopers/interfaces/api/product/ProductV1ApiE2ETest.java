@@ -69,7 +69,7 @@ class ProductV1ApiE2ETest {
         return brandApplicationService.createBrand(name, name + " 설명");
     }
 
-    private ProductInfo createProduct(Long brandId, String name, Long price, Integer quantity) {
+    private ProductInfo createProduct(String brandId, String name, Long price, Integer quantity) {
         return productApplicationService.createProduct(brandId, name, name + " 설명", price, quantity);
     }
 
@@ -162,7 +162,7 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            String userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
             likeApplicationService.addLike(userId, hasLike.id());
 
             // act
@@ -189,7 +189,7 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            String userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
             likeApplicationService.addLike(userId, hasLike.id());
 
             // act
@@ -341,7 +341,7 @@ class ProductV1ApiE2ETest {
         void returnsNotFound_whenBrandDoesNotExist() {
             // arrange
             ProductV1Dto.CreateProductRequest request =
-                    new ProductV1Dto.CreateProductRequest(999L, "에어맥스", "최고의 운동화", 100_000L, 10);
+                    new ProductV1Dto.CreateProductRequest("999", "에어맥스", "최고의 운동화", 100_000L, 10);
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> type =
@@ -361,7 +361,7 @@ class ProductV1ApiE2ETest {
         void returnsForbidden_whenAdminHeaderIsMissing() {
             // arrange
             ProductV1Dto.CreateProductRequest request =
-                    new ProductV1Dto.CreateProductRequest(1L, "에어맥스", "최고의 운동화", 100_000L, 10);
+                    new ProductV1Dto.CreateProductRequest("1", "에어맥스", "최고의 운동화", 100_000L, 10);
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> type =

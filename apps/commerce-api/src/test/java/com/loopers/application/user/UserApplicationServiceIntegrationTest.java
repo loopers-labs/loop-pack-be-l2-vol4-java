@@ -43,7 +43,7 @@ class UserApplicationServiceIntegrationTest {
             createUser("testuser");
 
             // act
-            Long userId = userApplicationService.authenticate("testuser", "Password1!");
+            String userId = userApplicationService.authenticate("testuser", "Password1!");
 
             // assert
             assertNotNull(userId);
