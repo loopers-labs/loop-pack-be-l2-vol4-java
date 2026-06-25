@@ -28,6 +28,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderEntity> findByIdWithLock(Long id) {
+        return orderJpaRepository.findByIdWithLock(id).map(OrderMapper::toDomain);
+    }
+
+    @Override
     public Page<OrderEntity> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdWithDateRange(userId, startAt, endAt, pageable)
                 .map(OrderMapper::toDomain);

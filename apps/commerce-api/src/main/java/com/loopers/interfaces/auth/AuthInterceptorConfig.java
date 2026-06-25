@@ -23,7 +23,8 @@ public class AuthInterceptorConfig implements WebMvcConfigurer {
                         "/api/v1/users",
                         "/api/v1/brands/*",
                         "/api/v1/products",
-                        "/api/v1/products/*"
+                        "/api/v1/products/*",
+                        "/api/v1/payments/callback"
                 );
 
         registry.addInterceptor(new AdminAuthInterceptor())

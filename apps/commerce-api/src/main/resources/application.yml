@@ -23,11 +23,30 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg:
+  base-url: http://localhost:8090
+  callback-timeout-seconds: 10   # CompletableFuture orTimeout. 콜백 대기 시간
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgClient:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
 
 ---
 spring:
@@ -56,3 +75,11 @@ spring:
 springdoc:
   api-docs:
     enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+pg:
+  callback-timeout-seconds: 2
