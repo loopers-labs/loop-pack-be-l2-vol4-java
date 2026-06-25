@@ -23,6 +23,31 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pgSimulator:
+            connect-timeout: 1000 # 연결 타임아웃(ms) — Timeout 전략(HTTP)
+            read-timeout: 3000    # 응답 타임아웃(ms)
+
+pg:
+  simulator:
+    url: http://localhost:8082   # pg-simulator 로컬 포트
+
+# PG 회복 전략: @CircuitBreaker(name="pgCircuit") — 보편값(커리큘럼 기준)
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgCircuit:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50            # 실패율 50% 초과 시 Open
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-duration-threshold: 2s      # 느린 호출도 실패로 간주
+        slow-call-rate-threshold: 50
+        register-health-indicator: true
 
 springdoc:
   use-fqn: true
