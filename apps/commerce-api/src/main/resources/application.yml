@@ -29,6 +29,14 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+pg:
+  base-url: http://localhost:8082
+
+spring.cloud.openfeign.client.config:
+  pgClient:
+    connect-timeout: 1000
+    read-timeout: 2000
+
 ---
 spring:
   config:
