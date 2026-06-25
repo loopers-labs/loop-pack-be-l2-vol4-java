@@ -72,7 +72,7 @@ class PaymentResultHandlerTest {
     }
 
     @Test
-    @DisplayName("transactionKey 로 결제를 못 찾으면 무시한다(대사가 회수)")
+    @DisplayName("transactionKey 로 결제를 못 찾으면 무시한다(정합성 보정이 회수)")
     void givenUnknownTransactionKey_whenHandle_thenIgnored() {
         when(paymentRepository.findByTransactionKey(TRANSACTION_KEY)).thenReturn(Optional.empty());
 

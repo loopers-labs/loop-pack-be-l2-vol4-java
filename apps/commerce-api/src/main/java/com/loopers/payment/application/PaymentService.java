@@ -11,6 +11,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,13 @@ public class PaymentService {
             throw new CoreException(ErrorType.CONFLICT, PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
         }
 
-        Payment saved = paymentRepository.save(Payment.create(userId, orderNumber, Money.of(order.finalAmount())));
+        Payment saved;
+        try {
+            // IDENTITY 키라 save 시점에 즉시 INSERT — 동시 더블서밋이 가드를 함께 통과해도 유니크 제약이 여기서 막는다.
+            saved = paymentRepository.save(Payment.create(userId, orderNumber, Money.of(order.finalAmount())));
+        } catch (DataIntegrityViolationException e) {
+            throw new CoreException(ErrorType.CONFLICT, PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
+        }
         log.info("결제 PENDING 생성 orderNumber={} paymentId={} amount={}", orderNumber, saved.getId(), saved.getAmount().value());
         return new PaymentResult.Pending(saved.getId(), saved.getOrderNumber(), saved.getAmount().value());
     }

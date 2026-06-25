@@ -11,13 +11,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "payments")
+@Table(
+        name = "payments",
+        // 한 주문번호엔 결제 1건만 — 활성 결제 가드(read-then-write)의 동시성 구멍을 막는 최후의 backstop.
+        uniqueConstraints = @UniqueConstraint(name = "uk_payments_order_number", columnNames = "order_number"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {

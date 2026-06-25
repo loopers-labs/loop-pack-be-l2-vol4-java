@@ -42,4 +42,9 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public List<Payment> findStalePendingWithKey(ZonedDateTime before) {
         return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNullAndCreatedAtBefore(PaymentStatus.PENDING, before);
     }
+
+    @Override
+    public List<Payment> findStalePendingWithoutKey(ZonedDateTime before) {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNullAndCreatedAtBefore(PaymentStatus.PENDING, before);
+    }
 }

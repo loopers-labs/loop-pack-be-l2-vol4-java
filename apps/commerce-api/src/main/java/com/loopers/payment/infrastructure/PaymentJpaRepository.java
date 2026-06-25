@@ -16,4 +16,6 @@ public interface PaymentJpaRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByTransactionKey(String transactionKey);
 
     List<Payment> findByStatusAndTransactionKeyIsNotNullAndCreatedAtBefore(PaymentStatus status, ZonedDateTime before);
+
+    List<Payment> findByStatusAndTransactionKeyIsNullAndCreatedAtBefore(PaymentStatus status, ZonedDateTime before);
 }

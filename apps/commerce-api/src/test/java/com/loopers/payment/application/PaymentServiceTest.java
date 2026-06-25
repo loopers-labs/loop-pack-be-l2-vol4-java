@@ -12,6 +12,7 @@ import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
@@ -88,6 +89,19 @@ class PaymentServiceTest {
         when(orderReader.findForPayment(ORDER_NUMBER)).thenReturn(Optional.of(payableOrder()));
         when(paymentRepository.findActiveByOrderNumber(ORDER_NUMBER))
                 .thenReturn(Optional.of(Payment.create(USER_ID, ORDER_NUMBER, Money.of(FINAL_AMOUNT))));
+
+        assertThatThrownBy(() -> paymentService.createPending(USER_ID, ORDER_NUMBER))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("가드를 통과한 동시 요청이 유니크 제약에 걸리면 PAYMENT_ALREADY_IN_PROGRESS 로 번역한다")
+    void givenUniqueConstraintViolationOnSave_whenCreatePending_thenThrowsAlreadyInProgress() {
+        when(orderReader.findForPayment(ORDER_NUMBER)).thenReturn(Optional.of(payableOrder()));
+        when(paymentRepository.findActiveByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any())).thenThrow(new DataIntegrityViolationException("uk_payments_order_number"));
 
         assertThatThrownBy(() -> paymentService.createPending(USER_ID, ORDER_NUMBER))
                 .isInstanceOf(CoreException.class)

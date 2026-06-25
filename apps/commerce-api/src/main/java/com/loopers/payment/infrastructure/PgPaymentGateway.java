@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * 단일 PG(Toss) 게이트웨이. PG 전송(Feign)·응답 매핑·provider 스탬프·callbackUrl 조립을 담당하고,
  * 회복탄력성(CB/Retry/RateLimiter) 조합은 {@link PgResilienceExecutor} 에 위임한다.
@@ -73,5 +75,17 @@ public class PgPaymentGateway implements PaymentGateway {
         PgTransactionDetail detail = tossPgClient.getTransaction(String.valueOf(userId), transactionKey).data();
         return new PaymentGatewayResult(
                 detail.transactionKey(), PROVIDER, PaymentStatus.valueOf(detail.status()), detail.reason());
+    }
+
+    @Override
+    public List<PaymentGatewayResult> inquireByOrder(Long userId, String orderNumber) {
+        PgOrderTransactions data = tossPgClient.getTransactionsByOrder(String.valueOf(userId), orderNumber).data();
+        if (data == null || data.transactions() == null) {
+            return List.of();
+        }
+        return data.transactions().stream()
+                .map(tx -> new PaymentGatewayResult(
+                        tx.transactionKey(), PROVIDER, PaymentStatus.valueOf(tx.status()), tx.reason()))
+                .toList();
     }
 }

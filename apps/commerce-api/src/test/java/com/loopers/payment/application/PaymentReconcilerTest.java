@@ -44,6 +44,10 @@ class PaymentReconcilerTest {
         return payment;
     }
 
+    private Payment stalePaymentWithoutKey() {
+        return Payment.create(USER_ID, ORDER_NUMBER, Money.of(AMOUNT));
+    }
+
     @Test
     @DisplayName("PG 조회가 terminal 이면 공유 진입점으로 확정한다")
     void givenPgTerminal_whenReconcile_thenConfirmsViaHandler() {
@@ -98,5 +102,62 @@ class PaymentReconcilerTest {
 
         verify(paymentService).abandon(any(), anyString());
         verify(paymentResultHandler, never()).handle(any());
+    }
+
+    @Test
+    @DisplayName("주문 기준 보정: PG 에 terminal 거래가 있으면 키를 채우고 공유 진입점으로 확정한다")
+    void givenNoKeyAndPgTerminal_whenReconcile_thenAssignsKeyAndConfirms() {
+        when(paymentRepository.findStalePendingWithoutKey(any())).thenReturn(List.of(stalePaymentWithoutKey()));
+        when(paymentGateway.inquireByOrder(USER_ID, ORDER_NUMBER)).thenReturn(List.of(
+                new PaymentGatewayResult(TRANSACTION_KEY, PgProvider.TOSS, PaymentStatus.SUCCESS, null)));
+
+        reconciler.reconcileWithoutKey();
+
+        verify(paymentService).assignTransaction(any(), eq(TRANSACTION_KEY), eq(PgProvider.TOSS));
+        verify(paymentResultHandler).handle(argThat(c ->
+                c.transactionKey().equals(TRANSACTION_KEY)
+                        && c.orderNumber().equals(ORDER_NUMBER)
+                        && c.amount() == AMOUNT
+                        && c.status() == PaymentStatus.SUCCESS));
+    }
+
+    @Test
+    @DisplayName("주문 기준 보정: PG 거래가 아직 PENDING 이면 키만 채우고 확정하지 않는다(다음 주기 키 기준 보정)")
+    void givenNoKeyAndPgPending_whenReconcile_thenAssignsKeyOnly() {
+        when(paymentRepository.findStalePendingWithoutKey(any())).thenReturn(List.of(stalePaymentWithoutKey()));
+        when(paymentGateway.inquireByOrder(USER_ID, ORDER_NUMBER)).thenReturn(List.of(
+                new PaymentGatewayResult(TRANSACTION_KEY, PgProvider.TOSS, PaymentStatus.PENDING, null)));
+
+        reconciler.reconcileWithoutKey();
+
+        verify(paymentService).assignTransaction(any(), eq(TRANSACTION_KEY), eq(PgProvider.TOSS));
+        verify(paymentResultHandler, never()).handle(any());
+    }
+
+    @Test
+    @DisplayName("주문 기준 보정: PG 에 거래가 없으면 무거래로 보고 FAILED 정리+보상한다")
+    void givenNoKeyAndNoPgTransaction_whenReconcile_thenHandlesAbsent() {
+        when(paymentRepository.findStalePendingWithoutKey(any())).thenReturn(List.of(stalePaymentWithoutKey()));
+        when(paymentGateway.inquireByOrder(USER_ID, ORDER_NUMBER)).thenReturn(List.of());
+
+        reconciler.reconcileWithoutKey();
+
+        verify(paymentResultHandler).handleAbsentTransaction(any());
+        verify(paymentService, never()).assignTransaction(any(), anyString(), any());
+        verify(paymentResultHandler, never()).handle(any());
+    }
+
+    @Test
+    @DisplayName("주문 기준 보정: 조회 실패 + 임계 시간 경과면 ABANDONED 로 포기한다")
+    void givenNoKeyInquiryFailsAndOldEnough_whenReconcile_thenAbandons() {
+        Payment old = stalePaymentWithoutKey();
+        ReflectionTestUtils.setField(old, "createdAt", ZonedDateTime.now().minusHours(2));
+        when(paymentRepository.findStalePendingWithoutKey(any())).thenReturn(List.of(old));
+        when(paymentGateway.inquireByOrder(any(), any())).thenThrow(new RuntimeException("PG 조회 실패"));
+
+        reconciler.reconcileWithoutKey();
+
+        verify(paymentService).abandon(any(), anyString());
+        verify(paymentResultHandler, never()).handleAbsentTransaction(any());
     }
 }
