@@ -23,6 +23,7 @@ import org.springframework.http.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -83,10 +84,12 @@ class PaymentV1ApiE2ETest {
         void pay_returnsSuccess_whenCallbackArrives() throws Exception {
             when(pgClient.requestPayment(any()))
                 .thenReturn(new PgTransactionResponse("TX-E2E-001", PgTransactionStatus.PENDING, null));
+            when(pgClient.getTransaction("TX-E2E-001"))
+                .thenReturn(new PgTransactionResponse("TX-E2E-001", PgTransactionStatus.SUCCESS, null));
 
             var executor = Executors.newSingleThreadExecutor();
             executor.submit(() -> {
-                Thread.sleep(300);
+                Thread.sleep(100);
                 HttpHeaders cbHeaders = new HttpHeaders();
                 cbHeaders.setContentType(MediaType.APPLICATION_JSON);
                 testRestTemplate.postForEntity(
@@ -113,6 +116,11 @@ class PaymentV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().status()).isEqualTo("SUCCESS");
             executor.shutdown();
+            try {
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         @DisplayName("존재하지 않는 주문으로 결제 요청 시 404를 반환한다.")
@@ -329,6 +337,11 @@ class PaymentV1ApiE2ETest {
             f1.get(10, java.util.concurrent.TimeUnit.SECONDS);
             f2.get(10, java.util.concurrent.TimeUnit.SECONDS);
             executor.shutdown();
+            try {
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
             assertThat(successCount.get()).isEqualTo(1);
             assertThat(conflictCount.get()).isEqualTo(1);
