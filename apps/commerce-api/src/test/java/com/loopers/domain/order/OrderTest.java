@@ -28,6 +28,23 @@ class OrderTest {
             assertThat(order.getIssuedCouponId()).isNull();
         }
 
+        @DisplayName("주문을 생성하면, orderCode(TSID)가 발급된다.")
+        @Test
+        void issuesOrderCode_onCreate() {
+            Order order = Order.create(1L, 100_000L, 0L, null);
+
+            assertThat(order.getOrderCode()).isNotNull();
+        }
+
+        @DisplayName("서로 다른 주문은 서로 다른 orderCode를 가진다.")
+        @Test
+        void issuesUniqueOrderCode() {
+            Order first = Order.create(1L, 100_000L, 0L, null);
+            Order second = Order.create(1L, 100_000L, 0L, null);
+
+            assertThat(first.getOrderCode()).isNotEqualTo(second.getOrderCode());
+        }
+
         @DisplayName("쿠폰을 적용하면, totalAmount = originalAmount - discountAmount다.")
         @Test
         void createsOrder_withCoupon() {

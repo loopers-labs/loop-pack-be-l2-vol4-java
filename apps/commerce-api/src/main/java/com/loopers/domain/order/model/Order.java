@@ -3,6 +3,7 @@ package com.loopers.domain.order.model;
 import com.loopers.domain.BaseEntity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import io.hypersistence.tsid.TSID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -12,6 +13,9 @@ import lombok.Getter;
 @Table(name = "orders")
 @Getter
 public class Order extends BaseEntity {
+
+    @Column(name = "order_code", nullable = false, unique = true, updatable = false)
+    private Long orderCode;
 
     @Column(name = "member_id", nullable = false)
     private Long memberId;
@@ -40,6 +44,7 @@ public class Order extends BaseEntity {
         if (discountAmount == null || discountAmount < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "할인 금액은 0 이상이어야 합니다.");
         }
+        this.orderCode = TSID.Factory.getTsid().toLong();
         this.memberId = memberId;
         this.originalAmount = originalAmount;
         this.discountAmount = discountAmount;
