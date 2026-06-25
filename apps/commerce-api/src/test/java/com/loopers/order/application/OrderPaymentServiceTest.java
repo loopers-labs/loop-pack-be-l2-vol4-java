@@ -24,16 +24,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class OrderCompensationServiceTest {
+class OrderPaymentServiceTest {
 
-    private static final Long ORDER_ID = 1L;
+    private static final String ORDER_NUMBER = "20260528-000001";
 
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ProductStockRepository productStockRepository = mock(ProductStockRepository.class);
     private final CouponUsageService couponUsageService = mock(CouponUsageService.class);
 
-    private final OrderCompensationService orderCompensationService = new OrderCompensationService(
+    private final OrderPaymentService orderPaymentService = new OrderPaymentService(
             orderRepository, orderItemRepository, productStockRepository, couponUsageService
     );
 
@@ -42,7 +42,7 @@ class OrderCompensationServiceTest {
     }
 
     private Order order(Long userCouponId) {
-        Order order = Order.create(1L, "20260528-000001", shipping(),
+        Order order = Order.create(1L, ORDER_NUMBER, shipping(),
                 List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 2)));
         if (userCouponId != null) {
             order.applyDiscount(userCouponId, Money.of(3_000L));
@@ -51,16 +51,27 @@ class OrderCompensationServiceTest {
     }
 
     @Test
-    @DisplayName("보상: 재고를 복구하고 쿠폰을 되돌리며 주문을 FAILED 로 전이한다")
+    @DisplayName("markPaid 는 주문을 PAID 로 전이한다")
+    void givenPendingPaymentOrder_whenMarkPaid_thenStatusIsPaid() {
+        Order order = order(null);
+        when(orderRepository.findByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.of(order));
+
+        orderPaymentService.markPaid(ORDER_NUMBER);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("compensate 는 재고를 복구하고 쿠폰을 되돌리며 주문을 PAYMENT_FAILED 로 전이한다")
     void givenOrderWithCoupon_whenCompensate_thenRestoresStockAndCouponAndFails() {
         Order order = order(50L);
         ProductStock stock = ProductStock.create(10L, 48);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderId(ORDER_ID))
+        when(orderRepository.findByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(any()))
                 .thenReturn(List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 2)));
         when(productStockRepository.findByProductIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        orderCompensationService.compensate(ORDER_ID);
+        orderPaymentService.compensate(ORDER_NUMBER);
 
         assertAll(
                 () -> assertThat(stock.getQuantity()).isEqualTo(50),
@@ -70,16 +81,16 @@ class OrderCompensationServiceTest {
     }
 
     @Test
-    @DisplayName("보상: 쿠폰 미적용 주문이면 쿠폰 복원을 호출하지 않고 재고만 복구한다")
+    @DisplayName("compensate 는 쿠폰 미적용 주문이면 쿠폰 복원 없이 재고만 복구한다")
     void givenOrderWithoutCoupon_whenCompensate_thenRestoresStockOnly() {
         Order order = order(null);
         ProductStock stock = ProductStock.create(10L, 48);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderId(ORDER_ID))
+        when(orderRepository.findByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(any()))
                 .thenReturn(List.of(OrderItem.create(10L, "셔츠", 1L, "루퍼스", 29_000L, 2)));
         when(productStockRepository.findByProductIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        orderCompensationService.compensate(ORDER_ID);
+        orderPaymentService.compensate(ORDER_NUMBER);
 
         assertAll(
                 () -> assertThat(stock.getQuantity()).isEqualTo(50),

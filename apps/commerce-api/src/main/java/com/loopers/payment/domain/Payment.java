@@ -2,6 +2,8 @@ package com.loopers.payment.domain;
 
 import com.loopers.common.domain.Money;
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -58,6 +60,15 @@ public class Payment extends BaseEntity {
     public void assignTransaction(String transactionKey, PgProvider pgProvider) {
         this.transactionKey = transactionKey;
         this.pgProvider = pgProvider;
+    }
+
+    /**
+     * 콜백/보정 통보가 이 결제와 일치하는지 검증한다(서명이 없는 PG라 orderNumber·amount 일치로 진위를 확인).
+     */
+    public void verifyCallback(String orderNumber, long amount) {
+        if (!this.orderNumber.equals(orderNumber) || this.amount.value() != amount) {
+            throw new CoreException(ErrorType.BAD_REQUEST, PaymentErrorCode.PAYMENT_CALLBACK_INVALID);
+        }
     }
 
     public void markSuccess() {

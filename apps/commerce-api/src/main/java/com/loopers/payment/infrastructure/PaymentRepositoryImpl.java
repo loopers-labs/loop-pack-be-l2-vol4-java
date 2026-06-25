@@ -28,6 +28,11 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByTransactionKey(String transactionKey) {
+        return paymentJpaRepository.findByTransactionKey(transactionKey);
+    }
+
+    @Override
     public Optional<Payment> findActiveByOrderNumber(String orderNumber) {
         return paymentJpaRepository.findFirstByOrderNumberAndStatusInOrderByIdDesc(orderNumber, ACTIVE_STATUSES);
     }

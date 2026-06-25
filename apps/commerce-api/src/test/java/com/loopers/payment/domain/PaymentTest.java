@@ -1,10 +1,13 @@
 package com.loopers.payment.domain;
 
 import com.loopers.common.domain.Money;
+import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 class PaymentTest {
@@ -93,5 +96,36 @@ class PaymentTest {
         payment.markSuccess();
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("verifyCallback 은 orderNumber·amount 가 일치하면 통과한다")
+    void givenMatchingCallback_whenVerify_thenOk() {
+        Payment payment = Payment.create(ORDER_NUMBER, AMOUNT);
+
+        assertThatCode(() -> payment.verifyCallback(ORDER_NUMBER, AMOUNT.value()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("verifyCallback 은 amount 가 다르면 PAYMENT_CALLBACK_INVALID 가 발생한다")
+    void givenAmountMismatch_whenVerify_thenThrows() {
+        Payment payment = Payment.create(ORDER_NUMBER, AMOUNT);
+
+        assertThatThrownBy(() -> payment.verifyCallback(ORDER_NUMBER, AMOUNT.value() + 1))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_CALLBACK_INVALID);
+    }
+
+    @Test
+    @DisplayName("verifyCallback 은 orderNumber 가 다르면 PAYMENT_CALLBACK_INVALID 가 발생한다")
+    void givenOrderNumberMismatch_whenVerify_thenThrows() {
+        Payment payment = Payment.create(ORDER_NUMBER, AMOUNT);
+
+        assertThatThrownBy(() -> payment.verifyCallback("20991231-999999", AMOUNT.value()))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_CALLBACK_INVALID);
     }
 }

@@ -8,5 +8,7 @@ public interface PaymentRepository {
 
     Optional<Payment> findById(Long id);
 
+    Optional<Payment> findByTransactionKey(String transactionKey);
+
     Optional<Payment> findActiveByOrderNumber(String orderNumber);
 }
