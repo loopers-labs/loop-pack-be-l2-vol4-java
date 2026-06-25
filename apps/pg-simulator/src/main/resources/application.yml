@@ -47,6 +47,13 @@ management:
   server:
     port: 8083
 
+# 공유 jpa.yml 의 local 프로파일이 jdbc-url 을 loopers 로 강제하므로, pg-simulator 는
+# 자기 local 프로파일에서 paymentgateway 로 덮어쓴다(commerce-api 의 loopers.payments 와 분리).
+datasource:
+  mysql-jpa:
+    main:
+      jdbc-url: jdbc:mysql://localhost:3306/paymentgateway
+
 ---
 spring:
   config:
