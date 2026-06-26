@@ -6,14 +6,16 @@ public record PaymentInfo(
         Long id,
         Long orderId,
         Long amount,
-        String status
+        String status,
+        String transactionKey
 ) {
     public static PaymentInfo from(PaymentModel payment) {
         return new PaymentInfo(
                 payment.getId(),
                 payment.getOrderId(),
                 payment.getAmount().getValue(),
-                payment.getStatus().getDescription()
+                payment.getStatus().getDescription(),
+                payment.getTransactionKey()
         );
     }
 }
