@@ -19,11 +19,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -267,5 +270,54 @@ class PaymentFacadeTest {
 
         assertThat(result.skipped()).isEqualTo(1);
         assertThat(result.paid()).isZero();
+    }
+
+    // ── reconcile give-up: 데드라인 초과 PENDING은 무한 재조회하지 않고 실패로 단념 ───────────────
+
+    /** id/createdAt까지 채운 복원형 PENDING (나이 측정 가능). cardNo는 이미 마스킹된 값으로 둔다. */
+    private PaymentModel reconstitutedPending(long orderId, String transactionKey, ZonedDateTime createdAt) {
+        return PaymentModel.reconstitute(1L, orderId, 1L, CardType.SAMSUNG, "1234-****-****-1451",
+                5000L, transactionKey, PaymentStatus.PENDING, null, createdAt);
+    }
+
+    @Test
+    @DisplayName("reconcile: PG에 거래가 없고 not-found 데드라인(2분)을 넘긴 PENDING은 FAILED로 단념(gaveUp)한다")
+    void given_pgHasNoTxAndAgedOut_when_reconcile_then_gaveUp() {
+        PaymentModel aged = reconstitutedPending(10L, "TX-1", ZonedDateTime.now().minusMinutes(5));
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(aged));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of()); // tx 미발견
+
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.gaveUp()).isEqualTo(1);
+        assertThat(result.stillPending()).isZero();
+        verify(paymentConfirmer).confirm(eq("TX-1"), eq(PaymentStatus.FAILED), anyString());
+    }
+
+    @Test
+    @DisplayName("reconcile: PG도 PENDING이고 pending 데드라인(10분)을 넘긴 결제는 FAILED로 단념(gaveUp)한다")
+    void given_pgStillPendingAndAgedOut_when_reconcile_then_gaveUp() {
+        PaymentModel aged = reconstitutedPending(10L, "TX-1", ZonedDateTime.now().minusMinutes(11));
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(aged));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.PENDING, null)));
+
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.gaveUp()).isEqualTo(1);
+        verify(paymentConfirmer).confirm(eq("TX-1"), eq(PaymentStatus.FAILED), anyString());
+    }
+
+    @Test
+    @DisplayName("reconcile: PG도 PENDING이지만 데드라인 전(5분)이면 단념하지 않고 stillPending으로 미룬다")
+    void given_pgStillPendingButFresh_when_reconcile_then_stillPending() {
+        PaymentModel fresh = reconstitutedPending(10L, "TX-1", ZonedDateTime.now().minusMinutes(5));
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, 0, 100)).thenReturn(List.of(fresh));
+        when(pgClient.findTransactionsByOrder(10L)).thenReturn(List.of(pgTx("TX-1", PaymentStatus.PENDING, null)));
+
+        PaymentReconcileResult result = facade.reconcilePending(0, 100);
+
+        assertThat(result.stillPending()).isEqualTo(1);
+        assertThat(result.gaveUp()).isZero();
+        verify(paymentConfirmer, never()).confirm(any(), any(), any());
     }
 }

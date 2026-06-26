@@ -43,7 +43,7 @@ class PaymentReconcileSchedulerTest {
     void delegatesToFacadeWithConfiguredPageSize() {
         ReflectionTestUtils.setField(scheduler, "pageSize", 50);
         when(paymentFacade.reconcilePending(0, 50))
-            .thenReturn(new PaymentReconcileResult(0, 0, 0, 0, 0));
+            .thenReturn(new PaymentReconcileResult(0, 0, 0, 0, 0, 0));
 
         scheduler.reconcilePending();
 

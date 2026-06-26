@@ -32,7 +32,8 @@ public final class PaymentEntityMapper {
                 entity.getAmount(),
                 entity.getTransactionKey(),
                 entity.getStatus(),
-                entity.getReason()
+                entity.getReason(),
+                entity.getCreatedAt()
         );
     }
 }

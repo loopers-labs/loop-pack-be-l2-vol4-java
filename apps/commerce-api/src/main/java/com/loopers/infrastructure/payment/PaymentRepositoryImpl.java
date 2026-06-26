@@ -54,7 +54,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public List<PaymentModel> findByStatus(PaymentStatus status, int page, int size) {
-        return paymentJpaRepository.findByStatusOrderByIdDesc(status, PageRequest.of(page, size)).stream()
+        return paymentJpaRepository.findByStatusOrderByIdAsc(status, PageRequest.of(page, size)).stream()
                 .map(PaymentEntityMapper::toDomain)
                 .toList();
     }

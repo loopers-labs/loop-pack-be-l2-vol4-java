@@ -2,7 +2,7 @@
 
 volume-6 결제 기능의 흐름을 레이어별 참여자 기준으로 시각화한다. 표기 규칙(레이어/화살표/생략/공통 에러)은 [`../week2/02-sequence-diagrams.md`](../week2/02-sequence-diagrams.md) §0을 그대로 따른다.
 
-> 본 문서는 **현재 확정·구현된 흐름**인 "결제 시작(pay)"만 담는다. **결제 콜백 수신**과 **Reconcile**(고아 PENDING 정리·최종 확정) 시퀀스는 §3.4/§3.5 설계가 확정된 뒤 추가한다.
+> 본 문서는 구현된 결제 흐름 3종을 담는다 — **결제 시작(pay)** · **콜백 수신(callback, §3.4)** · **Reconcile 대사 배치(§3.5)**. 콜백·Reconcile은 모두 동일한 확정 단위 `PaymentConfirmer.confirm`(비관락+멱등)을 거쳐 "정확히 한 번"만 상태 전이가 일어난다.
 
 ## 0. 이 문서의 참여자 (week2 §0.1 레이어에 결제 도메인 추가)
 
@@ -85,6 +85,106 @@ sequenceDiagram
 - **트랜잭션 경계** — `PaymentFacade.pay`는 `@Transactional`이 아니며, 각 `save`는 개별 트랜잭션으로 처리된다. PG HTTP 호출이 DB 커넥션/락을 잡지 않도록 트랜잭션 밖에서 일어난다.
 - **응답은 PENDING** — pg-simulator는 즉시 PENDING 거래만 발급하고 실제 결과는 1~5초 뒤 비동기로 콜백한다. 따라서 이 흐름의 응답은 항상 PENDING이며, 클라이언트는 콜백 처리 이후의 상태를 별도로 조회한다.
 
-### 후속 (미작성 — §3.4/§3.5 설계 후 추가)
-- **UC-P2. 결제 콜백 수신** (`POST /api/v1/payments/callback`) — PG의 `TransactionInfo` 수신 → `findByTransactionKeyForUpdate`로 잠그고 `markSuccess`/`markFailed` → 주문 `markPaid`/`markFailed`(재고·쿠폰 원복) 연계.
-- **UC-P3. Reconcile** — PENDING 결제를 `findTransactionsByOrder`로 PG 진실원천과 대조해 최종 확정. 콜백 유실·요청 실패로 남은 **고아 PENDING** 정리(재결제 가능화) 포함.
+---
+
+## UC-P2. 결제 콜백 수신 — `POST /api/v1/payments/callback`
+
+pg-simulator가 1~5초 뒤 비동기로 보내는 `TransactionInfo`를 수신해 결제·주문을 최종 확정한다. 확정은 콜백·Reconcile이 공유하는 `PaymentConfirmer.confirm`(비관락 `findByTransactionKeyForUpdate` → 멱등 체크 → 상태 전이 → 주문 cascade)으로 일원화돼 있다.
+
+```mermaid
+sequenceDiagram
+    actor PG as pg-simulator
+    participant PCtrl as PaymentV1Controller
+    participant PCfm as PaymentConfirmer
+    participant PRepo as PaymentRepository
+    participant Pay as PaymentModel
+    participant OSvc as OrderService
+
+    PG->>PCtrl: POST /callback\nTransactionInfo{transactionKey, status, reason}
+    PCtrl->>PCfm: confirm(transactionKey, status, reason)
+
+    Note over PCfm,PRepo: @Transactional — 결제 락 + 주문 확정을 한 트랜잭션으로
+    PCfm->>PRepo: findByTransactionKeyForUpdate(transactionKey)
+    Note over PRepo: SELECT ... FOR UPDATE (콜백/Reconcile 직렬화)
+    PRepo-->>PCfm: PaymentModel
+
+    alt 미존재 거래키
+        PCfm-->>PG: 404 NOT_FOUND
+    else 이미 확정(SUCCESS/FAILED)
+        Note over PCfm: 멱등 — 재반영 없이 현재 상태 반환
+    else PENDING
+        alt status = SUCCESS
+            PCfm->>Pay: markSuccess()
+            PCfm->>OSvc: markPaid(orderId)
+        else status = FAILED
+            PCfm->>Pay: markFailed(reason)
+            PCfm->>OSvc: markFailed(orderId)
+            Note over OSvc: 재고·쿠폰 원복(cascade)
+        end
+        PCfm->>PRepo: save(payment)
+        Note over PCfm,OSvc: 주문이 이미 다른 경로로 확정 시 CONFLICT → 멱등 skip
+    end
+    PCfm-->>PG: 200 OK
+```
+
+### 메모
+- **주문 식별은 콜백 payload를 불신**하고, 우리 결제 레코드의 `orderId`를 신뢰한다(위변조 방지).
+- 콜백은 인증 헤더 없이 수신하며 래퍼 없는 `TransactionInfo` 원본을 받는다.
+
+---
+
+## UC-P3. Reconcile 대사 배치 — 스케줄러 + 단념(give-up)
+
+콜백이 유실돼 PENDING으로 남은 결제를 PG 진실원천과 대조해 끝내 확정하는 **안전망 배치**다. 주기 실행(`PaymentReconcileScheduler`)과 운영 수동(`AdminPaymentV1Controller`) 두 트리거가 같은 `PaymentFacade.reconcilePending`을 호출한다. 멀티 인스턴스에서는 **ShedLock**으로 회차당 한 인스턴스만 실행한다.
+
+```mermaid
+sequenceDiagram
+    participant Sch as PaymentReconcileScheduler
+    participant SL as ShedLock(shedlock 테이블)
+    participant PFac as PaymentFacade
+    participant PRepo as PaymentRepository
+    participant PG as PgClient(PgSimulatorClient)
+    participant PCfm as PaymentConfirmer
+
+    Note over Sch: @Scheduled(fixedDelay 60s) — 직전 회차 종료 후
+    Sch->>SL: 락 획득 시도 (name=paymentReconcile)
+    alt 다른 인스턴스가 보유 중
+        SL-->>Sch: 실패 → 이번 회차 skip
+    else 락 획득
+        Sch->>PFac: reconcilePending(page=0, size)
+        PFac->>PRepo: findByStatus(PENDING, 0, size)
+        Note over PRepo: 오래된 것 우선(id ASC) — 가장 위험한 건이 첫 페이지
+        PRepo-->>PFac: List~PaymentModel~
+
+        loop 각 PENDING 결제
+            alt 거래키 없음(고아)
+                Note over PFac: skip (pay()가 이미 FAILED 정리)
+            else 거래키 있음
+                PFac->>PG: findTransactionsByOrder(orderId)
+                Note over PFac,PG: DB 트랜잭션 밖에서 조회
+                PG-->>PFac: List~PgTransaction~ (txKey로 매칭)
+
+                alt PG가 SUCCESS/FAILED
+                    PFac->>PCfm: confirm(txKey, status, reason)
+                    Note over PCfm: paid / failed 집계
+                else PG 미확정(PENDING) 또는 미발견(null)
+                    alt 체류시간 ≥ 데드라인(미발견 2분 / PENDING 10분)
+                        PFac->>PCfm: confirm(txKey, FAILED, "단념")
+                        Note over PCfm: gaveUp — 주문 markFailed(재고·쿠폰 원복)→재결제 가능
+                    else 데드라인 전
+                        Note over PFac: stillPending — 다음 회차로 미룸
+                    end
+                end
+            end
+        end
+
+        PFac-->>Sch: PaymentReconcileResult{scanned,paid,failed,gaveUp,stillPending,skipped}
+        Sch->>SL: 락 해제(lockAtLeastFor 경과 후)
+    end
+```
+
+### 메모
+- **무한 PENDING 종료(give-up)** — PG가 끝내 미확정/미발견이어도 체류 데드라인을 넘기면 FAILED로 단념해 종료한다. 이전엔 종료 조건이 없어 60초마다 영원히 재조회했다. 데드라인은 `payment.reconcile.give-up.{not-found-after, pending-after}`로 설정.
+- **starvation 방지** — 스캔을 `id ASC`(오래된 것 우선)로 바꿔, PENDING이 페이지 크기를 넘어도 가장 오래(=가장 위험)된 건이 첫 페이지에서 우선 처리된다.
+- **확정 경로 단일화** — 정상 확정·give-up 모두 `PaymentConfirmer.confirm`을 거치므로, 늦은 콜백과 경합해도 비관락+멱등으로 한 번만 반영된다(경합 건은 `skipped`).
+- **트랜잭션 경계** — `reconcilePending` 자체는 `@Transactional`이 아니며 PG 조회는 DB tx 밖, 각 확정만 `confirm`의 독립 트랜잭션. 한 건 실패가 배치 전체를 막지 않는다.

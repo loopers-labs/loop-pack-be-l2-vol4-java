@@ -26,5 +26,9 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentEntity, Long>
 
     List<PaymentEntity> findByOrderId(Long orderId);
 
-    List<PaymentEntity> findByStatusOrderByIdDesc(PaymentStatus status, Pageable pageable);
+    /**
+     * reconcile 스캔용 — 오래된(id 작은) PENDING부터. TSID는 시간정렬이라 id ASC = 생성 시각 오름차순.
+     * 가장 오래(=가장 위험)된 PENDING을 첫 페이지에서 우선 처리해, 백로그가 100건을 넘어도 옛 건이 굶지 않게 한다.
+     */
+    List<PaymentEntity> findByStatusOrderByIdAsc(PaymentStatus status, Pageable pageable);
 }

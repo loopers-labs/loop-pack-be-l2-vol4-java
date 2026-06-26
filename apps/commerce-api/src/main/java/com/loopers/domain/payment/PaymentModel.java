@@ -3,6 +3,8 @@ package com.loopers.domain.payment;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
+import java.time.ZonedDateTime;
+
 /**
  * Payment Aggregate 루트 — 순수 도메인 객체. 한 주문에 대한 외부 결제 시도 한 건을 표현한다.
  * 상태 머신(PENDING → SUCCESS/FAILED)만 보유하고 영속 기술(JPA)에는 의존하지 않는다.
@@ -19,6 +21,7 @@ public class PaymentModel {
     private String transactionKey;  // PG가 발급한 거래 키 (요청 성공 후 채워짐)
     private PaymentStatus status;
     private String reason;
+    private final ZonedDateTime createdAt;  // 영속 전에는 null, 복원 시 채워짐 (reconcile 나이 측정용)
 
     public PaymentModel(Long orderId, Long userId, CardType cardType, String rawCardNo, Long amount) {
         if (orderId == null) {
@@ -40,10 +43,11 @@ public class PaymentModel {
         this.cardNo = maskCardNo(rawCardNo);
         this.amount = amount;
         this.status = PaymentStatus.PENDING;
+        this.createdAt = null;
     }
 
     private PaymentModel(Long id, Long orderId, Long userId, CardType cardType, String cardNo, Long amount,
-                         String transactionKey, PaymentStatus status, String reason) {
+                         String transactionKey, PaymentStatus status, String reason, ZonedDateTime createdAt) {
         this.id = id;
         this.orderId = orderId;
         this.userId = userId;
@@ -53,12 +57,14 @@ public class PaymentModel {
         this.transactionKey = transactionKey;
         this.status = status;
         this.reason = reason;
+        this.createdAt = createdAt;
     }
 
     /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). cardNo는 이미 마스킹된 값. */
     public static PaymentModel reconstitute(Long id, Long orderId, Long userId, CardType cardType, String cardNo,
-                                            Long amount, String transactionKey, PaymentStatus status, String reason) {
-        return new PaymentModel(id, orderId, userId, cardType, cardNo, amount, transactionKey, status, reason);
+                                            Long amount, String transactionKey, PaymentStatus status, String reason,
+                                            ZonedDateTime createdAt) {
+        return new PaymentModel(id, orderId, userId, cardType, cardNo, amount, transactionKey, status, reason, createdAt);
     }
 
     /** PG 요청 성공 후 발급받은 거래 키를 부여한다. */
@@ -136,5 +142,10 @@ public class PaymentModel {
 
     public String getReason() {
         return reason;
+    }
+
+    /** 영속 생성 시각. 신규(미저장) 객체는 null. reconcile이 PENDING 체류 시간을 잴 때 쓴다. */
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
     }
 }

@@ -14,8 +14,11 @@ import com.loopers.domain.payment.PgTransaction;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 /**
@@ -36,6 +39,14 @@ public class PaymentFacade {
     private final PaymentRepository paymentRepository;
     private final PgClient pgClient;
     private final PaymentConfirmer paymentConfirmer;
+
+    /** PG에 거래 기록 자체가 없는 PENDING을 실패로 단념하기까지의 체류 한도(짧게 — 우리 요청이 안 닿았을 가능성). */
+    @Value("${payment.reconcile.give-up.not-found-after:PT2M}")
+    private Duration giveUpWhenNotFoundAfter = Duration.ofMinutes(2);
+
+    /** PG도 아직 PENDING인 결제를 실패로 단념하기까지의 체류 한도(길게 — 콜백이 늦게라도 올 여지를 줌). */
+    @Value("${payment.reconcile.give-up.pending-after:PT10M}")
+    private Duration giveUpWhenPendingAfter = Duration.ofMinutes(10);
 
     public PaymentInfo pay(String loginId, String loginPw, Long orderId, CardType cardType, String cardNo) {
         Long userId = userFacade.authenticate(loginId, loginPw);
@@ -96,10 +107,15 @@ public class PaymentFacade {
      * 한 건 실패가 배치 전체를 막지 않는다. PG 조회/확정은 DB 트랜잭션 밖에서 이뤄진다.
      * 트리거는 두 가지 — 운영 수동(AdminPaymentV1Controller)과 주기 자동(PaymentReconcileScheduler).
      * 자동 실행은 멀티 인스턴스에서 ShedLock으로 한 인스턴스만 잡도록 직렬화된다.
+     * <p>
+     * <b>단념(give-up)</b>: PG가 끝내 미확정/미발견인 PENDING은 무한 재조회하지 않고, 체류 시간이 데드라인
+     * ({@code giveUpWhenNotFoundAfter}/{@code giveUpWhenPendingAfter})을 넘으면 FAILED로 확정해 종료시킨다
+     * (주문 markFailed cascade로 재고·쿠폰 원복 → 재결제 가능). 데드라인 전이면 다음 회차로 미룬다(stillPending).
      */
     public PaymentReconcileResult reconcilePending(int page, int size) {
         List<PaymentModel> pendings = paymentRepository.findByStatus(PaymentStatus.PENDING, page, size);
-        int paid = 0, failed = 0, stillPending = 0, skipped = 0;
+        ZonedDateTime now = ZonedDateTime.now();
+        int paid = 0, failed = 0, gaveUp = 0, stillPending = 0, skipped = 0;
         for (PaymentModel payment : pendings) {
             String transactionKey = payment.getTransactionKey();
             // 거래키 없는 PENDING = PG 요청조차 못 한 고아(pay()가 이미 FAILED로 정리). 방어적 skip.
@@ -113,7 +129,18 @@ public class PaymentFacade {
                     .findFirst()
                     .orElse(null);
             if (tx == null || tx.isPending()) {
-                stillPending++;   // PG도 미확정 → 다음 회차로 미룸
+                // PG도 미확정. 데드라인을 넘겼으면 더 기다리지 않고 실패로 단념, 아니면 다음 회차로 미룸.
+                if (!isStaleEnoughToGiveUp(payment, tx, now)) {
+                    stillPending++;
+                    continue;
+                }
+                try {
+                    paymentConfirmer.confirm(transactionKey, PaymentStatus.FAILED, giveUpReason(tx));
+                    gaveUp++;
+                } catch (CoreException e) {
+                    // 단념 직전 다른 경로(늦은 콜백 등)가 먼저 확정 → 멱등 skip
+                    skipped++;
+                }
                 continue;
             }
             try {
@@ -128,7 +155,27 @@ public class PaymentFacade {
                 skipped++;
             }
         }
-        return new PaymentReconcileResult(pendings.size(), paid, failed, stillPending, skipped);
+        return new PaymentReconcileResult(pendings.size(), paid, failed, gaveUp, stillPending, skipped);
+    }
+
+    /**
+     * 미확정 PENDING을 실패로 단념해도 될 만큼 오래 머물렀는지. {@code createdAt}을 모르는(미저장) 결제는
+     * 나이를 잴 수 없으므로 단념하지 않는다(false). PG 거래 미발견(tx==null)은 더 짧게, PG가 보유한 PENDING은 더 길게.
+     */
+    private boolean isStaleEnoughToGiveUp(PaymentModel payment, PgTransaction tx, ZonedDateTime now) {
+        ZonedDateTime createdAt = payment.getCreatedAt();
+        if (createdAt == null) {
+            return false;
+        }
+        Duration age = Duration.between(createdAt, now);
+        Duration deadline = (tx == null) ? giveUpWhenNotFoundAfter : giveUpWhenPendingAfter;
+        return age.compareTo(deadline) >= 0;
+    }
+
+    private String giveUpReason(PgTransaction tx) {
+        return (tx == null)
+                ? "reconcile 단념 — PG에 거래 기록 없음(체류 한도 초과)"
+                : "reconcile 단념 — PG 미확정 PENDING(체류 한도 초과)";
     }
 
     /** (orderId)에 진행 중(PENDING) 또는 이미 성공(SUCCESS)한 결제가 있으면 중복 결제 차단. */
