@@ -23,7 +23,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/v1/brands/*",       // 브랜드 상세 조회 (인증 불필요)
                 "/api/v1/products",       // 상품 목록 조회 (인증 불필요)
                 "/api/v1/products/*",     // 상품 상세 조회 (인증 불필요) — /products/{id}/likes 는 제외되지 않음
-                "/api/v1/examples/**"     // 예시 API (테스트용, 인증 불필요)
+                "/api/v1/examples/**",    // 예시 API (테스트용, 인증 불필요)
+                "/api/v1/payments/callback" // PG 콜백 (PG 서버가 호출, 인증 불필요)
             );
 
         registry.addInterceptor(adminInterceptor)
