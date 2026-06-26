@@ -63,7 +63,7 @@ public class UserCouponModel extends BaseEntity {
         if (status != UserCouponStatus.USED) {
             throw new CoreException(ErrorType.BAD_REQUEST, "사용된 쿠폰만 복구할 수 있습니다.");
         }
-        this.status = UserCouponStatus.ISSUED;
+        this.status = coupon.getExpiry().isExpired() ? UserCouponStatus.EXPIRED : UserCouponStatus.ISSUED;
         this.usedAt = null;
     }
 }
