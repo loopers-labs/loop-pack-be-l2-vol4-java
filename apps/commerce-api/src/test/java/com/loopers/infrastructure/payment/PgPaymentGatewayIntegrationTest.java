@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -23,18 +21,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SpringBootTest
+// WireMock 고정 포트 + pg.base-url 정적 프로퍼티 (dynamicPort + @DynamicPropertySource는
+// 컨텍스트 캐싱과 얽혀 포트 불일치를 유발하므로 고정 포트로 회피). read-timeout은 yml의 2s 사용.
+@SpringBootTest(properties = {
+    "pg.base-url=http://localhost:18082"
+})
 class PgPaymentGatewayIntegrationTest {
 
     @RegisterExtension
     static WireMockExtension wiremock = WireMockExtension.newInstance()
-        .options(WireMockConfiguration.wireMockConfig().dynamicPort())
+        .options(WireMockConfiguration.wireMockConfig().port(18082))
         .build();
-
-    @DynamicPropertySource
-    static void overridePgBaseUrl(DynamicPropertyRegistry registry) {
-        registry.add("pg.base-url", wiremock::baseUrl);
-    }
 
     @Autowired
     private PaymentGateway paymentGateway;
