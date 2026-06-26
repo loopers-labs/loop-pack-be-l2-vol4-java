@@ -22,9 +22,7 @@ datasource:
     master:
       host: localhost
       port: 6379
-    replicas:
-      - host: localhost
-        port: 6380
+    replicas: []
 
 ---
 spring.config.activate.on-profile: dev

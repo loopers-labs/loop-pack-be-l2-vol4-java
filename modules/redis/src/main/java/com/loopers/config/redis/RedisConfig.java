@@ -78,12 +78,19 @@ public class RedisConfig{
         LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder();
         if(customizer != null) customizer.accept(builder);
         LettuceClientConfiguration clientConfig = builder.build();
-        RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
-        masterReplicaConfig.setDatabase(database);
-        for(RedisNodeInfo r : replicas){
-            masterReplicaConfig.addNode(r.host(), r.port());
+        if (replicas == null || replicas.isEmpty()) {
+            org.springframework.data.redis.connection.RedisStandaloneConfiguration standaloneConfig = 
+                new org.springframework.data.redis.connection.RedisStandaloneConfiguration(master.host(), master.port());
+            standaloneConfig.setDatabase(database);
+            return new LettuceConnectionFactory(standaloneConfig, clientConfig);
+        } else {
+            RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
+            masterReplicaConfig.setDatabase(database);
+            for(RedisNodeInfo r : replicas){
+                masterReplicaConfig.addNode(r.host(), r.port());
+            }
+            return new LettuceConnectionFactory(masterReplicaConfig, clientConfig);
         }
-        return new LettuceConnectionFactory(masterReplicaConfig, clientConfig);
     }
 
     private <K,V> RedisTemplate<K,V> defaultRedisTemplate(
