@@ -66,6 +66,7 @@ public interface PaymentRepository {
     // affected=1이면 호출자가 후처리를 1회 실행, 0이면 스킵한다.
     int transitionToPaid(Long id, String transactionKey);
     int transitionToFailed(Long id, String reason);
+    int transitionToUnknown(Long id); // 격리도 조건부 UPDATE(PENDING 만) — 동시 전이 race 시 terminal 덮어쓰기 방지(§8)
 
     // 폴링 대상: grace period 경과한 PENDING (createdAt 기준)
     List<PaymentModel> findPendingOlderThan(ZonedDateTime threshold);
@@ -150,8 +151,10 @@ public interface PaymentGatewayFeignClient {
 - **Feign 예외 → 도메인 예외 분기 변환(재시도 정책 분리)**:
   - 5xx(`FeignException` 5xx) · Connect Timeout(연결 실패) → `PaymentGatewayException` (미도달, **재시도 대상**)
   - Read Timeout(`SocketTimeoutException` read) → `PaymentGatewayTimeoutException` (**재시도 제외**, PENDING 유지 후 폴링)
-  - 4xx → `CoreException(BAD_REQUEST)` (CB/Retry 모두 ignore)
-- ErrorDecoder 또는 try-catch에서 위 분기를 구현. FeignClient 자체 재시도(`Retryer`)는 `Retryer.NEVER_RETRY`로 끄고 resilience4j `@Retry`로 일원화.
+  - **요청(POST) 4xx → `CoreException(BAD_REQUEST)`** (CB/Retry 모두 ignore)
+  - **조회(GET) 404(`FeignException.NotFound`) → 빈 `Optional`/빈 `List`** (구현 보정). PG 의 `GET /{key}`·`GET ?orderId=` 는 "주문 없음"을 404 로 응답한다. 이를 예외로 흘리면 `paymentQuery` CB 오작동 + "주문 없음 → FAILED 확정" 로직이 죽으므로, 조회 메서드에서 404 는 **빈 결과(= 미도달 신호)** 로 변환한다. (4xx → CoreException 매핑은 요청 POST 에만 적용.)
+- 위 분기는 어댑터 try-catch 에서 구현한다. `RetryableException` 은 `FeignException` 의 하위 타입이므로 **먼저 catch** 한다(타임아웃/연결 실패). FeignClient 자체 재시도(`Retryer`)는 `Retryer.NEVER_RETRY`로 끄고 resilience4j `@Retry`로 일원화한다.
+- **`@FeignClient(primary = false)`** (구현 보정): Spring Cloud OpenFeign 은 클라이언트 빈을 기본 `@Primary` 로 등록한다. 통합 테스트에서 `@Primary` 스텁으로 교체하려면 `primary = false` 로 둬 충돌을 푼다(운영은 단일 빈이라 무영향).
 
 ---
 
@@ -185,10 +188,11 @@ public PaymentInfo pay(Long userId, String orderNumber, CardType cardType, Strin
 - **DB 레벨 백스톱**: "활성 결제 1건" 부분 unique 제약(설계 §9.1)을 최후 방어선으로 둔다. 동시 진입 race를 제약으로 막으려면 `createPending`(Tx1) 둘레에 `catch (DataIntegrityViolationException) → findActive 재조회 → 멱등 반환`을 **추가로** 구현해야 한다(위 스켈레톤의 try-catch는 PG 예외만 다루므로 별도). 과제 범위에선 진입 시 `findActive`만으로 충분하고, 제약+재조회는 멀티 인스턴스 대비 강화 옵션이다.
 - `PaymentInfo`(application DTO, record): `paymentId`, `orderNumber`, `status`, `message`.
 
-### 3.2 후처리(주문 확정) — `confirm` 흐름
-- 콜백/폴링 → `PaymentService.confirm(...)`이 조건부 UPDATE.
-- **affected=1일 때만** Facade가 주문 확정(`orderService.markPaid(orderId)`)을 호출. 0이면 스킵(멱등).
-- 후처리도 외부 호출이 없으므로 Tx로 묶어 안전(주문+결제 동일 DB).
+### 3.2 후처리(주문 확정) — `confirm` 흐름 (구현 보정)
+- `PaymentService.confirm(...)`은 무결성 가드 + 조건부 UPDATE 후 **`ConfirmOutcome`(PAID/FAILED/SKIPPED/ISOLATED/STILL_PENDING)** 을 반환한다(boolean 대신 enum 으로 후처리 분기를 명확화).
+- **confirm(조건부 UPDATE) + 주문 후처리를 한 트랜잭션으로 묶는다.** `PaymentFacade.confirmResolved(...)` 에 `@Transactional` 을 붙여, `confirm` 이 반환한 outcome 이 `PAID`면 `orderService.markPaid(orderId)`, `FAILED`면 `markPaymentFailed(orderId)` 를 **같은 트랜잭션 안에서** 호출한다. 두 트랜잭션으로 쪼개면 "결제 PAID 인데 주문 미확정" crash gap 이 생기므로 묶는다. (외부 호출 없음 → 트랜잭션 안전, 주문+결제 동일 DB.)
+- `pay()` 의 비트랜잭션 규칙과 충돌하지 않는다 — 비트랜잭션이어야 하는 이유는 *흐름 안의 외부 HTTP 호출*(설계 §4.1)인데, confirm 경로는 PG 조회가 `confirmResolved` **이전**에 이미 끝나 있다.
+- 콜백은 PG status 문자열을 받으므로 `confirmResult(...)`(문자열 매핑) → `confirmResolved(...)` 로 위임하고, 폴링은 이미 매핑된 `PaymentStatus` 로 `confirmResolved(...)` 를 직접 호출해 같은 확정 경로를 공유한다.
 
 ---
 
@@ -211,8 +215,8 @@ public PaymentInfo pay(Long userId, String orderNumber, CardType cardType, Strin
 - `CallbackRequest` — **PG가 보내는 페이로드는 `TransactionInfo` 전체**(pg-simulator의 `PaymentCoreRelay`가 `RestTemplate.postForEntity(callbackUrl, transactionInfo, ...)`로 전송): `transactionKey`, `orderId`, `cardType`, `cardNo`, `amount`, `status`, `reason`. **수신 record는 이 필드 전체를 받도록** 정의하고(역직렬화 실패 방지), `status`는 PG enum `PENDING/SUCCESS/FAILED` 문자열 → 우리 PaymentStatus로 매핑(`SUCCESS→PAID`, `FAILED→FAILED`, `PENDING→`보류).
   - **무결성 가드(설계 §6.2)**: 전이 전 콜백의 `amount`·`cardNo`(마스킹 비교)가 우리가 저장한 `PaymentModel` 값과 일치하는지 확인한다. **불일치하면 `PAID`/`FAILED`로 전이하지 않고 `markUnknown(paymentId)`으로 격리 + 운영 알림 로그**를 남긴다(금액 위변조·오배달 방어). 진위 검증을 생략(§4.3)한 만큼 이 대조가 유일한 무결성 방어선이다.
 
-### 4.3 인증 인터셉터 예외
-- 콜백 경로(`/api/v1/payments/callback`)를 **인증 인터셉터 화이트리스트**에 등록(PG는 로그인 헤더 없음).
+### 4.3 콜백 엔드포인트 공개 (구현 보정)
+- **commerce-api 에는 전역 인증 인터셉터가 없다.** 각 컨트롤러 핸들러가 `@RequestHeader(AuthHeaders.LOGIN_ID/LOGIN_PW)` 로 로그인 정보를 직접 받고 Facade 가 `userService.getLoginUser(...)` 로 검증한다. → **별도 화이트리스트 등록이 불필요**하다. 콜백 핸들러(`callback`)는 **로그인 헤더 파라미터를 선언하지 않으므로 자연히 공개**된다.
 - **콜백 진위 검증은 생략한다**(설계 §10-3) — 이 과제는 견고한 인증/인가를 다루지 않고 `loginId`/`loginPw` 헤더 수준의 로그인만 처리하므로, 콜백에도 동일 수위를 맞춘다. 서명/IP 화이트리스트는 구현하지 않는다. 대신 **§4.2 amount·cardNo 무결성 가드**가 잘못된 콜백으로 인한 오염을 막는 1차 방어선 역할을 한다.
 
 ---
