@@ -6,7 +6,7 @@
 
 문서는 **두 층**으로 본다 — 맨 위에 도메인 전체를 잇는 **통합 클래스 다이어그램** 하나를 두어 Aggregate 사이 참조를 조망하고, 그 아래에서 **도메인별로 쪼개** 각 영역의 객체를 자세히 설명한다.
 
-## 한눈에 — Aggregate 8개
+## 한눈에 — Aggregate 9개
 
 외부에서는 각 Aggregate의 대표 객체(Root)로만 접근한다.
 
@@ -20,6 +20,7 @@
 | 주문 | `Order` | 최종 금액 = 적용 전 금액 − 할인액(≥ 0). 주문 이력은 불변. |
 | 쿠폰 템플릿 | `CouponTemplate` | 할인 종류·값·유효일수가 유효 범위를 지킨다. 삭제는 논리 삭제. |
 | 내 쿠폰 | `UserCoupon` | 한 사용자-템플릿 쌍에 쿠폰은 최대 1장. 사용 완료된 쿠폰은 재사용 불가. |
+| 결제 | `Payment` | 한 주문에 여러 시도(N:1). 종결(`SUCCESS`/`FAILED`) 상태는 다시 전이하지 않는다(멱등). 같은 주문의 동시 결제는 주문 행 비관락으로 직렬화한다. |
 
 ---
 
@@ -107,6 +108,36 @@ classDiagram
     class OrderStatus {
         <<enumeration>>
         CREATED
+        PAID
+    }
+    class Payment {
+        <<AggregateRoot>>
+        -Long id
+        -Long orderId
+        -string transactionKey
+        -CardType cardType
+        -string maskedCardNo
+        -Money amount
+        -PaymentStatus status
+        -string reason
+        +create(orderId, cardType, cardNo, amount)$ Payment
+        +assignTransactionKey(transactionKey)
+        +markSuccess() bool
+        +markFailed(reason) bool
+        +isPending() bool
+        +isSuccess() bool
+    }
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING
+        SUCCESS
+        FAILED
+    }
+    class CardType {
+        <<enumeration>>
+        SAMSUNG
+        KB
+        HYUNDAI
     }
     class CouponTemplate {
         <<AggregateRoot>>
@@ -174,9 +205,13 @@ classDiagram
     UserCoupon ..> CouponStatus : 상태
     DiscountPolicy ..> DiscountType : 종류
     DiscountPolicy ..> Money : 할인액 산출
+    Payment "0..*" ..> "1" Order : 결제 대상(시도)
+    Payment ..> Money : 결제 금액
+    Payment ..> PaymentStatus : 상태
+    Payment ..> CardType : 카드
 ```
 
-**관계 읽는 법** — `*--`(합성)은 부모가 사라지면 자식도 사라지는 한 Aggregate 내부 관계(`Order`–`OrderItem`). `..>`(의존)은 Aggregate 경계를 넘는 참조로, 객체 전체가 아니라 **ID로만** 가리킨다(`Like`·`Order` → `UserModel`·`Product`, `Inventory` → `Product`).
+**관계 읽는 법** — `*--`(합성)은 부모가 사라지면 자식도 사라지는 한 Aggregate 내부 관계(`Order`–`OrderItem`). `..>`(의존)은 Aggregate 경계를 넘는 참조로, 객체 전체가 아니라 **ID로만** 가리킨다(`Like`·`Order` → `UserModel`·`Product`, `Inventory` → `Product`, `Payment` → `Order`). 한 주문에 결제 **시도**가 여러 개일 수 있어 `Payment`–`Order`는 N:1이며, 주문은 결제를 역참조하지 않는다(쿠폰처럼 단방향). `Payment`는 `userId`를 보유하지 않고 결제자를 `orderId → Order.userId`로 도출한다.
 
 ---
 
@@ -280,18 +315,19 @@ classDiagram
     class OrderStatus {
         <<enumeration>>
         CREATED
+        PAID
     }
 
     Order "1" *-- "1..*" OrderItem : 합성
     Order ..> OrderStatus : 상태
 ```
 
-- **`Order`** (AggregateRoot) — 주문 한 건의 일관성. 항목·금액을 묶어 관리한다. `create(...)`로 주문 항목과 할인액을 받아 **적용 전 금액(항목 소계 합)·할인액·최종 금액**을 구성하며, 주문은 생성과 동시에 `CREATED` 상태가 된다 — 결제 단계가 없어 상태 전이가 없다. 주문자는 `userId`로 `UserModel`을 ID 참조한다. **`Order`는 쿠폰을 참조하지 않는다** — "얼마 할인됐는지"라는 결과 금액(`discountAmount`)만 보관하고, "어떤 쿠폰이 쓰였는지"는 알 필요가 없다. 쿠폰 사용 사실(어느 주문에서 썼는지)은 `UserCoupon`이 `orderId`로 단방향 보관한다(쿠폰 미사용 시 `discountAmount`는 0).
+- **`Order`** (AggregateRoot) — 주문 한 건의 일관성. 항목·금액을 묶어 관리한다. `create(...)`로 주문 항목과 할인액을 받아 **적용 전 금액(항목 소계 합)·할인액·최종 금액**을 구성하며, 주문은 생성과 동시에 `CREATED` 상태가 된다. 결제가 성공하면(연결된 `Payment` SUCCESS 콜백) `pay()`로 **`CREATED`→`PAID`** 로 전이한다(Round 6). 결제 실패는 주문을 `CREATED`로 유지해 재결제를 허용한다. 주문자는 `userId`로 `UserModel`을 ID 참조한다. **`Order`는 `Payment`를 역참조하지 않는다** — 쿠폰과 같은 원칙으로, "결제됐는지(`PAID`)"라는 상태만 갖고 "어느 시도로 결제됐는지"는 `Payment`가 `orderId`로 단방향 보관한다(현재 유효 결제 = 최신 시도, 조회로 도출). **`Order`는 쿠폰을 참조하지 않는다** — "얼마 할인됐는지"라는 결과 금액(`discountAmount`)만 보관하고, "어떤 쿠폰이 쓰였는지"는 알 필요가 없다. 쿠폰 사용 사실(어느 주문에서 썼는지)은 `UserCoupon`이 `orderId`로 단방향 보관한다(쿠폰 미사용 시 `discountAmount`는 0).
 - **`OrderItem`** (값 컬렉션 요소) — 주문에 담긴 상품 1종과 수량. `productName`·`unitPrice`는 주문 시점 스냅샷(주문 이력)이라 이후 상품이 바뀌어도 불변. `productId`는 ID 참조 스냅샷으로 따로 보관한다. `Order` 없이는 존재하지 않으므로 합성 관계이며, 독립 정체성이 없어 식별자(`id`)를 두지 않는다 — 부분 취소·항목 단위 수정 같은 "항목을 단독으로 가리키는 행위"가 명세에 없어 식별자가 dead field 가 되기 때문이다. 매핑은 `@ElementCollection` + `@Embeddable OrderItem`(`@CollectionTable(name="order_items")`) 값 컬렉션으로, 대리키 없이 `order_id` 로 소속 주문에 종속된다. 부분 취소처럼 항목 단독 행위가 추가되는 시점에 별도 엔티티/도메인 id 도입을 검토한다.
 - **금액 3종 스냅샷** — `originalAmount`(쿠폰 적용 전 항목 소계 합), `discountAmount`(할인액), `totalAmount`(최종 = original − discount)를 모두 주문에 저장한다. 할인 계산은 쿠폰(`UserCoupon.calculateDiscount`)이 책임지고, `Order`는 그 **결과 금액만 받아 보관**한다 — 주문은 쿠폰 도메인을 알 필요 없이 "얼마 할인됐는지"라는 값만 받는다. 영수증처럼 주문 시점 금액을 고정해, 이후 쿠폰·상품이 바뀌어도 주문 상세는 불변이다.
 - **불변식** — 주문 항목은 1개 이상. 적용 전 금액 = 모든 항목 소계의 합. 할인액 ≤ 적용 전 금액, 최종 금액 ≥ 0. 주문 항목의 상품명·단가, 그리고 금액 3종은 주문 시점 스냅샷이며 생성 후 불변(주문 이력).
 
-> **enum 한국어 대응** — `OrderStatus`: `CREATED`(주문 생성) — 결제·배송을 설계 범위에서 제외해 주문은 생성 후 상태 전이가 없는 단일 상태다.
+> **enum 한국어 대응** — `OrderStatus`: `CREATED`(주문 생성), `PAID`(결제 완료). 결제 성공 콜백 시 `CREATED`→`PAID`로 전이한다(Round 6). 배송 등 이후 단계는 설계 범위 밖.
 
 ### 쿠폰 — `CouponTemplate` / `UserCoupon` / `DiscountPolicy`
 
@@ -362,3 +398,54 @@ classDiagram
 > **enum 한국어 대응**
 > - `DiscountType`: `FIXED`(정액·원), `RATE`(정률·%).
 > - `CouponStatus`: `AVAILABLE`(사용 가능), `USED`(사용 완료), `EXPIRED`(만료) — `EXPIRED`는 조회 시점 파생값이며 저장되지 않는다.
+
+### 결제 — `Payment` / `PaymentStatus` / `CardType` (Round 6)
+
+```mermaid
+classDiagram
+    class Payment {
+        <<AggregateRoot>>
+        -Long id
+        -Long orderId
+        -string transactionKey
+        -CardType cardType
+        -string maskedCardNo
+        -Money amount
+        -PaymentStatus status
+        -string reason
+        +create(orderId, cardType, cardNo, amount)$ Payment
+        +assignTransactionKey(transactionKey)
+        +markSuccess() bool
+        +markFailed(reason) bool
+        +isPending() bool
+        +isSuccess() bool
+    }
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING
+        SUCCESS
+        FAILED
+    }
+    class CardType {
+        <<enumeration>>
+        SAMSUNG
+        KB
+        HYUNDAI
+    }
+    Payment ..> PaymentStatus : 상태
+    Payment ..> CardType : 카드
+    note for Payment "orderId로 Order를 ID 참조 — 다른 Aggregate. userId는 보유하지 않고 주문에서 도출. 한 주문에 시도 여러 개(N:1)."
+```
+
+- **`Payment`** (AggregateRoot) — **한 번의 결제 시도**를 표현한다. 한 주문에 시도가 여러 개일 수 있어(`orderId`로 `Order`를 ID 참조, **N:1**), 실패 후 카드를 바꿔 재결제하면 같은 주문에 **새 `Payment`** 가 생긴다(주문당 1건이 아니라 **시도당 1건** — 종결된 시도를 되살리는 대신 새 시도를 만들어, 전이 가드와 재시도가 충돌하지 않는다). `userId`는 보유하지 않는다 — 결제 주체는 `orderId → Order.userId`로 도출되는 파생값이라 스냅샷 의미가 없다(반면 금액은 결제 시점 박제라 보유). 생성은 `create(...)`로 `PENDING` 상태가 되고, PG 접수 응답을 받으면 `assignTransactionKey(transactionKey)`로 거래키만 저장하되 **여전히 `PENDING`** 이다(접수≠결과). 결과 확정은 `markSuccess()`/`markFailed(reason)`이 하며, 둘 다 **`PENDING`에서만** 전이하고 종결(`SUCCESS`/`FAILED`) 상태에서는 무시하고 `false`를 반환한다(`isTerminal()` 가드) — 콜백 중복(at-least-once)·콜백과 정산의 동시 종결을 이 값-멱등 no-op 가드가 흡수한다(전이가 실제 일어났을 때만 `order.pay()`). **금액(`amount`)은 결제 요청 시점 주문 최종 금액의 스냅샷**으로, `Money` VO를 공유한다.
+- **이중결제(따닥) 차단** — 같은 주문에 대한 동시 결제 요청은 **주문 행 비관락(FOR UPDATE)** 으로 직렬화한다. 응용은 예약 트랜잭션에서 주문을 잠그고 "살아있는 시도(`PENDING`·`SUCCESS`)가 있으면 차단" + `PENDING` 저장을 한 번에 처리한다(검사+삽입 원자화 → `if 존재? 차단 : 생성`의 동시성 창 제거). 락은 PG 호출 **전에** 해제한다. `FAILED`만 있으면 정당한 재시도로 보고 허용한다. cf. 멱등키(클라이언트 발급 키 + 유니크) 대신 비관락을 택한 이유 — orderId가 이미 자연 키라 새 식별자/클라이언트 계약이 불필요하고, 외부 청구가 트랜잭션 한가운데 있는 형태라 "호출 전 직렬화"가 필요하기 때문(낙관락은 commit 시점=청구 이후 감지라 부적합).
+- **`transactionKey`** — PG가 접수 시 부여하는 거래 식별자(nullable). 현재 콜백/정산의 결제 매칭은 이 키로 한다. 요청 타임아웃이면 이 응답이 유실될 수 있는데(in-doubt), 그 경우 키가 없어 매칭이 안 되므로 `orderId` 상관키 매칭은 후속 하드닝으로 남긴다(2단계 시퀀스 4-2·4-3).
+- **불변식** — 한 결제의 상태 전이는 `PENDING → SUCCESS` 또는 `PENDING → FAILED` 단방향이며 종결 상태는 불변이다. `FAILED`는 사유(`reason`, 자유 문자열)를 가진다. 금액 ≥ 0.
+- **상태가 어긋날 수 있음(내부↔PG)** — `PENDING`은 "처리 중"과 "타임아웃으로 모름"을 함께 흡수한다(별도 `UNKNOWN` 상태를 두지 않아 상태 폭발을 막음). "타임아웃→`FAILED`" 단정을 하지 않는 것이 (내부=실패, PG=승인) 조합을 구조적으로 막는 핵심이다(2단계 시퀀스 4-3 어긋남 표).
+
+> **enum 한국어 대응**
+> - `PaymentStatus`: `PENDING`(접수·대기 = 처리중 + 타임아웃으로 모름), `SUCCESS`(승인), `FAILED`(실패).
+> - 실패 사유는 별도 enum 없이 `reason`(자유 문자열)으로 보관한다(PG가 내려준 사유를 그대로 기록).
+> - `CardType`: 카드사(예: `SAMSUNG`/`KB`/`HYUNDAI`) — pg-simulator가 받는 카드 종류에 맞춘다.
+
+> **기법 선택(결제 동시성)** — 결제는 ⓐ 요청 중복(따닥)을 **주문 행 비관락**(예약 시 FOR UPDATE로 검사+삽입 직렬화, PG 호출 전 해제)으로, ⓑ 콜백 중복·콜백↔정산 경쟁을 **종결 no-op 가드**(값-멱등 전이 + 실제 전이 시에만 `order.pay()`)로 막는다. 재고(비관 락)·쿠폰(낙관 락)·좋아요(원자 UPDATE)에 이어, 결제 ⓑ는 **"외부 시스템과의 멱등"** 이라 결이 또 다르다 — 경합 상대가 내부 트랜잭션이 아니라 *재전송·중복 통지*이기 때문이다. 지금은 `order.pay()`가 순수 상태 전이라 ⓑ에 별도 락이 불필요하지만, `PAID`에 부작용이 붙으면 그때 낙관락(`@Version`)을 도입한다(현재 미적용). cf. ⓐ에서 멱등키(클라이언트 키 유니크) 대신 비관락을 택했다 — orderId가 이미 자연 키이고, 외부 청구가 트랜잭션 한가운데 있어 "호출 전 직렬화"가 필요하기 때문(낙관락은 commit=청구 이후 감지라 부적합).

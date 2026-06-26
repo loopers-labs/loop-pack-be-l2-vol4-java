@@ -96,6 +96,22 @@ public class Order extends BaseEntity {
     }
 
     /**
+     * 결제 성공으로 주문을 확정한다. 이미 PAID 면 멱등하게 무시하고 {@code false} 를 반환한다.
+     *
+     * @return 이번 호출로 CREATED → PAID 전이가 실제로 일어났으면 {@code true}
+     */
+    public boolean pay() {
+        if (status == OrderStatus.PAID) {
+            return false;
+        }
+        if (status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제할 수 없는 주문 상태입니다.");
+        }
+        this.status = OrderStatus.PAID;
+        return true;
+    }
+
+    /**
      * 주문 시각은 영속 시점에 BaseEntity 가 기록하는 createdAt(ZonedDateTime) 을
      * 서비스 표준 시간대(Asia/Seoul) 의 LocalDateTime 으로 노출한다.
      */

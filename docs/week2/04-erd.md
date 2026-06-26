@@ -14,6 +14,7 @@ erDiagram
     orders ||--|{ order_items : "포함한다"
     coupon_templates ||--o{ user_coupons : "발급 원형"
     user_coupons |o--o| orders : "사용된다"
+    orders ||--o{ payments : "결제 시도(N:1)"
 
     users {
         bigint id PK
@@ -65,7 +66,7 @@ erDiagram
     orders {
         bigint id PK
         bigint user_id FK "NOT NULL"
-        varchar(20) status "NOT NULL / CREATED"
+        varchar(20) status "NOT NULL / CREATED | PAID"
         bigint original_amount "NOT NULL / CHECK >= 0 / 쿠폰 적용 전 / 원"
         bigint discount_amount "NOT NULL / DEFAULT 0 / CHECK >= 0 / 할인액 / 원"
         bigint total_amount "NOT NULL / CHECK >= 0 / 최종 = original - discount / 원"
@@ -105,6 +106,19 @@ erDiagram
         bigint order_id "NULL / 사용된 주문"
         bigint version "NOT NULL / 낙관적 락 @Version"
         timestamp created_at "NOT NULL / 발급 시각"
+        timestamp updated_at "NOT NULL"
+    }
+
+    payments {
+        bigint id PK
+        bigint order_id FK "NOT NULL / 결제 대상 주문(N:1, ID 참조). 결제자는 주문에서 도출"
+        varchar(100) transaction_key UK "NULL / PG 접수 시 부여(유실 가능)"
+        varchar(20) card_type "NOT NULL / SAMSUNG | KB | HYUNDAI ..."
+        varchar(19) masked_card_no "NOT NULL / 마스킹 번호, 풀 PAN 저장 안 함"
+        bigint amount "NOT NULL / CHECK >= 0 / 요청 시점 주문 최종 금액 스냅샷 / 원"
+        varchar(20) status "NOT NULL / PENDING | SUCCESS | FAILED"
+        varchar(255) reason "NULL / 실패 사유(자유 문자열)"
+        timestamp created_at "NOT NULL"
         timestamp updated_at "NOT NULL"
     }
 ```
@@ -197,7 +211,7 @@ erDiagram
 |------|------|------|------|
 | id | BIGINT | PK, IDENTITY | 대리키 |
 | user_id | BIGINT | FK→users.id, NOT NULL | 주문자 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'CREATED', CHECK (status = 'CREATED') | 주문 상태 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'CREATED', CHECK (status IN ('CREATED','PAID')) | 주문 상태 (`PAID`=결제 성공 콜백 시 전이, Round 6) |
 | original_amount | BIGINT | NOT NULL, CHECK (original_amount >= 0) | 쿠폰 적용 전 금액(항목 소계 합, 원) |
 | discount_amount | BIGINT | NOT NULL, DEFAULT 0, CHECK (discount_amount >= 0) | 할인액(원, 쿠폰 미사용 시 0) |
 | total_amount | BIGINT | NOT NULL, CHECK (total_amount >= 0) | 최종 금액 = original − discount(원) |
@@ -263,3 +277,29 @@ erDiagram
 **동시성(쿠폰)** — 한 쿠폰이 동시에 두 주문에 사용되는 것(중복 사용)은 **낙관적 락(`version` 컬럼, `@Version`)** 으로 막는다. `AVAILABLE→USED` 전이는 한 유저·한 쿠폰끼리의 **저경합**이라, "충돌은 드물다"고 가정하고 커밋 시점에 버전으로 검출하는 낙관적 락이 가장 싸다 — 동시 사용 시 한쪽만 성공하고 나머지는 충돌(`OptimisticLockingFailureException`)로 전체 주문 트랜잭션이 롤백된다(재고 차감·주문 저장까지 함께 취소 = AC-07-8의 처리 단위 유지). 재고가 **비관적 락**(주문마다 거의 확실히 잠그는 핫 로우)을 쓰는 것과 대비된다 — 쿠폰은 한 유저·한 쿠폰의 저경합이라 "충돌은 드물다"고 가정하고 무는 비용이 거의 없는 낙관 락을, 재고는 어차피 로드하는 행에 락을 얹는 비관 락을 택했다. 같은 "lost update 방지"라도 경합 정도와 연산 성격이 달라 기법을 달리한 것이다.
 
 > **최소 주문 금액(`min_order_amount`)** — `DiscountPolicy` VO의 일부로 발급 시점에 스냅샷된다. 주문 시 적용 전 금액이 이 값 미만이면 `DiscountPolicy.calculate()`가 `BAD_REQUEST`로 거부해 주문이 성립하지 않는다(`0`이면 제한 없음). 사용 조건이지만 자기가 게이트하는 할인(`discount_type`/`value`)과 같은 VO에 두어 발급 스냅샷으로 함께 전파된다.
+
+### 결제 — `payments` (Round 6)
+
+생성된 주문에 대한 **한 번의 결제 시도**. 한 주문에 시도가 여러 개일 수 있어 `order_id`로 주문을 ID 참조하는 **N:1**이며, 주문은 결제를 역참조하지 않는다(쿠폰처럼 단방향 — "결제됐는지"는 `orders.status='PAID'`로, "어느 시도로"는 `payments`가 보관). 금액·카드는 외부 PG로 청구하는 값이라 **요청 시점 스냅샷**으로 둔다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| id | BIGINT | PK, IDENTITY | 대리키 |
+| order_id | BIGINT | FK→orders.id, NOT NULL | 결제 대상 주문 (ID 참조, N:1). 결제자는 주문에서 도출(userId 미보유) |
+| transaction_key | VARCHAR(100) | UNIQUE, NULL | PG 접수 시 부여(요청 타임아웃 시 유실 가능) |
+| card_type | VARCHAR(20) | NOT NULL | 카드사 (`SAMSUNG` \| `KB` \| `HYUNDAI` …) |
+| masked_card_no | VARCHAR(19) | NOT NULL | 마스킹 카드번호(`**** **** **** 1451`). 풀 PAN은 저장 안 함(PCI) |
+| amount | BIGINT | NOT NULL, CHECK (amount >= 0) | 요청 시점 주문 최종 금액 스냅샷(원) |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'PENDING', CHECK (status IN ('PENDING','SUCCESS','FAILED')) | 결제 상태 |
+| reason | VARCHAR(255) | NULL | 실패 사유(자유 문자열, `FAILED`일 때 PG 사유 기록) |
+| created_at | TIMESTAMP | NOT NULL | 생성 시각 |
+| updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
+
+**제약** — `status`는 세 값만 가지며 전이는 `PENDING → SUCCESS`/`PENDING → FAILED` 단방향이다(`PENDING`은 "처리 중 + 타임아웃으로 모름"을 함께 흡수, 별도 `UNKNOWN` 없음). `reason`은 `FAILED`일 때 PG 사유를 자유 문자열로 기록한다(별도 enum 없음). `transaction_key`는 nullable·UNIQUE이며, 현재 콜백/조회의 결제 매칭은 이 키로 한다 — 요청 타임아웃으로 거래키 응답이 유실된 결제(in-doubt)는 키가 없어 이 매칭이 안 되므로 `order_id` 상관키 매칭은 후속 하드닝으로 남긴다. 한 주문에 여러 시도가 정상이므로 `order_id`에는 유니크를 두지 않는다(주문당 1건이 아니라 시도당 1건).
+
+**이중결제 (요청 중복/따닥) — 주문 행 비관락** — 사용자 더블클릭·동시 요청으로 같은 주문이 두 번 청구되는 것을, 결제 예약 시 **주문 행을 `SELECT ... FOR UPDATE`로 잠그고** "살아있는 시도(`PENDING`·`SUCCESS`)가 있으면 차단" + `PENDING` 저장을 한 트랜잭션에서 처리해 막는다(검사+삽입 원자화). `if 존재? 차단 : 생성`(read-then-write)은 동시 더블클릭이 둘 다 "없음"을 읽는 창이 있으나, 주문 행 락이 그 경쟁을 직렬화해 패자가 승자의 `PENDING`을 보고 `CONFLICT`가 되게 한다. 락은 PG 호출 **전에** 해제한다(외부 청구를 락 안에 품지 않음). `FAILED`만 있으면 정당한 재시도로 허용한다. cf. 멱등키(클라 발급 키 + UNIQUE) 대신 비관락을 택했다 — `order_id`가 이미 자연 키라 새 식별자/클라 계약이 불필요하고, 외부 청구가 트랜잭션 한가운데 있어 "호출 전 직렬화"가 필요하기 때문(낙관락은 commit=청구 이후 감지라 부적합).
+
+**동시성 (결과 확정) — 종결 no-op 가드** — 콜백은 at-least-once라 같은 결제에 여러 번 올 수 있고, 콜백과 정산(상태 조회)이 같은 `PENDING`을 동시에 종결시키려 경쟁할 수 있다. 이를 **종결 상태 no-op 전이 가드**(`SUCCESS`/`FAILED`면 무시·`false` 반환, `PENDING`에서만 전이)로 흡수하고, **전이가 실제 일어났을 때만** `orders.status`를 `PAID`로 반영한다. 지금은 `PAID` 전이가 순수 상태 변경이라 같은 값으로의 동시 전이가 무해해 별도 락이 불필요하지만, `PAID`에 부작용(적립·알림)이 붙으면 이중 실행이 되므로 그 시점에 낙관락(`@Version`)을 도입한다(**현재 미적용**).
+
+> **기법 선택(재고 vs 좋아요 vs 쿠폰 vs 결제)** — 재고는 oversell 직결이라 **비관 락**, 좋아요는 고경합 단순 카운터라 **원자 UPDATE**, 쿠폰은 저경합 상태 전이라 **낙관 락**, 결제는 ⓐ 요청 중복(따닥)을 **주문 행 비관 락**으로, ⓑ 결과 확정 경쟁(*외부 재전송·중복 통지*)을 **종결 no-op 가드**로 막는다 — 경합 상대와 연산 성격이 모두 달라 기법을 달리한 것이다.
+> **트랜잭션 경계(dual-write)** — `payments`의 `PENDING` 행은 PG 호출 **전에** 커밋된다(외부 호출은 트랜잭션 밖). 외부 응답 시간만큼 커넥션·락을 잡지 않게 하고, 이후 콜백/정산이 매칭할 대상을 먼저 만들어 두기 위함이다. 외부 호출의 부작용(승인)은 우리 트랜잭션으로 롤백되지 않으므로, "먼저 PENDING 기록 → 외부 호출 → 결과로 종결"이라는 순서 자체가 정합성의 뿌리다(2단계 시퀀스 4-1).
