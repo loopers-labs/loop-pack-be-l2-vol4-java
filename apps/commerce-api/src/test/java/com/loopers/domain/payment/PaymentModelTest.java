@@ -170,27 +170,11 @@ class PaymentModelTest {
         }
     }
 
-    @DisplayName("결제를 확정할 때,")
+    @DisplayName("결제를 실패로 확정할 때,")
     @Nested
-    class Confirm {
+    class Fail {
 
-        @DisplayName("PENDING이면 succeed로 SUCCESS로 전이한다.")
-        @Test
-        void succeeds_whenPending() {
-            // arrange
-            PaymentModel payment = payment(ZonedDateTime.now());
-
-            // act
-            payment.succeed();
-
-            // assert
-            assertAll(
-                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
-                () -> assertThat(payment.isTerminal()).isTrue()
-            );
-        }
-
-        @DisplayName("PENDING이면 fail로 FAILED로 전이하고 사유를 기록한다.")
+        @DisplayName("PENDING이면 FAILED로 전이하고 사유를 기록한다.")
         @Test
         void fails_whenPending() {
             // arrange
@@ -207,32 +191,51 @@ class PaymentModelTest {
             );
         }
 
-        @DisplayName("이미 SUCCESS면 fail을 호출해도 상태와 사유가 바뀌지 않는다.")
+        @DisplayName("이미 종료된 결제면 사유를 덮어쓰지 않는다.")
         @Test
-        void ignoresFail_whenAlreadySuccess() {
+        void ignoresFail_whenAlreadyTerminal() {
             // arrange
             PaymentModel payment = payment(ZonedDateTime.now());
-            payment.succeed();
+            payment.fail("먼저 기록된 사유");
 
             // act
-            payment.fail("한도 초과");
+            payment.fail("나중에 들어온 사유");
+
+            // assert
+            assertThat(payment.getReason()).isEqualTo("먼저 기록된 사유");
+        }
+    }
+
+    @DisplayName("결제를 STUCK으로 격리할 때,")
+    @Nested
+    class MarkStuck {
+
+        @DisplayName("PENDING이면 STUCK으로 전이한다.")
+        @Test
+        void marksStuck_whenPending() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.markStuck();
 
             // assert
             assertAll(
-                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
-                () -> assertThat(payment.getReason()).isNull()
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.STUCK),
+                () -> assertThat(payment.isStuck()).isTrue(),
+                () -> assertThat(payment.isTerminal()).isFalse()
             );
         }
 
-        @DisplayName("이미 FAILED면 succeed를 호출해도 SUCCESS로 바뀌지 않는다.")
+        @DisplayName("이미 종료된 결제면 STUCK으로 바뀌지 않는다.")
         @Test
-        void ignoresSucceed_whenAlreadyFailed() {
+        void ignoresMarkStuck_whenAlreadyTerminal() {
             // arrange
             PaymentModel payment = payment(ZonedDateTime.now());
             payment.fail("한도 초과");
 
             // act
-            payment.succeed();
+            payment.markStuck();
 
             // assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);

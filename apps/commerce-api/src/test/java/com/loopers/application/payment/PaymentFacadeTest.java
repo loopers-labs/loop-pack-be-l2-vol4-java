@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -23,13 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
-import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentRequestResult;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.PaymentTransactionStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -48,6 +47,9 @@ class PaymentFacadeTest {
 
     @Mock
     private PaymentGateway paymentGateway;
+
+    @Mock
+    private PaymentTransactionWriter paymentTransactionWriter;
 
     @InjectMocks
     private PaymentFacade paymentFacade;
@@ -204,46 +206,54 @@ class PaymentFacadeTest {
             return payment;
         }
 
-        @DisplayName("성공 콜백이면 결제를 SUCCESS로 확정하고 주문을 PAID로 전이한다.")
+        @DisplayName("콜백을 받으면 콜백 내용이 아니라 외부 결제 시스템 조회 결과로 결제를 확정한다.")
         @Test
-        void confirmsSuccess_andMarksOrderPaid() {
+        void confirmsWithGatewayResult_notCallbackPayload() {
             // arrange
             PaymentModel payment = pendingPayment();
-            OrderModel order = order(78_000);
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
-            given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
+            PaymentTransactionStatus verified = PaymentTransactionStatus.found(TX_KEY, PaymentStatus.SUCCESS, null);
+            given(paymentGateway.queryTransaction(payment)).willReturn(verified);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.SUCCESS, null);
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY);
 
             // assert
-            assertAll(
-                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID)
-            );
+            then(paymentTransactionWriter).should().confirm(payment, verified);
         }
 
-        @DisplayName("실패 콜백이면 결제를 FAILED로 확정하고 사유를 기록하며 주문을 PAYMENT_FAILED로 전이한다.")
+        @DisplayName("외부 결제 시스템이 아직 처리 중이면 확정하지 않고 폴링 보정에 맡긴다.")
         @Test
-        void confirmsFailure_andMarksOrderPaymentFailed() {
+        void defersToReconciliation_whenGatewayStillProcessing() {
             // arrange
             PaymentModel payment = pendingPayment();
-            OrderModel order = order(78_000);
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
-            given(orderRepository.getActiveById(ORDER_ID)).willReturn(order);
+            given(paymentGateway.queryTransaction(payment))
+                .willReturn(PaymentTransactionStatus.found(TX_KEY, PaymentStatus.PENDING, null));
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.FAILED, "한도 초과");
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY);
 
             // assert
-            assertAll(
-                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
-                () -> assertThat(payment.getReason()).isEqualTo("한도 초과"),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED)
-            );
+            then(paymentTransactionWriter).shouldHaveNoInteractions();
         }
 
-        @DisplayName("콜백의 거래 식별자가 결제와 일치하지 않으면 FORBIDDEN 예외가 발생하고 상태를 바꾸지 않는다.")
+        @DisplayName("외부 결제 시스템 조회가 결과 불명이면 확정하지 않고 폴링 보정에 맡긴다.")
+        @Test
+        void defersToReconciliation_whenGatewayUnknown() {
+            // arrange
+            PaymentModel payment = pendingPayment();
+            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
+            given(paymentGateway.queryTransaction(payment)).willReturn(PaymentTransactionStatus.unknown());
+
+            // act
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY);
+
+            // assert
+            then(paymentTransactionWriter).shouldHaveNoInteractions();
+        }
+
+        @DisplayName("콜백의 거래 식별자가 결제와 일치하지 않으면 FORBIDDEN 예외가 발생하고 외부 조회·확정을 하지 않는다.")
         @Test
         void throwsForbidden_whenTransactionKeyMismatch() {
             // arrange
@@ -251,47 +261,32 @@ class PaymentFacadeTest {
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
 
             // act & assert
-            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, "TX-FORGED", PaymentStatus.SUCCESS, null))
+            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, "TX-FORGED"))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.FORBIDDEN);
 
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
-            then(orderRepository).should(never()).getActiveById(anyLong());
+            then(paymentGateway).should(never()).queryTransaction(any());
+            then(paymentTransactionWriter).shouldHaveNoInteractions();
         }
 
-        @DisplayName("이미 확정된 결제면 상태를 바꾸지 않고 주문을 전이하지 않는다.")
+        @DisplayName("이미 확정된 결제면 외부 조회·확정을 하지 않는다.")
         @Test
         void ignoresCallback_whenAlreadyTerminal() {
             // arrange
             PaymentModel payment = pendingPayment();
-            payment.succeed();
+            payment.applyRequestResult(PaymentRequestResult.rejected("이미 실패"));
             given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
 
             // act
-            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.FAILED, "한도 초과");
+            paymentFacade.handleCallback(ORDER_ID, TX_KEY);
 
             // assert
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-            then(orderRepository).should(never()).getActiveById(anyLong());
+            then(paymentGateway).should(never()).queryTransaction(any());
+            then(paymentTransactionWriter).shouldHaveNoInteractions();
         }
 
-        @DisplayName("예상치 못한 PENDING 콜백이면 결제·주문 상태를 바꾸지 않고 주문을 조회하지 않는다.")
-        @Test
-        void ignoresCallback_whenResultIsPending() {
-            // arrange
-            PaymentModel payment = pendingPayment();
-            given(paymentRepository.getByOrderId(ORDER_ID)).willReturn(payment);
-
-            // act
-            paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.PENDING, null);
-
-            // assert
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
-            then(orderRepository).should(never()).getActiveById(anyLong());
-        }
-
-        @DisplayName("콜백이 가리키는 결제가 없으면 NOT_FOUND 예외가 발생하고 주문을 전이하지 않는다.")
+        @DisplayName("콜백이 가리키는 결제가 없으면 NOT_FOUND 예외가 발생하고 외부 조회·확정을 하지 않는다.")
         @Test
         void throwsNotFound_whenPaymentAbsent() {
             // arrange
@@ -299,12 +294,13 @@ class PaymentFacadeTest {
                 .willThrow(new CoreException(ErrorType.NOT_FOUND, "결제가 존재하지 않습니다."));
 
             // act & assert
-            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, TX_KEY, PaymentStatus.SUCCESS, null))
+            assertThatThrownBy(() -> paymentFacade.handleCallback(ORDER_ID, TX_KEY))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.NOT_FOUND);
 
-            then(orderRepository).should(never()).getActiveById(anyLong());
+            then(paymentGateway).should(never()).queryTransaction(any());
+            then(paymentTransactionWriter).shouldHaveNoInteractions();
         }
     }
 }

@@ -13,6 +13,7 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,8 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRequestResult;
+import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.PaymentTransactionStatus;
 
 import feign.FeignException;
 import feign.Request;
@@ -62,6 +65,12 @@ class PaymentGatewayResilienceIntegrationTest {
             .rawCardNo("1234-5678-9012-3456")
             .requestedAt(ZonedDateTime.now())
             .build();
+    }
+
+    private PaymentModel paymentWithTransactionKey(String transactionKey) {
+        PaymentModel payment = payment();
+        payment.recordTransactionKey(transactionKey);
+        return payment;
     }
 
     private Request request() {
@@ -192,6 +201,84 @@ class PaymentGatewayResilienceIntegrationTest {
         assertAll(
             () -> assertThat(result.outcome()).isEqualTo(PaymentRequestResult.Outcome.UNKNOWN),
             () -> verify(pgSimulatorClient, never()).requestPayment(any(), any())
+        );
+    }
+
+    @DisplayName("거래 식별자가 있으면 단건 조회로 거래 상태를 확인한다.")
+    @Test
+    void queryByTransactionKey_returnsFound() {
+        // arrange
+        given(pgSimulatorClient.getTransaction(any(), any())).willReturn(
+            new PgSimulatorDto.ApiResponse<>(null, new PgSimulatorDto.TransactionResponse("TX-0001", "SUCCESS", null)));
+
+        // act
+        PaymentTransactionStatus status = paymentGateway.queryTransaction(paymentWithTransactionKey("TX-0001"));
+
+        // assert
+        assertAll(
+            () -> assertThat(status.outcome()).isEqualTo(PaymentTransactionStatus.Outcome.FOUND),
+            () -> assertThat(status.status()).isEqualTo(PaymentStatus.SUCCESS),
+            () -> assertThat(status.transactionKey()).isEqualTo("TX-0001")
+        );
+    }
+
+    @DisplayName("거래 식별자가 없으면 주문별 조회로 가장 최근 거래 상태를 확인한다.")
+    @Test
+    void queryByOrderId_returnsFound() {
+        // arrange
+        given(pgSimulatorClient.getTransactionsByOrder(any(), any())).willReturn(
+            new PgSimulatorDto.ApiResponse<>(null, new PgSimulatorDto.OrderResponse("000100",
+                List.of(new PgSimulatorDto.TransactionResponse("TX-0001", "FAILED", "한도 초과")))));
+
+        // act
+        PaymentTransactionStatus status = paymentGateway.queryTransaction(payment());
+
+        // assert
+        assertAll(
+            () -> assertThat(status.outcome()).isEqualTo(PaymentTransactionStatus.Outcome.FOUND),
+            () -> assertThat(status.status()).isEqualTo(PaymentStatus.FAILED),
+            () -> assertThat(status.transactionKey()).isEqualTo("TX-0001")
+        );
+    }
+
+    @DisplayName("거래 식별자가 없고 주문에 거래가 전혀 없으면(404) 미도달(NOT_FOUND)로 판정한다.")
+    @Test
+    void queryByOrderId_returnsNotFound_whenNoTransaction() {
+        // arrange
+        FeignException notFound = FeignException.errorStatus(
+            "getTransactionsByOrder",
+            feign.Response.builder()
+                .status(404)
+                .reason("not found")
+                .request(request())
+                .headers(Collections.emptyMap())
+                .build()
+        );
+        given(pgSimulatorClient.getTransactionsByOrder(any(), any())).willThrow(notFound);
+
+        // act
+        PaymentTransactionStatus status = paymentGateway.queryTransaction(payment());
+
+        // assert
+        assertThat(status.outcome()).isEqualTo(PaymentTransactionStatus.Outcome.NOT_FOUND);
+    }
+
+    @DisplayName("거래 조회가 타임아웃이면 보정 경로 재시도를 모두 소진한 뒤 결과 불명(UNKNOWN)으로 흡수한다.")
+    @Test
+    void queryTransaction_retriesThenAbsorbsTimeout_asUnknown() {
+        // arrange
+        RetryableException timeout = new RetryableException(
+            -1, "read timed out", Request.HttpMethod.GET,
+            new SocketTimeoutException("Read timed out"), (Long) null, request());
+        given(pgSimulatorClient.getTransaction(any(), any())).willThrow(timeout);
+
+        // act
+        PaymentTransactionStatus status = paymentGateway.queryTransaction(paymentWithTransactionKey("TX-0001"));
+
+        // assert
+        assertAll(
+            () -> assertThat(status.outcome()).isEqualTo(PaymentTransactionStatus.Outcome.UNKNOWN),
+            () -> verify(pgSimulatorClient, times(3)).getTransaction(any(), any())
         );
     }
 }

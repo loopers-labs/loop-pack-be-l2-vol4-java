@@ -32,6 +32,7 @@ import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRequestResult;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.PaymentTransactionStatus;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.order.OrderJpaRepository;
@@ -329,6 +330,8 @@ class PaymentV1ApiE2ETest {
             UserModel user = saveUser("kylekim");
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            given(paymentGateway.queryTransaction(any()))
+                .willReturn(PaymentTransactionStatus.found(TRANSACTION_KEY, PaymentStatus.SUCCESS, null));
             PaymentV1Dto.CallbackRequest callback =
                 new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.SUCCESS, null);
 
@@ -354,6 +357,8 @@ class PaymentV1ApiE2ETest {
             UserModel user = saveUser("kylekim");
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            given(paymentGateway.queryTransaction(any()))
+                .willReturn(PaymentTransactionStatus.found(TRANSACTION_KEY, PaymentStatus.FAILED, "한도 초과"));
             PaymentV1Dto.CallbackRequest callback =
                 new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.FAILED, "한도 초과");
 
@@ -379,6 +384,8 @@ class PaymentV1ApiE2ETest {
             UserModel user = saveUser("kylekim");
             OrderModel order = saveOrder(user.getId(), 78_000);
             PaymentModel payment = savePendingPayment(order.getId(), user.getId());
+            given(paymentGateway.queryTransaction(any()))
+                .willReturn(PaymentTransactionStatus.found(TRANSACTION_KEY, PaymentStatus.SUCCESS, null));
             PaymentV1Dto.CallbackRequest success =
                 new PaymentV1Dto.CallbackRequest(order.getId(), TRANSACTION_KEY, PaymentStatus.SUCCESS, null);
             testRestTemplate.exchange(CALLBACK_ENDPOINT, HttpMethod.POST, guestJsonRequest(success), MAP_RESPONSE);
