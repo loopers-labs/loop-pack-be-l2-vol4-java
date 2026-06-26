@@ -40,7 +40,9 @@ resilience4j:
     instances:
       pgRetry:
         max-attempts: 3                   # 최초 1회 + 재시도 2회 = 총 3번
-        wait-duration: 500ms              # 재시도 간격 (fixed)
+        wait-duration: 500ms              # 재시도 초기 대기 시간
+        enable-exponential-backoff: true  # 재시도마다 대기 시간 지수 증가 (PG 과부하 시 부하 분산)
+        exponential-backoff-multiplier: 2 # 500ms → 1000ms → (fallback)
         retry-exceptions:
           - org.springframework.web.client.HttpServerErrorException  # 5xx — PG 서버 오류, 재시도 가치 있음
         ignore-exceptions:
