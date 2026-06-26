@@ -32,7 +32,7 @@ springdoc:
     path: /swagger-ui.html
 
 pg:
-  base-url: http://localhost:8090
+  base-url: http://localhost:8082
   callback-timeout-seconds: 10   # CompletableFuture orTimeout. 콜백 대기 시간
   callback-url: http://localhost:8080/api/v1/payments/callback
 
@@ -40,9 +40,9 @@ resilience4j:
   circuitbreaker:
     instances:
       pgClient:
-        sliding-window-size: 10
+        sliding-window-size: 100
         failure-rate-threshold: 50
-        slow-call-duration-threshold: 2s
+        slow-call-duration-threshold: 5s
         slow-call-rate-threshold: 50
         wait-duration-in-open-state: 15s
         permitted-number-of-calls-in-half-open-state: 3
@@ -53,6 +53,19 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+# supports/monitoring(monitoring.yml)의 exposure 를 덮어쓴다. spring.config.import 로 들어온
+# monitoring.yml 은 non-profile 이라, profile-specific 인 이 문서가 우선한다.
+# 부하 테스트 시 서킷브레이커 상태/이벤트를 actuator(:8081)로 확인하기 위해 추가 노출.
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+          - circuitbreakers
+          - circuitbreakerevents
 
 ---
 spring:

@@ -1,0 +1,132 @@
+{
+  "title": "Resilience4j · Payment (pgClient)",
+  "uid": "r4j-payment",
+  "tags": ["loopers", "resilience4j", "payment"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "app",
+        "label": "application",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(resilience4j_circuitbreaker_state, application)",
+        "current": { "text": "commerce-api", "value": "commerce-api" },
+        "includeAll": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "CircuitBreaker State (1 = active)",
+      "datasource": "Prometheus",
+      "description": "pgClient 의 현재 상태. open/half_open 으로 1이 뜨는 구간이 전이 시점.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 20, "stepAfter": true } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "Prometheus",
+          "expr": "resilience4j_circuitbreaker_state{application=\"$app\", name=\"pgClient\"}",
+          "legendFormat": "{{state}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Failure Rate / Slow Call Rate (%)",
+      "datasource": "Prometheus",
+      "description": "failure-rate-threshold(50%), slow-call-rate-threshold(50%) 를 넘으면 OPEN. -1 은 윈도우 미충족(데이터 부족).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "drawStyle": "line", "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": "Prometheus", "expr": "resilience4j_circuitbreaker_failure_rate{application=\"$app\", name=\"pgClient\"}", "legendFormat": "failure rate" },
+        { "refId": "B", "datasource": "Prometheus", "expr": "resilience4j_circuitbreaker_slow_call_rate{application=\"$app\", name=\"pgClient\"}", "legendFormat": "slow call rate" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Calls by kind (ops/s)",
+      "datasource": "Prometheus",
+      "description": "성공/실패/무시 호출 비율. failed 가 치솟으면 곧 OPEN.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "Prometheus",
+          "expr": "sum by (kind) (rate(resilience4j_circuitbreaker_calls_seconds_count{application=\"$app\", name=\"pgClient\"}[1m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Not Permitted Calls (fast-fail, ops/s)",
+      "datasource": "Prometheus",
+      "description": "OPEN 동안 차단(fast-fail)된 호출 수. 0보다 크면 서킷이 열려 요청을 즉시 거절 중.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "bars", "fillOpacity": 60 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "Prometheus",
+          "expr": "rate(resilience4j_circuitbreaker_not_permitted_calls_total{application=\"$app\", name=\"pgClient\"}[1m])",
+          "legendFormat": "not permitted"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "text",
+      "title": "결제 결과(k6) 패널 사용법",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 16 },
+      "options": {
+        "mode": "markdown",
+        "content": "아래 두 패널은 **k6 를 Prometheus remote-write 로 실행**해야 데이터가 들어옵니다.\n\n```\nK6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write \\\nK6_PROMETHEUS_RW_TREND_STATS=p(95),p(99),avg \\\nk6 run -o experimental-prometheus-rw k6/payment-load.js\n```\n\n(Prometheus 는 `--web.enable-remote-write-receiver` 플래그 필요. 미사용 시 이 패널은 비워집니다.)"
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "결제 결과 분포 (k6 pay_result, ops/s)",
+      "datasource": "Prometheus",
+      "description": "status: SUCCESS / FAILED(한도초과·잘못된카드) / HTTP_5xx(서킷 fast-fail 등).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "Prometheus",
+          "expr": "sum by (status) (rate(k6_pay_result_total[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "결제 결과 누적 (k6)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "Prometheus",
+          "expr": "sum by (status) (k6_pay_result_total)",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    }
+  ]
+}
