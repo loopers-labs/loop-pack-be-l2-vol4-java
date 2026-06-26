@@ -56,11 +56,6 @@ public class OrderFacade {
         orderService.cancel(orderId, memberId);
     }
 
-    public OrderInfo confirmOrder(Long orderId, Long memberId) {
-        var order = orderService.confirm(orderId, memberId);
-        var orderItems = orderService.getItemsByOrderId(order.getId());
-        return OrderInfo.of(order, orderItems);
-    }
 
     public List<OrderInfo> getOrders(Long memberId, LocalDate startAt, LocalDate endAt) {
         List<OrderModel> orders = orderService.getOrders(memberId, startAt, endAt);

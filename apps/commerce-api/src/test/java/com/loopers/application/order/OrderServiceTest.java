@@ -157,6 +157,85 @@ class OrderServiceTest {
         }
     }
 
+    @DisplayName("시스템이 주문을 확정할 때,")
+    @Nested
+    class ConfirmBySystem {
+
+        @DisplayName("PENDING 주문을 confirmBySystem()으로 확정하면, CONFIRMED로 변경된다.")
+        @Test
+        void confirmBySystem_changesPendingToConfirmed() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
+
+            // act
+            orderService.confirmBySystem(order.getId());
+
+            // assert
+            OrderModel confirmed = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        }
+
+        @DisplayName("존재하지 않는 orderId로 confirmBySystem()을 호출하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void confirmBySystem_throwsException_whenNotFound() {
+            assertThatThrownBy(() -> orderService.confirmBySystem(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("시스템이 주문을 취소할 때,")
+    @Nested
+    class CancelBySystem {
+
+        @DisplayName("PENDING 주문을 cancelBySystem()으로 취소하면, CANCELLED로 변경되고 재고가 복구된다.")
+        @Test
+        void cancelBySystem_cancelsPendingOrder_andRestoresStock() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 3)), null, 30000L, 0L);
+
+            // act
+            orderService.cancelBySystem(order.getId());
+
+            // assert
+            OrderModel cancelled = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(fakeStockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @DisplayName("CONFIRMED 주문을 cancelBySystem()으로 취소하면, CANCELLED로 변경되고 재고가 복구된다.")
+        @Test
+        void cancelBySystem_cancelsConfirmedOrder_andRestoresStock() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 2)), null, 20000L, 0L);
+            orderService.confirm(order.getId(), 1L);
+
+            // act
+            orderService.cancelBySystem(order.getId());
+
+            // assert
+            OrderModel cancelled = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(fakeStockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @DisplayName("존재하지 않는 orderId로 cancelBySystem()을 호출하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void cancelBySystem_throwsException_whenNotFound() {
+            assertThatThrownBy(() -> orderService.cancelBySystem(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("주문 목록을 조회할 때,")
     @Nested
     class GetOrders {
@@ -229,6 +308,13 @@ class OrderServiceTest {
         @Override
         public List<OrderItemModel> findItemsByOrderId(Long orderId) {
             return itemStore.getOrDefault(orderId, List.of());
+        }
+
+        @Override
+        public List<OrderItemModel> findItemsByOrderIdIn(List<Long> orderIds) {
+            return orderIds.stream()
+                .flatMap(id -> itemStore.getOrDefault(id, List.of()).stream())
+                .toList();
         }
 
         private void setId(OrderModel order, long id) {

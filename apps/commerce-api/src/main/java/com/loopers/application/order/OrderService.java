@@ -108,6 +108,30 @@ public class OrderService {
     }
 
     @Transactional
+    public void confirmBySystem(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+        order.confirm();
+    }
+
+    @Transactional
+    public void cancelBySystem(Long orderId) {
+        OrderModel order = orderRepository.findByIdForUpdate(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+
+        order.cancel();
+
+        List<OrderItemModel> items = orderRepository.findItemsByOrderId(orderId).stream()
+            .sorted(Comparator.comparingLong(OrderItemModel::getProductId))
+            .toList();
+
+        for (OrderItemModel item : items) {
+            StockModel stock = stockService.getByProductIdForUpdate(item.getProductId());
+            stock.increase(item.getQuantity());
+        }
+    }
+
+    @Transactional
     public OrderModel confirm(Long orderId, Long memberId) {
         OrderModel order = orderRepository.findById(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
