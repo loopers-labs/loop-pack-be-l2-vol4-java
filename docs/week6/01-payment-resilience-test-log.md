@@ -637,3 +637,178 @@ Green 확인:
 - request CB가 OPEN으로 간주되면 `POST /api/v1/payments`는 `503 SERVICE_UNAVAILABLE`을 반환한다.
 - PG request 호출은 0회다.
 - `payments` row는 생성되지 않는다.
+
+## 6차 라이브 재검증 - 2026-06-26 14:03 KST
+
+### 목적
+
+5차 보완까지 반영한 현재 코드가 실제 `pg-simulator`와 함께 실행될 때도 기대한 동작을 보이는지 다시 확인했다.
+
+특히 다음 조건을 검증했다.
+
+- request CB가 `OPEN`이면 신규 결제 요청을 `503`으로 차단한다.
+- request CB `OPEN` 차단 시 commerce `payments` row를 만들지 않는다.
+- `PG_LOOKUP_EMPTY`는 10초 유예시간 이후 `FAILED`로 전이한다.
+- 결제 생성 CB(`pgPaymentRequest`)와 상태 조회 CB(`pgPaymentLookup`)는 분리되어 동작한다.
+
+### 실행 환경
+
+- local infra: `docker/infra-compose.yml`
+- commerce-api: `localhost:8080`
+- commerce-api actuator: `localhost:8081`
+- pg-simulator: `localhost:8082`
+- pg-simulator actuator: `localhost:8083`
+- pg-simulator DB: `paymentgateway`
+
+pg-simulator는 별도 worktree에서 다음 옵션으로 실행했다.
+
+```bash
+./gradlew :apps:pg-simulator:bootRun --args="--datasource.mysql-jpa.main.jdbc-url=jdbc:mysql://localhost:3306/paymentgateway" --no-daemon
+```
+
+commerce-api는 현재 `volume-6` 코드로 실행했다.
+
+```bash
+./gradlew :apps:commerce-api:bootRun --no-daemon
+```
+
+원본 로그:
+
+```text
+/private/tmp/payment-live-test-20260626-140315.log
+```
+
+### 요청 결과
+
+12건의 결제 요청을 반복했다.
+
+| 범위 | HTTP 결과 | payment status | pendingReason | transactionKey | 관찰 |
+|---:|---|---|---|---|---|
+| 1-4 | 200 | `PENDING` | `PG_REQUEST_FAILED` | 없음 | PG simulator 랜덤 실패 fallback |
+| 5 | 200 | `PENDING` | `WAITING_CALLBACK` | `20260626:TR:885af2` | PG transaction 생성, callback 대기 |
+| 6-12 | 503 | 없음 | 없음 | 없음 | request CB `OPEN`, payment row 미생성 |
+
+8초 대기 후 상태 조회 결과:
+
+| 대상 | 조회 결과 | 관찰 |
+|---|---|---|
+| order 1-4 | `FAILED` | `PG_LOOKUP_EMPTY` 유예시간 10초가 지나 실패 확정 |
+| order 5 | `PAID` | callback 반영, reason `정상 승인되었습니다.` |
+| order 6-12 | 404 | CB `OPEN` 차단으로 payment row가 생성되지 않았으므로 정상 |
+
+commerce DB 최종 상태:
+
+| status | 건수 |
+|---|---:|
+| `FAILED` | 4 |
+| `PAID` | 1 |
+
+pg-simulator DB 최종 상태:
+
+| status | 건수 |
+|---|---:|
+| `SUCCESS` | 1 |
+
+### Resilience4j 메트릭
+
+| 메트릭 | 결과 | 해석 |
+|---|---|---|
+| `pgPaymentRequest` failed | 4 | 결제 생성 PG 요청 실패 |
+| `pgPaymentRequest` successful | 1 | 결제 생성 PG 요청 성공 |
+| `pgPaymentRequest` open state | 1.0 | 실패율 조건 충족 후 request CB OPEN |
+| `pgPaymentLookup` successful | 5 | 상태 조회는 정상 호출됨 |
+| `pgPaymentLookup` closed state | 1.0 | 생성 CB와 분리되어 lookup CB는 닫힌 상태 유지 |
+| `pgPaymentStatusLookup` successful_without_retry | 5.0 | 상태 조회 retry는 추가 재시도 없이 성공 |
+
+### 판단
+
+현재 코드 기준으로 보완한 동작이 실제 실행 환경에서도 재현됐다.
+
+- CB `OPEN` 상태의 신규 결제 요청은 결제 접수 자체를 막는다.
+- 이때 commerce `payments`에 복구 불가능한 `PENDING + CB_OPEN` row를 남기지 않는다.
+- PG에 거래가 없다고 확인된 기존 `PENDING + PG_LOOKUP_EMPTY` 건은 학습용 기본 유예시간 10초 이후 `FAILED`로 마감된다.
+- 결제 생성 CB가 열려도 상태 조회 CB는 별도 인스턴스로 유지되어 기존 미확정 결제를 조회/정리할 수 있다.
+
+테스트 종료 후 `commerce-api`와 `pg-simulator` bootRun 세션을 모두 종료했고, actuator health check가 응답하지 않는 것까지 확인했다.
+
+## 7차 보완 검증 - PENDING Reconciliation Scheduler
+
+### 보강 대상
+
+장애 대응 관점에서 `FAILED` 자체를 자동 재시도하는 것은 안전하지 않다. PG가 카드 한도 초과, 잘못된 카드 등으로 명시적으로 실패를 반환한 경우 같은 결제를 자동 재시도해도 성공 가능성이 낮고, 사용자 결제 수단 변경이 필요하다.
+
+대신 자동화해야 하는 대상은 최종 실패가 아니라 미확정 `PENDING`이다.
+
+- `WAITING_CALLBACK`: callback 지연 또는 유실 가능성
+- `TIMEOUT_UNKNOWN`: PG가 실제로 처리했는지 알 수 없음
+- `PG_LOOKUP_FAILED`: 조회 자체가 실패했으므로 다음 주기 재조회 필요
+- `PG_REQUEST_FAILED`: 생성 실패 가능성이 크지만, 보수적으로 PG order 조회 가능
+- `PG_LOOKUP_EMPTY`: 유예시간 이후 `FAILED` 마감 대상
+
+### 결정
+
+`PENDING` 결제를 주기적으로 조회하는 reconciliation scheduler를 추가했다.
+
+중요한 제약:
+
+- PG 결제 생성 `POST`는 scheduler에서도 재시도하지 않는다.
+- scheduler는 PG 상태 조회 `GET`만 수행한다.
+- 조회 결과가 `SUCCESS`/`FAILED`이면 내부 결제를 최종 상태로 반영한다.
+- 조회 결과가 `PG_LOOKUP_EMPTY`이고 유예시간이 지났으면 `FAILED` 처리한다.
+- 조회 자체가 실패하면 `PENDING`을 유지하고 다음 주기에 다시 시도한다.
+
+### 구현 메모
+
+- `PaymentStatusSynchronizer`
+  - 수동 상태 조회 API와 scheduler가 공유하는 동기화 로직이다.
+  - `paymentGateway.getByOrder(...)`만 호출한다.
+  - `Payment.failIfLookupEmptyGracePeriodElapsed(...)`를 함께 평가한다.
+  - 저장은 기존 `completeIfPending` 조건부 update 경로를 사용한다.
+- `PaymentReconciliationScheduler`
+  - `PaymentService.findPendingPaymentsForReconciliation(batchSize)`로 오래된 `PENDING` 결제를 가져온다.
+  - 각 결제를 `PaymentStatusSynchronizer.syncPayment(...)`로 동기화한다.
+  - 개별 결제 동기화 실패는 로그만 남기고 다음 결제를 계속 처리한다.
+- `PaymentRepository.findPendingPaymentsForReconciliation(limit)`
+  - `status = PENDING`인 결제를 `createdAt ASC` 순으로 batch 조회한다.
+
+기본 설정:
+
+```yaml
+loopers:
+  payment:
+    reconciliation-enabled: true
+    reconciliation-delay: 10s
+    reconciliation-batch-size: 20
+```
+
+### 검증 결과
+
+새로 추가한 E2E 검증:
+
+```bash
+./gradlew :apps:commerce-api:test --tests 'com.loopers.interfaces.api.payment.PaymentV1ApiE2ETest$RequestPayment.reconcilesPendingPaymentByLookup_withoutRetryingPaymentCreation' --no-daemon
+```
+
+결과: 성공.
+
+검증한 조건:
+
+- 최초 PG 생성 요청이 `TIMEOUT_UNKNOWN`으로 끝난 결제를 만든다.
+- scheduler를 실행하면 PG 생성 `POST`를 다시 호출하지 않는다.
+- scheduler는 PG 상태 조회 `GET`만 1회 호출한다.
+- 조회 결과가 성공이면 결제를 `PAID`로 복구한다.
+- commerce `payments` row는 1건만 유지된다.
+
+회귀 확인:
+
+```bash
+./gradlew :apps:commerce-api:test --tests 'com.loopers.domain.payment.*' --tests 'com.loopers.interfaces.api.payment.PaymentV1ApiE2ETest' --tests 'com.loopers.infrastructure.payment.*' --no-daemon
+```
+
+결과: 성공.
+
+### 판단
+
+이번 보강으로 “콜백이 오지 않더라도 일정 주기 혹은 수동 API 호출로 상태를 복구할 수 있다”는 체크리스트를 수동 API와 scheduler 양쪽으로 충족하게 됐다.
+
+여전히 자동 재시도 범위는 상태 조회 GET으로 제한한다. 결제 생성 POST 자동 재시도는 PG 멱등키나 명확한 PG 계약이 없는 한 이중 결제 위험이 있으므로 적용하지 않는다.
