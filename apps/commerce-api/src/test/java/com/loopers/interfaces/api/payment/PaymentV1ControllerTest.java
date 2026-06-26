@@ -53,4 +53,32 @@ class PaymentV1ControllerTest {
                 .andExpect(jsonPath("$.meta.result").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.paymentId").value(500));
     }
+
+    @Test
+    @DisplayName("서킷 브레이커 OPEN 상태 시 결제 요청을 하면 503 SERVICE_UNAVAILABLE을 반환한다.")
+    void processPayment_CircuitBreakerOpen_Returns503() throws Exception {
+        // given
+        PaymentV1Dto.PaymentRequest request = new PaymentV1Dto.PaymentRequest(
+                100L,
+                PaymentMethod.CARD,
+                new BigDecimal("50000")
+        );
+
+        io.github.resilience4j.circuitbreaker.CircuitBreaker realCircuitBreaker = io.github.resilience4j.circuitbreaker.CircuitBreaker.ofDefaults("pgCircuitBreaker");
+
+        io.github.resilience4j.circuitbreaker.CallNotPermittedException exception =
+                io.github.resilience4j.circuitbreaker.CallNotPermittedException.createCallNotPermittedException(realCircuitBreaker);
+
+        given(paymentFacade.processPayment(eq(100L), eq(PaymentMethod.CARD), any(BigDecimal.class)))
+                .willThrow(exception);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.meta.result").value("FAIL"))
+                .andExpect(jsonPath("$.meta.errorCode").value("PAYMENT-503"))
+                .andExpect(jsonPath("$.meta.message").value("현재 외부 결제 시스템 장애로 결제가 일시 중단되었습니다."));
+    }
 }
