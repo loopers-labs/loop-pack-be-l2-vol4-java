@@ -28,6 +28,7 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentRequestResult;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -107,7 +108,7 @@ class PaymentFacadeTest {
             given(orderRepository.getActiveByIdAndUserId(ORDER_ID, USER_ID)).willReturn(order(finalAmount));
             given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
             given(paymentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
-            given(paymentGateway.requestPayment(any())).willReturn("TX-0001");
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.accepted("TX-0001"));
 
             // act
             PaymentInfo paymentInfo = paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now());
@@ -128,7 +129,7 @@ class PaymentFacadeTest {
             given(orderRepository.getActiveByIdAndUserId(ORDER_ID, USER_ID)).willReturn(order(78_000));
             given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
             given(paymentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
-            given(paymentGateway.requestPayment(any())).willReturn("TX-0001");
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.accepted("TX-0001"));
 
             // act
             PaymentInfo paymentInfo = paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now());
@@ -148,23 +149,39 @@ class PaymentFacadeTest {
             );
         }
 
-        @DisplayName("외부 결제 시스템 호출이 실패하면 PENDING 접수만 저장한 채 거래 식별자를 기록하지 않고 예외가 전파된다.")
+        @DisplayName("결과가 불명이면 거래 식별자 없이 PENDING으로 접수만 남기고 정상 응답한다.")
         @Test
-        void propagatesGatewayError_withoutRecordingTransactionKey() {
+        void keepsPending_whenResultUnknown() {
             // arrange
             given(orderRepository.getActiveByIdAndUserId(ORDER_ID, USER_ID)).willReturn(order(78_000));
             given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
             given(paymentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
-            given(paymentGateway.requestPayment(any()))
-                .willThrow(new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "결제 시스템 연동에 실패했습니다."));
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.unknown());
 
-            // act & assert
-            assertThatThrownBy(() -> paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now()))
-                .isInstanceOf(CoreException.class)
-                .extracting("errorType")
-                .isEqualTo(ErrorType.PAYMENT_GATEWAY_ERROR);
+            // act
+            PaymentInfo paymentInfo = paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now());
 
-            then(paymentRepository).should(times(1)).save(any());
+            // assert
+            assertAll(
+                () -> assertThat(paymentInfo.status()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(paymentInfo.transactionKey()).isNull()
+            );
+        }
+
+        @DisplayName("접수가 거절되면 FAILED로 확정하고 정상 응답한다.")
+        @Test
+        void marksFailed_whenResultRejected() {
+            // arrange
+            given(orderRepository.getActiveByIdAndUserId(ORDER_ID, USER_ID)).willReturn(order(78_000));
+            given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
+            given(paymentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.rejected("결제가 거절되었습니다."));
+
+            // act
+            PaymentInfo paymentInfo = paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now());
+
+            // assert
+            assertThat(paymentInfo.status()).isEqualTo(PaymentStatus.FAILED);
         }
     }
 

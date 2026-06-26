@@ -30,6 +30,7 @@ import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
+import com.loopers.domain.payment.PaymentRequestResult;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.user.PasswordEncrypter;
 import com.loopers.domain.user.UserModel;
@@ -37,7 +38,6 @@ import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.payment.PaymentJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.payment.PaymentV1Dto;
-import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
 
@@ -138,7 +138,7 @@ class PaymentV1ApiE2ETest {
             // arrange
             UserModel user = saveUser("kylekim");
             OrderModel order = saveOrder(user.getId(), 78_000);
-            given(paymentGateway.requestPayment(any())).willReturn("TX-0001");
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.accepted("TX-0001"));
             PaymentV1Dto.CreateRequest requestBody = new PaymentV1Dto.CreateRequest(order.getId(), CardType.SAMSUNG, CARD_NO);
 
             // act
@@ -246,14 +246,13 @@ class PaymentV1ApiE2ETest {
             );
         }
 
-        @DisplayName("외부 결제 시스템 연동이 실패하면, 502 Bad Gateway로 응답하고 PENDING 접수는 남는다.")
+        @DisplayName("외부 결제 시스템 응답이 불명이면, 201 Created로 PENDING 접수를 남기고 정상 응답한다.")
         @Test
-        void returnsBadGateway_andKeepsPending_whenPaymentGatewayFails() {
+        void returnsCreated_andKeepsPending_whenGatewayResultUnknown() {
             // arrange
             UserModel user = saveUser("kylekim");
             OrderModel order = saveOrder(user.getId(), 78_000);
-            given(paymentGateway.requestPayment(any()))
-                .willThrow(new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "결제 시스템 연동에 실패했습니다."));
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.unknown());
             PaymentV1Dto.CreateRequest requestBody = new PaymentV1Dto.CreateRequest(order.getId(), CardType.SAMSUNG, CARD_NO);
 
             // act
@@ -261,12 +260,38 @@ class PaymentV1ApiE2ETest {
                 ENDPOINT, HttpMethod.POST, memberJsonRequest("kylekim", requestBody), MAP_RESPONSE);
 
             // assert
+            Map<String, Object> data = response.getBody().data();
             assertAll(
-                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY),
-                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
-                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo(ErrorType.PAYMENT_GATEWAY_ERROR.getCode()),
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(data.get("status")).isEqualTo("PENDING"),
+                () -> assertThat(data.get("transactionKey")).isNull(),
                 () -> assertThat(paymentJpaRepository.findByOrderId(order.getId()))
                     .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING))
+            );
+        }
+
+        @DisplayName("외부 결제 시스템이 접수를 거절하면, 201 Created로 FAILED 결제를 남기고 정상 응답한다.")
+        @Test
+        void returnsCreated_andMarksFailed_whenGatewayRejects() {
+            // arrange
+            UserModel user = saveUser("kylekim");
+            OrderModel order = saveOrder(user.getId(), 78_000);
+            given(paymentGateway.requestPayment(any())).willReturn(PaymentRequestResult.rejected("결제가 거절되었습니다."));
+            PaymentV1Dto.CreateRequest requestBody = new PaymentV1Dto.CreateRequest(order.getId(), CardType.SAMSUNG, CARD_NO);
+
+            // act
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = testRestTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, memberJsonRequest("kylekim", requestBody), MAP_RESPONSE);
+
+            // assert
+            Map<String, Object> data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.SUCCESS),
+                () -> assertThat(data.get("status")).isEqualTo("FAILED"),
+                () -> assertThat(paymentJpaRepository.findByOrderId(order.getId()))
+                    .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED))
             );
         }
 

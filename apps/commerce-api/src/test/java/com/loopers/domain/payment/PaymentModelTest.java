@@ -116,6 +116,60 @@ class PaymentModelTest {
         }
     }
 
+    @DisplayName("외부 결제 시스템의 접수 결과를 반영할 때,")
+    @Nested
+    class ApplyRequestResult {
+
+        @DisplayName("접수에 성공하면 거래 식별자를 기록하고 PENDING을 유지한다.")
+        @Test
+        void recordsTransactionKey_andStaysPending_whenAccepted() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.accepted("TX-0001"));
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getTransactionKey()).isEqualTo("TX-0001"),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING)
+            );
+        }
+
+        @DisplayName("결과가 불명이면 거래 식별자 없이 PENDING을 유지한다.")
+        @Test
+        void staysPending_withoutTransactionKey_whenUnknown() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.unknown());
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getTransactionKey()).isNull(),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING)
+            );
+        }
+
+        @DisplayName("접수가 거절되면 FAILED로 확정하고 사유를 기록한다.")
+        @Test
+        void fails_withReason_whenRejected() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.rejected("결제가 거절되었습니다."));
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getReason()).isEqualTo("결제가 거절되었습니다."),
+                () -> assertThat(payment.getTransactionKey()).isNull()
+            );
+        }
+    }
+
     @DisplayName("결제를 확정할 때,")
     @Nested
     class Confirm {
