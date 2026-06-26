@@ -36,7 +36,9 @@ import static org.mockito.Mockito.when;
     "resilience4j.circuitbreaker.instances.pgCircuit.failure-rate-threshold=50",
     "resilience4j.circuitbreaker.instances.pgCircuit.wait-duration-in-open-state=60s",
     "resilience4j.retry.instances.pgRequestRetry.max-attempts=2",
-    "resilience4j.retry.instances.pgRequestRetry.wait-duration=1ms"
+    "resilience4j.retry.instances.pgRequestRetry.wait-duration=1ms",
+    // 5xx만 재시도(IO 오류=응답유실은 재전송 금지) — 부분 오버라이드 시 base 리스트가 유실될 수 있어 명시한다
+    "resilience4j.retry.instances.pgRequestRetry.retry-exceptions=org.springframework.web.client.HttpServerErrorException"
 })
 class PgGatewayAspectOrderTest {
 
@@ -78,6 +80,6 @@ class PgGatewayAspectOrderTest {
         GatewayResult result = paymentGateway.requestPayment(CMD); // 재시도 없이 Fallback → pending
 
         verify(pgClient, times(1)).requestPayment(any());
-        assertThat(result.accepted()).isFalse();
+        assertThat(result.isAccepted()).isFalse();
     }
 }

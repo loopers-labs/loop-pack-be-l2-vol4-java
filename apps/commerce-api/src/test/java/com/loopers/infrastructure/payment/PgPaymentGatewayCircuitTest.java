@@ -100,7 +100,7 @@ class PgPaymentGatewayCircuitTest {
     @Nested
     class WhenOpen {
 
-        @DisplayName("PG를 더 호출하지 않고(fast-fail) PENDING fallback을 반환한다")
+        @DisplayName("PG를 더 호출하지 않고(fast-fail) REJECTED fallback을 반환한다 (PG 미접수 확정)")
         @Test
         void shortCircuitsToFallback() {
             stubFailFirst(10);
@@ -111,7 +111,8 @@ class PgPaymentGatewayCircuitTest {
 
             GatewayResult result = paymentGateway.requestPayment(CMD);
 
-            assertThat(result.accepted()).isFalse();
+            assertThat(result.isAccepted()).isFalse();
+            assertThat(result.isRejected()).isTrue(); // 서킷 OPEN은 PENDING이 아니라 REJECTED — PG에 안 나갔으므로
             verify(pgClient, times(10)).requestPayment(any());
         }
     }
