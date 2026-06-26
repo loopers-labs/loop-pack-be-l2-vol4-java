@@ -6,6 +6,7 @@ import com.loopers.domain.coupon.*;
 import com.loopers.application.coupon.CouponRepository;
 import com.loopers.application.order.OrderRepository;
 import com.loopers.domain.payment.PaymentMethod;
+import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.application.payment.PaymentRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.application.product.ProductRepository;
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@org.springframework.test.context.ContextConfiguration(initializers = com.loopers.testcontainers.RedisTestContainersConfig.class)
 class OrderFacadeConcurrencyTest {
 
     @Autowired
@@ -50,6 +52,9 @@ class OrderFacadeConcurrencyTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private com.loopers.application.payment.PaymentFacade paymentFacade;
 
     @SpyBean
     private PaymentGateway paymentGateway;
@@ -87,12 +92,11 @@ class OrderFacadeConcurrencyTest {
                 executorService.submit(() -> {
                     try {
                         barrier.await();
-                        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                                null,
-                                PaymentMethod.CARD
+                        OrderCreateRequest request = new OrderCreateRequest(
+                                List.of(new OrderCreateRequest.Item(productId, 1)),
+                                null
                         );
-                        orderFacade.checkout(userId, request);
+                        orderFacade.createOrder(userId, request);
                         successCount.incrementAndGet();
                     } catch (Exception e) {
                         failCount.incrementAndGet();
@@ -156,12 +160,11 @@ class OrderFacadeConcurrencyTest {
                 executorService.submit(() -> {
                     try {
                         barrier.await();
-                        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                                couponIssueId,
-                                PaymentMethod.CARD
+                        OrderCreateRequest request = new OrderCreateRequest(
+                                List.of(new OrderCreateRequest.Item(productId, 1)),
+                                couponIssueId
                         );
-                        orderFacade.checkout(userId, request);
+                        orderFacade.createOrder(userId, request);
                         successCount.incrementAndGet();
                     } catch (Exception e) {
                         failCount.incrementAndGet();
@@ -218,17 +221,19 @@ class OrderFacadeConcurrencyTest {
             return invocation.callRealMethod();
         }).when(paymentGateway).requestPayment(Mockito.anyLong(), Mockito.any(), Mockito.any());
 
-        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                couponIssueId,
-                PaymentMethod.CARD
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderCreateRequest.Item(productId, 1)),
+                couponIssueId
         );
 
         // when
-        Long orderId = orderFacade.checkout(userId, request);
+        Long orderId = orderFacade.createOrder(userId, request);
+        Long paymentId = paymentFacade.processPayment(orderId, PaymentMethod.CARD, new BigDecimal("190000"));
 
         // then
         assertThat(orderId).isNotNull();
+        com.loopers.domain.payment.PaymentStatus paymentStatus = paymentFacade.getPaymentStatus(paymentId);
+        assertThat(paymentStatus).isEqualTo(com.loopers.domain.payment.PaymentStatus.APPROVED);
         CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
         assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
     }

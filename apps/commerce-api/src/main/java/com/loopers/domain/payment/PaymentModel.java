@@ -47,4 +47,21 @@ public class PaymentModel extends BaseTimeEntity {
         this.transactionId = transactionId;
         this.approvedAt = approvedAt;
     }
+
+    public PaymentModel(Long orderId, PaymentMethod method, BigDecimal amount) {
+        this.orderId = orderId;
+        this.method = method;
+        this.amount = amount;
+        this.status = PaymentStatus.READY;
+    }
+
+    public void approve(String transactionId, LocalDateTime approvedAt) {
+        this.status = PaymentStatus.APPROVED;
+        this.transactionId = transactionId;
+        this.approvedAt = approvedAt;
+    }
+
+    public void fail() {
+        this.status = PaymentStatus.FAILED;
+    }
 }

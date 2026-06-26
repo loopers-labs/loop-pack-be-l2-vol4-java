@@ -33,20 +33,19 @@ class OrderV1ControllerTest {
     private OrderFacade orderFacade;
 
     @Test
-    @DisplayName("통합 주문 결제(checkout) 요청 시 HTTP 200과 orderId가 반환된다.")
-    void checkout_ApiSuccess() throws Exception {
+    @DisplayName("주문 생성(orders) 요청 시 HTTP 200과 orderId가 반환된다.")
+    void createOrder_ApiSuccess() throws Exception {
         // given
         Long userId = 1L;
-        OrderV1Dto.CheckoutRequest request = new OrderV1Dto.CheckoutRequest(
+        OrderV1Dto.OrderCreateRequest request = new OrderV1Dto.OrderCreateRequest(
                 List.of(new OrderV1Dto.ItemRequest(10L, 2)),
-                42L,
-                PaymentMethod.CARD
+                42L
         );
 
-        given(orderFacade.checkout(eq(userId), any())).willReturn(100L);
+        given(orderFacade.createOrder(eq(userId), any())).willReturn(100L);
 
         // when & then
-        mockMvc.perform(post("/api/v1/orders/checkout")
+        mockMvc.perform(post("/api/v1/orders")
                         .header("X-Loopers-UserId", userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

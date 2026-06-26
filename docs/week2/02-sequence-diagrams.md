@@ -1,61 +1,112 @@
 ```mermaid
 sequenceDiagram
-    title 주문 요청 API 시퀀스 다이어그램
+    title 주문 생성 및 결제 요청 API (트랜잭션 분리)
     actor User
-    participant Controller as OrderController
-    participant Facade as OrderFacade (Application)
-    participant Repo as DB & Repositories
-    participant Domain as Order / Coupon / Stock (Domain)
-    participant PG as PaymentGateway
+    participant OrderAPI as POST /orders
+    participant PaymentAPI as POST /payments
+    participant Facade as Facade
+    participant DB
+    participant PG as PG Simulator
+    participant Redis
 
-    User->>Controller: POST /api/v1/orders/checkout (상품목록, 쿠폰ID, 결제수단)
-    activate Controller
-
-    Controller->>Facade: 주문 및 결제 요청
-    activate Facade
-
-    rect rgba(128, 128, 128, 0.2)
-        Note right of Facade: [@Transactional Begin]
-
-        Note right of Facade: 1. 데이터 조회 (Application -> Infra)
-        Facade->>Repo: SELECT FOR UPDATE 재고 락 획득
-        Repo-->>Facade: Stock Entity
-        Facade->>Repo: SELECT 상품 메타데이터 및 쿠폰 발급 내역
-        Repo-->>Facade: Product Entity / Coupon Issue Entity
-
-        Note right of Facade: 2. 도메인 로직 처리 (Application -> Domain)
-        Facade->>Domain: Stock.decrease(quantity)
-        Facade->>Domain: CouponIssue.use() (할인 검증)
-        Facade->>Domain: Order.create(Product, Stock, Coupon)
-        Domain-->>Facade: 생성된 Order 엔티티 및 상태가 변경된 엔티티 반환
-
-        Note right of Facade: 3. 영속화 (Application -> Infra)
-        Facade->>Repo: INSERT 주문 및 주문상세 (임시 저장)
-        
-        Note right of Facade: 4. 외부 API 호출 (동기)
-        Facade->>PG: 결제 승인 요청 (amount, paymentMethod)
-        activate PG
-        
-        alt 결제 승인 성공 시
-            PG-->>Facade: PaymentResponse (success)
-            deactivate PG
-
-            Note right of Facade: 5. 결제 후처리 로직 및 최종 영속화
-            Facade->>Domain: Order.completePayment()
-            Facade->>Repo: INSERT 결제 내역
-            Facade->>Repo: UPDATE 주문 및 쿠폰 상태
-
-            Note right of Facade: [@Transactional Commit] DB 변경 반영
-        else PG사 응답 타임아웃 또는 잔액 부족 등 승인 거절 시
-            PG-->>Facade: 결제 실패 예외 발생
-            Note right of Facade: [트랜잭션 롤백] 
-        end
+    %% 1단계: 주문 생성
+    rect rgba(0, 128, 0, 0.1)
+        Note over User, DB: 트랜잭션 1: 주문 생성 (단기)
+        User->>OrderAPI: 1. 주문 생성 요청
+        OrderAPI->>Facade: createOrder()
+        Facade->>DB: 재고 락 & 차감, 쿠폰 사용
+        Facade->>DB: 주문 PENDING 저장
+        Facade-->>OrderAPI: orderId 반환
+        OrderAPI-->>User: 200 OK (orderId)
     end
 
-    Facade-->>Controller: 결제 완료 및 주문 반환
-    deactivate Facade
-    Controller-->>User: 200 OK
-    deactivate Controller
+    %% 2단계: 결제 요청
+    rect rgba(0, 0, 255, 0.1)
+        Note over User, DB: 트랜잭션 2: 결제 정보 저장 (단기)
+        User->>PaymentAPI: 2. 결제 요청 (orderId, cardNo)
+        PaymentAPI->>Facade: processPayment()
+        Facade->>DB: 결제 READY 저장
+        Facade->>Redis: TTL 10초 Key 생성 (payment_retry, count=0)
+    end
+    
+    Note over Facade, PG: DB 락 없이 외부 API 비동기 대기
+    Facade->>PG: 결제 승인 요청 (timeout 500ms)
+    
+    alt 정상 접수
+        PG-->>Facade: 200 OK
+        Facade-->>PaymentAPI: 결제 진행 중
+        PaymentAPI-->>User: 진행 중 응답
+    else Timeout 예외 발생
+        PG--xFacade: Timeout
+        Note right of Facade: 즉시 취소하지 않고 상태 유지<br>(콜백이나 Redis TTL 만료 시 보정)
+        Facade-->>PaymentAPI: 타임아웃 안내
+        PaymentAPI-->>User: 진행 상태 대기 안내
+    end
+```
+
+```mermaid
+sequenceDiagram
+    title 비동기 콜백 처리 및 보상 트랜잭션
+    participant PG as PG Simulator
+    participant CallbackAPI as POST /callback
+    participant Facade as Facade
+    participant DB
+
+    PG->>CallbackAPI: 3. 결제 결과 콜백 (상태, 금액 등 포함)
+    CallbackAPI->>Facade: handleCallback(callbackData)
+
+    rect rgba(255, 0, 0, 0.1)
+        Note over Facade, DB: 트랜잭션 3: 결과 반영 및 보상 트랜잭션 (단기)
+        alt 콜백 결제 성공 시
+            Facade->>DB: 결제 APPROVED, 주문 COMPLETED
+        else 콜백 결제 실패 시
+            Facade->>DB: 결제 FAILED, 주문 CANCELED
+            Note right of Facade: 보상 트랜잭션 실행
+            Facade->>DB: 재고 복구, 쿠폰 원복
+        end
+    end
+```
+
+```mermaid
+sequenceDiagram
+    title 결제 지연 보정 및 Retry (연쇄 Redis TTL)
+    actor User
+    participant Redis
+    participant Listener as PaymentExpirationListener
+    participant Facade as Facade
+    participant PG as PG Simulator
+    participant DB
+
+    Note over Redis, Listener: 10초 뒤 TTL 만료 시 이벤트 발생
+    Redis->>Listener: KeyExpiredEvent (payment_retry:{id})
+    Listener->>Facade: retryOrCompensatePayment(paymentId)
+
+    Facade->>DB: 결제 상태 조회
+    alt 상태가 READY가 아님 (이미 처리됨)
+        Facade-->>Listener: 무시 (종료)
+    else 상태가 READY임
+        Facade->>PG: GET /payments/{paymentId} (상태 조회)
+        PG-->>Facade: 실제 상태 응답
+        
+        alt 결제 성공
+            rect rgba(0, 128, 0, 0.1)
+                Facade->>DB: APPROVED / COMPLETED 갱신
+            end
+        else 미결제 / 응답 없음 (Retry 진행)
+            alt 재시도 횟수 < 3
+                Note right of Facade: 아직 3회가 안 됨, TTL 연장
+                Facade->>Redis: TTL 10초 재설정 (count + 1)
+            else 재시도 횟수 >= 3 (최종 실패)
+                rect rgba(255, 0, 0, 0.1)
+                    Note over Facade, DB: 트랜잭션: 최종 실패 및 보상
+                    Facade->>DB: FAILED / CANCELED 갱신
+                    Facade->>DB: 재고 복구 및 쿠폰 AVAILABLE 처리
+                end
+                Note right of Facade: 사용자에게 실패 알림 (개념적)
+                Facade-->>User: [알림] 결제 시간 초과, 재시도 안내
+            end
+        end
+    end
 ```
 
 ```mermaid
@@ -234,4 +285,28 @@ sequenceDiagram
 
     Controller-->>User: 상품 정보/목록 반환
     deactivate Controller
+```
+
+```mermaid
+sequenceDiagram
+    title 결제 유실 보정 (Fallback Scheduler - 30분 주기)
+    participant Scheduler as PaymentFallbackScheduler
+    participant Facade as PaymentFacade
+    participant PG as PG Simulator
+    participant DB
+    participant Notification as NotificationService
+
+    Scheduler->>Facade: 30분 경과 READY 건 보정 실행 (isFallback=true)
+    Facade->>PG: 결제 상태 조회 (GET /payments/{orderId})
+    PG-->>Facade: 실제 상태 응답
+    
+    alt 결제 성공 (APPROVED)
+        Note over Facade, PG: 30분 지연 건이므로 물리적 결제 취소 연동
+        Facade->>PG: 결제 취소 API 호출 (환불)
+        Facade->>Notification: 환불 완료 알림 발송 (sendPaymentRefund)
+        Facade->>DB: FAILED / CANCELED 갱신 및 보상 트랜잭션 (재고/쿠폰 복구)
+    else 미결제 / 실패 (PENDING / FAILED)
+        Facade->>DB: FAILED / CANCELED 갱신 및 보상 트랜잭션 (재고/쿠폰 복구)
+        Note over Facade: 스팸 방지를 위해 일반 타임아웃 알림 미발송
+    end
 ```
