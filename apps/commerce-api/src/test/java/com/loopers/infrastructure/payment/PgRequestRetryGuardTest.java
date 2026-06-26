@@ -48,6 +48,7 @@ class PgRequestRetryGuardTest {
         GatewayResult result = paymentGateway.requestPayment(CMD); // 재시도 없이 Fallback → pending
 
         verify(pgClient, times(1)).requestPayment(any());
-        assertThat(result.isAccepted()).isFalse();
+        assertThat(result.isPending()).isTrue();
+        assertThat(result.getTransactionKey()).isNull();
     }
 }
