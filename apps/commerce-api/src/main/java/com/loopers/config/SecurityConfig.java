@@ -48,7 +48,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/likes/**").authenticated()
                 .requestMatchers("/api/v1/orders/**").authenticated()
                 .requestMatchers("/api/v1/coupons/**").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/v1/payments").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint))
             .addFilterBefore(new AdminAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)

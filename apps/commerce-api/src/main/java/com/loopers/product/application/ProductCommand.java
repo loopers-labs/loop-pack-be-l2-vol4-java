@@ -1,16 +1,6 @@
 package com.loopers.product.application;
 
-import com.loopers.product.domain.ProductSortOption;
-
 public class ProductCommand {
-
-    public record PageQuery(
-        Long brandId,
-        ProductSortOption sort,
-        int page,
-        int size
-    ) {
-    }
 
     public record Create(
         Long brandId,

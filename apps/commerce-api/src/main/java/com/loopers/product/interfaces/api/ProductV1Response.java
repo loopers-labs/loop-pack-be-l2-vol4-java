@@ -3,25 +3,7 @@ package com.loopers.product.interfaces.api;
 import com.loopers.product.application.ProductResult;
 import com.loopers.product.domain.ProductDisplayStatus;
 
-import java.util.List;
-
 public class ProductV1Response {
-
-    public record Page(
-        List<Detail> content,
-        long totalCount,
-        int page,
-        int size
-    ) {
-        public static Page from(ProductResult.Page result) {
-            return new Page(
-                result.content().stream().map(Detail::from).toList(),
-                result.totalCount(),
-                result.page(),
-                result.size()
-            );
-        }
-    }
 
     public record Detail(
         Long id,

@@ -5,6 +5,8 @@ import com.loopers.product.domain.ProductSortOption;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import java.util.List;
+
 @Tag(name = "Product V1 API", description = "Loopers 상품 조회 API 입니다.")
 public interface ProductV1ApiSpec {
 
@@ -16,8 +18,7 @@ public interface ProductV1ApiSpec {
 
     @Operation(
         summary = "상품 목록 조회",
-        description = "판매중인 상품 목록을 brandId 로 필터링하고 sort 기준으로 정렬해 페이지(content + totalCount)로 반환합니다. "
-            + "(sort: LATEST | PRICE_ASC | LIKES_DESC)"
+        description = "판매중인 상품 목록을 sort 기준으로 정렬해 반환합니다. (LATEST | PRICE_ASC | LIKES_DESC)"
     )
-    ApiResponse<ProductV1Response.Page> getAll(Long brandId, ProductSortOption sort, int page, int size);
+    ApiResponse<List<ProductV1Response.Detail>> getAll(ProductSortOption sort);
 }

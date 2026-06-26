@@ -23,81 +23,17 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
-  cloud:
-    openfeign:
-      client:
-        config:
-          tossPgClient:
-            connect-timeout: 2000   # PG 동기 호출은 서브초 — 멈춘 PG 가 스레드를 오래 잡지 않게
-            read-timeout: 2000
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
 
-# p6spy SQL 로깅: 기본 비활성 (운영/테스트 노이즈 방지), local 에서만 활성화
-decorator:
-  datasource:
-    enabled: false
-
-# PG(pg-simulator) 연동. callback-base-url=PG 가 결과를 통보할 우리 주소(공통),
-# 각 PG 의 요청 주소는 payment.pg.<provider>.base-url 로 둔다(멀티 PG 대비).
-payment:
-  pg:
-    callback-base-url: http://localhost:8080
-    toss:
-      base-url: http://localhost:8082
-
-# PG 호출 회복탄력성. 게이트웨이에서 CircuitBreaker(Retry(RateLimiter(call))) 순서로 수동 조합한다.
-resilience4j:
-  circuitbreaker:
-    instances:
-      toss:
-        sliding-window-type: TIME_BASED       # 불규칙 트래픽 — "최근 N초" 건강도로 평가(콜 수 기반은 저트래픽서 stale)
-        sliding-window-size: 60               # 최근 60초
-        minimum-number-of-calls: 10           # 60초 안에 10콜 모이면 평가(저트래픽서도 도달 가능, 50%=5실패). 미달이면 안 열고 타임아웃+보정에 위임
-        failure-rate-threshold: 50            # 실패율 50% 초과 시 OPEN
-        wait-duration-in-open-state: 10s      # 10초 차단 후 HALF_OPEN
-        permitted-number-of-calls-in-half-open-state: 3
-        ignore-exceptions:                    # throttle(RateLimiter 거절)·차단은 PG 실패로 집계하지 않는다
-          - io.github.resilience4j.ratelimiter.RequestNotPermitted
-          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
-  retry:
-    instances:
-      toss:
-        max-attempts: 3
-        wait-duration: 200ms
-        retry-exceptions:
-          # 전송 계층 실패(RetryableException = connect 실패·timeout)만 재시도.
-          - feign.RetryableException
-  ratelimiter:
-    instances:
-      toss:
-        limit-for-period: 50
-        limit-refresh-period: 1s
-        timeout-duration: 100ms
-
 ---
 spring:
   config:
     activate:
       on-profile: local, test
-
----
-spring:
-  config:
-    activate:
-      on-profile: local
-
-# 실제 바인딩 값이 인라인된 SQL 한 줄을 slf4j 로 출력
-decorator:
-  datasource:
-    enabled: false
-    p6spy:
-      enable-logging: true
-      logging: slf4j
-      # SQL 포맷·노이즈 제거는 spy.properties 의 커스텀 포매터(P6spyPrettySqlFormatter)로 처리
 
 ---
 spring:

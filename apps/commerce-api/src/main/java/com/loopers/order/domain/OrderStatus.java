@@ -1,11 +1,11 @@
 package com.loopers.order.domain;
 
 /**
- * 주문 상태. 결제 흐름과 맞물린다.
- * PENDING_PAYMENT(생성·재고 선점, 결제 대기) → 콜백 SUCCESS 시 PAID / FAILED 시 PAYMENT_FAILED(+보상).
+ * 주문 상태. PENDING 으로 생성되며, PAID/FAILED 는 결제 도메인이 추가될 때 사용한다.
+ * 현재 범위에서는 주문이 생성 직후 PENDING 으로 종료된다.
  */
 public enum OrderStatus {
-    PENDING_PAYMENT,
+    PENDING,
     PAID,
-    PAYMENT_FAILED
+    FAILED
 }

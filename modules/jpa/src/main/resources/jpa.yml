@@ -35,9 +35,9 @@ spring.config.activate.on-profile: local
 
 spring:
   jpa:
-    show-sql: false   # p6spy 로 실제 바인딩 값 포함 SQL 출력 (commerce-api local)
+    show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: create
 
 datasource:
   mysql-jpa:
