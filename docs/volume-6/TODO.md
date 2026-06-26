@@ -100,7 +100,7 @@ flowchart TD
 - [X] **`PaymentGateway` FeignClient 구현**(infra 어댑터) — `X-USER-ID` 헤더 주입. **타임아웃·재시도·서킷 없음(의도적)** (PAY-1)
 - [X] **결제 요청 API** `POST /api/v1/payments`(Controller/Dto/Facade) — `orderId`+`cardType`+`cardNo` 입력 → 주문/금액 확인 → PG 접수 요청 → `transactionKey` 매핑·`PENDING` 저장 → 접수 응답 (PAY-1)
 - [X] **콜백 엔드포인트** `POST`(8080, PG가 `callbackUrl`로 통보) — 결과 수신 → 결제 상태 전이 + 주문 상태 전이(`PAID`/`PAYMENT_FAILED`) (PAY-2)
-- [ ] pg-simulator 실행 + `.http`로 happy path 수동 검증
+- [X] pg-simulator 실행 + `.http`로 happy path 수동 검증
 
 **의도적 결함(이후 단계에서 제거):** 타임아웃 X · 재시도 X · 서킷 X · fallback X · 폴링 X.
 
@@ -112,12 +112,14 @@ flowchart TD
 
 **목표:** 무방비 상태가 외부 지연 하나로 어떻게 무너지는지 수치로 박제한다. → `reports/01-baseline.md`
 
-- [ ] **타임아웃 없는** 현재 구현으로 측정
-- [ ] k6 장면 1: PG 응답 지연 시 톰캣 스레드가 점유되어 **결제와 무관한 요청까지 응답이 붕괴**하는지 관찰(동시 N명)
-- [ ] 관찰: 요청 실패 40%가 **사용자 에러(500)로 직결**되는 것
-- [ ] **`reports/01-baseline.md` 작성** (As-Is 원점)
+- [X] **타임아웃 없는** 현재 구현으로 측정 (톰캣 스레드를 10으로 임시 축소해 저부하로 재현 — 머신 보호)
+- [X] k6 장면 1: PG 응답 지연 시 톰캣 스레드가 점유되어 **결제와 무관한 요청까지 응답이 붕괴**하는지 관찰 — prober p50 **22ms→404ms(20VU, 18배) / 18ms→1.62s(50VU, 90배)**
+- [X] 관찰: 요청 실패 40%가 **사용자 에러(500)로 직결**되는 것 — payment_500 **39.4%**(≈PG 40% 사양)
+- [X] **`reports/01-baseline.md` 작성** (As-Is 원점)
 
 **검증:** 무방비 상태의 스레드 고갈/에러율 곡선을 확보. 모든 비교의 원점이 된다.
+
+> **측정으로 드러난 사실(plan 보정):** 결함은 *완전 붕괴(타임아웃/거부)*가 아니라 **전파성 지연**으로 나타났고 prober 지연은 ~1.9s에서 **plateau**했다(`prober_fail` 0%). 이유는 ① PG 접수 지연이 100~500ms로 짧아 스레드가 빨리 회전 ② 부하원이 닫힌 모델(ramping-vus)이라 큐가 바운드. → **열린 도착/긴 의존 지연이면 큐가 상한 없이 쌓여 타임아웃·거부로 전환**된다. 지금의 plateau는 안전이 아니라 운이며, 이것이 Stage 2(능동 타임아웃으로 자원 회수)의 동기. 부산물로 접수 성공분이 **PENDING으로 누적**(콜백 미반영) → Stage 6 동기.
 
 ---
 
