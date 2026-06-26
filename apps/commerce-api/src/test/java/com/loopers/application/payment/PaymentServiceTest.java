@@ -96,7 +96,7 @@ class PaymentServiceTest {
             paymentService.success("20250625:TR:abc123");
 
             // assert
-            PaymentModel updated = paymentJpaRepository.findById(payment.getId()).orElseThrow();
+            PaymentModel updated = paymentJpaRepository.findByTransactionKey("20250625:TR:abc123").orElseThrow();
             assertThat(updated.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         }
 
@@ -126,7 +126,7 @@ class PaymentServiceTest {
             paymentService.failByTransactionKey("20250625:TR:abc123", "한도 초과");
 
             // assert
-            PaymentModel updated = paymentJpaRepository.findById(payment.getId()).orElseThrow();
+            PaymentModel updated = paymentJpaRepository.findByTransactionKey("20250625:TR:abc123").orElseThrow();
             assertThat(updated.getStatus()).isEqualTo(PaymentStatus.FAILED);
             assertThat(updated.getTransactionKey()).isEqualTo("20250625:TR:abc123");
             assertThat(updated.getFailureReason()).isEqualTo("한도 초과");

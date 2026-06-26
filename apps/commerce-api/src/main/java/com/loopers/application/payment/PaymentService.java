@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class PaymentService {
@@ -52,5 +55,30 @@ public class PaymentService {
     public PaymentModel getById(Long id) {
         return paymentRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 결제를 찾을 수 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentModel> findPendingBefore(ZonedDateTime threshold) {
+        return paymentRepository.findPendingBefore(threshold);
+    }
+
+    @Transactional
+    public void markConflictByOrderId(Long orderId) {
+        PaymentModel payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 결제를 찾을 수 없습니다."));
+        payment.markAsConflict();
+    }
+
+    @Transactional
+    public void successByOrderId(Long orderId, String transactionKey) {
+        PaymentModel payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 결제를 찾을 수 없습니다."));
+        payment.success(transactionKey);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentModel getByTransactionKey(String transactionKey) {
+        return paymentRepository.findByTransactionKey(transactionKey)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
     }
 }
