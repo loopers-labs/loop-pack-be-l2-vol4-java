@@ -48,6 +48,15 @@ like-events:
 pg-simulator:
   base-url: http://localhost:8082
 
+# PENDING 결제 자동 정리(reconcile) 스케줄러 — 콜백 유실 안전망. 멀티 인스턴스 중복은 ShedLock으로 차단.
+payment:
+  reconcile:
+    fixed-delay: 60000        # 직전 회차 종료 후 다음 회차까지 대기(ms)
+    initial-delay: 30000      # 부팅 직후 첫 실행까지 대기(ms) — 기동 안정화 후 시작
+    page-size: 100            # 한 회차에 훑는 PENDING 결제 수(첫 페이지)
+    lock-at-most-for: PT2M    # 락 안전 상한 — 작업이 죽어도 이만큼 뒤엔 다른 인스턴스가 재실행
+    lock-at-least-for: PT5S   # 락 최소 유지 — 너무 빨리 끝나도 동시 재실행 방지
+
 # 회복성 — pg-simulator는 동기 요청의 40%를 일시 500으로 떨군다.
 resilience4j:
   retry:

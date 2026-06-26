@@ -17,6 +17,11 @@ dependencies {
     implementation("io.github.resilience4j:resilience4j-spring-boot3")
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
+    // reconcile 스케줄러 분산 락 — 멀티 인스턴스에서 같은 회차를 한 인스턴스만 실행하도록(ShedLock).
+    // BOM 미관리 라이브러리라 버전 핀. JDBC 백엔드(shedlock 테이블)로 락 상태를 공유한다.
+    implementation("net.javacrumbs.shedlock:shedlock-spring:${project.properties["shedLockVersion"]}")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:${project.properties["shedLockVersion"]}")
+
     // 식별자 — 주문 PK를 앱 생성 TSID(Time-Sorted ID, 64bit Long)로 사용. 비순차+시간정렬.
     implementation("io.hypersistence:hypersistence-tsid:2.1.4")
 

@@ -94,7 +94,8 @@ public class PaymentFacade {
      * <p>
      * 각 결제 확정은 {@link PaymentConfirmer#confirm}의 독립 트랜잭션으로 처리되며(콜백과 동일 경로),
      * 한 건 실패가 배치 전체를 막지 않는다. PG 조회/확정은 DB 트랜잭션 밖에서 이뤄진다.
-     * 트리거는 운영/배치(AdminPaymentV1Controller) — 별도 스케줄러는 두지 않는다.
+     * 트리거는 두 가지 — 운영 수동(AdminPaymentV1Controller)과 주기 자동(PaymentReconcileScheduler).
+     * 자동 실행은 멀티 인스턴스에서 ShedLock으로 한 인스턴스만 잡도록 직렬화된다.
      */
     public PaymentReconcileResult reconcilePending(int page, int size) {
         List<PaymentModel> pendings = paymentRepository.findByStatus(PaymentStatus.PENDING, page, size);
