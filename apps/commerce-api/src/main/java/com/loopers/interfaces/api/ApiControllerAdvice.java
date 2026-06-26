@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -121,6 +123,26 @@ public class ApiControllerAdvice {
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handleNotFound(NoResourceFoundException e) {
         return failureResponse(ErrorType.NOT_FOUND, null);
+    }
+
+    /**
+     * 낙관적 락 충돌 (예: UserCoupon @Version) → CONFLICT 로 응답.
+     * 두 요청이 같은 자원을 동시에 수정해 한쪽이 졌다는 의미라 재시도 여지를 안내한다.
+     */
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(OptimisticLockingFailureException e) {
+        log.warn("OptimisticLockingFailure : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, "동시 수정으로 충돌이 발생했습니다. 다시 시도해 주세요.");
+    }
+
+    /**
+     * UNIQUE 제약 위반 등 데이터 무결성 충돌 (예: 좋아요 동시 추가) → CONFLICT.
+     * 도메인 멱등 처리가 race window 를 못 잡은 잔여 케이스의 최종 안전망 역할.
+     */
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleConflict(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolation : {}", e.getMessage());
+        return failureResponse(ErrorType.CONFLICT, "이미 존재하는 자원이거나 동시 요청으로 충돌이 발생했습니다.");
     }
 
     @ExceptionHandler

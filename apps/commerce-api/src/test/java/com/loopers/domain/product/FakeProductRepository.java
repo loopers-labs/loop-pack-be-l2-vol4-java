@@ -32,6 +32,15 @@ public class FakeProductRepository implements ProductRepository {
         return Optional.ofNullable(store.get(id));
     }
 
+    /**
+     * Fake 는 단일 스레드 단위 테스트용이라 실제 DB 락을 흉내내지 않는다.
+     * 락 동작 자체는 통합 테스트(@Sql + Testcontainers)에서 검증한다.
+     */
+    @Override
+    public Optional<Product> findForUpdate(Long id) {
+        return find(id);
+    }
+
     @Override
     public List<Product> findAll() {
         return new ArrayList<>(store.values());

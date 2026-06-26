@@ -11,13 +11,18 @@ public enum ProductSortType {
     PRICE_ASC,
     LIKES_DESC;
 
+    /**
+     * 문자열 → enum 매핑. 대소문자 무관 ("LIKES_DESC", "likes_desc" 둘 다 같은 값).
+     * 알 수 없는 값은 LATEST 로 폴백.
+     */
     public static ProductSortType from(String value) {
         if (value == null || value.isBlank()) {
             return LATEST;
         }
-        return switch (value) {
+        return switch (value.toLowerCase()) {
             case "price_asc" -> PRICE_ASC;
             case "likes_desc" -> LIKES_DESC;
+            case "latest" -> LATEST;
             default -> LATEST;
         };
     }
