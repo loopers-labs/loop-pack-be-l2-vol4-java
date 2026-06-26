@@ -68,15 +68,8 @@ resilience4j:
         randomized-wait-factor: 0.5
         ignore-exceptions:
           - com.loopers.support.error.CoreException
-      pgRequestRetry:                       # 결제 접수(POST) 전용 — 쓰기라 응답유실 시 재전송하면 이중 접수 위험
-        max-attempts: 3
-        wait-duration: 200ms
-        enable-exponential-backoff: true
-        exponential-backoff-multiplier: 2
-        enable-randomized-wait: true
-        randomized-wait-factor: 0.5
-        retry-exceptions:                   # 5xx(거래 생성 前 거절)만 재시도 — IO오류(응답유실)는 재시도 X, 폴링이 orderId로 메꿈
-          - org.springframework.web.client.HttpServerErrorException
+      pgRequestRetry:                       # 결제 접수(POST) 전용 — 비멱등 쓰기라 재시도하지 않는다(max-attempts=1).
+        max-attempts: 1                     # 5xx가 '거래 생성 後'면 재전송 시 이중 접수/이중 청구 위험. 응답유실·5xx는 폴링이 orderId로 메꿈.
 
 ---
 spring:

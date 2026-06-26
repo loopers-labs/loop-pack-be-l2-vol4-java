@@ -5,6 +5,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +26,14 @@ public class PaymentService {
                 }
                 return existing;
             })
-            .orElseGet(() -> paymentRepository.save(new PaymentModel(orderId, userId, cardType, amount)));
+            .orElseGet(() -> {
+                try {
+                    return paymentRepository.save(new PaymentModel(orderId, userId, cardType, amount));
+                } catch (DataIntegrityViolationException e) {
+                    // 동시 최초 생성 경합 — UNIQUE(order_id) 충돌을 CONFLICT로 변환
+                    throw new CoreException(ErrorType.CONFLICT, "[orderId = " + orderId + "] 이미 처리된 결제가 있습니다.", e);
+                }
+            });
     }
 
     @Transactional

@@ -53,6 +53,9 @@ public class PaymentRecoveryService {
                     .ifPresent(s -> paymentService.confirmFromGatewayStatus(payment.getTransactionKey(), s.status(), s.reason()));
             } catch (ObjectOptimisticLockingFailureException alreadyConfirmed) {
                 // 콜백·다른 인스턴스가 동시에 확정 — no-op, 다음 건으로 진행
+            } catch (Exception e) {
+                // 한 건의 실패가 복구 루프 전체를 멈추지 않도록 격리 — 다음 건으로 진행
+                log.warn("PENDING 재조회 실패 — orderId={}", payment.getOrderId(), e);
             }
         }
     }
@@ -75,6 +78,9 @@ public class PaymentRecoveryService {
                 }
             } catch (ObjectOptimisticLockingFailureException alreadyConfirmed) {
                 // 콜백·다른 인스턴스가 동시에 확정 — no-op, 다음 건으로 진행
+            } catch (Exception e) {
+                // 한 건의 실패가 복구 루프 전체를 멈추지 않도록 격리 — 다음 건으로 진행
+                log.warn("거래키 없는 PENDING 복구 실패 — orderId={}", payment.getOrderId(), e);
             }
         }
     }

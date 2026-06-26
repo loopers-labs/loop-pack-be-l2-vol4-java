@@ -32,12 +32,15 @@ public class PaymentFacade {
         }
         long amount = order.getFinalAmount().value();
 
-        paymentService.createPending(orderId, userId, cardType, Money.of(amount));
+        PaymentModel payment = paymentService.createPending(orderId, userId, cardType, Money.of(amount));
 
-        GatewayResult result = paymentGateway.requestPayment(
-            new GatewayCommand(orderId, userId, cardType, cardNo, amount));
-        if (result.accepted()) {
-            paymentService.assignTransactionKey(orderId, result.transactionKey());
+        // 이미 거래키를 받은 PENDING(이전 시도 성공분)이면 PG를 다시 때리지 않는다 — 이중 접수 방지.
+        if (payment.getTransactionKey() == null) {
+            GatewayResult result = paymentGateway.requestPayment(
+                new GatewayCommand(orderId, userId, cardType, cardNo, amount));
+            if (result.accepted()) {
+                paymentService.assignTransactionKey(orderId, result.transactionKey());
+            }
         }
 
         return PaymentInfo.from(paymentService.getByOrderId(orderId));

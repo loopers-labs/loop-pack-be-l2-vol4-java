@@ -33,7 +33,7 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
 
     @PostMapping("/callback")
     @Override
-    public ApiResponse<Object> handleCallback(@RequestBody PaymentCallbackV1Request request) {
+    public ApiResponse<Object> handleCallback(@Valid @RequestBody PaymentCallbackV1Request request) {
         paymentFacade.handleCallback(request.transactionKey());
         return ApiResponse.success();
     }

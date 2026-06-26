@@ -24,11 +24,11 @@ public class OrderPaymentResultHandler {
         orderService.pay(orderId);
     }
 
-    /** 재고·쿠폰 복원은 비멱등이므로, 이미 CANCELED면 no-op으로 중복 보상을 막는다. */
+    /** 재고·쿠폰 복원은 비멱등이므로, CREATED가 아니면(이미 CANCELED·PAID) no-op으로 중복/오보상을 막는다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onFailed(Long orderId) {
         OrderModel order = orderService.getById(orderId);
-        if (order.getStatus() == OrderStatus.CANCELED) {
+        if (order.getStatus() != OrderStatus.CREATED) {
             return;
         }
         order.getItems().forEach(item -> stockService.increase(item.getProductId(), item.getQuantity()));
