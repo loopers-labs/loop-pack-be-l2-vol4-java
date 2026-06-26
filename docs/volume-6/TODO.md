@@ -60,7 +60,7 @@ flowchart TD
     S1["Stage 1 · 장애 전파 재현\n무방비 상태를 k6로 박제 (As-Is)"] -->|"reports: 01-baseline"| S2
     S2["Stage 2 · Timeout\n접수 응답 기준 타임아웃 + 외부 호출 트랜잭션 밖으로"] -->|"reports: 02-timeout"| S3
     S3["Stage 3 · Fallback\n결과 불명 → PENDING 흡수 (내부는 정상 응답)"] --> S4
-    S4["Stage 4 · Circuit Breaker\n역산+민감도 · ignore 4xx · 메트릭 노출"] -->|"reports: 03-circuit"| S5
+    S4["Stage 4 · Circuit Breaker\n역산+민감도 · ignore 4xx · 메트릭 노출"] -->|"reports: 04-circuit"| S5
     S5["Stage 5 · Retry (Nice-to-Have)\n유저=빠른실패 · retry 정책 정의"] --> S6
     S6["Stage 6 · 폴링 Reconciliation\n콜백 유실 보정 · PG 교차검증 · STUCK 격리"] --> S7
     S7["Stage 7 · 동시성\n조건부 UPDATE로 후처리 1회"] --> DOC["Writing Quest\n단계별 '왜'를 AS-IS/TO-BE로"]
@@ -84,7 +84,7 @@ flowchart TD
 - **위치**: `docs/volume-6/measurement/k6/`(시나리오), `docs/volume-6/reports/`(결과)
 - **k6 2장면**:
   - **장면 1 — 스레드 고갈**: 타임아웃 적용 전/후, PG 지연 상황에서 결제와 무관한 요청(예: 상품 조회)의 응답이 어떻게 변하는지. → `reports/01-baseline.md`(전), `reports/02-timeout.md`(후)
-  - **장면 2 — 서킷 OPEN**: 부하 중 실패율이 임계치를 넘어 `CLOSED→OPEN` 전이가 일어나고, OPEN 동안 PG를 호출하지 않고 즉시 fallback 하는지. 서킷 메트릭(오픈 횟수)과 함께 관찰. → `reports/03-circuit.md`
+  - **장면 2 — 서킷 OPEN**: 부하 중 실패율이 임계치를 넘어 `CLOSED→OPEN` 전이가 일어나고, OPEN 동안 PG를 호출하지 않고 즉시 fallback 하는지. 서킷 메트릭(오픈 횟수)과 함께 관찰. → `reports/04-circuit.md`
 - **결정론 vs 실측**: pg-simulator의 내장 확률(요청 실패 40%·처리 지연 1~5s)을 그대로 쓸지, 어댑터를 스텁으로 교체해 지연/실패율을 고정할지는 측정 시 선택(서킷 임계치 민감도는 결정론 제어가 깔끔).
 - **장애 재현 통합테스트**: `@MockitoBean`으로 타임아웃/네트워크 예외를 주입하고, `CircuitBreakerRegistry`로 상태 전이를 단언한다. 라이브러리 동작("실패율 N%면 열림")이 아니라 **우리 fallback 계약**(PENDING 저장·주문 전이)을 검증한다.
 
@@ -142,28 +142,32 @@ flowchart TD
 
 **목표:** 외부 장애를 "결제 실패"로 단정하지 않고, 내부는 정상적으로 응답한다.
 
-- [ ] **Resilience4j 도입** (`resilience4j-spring-boot3` + `spring-boot-starter-aop`)
-- [ ] **실패 종류 분기(Stage 2 측정 보정 반영)** — 어댑터에서 502 단일 변환을 갈라:
-  - **타임아웃/네트워크(결과 불명)** → `PENDING` + "결제 처리 중" 안내로 **fallback 흡수** (PG가 처리했을 수 있으니 단정 금지 → Stage 6 폴링이 SUCCESS/취소 확정)
-  - **PG 5xx(트랜잭션 키 발급 전 실패 = 찌꺼기 없는 확정 실패)** → `FAILED` 확정 (재시도 후보, 단 멱등 전제는 Stage 5)
-- [ ] fallback 위치 — 서킷은 느슨한 기본값으로 시작(본격 튜닝 Stage 4). 이후 CB/Retry가 쌓이면 fallbackMethod는 **최외곽에 둔다**(Stage 4 참고)
-- [ ] 비즈니스 거절(한도 초과/잘못된 카드)은 fallback이 아니라 콜백 결과로 `FAILED` 확정 — 상황(`t`)에 맞게 분기
-- [ ] 장애 재현 통합테스트: fallback이 PENDING으로 저장하는지(계약) 단언
+- [X] **Resilience4j 도입** (`resilience4j-spring-boot3`(2.2.0, Spring Cloud BOM 관리) + `spring-boot-starter-aop`)
+- [X] **실패 종류 분기(Stage 2 측정 보정 반영)** — 어댑터 `fallbackMethod`에서 502 단일 변환을 갈라:
+  - **타임아웃/네트워크(결과 불명)** → `PaymentRequestResult.unknown()` → `PENDING` 유지로 **fallback 흡수** (PG가 처리했을 수 있으니 단정 금지 → Stage 6 폴링이 SUCCESS/취소 확정). `RetryableException`(+CB OPEN의 `CallNotPermittedException`)으로 식별
+  - **PG 5xx(트랜잭션 키 발급 전 실패 = 찌꺼기 없는 확정 실패)** → `PaymentRequestResult.rejected()` → `FAILED` 확정 (재시도 후보, 단 멱등 전제는 Stage 5). `FeignException.status() >= 500`으로 식별
+- [X] fallback 위치 — `@CircuitBreaker(name="pg-simulator", fallbackMethod=...)` 어댑터 메서드에 부착, 서킷은 느슨한 기본값(failure-rate 90%)으로 시작(본격 튜닝 Stage 4). 이후 CB/Retry가 쌓이면 fallbackMethod는 **최외곽에 둔다**(Stage 4 참고)
+- [X] 비즈니스 거절(한도 초과/잘못된 카드)은 fallback이 아니라 콜백 결과로 `FAILED` 확정 — 접수 단계(fallback)와 처리 결과(콜백)를 분리
+- [X] 장애 재현 통합테스트(`PaymentGatewayResilienceIntegrationTest`): 실제 AOP fallback이 타임아웃→UNKNOWN, 5xx→REJECTED 반환하는 계약 단언. E2E는 UNKNOWN→201 PENDING / REJECTED→201 FAILED 저장 단언
 
-**검증:** PG 요청 실패/타임아웃에도 내부는 200 + `PENDING` 으로 응답한다. (체크리스트: 외부 장애 시 내부 정상 응답)
+**검증:** PG 요청 실패/타임아웃에도 내부는 201 + `PENDING`(결과 불명) / `FAILED`(확정 거절)로 응답한다. 502 직격 제거. (체크리스트: 외부 장애 시 내부 정상 응답)
+> **Stage 3 완료.** 어댑터 502 단일 변환을 `PaymentRequestResult`(ACCEPTED/UNKNOWN/REJECTED) 3분기로 교체하고 분기 적용은 `PaymentModel.applyRequestResult`로 캡슐화. 코드 + 테스트(도메인/Facade 단위 · 어댑터 AOP 통합 · E2E) + 전체 통과.
+> **런타임 검증 완료(`reports/03-fallback.md`).** 실제 PG 연동에서 결제 40건 + k6 90s 부하: 502 **0건**, DB 분포 PENDING·txkey=NULL 23(UNKNOWN) / FAILED·txkey=NULL 9(REJECTED) / 콜백 종결 SUCCESS 5·FAILED 3(ACCEPTED). 집계 `payment_500` baseline **39.4%→0%**. request-time 4xx는 0건(데드 패스 실측 확인 → Stage 4 이월 근거).
+> **plan 보정:** ① 포트 반환형을 `String txKey`→`PaymentRequestResult`로 승격(결과 3종을 표현). ② **결과 불명/확정 실패 모두 내부는 201 정상 응답**(상태값만 PENDING/FAILED로 다름) — "내부는 200" 표현은 "2xx 정상 응답"의 약칭으로, FAILED도 리소스는 생성됐으므로 201 유지. ③ 기존 `ErrorType.PAYMENT_GATEWAY_ERROR`(502)는 더 이상 발화하지 않는 미사용 상수가 됨 — 제거하지 않고 보존(향후 진짜 예상 밖 오류용).
 
 ---
 
 ## Stage 4 — Circuit Breaker
 
-**목표:** 계속 실패하는 PG를 "이제 그만 두드린다"로 차단해 자원 고갈을 원천 차단한다. → `reports/03-circuit.md`
+**목표:** 계속 실패하는 PG를 "이제 그만 두드린다"로 차단해 자원 고갈을 원천 차단한다. → `reports/04-circuit.md`
 
 - [ ] CircuitBreaker 설정 — 집계 단위(COUNT/TIME, 트래픽 근거) · sliding-window · failure-rate · **slow-call**(느린 응답도 실패) · wait-in-open · half-open permitted
 - [ ] **설정값 역산** — 요청 성공 60% × 처리 성공 70% 등 PG 사양에서 초기값 근거를 잡고, **k6 민감도 테스트로 과민/둔감 검증**해 조정
 - [ ] **record/ignore-exceptions** — 5xx/타임아웃/네트워크는 record, **4xx·비즈니스 예외는 ignore**(의도된 거절로 서킷이 열리지 않게)
+- [ ] **(Stage 3 이월) request-time 4xx 분류 빈틈 정리** — 현재 `PaymentGatewayImpl.isConfirmedFailure`가 `status() >= 500`만 확정 실패로 보아 **4xx가 UNKNOWN(→PENDING)으로 흡수**된다. 4xx는 *결과 불명*이 아니라 *확정 거절*(돈 안 빠짐·거래키 없음·재시도해도 동일)이므로 **REJECTED(→FAILED)로 분류**해야 한다. record/ignore와 한 묶음으로 정리하고(서킷 집계에선 ignore), 재시도 제외(영구 실패)는 Stage 5와 연결. *우리 pg-simulator는 접수 단계에서 4xx를 내지 않아 현재는 데드 패스라 미룬 항목*
 - [ ] **aspect-order CB(1) > Retry(2)** + **fallbackMethod는 최외곽(CB)에 부착** — 재시도 묶음을 서킷이 1회로 카운트하고, **재시도가 모두 소진된 뒤에야 fallback이 발동**하게 한다(안쪽 어노테이션에 fallback을 달면 예외를 먼저 삼켜 Retry가 동작하지 않는 함정 회피). Retry 본체는 Stage 5
 - [ ] **서킷 메트릭을 actuator/prometheus로 노출**(상태/오픈 횟수)
-- [ ] k6 장면 2: 부하 중 `CLOSED→OPEN` 전이 + OPEN 동안 PG 미호출·즉시 fallback 관찰 → `reports/03-circuit.md`
+- [ ] k6 장면 2: 부하 중 `CLOSED→OPEN` 전이 + OPEN 동안 PG 미호출·즉시 fallback 관찰 → `reports/04-circuit.md`
 - [ ] 통합테스트: `transitionToOpenState()`로 강제 OPEN 후 fallback 계약 단언
 
 **검증:** 부하 중 서킷이 열리고, OPEN 동안 PG를 부르지 않고 즉시 PENDING으로 떨군다. 메트릭에 오픈 횟수가 보인다.
@@ -255,5 +259,6 @@ docs/volume-6/
   reports/
     01-baseline.md        ← 무방비 As-Is (스레드 고갈)
     02-timeout.md         ← 타임아웃 적용 후
-    03-circuit.md         ← 부하 중 서킷 OPEN
+    03-fallback.md        ← fallback 응답 분기 검증 (502→0, payment_500 39.4%→0%)
+    04-circuit.md         ← 부하 중 서킷 OPEN
 ```
