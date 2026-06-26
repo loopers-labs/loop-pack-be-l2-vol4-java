@@ -21,7 +21,7 @@ class OrderDomainServiceTest {
     private final OrderDomainService orderDomainService = new OrderDomainService();
 
     private ProductModel product(Long id, String name, Long price, Integer stock) {
-        return new ProductModel(id, 1L, name, "설명", price, stock, null, null);
+        return new ProductModel(id, 1L, name, "설명", price, stock, 0L, null, null);
     }
 
     @DisplayName("주문을 생성하면, 재고를 차감하고 상품 정보를 스냅샷으로 담은 주문을 반환한다.")

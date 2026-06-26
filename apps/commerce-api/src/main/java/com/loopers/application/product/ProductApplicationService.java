@@ -6,6 +6,7 @@ import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,19 @@ public class ProductApplicationService {
     private final BrandRepository brandRepository;
     private final LikeRepository likeRepository;
     private final ProductDomainService productDomainService;
+    private final ProductCacheService productCacheService;
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(Long brandId, int page, int size, String sort) {
+        return productCacheService.getProductList(brandId, page, size, sort)
+            .orElseGet(() -> {
+                List<ProductInfo> result = fetchProductList(brandId, page, size, sort);
+                productCacheService.putProductList(brandId, page, size, sort, result);
+                return result;
+            });
+    }
+
+    private List<ProductInfo> fetchProductList(Long brandId, int page, int size, String sort) {
         List<ProductModel> products;
         if ("likes_desc".equals(sort)) {
             products = productRepository.findAllOrderByLikeCountDesc(brandId, PageRequest.of(page, size));
@@ -60,11 +71,26 @@ public class ProductApplicationService {
 
     @Transactional(readOnly = true)
     public ProductInfo getProduct(Long id) {
-        ProductModel product = productRepository.find(id)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
-        BrandModel brand = brandRepository.find(product.getBrandId())
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
-        long likeCount = likeRepository.countByProductId(id);
+        ProductModel product = productCacheService.getProduct(id)
+            .orElseGet(() -> {
+                ProductModel p = productRepository.find(id)
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
+                productCacheService.putProduct(p);
+                return p;
+            });
+        BrandModel brand = productCacheService.getBrand(product.getBrandId())
+            .orElseGet(() -> {
+                BrandModel b = brandRepository.find(product.getBrandId())
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
+                productCacheService.putBrand(b);
+                return b;
+            });
+        long likeCount = productCacheService.getProductLikeCount(id)
+            .orElseGet(() -> {
+                long count = likeRepository.countByProductId(id);
+                productCacheService.putProductLikeCount(id, count);
+                return count;
+            });
         return ProductInfo.from(productDomainService.compose(product, brand, likeCount));
     }
 
@@ -83,7 +109,9 @@ public class ProductApplicationService {
     @Transactional
     public ProductAdminInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
         ProductModel product = new ProductModel(brandId, name, description, price, stock);
-        return ProductAdminInfo.from(productRepository.save(product));
+        ProductAdminInfo result = ProductAdminInfo.from(productRepository.save(product));
+        productCacheService.evictAllProductLists();
+        return result;
     }
 
     @Transactional
@@ -91,7 +119,10 @@ public class ProductApplicationService {
         ProductModel product = productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
         product.update(name, description, price, stock);
-        return ProductAdminInfo.from(productRepository.save(product));
+        ProductAdminInfo result = ProductAdminInfo.from(productRepository.save(product));
+        productCacheService.evictProduct(id);
+        productCacheService.evictAllProductLists();
+        return result;
     }
 
     @Transactional
@@ -99,5 +130,7 @@ public class ProductApplicationService {
         productRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
         productRepository.delete(id);
+        productCacheService.evictProduct(id);
+        productCacheService.evictAllProductLists();
     }
 }

@@ -16,8 +16,16 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
     @Query("SELECT p FROM ProductEntity p WHERE (:brandId IS NULL OR p.brand.id = :brandId)")
     Page<ProductEntity> findAllByBrandId(@Param("brandId") Long brandId, Pageable pageable);
 
-    @Query("SELECT p FROM ProductEntity p WHERE (:brandId IS NULL OR p.brand.id = :brandId) ORDER BY (SELECT COUNT(l) FROM LikeEntity l WHERE l.productId = p.id) DESC")
+    @Query("SELECT p FROM ProductEntity p WHERE (:brandId IS NULL OR p.brand.id = :brandId) ORDER BY p.likeCount DESC")
     Page<ProductEntity> findAllOrderByLikeCountDesc(@Param("brandId") Long brandId, Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE ProductEntity p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    void incrementLikeCount(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE ProductEntity p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
+    void decrementLikeCount(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM ProductEntity p WHERE p.id = :id")

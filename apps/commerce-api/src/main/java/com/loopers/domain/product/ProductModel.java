@@ -12,6 +12,7 @@ public class ProductModel {
     private String description;
     private Long price;
     private Integer stock;
+    private long likeCount;
     private ZonedDateTime createdAt;
     private ZonedDateTime updatedAt;
 
@@ -26,7 +27,7 @@ public class ProductModel {
         this.stock = stock;
     }
 
-    public ProductModel(Long id, Long brandId, String name, String description, Long price, Integer stock, ZonedDateTime createdAt, ZonedDateTime updatedAt) {
+    public ProductModel(Long id, Long brandId, String name, String description, Long price, Integer stock, long likeCount, ZonedDateTime createdAt, ZonedDateTime updatedAt) {
         validate(name, description, price, stock);
         this.id = id;
         this.brandId = brandId;
@@ -34,6 +35,7 @@ public class ProductModel {
         this.description = description;
         this.price = price;
         this.stock = stock;
+        this.likeCount = likeCount;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -74,6 +76,7 @@ public class ProductModel {
     public String getDescription() { return description; }
     public Long getPrice() { return price; }
     public Integer getStock() { return stock; }
+    public long getLikeCount() { return likeCount; }
     public ZonedDateTime getCreatedAt() { return createdAt; }
     public ZonedDateTime getUpdatedAt() { return updatedAt; }
 }

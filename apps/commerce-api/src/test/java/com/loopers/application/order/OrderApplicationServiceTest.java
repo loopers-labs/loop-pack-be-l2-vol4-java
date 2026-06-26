@@ -12,6 +12,7 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -37,8 +38,9 @@ class OrderApplicationServiceTest {
     private final OrderDomainService orderDomainService = new OrderDomainService();
     private final CouponRepository couponRepository = mock(CouponRepository.class);
     private final UserCouponRepository userCouponRepository = mock(UserCouponRepository.class);
+    private final ProductCacheService productCacheService = mock(ProductCacheService.class);
     private final OrderApplicationService orderApplicationService =
-        new OrderApplicationService(orderRepository, productRepository, orderDomainService, couponRepository, userCouponRepository);
+        new OrderApplicationService(orderRepository, productRepository, orderDomainService, couponRepository, userCouponRepository, productCacheService);
 
     private static final Long USER_ID = 100L;
     private static final Long OTHER_USER_ID = 999L;
@@ -47,7 +49,7 @@ class OrderApplicationServiceTest {
     private static final ZonedDateTime FUTURE = ZonedDateTime.now().plusDays(30);
 
     private ProductModel product(Long id, String name, Long price, Integer stock) {
-        return new ProductModel(id, 1L, name, "설명", price, stock, null, null);
+        return new ProductModel(id, 1L, name, "설명", price, stock, 0L, null, null);
     }
 
     private CouponModel fixedCoupon(int discountAmount) {

@@ -9,6 +9,7 @@ import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class OrderApplicationService {
     private final OrderDomainService orderDomainService;
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public OrderInfo createOrder(Long userId, OrderCommand command) {
@@ -45,6 +47,7 @@ public class OrderApplicationService {
 
         OrderModel order = orderDomainService.place(userId, quantities, products, discountPrice);
         products.values().forEach(productRepository::save);
+        products.keySet().forEach(productCacheService::evictProductStock);
         return OrderInfo.from(orderRepository.save(order));
     }
 
