@@ -64,6 +64,21 @@ public class OrderModelTest {
             );
         }
 
+        @DisplayName("생성 즉시 TSID 식별자가 부여된다(저장 전 non-null, 매 생성 고유)")
+        @Test
+        void given_create_when_constructed_then_assignsUniqueTsid() {
+            OrderModel first = new OrderModel(100L, PaymentMethod.CARD);
+            OrderModel second = new OrderModel(100L, PaymentMethod.CARD);
+
+            assertAll(
+                    () -> assertThat(first.getId()).isNotNull(),
+                    () -> assertThat(second.getId()).isNotNull(),
+                    () -> assertThat(first.getId()).isNotEqualTo(second.getId()),
+                    // TSID는 시간 정렬(단조 증가) — 나중에 만든 주문의 id가 더 크다
+                    () -> assertThat(second.getId()).isGreaterThan(first.getId())
+            );
+        }
+
         @DisplayName("userId가 null이면 BAD_REQUEST 예외가 발생한다")
         @Test
         void given_nullUserId_when_create_then_throwsBadRequest() {

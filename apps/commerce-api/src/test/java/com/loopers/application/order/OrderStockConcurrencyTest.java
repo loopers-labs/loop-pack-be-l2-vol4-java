@@ -4,11 +4,9 @@ import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.PaymentMethod;
-import com.loopers.domain.payment.PgStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
-import com.loopers.infrastructure.payment.FakePaymentGateway;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 주문 Application Layer 동시성 — OrderFacade.placeOrder 전체 경로(주문 생성[tx] + 재고 차감 + PG + 확정)를
+ * 주문 Application Layer 동시성 — OrderFacade.placeOrder 경로(주문 생성[tx] + 재고 차감)를
  * 통해 동시 주문이 같은 상품 재고를 깎을 때 lost update 없이 정합성이 보장되는지 검증한다.
  * StockServiceIntegrationTest가 도메인 서비스 단위라면, 이 테스트는 트랜잭션 경계를 포함한 통합 경로를 본다.
  *
@@ -40,7 +38,6 @@ public class OrderStockConcurrencyTest {
     @Autowired BrandService brandService;
     @Autowired ProductService productService;
     @Autowired StockService stockService;
-    @Autowired FakePaymentGateway fakePaymentGateway;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     private static final Long USER_ID = 100L;
@@ -51,8 +48,6 @@ public class OrderStockConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        fakePaymentGateway.reset();
-        fakePaymentGateway.setForcedStatus(PgStatus.SUCCESS);
         BrandModel brand = brandService.register("나이키", "스포츠");
         ProductModel product = productService.createProduct(brand.getId(), "에어맥스", "러닝화", null, 10000L);
         productId = product.getId();

@@ -1,8 +1,7 @@
 package com.loopers.interfaces.api;
 
+import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.PaymentMethod;
-import com.loopers.domain.payment.PgStatus;
-import com.loopers.infrastructure.payment.FakePaymentGateway;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.product.ProductV1Dto;
@@ -31,21 +30,20 @@ class AdminOrderV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final DatabaseCleanUp databaseCleanUp;
-    private final FakePaymentGateway fakePaymentGateway;
+    private final OrderService orderService;
 
     private Long productId;
 
     @Autowired
     public AdminOrderV1ApiE2ETest(TestRestTemplate testRestTemplate, DatabaseCleanUp databaseCleanUp,
-                                  FakePaymentGateway fakePaymentGateway) {
+                                  OrderService orderService) {
         this.testRestTemplate = testRestTemplate;
         this.databaseCleanUp = databaseCleanUp;
-        this.fakePaymentGateway = fakePaymentGateway;
+        this.orderService = orderService;
     }
 
     @BeforeEach
     void setUp() {
-        fakePaymentGateway.reset();
         signUp("buyer1", "테스터일");
         signUp("buyer2", "테스터이");
         Long brandId = createBrand("나이키");
@@ -55,7 +53,6 @@ class AdminOrderV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-        fakePaymentGateway.reset();
     }
 
     private HttpHeaders authHeaders(String loginId) {
@@ -87,12 +84,14 @@ class AdminOrderV1ApiE2ETest {
         return response.getBody().data().id();
     }
 
-    private void placeOrder(String loginId) {
+    private Long placeOrder(String loginId) {
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
                 PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 1)), null);
-        testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST,
+        ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
+                "/api/v1/orders", HttpMethod.POST,
                 new HttpEntity<>(request, authHeaders(loginId)),
-                new ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>>() {});
+                new ParameterizedTypeReference<>() {});
+        return response.getBody().data().id();
     }
 
     private static final ParameterizedTypeReference<ApiResponse<List<OrderV1Dto.OrderResponse>>> LIST_TYPE =
@@ -120,10 +119,8 @@ class AdminOrderV1ApiE2ETest {
         @DisplayName("상태 필터를 주면, 해당 상태의 주문만 반환된다.")
         @Test
         void filtersByStatus() {
-            fakePaymentGateway.setForcedStatus(PgStatus.SUCCESS);
-            placeOrder("buyer1"); // PAID
-            fakePaymentGateway.setForcedStatus(PgStatus.FAILED);
-            placeOrder("buyer2"); // FAILED
+            orderService.markPaid(placeOrder("buyer1"));        // PAID
+            orderService.markFailed(placeOrder("buyer2"), "결제 거절");  // FAILED
 
             List<OrderV1Dto.OrderResponse> paid = getAdminOrders("?status=PAID").getBody().data();
             List<OrderV1Dto.OrderResponse> failed = getAdminOrders("?status=FAILED").getBody().data();

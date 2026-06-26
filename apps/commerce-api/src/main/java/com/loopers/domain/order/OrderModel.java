@@ -2,6 +2,7 @@ package com.loopers.domain.order;
 
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.tsid.TsidGenerator;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ import java.util.List;
  */
 public class OrderModel {
 
-    private final Long id;   // 영속 전에는 null, 저장 후 매퍼가 채운 값으로 복원된다.
+    private final Long id;   // 앱 생성 TSID — 생성자에서 즉시 발급(저장 전부터 non-null). 복원 시엔 저장된 값을 그대로.
     private final Long userId;
     private OrderStatus status;
     private Money totalAmount;        // 쿠폰 적용 전 금액 (라인 합계, 01 §7.7)
@@ -34,7 +35,7 @@ public class OrderModel {
         if (paymentMethod == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "결제 수단은 null일 수 없습니다.");
         }
-        this.id = null;
+        this.id = TsidGenerator.generate();
         this.userId = userId;
         this.paymentMethod = paymentMethod;
         this.status = OrderStatus.PENDING;

@@ -3,8 +3,6 @@ package com.loopers.infrastructure.order;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -20,20 +18,20 @@ public class OrderRepositoryImpl implements OrderRepository {
 
     /**
      * 순수 도메인 ↔ JPA 엔티티 경계.
-     * - 신규(id == null): 매퍼로 엔티티를 만들어 INSERT.
-     * - 기존(id != null): managed 엔티티를 로드해 가변 상태만 복사 → dirty checking으로 UPDATE.
-     *   (BaseEntity의 id가 final이라 도메인을 그대로 새 엔티티로 만들면 INSERT로 오인되므로 이 경로가 필요하다.)
+     * 주문 PK는 앱 생성 TSID라 신규에도 id가 채워져 있으므로, id 유무 대신 <b>실제 영속 여부</b>로 분기한다.
+     * - 미존재(findById 비어 있음): 매퍼로 엔티티를 만들어 INSERT(OrderEntity.isNew()로 persist 유도).
+     * - 기존: managed 엔티티를 로드해 가변 상태만 복사 → dirty checking으로 UPDATE.
      */
     @Override
     public OrderModel save(OrderModel order) {
-        if (order.getId() == null) {
-            OrderEntity saved = orderJpaRepository.save(OrderEntityMapper.toEntity(order));
-            return OrderEntityMapper.toDomain(saved);
-        }
-        OrderEntity entity = orderJpaRepository.findById(order.getId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + order.getId() + "] 주문을 찾을 수 없습니다."));
-        entity.applyState(order.getStatus(), order.getTotalAmount().getAmount(), order.getFailureReason(), order.getPaidAt());
-        return OrderEntityMapper.toDomain(orderJpaRepository.save(entity));
+        return orderJpaRepository.findById(order.getId())
+                .map(entity -> {
+                    entity.applyState(order.getStatus(), order.getTotalAmount().getAmount(),
+                            order.getFailureReason(), order.getPaidAt());
+                    return OrderEntityMapper.toDomain(orderJpaRepository.save(entity));
+                })
+                .orElseGet(() -> OrderEntityMapper.toDomain(
+                        orderJpaRepository.save(OrderEntityMapper.toEntity(order))));
     }
 
     @Override

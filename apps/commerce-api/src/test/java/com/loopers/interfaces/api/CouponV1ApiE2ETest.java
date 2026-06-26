@@ -116,7 +116,7 @@ class CouponV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {});
         assertThat(myCoupons.getBody().data()).hasSize(1);
 
-        // 4. 쿠폰을 적용해 주문 (10000 × 2 = 20000, 10% 할인 → 18000 결제)
+        // 4. 쿠폰을 적용해 주문 (10000 × 2 = 20000, 10% 할인 → 최종 18000). 결제는 분리돼 주문은 PENDING (03 §3.7)
         OrderV1Dto.PlaceOrderRequest orderRequest = new OrderV1Dto.PlaceOrderRequest(
                 PaymentMethod.CARD, List.of(new OrderV1Dto.OrderLineRequest(productId, 2)), couponId);
         ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> order = testRestTemplate.exchange(
@@ -125,7 +125,7 @@ class CouponV1ApiE2ETest {
                 new ParameterizedTypeReference<>() {});
         assertAll(
                 () -> assertThat(order.getStatusCode().is2xxSuccessful()).isTrue(),
-                () -> assertThat(order.getBody().data().status()).isEqualTo("PAID"),
+                () -> assertThat(order.getBody().data().status()).isEqualTo("PENDING"),
                 () -> assertThat(order.getBody().data().totalAmount()).isEqualTo(20000L),
                 () -> assertThat(order.getBody().data().discountAmount()).isEqualTo(2000L),
                 () -> assertThat(order.getBody().data().finalAmount()).isEqualTo(18000L)

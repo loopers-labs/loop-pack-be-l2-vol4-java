@@ -1,4 +1,7 @@
 server:
+  # pg-simulator는 결제 callbackUrl이 http://localhost:8080 으로 시작할 것을 요구한다(03 §3.8).
+  # PaymentFacade.CALLBACK_URL과 일치해야 콜백 수신이 동작하므로 기본값에 의존하지 않고 명시한다.
+  port: 8080
   shutdown: graceful
   tomcat:
     threads:
@@ -24,11 +27,60 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
+  # 외부 PG(pg-simulator) Feign 타임아웃 — OpenFeign 기본(connect 10s / read 60s)은 결제 호출치고 과도하게 길다.
+  # pg-simulator 정상 응답 지연은 100~500ms(요청 엔드포인트의 인위적 sleep)이므로 read 2s로 4배 여유를 두되,
+  # 응답이 끝내 안 오면 60s가 아니라 2s 안에 끊어 @Retry(아래 resilience4j)로 넘긴다. 타임아웃은 feign.RetryableException
+  # 으로 감싸져 재시도 대상에 포함된다. connect는 로컬/동일망 기준 1s면 충분.
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-simulator:
+            connect-timeout: 1000
+            read-timeout: 2000
 
 # 좋아요 카운터 비동기 집계 토픽 (commerce-streamer가 컨슈머). key=productId 로 같은 상품은 같은 파티션.
 like-events:
   topic: catalog.like-changed.v1
   partitions: 3
+
+# 외부 PG(pg-simulator) 연동
+pg-simulator:
+  base-url: http://localhost:8082
+
+# PENDING 결제 자동 정리(reconcile) 스케줄러 — 콜백 유실 안전망. 멀티 인스턴스 중복은 ShedLock으로 차단.
+payment:
+  reconcile:
+    fixed-delay: 60000        # 직전 회차 종료 후 다음 회차까지 대기(ms)
+    initial-delay: 30000      # 부팅 직후 첫 실행까지 대기(ms) — 기동 안정화 후 시작
+    page-size: 100            # 한 회차에 훑는 PENDING 결제 수(첫 페이지, 오래된 것 우선)
+    lock-at-most-for: PT2M    # 락 안전 상한 — 작업이 죽어도 이만큼 뒤엔 다른 인스턴스가 재실행
+    lock-at-least-for: PT5S   # 락 최소 유지 — 너무 빨리 끝나도 동시 재실행 방지
+    give-up:                  # 무한 PENDING 단념(데드라인 초과 시 FAILED 확정 → 재고·쿠폰 원복)
+      not-found-after: PT2M   # PG에 거래 기록 자체가 없는 PENDING — 짧게 단념(요청이 안 닿았을 가능성)
+      pending-after: PT10M    # PG도 아직 PENDING — 길게 대기 후 단념(늦은 콜백 여지)
+
+# 회복성 — pg-simulator는 동기 요청의 40%를 일시 500으로 떨군다.
+resilience4j:
+  retry:
+    instances:
+      pgSimulator:
+        max-attempts: 4              # 최초 1 + 재시도 3 (0.6^4 ≈ 13% 까지 실패 누적 확률을 낮춤)
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException        # 연결/타임아웃
+          - feign.FeignException.InternalServerError   # 주입된 500
+  circuitbreaker:
+    instances:
+      pgSimulator:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 70           # 40% 정상 실패보다 높게 — 진짜 장애에만 개방
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
 
 springdoc:
   use-fqn: true
