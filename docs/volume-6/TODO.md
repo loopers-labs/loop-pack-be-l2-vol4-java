@@ -127,12 +127,14 @@ flowchart TD
 
 **목표:** "안 빠지는 물을 언제 포기할 것인가"를 정해 자원(스레드/커넥션)을 회수한다. → `reports/02-timeout.md`
 
-- [ ] **Feign connect/read 타임아웃** — 접수 응답 기준으로 짧게(연결 ~1s / 응답 1~2s). + 커넥션 풀에서 대기 없이 실패하도록 connection-request 타임아웃
-- [ ] 타임아웃/요청 실패 시 **명확한 예외**로 사용자에게 즉시 응답
-- [ ] **외부 호출을 `@Transactional` 밖으로** — `PENDING`을 먼저 커밋한 뒤 PG 호출(커밋 이후/별도 트랜잭션). 커넥션 점유 해소
-- [ ] k6 장면 1 재측정: 스레드가 회수되어 무관 요청이 생존하는지 → `reports/02-timeout.md`
+- [X] **Feign connect/read 타임아웃** — 연결 1s / **응답 300ms**. `application.yml`의 `spring.cloud.openfeign.client.config.pg-simulator`. *값 근거: PG 접수 분포가 ≤500ms라 2s는 절대 발화 안 하는 **죽은 코드**(측정 확인) → 분포 안(200~300ms)으로 내려 "300ms만 기다리고 초과분은 포기→PENDING→폴링" 정책. 재시도 미도입(Stage 5에서 단일화), connection-request 타임아웃 미적용(기본 클라이언트, 단일 PG엔 과함)*
+- [X] 타임아웃/요청 실패 시 **명확한 예외**로 사용자에게 즉시 응답 — 어댑터(`PaymentGatewayImpl`)에서 `FeignException`→`CoreException(PAYMENT_GATEWAY_ERROR, 502)` 변환·로깅. 막연한 500 직결 제거
+- [X] **외부 호출을 `@Transactional` 밖으로** — 클래스 레벨 `@Transactional` 제거. `acceptPayment`(PENDING 저장)는 리포지토리 자체 트랜잭션으로 즉시 커밋(OSIV=false라 커넥션 반납) → 트랜잭션 밖에서 PG 호출 → 거래키 저장. *결과: PG 실패 시 PENDING은 커밋된 채 남고 예외 전파(합의), 잔존 PENDING은 Stage 6 폴링이 복구*
+- [X] k6 장면 1 재측정 (baseline 동일 환경, 3-way: baseline / 2s / 300ms) → `reports/02-timeout.md`
 
-**검증:** 타임아웃 전후 비교에서 스레드 고갈이 해소된다. → 여기서 *"끊었는데 PG에선 결제됐으면?"* 이라는 결과 불명 문제가 드러나며 Stage 3·6의 동기가 된다.
+**검증(보정됨):** ~~타임아웃 전후 비교에서 스레드 고갈이 해소된다~~ → **측정 결과 "해소"가 아니라 "완화"**(50VU prober p50 1.62s→1.44s, ~11%). 동기 호출이라 스레드 점유 자체는 잔존 → 고갈 원천 차단은 **Stage 4 서킷**의 몫. 부수로 *"끊었는데 PG에선 결제됐으면?"* 결과 불명이 실패 73% 중 ~50%p로 드러나 Stage 3·6의 동기가 된다.
+> **Stage 2 완료.** 코드(Feign 타임아웃·예외 변환·트랜잭션 분리) + 테스트(`PaymentGatewayImplTest`/`PaymentFacadeTest`/`PaymentV1ApiE2ETest`, 전체 통과) + 측정(`reports/02-timeout.md`) 완료.
+> **측정으로 드러난 plan 보정 2건:** ① **타임아웃은 의존성 응답 분포 안에 둬야 의미** — 분포 위(2s)는 죽은 코드. ② **실패 종류를 갈라야 함** — `타임아웃=결과 불명→PENDING`(폴링 보정) vs `PG 500=찌꺼기 없는 확정 실패→FAILED`(재시도 후보). 현재는 502 단일 변환 → **Stage 3에서 분기 도입**(아래 Stage 3 체크리스트 반영).
 
 ---
 
@@ -141,7 +143,10 @@ flowchart TD
 **목표:** 외부 장애를 "결제 실패"로 단정하지 않고, 내부는 정상적으로 응답한다.
 
 - [ ] **Resilience4j 도입** (`resilience4j-spring-boot3` + `spring-boot-starter-aop`)
-- [ ] 어댑터에 **fallback 계약** — 타임아웃/요청 실패(결과 불명) 시 `PENDING` + "결제 처리 중" 안내로 흡수(서킷은 느슨한 기본값으로 시작, 본격 튜닝은 Stage 4). 이후 CB/Retry가 쌓이면 fallbackMethod는 **최외곽에 둔다**(Stage 4 참고)
+- [ ] **실패 종류 분기(Stage 2 측정 보정 반영)** — 어댑터에서 502 단일 변환을 갈라:
+  - **타임아웃/네트워크(결과 불명)** → `PENDING` + "결제 처리 중" 안내로 **fallback 흡수** (PG가 처리했을 수 있으니 단정 금지 → Stage 6 폴링이 SUCCESS/취소 확정)
+  - **PG 5xx(트랜잭션 키 발급 전 실패 = 찌꺼기 없는 확정 실패)** → `FAILED` 확정 (재시도 후보, 단 멱등 전제는 Stage 5)
+- [ ] fallback 위치 — 서킷은 느슨한 기본값으로 시작(본격 튜닝 Stage 4). 이후 CB/Retry가 쌓이면 fallbackMethod는 **최외곽에 둔다**(Stage 4 참고)
 - [ ] 비즈니스 거절(한도 초과/잘못된 카드)은 fallback이 아니라 콜백 결과로 `FAILED` 확정 — 상황(`t`)에 맞게 분기
 - [ ] 장애 재현 통합테스트: fallback이 PENDING으로 저장하는지(계약) 단언
 
