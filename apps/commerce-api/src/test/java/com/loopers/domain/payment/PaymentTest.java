@@ -126,11 +126,11 @@ class PaymentTest {
 
         @Test
         @DisplayName("POLLING_EXHAUSTED 상태에서 SUCCESS 콜백을 수신하면 SUCCESS로 전환된다.")
-        void completesPayment_withSuccess_whenStatusIsAbandoned() {
+        void completesPayment_withSuccess_whenStatusIsPollingExhausted() {
             // Arrange
             Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             payment.markInProgress("20260622:TR:a1b2c3");
-            payment.abandon();
+            payment.exhaustPolling();
             String reason = "정상 승인되었습니다.";
 
             // Act
@@ -158,46 +158,46 @@ class PaymentTest {
     }
 
     @Nested
-    @DisplayName("결제 포기 처리 시")
-    class Abandon {
+    @DisplayName("폴링 소진 처리 시")
+    class ExhaustPolling {
 
         @Test
-        @DisplayName("PENDING 상태에서 abandon을 호출하면 POLLING_EXHAUSTED로 전환된다.")
-        void abandonsPayment_whenStatusIsPending() {
+        @DisplayName("CREATED 상태에서 exhaustPolling을 호출하면 POLLING_EXHAUSTED로 전환된다.")
+        void exhaustsPolling_whenStatusIsCreated() {
             // Arrange
             Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
 
             // Act
-            payment.abandon();
+            payment.exhaustPolling();
 
             // Assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.POLLING_EXHAUSTED);
         }
 
         @Test
-        @DisplayName("IN_PROGRESS 상태에서 abandon을 호출하면 POLLING_EXHAUSTED로 전환된다.")
-        void abandonsPayment_whenStatusIsInProgress() {
+        @DisplayName("IN_PROGRESS 상태에서 exhaustPolling을 호출하면 POLLING_EXHAUSTED로 전환된다.")
+        void exhaustsPolling_whenStatusIsInProgress() {
             // Arrange
             Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             payment.markInProgress("20260622:TR:a1b2c3");
 
             // Act
-            payment.abandon();
+            payment.exhaustPolling();
 
             // Assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.POLLING_EXHAUSTED);
         }
 
         @Test
-        @DisplayName("SUCCESS 상태에서 abandon을 호출하면 예외가 발생한다.")
-        void throwsException_whenAbandonCalledOnSuccessStatus() {
+        @DisplayName("SUCCESS 상태에서 exhaustPolling을 호출하면 예외가 발생한다.")
+        void throwsException_whenExhaustPollingCalledOnSuccessStatus() {
             // Arrange
             Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
             payment.markInProgress("20260622:TR:a1b2c3");
             payment.complete(PaymentStatus.SUCCESS, "정상 승인되었습니다.");
 
             // Act & Assert
-            CoreException exception = assertThrows(CoreException.class, payment::abandon);
+            CoreException exception = assertThrows(CoreException.class, payment::exhaustPolling);
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
@@ -220,6 +220,32 @@ class PaymentTest {
                 () -> assertThat(payment.getPollingCount()).isEqualTo(1),
                 () -> assertThat(payment.getLastPolledAt()).isNotNull()
             );
+        }
+
+        @Test
+        @DisplayName("SUCCESS 상태에서 recordPolling을 호출하면 예외가 발생한다.")
+        void throwsException_whenRecordPollingCalledOnSuccessStatus() {
+            // Arrange
+            Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            payment.markInProgress("20260622:TR:a1b2c3");
+            payment.complete(PaymentStatus.SUCCESS, "정상 승인되었습니다.");
+
+            // Act & Assert
+            CoreException exception = assertThrows(CoreException.class, payment::recordPolling);
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @Test
+        @DisplayName("FAILED 상태에서 recordPolling을 호출하면 예외가 발생한다.")
+        void throwsException_whenRecordPollingCalledOnFailedStatus() {
+            // Arrange
+            Payment payment = new Payment(1L, 1L, CardType.SAMSUNG, "1234-5678-9012-3456", 50000L);
+            payment.markInProgress("20260622:TR:a1b2c3");
+            payment.complete(PaymentStatus.FAILED, "한도초과입니다.");
+
+            // Act & Assert
+            CoreException exception = assertThrows(CoreException.class, payment::recordPolling);
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 }

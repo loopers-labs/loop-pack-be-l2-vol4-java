@@ -58,13 +58,15 @@ class PaymentPollingSchedulerUnitTest {
             then(paymentService).should(never()).recordPolling(any());
         }
 
-        @DisplayName("PENDING 결제의 폴링 횟수가 최대치 미만이면, 폴링만 기록하고 PG를 조회하지 않는다.")
+        @DisplayName("CREATED 결제에서 PG에 거래 내역이 없고 폴링 횟수가 최대치 미만이면, 폴링만 기록한다.")
         @Test
-        void recordsPolling_andSkipsPgQuery_whenPendingPaymentCountBelowMax() {
+        void recordsPolling_whenCreatedPaymentHasNoTransactionOnPgAndBelowMax() {
             // Arrange
             Payment pendingPayment = pendingPayment(0);
             Payment recordedPayment = pendingPayment(1);
             given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(pendingPayment));
+            given(pgFeignClient.getPaymentStatusByOrderId(String.valueOf(USER_ID), String.format("%06d", ORDER_ID)))
+                .willReturn(new PgApiResponse.PaymentStatusWithOrderId(String.format("%06d", ORDER_ID), List.of()));
             given(paymentService.recordPolling(pendingPayment)).willReturn(recordedPayment);
 
             // Act
@@ -72,35 +74,33 @@ class PaymentPollingSchedulerUnitTest {
 
             // Assert
             then(paymentService).should().recordPolling(pendingPayment);
-            then(pgFeignClient).should(never()).getPaymentStatus(anyString(), anyString());
-            then(paymentService).should(never()).abandon(any());
+            then(paymentService).should(never()).exhaustPolling(any());
         }
 
-        @DisplayName("폴링 횟수가 최대치에 도달하면, 결제를 POLLING_EXHAUSTED 처리한다.")
+        @DisplayName("CREATED 결제에서 PG에 거래 내역이 없고 폴링 횟수가 최대치에 도달하면, POLLING_EXHAUSTED 처리한다.")
         @Test
-        void abandons_whenPollingCountReachesMax() {
+        void exhaustsPolling_whenCreatedPaymentHasNoTransactionOnPgAndReachesMax() {
             // Arrange
             Payment pendingPayment = pendingPayment(MAX_POLLING_COUNT - 1);
             Payment recordedPayment = pendingPayment(MAX_POLLING_COUNT);
             given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(pendingPayment));
+            given(pgFeignClient.getPaymentStatusByOrderId(String.valueOf(USER_ID), String.format("%06d", ORDER_ID)))
+                .willReturn(new PgApiResponse.PaymentStatusWithOrderId(String.format("%06d", ORDER_ID), List.of()));
             given(paymentService.recordPolling(pendingPayment)).willReturn(recordedPayment);
 
             // Act
             scheduler.pollPendingPayments();
 
             // Assert
-            then(paymentService).should().abandon(recordedPayment);
-            then(pgFeignClient).should(never()).getPaymentStatus(anyString(), anyString());
+            then(paymentService).should().exhaustPolling(recordedPayment);
         }
 
-        @DisplayName("IN_PROGRESS 결제에서 PG가 SUCCESS를 반환하면, 결제를 완료하고 주문을 확정한다.")
+        @DisplayName("IN_PROGRESS 결제에서 PG가 SUCCESS를 반환하면, 폴링 기록 없이 결제를 완료하고 주문을 확정한다.")
         @Test
         void completesSuccessAndConfirmsOrder_whenInProgressAndPgReturnsSuccess() {
             // Arrange
             Payment inProgressPayment = inProgressPayment(0);
-            Payment recordedPayment = inProgressPayment(1);
             given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(inProgressPayment));
-            given(paymentService.recordPolling(inProgressPayment)).willReturn(recordedPayment);
             given(pgFeignClient.getPaymentStatus(String.valueOf(USER_ID), TRANSACTION_KEY)).willReturn(
                 new PgApiResponse.PaymentStatus(TRANSACTION_KEY, String.format("%06d", ORDER_ID), "SAMSUNG", "1234-5678-9012-3456", 50000L, "SUCCESS", "정상 승인되었습니다.")
             );
@@ -109,18 +109,17 @@ class PaymentPollingSchedulerUnitTest {
             scheduler.pollPendingPayments();
 
             // Assert
+            then(paymentService).should(never()).recordPolling(any());
             then(paymentService).should().complete(TRANSACTION_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다.");
             then(orderService).should().confirm(ORDER_ID);
         }
 
-        @DisplayName("IN_PROGRESS 결제에서 PG가 FAILED를 반환하면, 결제만 실패 처리하고 주문은 변경하지 않는다.")
+        @DisplayName("IN_PROGRESS 결제에서 PG가 FAILED를 반환하면, 폴링 기록 없이 결제만 실패 처리하고 주문은 변경하지 않는다.")
         @Test
         void completesFailed_andDoesNotConfirmOrder_whenInProgressAndPgReturnsFailed() {
             // Arrange
             Payment inProgressPayment = inProgressPayment(0);
-            Payment recordedPayment = inProgressPayment(1);
             given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(inProgressPayment));
-            given(paymentService.recordPolling(inProgressPayment)).willReturn(recordedPayment);
             given(pgFeignClient.getPaymentStatus(String.valueOf(USER_ID), TRANSACTION_KEY)).willReturn(
                 new PgApiResponse.PaymentStatus(TRANSACTION_KEY, String.format("%06d", ORDER_ID), "SAMSUNG", "1234-5678-9012-3456", 50000L, "FAILED", "한도초과입니다.")
             );
@@ -129,8 +128,49 @@ class PaymentPollingSchedulerUnitTest {
             scheduler.pollPendingPayments();
 
             // Assert
+            then(paymentService).should(never()).recordPolling(any());
             then(paymentService).should().complete(TRANSACTION_KEY, PaymentStatus.FAILED, "한도초과입니다.");
             then(orderService).should(never()).confirm(any());
+        }
+
+        @DisplayName("IN_PROGRESS 결제에서 PG가 미결 상태를 반환하고 폴링 횟수가 최대치 미만이면, 폴링만 기록한다.")
+        @Test
+        void recordsPolling_whenInProgressAndPgReturnsNonTerminalStatusAndBelowMax() {
+            // Arrange
+            Payment inProgressPayment = inProgressPayment(0);
+            Payment recordedPayment = inProgressPayment(1);
+            given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(inProgressPayment));
+            given(pgFeignClient.getPaymentStatus(String.valueOf(USER_ID), TRANSACTION_KEY)).willReturn(
+                new PgApiResponse.PaymentStatus(TRANSACTION_KEY, String.format("%06d", ORDER_ID), "SAMSUNG", "1234-5678-9012-3456", 50000L, "IN_PROGRESS", null)
+            );
+            given(paymentService.recordPolling(inProgressPayment)).willReturn(recordedPayment);
+
+            // Act
+            scheduler.pollPendingPayments();
+
+            // Assert
+            then(paymentService).should().recordPolling(inProgressPayment);
+            then(paymentService).should(never()).exhaustPolling(any());
+            then(paymentService).should(never()).complete(any(), any(), any());
+        }
+
+        @DisplayName("IN_PROGRESS 결제에서 PG가 미결 상태를 반환하고 폴링 횟수가 최대치에 도달하면, POLLING_EXHAUSTED 처리한다.")
+        @Test
+        void exhaustsPolling_whenInProgressAndPgReturnsNonTerminalStatusAndReachesMax() {
+            // Arrange
+            Payment inProgressPayment = inProgressPayment(MAX_POLLING_COUNT - 1);
+            Payment recordedPayment = inProgressPayment(MAX_POLLING_COUNT);
+            given(paymentService.findAllPendingOrInProgress()).willReturn(List.of(inProgressPayment));
+            given(pgFeignClient.getPaymentStatus(String.valueOf(USER_ID), TRANSACTION_KEY)).willReturn(
+                new PgApiResponse.PaymentStatus(TRANSACTION_KEY, String.format("%06d", ORDER_ID), "SAMSUNG", "1234-5678-9012-3456", 50000L, "IN_PROGRESS", null)
+            );
+            given(paymentService.recordPolling(inProgressPayment)).willReturn(recordedPayment);
+
+            // Act
+            scheduler.pollPendingPayments();
+
+            // Assert
+            then(paymentService).should().exhaustPolling(recordedPayment);
         }
 
         @DisplayName("PG 상태 조회 중 예외가 발생하면, 폴링 횟수를 증가시키지 않고 다음 결제 처리를 계속한다.")

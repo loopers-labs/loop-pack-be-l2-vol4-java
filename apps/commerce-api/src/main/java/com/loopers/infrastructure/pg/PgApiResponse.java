@@ -13,4 +13,6 @@ public class PgApiResponse {
         String status,
         String reason
     ) {}
+
+    public record PaymentStatusWithOrderId(String orderId, java.util.List<Payment> transactions) {}
 }

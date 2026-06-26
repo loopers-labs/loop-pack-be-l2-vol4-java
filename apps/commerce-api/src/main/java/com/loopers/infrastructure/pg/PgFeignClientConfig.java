@@ -13,7 +13,7 @@ public class PgFeignClientConfig {
 
     @Bean
     public Request.Options options() {
-        return new Request.Options(3000, TimeUnit.MILLISECONDS, 5000, TimeUnit.MILLISECONDS, true);
+        return new Request.Options(500, TimeUnit.MILLISECONDS, 2000, TimeUnit.MILLISECONDS, true);
     }
 
     @Bean

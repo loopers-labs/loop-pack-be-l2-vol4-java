@@ -38,8 +38,8 @@ public class PaymentService {
     }
 
     @Transactional
-    public Payment abandon(Payment payment) {
-        payment.abandon();
+    public Payment exhaustPolling(Payment payment) {
+        payment.exhaustPolling();
         return paymentRepository.save(payment);
     }
 

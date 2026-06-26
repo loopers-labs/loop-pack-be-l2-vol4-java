@@ -69,14 +69,17 @@ public class Payment extends BaseDomain {
         this.completedAt = ZonedDateTime.now();
     }
 
-    public void abandon() {
+    public void exhaustPolling() {
         if (this.status != PaymentStatus.CREATED && this.status != PaymentStatus.IN_PROGRESS) {
-            throw new CoreException(ErrorType.CONFLICT, "CREATED 또는 IN_PROGRESS 상태의 결제만 포기할 수 있습니다.");
+            throw new CoreException(ErrorType.CONFLICT, "CREATED 또는 IN_PROGRESS 상태의 결제만 폴링 소진 처리할 수 있습니다.");
         }
         this.status = PaymentStatus.POLLING_EXHAUSTED;
     }
 
     public void recordPolling() {
+        if (this.status != PaymentStatus.CREATED && this.status != PaymentStatus.IN_PROGRESS) {
+            throw new CoreException(ErrorType.CONFLICT, "CREATED 또는 IN_PROGRESS 상태의 결제만 폴링 횟수를 기록할 수 있습니다.");
+        }
         this.pollingCount++;
         this.lastPolledAt = ZonedDateTime.now();
     }

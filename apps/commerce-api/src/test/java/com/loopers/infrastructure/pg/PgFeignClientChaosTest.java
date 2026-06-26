@@ -71,9 +71,14 @@ class PgFeignClientChaosTest {
 
         // 운영 설정과 동일한 구성 (단, 테스트에서는 대기 없이 즉시 재시도)
         retry = Retry.of("pg-payment", RetryConfig.custom()
-            .maxAttempts(2)
+            .maxAttempts(3)
             .waitDuration(Duration.ZERO)
             .retryExceptions(RetryableException.class, IOException.class)
+            .ignoreExceptions(feign.FeignException.BadRequest.class,
+                feign.FeignException.Unauthorized.class,
+                feign.FeignException.Forbidden.class,
+                feign.FeignException.NotFound.class,
+                feign.FeignException.Conflict.class)
             .build());
     }
 
@@ -87,7 +92,7 @@ class PgFeignClientChaosTest {
     @Nested
     class When500Error {
 
-        @DisplayName("2회 연속 500이면 RetryableException이 발생하고 총 2번 요청한다.")
+        @DisplayName("3회 연속 500이면 RetryableException이 발생하고 총 3번 요청한다.")
         @Test
         void throws_afterMaxRetries_whenAllAttemptsFail() {
             // Arrange
@@ -98,12 +103,12 @@ class PgFeignClientChaosTest {
             assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
                 .isInstanceOf(RetryableException.class);
 
-            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
 
-        @DisplayName("500이 1번 후 2번째에 성공하면 총 2번 요청 후 정상 응답을 반환한다.")
+        @DisplayName("500이 2번 후 3번째에 성공하면 총 3번 요청 후 정상 응답을 반환한다.")
         @Test
-        void returns_success_onSecondAttempt() {
+        void returns_success_onThirdAttempt() {
             // Arrange
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
                 .inScenario("retry-success")
@@ -114,6 +119,12 @@ class PgFeignClientChaosTest {
             wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
                 .inScenario("retry-success")
                 .whenScenarioStateIs("1st-fail")
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("2nd-fail"));
+
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .inScenario("retry-success")
+                .whenScenarioStateIs("2nd-fail")
                 .willReturn(okJson("{\"data\":{\"transactionKey\":\"20260623:TR:abc123\",\"status\":\"PENDING\",\"reason\":null}}")));
 
             // Act
@@ -121,7 +132,40 @@ class PgFeignClientChaosTest {
 
             // Assert
             assertThat(response.transactionKey()).isEqualTo("20260623:TR:abc123");
-            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
+        }
+    }
+
+    @DisplayName("PG 서버가 4xx를 반환할 때")
+    @Nested
+    class When4xxError {
+
+        @DisplayName("400을 반환하면 재시도 없이 즉시 FeignException.BadRequest가 발생하고 총 1번만 요청한다.")
+        @Test
+        void throws_immediately_without_retry_when400() {
+            // Arrange
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .willReturn(aResponse().withStatus(400)));
+
+            // Act & Assert
+            assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
+                .isInstanceOf(feign.FeignException.BadRequest.class);
+
+            wireMockServer.verify(1, postRequestedFor(urlEqualTo("/api/v1/payments")));
+        }
+
+        @DisplayName("409를 반환하면 재시도 없이 즉시 FeignException.Conflict가 발생하고 총 1번만 요청한다.")
+        @Test
+        void throws_immediately_without_retry_when409() {
+            // Arrange
+            wireMockServer.stubFor(post(urlEqualTo("/api/v1/payments"))
+                .willReturn(aResponse().withStatus(409)));
+
+            // Act & Assert
+            assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
+                .isInstanceOf(feign.FeignException.Conflict.class);
+
+            wireMockServer.verify(1, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
 
@@ -149,7 +193,7 @@ class PgFeignClientChaosTest {
     @Nested
     class WhenNetworkFault {
 
-        @DisplayName("2회 연속 연결 단절이면 RetryableException이 발생하고 총 2번 요청한다.")
+        @DisplayName("3회 연속 연결 단절이면 RetryableException이 발생하고 총 3번 요청한다.")
         @Test
         void throws_afterMaxRetries_whenConnectionReset() {
             // Arrange
@@ -160,7 +204,7 @@ class PgFeignClientChaosTest {
             assertThatThrownBy(() -> requestPaymentWithRetry(sampleRequest()))
                 .isInstanceOf(RetryableException.class);
 
-            wireMockServer.verify(2, postRequestedFor(urlEqualTo("/api/v1/payments")));
+            wireMockServer.verify(3, postRequestedFor(urlEqualTo("/api/v1/payments")));
         }
     }
 
