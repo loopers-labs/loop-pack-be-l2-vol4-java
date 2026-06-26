@@ -13,6 +13,7 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -23,9 +24,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_order_order_number", columnNames = {"order_number"})
-})
+@Table(
+        name = "orders",
+        uniqueConstraints = @UniqueConstraint(name = "uq_order_order_number", columnNames = {"order_number"}),
+        indexes = {
+                @Index(name = "idx_orders_status_created_at", columnList = "status, created_at"),
+                @Index(name = "idx_orders_user_coupon_id", columnList = "user_coupon_id")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderModel extends BaseEntity {
 
@@ -78,6 +84,7 @@ public class OrderModel extends BaseEntity {
     }
 
     public void complete() {
+        if (this.status == OrderStatus.COMPLETED) return;
         if (this.status != OrderStatus.REQUESTED) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청 상태에서만 완료 처리할 수 있습니다.");
         }

@@ -5,12 +5,24 @@ import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
 import com.loopers.domain.product.vo.StockQuantity;
 import com.loopers.support.Guard;
-import jakarta.persistence.*;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "order_items")
+@Table(name = "order_items", indexes = {
+        @Index(name = "idx_order_items_order_id", columnList = "order_id")
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderItemModel extends BaseEntity {
 
