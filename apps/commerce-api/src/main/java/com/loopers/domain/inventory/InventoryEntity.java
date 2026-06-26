@@ -8,19 +8,19 @@ import java.time.ZonedDateTime;
 
 public class InventoryEntity extends BaseEntity {
 
-    private Long productId;
+    private String productId;
     private Integer quantity;
 
     protected InventoryEntity() {}
 
-    public InventoryEntity(Long productId, Integer quantity) {
+    public InventoryEntity(String productId, Integer quantity) {
         validateProductId(productId);
         validateQuantity(quantity);
         this.productId = productId;
         this.quantity = quantity;
     }
 
-    public static InventoryEntity of(Long id, Long productId, Integer quantity,
+    public static InventoryEntity of(String id, String productId, Integer quantity,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         InventoryEntity entity = new InventoryEntity();
         entity.productId = productId;
@@ -29,7 +29,7 @@ public class InventoryEntity extends BaseEntity {
         return entity;
     }
 
-    public Long getProductId() {
+    public String getProductId() {
         return productId;
     }
 
@@ -50,7 +50,7 @@ public class InventoryEntity extends BaseEntity {
         this.quantity = newQuantity;
     }
 
-    private void validateProductId(Long productId) {
+    private void validateProductId(String productId) {
         if (productId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 필수입니다.");
         }

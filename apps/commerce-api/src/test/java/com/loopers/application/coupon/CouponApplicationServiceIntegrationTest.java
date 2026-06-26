@@ -88,7 +88,7 @@ class CouponApplicationServiceIntegrationTest {
 
             // act & assert
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.issueCoupon(user.id(), 999L));
+                    () -> couponApplicationService.issueCoupon(user.id(), "999"));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
 
@@ -177,7 +177,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenTemplateNotFound() {
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.getTemplate(999L));
+                    () -> couponApplicationService.getTemplate("999"));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
     }
@@ -266,7 +266,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenTemplateNotFound() {
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.updateTemplate(999L, "변경", null, NEAR_FUTURE));
+                    () -> couponApplicationService.updateTemplate("999", "변경", null, NEAR_FUTURE));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
     }
@@ -314,7 +314,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenTemplateNotFound() {
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.deleteTemplate(999L));
+                    () -> couponApplicationService.deleteTemplate("999"));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
     }
@@ -349,7 +349,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenTemplateNotFound() {
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.getTemplateIssues(999L, PageRequest.of(0, 20)));
+                    () -> couponApplicationService.getTemplateIssues("999", PageRequest.of(0, 20)));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
     }
@@ -441,7 +441,7 @@ class CouponApplicationServiceIntegrationTest {
         @Test
         void throwsNotFoundException_whenCouponNotFound() {
             CoreException ex = assertThrows(CoreException.class,
-                    () -> couponApplicationService.useCoupon(999L, 1L, 10000L));
+                    () -> couponApplicationService.useCoupon("999", "1", 10000L));
             assertEquals(ErrorType.NOT_FOUND, ex.getErrorType());
         }
 

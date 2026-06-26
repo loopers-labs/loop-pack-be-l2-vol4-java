@@ -27,7 +27,7 @@ public interface ProductV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PageResult<ProductV1Dto.PlpResponse>> getAllProducts(
-            @Parameter(description = "브랜드 ID 필터 (선택)") Long brandId,
+            @Parameter(description = "브랜드 ID 필터 (선택)") String brandId,
             @Parameter(description = "정렬 기준: latest | price_asc | price_desc | like_asc | like_desc (기본값: latest)") String sort,
             @Parameter(description = "페이지 번호 (0-based, 기본값: 0)") int page,
             @Parameter(description = "페이지 크기 (기본값: 20)") int size
@@ -40,6 +40,6 @@ public interface ProductV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<ProductV1Dto.PdpResponse> getProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId
+            @Parameter(description = "상품 ID", required = true) String productId
     );
 }

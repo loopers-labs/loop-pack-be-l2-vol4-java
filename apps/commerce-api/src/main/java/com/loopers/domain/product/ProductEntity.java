@@ -8,7 +8,7 @@ import java.time.ZonedDateTime;
 
 public class ProductEntity extends BaseEntity {
 
-    private Long brandId;
+    private String brandId;
     private String name;
     private String description;
     private Long price;
@@ -16,7 +16,7 @@ public class ProductEntity extends BaseEntity {
 
     protected ProductEntity() {}
 
-    public ProductEntity(Long brandId, String name, String description, Long price) {
+    public ProductEntity(String brandId, String name, String description, Long price) {
         validateBrandId(brandId);
         validateName(name);
         validateDescription(description);
@@ -28,7 +28,7 @@ public class ProductEntity extends BaseEntity {
         this.likeCount = 0L;
     }
 
-    public static ProductEntity of(Long id, Long brandId, String name, String description, Long price, Long likeCount,
+    public static ProductEntity of(String id, String brandId, String name, String description, Long price, Long likeCount,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         ProductEntity model = new ProductEntity();
         model.brandId = brandId;
@@ -40,7 +40,7 @@ public class ProductEntity extends BaseEntity {
         return model;
     }
 
-    public Long getBrandId() {
+    public String getBrandId() {
         return brandId;
     }
 
@@ -69,7 +69,7 @@ public class ProductEntity extends BaseEntity {
         this.price = newPrice;
     }
 
-    private void validateBrandId(Long brandId) {
+    private void validateBrandId(String brandId) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드 ID는 필수입니다.");
         }

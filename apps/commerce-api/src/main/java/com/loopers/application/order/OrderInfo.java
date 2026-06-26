@@ -9,18 +9,18 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 public record OrderInfo(
-        Long orderId,
-        Long userId,
+        String orderId,
+        String userId,
         OrderStatus status,
         Long originalAmount,
         Long discountAmount,
         Long finalAmount,
-        Long couponId,
+        String couponId,
         List<OrderItemInfo> items,
         ZonedDateTime createdAt
 ) {
     public record OrderItemInfo(
-            Long productId,
+            String productId,
             String productName,
             Long productPrice,
             Integer quantity,

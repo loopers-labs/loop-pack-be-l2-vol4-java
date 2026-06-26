@@ -5,8 +5,8 @@ import com.loopers.domain.inventory.InventoryEntity;
 import com.loopers.domain.product.ProductEntity;
 
 public record LikeInfo(
-    Long id,
-    Long brandId,
+    String id,
+    String brandId,
     String brandName,
     String name,
     Long price,

@@ -18,8 +18,8 @@ import java.time.ZonedDateTime;
 @Getter
 public class OrderJpaEntity extends BaseJpaEntity {
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "ref_user_id", nullable = false)
+    private String userId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -31,7 +31,12 @@ public class OrderJpaEntity extends BaseJpaEntity {
 
     protected OrderJpaEntity() {}
 
-    OrderJpaEntity(Long id, Long userId, OrderStatus status, OrderSnapshot snapshot, ZonedDateTime deletedAt) {
+    @Override
+    protected String idCode() {
+        return "ORD";
+    }
+
+    OrderJpaEntity(String id, String userId, OrderStatus status, OrderSnapshot snapshot, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.userId = userId;
         this.status = status;

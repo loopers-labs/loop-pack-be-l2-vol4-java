@@ -11,19 +11,19 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface LikeJpaRepository extends JpaRepository<LikeJpaEntity, Long> {
+public interface LikeJpaRepository extends JpaRepository<LikeJpaEntity, String> {
 
-    Optional<LikeJpaEntity> findByUserIdAndProductIdAndDeletedAtIsNull(Long userId, Long productId);
+    Optional<LikeJpaEntity> findByUserIdAndProductIdAndDeletedAtIsNull(String userId, String productId);
 
-    Optional<LikeJpaEntity> findByUserIdAndProductId(Long userId, Long productId);
+    Optional<LikeJpaEntity> findByUserIdAndProductId(String userId, String productId);
 
-    Page<LikeJpaEntity> findAllByUserIdAndDeletedAtIsNull(Long userId, Pageable pageable);
+    Page<LikeJpaEntity> findAllByUserIdAndDeletedAtIsNull(String userId, Pageable pageable);
 
     @Modifying
     @Query("UPDATE LikeJpaEntity l SET l.deletedAt = :now WHERE l.productId = :productId AND l.deletedAt IS NULL")
-    void softDeleteAllByProductId(@Param("productId") Long productId, @Param("now") ZonedDateTime now);
+    void softDeleteAllByProductId(@Param("productId") String productId, @Param("now") ZonedDateTime now);
 
     @Modifying
     @Query("UPDATE LikeJpaEntity l SET l.deletedAt = :now WHERE l.productId IN :productIds AND l.deletedAt IS NULL")
-    void softDeleteAllByProductIds(@Param("productIds") List<Long> productIds, @Param("now") ZonedDateTime now);
+    void softDeleteAllByProductIds(@Param("productIds") List<String> productIds, @Param("now") ZonedDateTime now);
 }

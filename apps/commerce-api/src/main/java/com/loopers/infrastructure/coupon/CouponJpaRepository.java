@@ -12,18 +12,18 @@ import org.springframework.data.repository.query.Param;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 
-public interface CouponJpaRepository extends JpaRepository<CouponJpaEntity, Long> {
-    Optional<CouponJpaEntity> findByIdAndDeletedAtIsNull(Long id);
+public interface CouponJpaRepository extends JpaRepository<CouponJpaEntity, String> {
+    Optional<CouponJpaEntity> findByIdAndDeletedAtIsNull(String id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM CouponJpaEntity c WHERE c.id = :id AND c.deletedAt IS NULL")
-    Optional<CouponJpaEntity> findByIdWithLock(@Param("id") Long id);
+    Optional<CouponJpaEntity> findByIdWithLock(@Param("id") String id);
 
-    Page<CouponJpaEntity> findAllByUserIdAndDeletedAtIsNull(Long userId, Pageable pageable);
+    Page<CouponJpaEntity> findAllByUserIdAndDeletedAtIsNull(String userId, Pageable pageable);
 
-    Page<CouponJpaEntity> findAllByCouponTemplateIdAndDeletedAtIsNull(Long couponTemplateId, Pageable pageable);
+    Page<CouponJpaEntity> findAllByCouponTemplateIdAndDeletedAtIsNull(String couponTemplateId, Pageable pageable);
 
     @Modifying
     @Query("UPDATE CouponJpaEntity c SET c.deletedAt = :now WHERE c.couponTemplateId = :templateId AND c.deletedAt IS NULL")
-    void softDeleteAllByTemplateId(@Param("templateId") Long templateId, @Param("now") ZonedDateTime now);
+    void softDeleteAllByTemplateId(@Param("templateId") String templateId, @Param("now") ZonedDateTime now);
 }

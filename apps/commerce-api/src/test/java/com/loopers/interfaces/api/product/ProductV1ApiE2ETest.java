@@ -9,6 +9,7 @@ import com.loopers.application.user.UserApplicationService;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,7 @@ class ProductV1ApiE2ETest {
     private final LikeApplicationService likeApplicationService;
     private final UserApplicationService userApplicationService;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     ProductV1ApiE2ETest(
@@ -44,7 +46,8 @@ class ProductV1ApiE2ETest {
             ProductApplicationService productApplicationService,
             LikeApplicationService likeApplicationService,
             UserApplicationService userApplicationService,
-            DatabaseCleanUp databaseCleanUp
+            DatabaseCleanUp databaseCleanUp,
+            RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandApplicationService = brandApplicationService;
@@ -52,11 +55,14 @@ class ProductV1ApiE2ETest {
         this.likeApplicationService = likeApplicationService;
         this.userApplicationService = userApplicationService;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        // 상품 목록 page-0 캐시(Redis)가 테스트 간 공유되지 않도록 정리
+        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders adminHeaders() {
@@ -69,7 +75,7 @@ class ProductV1ApiE2ETest {
         return brandApplicationService.createBrand(name, name + " 설명");
     }
 
-    private ProductInfo createProduct(Long brandId, String name, Long price, Integer quantity) {
+    private ProductInfo createProduct(String brandId, String name, Long price, Integer quantity) {
         return productApplicationService.createProduct(brandId, name, name + " 설명", price, quantity);
     }
 
@@ -162,7 +168,7 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            String userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
             likeApplicationService.addLike(userId, hasLike.id());
 
             // act
@@ -189,7 +195,7 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            Long userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
+            String userId = userApplicationService.signup("testuser1", "Test1234!", "홍길동", LocalDate.of(1995, 1, 1), "test@test.com").id();
             likeApplicationService.addLike(userId, hasLike.id());
 
             // act
@@ -341,7 +347,7 @@ class ProductV1ApiE2ETest {
         void returnsNotFound_whenBrandDoesNotExist() {
             // arrange
             ProductV1Dto.CreateProductRequest request =
-                    new ProductV1Dto.CreateProductRequest(999L, "에어맥스", "최고의 운동화", 100_000L, 10);
+                    new ProductV1Dto.CreateProductRequest("999", "에어맥스", "최고의 운동화", 100_000L, 10);
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> type =
@@ -361,7 +367,7 @@ class ProductV1ApiE2ETest {
         void returnsForbidden_whenAdminHeaderIsMissing() {
             // arrange
             ProductV1Dto.CreateProductRequest request =
-                    new ProductV1Dto.CreateProductRequest(1L, "에어맥스", "최고의 운동화", 100_000L, 10);
+                    new ProductV1Dto.CreateProductRequest("1", "에어맥스", "최고의 운동화", 100_000L, 10);
 
             // act
             ParameterizedTypeReference<ApiResponse<Void>> type =

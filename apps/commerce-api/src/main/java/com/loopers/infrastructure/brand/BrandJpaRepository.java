@@ -7,8 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface BrandJpaRepository extends JpaRepository<BrandJpaEntity, Long> {
+public interface BrandJpaRepository extends JpaRepository<BrandJpaEntity, String> {
     Optional<BrandJpaEntity> findByNameAndDeletedAtIsNull(String name);
     Page<BrandJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
-    List<BrandJpaEntity> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
+    List<BrandJpaEntity> findAllByIdInAndDeletedAtIsNull(List<String> ids);
 }

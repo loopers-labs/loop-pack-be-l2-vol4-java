@@ -126,7 +126,7 @@ public class CouponTemplateEntityTest {
         @Test
         void returnsTrue_whenExpiredAtIsInPast() {
             // arrange
-            CouponTemplateEntity template = CouponTemplateEntity.of(1L, VALID_NAME, VALID_TYPE, VALID_VALUE, null, PAST, null, null, null);
+            CouponTemplateEntity template = CouponTemplateEntity.of("1", VALID_NAME, VALID_TYPE, VALID_VALUE, null, PAST, null, null, null);
 
             // act & assert
             assertTrue(template.isExpired());

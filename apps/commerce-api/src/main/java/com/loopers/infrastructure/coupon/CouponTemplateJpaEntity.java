@@ -34,7 +34,12 @@ public class CouponTemplateJpaEntity extends BaseJpaEntity {
 
     protected CouponTemplateJpaEntity() {}
 
-    CouponTemplateJpaEntity(Long id, String name, CouponType type, Long value, Long minOrderAmount,
+    @Override
+    protected String idCode() {
+        return "CTP";
+    }
+
+    CouponTemplateJpaEntity(String id, String name, CouponType type, Long value, Long minOrderAmount,
             ZonedDateTime expiredAt, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.name = name;

@@ -34,7 +34,7 @@ public class UserEntity extends BaseEntity {
         this.birthDate = birthDate;
     }
 
-    public static UserEntity of(Long id, String userId, String name, String email, String encodedPassword,
+    public static UserEntity of(String id, String userId, String name, String email, String encodedPassword,
             LocalDate birthDate, ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         UserEntity model = new UserEntity();
         model.userId = userId;

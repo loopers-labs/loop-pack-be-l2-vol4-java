@@ -30,7 +30,12 @@ public class UserJpaEntity extends BaseJpaEntity {
 
     protected UserJpaEntity() {}
 
-    UserJpaEntity(Long id, String userId, String name, String email, String password, LocalDate birthDate) {
+    @Override
+    protected String idCode() {
+        return "USR";
+    }
+
+    UserJpaEntity(String id, String userId, String name, String email, String password, LocalDate birthDate) {
         if (id != null) {
             setId(id);
         }

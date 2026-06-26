@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class InventoryEntityTest {
 
-    private static final Long VALID_PRODUCT_ID = 1L;
+    private static final String VALID_PRODUCT_ID = "1";
     private static final Integer VALID_QUANTITY = 10;
 
     @DisplayName("재고 생성")

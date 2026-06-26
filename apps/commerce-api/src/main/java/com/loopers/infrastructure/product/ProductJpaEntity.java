@@ -17,19 +17,19 @@ import java.time.ZonedDateTime;
         @Index(name = "idx_product_deleted_at_price",            columnList = "deleted_at, price"),
         // 전체 조회 + like_count 정렬
         @Index(name = "idx_product_deleted_at_like_count",       columnList = "deleted_at, like_count"),
-        // 브랜드 필터 + price 정렬 (brand_id 선두 - 선택도 높음)
-        @Index(name = "idx_product_brand_deleted_at_price",      columnList = "brand_id, deleted_at, price"),
+        // 브랜드 필터 + price 정렬 (ref_brand_id 선두 - 선택도 높음)
+        @Index(name = "idx_product_brand_deleted_at_price",      columnList = "ref_brand_id, deleted_at, price"),
         // 브랜드 필터 + like_count 정렬
-        @Index(name = "idx_product_brand_deleted_at_like_count", columnList = "brand_id, deleted_at, like_count"),
+        @Index(name = "idx_product_brand_deleted_at_like_count", columnList = "ref_brand_id, deleted_at, like_count"),
         // 브랜드 필터 + latest(id) 정렬 — InnoDB가 PK(id)를 묵시적으로 포함하므로 id 명시 불필요
-        @Index(name = "idx_product_brand_deleted_at",            columnList = "brand_id, deleted_at")
+        @Index(name = "idx_product_brand_deleted_at",            columnList = "ref_brand_id, deleted_at")
     }
 )
 @Getter
 public class ProductJpaEntity extends BaseJpaEntity {
 
-    @Column(name = "brand_id", nullable = false)
-    private Long brandId;
+    @Column(name = "ref_brand_id", nullable = false)
+    private String brandId;
 
     @Column(nullable = false)
     private String name;
@@ -45,7 +45,12 @@ public class ProductJpaEntity extends BaseJpaEntity {
 
     protected ProductJpaEntity() {}
 
-    ProductJpaEntity(Long id, Long brandId, String name, String description, Long price, Long likeCount, ZonedDateTime deletedAt) {
+    @Override
+    protected String idCode() {
+        return "PRD";
+    }
+
+    ProductJpaEntity(String id, String brandId, String name, String description, Long price, Long likeCount, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.brandId = brandId;
         this.name = name;

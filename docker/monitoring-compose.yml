@@ -6,6 +6,11 @@ services:
       - "9090:9090"
     volumes:
       - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+    # k6 의 prometheus remote-write 출력을 수신하려면 receiver 활성화 필요.
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-remote-write-receiver"
 
   grafana:
     image: grafana/grafana

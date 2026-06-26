@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.order;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderItemCommand;
 import com.loopers.domain.order.OrderStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -15,11 +16,11 @@ public class OrderV1Dto {
 
     public record CreateOrderRequest(
             @NotEmpty List<@Valid OrderItemRequest> items,
-            Long couponId
+            String couponId
     ) {
         public record OrderItemRequest(
-                @NotNull Long productId,
-                @Min(1) int quantity
+                @NotNull @Schema(example = "1") String productId,
+                @Min(1) @Schema(example = "2") int quantity
         ) {}
 
         public List<OrderItemCommand> toCommands() {
@@ -29,14 +30,14 @@ public class OrderV1Dto {
         }
     }
 
-    public record CreateOrderResponse(Long orderId) {
+    public record CreateOrderResponse(String orderId) {
         public static CreateOrderResponse from(OrderInfo info) {
             return new CreateOrderResponse(info.orderId());
         }
     }
 
     public record OrderItemResponse(
-            Long productId,
+            String productId,
             String productName,
             Long productPrice,
             Integer quantity,
@@ -54,12 +55,12 @@ public class OrderV1Dto {
     }
 
     public record OrderResponse(
-            Long orderId,
+            String orderId,
             OrderStatus status,
             Long originalAmount,
             Long discountAmount,
             Long finalAmount,
-            Long couponId,
+            String couponId,
             List<OrderItemResponse> items,
             ZonedDateTime createdAt
     ) {
@@ -78,13 +79,13 @@ public class OrderV1Dto {
     }
 
     public record AdminOrderResponse(
-            Long orderId,
-            Long userId,
+            String orderId,
+            String userId,
             OrderStatus status,
             Long originalAmount,
             Long discountAmount,
             Long finalAmount,
-            Long couponId,
+            String couponId,
             List<OrderItemResponse> items,
             ZonedDateTime createdAt
     ) {

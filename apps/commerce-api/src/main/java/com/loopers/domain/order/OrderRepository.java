@@ -8,7 +8,8 @@ import java.util.Optional;
 
 public interface OrderRepository {
     OrderEntity save(OrderEntity order);
-    Optional<OrderEntity> findById(Long id);
-    Page<OrderEntity> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable);
+    Optional<OrderEntity> findById(String id);
+    Optional<OrderEntity> findByIdWithLock(String id);
+    Page<OrderEntity> findAllByUserId(String userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable);
     Page<OrderEntity> findAll(Pageable pageable);
 }

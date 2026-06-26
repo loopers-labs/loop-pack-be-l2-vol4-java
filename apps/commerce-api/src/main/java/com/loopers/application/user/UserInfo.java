@@ -5,7 +5,7 @@ import com.loopers.domain.user.UserEntity;
 import java.time.LocalDate;
 
 public record UserInfo(
-    Long id,
+    String id,
     String userId,
     String name,
     LocalDate birthDate,

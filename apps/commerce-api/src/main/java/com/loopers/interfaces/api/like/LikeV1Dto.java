@@ -5,8 +5,8 @@ import com.loopers.application.like.LikeInfo;
 public class LikeV1Dto {
 
     public record LikeResponse(
-            Long id,
-            Long brandId,
+            String id,
+            String brandId,
             String brandName,
             String name,
             Long price,

@@ -22,13 +22,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Optional<ProductEntity> find(Long id) {
+    public Optional<ProductEntity> find(String id) {
         return productJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(ProductMapper::toDomain);
     }
 
     @Override
-    public Page<ProductEntity> findAll(Long brandId, Pageable pageable) {
+    public Page<ProductEntity> findAll(String brandId, Pageable pageable) {
         if (brandId != null) {
             return productJpaRepository.findAllByBrandIdAndDeletedAtIsNull(brandId, pageable)
                     .map(ProductMapper::toDomain);
@@ -38,24 +38,24 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public List<Long> findIdsByBrandId(Long brandId) {
+    public List<String> findIdsByBrandId(String brandId) {
         return productJpaRepository.findIdsByBrandId(brandId);
     }
 
     @Override
-    public List<ProductEntity> findAllByIds(List<Long> ids) {
+    public List<ProductEntity> findAllByIds(List<String> ids) {
         return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids).stream()
                 .map(ProductMapper::toDomain)
                 .toList();
     }
 
     @Override
-    public void incrementLikeCount(Long id) {
+    public void incrementLikeCount(String id) {
         productJpaRepository.incrementLikeCount(id);
     }
 
     @Override
-    public void decrementLikeCount(Long id) {
+    public void decrementLikeCount(String id) {
         productJpaRepository.decrementLikeCount(id);
     }
 }

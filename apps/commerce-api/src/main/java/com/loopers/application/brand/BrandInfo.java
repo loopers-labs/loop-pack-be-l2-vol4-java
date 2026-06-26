@@ -5,7 +5,7 @@ import com.loopers.domain.brand.BrandEntity;
 import java.time.ZonedDateTime;
 
 public record BrandInfo(
-        Long id,
+        String id,
         String name,
         String description,
         ZonedDateTime createdAt,

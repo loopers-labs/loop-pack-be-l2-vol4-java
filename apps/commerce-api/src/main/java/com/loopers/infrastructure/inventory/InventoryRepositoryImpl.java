@@ -21,32 +21,32 @@ public class InventoryRepositoryImpl implements InventoryRepository {
     }
 
     @Override
-    public Optional<InventoryEntity> findByProductId(Long productId) {
+    public Optional<InventoryEntity> findByProductId(String productId) {
         return inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId)
                 .map(InventoryMapper::toDomain);
     }
 
     @Override
-    public List<InventoryEntity> findAllByProductIds(List<Long> productIds) {
+    public List<InventoryEntity> findAllByProductIds(List<String> productIds) {
         return inventoryJpaRepository.findAllByProductIdInAndDeletedAtIsNull(productIds).stream()
                 .map(InventoryMapper::toDomain)
                 .toList();
     }
 
     @Override
-    public List<InventoryEntity> findAllByProductIdsWithLock(List<Long> productIds) {
+    public List<InventoryEntity> findAllByProductIdsWithLock(List<String> productIds) {
         return inventoryJpaRepository.findAllByProductIdsWithLock(productIds).stream()
                 .map(InventoryMapper::toDomain)
                 .toList();
     }
 
     @Override
-    public void deleteByProductId(Long productId) {
+    public void deleteByProductId(String productId) {
         inventoryJpaRepository.softDeleteByProductId(productId, ZonedDateTime.now());
     }
 
     @Override
-    public void deleteAllByProductIds(List<Long> productIds) {
+    public void deleteAllByProductIds(List<String> productIds) {
         inventoryJpaRepository.softDeleteAllByProductIds(productIds, ZonedDateTime.now());
     }
 }

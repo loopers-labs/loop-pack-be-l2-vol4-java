@@ -7,10 +7,12 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Pageable;
 
 @Tag(name = "Brand V1 API (Admin)", description = "어드민용 브랜드 관리 API. X-Loopers-Ldap: loopers.admin 헤더 필요.")
+@SecurityRequirement(name = "X-Loopers-Ldap")
 public interface BrandAdminV1ApiSpec {
 
     @Operation(summary = "브랜드 목록 조회", description = "등록된 브랜드를 페이지네이션으로 조회합니다.")
@@ -30,7 +32,7 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<BrandV1Dto.BrandAdminResponse> getBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId
+            @Parameter(description = "브랜드 ID", required = true) String brandId
     );
 
     @Operation(summary = "브랜드 등록", description = "새 브랜드를 등록합니다. 브랜드명은 중복 불가입니다.")
@@ -54,7 +56,7 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<BrandV1Dto.BrandAdminResponse> updateBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId,
+            @Parameter(description = "브랜드 ID", required = true) String brandId,
             BrandV1Dto.UpdateBrandRequest request
     );
 
@@ -67,6 +69,6 @@ public interface BrandAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<Object> deleteBrand(
-            @Parameter(description = "브랜드 ID", required = true) Long brandId
+            @Parameter(description = "브랜드 ID", required = true) String brandId
     );
 }

@@ -26,7 +26,7 @@ public class CouponAdminV1Dto {
     ) {}
 
     public record TemplateListResponse(
-            Long couponTemplateId,
+            String couponTemplateId,
             String name,
             CouponType type,
             Long value,
@@ -48,7 +48,7 @@ public class CouponAdminV1Dto {
     }
 
     public record TemplateDetailResponse(
-            Long couponTemplateId,
+            String couponTemplateId,
             String name,
             CouponType type,
             Long value,
@@ -72,7 +72,7 @@ public class CouponAdminV1Dto {
     }
 
     public record IssueHistoryResponse(
-            Long couponId,
+            String couponId,
             String templateName,
             CouponType type,
             Long value,

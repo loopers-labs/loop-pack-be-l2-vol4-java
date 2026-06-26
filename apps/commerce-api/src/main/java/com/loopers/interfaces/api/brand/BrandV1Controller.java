@@ -16,7 +16,7 @@ public class BrandV1Controller implements BrandV1ApiSpec {
     private final BrandApplicationService brandApplicationService;
 
     @GetMapping("/{brandId}")
-    public ApiResponse<BrandV1Dto.BrandResponse> getBrand(@PathVariable Long brandId) {
+    public ApiResponse<BrandV1Dto.BrandResponse> getBrand(@PathVariable String brandId) {
         return ApiResponse.success(BrandV1Dto.BrandResponse.from(brandApplicationService.getBrand(brandId)));
     }
 }

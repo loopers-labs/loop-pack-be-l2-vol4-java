@@ -73,14 +73,14 @@ class UserAuthInterceptorTest {
             // arrange
             given(request.getHeader(LOGIN_ID_HEADER)).willReturn("testuser");
             given(request.getHeader(LOGIN_PW_HEADER)).willReturn("Password1!");
-            given(userApplicationService.authenticate("testuser", "Password1!")).willReturn(1L);
+            given(userApplicationService.authenticate("testuser", "Password1!")).willReturn("1");
 
             // act
             boolean result = interceptor.preHandle(request, response, handler);
 
             // assert
             assertTrue(result);
-            verify(request).setAttribute("userId", 1L);
+            verify(request).setAttribute("userId", "1");
         }
 
         @DisplayName("[ECP] 인증 실패 시 UserApplicationService에서 발생한 UNAUTHORIZED 예외가 전파된다.")

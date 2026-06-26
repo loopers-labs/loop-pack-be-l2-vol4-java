@@ -58,7 +58,7 @@ class LikeV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    private Long createUser() {
+    private String createUser() {
         return userApplicationService.signup(DEFAULT_LOGIN_ID, DEFAULT_PASSWORD, "홍길동",
                 LocalDate.of(1995, 1, 1), "test@test.com").id();
     }
@@ -115,7 +115,7 @@ class LikeV1ApiE2ETest {
         @DisplayName("이미 좋아요한 상품에 재등록하면 409를 반환한다.")
         @Test
         void returnsConflict_whenAlreadyLiked() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct();
             likeApplicationService.addLike(userId, product.id());
 
@@ -131,7 +131,7 @@ class LikeV1ApiE2ETest {
         @DisplayName("좋아요 취소 후 재등록하면 204를 반환한다.")
         @Test
         void returnsNoContent_whenRestored() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct();
             likeApplicationService.addLike(userId, product.id());
             likeApplicationService.removeLike(userId, product.id());
@@ -157,7 +157,7 @@ class LikeV1ApiE2ETest {
         @DisplayName("좋아요한 상품을 취소하면 204 No Content를 반환한다.")
         @Test
         void returnsNoContent_whenLikeExists() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct();
             likeApplicationService.addLike(userId, product.id());
 
@@ -197,7 +197,7 @@ class LikeV1ApiE2ETest {
         @DisplayName("내 좋아요 목록을 조회하면 200과 PLP 필드셋을 반환한다.")
         @Test
         void returnsLikedProducts_whenRequestIsValid() {
-            Long userId = createUser();
+            String userId = createUser();
             ProductInfo product = createProduct();
             likeApplicationService.addLike(userId, product.id());
 
@@ -223,7 +223,7 @@ class LikeV1ApiE2ETest {
         @Test
         void returnsForbidden_whenAccessingOtherUserLikes() {
             createUser();
-            Long otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
+            String otherUserId = userApplicationService.signup("otheruser1", "Other1234!", "김철수",
                     LocalDate.of(1990, 5, 15), "other@test.com").id();
 
             ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};

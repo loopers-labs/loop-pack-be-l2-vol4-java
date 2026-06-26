@@ -28,7 +28,7 @@ public class UserAuthInterceptor implements HandlerInterceptor {
             throw new CoreException(ErrorType.UNAUTHORIZED, "X-Loopers-LoginPw 헤더가 필요합니다.");
         }
 
-        Long userId = userApplicationService.authenticate(loginId, loginPw);
+        String userId = userApplicationService.authenticate(loginId, loginPw);
         request.setAttribute(LoginUserArgumentResolver.USER_ID_ATTRIBUTE, userId);
         return true;
     }

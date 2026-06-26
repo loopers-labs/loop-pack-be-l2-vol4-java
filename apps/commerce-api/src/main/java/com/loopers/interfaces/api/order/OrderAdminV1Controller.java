@@ -28,7 +28,7 @@ public class OrderAdminV1Controller implements OrderAdminV1ApiSpec {
     }
 
     @GetMapping("/{orderId}")
-    public ApiResponse<OrderV1Dto.AdminOrderResponse> getOrder(@PathVariable Long orderId) {
+    public ApiResponse<OrderV1Dto.AdminOrderResponse> getOrder(@PathVariable String orderId) {
         return ApiResponse.success(
                 OrderV1Dto.AdminOrderResponse.from(orderApplicationService.getAdminOrder(orderId))
         );

@@ -17,8 +17,8 @@ public class CouponV1Controller {
     @PostMapping("/{couponTemplateId}/issue")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CouponV1Dto.IssueCouponResponse> issueCoupon(
-            @PathVariable Long couponTemplateId,
-            @LoginUser Long userId
+            @PathVariable String couponTemplateId,
+            @LoginUser String userId
     ) {
         return ApiResponse.success(CouponV1Dto.IssueCouponResponse.from(
                 couponApplicationService.issueCoupon(userId, couponTemplateId)

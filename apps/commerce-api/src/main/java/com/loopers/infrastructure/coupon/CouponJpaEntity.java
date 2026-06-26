@@ -16,11 +16,11 @@ import java.time.ZonedDateTime;
 @Getter
 public class CouponJpaEntity extends BaseJpaEntity {
 
-    @Column(name = "coupon_template_id", nullable = false)
-    private Long couponTemplateId;
+    @Column(name = "ref_coupon_template_id", nullable = false)
+    private String couponTemplateId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "ref_user_id", nullable = false)
+    private String userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -28,7 +28,12 @@ public class CouponJpaEntity extends BaseJpaEntity {
 
     protected CouponJpaEntity() {}
 
-    CouponJpaEntity(Long id, Long couponTemplateId, Long userId, CouponStatus status, ZonedDateTime deletedAt) {
+    @Override
+    protected String idCode() {
+        return "CPN";
+    }
+
+    CouponJpaEntity(String id, String couponTemplateId, String userId, CouponStatus status, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.couponTemplateId = couponTemplateId;
         this.userId = userId;

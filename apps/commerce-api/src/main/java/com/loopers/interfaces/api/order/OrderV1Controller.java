@@ -27,7 +27,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<OrderV1Dto.CreateOrderResponse> createOrder(
             @Valid @RequestBody OrderV1Dto.CreateOrderRequest request,
-            @LoginUser Long userId
+            @LoginUser String userId
     ) {
         return ApiResponse.success(
                 OrderV1Dto.CreateOrderResponse.from(
@@ -40,7 +40,7 @@ public class OrderV1Controller implements OrderV1ApiSpec {
 
     @GetMapping
     public ApiResponse<PageResult<OrderV1Dto.OrderResponse>> getOrders(
-            @LoginUser Long userId,
+            @LoginUser String userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startAt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endAt,
             @RequestParam(defaultValue = "0") int page,
@@ -58,8 +58,8 @@ public class OrderV1Controller implements OrderV1ApiSpec {
 
     @GetMapping("/{orderId}")
     public ApiResponse<OrderV1Dto.OrderResponse> getOrder(
-            @PathVariable Long orderId,
-            @LoginUser Long userId
+            @PathVariable String orderId,
+            @LoginUser String userId
     ) {
         return ApiResponse.success(
                 OrderV1Dto.OrderResponse.from(orderApplicationService.getOrder(userId, orderId))

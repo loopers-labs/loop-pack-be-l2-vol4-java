@@ -28,7 +28,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
     private static final QInventoryJpaEntity inventory = QInventoryJpaEntity.inventoryJpaEntity;
 
     @Override
-    public Page<ProductInfo> findAllWithDetails(Long brandId, Pageable pageable) {
+    public Page<ProductInfo> findAllWithDetails(String brandId, Pageable pageable) {
         BooleanBuilder where = new BooleanBuilder()
                 .and(product.deletedAt.isNull());
                 // .and(brand.deletedAt.isNull())

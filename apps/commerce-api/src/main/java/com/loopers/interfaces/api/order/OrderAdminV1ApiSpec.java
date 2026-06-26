@@ -7,9 +7,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "Order Admin V1 API", description = "주문 관리 API (Admin). X-Loopers-Ldap: loopers.admin 헤더 필요.")
+@SecurityRequirement(name = "X-Loopers-Ldap")
 public interface OrderAdminV1ApiSpec {
 
     @Operation(summary = "전체 주문 목록 조회", description = "전체 사용자의 주문 목록을 페이지네이션으로 조회합니다.")
@@ -32,6 +34,6 @@ public interface OrderAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<OrderV1Dto.AdminOrderResponse> getOrder(
-            @Parameter(description = "주문 ID", required = true) Long orderId
+            @Parameter(description = "주문 ID", required = true) String orderId
     );
 }

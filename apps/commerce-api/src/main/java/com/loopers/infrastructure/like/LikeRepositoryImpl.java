@@ -23,30 +23,30 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
-    public Optional<LikeEntity> findActive(Long userId, Long productId) {
+    public Optional<LikeEntity> findActive(String userId, String productId) {
         return likeJpaRepository.findByUserIdAndProductIdAndDeletedAtIsNull(userId, productId)
                 .map(LikeMapper::toDomain);
     }
 
     @Override
-    public Optional<LikeEntity> findAny(Long userId, Long productId) {
+    public Optional<LikeEntity> findAny(String userId, String productId) {
         return likeJpaRepository.findByUserIdAndProductId(userId, productId)
                 .map(LikeMapper::toDomain);
     }
 
     @Override
-    public Page<LikeEntity> findActiveByUserId(Long userId, Pageable pageable) {
+    public Page<LikeEntity> findActiveByUserId(String userId, Pageable pageable) {
         return likeJpaRepository.findAllByUserIdAndDeletedAtIsNull(userId, pageable)
                 .map(LikeMapper::toDomain);
     }
 
     @Override
-    public void deleteAllByProductId(Long productId) {
+    public void deleteAllByProductId(String productId) {
         likeJpaRepository.softDeleteAllByProductId(productId, ZonedDateTime.now());
     }
 
     @Override
-    public void deleteAllByProductIds(List<Long> productIds) {
+    public void deleteAllByProductIds(List<String> productIds) {
         likeJpaRepository.softDeleteAllByProductIds(productIds, ZonedDateTime.now());
     }
 }

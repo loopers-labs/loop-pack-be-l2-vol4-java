@@ -1,31 +1,32 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.ZonedDateTime;
 
 public class ProductV1Dto {
 
     public record CreateProductRequest(
-        Long brandId,
-        String name,
-        String description,
-        Long price,
-        Integer quantity
+        @Schema(example = "1") String brandId,
+        @Schema(example = "에어맥스 90") String name,
+        @Schema(example = "나이키의 대표 클래식 운동화") String description,
+        @Schema(example = "159000") Long price,
+        @Schema(example = "100") Integer quantity
     ) {}
 
     public record UpdateProductRequest(
-        String name,
-        String description,
-        Long price,
-        Integer quantity
+        @Schema(example = "에어맥스 90 리미티드") String name,
+        @Schema(example = "한정판 에어맥스 90") String description,
+        @Schema(example = "199000") Long price,
+        @Schema(example = "30") Integer quantity
     ) {}
 
-    public record CreateProductResponse(Long id) {}
+    public record CreateProductResponse(String id) {}
 
     public record PlpResponse(
-        Long id,
-        Long brandId,
+        String id,
+        String brandId,
         String brandName,
         String name,
         Long price,
@@ -44,8 +45,8 @@ public class ProductV1Dto {
     }
 
     public record PdpResponse(
-        Long id,
-        Long brandId,
+        String id,
+        String brandId,
         String brandName,
         String name,
         Long price,
@@ -68,8 +69,8 @@ public class ProductV1Dto {
     }
 
     public record AdminPlpResponse(
-        Long id,
-        Long brandId,
+        String id,
+        String brandId,
         String brandName,
         String name,
         Long price,
@@ -94,8 +95,8 @@ public class ProductV1Dto {
     }
 
     public record AdminPdpResponse(
-        Long id,
-        Long brandId,
+        String id,
+        String brandId,
         String brandName,
         String name,
         Long price,

@@ -7,5 +7,5 @@ public record OrderSnapshot(
         Long originalAmount,
         Long discountAmount,
         Long finalAmount,
-        Long couponId
+        String couponId
 ) {}

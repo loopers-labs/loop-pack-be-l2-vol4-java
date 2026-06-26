@@ -42,7 +42,7 @@ public class CouponAdminV1Controller {
 
     @GetMapping("/{couponTemplateId}")
     public ApiResponse<CouponAdminV1Dto.TemplateDetailResponse> getTemplate(
-            @PathVariable Long couponTemplateId
+            @PathVariable String couponTemplateId
     ) {
         return ApiResponse.success(CouponAdminV1Dto.TemplateDetailResponse.from(
                 couponApplicationService.getTemplate(couponTemplateId)
@@ -51,7 +51,7 @@ public class CouponAdminV1Controller {
 
     @PutMapping("/{couponTemplateId}")
     public ApiResponse<CouponAdminV1Dto.TemplateDetailResponse> updateTemplate(
-            @PathVariable Long couponTemplateId,
+            @PathVariable String couponTemplateId,
             @Valid @RequestBody CouponAdminV1Dto.UpdateTemplateRequest request
     ) {
         couponApplicationService.updateTemplate(
@@ -63,14 +63,14 @@ public class CouponAdminV1Controller {
     }
 
     @DeleteMapping("/{couponTemplateId}")
-    public ApiResponse<Object> deleteTemplate(@PathVariable Long couponTemplateId) {
+    public ApiResponse<Object> deleteTemplate(@PathVariable String couponTemplateId) {
         couponApplicationService.deleteTemplate(couponTemplateId);
         return ApiResponse.success();
     }
 
     @GetMapping("/{couponTemplateId}/issues")
     public ApiResponse<PageResult<CouponAdminV1Dto.IssueHistoryResponse>> getTemplateIssues(
-            @PathVariable Long couponTemplateId,
+            @PathVariable String couponTemplateId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

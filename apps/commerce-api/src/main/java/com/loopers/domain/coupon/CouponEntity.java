@@ -8,13 +8,13 @@ import java.time.ZonedDateTime;
 
 public class CouponEntity extends BaseEntity {
 
-    private Long couponTemplateId;
-    private Long userId;
+    private String couponTemplateId;
+    private String userId;
     private CouponStatus status;
 
     protected CouponEntity() {}
 
-    public CouponEntity(Long couponTemplateId, Long userId) {
+    public CouponEntity(String couponTemplateId, String userId) {
         if (couponTemplateId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 템플릿 ID는 필수입니다.");
         }
@@ -26,7 +26,7 @@ public class CouponEntity extends BaseEntity {
         this.status = CouponStatus.AVAILABLE;
     }
 
-    public static CouponEntity of(Long id, Long couponTemplateId, Long userId, CouponStatus status,
+    public static CouponEntity of(String id, String couponTemplateId, String userId, CouponStatus status,
             ZonedDateTime createdAt, ZonedDateTime updatedAt, ZonedDateTime deletedAt) {
         CouponEntity entity = new CouponEntity();
         entity.couponTemplateId = couponTemplateId;
@@ -36,11 +36,11 @@ public class CouponEntity extends BaseEntity {
         return entity;
     }
 
-    public Long getCouponTemplateId() {
+    public String getCouponTemplateId() {
         return couponTemplateId;
     }
 
-    public Long getUserId() {
+    public String getUserId() {
         return userId;
     }
 
@@ -62,7 +62,7 @@ public class CouponEntity extends BaseEntity {
         return status;
     }
 
-    public boolean isOwnedBy(Long userId) {
+    public boolean isOwnedBy(String userId) {
         return this.userId.equals(userId);
     }
 }

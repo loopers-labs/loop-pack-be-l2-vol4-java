@@ -8,9 +8,9 @@ import java.util.Optional;
 
 public interface LikeRepository {
     LikeEntity save(LikeEntity like);
-    Optional<LikeEntity> findActive(Long userId, Long productId);
-    Optional<LikeEntity> findAny(Long userId, Long productId);
-    Page<LikeEntity> findActiveByUserId(Long userId, Pageable pageable);
-    void deleteAllByProductId(Long productId);
-    void deleteAllByProductIds(List<Long> productIds);
+    Optional<LikeEntity> findActive(String userId, String productId);
+    Optional<LikeEntity> findAny(String userId, String productId);
+    Page<LikeEntity> findActiveByUserId(String userId, Pageable pageable);
+    void deleteAllByProductId(String productId);
+    void deleteAllByProductIds(List<String> productIds);
 }

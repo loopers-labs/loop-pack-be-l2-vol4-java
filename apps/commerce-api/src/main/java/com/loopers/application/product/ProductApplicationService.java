@@ -43,7 +43,7 @@ public class ProductApplicationService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer quantity) {
+    public ProductInfo createProduct(String brandId, String name, String description, Long price, Integer quantity) {
         BrandEntity brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
         ProductEntity product = productRepository.save(new ProductEntity(brandId, name, description, price));
@@ -51,11 +51,11 @@ public class ProductApplicationService {
         return ProductInfo.from(product, brand, inventory);
     }
 
-    public ProductInfo getProduct(Long id) {
+    public ProductInfo getProduct(String id) {
         return assembleProductInfo(findProductOrThrow(id));
     }
 
-    public Page<ProductInfo> getAllProducts(Long brandId, Pageable pageable) {
+    public Page<ProductInfo> getAllProducts(String brandId, Pageable pageable) {
         if (pageable.getPageNumber() == 0) {
             return getPage0WithCache(brandId, pageable);
         }
@@ -63,7 +63,7 @@ public class ProductApplicationService {
     }
 
     @Transactional
-    public void updateProduct(Long id, String name, String description, Long price, Integer quantity) {
+    public void updateProduct(String id, String name, String description, Long price, Integer quantity) {
         ProductEntity product = findProductOrThrow(id);
         product.update(name, description, price);
         productRepository.save(product);
@@ -75,7 +75,7 @@ public class ProductApplicationService {
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
+    public void deleteProduct(String id) {
         ProductEntity product = findProductOrThrow(id);
         product.delete();
         productRepository.save(product);
@@ -83,7 +83,7 @@ public class ProductApplicationService {
         likeRepository.deleteAllByProductId(id);
     }
 
-    private Page<ProductInfo> getPage0WithCache(Long brandId, Pageable pageable) {
+    private Page<ProductInfo> getPage0WithCache(String brandId, Pageable pageable) {
         String key = buildCacheKey(brandId, pageable);
 
         // Look-aside: 캐시 조회
@@ -108,16 +108,16 @@ public class ProductApplicationService {
         return result;
     }
 
-    private Page<ProductInfo> queryFromDb(Long brandId, Pageable pageable) {
+    private Page<ProductInfo> queryFromDb(String brandId, Pageable pageable) {
         // [Batch] IN 쿼리 배치 조회 방식 (3 쿼리)
         Page<ProductEntity> products = productRepository.findAll(brandId, pageable);
 
-        List<Long> brandIds = products.stream().map(ProductEntity::getBrandId).distinct().toList();
-        List<Long> productIds = products.stream().map(ProductEntity::getId).toList();
+        List<String> brandIds = products.stream().map(ProductEntity::getBrandId).distinct().toList();
+        List<String> productIds = products.stream().map(ProductEntity::getId).toList();
 
-        Map<Long, BrandEntity> brandMap = brandRepository.findAllByIds(brandIds).stream()
+        Map<String, BrandEntity> brandMap = brandRepository.findAllByIds(brandIds).stream()
                 .collect(Collectors.toMap(BrandEntity::getId, Function.identity()));
-        Map<Long, InventoryEntity> inventoryMap = inventoryRepository.findAllByProductIds(productIds).stream()
+        Map<String, InventoryEntity> inventoryMap = inventoryRepository.findAllByProductIds(productIds).stream()
                 .collect(Collectors.toMap(InventoryEntity::getProductId, Function.identity()));
 
         return products.map(product -> {
@@ -132,7 +132,7 @@ public class ProductApplicationService {
         // return productQueryRepository.findAllWithDetails(brandId, pageable);
     }
 
-    private String buildCacheKey(Long brandId, Pageable pageable) {
+    private String buildCacheKey(String brandId, Pageable pageable) {
         String brandPart = brandId != null ? brandId.toString() : "all";
         return CACHE_PREFIX + brandPart + "::" + pageable.getSort().toString();
     }
@@ -145,7 +145,7 @@ public class ProductApplicationService {
         return ProductInfo.from(product, brand, inventory);
     }
 
-    private ProductEntity findProductOrThrow(Long id) {
+    private ProductEntity findProductOrThrow(String id) {
         return productRepository.find(id)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 상품을 찾을 수 없습니다."));
     }

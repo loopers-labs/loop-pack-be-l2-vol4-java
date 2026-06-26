@@ -7,6 +7,6 @@ import java.util.Optional;
 
 public interface CouponTemplateRepository {
     CouponTemplateEntity save(CouponTemplateEntity template);
-    Optional<CouponTemplateEntity> findById(Long id);
+    Optional<CouponTemplateEntity> findById(String id);
     Page<CouponTemplateEntity> findAll(Pageable pageable);
 }

@@ -21,8 +21,8 @@ public class LikeV1Controller implements LikeV1ApiSpec {
     @PostMapping("/products/{productId}/likes")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void addLike(
-            @PathVariable Long productId,
-            @LoginUser Long userId
+            @PathVariable String productId,
+            @LoginUser String userId
     ) {
         likeApplicationService.addLike(userId, productId);
     }
@@ -30,16 +30,16 @@ public class LikeV1Controller implements LikeV1ApiSpec {
     @DeleteMapping("/products/{productId}/likes")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeLike(
-            @PathVariable Long productId,
-            @LoginUser Long userId
+            @PathVariable String productId,
+            @LoginUser String userId
     ) {
         likeApplicationService.removeLike(userId, productId);
     }
 
     @GetMapping("/users/{userId}/likes")
     public ApiResponse<PageResult<LikeV1Dto.LikeResponse>> getLikedProducts(
-            @PathVariable Long userId,
-            @LoginUser Long authUserId,
+            @PathVariable String userId,
+            @LoginUser String authUserId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

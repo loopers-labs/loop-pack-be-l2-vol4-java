@@ -6,7 +6,7 @@ import com.loopers.domain.coupon.CouponType;
 import java.time.ZonedDateTime;
 
 public record CouponTemplateInfo(
-        Long templateId,
+        String templateId,
         String name,
         CouponType type,
         Long value,

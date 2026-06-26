@@ -22,13 +22,18 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Optional<OrderEntity> findById(Long id) {
+    public Optional<OrderEntity> findById(String id) {
         return orderJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(OrderMapper::toDomain);
     }
 
     @Override
-    public Page<OrderEntity> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
+    public Optional<OrderEntity> findByIdWithLock(String id) {
+        return orderJpaRepository.findByIdWithLock(id).map(OrderMapper::toDomain);
+    }
+
+    @Override
+    public Page<OrderEntity> findAllByUserId(String userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdWithDateRange(userId, startAt, endAt, pageable)
                 .map(OrderMapper::toDomain);
     }

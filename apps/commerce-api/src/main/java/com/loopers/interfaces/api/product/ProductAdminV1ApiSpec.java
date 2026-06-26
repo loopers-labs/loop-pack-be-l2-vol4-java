@@ -7,9 +7,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "Product V1 API (Admin)", description = "어드민용 상품 관리 API. X-Loopers-Ldap: loopers.admin 헤더 필요.")
+@SecurityRequirement(name = "X-Loopers-Ldap")
 public interface ProductAdminV1ApiSpec {
 
     @Operation(summary = "상품 등록", description = "새 상품을 등록합니다. brandId로 브랜드 존재 여부를 검증합니다. 재고(Inventory)도 함께 생성됩니다.")
@@ -29,7 +31,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<PageResult<ProductV1Dto.AdminPlpResponse>> getAllProducts(
-            @Parameter(description = "브랜드 ID 필터 (선택)") Long brandId,
+            @Parameter(description = "브랜드 ID 필터 (선택)") String brandId,
             @Parameter(description = "페이지 번호 (0-based, 기본값: 0)") int page,
             @Parameter(description = "페이지 크기 (기본값: 20)") int size
     );
@@ -43,7 +45,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     ApiResponse<ProductV1Dto.AdminPdpResponse> getProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId
+            @Parameter(description = "상품 ID", required = true) String productId
     );
 
     @Operation(summary = "상품 수정", description = "상품 이름·설명·가격·재고 수량을 수정합니다. 브랜드는 변경할 수 없습니다.")
@@ -55,7 +57,7 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void updateProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId,
+            @Parameter(description = "상품 ID", required = true) String productId,
             ProductV1Dto.UpdateProductRequest request
     );
 
@@ -68,6 +70,6 @@ public interface ProductAdminV1ApiSpec {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     void deleteProduct(
-            @Parameter(description = "상품 ID", required = true) Long productId
+            @Parameter(description = "상품 ID", required = true) String productId
     );
 }

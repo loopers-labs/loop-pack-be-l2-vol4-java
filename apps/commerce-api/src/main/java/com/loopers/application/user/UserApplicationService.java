@@ -52,7 +52,7 @@ public class UserApplicationService {
         userRepository.save(user);
     }
 
-    public Long authenticate(String loginId, String password) {
+    public String authenticate(String loginId, String password) {
         try {
             UserEntity user = findByUserIdOrThrow(loginId);
             if (!passwordEncoder.matches(password, user.getPassword())) {

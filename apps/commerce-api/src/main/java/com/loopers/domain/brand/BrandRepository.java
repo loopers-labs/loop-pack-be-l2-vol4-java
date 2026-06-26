@@ -8,8 +8,8 @@ import java.util.Optional;
 
 public interface BrandRepository {
     BrandEntity save(BrandEntity brand);
-    Optional<BrandEntity> findById(Long id);
-    List<BrandEntity> findAllByIds(List<Long> ids);
+    Optional<BrandEntity> findById(String id);
+    List<BrandEntity> findAllByIds(List<String> ids);
     Page<BrandEntity> findAll(Pageable pageable);
     Optional<BrandEntity> findByName(String name);
 }

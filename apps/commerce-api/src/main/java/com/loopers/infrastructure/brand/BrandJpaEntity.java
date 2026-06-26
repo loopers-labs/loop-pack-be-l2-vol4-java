@@ -27,7 +27,12 @@ public class BrandJpaEntity extends BaseJpaEntity {
 
     protected BrandJpaEntity() {}
 
-    BrandJpaEntity(Long id, String name, String description, ZonedDateTime deletedAt) {
+    @Override
+    protected String idCode() {
+        return "BRD";
+    }
+
+    BrandJpaEntity(String id, String name, String description, ZonedDateTime deletedAt) {
         super(id, deletedAt);
         this.name = name;
         this.description = description;

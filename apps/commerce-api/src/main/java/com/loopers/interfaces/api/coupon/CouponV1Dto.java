@@ -9,7 +9,7 @@ import java.time.ZonedDateTime;
 public class CouponV1Dto {
 
     public record IssueCouponResponse(
-            Long couponId,
+            String couponId,
             String templateName,
             CouponType type,
             Long value,
@@ -31,7 +31,7 @@ public class CouponV1Dto {
     }
 
     public record MyCouponResponse(
-            Long couponId,
+            String couponId,
             String templateName,
             CouponType type,
             Long value,

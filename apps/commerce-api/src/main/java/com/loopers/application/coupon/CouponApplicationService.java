@@ -30,7 +30,7 @@ public class CouponApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public CouponTemplateInfo getTemplate(Long couponTemplateId) {
+    public CouponTemplateInfo getTemplate(String couponTemplateId) {
         return CouponTemplateInfo.from(findTemplateOrThrow(couponTemplateId));
     }
 
@@ -40,14 +40,14 @@ public class CouponApplicationService {
     }
 
     @Transactional
-    public void updateTemplate(Long couponTemplateId, String name, Long minOrderAmount, ZonedDateTime expiredAt) {
+    public void updateTemplate(String couponTemplateId, String name, Long minOrderAmount, ZonedDateTime expiredAt) {
         CouponTemplateEntity template = findTemplateOrThrow(couponTemplateId);
         template.update(name, minOrderAmount, expiredAt);
         couponTemplateRepository.save(template);
     }
 
     @Transactional
-    public void deleteTemplate(Long couponTemplateId) {
+    public void deleteTemplate(String couponTemplateId) {
         CouponTemplateEntity template = findTemplateOrThrow(couponTemplateId);
         template.delete();
         couponTemplateRepository.save(template);
@@ -55,14 +55,14 @@ public class CouponApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<CouponInfo> getTemplateIssues(Long couponTemplateId, Pageable pageable) {
+    public Page<CouponInfo> getTemplateIssues(String couponTemplateId, Pageable pageable) {
         CouponTemplateEntity template = findTemplateOrThrow(couponTemplateId);
         return couponRepository.findAllByCouponTemplateId(couponTemplateId, pageable)
                 .map(coupon -> CouponInfo.from(coupon, template));
     }
 
     @Transactional
-    public CouponInfo issueCoupon(Long userId, Long couponTemplateId) {
+    public CouponInfo issueCoupon(String userId, String couponTemplateId) {
         CouponTemplateEntity template = findTemplateOrThrow(couponTemplateId);
         if (template.isExpired()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰 템플릿입니다.");
@@ -72,13 +72,13 @@ public class CouponApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<CouponInfo> getMyCoupons(Long userId, Pageable pageable) {
+    public Page<CouponInfo> getMyCoupons(String userId, Pageable pageable) {
         return couponRepository.findAllByUserId(userId, pageable)
                 .map(coupon -> CouponInfo.from(coupon, findTemplateOrThrow(coupon.getCouponTemplateId())));
     }
 
     @Transactional
-    public Long useCoupon(Long couponId, Long userId, Long originalAmount) {
+    public Long useCoupon(String couponId, String userId, Long originalAmount) {
         CouponEntity coupon = couponRepository.findByIdWithLock(couponId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
         if (!coupon.isOwnedBy(userId)) {
@@ -95,7 +95,7 @@ public class CouponApplicationService {
         return discountAmount;
     }
 
-    private CouponTemplateEntity findTemplateOrThrow(Long couponTemplateId) {
+    private CouponTemplateEntity findTemplateOrThrow(String couponTemplateId) {
         return couponTemplateRepository.findById(couponTemplateId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 템플릿을 찾을 수 없습니다."));
     }

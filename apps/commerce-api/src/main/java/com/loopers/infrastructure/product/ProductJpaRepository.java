@@ -10,21 +10,21 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Long> {
-    Optional<ProductJpaEntity> findByIdAndDeletedAtIsNull(Long id);
+public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, String> {
+    Optional<ProductJpaEntity> findByIdAndDeletedAtIsNull(String id);
     Page<ProductJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
-    Page<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(Long brandId, Pageable pageable);
+    Page<ProductJpaEntity> findAllByBrandIdAndDeletedAtIsNull(String brandId, Pageable pageable);
 
     @Query("SELECT p.id FROM ProductJpaEntity p WHERE p.brandId = :brandId AND p.deletedAt IS NULL")
-    List<Long> findIdsByBrandId(@Param("brandId") Long brandId);
+    List<String> findIdsByBrandId(@Param("brandId") String brandId);
 
-    List<ProductJpaEntity> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
+    List<ProductJpaEntity> findAllByIdInAndDeletedAtIsNull(List<String> ids);
 
     @Modifying
     @Query("UPDATE ProductJpaEntity p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id AND p.deletedAt IS NULL")
-    int incrementLikeCount(@Param("id") Long id);
+    int incrementLikeCount(@Param("id") String id);
 
     @Modifying
     @Query("UPDATE ProductJpaEntity p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.deletedAt IS NULL")
-    int decrementLikeCount(@Param("id") Long id);
+    int decrementLikeCount(@Param("id") String id);
 }
