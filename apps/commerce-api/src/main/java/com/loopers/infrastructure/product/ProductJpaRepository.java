@@ -53,7 +53,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
           AND (:minPrice IS NULL OR p.price >= :minPrice)
           AND (:maxPrice IS NULL OR p.price <= :maxPrice)
           AND (:inStock = false OR s.quantity > 0)
-        ORDER BY COALESCE(plv.likeCount, 0) DESC
+        ORDER BY COALESCE(plv.likeCount, 0) DESC, p.id DESC
         """,
         countQuery = """
         SELECT COUNT(p) FROM ProductModel p

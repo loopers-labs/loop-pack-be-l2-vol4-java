@@ -5,12 +5,12 @@ import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.application.product.ProductService;
+import com.loopers.application.stock.StockService;
 import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.stock.StockModel;
-import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,14 +35,14 @@ class OrderServiceTest {
 
     private OrderService orderService;
     private FakeOrderRepository fakeOrderRepository;
-    private FakeProductRepository fakeProductRepository;
-    private FakeStockRepository fakeStockRepository;
+    private FakeProductService fakeProductRepository;
+    private FakeStockService fakeStockRepository;
 
     @BeforeEach
     void setUp() {
         fakeOrderRepository = new FakeOrderRepository();
-        fakeProductRepository = new FakeProductRepository();
-        fakeStockRepository = new FakeStockRepository();
+        fakeProductRepository = new FakeProductService();
+        fakeStockRepository = new FakeStockService();
         orderService = new OrderService(fakeOrderRepository, fakeProductRepository, fakeStockRepository, new OrderDomainService());
     }
 
@@ -157,6 +157,85 @@ class OrderServiceTest {
         }
     }
 
+    @DisplayName("시스템이 주문을 확정할 때,")
+    @Nested
+    class ConfirmBySystem {
+
+        @DisplayName("PENDING 주문을 confirmBySystem()으로 확정하면, CONFIRMED로 변경된다.")
+        @Test
+        void confirmBySystem_changesPendingToConfirmed() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 1)), null, 10000L, 0L);
+
+            // act
+            orderService.confirmBySystem(order.getId());
+
+            // assert
+            OrderModel confirmed = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        }
+
+        @DisplayName("존재하지 않는 orderId로 confirmBySystem()을 호출하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void confirmBySystem_throwsException_whenNotFound() {
+            assertThatThrownBy(() -> orderService.confirmBySystem(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("시스템이 주문을 취소할 때,")
+    @Nested
+    class CancelBySystem {
+
+        @DisplayName("PENDING 주문을 cancelBySystem()으로 취소하면, CANCELLED로 변경되고 재고가 복구된다.")
+        @Test
+        void cancelBySystem_cancelsPendingOrder_andRestoresStock() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 3)), null, 30000L, 0L);
+
+            // act
+            orderService.cancelBySystem(order.getId());
+
+            // assert
+            OrderModel cancelled = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(fakeStockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @DisplayName("CONFIRMED 주문을 cancelBySystem()으로 취소하면, CANCELLED로 변경되고 재고가 복구된다.")
+        @Test
+        void cancelBySystem_cancelsConfirmedOrder_andRestoresStock() {
+            // arrange
+            ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 10000L, 1L));
+            fakeStockRepository.save(new StockModel(product.getId(), 10));
+            OrderModel order = orderService.create(1L, List.of(new OrderItemCommand(product.getId(), 2)), null, 20000L, 0L);
+            orderService.confirm(order.getId(), 1L);
+
+            // act
+            orderService.cancelBySystem(order.getId());
+
+            // assert
+            OrderModel cancelled = fakeOrderRepository.findById(order.getId()).orElseThrow();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(fakeStockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+        }
+
+        @DisplayName("존재하지 않는 orderId로 cancelBySystem()을 호출하면, NOT_FOUND 예외가 발생한다.")
+        @Test
+        void cancelBySystem_throwsException_whenNotFound() {
+            assertThatThrownBy(() -> orderService.cancelBySystem(999L))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
     @DisplayName("주문 목록을 조회할 때,")
     @Nested
     class GetOrders {
@@ -231,6 +310,13 @@ class OrderServiceTest {
             return itemStore.getOrDefault(orderId, List.of());
         }
 
+        @Override
+        public List<OrderItemModel> findItemsByOrderIdIn(List<Long> orderIds) {
+            return orderIds.stream()
+                .flatMap(id -> itemStore.getOrDefault(id, List.of()).stream())
+                .toList();
+        }
+
         private void setId(OrderModel order, long id) {
             try {
                 var field = com.loopers.domain.BaseEntity.class.getDeclaredField("id");
@@ -242,12 +328,15 @@ class OrderServiceTest {
         }
     }
 
-    private static class FakeProductRepository implements ProductRepository {
+    private static class FakeProductService extends ProductService {
 
         private final Map<Long, ProductModel> store = new HashMap<>();
         private final AtomicLong seq = new AtomicLong(1L);
 
-        @Override
+        FakeProductService() {
+            super(null);
+        }
+
         public ProductModel save(ProductModel product) {
             setId(product, seq.getAndIncrement());
             store.put(product.getId(), product);
@@ -255,29 +344,11 @@ class OrderServiceTest {
         }
 
         @Override
-        public Optional<ProductModel> findById(Long id) {
+        public ProductModel getById(Long id) {
             return Optional.ofNullable(store.get(id))
-                .filter(p -> p.getDeletedAt() == null);
-        }
-
-        @Override
-        public Optional<ProductModel> findByIdForUpdate(Long id) {
-            return findById(id);
-        }
-
-        @Override
-        public List<ProductModel> findAllByBrandId(Long brandId) {
-            return store.values().stream().filter(p -> p.getBrandId().equals(brandId)).toList();
-        }
-
-        @Override
-        public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<ProductModel> findAllByIds(List<Long> ids) {
-            return ids.stream().map(store::get).filter(p -> p != null && p.getDeletedAt() == null).toList();
+                .filter(p -> p.getDeletedAt() == null)
+                .orElseThrow(() -> new com.loopers.support.error.CoreException(
+                    com.loopers.support.error.ErrorType.NOT_FOUND, "[productId = " + id + "] 상품을 찾을 수 없습니다."));
         }
 
         private void setId(ProductModel product, long id) {
@@ -291,25 +362,29 @@ class OrderServiceTest {
         }
     }
 
-    private static class FakeStockRepository implements StockRepository {
+    private static class FakeStockService extends StockService {
 
         private final Map<Long, StockModel> store = new HashMap<>();
 
-        @Override
+        FakeStockService() {
+            super(null);
+        }
+
         public StockModel save(StockModel stock) {
             store.put(stock.getProductId(), stock);
             return stock;
         }
 
-        @Override
         public Optional<StockModel> findByProductId(Long productId) {
             return Optional.ofNullable(store.get(productId))
                 .filter(s -> s.getDeletedAt() == null);
         }
 
         @Override
-        public Optional<StockModel> findByProductIdForUpdate(Long productId) {
-            return findByProductId(productId);
+        public StockModel getByProductIdForUpdate(Long productId) {
+            return findByProductId(productId)
+                .orElseThrow(() -> new com.loopers.support.error.CoreException(
+                    com.loopers.support.error.ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
         }
     }
 }

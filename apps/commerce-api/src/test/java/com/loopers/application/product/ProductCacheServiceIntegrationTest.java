@@ -100,7 +100,7 @@ class ProductCacheServiceIntegrationTest {
             List<ProductInfo> items = List.of(
                 new ProductInfo(1L, "에어포스1", 139000L, 1L, null, 0, null)
             );
-            productCacheService.putList(ProductSort.LATEST, 0, items);
+            productCacheService.putList(ProductSort.LATEST, 0, items, items.size());
 
             // act
             Optional<List<ProductInfo>> result = productCacheService.getList(ProductSort.LATEST, 0);
@@ -121,7 +121,7 @@ class ProductCacheServiceIntegrationTest {
             );
             for (ProductSort sort : ProductSort.values()) {
                 for (int page = 0; page < 3; page++) {
-                    productCacheService.putList(sort, page, items);
+                    productCacheService.putList(sort, page, items, items.size());
                 }
             }
 

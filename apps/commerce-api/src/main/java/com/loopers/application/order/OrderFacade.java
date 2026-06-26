@@ -6,6 +6,8 @@ import com.loopers.domain.coupon.CouponDomainService;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.order.OrderItemModel;
+import com.loopers.domain.order.OrderModel;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -52,15 +56,15 @@ public class OrderFacade {
         orderService.cancel(orderId, memberId);
     }
 
-    public OrderInfo confirmOrder(Long orderId, Long memberId) {
-        var order = orderService.confirm(orderId, memberId);
-        var orderItems = orderService.getItemsByOrderId(order.getId());
-        return OrderInfo.of(order, orderItems);
-    }
 
     public List<OrderInfo> getOrders(Long memberId, LocalDate startAt, LocalDate endAt) {
-        return orderService.getOrders(memberId, startAt, endAt).stream()
-            .map(order -> OrderInfo.of(order, orderService.getItemsByOrderId(order.getId())))
+        List<OrderModel> orders = orderService.getOrders(memberId, startAt, endAt);
+        if (orders.isEmpty()) return List.of();
+        List<Long> orderIds = orders.stream().map(OrderModel::getId).toList();
+        Map<Long, List<OrderItemModel>> itemsByOrderId = orderService.getItemsByOrderIds(orderIds).stream()
+            .collect(Collectors.groupingBy(OrderItemModel::getOrderId));
+        return orders.stream()
+            .map(order -> OrderInfo.of(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
             .toList();
     }
 
@@ -74,8 +78,13 @@ public class OrderFacade {
     }
 
     public List<OrderInfo> getAllOrders(LocalDate startAt, LocalDate endAt) {
-        return orderService.getAllOrders(startAt, endAt).stream()
-            .map(order -> OrderInfo.of(order, orderService.getItemsByOrderId(order.getId())))
+        List<OrderModel> orders = orderService.getAllOrders(startAt, endAt);
+        if (orders.isEmpty()) return List.of();
+        List<Long> orderIds = orders.stream().map(OrderModel::getId).toList();
+        Map<Long, List<OrderItemModel>> itemsByOrderId = orderService.getItemsByOrderIds(orderIds).stream()
+            .collect(Collectors.groupingBy(OrderItemModel::getOrderId));
+        return orders.stream()
+            .map(order -> OrderInfo.of(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
             .toList();
     }
 

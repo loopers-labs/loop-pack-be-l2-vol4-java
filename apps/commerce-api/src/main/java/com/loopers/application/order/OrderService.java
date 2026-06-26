@@ -1,13 +1,13 @@
 package com.loopers.application.order;
 
+import com.loopers.application.product.ProductService;
+import com.loopers.application.stock.StockService;
 import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockModel;
-import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
-    private final StockRepository stockRepository;
+    private final ProductService productService;
+    private final StockService stockService;
     private final OrderDomainService orderDomainService;
 
     @Transactional(readOnly = true)
@@ -34,8 +34,7 @@ public class OrderService {
         Map<Long, ProductModel> productMap = commands.stream()
             .collect(Collectors.toMap(
                 OrderItemCommand::productId,
-                cmd -> productRepository.findById(cmd.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 상품을 찾을 수 없습니다."))
+                cmd -> productService.getById(cmd.productId())
             ));
         Map<Long, Integer> quantityMap = commands.stream()
             .collect(Collectors.toMap(OrderItemCommand::productId, OrderItemCommand::quantity));
@@ -48,8 +47,7 @@ public class OrderService {
         Map<Long, ProductModel> productMap = commands.stream()
             .collect(Collectors.toMap(
                 OrderItemCommand::productId,
-                cmd -> productRepository.findById(cmd.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 상품을 찾을 수 없습니다."))
+                cmd -> productService.getById(cmd.productId())
             ));
 
         // 2. productId 오름차순 정렬 (데드락 방지)
@@ -61,8 +59,7 @@ public class OrderService {
         Map<Long, StockModel> stockMap = sorted.stream()
             .collect(Collectors.toMap(
                 OrderItemCommand::productId,
-                cmd -> stockRepository.findByProductIdForUpdate(cmd.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + cmd.productId() + "] 재고를 찾을 수 없습니다."))
+                cmd -> stockService.getByProductIdForUpdate(cmd.productId())
             ));
 
         Map<Long, Integer> quantityMap = commands.stream()
@@ -105,8 +102,31 @@ public class OrderService {
             .toList();
 
         for (OrderItemModel item : items) {
-            StockModel stock = stockRepository.findByProductIdForUpdate(item.getProductId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + item.getProductId() + "] 재고를 찾을 수 없습니다."));
+            StockModel stock = stockService.getByProductIdForUpdate(item.getProductId());
+            stock.increase(item.getQuantity());
+        }
+    }
+
+    @Transactional
+    public void confirmBySystem(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+        order.confirm();
+    }
+
+    @Transactional
+    public void cancelBySystem(Long orderId) {
+        OrderModel order = orderRepository.findByIdForUpdate(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+
+        order.cancel();
+
+        List<OrderItemModel> items = orderRepository.findItemsByOrderId(orderId).stream()
+            .sorted(Comparator.comparingLong(OrderItemModel::getProductId))
+            .toList();
+
+        for (OrderItemModel item : items) {
+            StockModel stock = stockService.getByProductIdForUpdate(item.getProductId());
             stock.increase(item.getQuantity());
         }
     }
@@ -143,5 +163,10 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<OrderItemModel> getItemsByOrderId(Long orderId) {
         return orderRepository.findItemsByOrderId(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderItemModel> getItemsByOrderIds(List<Long> orderIds) {
+        return orderRepository.findItemsByOrderIdIn(orderIds);
     }
 }

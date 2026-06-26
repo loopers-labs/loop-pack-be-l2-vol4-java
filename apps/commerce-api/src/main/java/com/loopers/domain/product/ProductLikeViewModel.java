@@ -1,5 +1,7 @@
 package com.loopers.domain.product;
 
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -27,6 +29,9 @@ public class ProductLikeViewModel {
     }
 
     public void decrement() {
+        if (this.likeCount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "[productId = " + productId + "] 좋아요 수가 이미 0입니다.");
+        }
         this.likeCount--;
     }
 

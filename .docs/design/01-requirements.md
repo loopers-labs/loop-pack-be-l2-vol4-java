@@ -28,6 +28,11 @@
 | 주문 항목 | OrderItem | 주문 안의 개별 상품+수량+가격 스냅샷 |
 | 주문 상태 | OrderStatus | PENDING / CONFIRMED / CANCELLED |
 | 가격 | Price | 금액을 나타내는 값 |
+| 결제 | Payment | 주문에 대한 외부 PG 결제 처리 단위 |
+| 결제 상태 | PaymentStatus | PENDING / SUCCESS / FAILED |
+| 트랜잭션 키 | TransactionKey | PG가 결제 요청 수락 시 발급하는 고유 식별자 |
+| 콜백 | Callback | PG가 결제 처리 완료 후 우리 서버로 전송하는 결과 알림 |
+| 서킷 브레이커 | CircuitBreaker | 외부 시스템 장애 시 호출을 차단하여 장애 확산을 방지하는 패턴 |
 
 ---
 
@@ -82,7 +87,11 @@
 | FR-16 | Order | 내 주문 목록 조회 (날짜 범위 필터) | USER |
 | FR-17 | Order | 주문 상세 조회 | USER |
 | FR-18 | Order | 전체 주문 목록 조회 | ADMIN |
-| FR-19 | Order | 주문 상태 확정 (CONFIRMED) | USER |
+| FR-19 | Order | 주문 상태 확정 (CONFIRMED) — PG 콜백 수신 시 자동 처리 | SYSTEM |
+| FR-20 | Payment | 결제 요청 (FeignClient → PG, PENDING 저장 후 즉시 응답) | USER |
+| FR-21 | Payment | 콜백 수신 (PG → 우리 서버, Payment/Order 상태 업데이트) | SYSTEM |
+| FR-22 | Payment | 결제 상태 조회 | USER |
+| FR-23 | Payment | PENDING 결제 주기적 복구 (30초 배치, PG 상태 확인 API 활용) | SYSTEM |
 
 ---
 
@@ -153,9 +162,55 @@
 - 주문 취소 + 재고 복구: 단일 트랜잭션
 - OrderItem에 주문 시점 가격 + 상품명 스냅샷 저장
 - 주문 목록: 날짜 범위 필터 (`startAt`, `endAt`)
+- 주문 확정(CONFIRMED)은 클라이언트가 호출하지 않고 PG 콜백 수신 시 자동 처리
 
-> ⚠️ **잠재 리스크**: 클라이언트가 주문 생성 후 confirm을 호출하지 않으면 재고가 점유된 채 PENDING 상태로 방치됩니다.
-> 배치 자동 취소(생성 후 10분 경과 시 CANCELLED + 재고 복구)로 해결 가능하나 이번 구현 범위 외입니다.
+---
+
+### 결제 (Payment)
+
+- 결제 도메인은 주문과 별도 엔티티로 분리 (`PaymentModel`)
+- 결제 요청 시 `PaymentModel(PENDING)` 저장 후 PG에 비동기 결제 요청
+- PG 호출은 트랜잭션 외부에서 실행 (DB 커넥션 점유 방지)
+- `orderId`에 UNIQUE 제약으로 동일 주문 중복 결제 방지
+- PG에 전달하는 orderId 형식: `"ORDER-" + order.getId()` (PG 6자리 이상 요구)
+- PG 결제 결과는 콜백(callbackUrl)으로 수신 → Payment/Order 상태 업데이트
+- PG 500 에러 발생 시 Retry 3회 수행 (PG가 `createTransaction` 이전에 실패하므로 중복 결제 위험 없음)
+- Timeout 발생 시 Retry 없음 — Payment PENDING 유지, 배치가 복구
+- CircuitBreaker Open 시 Fallback: Payment PENDING 유지 + "결제가 진행중입니다." 응답
+- 500 Retry 소진 시 즉시 FAILED 처리 + 주문 취소(cancelBySystem) + 재고 복구
+- Timeout/CircuitBreaker Fallback 케이스는 PENDING 유지 → 배치가 PG 상태 조회 후 처리
+
+**PaymentStatus 전이**
+
+| 상태 | 의미 | 전이 조건 |
+|------|------|----------|
+| PENDING | 결과 대기 중 | 결제 요청 직후 / Timeout / CircuitBreaker Fallback |
+| SUCCESS | 결제 성공 | PG 콜백 수신 (SUCCESS) or 배치 PG 조회 결과 SUCCESS |
+| FAILED | 결제 실패 | PG 콜백 수신 (FAILED) or PG 500 Retry 소진 or 배치 PG 조회 결과 FAILED/없음 |
+
+**Resilience 설정**
+
+| 항목 | 값 |
+|------|----|
+| connectTimeout | 1,000ms |
+| readTimeout | 400ms (PG 요청 지연 최대 500ms → 타임아웃 시나리오 재현 목적) |
+| sliding-window-size | 10 |
+| failure-rate-threshold | 50% |
+| wait-duration-in-open-state | 10s |
+| slow-call-duration-threshold | 2s |
+| slow-call-rate-threshold | 50% |
+
+**PENDING 복구 배치**
+- 주기: 30초 (`@Scheduled(fixedDelay = 30000)`)
+- 대상: `created_at < now() - 30초` 이면서 `status = PENDING`인 Payment
+  - PG 200 OK를 받았으나 콜백이 미도착한 경우 (transactionKey 있을 수 있음)
+  - Timeout/CircuitBreaker로 응답을 받지 못한 경우 (transactionKey 없음)
+- 동작: PG `GET /api/v1/payments?orderId={orderId}` 조회 후 아래 처리
+  - PG SUCCESS + 주문 PENDING → Payment SUCCESS + 주문 확정(CONFIRMED)
+  - PG SUCCESS + 주문 CANCELLED → **로그 기록 후 수동 처리 대상 표시** (pg-simulator 취소 API 미지원으로 PG 결제 취소 불가)
+  - PG FAILED → Payment FAILED + cancelBySystem + 재고 복구
+  - PG 기록 없음 → Payment FAILED + cancelBySystem + 재고 복구
+  - PG PENDING → 다음 사이클에 재시도
 
 ---
 
@@ -274,7 +329,15 @@
 | DELETE | `/api/v1/orders/{orderId}` | USER | 주문 취소 (재고 복구) |
 | GET | `/api-admin/v1/orders` | ADMIN | 전체 주문 목록 조회 |
 | GET | `/api-admin/v1/orders/{orderId}` | ADMIN | 주문 상세 조회 |
-| PATCH | `/api/v1/orders/{orderId}/confirm` | USER | 주문 확정 (PENDING → CONFIRMED, PG 결제 성공 후 클라이언트 호출) |
+| PATCH | `/api/v1/orders/{orderId}/confirm` | SYSTEM | 주문 확정 (PENDING → CONFIRMED) — PG 콜백 수신 시 내부 처리 |
+
+### 결제 (Payments)
+
+| Method | URI | 인증 | 설명 |
+|--------|-----|------|------|
+| POST | `/api/v1/payments` | USER | 결제 요청 (Payment PENDING 저장 → PG 비동기 호출) |
+| POST | `/api/v1/payments/callback` | - | PG 콜백 수신 (Payment/Order 상태 업데이트) |
+| GET | `/api/v1/payments/{paymentId}` | USER | 결제 상태 조회 (앱 polling용) |
 
 **주문 생성 요청 예시:**
 ```json
@@ -377,10 +440,24 @@
 주문 생성
     ↓
 [PENDING] ──────────────→ [CANCELLED]
-    ↓ ADMIN 확정
+    ↓ PG 콜백(SUCCESS) 수신 시 자동 확정
 [CONFIRMED] ────────────→ [CANCELLED]
 ```
 
 - `PENDING`: 주문 생성 직후
-- `CONFIRMED`: 클라이언트가 PG 결제 성공 후 confirm 호출 (추후 Webhook으로 교체 예정)
+- `CONFIRMED`: PG 콜백 SUCCESS 수신 시 자동 전이 (클라이언트 개입 없음)
 - `CANCELLED`: PENDING / CONFIRMED 모두 취소 가능
+
+## 10. 결제 상태 전이
+
+```
+결제 요청
+    ↓
+[PENDING] ──── PG 콜백(FAILED) or PG 요청 거부 ────→ [FAILED]
+    ↓ PG 콜백(SUCCESS)
+[SUCCESS]
+```
+
+- `PENDING`: PG 결제 요청 수락 직후 (타임아웃/CircuitBreaker 포함 — 배치가 복구)
+- `SUCCESS`: PG 콜백 SUCCESS 수신 → Order CONFIRMED로 자동 전이
+- `FAILED`: PG 콜백 FAILED 수신 or PG 요청 자체 거부(40% 확률)

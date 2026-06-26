@@ -1,10 +1,10 @@
 package com.loopers.application.brand;
 
+import com.loopers.application.like.LikeService;
+import com.loopers.application.product.ProductCacheService;
 import com.loopers.application.product.ProductService;
 import com.loopers.application.stock.StockService;
 import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.like.LikeRepository;
-import com.loopers.domain.product.ProductLikeViewRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.stock.StockModel;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +22,8 @@ public class BrandFacade {
     private final BrandService brandService;
     private final ProductService productService;
     private final StockService stockService;
-    private final LikeRepository likeRepository;
-    private final ProductLikeViewRepository productLikeViewRepository;
+    private final LikeService likeService;
+    private final ProductCacheService productCacheService;
 
     public BrandInfo create(String name) {
         BrandModel saved = brandService.create(new BrandModel(name));
@@ -49,9 +49,10 @@ public class BrandFacade {
             product.delete();
             Optional<StockModel> stock = stockService.findByProductId(product.getId());
             stock.ifPresent(StockModel::delete);
-            likeRepository.deleteAllByProductId(product.getId());
-            productLikeViewRepository.deleteByProductId(product.getId());
+            likeService.deleteAllByProductId(product.getId());
+            productCacheService.evictDetail(product.getId());
         });
+        productCacheService.evictAllList();
         brandService.delete(id);
     }
 }

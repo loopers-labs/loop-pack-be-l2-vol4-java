@@ -59,12 +59,4 @@ public class OrderController {
         return ApiResponse.success(OrderDto.OrderResponse.from(info));
     }
 
-    @PatchMapping("/{orderId}/confirm")
-    public ApiResponse<OrderDto.OrderResponse> confirmOrder(
-        @PathVariable Long orderId,
-        @RequestAttribute("userId") Long userId
-    ) {
-        OrderInfo info = orderFacade.confirmOrder(orderId, userId);
-        return ApiResponse.success(OrderDto.OrderResponse.from(info));
-    }
 }
