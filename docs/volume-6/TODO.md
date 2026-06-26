@@ -182,12 +182,14 @@ flowchart TD
 
 > **경로 분리.** 유저 요청 경로와 보정(스케줄러) 경로는 retry 전략이 다르다. 보정 경로의 backoff+jitter는 스케줄러가 서는 **Stage 6에서 배선**하고, 이 단계에서는 **정책 정의 + 유저 경로**까지만 한다.
 
-- [ ] **유저 요청 경로 = 빠른 실패** — 재시도 미적용(또는 최소). 스레드를 외부 I/O 재시도로 오래 점유하지 않는다
-- [ ] **retry 정책 정의** — `retry-exceptions`를 5xx/SocketTimeout/네트워크로 한정, 4xx·비즈니스 예외는 ignore. 보정 경로용 Exponential backoff + jitter(Thundering Herd 회피) 값까지 정의해 둔다
-- [ ] **Feign 자체 재시도 비활성화**(`Retryer.NEVER_RETRY`) — Resilience4j로 단일화(이중 재시도 방지)
-- [ ] 멱등 전제 확인 — 결제 재시도는 조회로 "주문 없음(미도달)"을 확인한 뒤가 안전
+- [X] **유저 요청 경로 = 빠른 실패** — `requestPayment`에 `@Retry` 미부착(`@CircuitBreaker`만). 스레드를 외부 I/O 재시도로 오래 점유하지 않는다. 통합테스트(`userPath_failsFast_withoutRetry`)로 *단일 타임아웃에도 PG 정확히 1회 호출 + 즉시 UNKNOWN* 박제
+- [X] **retry 정책 정의** — `resilience4j.retry.instances.pg-reconciliation`: max-attempts 3 · exponential backoff(1s→2s→4s) · jitter ±50%(Thundering Herd 회피) · retry=`RetryableException`+`FeignServerException`(5xx) · ignore=`FeignClientException`(4xx). *유저 경로(CB `pg-simulator`)와 이름 분리 → 유저 요청엔 실수로도 안 붙음. 배선은 Stage 6 스케줄러*
+- [X] **Feign 자체 재시도 비활성화**(`Retryer.NEVER_RETRY`) — `FeignConfig`에 `@Bean Retryer.NEVER_RETRY` 명시. Spring Cloud 기본값이 이미 NEVER_RETRY지만 암묵적 → "재시도 단일 원천 = Resilience4j"를 코드로 드러내 이중 재시도 방지
+- [X] 멱등 전제 확인 — 접수 중복은 Facade `existsByOrderId` 가드가 차단. *재요청 안전(돈 안 빠진 미도달 확인)은 PG 조회로 "주문 없음"을 본 뒤가 전제이며, 그 조회 API는 Stage 6 의존이라 보정 경로 재요청은 Stage 6에서 배선*
 
-**검증:** 유저 경로가 빠르게 실패하고, 영구 실패(잘못된 카드)는 재시도하지 않으며, 이중 재시도가 없다. (보정 경로 backoff 적용·검증은 Stage 6)
+**검증:** 유저 경로가 빠르게 실패하고(재시도 0회), 영구 실패(4xx)는 retry 정책에서 ignore, Feign+R4j 이중 재시도가 없다. (보정 경로 backoff 적용·검증은 Stage 6)
+> **Stage 5 완료.** 코드(`FeignConfig` NEVER_RETRY Bean + `application.yml` `pg-reconciliation` retry 인스턴스 정의) + 테스트(`PaymentGatewayResilienceIntegrationTest`에 빠른 실패/무재시도 단언 추가, 결제 스위트 전체 통과). 측정 리포트 없음(Nice-to-Have, 정책 정의 단계).
+> **plan 보정:** ① 유저 경로는 *이미* fast-fail 상태(`@CircuitBreaker`만)였음 — Stage 5는 "구현"보다 *정책 정의 + 의도 명시(Feign Bean·테스트 박제)*가 본질. ② retry 인스턴스 이름을 CB(`pg-simulator`)와 분리한 `pg-reconciliation`으로 둬, 한 메서드에 동명 어노테이션이 겹쳐 유저 경로에 재시도가 새는 사고를 구조적으로 차단. ③ 정의만 하고 미배선 — Stage 6 스케줄러가 PG 재조회/재요청에 `@Retry("pg-reconciliation")`로 연결.
 
 ---
 
