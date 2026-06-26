@@ -76,6 +76,13 @@ public class PaymentModel extends BaseEntity {
         this.status = PaymentStatus.FAILED;
     }
 
+    public void markAsConflict() {
+        if (this.status != PaymentStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "PENDING 상태에서만 CONFLICT로 변경할 수 있습니다.");
+        }
+        this.status = PaymentStatus.CONFLICT;
+    }
+
     public Long getOrderId() { return orderId; }
     public String getTransactionKey() { return transactionKey; }
     public CardType getCardType() { return cardType; }
