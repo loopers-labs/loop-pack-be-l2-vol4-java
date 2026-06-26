@@ -21,6 +21,6 @@ public interface OrderRepository {
     /** 특정 시각 이전에 생성된 특정 상태의 주문 목록. 오래된 PENDING 주문 만료 처리용. */
     List<OrderModel> findByStatusAndOrderedAtBefore(OrderStatus status, ZonedDateTime before);
 
-    /** 자원 점유 후 특정 시각 이전부터 승인 결과를 못 받은 주문 목록. PAYMENT_IN_PROGRESS 잔존 건 처리용. */
-    List<OrderModel> findByStatusAndPaymentStartedAtBefore(OrderStatus status, ZonedDateTime before);
+    /** 특정 상태의 주문 전체. PG 대사 스케줄러가 PAYMENT_IN_PROGRESS 건을 매 틱 조회하는 용도. */
+    List<OrderModel> findByStatus(OrderStatus status);
 }
