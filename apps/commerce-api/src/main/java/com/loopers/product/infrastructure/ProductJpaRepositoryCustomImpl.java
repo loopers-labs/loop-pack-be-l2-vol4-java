@@ -1,10 +1,10 @@
 package com.loopers.product.infrastructure;
 
-import com.loopers.like.domain.QLike;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductSortOption;
 import com.loopers.product.domain.ProductStatus;
 import com.loopers.product.domain.QProduct;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -17,22 +17,44 @@ public class ProductJpaRepositoryCustomImpl implements ProductJpaRepositoryCusto
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public List<Product> findAllOnSale(ProductSortOption sort) {
+    public List<Product> findAllOnSale(Long brandId, ProductSortOption sort, long offset, int limit) {
         QProduct product = QProduct.product;
-        QLike like = QLike.like;
 
         JPAQuery<Product> query = queryFactory
                 .selectFrom(product)
-                .where(product.status.eq(ProductStatus.ON_SALE), product.deletedAt.isNull());
+                .where(onSale(product, brandId));
 
         return switch (sort) {
-            case LATEST -> query.orderBy(product.createdAt.desc(), product.id.desc()).fetch();
-            case PRICE_ASC -> query.orderBy(product.price.value.asc(), product.id.desc()).fetch();
+            case LATEST -> query
+                    .orderBy(product.createdAt.desc(), product.id.desc())
+                    .offset(offset).limit(limit).fetch();
+            case PRICE_ASC -> query
+                    .orderBy(product.price.value.asc(), product.id.desc())
+                    .offset(offset).limit(limit).fetch();
             case LIKES_DESC -> query
-                    .leftJoin(like).on(like.productId.eq(product.id), like.deletedAt.isNull())
-                    .groupBy(product.id)
-                    .orderBy(like.id.count().desc(), product.id.desc())
-                    .fetch();
+                    .orderBy(product.likeCount.desc(), product.id.desc())
+                    .offset(offset).limit(limit).fetch();
         };
+    }
+
+    @Override
+    public long countOnSale(Long brandId) {
+        QProduct product = QProduct.product;
+        Long count = queryFactory
+                .select(product.count())
+                .from(product)
+                .where(onSale(product, brandId))
+                .fetchOne();
+        return count == null ? 0L : count;
+    }
+
+    private BooleanBuilder onSale(QProduct product, Long brandId) {
+        BooleanBuilder where = new BooleanBuilder()
+                .and(product.status.eq(ProductStatus.ON_SALE))
+                .and(product.deletedAt.isNull());
+        if (brandId != null) {
+            where.and(product.brandId.eq(brandId));
+        }
+        return where;
     }
 }

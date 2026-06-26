@@ -4,11 +4,13 @@ import com.loopers.like.domain.Like;
 import com.loopers.like.domain.LikeErrorCode;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.application.ProductReader;
+import com.loopers.product.application.event.ProductLikeChangedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
@@ -30,7 +32,8 @@ class LikeServiceTest {
 
     private final LikeRepository likeRepository = mock(LikeRepository.class);
     private final ProductReader productReader = mock(ProductReader.class);
-    private final LikeService likeService = new LikeService(likeRepository, productReader);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final LikeService likeService = new LikeService(likeRepository, productReader, eventPublisher);
 
     @Test
     @DisplayName("register: 상품 존재 + Like 없으면 새로 저장한다")
@@ -45,6 +48,7 @@ class LikeServiceTest {
                 () -> assertThat(captor.getValue().getUserId()).isEqualTo(USER_ID),
                 () -> assertThat(captor.getValue().getProductId()).isEqualTo(PRODUCT_ID)
         );
+        verify(eventPublisher).publishEvent(new ProductLikeChangedEvent(PRODUCT_ID, 1L));
     }
 
     @Test
@@ -57,6 +61,7 @@ class LikeServiceTest {
 
         assertThat(active.getDeletedAt()).isNull();
         verify(likeRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -70,6 +75,7 @@ class LikeServiceTest {
 
         assertThat(cancelled.getDeletedAt()).isNull();
         verify(likeRepository, never()).save(any());
+        verify(eventPublisher).publishEvent(new ProductLikeChangedEvent(PRODUCT_ID, 1L));
     }
 
     @Test
@@ -107,6 +113,7 @@ class LikeServiceTest {
         likeService.cancel(USER_ID, PRODUCT_ID);
 
         assertThat(active.getDeletedAt()).isNotNull();
+        verify(eventPublisher).publishEvent(new ProductLikeChangedEvent(PRODUCT_ID, -1L));
     }
 
     @Test
@@ -120,6 +127,7 @@ class LikeServiceTest {
         likeService.cancel(USER_ID, PRODUCT_ID);
 
         assertThat(cancelled.getDeletedAt()).isEqualTo(firstDeletedAt);
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -130,5 +138,6 @@ class LikeServiceTest {
         likeService.cancel(USER_ID, PRODUCT_ID);
 
         verify(likeRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }
