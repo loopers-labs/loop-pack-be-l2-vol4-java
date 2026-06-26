@@ -11,6 +11,7 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentRequestResult;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -28,12 +29,12 @@ public class PaymentFacade {
     public PaymentInfo createPayment(Long userId, Long orderId, CardType cardType, String cardNo, ZonedDateTime now) {
         PaymentModel acceptedPayment = acceptPayment(userId, orderId, cardType, cardNo, now);
 
-        String transactionKey = paymentGateway.requestPayment(acceptedPayment);
+        PaymentRequestResult requestResult = paymentGateway.requestPayment(acceptedPayment);
 
-        acceptedPayment.recordTransactionKey(transactionKey);
-        PaymentModel mappedPayment = paymentRepository.save(acceptedPayment);
+        acceptedPayment.applyRequestResult(requestResult);
+        PaymentModel confirmedPayment = paymentRepository.save(acceptedPayment);
 
-        return PaymentInfo.from(mappedPayment);
+        return PaymentInfo.from(confirmedPayment);
     }
 
     private PaymentModel acceptPayment(Long userId, Long orderId, CardType cardType, String cardNo, ZonedDateTime now) {
