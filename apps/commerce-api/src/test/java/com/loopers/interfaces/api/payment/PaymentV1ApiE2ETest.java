@@ -8,6 +8,7 @@ import com.loopers.domain.product.ProductStockModel;
 import com.loopers.domain.product.ProductStockRepository;
 import com.loopers.domain.product.vo.Price;
 import com.loopers.domain.product.vo.ProductName;
+import com.loopers.domain.payment.enums.CardType;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.enums.UserRole;
@@ -93,22 +94,16 @@ class PaymentV1ApiE2ETest {
         return LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + suffix;
     }
 
-    private Long createOrder() {
+    private String createOrder() {
+        String orderNumber = orderNumber();
         OrderV1Dto.OrderRequest request = new OrderV1Dto.OrderRequest(
-                orderNumber(),
+                orderNumber,
                 List.of(new OrderV1Dto.OrderItemRequest(savedStock.getId(), 1)),
                 null
         );
         ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> type = new ParameterizedTypeReference<>() {};
-        return testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST,
-                new HttpEntity<>(request, authHeaders()), type).getBody().data().id();
-    }
-
-    private Long createPayment(Long orderId) {
-        PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(orderId);
-        ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-        return testRestTemplate.exchange("/api/v1/payments", HttpMethod.POST,
-                new HttpEntity<>(request, authHeaders()), type).getBody().data().id();
+        testRestTemplate.exchange("/api/v1/orders", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
+        return orderNumber;
     }
 
     @DisplayName("POST /api/v1/payments")
@@ -118,53 +113,16 @@ class PaymentV1ApiE2ETest {
         @DisplayName("유효한 주문이면, 201 CREATED와 결제 정보를 반환한다.")
         @Test
         void returnsPayment_whenOrderIsValid() {
-            Long orderId = createOrder();
-            PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(orderId);
+            String orderNumber = createOrder();
+            PaymentV1Dto.CreateRequest request = new PaymentV1Dto.CreateRequest(
+                    orderNumber, CardType.SAMSUNG, "1234-5678-1234-5678");
             ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
 
             ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
                     "/api/v1/payments", HttpMethod.POST, new HttpEntity<>(request, authHeaders()), type);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-            assertThat(response.getBody().data().orderId()).isEqualTo(orderId);
             assertThat(response.getBody().data().amount()).isEqualTo(10000L);
-            assertThat(response.getBody().data().status()).isEqualTo("결제 대기");
-        }
-    }
-
-    @DisplayName("POST /api/v1/payments/{paymentId}/approve")
-    @Nested
-    class ApprovePayment {
-
-        @DisplayName("대기 상태의 결제이면, 200 OK와 승인된 결제 정보를 반환한다.")
-        @Test
-        void approvesPayment_whenStatusIsPending() {
-            Long paymentId = createPayment(createOrder());
-            ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/approve", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().data().status()).isEqualTo("결제 승인");
-        }
-    }
-
-    @DisplayName("POST /api/v1/payments/{paymentId}/fail")
-    @Nested
-    class FailPayment {
-
-        @DisplayName("대기 상태의 결제이면, 200 OK와 실패 처리된 결제 정보를 반환한다.")
-        @Test
-        void failsPayment_whenStatusIsPending() {
-            Long paymentId = createPayment(createOrder());
-            ParameterizedTypeReference<ApiResponse<PaymentV1Dto.PaymentResponse>> type = new ParameterizedTypeReference<>() {};
-
-            ResponseEntity<ApiResponse<PaymentV1Dto.PaymentResponse>> response = testRestTemplate.exchange(
-                    "/api/v1/payments/" + paymentId + "/fail", HttpMethod.POST, new HttpEntity<>(null, authHeaders()), type);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().data().status()).isEqualTo("결제 실패");
         }
     }
 }

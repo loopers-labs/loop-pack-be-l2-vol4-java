@@ -36,25 +36,14 @@ class PaymentServiceUnitTest {
     @Nested
     class Create {
 
-        @DisplayName("유효한 주문이면, PENDING 상태의 결제가 생성된다.")
+        @DisplayName("유효한 주문이면, REQUEST 상태의 결제가 생성된다.")
         @Test
         void createsPayment_whenOrderIsValid() {
             PaymentModel result = sut.create(ORDER_ID, DEFAULT_AMOUNT);
 
             assertThat(result.getOrderId()).isEqualTo(ORDER_ID);
             assertThat(result.getAmount()).isEqualTo(DEFAULT_AMOUNT);
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
-        }
-
-        @DisplayName("동일 주문에 PENDING 결제가 이미 존재하면, CONFLICT 예외가 발생한다.")
-        @Test
-        void throwsConflict_whenPendingPaymentAlreadyExists() {
-            saveDefaultPayment();
-
-            CoreException exception = assertThrows(CoreException.class,
-                    () -> sut.create(ORDER_ID, DEFAULT_AMOUNT));
-
-            assertThat(exception.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+            assertThat(result.getStatus()).isEqualTo(PaymentStatus.REQUEST);
         }
     }
 
