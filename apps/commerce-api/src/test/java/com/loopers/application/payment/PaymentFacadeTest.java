@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 import java.time.ZonedDateTime;
 
@@ -113,9 +114,9 @@ class PaymentFacadeTest {
 
             // assert
             ArgumentCaptor<PaymentModel> captor = ArgumentCaptor.forClass(PaymentModel.class);
-            then(paymentRepository).should().save(captor.capture());
+            then(paymentRepository).should(times(2)).save(captor.capture());
             assertAll(
-                () -> assertThat(captor.getValue().getAmount()).isEqualTo(finalAmount),
+                () -> assertThat(captor.getAllValues().get(0).getAmount()).isEqualTo(finalAmount),
                 () -> assertThat(paymentInfo.amount()).isEqualTo(finalAmount)
             );
         }
@@ -145,6 +146,25 @@ class PaymentFacadeTest {
                 () -> assertThat(sentPayment.getCardType()).isEqualTo(CardType.SAMSUNG),
                 () -> assertThat(sentPayment.getCardNo().value()).isEqualTo(CARD_NO)
             );
+        }
+
+        @DisplayName("외부 결제 시스템 호출이 실패하면 PENDING 접수만 저장한 채 거래 식별자를 기록하지 않고 예외가 전파된다.")
+        @Test
+        void propagatesGatewayError_withoutRecordingTransactionKey() {
+            // arrange
+            given(orderRepository.getActiveByIdAndUserId(ORDER_ID, USER_ID)).willReturn(order(78_000));
+            given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
+            given(paymentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+            given(paymentGateway.requestPayment(any()))
+                .willThrow(new CoreException(ErrorType.PAYMENT_GATEWAY_ERROR, "결제 시스템 연동에 실패했습니다."));
+
+            // act & assert
+            assertThatThrownBy(() -> paymentFacade.createPayment(USER_ID, ORDER_ID, CardType.SAMSUNG, CARD_NO, ZonedDateTime.now()))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.PAYMENT_GATEWAY_ERROR);
+
+            then(paymentRepository).should(times(1)).save(any());
         }
     }
 
