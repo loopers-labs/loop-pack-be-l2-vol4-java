@@ -27,6 +27,17 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
+  # 외부 PG(pg-simulator) Feign 타임아웃 — OpenFeign 기본(connect 10s / read 60s)은 결제 호출치고 과도하게 길다.
+  # pg-simulator 정상 응답 지연은 100~500ms(요청 엔드포인트의 인위적 sleep)이므로 read 2s로 4배 여유를 두되,
+  # 응답이 끝내 안 오면 60s가 아니라 2s 안에 끊어 @Retry(아래 resilience4j)로 넘긴다. 타임아웃은 feign.RetryableException
+  # 으로 감싸져 재시도 대상에 포함된다. connect는 로컬/동일망 기준 1s면 충분.
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-simulator:
+            connect-timeout: 1000
+            read-timeout: 2000
 
 # 좋아요 카운터 비동기 집계 토픽 (commerce-streamer가 컨슈머). key=productId 로 같은 상품은 같은 파티션.
 like-events:
