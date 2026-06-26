@@ -1,7 +1,8 @@
 package com.loopers.domain.payment.enums;
 
 public enum PaymentStatus {
-    PENDING("결제 대기"),
+    REQUEST("결제 요청"),
+    PENDING("결제 진행중"),
     APPROVED("결제 승인"),
     FAILED("결제 실패"),
     EXPIRED("결제 만료");
