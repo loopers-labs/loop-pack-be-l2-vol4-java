@@ -70,6 +70,14 @@ public class ProductModel {
         this.stock -= quantity;
     }
 
+    /** 주문 취소 등으로 차감했던 재고를 복원한다. (decreaseStock 의 역연산) */
+    public void increaseStock(int quantity) {
+        if (quantity < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복원 수량은 0 이상이어야 합니다.");
+        }
+        this.stock += quantity;
+    }
+
     public Long getId() { return id; }
     public Long getBrandId() { return brandId; }
     public String getName() { return name; }

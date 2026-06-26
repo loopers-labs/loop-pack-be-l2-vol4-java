@@ -23,11 +23,45 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pgClient:
+            connect-timeout: 1000  # 연결 타임아웃 (ms)
+            read-timeout: 2000     # 읽기 타임아웃 (ms) - PG 요청 응답은 100~500ms 지연만 발생(처리 1~5s는 비동기 콜백)
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback  # PG 가 결제 결과를 통보할 콜백 (Phase 5에서 수신 엔드포인트 구현)
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10          # 최소 10건 이후부터 실패율 평가
+        failure-rate-threshold: 50           # 실패율 50% 이상이면 OPEN (PG 정상 실패율 40% < 50%)
+        slow-call-duration-threshold: 2s     # read-timeout(2s)과 정렬
+        slow-call-rate-threshold: 100
+        wait-duration-in-open-state: 10s     # OPEN 유지 후 HALF_OPEN 전환
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - com.loopers.domain.payment.PgClientException   # 하위 PgConnectionException 포함
+  retry:
+    instances:
+      pg:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.loopers.domain.payment.PgConnectionException  # 연결 실패(요청 미도달 확실)에만 재시도
 
 ---
 spring:

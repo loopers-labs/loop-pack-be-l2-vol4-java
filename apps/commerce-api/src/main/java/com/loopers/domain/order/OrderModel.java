@@ -52,6 +52,28 @@ public class OrderModel {
         return new OrderModel(null, userId, orderLines, originalTotalPrice, discountPrice, totalPrice, OrderStatus.PENDING, null, null);
     }
 
+    /** 결제 성공 시 호출. PENDING → PAID. 이미 PAID 면 멱등(no-op). */
+    public void pay() {
+        if (this.status == OrderStatus.PAID) {
+            return;
+        }
+        if (this.status != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 완료할 수 없는 주문 상태입니다: " + this.status);
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    /** 결제 실패 시 호출. PENDING → CANCELLED. 이미 CANCELLED 면 멱등(no-op). */
+    public void cancel() {
+        if (this.status == OrderStatus.CANCELLED) {
+            return;
+        }
+        if (this.status != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "취소할 수 없는 주문 상태입니다: " + this.status);
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
     public Long getId() { return id; }
     public Long getUserId() { return userId; }
     public List<OrderLine> getOrderLines() { return orderLines; }

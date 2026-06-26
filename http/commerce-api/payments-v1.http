@@ -1,0 +1,50 @@
+### Round 6 - 결제 API (commerce-api)
+### 사전: docker infra 기동 + commerce-api(8080) + pg-simulator(8082) 실행, 사용자/상품/주문 선행 생성
+
+### 1) 결제 요청 (PG 연동, 비동기) - 인증 필요
+### orderId 의 주문 금액으로 결제를 접수한다. 응답은 PENDING + transactionKey.
+POST {{commerce-api}}/api/v1/payments
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Pass1234!
+Content-Type: application/json
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451"
+}
+
+### 2) PG 콜백 수신 (PG -> commerce-api, 무인증)
+### PG 가 결제 결과를 통보. SUCCESS -> 주문 PAID, FAILED -> 주문 CANCELLED + 재고 복원.
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20250816:TR:9577c5",
+  "orderId": "000001",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "status": "SUCCESS",
+  "reason": null
+}
+
+### 3) 콜백 실패 케이스 예시 (FAILED)
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20250816:TR:9577c5",
+  "orderId": "000001",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "status": "FAILED",
+  "reason": "한도 초과"
+}
+
+### 4) 수동 동기화 (콜백 미수신/타임아웃 복구) - 인증 필요
+### PENDING 결제를 PG 상태확인 API 로 재조정한다. {paymentId} 를 실제 값으로 교체.
+POST {{commerce-api}}/api/v1/payments/1/sync
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Pass1234!
