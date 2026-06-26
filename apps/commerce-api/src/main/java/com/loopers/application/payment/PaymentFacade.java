@@ -39,7 +39,6 @@ public class PaymentFacade {
     }
 
     public Long processPayment(Long orderId, PaymentMethod method, BigDecimal amount) {
-        pgCircuitBreaker.acquirePermission();
 
         // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
         PaymentModel payment = new PaymentModel(orderId, method, amount);
