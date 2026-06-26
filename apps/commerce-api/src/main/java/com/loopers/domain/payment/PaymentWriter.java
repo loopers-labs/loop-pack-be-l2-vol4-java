@@ -9,7 +9,15 @@ public class PaymentWriter {
 
     private final PaymentRepository paymentRepository;
 
+    public PaymentCreationResult create(Payment payment) {
+        return paymentRepository.create(payment);
+    }
+
     public Payment save(Payment payment) {
         return paymentRepository.save(payment);
+    }
+
+    public Payment completeIfPending(Payment payment) {
+        return paymentRepository.completeIfPending(payment);
     }
 }

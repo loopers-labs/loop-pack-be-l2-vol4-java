@@ -27,4 +27,12 @@ public class PaymentService {
     public Payment save(Payment payment) {
         return paymentWriter.save(payment);
     }
+
+    public PaymentCreationResult create(Payment payment) {
+        return paymentWriter.create(payment);
+    }
+
+    public Payment completeIfPending(Payment payment) {
+        return paymentWriter.completeIfPending(payment);
+    }
 }

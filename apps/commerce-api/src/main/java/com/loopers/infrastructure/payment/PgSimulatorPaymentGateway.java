@@ -8,10 +8,12 @@ import com.loopers.domain.payment.PaymentGatewayResult;
 import com.loopers.domain.payment.PaymentGatewayStatus;
 import com.loopers.domain.payment.PaymentPendingReason;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
@@ -22,13 +24,22 @@ import java.util.List;
 @Component
 public class PgSimulatorPaymentGateway implements PaymentGateway {
 
-    private static final String CIRCUIT_BREAKER_NAME = "pgPayment";
+    private static final String PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME = "pgPaymentRequest";
+    private static final String PAYMENT_LOOKUP_CIRCUIT_BREAKER_NAME = "pgPaymentLookup";
 
     private final RestClient pgSimulatorRestClient;
     private final PgSimulatorProperties properties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
-    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "requestFallback")
+    public boolean isRequestAvailable() {
+        var state = circuitBreakerRegistry.circuitBreaker(PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME).getState();
+        return state != io.github.resilience4j.circuitbreaker.CircuitBreaker.State.OPEN
+            && state != io.github.resilience4j.circuitbreaker.CircuitBreaker.State.FORCED_OPEN;
+    }
+
+    @Override
+    @CircuitBreaker(name = PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME, fallbackMethod = "requestFallback")
     public PaymentGatewayResult request(PaymentGatewayCommand command) {
         PgPaymentRequest request = new PgPaymentRequest(
             PaymentOrderIdMapper.toPgOrderId(command.orderId()),
@@ -51,16 +62,25 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
 
     @Override
     @Retry(name = "pgPaymentStatusLookup", fallbackMethod = "getByOrderFallback")
-    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME)
+    @CircuitBreaker(name = PAYMENT_LOOKUP_CIRCUIT_BREAKER_NAME)
     public PaymentGatewayResult getByOrder(String userLoginId, Long orderId) {
-        PgOrderResponse response = pgSimulatorRestClient.get()
-            .uri(uriBuilder -> uriBuilder.path("/api/v1/payments")
-                .queryParam("orderId", PaymentOrderIdMapper.toPgOrderId(orderId))
-                .build())
-            .header("X-USER-ID", userLoginId)
-            .retrieve()
-            .body(PgApiResponseOfOrder.class)
-            .data();
+        PgOrderResponse response;
+        try {
+            response = pgSimulatorRestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/v1/payments")
+                    .queryParam("orderId", PaymentOrderIdMapper.toPgOrderId(orderId))
+                    .build())
+                .header("X-USER-ID", userLoginId)
+                .retrieve()
+                .body(PgApiResponseOfOrder.class)
+                .data();
+        } catch (HttpClientErrorException.NotFound ignored) {
+            return PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.PG_LOOKUP_EMPTY,
+                "PG 결제 조회 결과가 비어있습니다."
+            );
+        }
 
         return response.transactions().stream()
             .max(Comparator.comparing(PgTransactionResponse::transactionKey))

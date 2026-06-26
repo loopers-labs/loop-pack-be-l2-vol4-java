@@ -6,6 +6,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -86,6 +89,77 @@ class PaymentTest {
                 () -> assertThat(payment.getPendingReason()).isEqualTo(PaymentPendingReason.PG_REQUEST_FAILED),
                 () -> assertThat(payment.getTransactionKey()).isNull(),
                 () -> assertThat(payment.getReason()).isEqualTo("PG 요청 결과를 확인하지 못했습니다.")
+            );
+        }
+    }
+
+    @DisplayName("PG 빈 조회 결과를 마감할 때, ")
+    @Nested
+    class FailLookupEmpty {
+
+        @DisplayName("PG_LOOKUP_EMPTY 상태가 유예시간을 넘겼으면 FAILED 상태로 전이한다.")
+        @Test
+        void marksFailed_whenLookupEmptyGracePeriodHasElapsed() {
+            // arrange
+            ZonedDateTime createdAt = ZonedDateTime.parse("2026-06-26T13:00:00+09:00[Asia/Seoul]");
+            Payment payment = Payment.reconstruct(
+                1L,
+                "user1234",
+                1L,
+                PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451",
+                5_000L,
+                PaymentStatus.PENDING,
+                PaymentPendingReason.PG_LOOKUP_EMPTY,
+                null,
+                "PG에 해당 주문 결제가 없습니다.",
+                createdAt
+            );
+
+            // act
+            payment.failIfLookupEmptyGracePeriodElapsed(
+                createdAt.plusMinutes(11),
+                Duration.ofMinutes(10)
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getPendingReason()).isNull(),
+                () -> assertThat(payment.getReason()).isEqualTo("PG 거래가 확인되지 않아 결제를 실패 처리했습니다.")
+            );
+        }
+
+        @DisplayName("PG_LOOKUP_EMPTY 상태라도 유예시간이 남아 있으면 PENDING 상태를 유지한다.")
+        @Test
+        void keepsPending_whenLookupEmptyGracePeriodRemains() {
+            // arrange
+            ZonedDateTime createdAt = ZonedDateTime.parse("2026-06-26T13:00:00+09:00[Asia/Seoul]");
+            Payment payment = Payment.reconstruct(
+                1L,
+                "user1234",
+                1L,
+                PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451",
+                5_000L,
+                PaymentStatus.PENDING,
+                PaymentPendingReason.PG_LOOKUP_EMPTY,
+                null,
+                "PG에 해당 주문 결제가 없습니다.",
+                createdAt
+            );
+
+            // act
+            payment.failIfLookupEmptyGracePeriodElapsed(
+                createdAt.plusMinutes(9),
+                Duration.ofMinutes(10)
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(payment.getPendingReason()).isEqualTo(PaymentPendingReason.PG_LOOKUP_EMPTY),
+                () -> assertThat(payment.getReason()).isEqualTo("PG에 해당 주문 결제가 없습니다.")
             );
         }
     }

@@ -35,9 +35,22 @@ pg-simulator:
   connect-timeout: 500ms
   read-timeout: 800ms
 
+loopers:
+  payment:
+    lookup-empty-failure-delay: 10s
+
 resilience4j.circuitbreaker:
   instances:
-    pgPayment:
+    pgPaymentRequest:
+      registerHealthIndicator: true
+      slidingWindowType: COUNT_BASED
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 5
+      failureRateThreshold: 50
+      permittedNumberOfCallsInHalfOpenState: 2
+      waitDurationInOpenState: 10s
+      eventConsumerBufferSize: 20
+    pgPaymentLookup:
       registerHealthIndicator: true
       slidingWindowType: COUNT_BASED
       slidingWindowSize: 10

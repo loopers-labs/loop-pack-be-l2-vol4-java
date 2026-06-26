@@ -3,11 +3,17 @@ package com.loopers.application.payment;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.payment.Payment;
+import com.loopers.domain.payment.PaymentCreationResult;
 import com.loopers.domain.payment.PaymentGatewayResult;
 import com.loopers.domain.payment.PaymentService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
 @Component
@@ -16,6 +22,8 @@ public class PaymentFacade {
     private final OrderService orderService;
     private final PaymentService paymentService;
     private final PaymentGateway paymentGateway;
+    private final PaymentProperties paymentProperties;
+    private final Clock clock;
 
     @Transactional
     public PaymentInfo requestPayment(String userLoginId, PaymentGatewayCommand command) {
@@ -30,20 +38,31 @@ public class PaymentFacade {
         Payment payment = paymentService.getPayment(orderId, userLoginId);
         PaymentGatewayResult result = paymentGateway.getByOrder(userLoginId, orderId);
         payment.applyGatewayResult(result);
-        return PaymentInfo.from(paymentService.save(payment));
+        payment.failIfLookupEmptyGracePeriodElapsed(
+            ZonedDateTime.now(clock),
+            paymentProperties.lookupEmptyFailureDelay()
+        );
+        return PaymentInfo.from(saveGatewayResult(payment));
     }
 
     @Transactional
     public PaymentInfo handleCallback(PaymentCallbackCommand command) {
         Payment payment = paymentService.getPaymentByOrderId(command.orderId());
         payment.applyGatewayResult(command.toGatewayResult());
-        return PaymentInfo.from(paymentService.save(payment));
+        return PaymentInfo.from(saveGatewayResult(payment));
     }
 
     private PaymentInfo requestNewPayment(String userLoginId, Order order, PaymentGatewayCommand command) {
-        Payment payment = paymentService.save(
+        if (!paymentGateway.isRequestAvailable()) {
+            throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "PG 결제 요청이 일시적으로 차단되었습니다. 잠시 후 다시 시도해주세요.");
+        }
+        PaymentCreationResult creationResult = paymentService.create(
             new Payment(userLoginId, order.getId(), command.cardType(), command.cardNo(), order.getFinalAmount())
         );
+        Payment payment = creationResult.payment();
+        if (!creationResult.created()) {
+            return PaymentInfo.from(payment);
+        }
         PaymentGatewayResult result = paymentGateway.request(
             new PaymentGatewayCommand(
                 userLoginId,
@@ -54,6 +73,10 @@ public class PaymentFacade {
             )
         );
         payment.applyGatewayResult(result);
-        return PaymentInfo.from(paymentService.save(payment));
+        return PaymentInfo.from(saveGatewayResult(payment));
+    }
+
+    private Payment saveGatewayResult(Payment payment) {
+        return paymentService.completeIfPending(payment);
     }
 }

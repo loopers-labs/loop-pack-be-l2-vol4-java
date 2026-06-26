@@ -3,6 +3,7 @@ package com.loopers.domain.payment;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 
 public class Payment {
@@ -99,6 +100,24 @@ public class Payment {
             this.status = PaymentStatus.FAILED;
             this.pendingReason = null;
         }
+    }
+
+    public void failIfLookupEmptyGracePeriodElapsed(ZonedDateTime now, Duration gracePeriod) {
+        if (now == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 시간은 비어있을 수 없습니다.");
+        }
+        if (gracePeriod == null || gracePeriod.isNegative()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 실패 유예시간은 0 이상이어야 합니다.");
+        }
+        if (status != PaymentStatus.PENDING || pendingReason != PaymentPendingReason.PG_LOOKUP_EMPTY) {
+            return;
+        }
+        if (createdAt == null || createdAt.plus(gracePeriod).isAfter(now)) {
+            return;
+        }
+        this.status = PaymentStatus.FAILED;
+        this.pendingReason = null;
+        this.reason = "PG 거래가 확인되지 않아 결제를 실패 처리했습니다.";
     }
 
     public Long getId() {

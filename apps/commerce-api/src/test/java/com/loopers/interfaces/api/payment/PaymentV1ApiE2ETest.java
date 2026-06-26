@@ -31,13 +31,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "loopers.payment.lookup-empty-failure-delay=0s"
+)
 class PaymentV1ApiE2ETest {
 
     private static final String ENDPOINT_PAYMENTS = "/api/v1/payments";
@@ -140,6 +149,41 @@ class PaymentV1ApiE2ETest {
             );
         }
 
+        @DisplayName("같은 주문으로 결제 요청이 동시에 들어와도, PG 결제 생성 요청은 한 번만 보내고 같은 결제를 반환한다.")
+        @Test
+        void returnsExistingPayment_withoutRequestingPgAgain_whenSameOrderPaymentIsRequestedConcurrently()
+            throws InterruptedException {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            paymentGateway.setRequestDelayMillis(300);
+            int threadCount = 5;
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+
+            // act
+            List<ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>>> responses =
+                requestPaymentConcurrently(threadCount, "user1234", "abc123!?", request);
+
+            // assert
+            List<Long> paymentIds = responses.stream()
+                .map(response -> response.getBody().data().id())
+                .distinct()
+                .toList();
+            assertAll(
+                () -> assertThat(responses).hasSize(threadCount),
+                () -> assertThat(responses).allSatisfy(response ->
+                    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK)
+                ),
+                () -> assertThat(paymentIds).containsExactly(responses.get(0).getBody().data().id()),
+                () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
+                () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
+            );
+        }
+
         @DisplayName("PG 생성 요청 결과를 확정하지 못한 주문도 POST 재시도로 PG 생성을 반복하지 않고, 상태 조회로 복구한다.")
         @Test
         void recoversByStatusLookup_withoutRetryingPaymentCreation_whenInitialRequestIsUnknown() {
@@ -190,6 +234,82 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
                 () -> assertThat(paymentGateway.getByOrderCount()).isEqualTo(1),
                 () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("PG 상태 조회에서도 거래가 없고 유예시간이 지났으면 결제를 FAILED로 확정한다.")
+        @Test
+        void marksPaymentFailed_whenLookupEmptyGracePeriodHasElapsed() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            paymentGateway.setRequestResult(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.TIMEOUT_UNKNOWN,
+                "PG 요청 결과를 확인하지 못했습니다: Read timed out"
+            ));
+            paymentGateway.setLookupResult(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.PG_LOOKUP_EMPTY,
+                "PG에 해당 주문 결제가 없습니다."
+            ));
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> firstResponse =
+                requestPayment("user1234", "abc123!?", request);
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> lookupResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_PAYMENTS + "/orders/" + order.getId(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(authHeaders("user1234", "abc123!?")),
+                    paymentResponseType()
+                );
+
+            // assert
+            PaymentDto.RequestPayment.V1.Response firstData = firstResponse.getBody().data();
+            PaymentDto.RequestPayment.V1.Response lookupData = lookupResponse.getBody().data();
+            assertAll(
+                () -> assertThat(firstData.status()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(firstData.pendingReason()).isEqualTo(PaymentPendingReason.TIMEOUT_UNKNOWN),
+                () -> assertThat(lookupResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(lookupData.status()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(lookupData.pendingReason()).isNull(),
+                () -> assertThat(lookupData.reason()).isEqualTo("PG 거래가 확인되지 않아 결제를 실패 처리했습니다."),
+                () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
+                () -> assertThat(paymentGateway.getByOrderCount()).isEqualTo(1),
+                () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("PG 결제 생성 circuit breaker가 OPEN이면 결제 row를 만들지 않고 에러를 반환한다.")
+        @Test
+        void returnsServiceUnavailable_withoutCreatingPayment_whenPaymentRequestCircuitBreakerIsOpen() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            paymentGateway.setRequestAvailable(false);
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+
+            // act
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> response =
+                requestPayment("user1234", "abc123!?", request);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE),
+                () -> assertThat(response.getBody().data()).isNull(),
+                () -> assertThat(response.getBody().meta().message()).isEqualTo("PG 결제 요청이 일시적으로 차단되었습니다. 잠시 후 다시 시도해주세요."),
+                () -> assertThat(paymentGateway.requestCount()).isZero(),
+                () -> assertThat(paymentJpaRepository.count()).isZero()
             );
         }
     }
@@ -284,6 +404,46 @@ class PaymentV1ApiE2ETest {
         return new ParameterizedTypeReference<>() {};
     }
 
+    private List<ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>>> requestPaymentConcurrently(
+        int threadCount,
+        String loginId,
+        String password,
+        PaymentDto.RequestPayment.V1.Request request
+    ) throws InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        List<ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>>> responses =
+            Collections.synchronizedList(new ArrayList<>());
+        List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());
+
+        try {
+            for (int index = 0; index < threadCount; index++) {
+                executorService.submit(() -> {
+                    readyLatch.countDown();
+                    try {
+                        startLatch.await();
+                        responses.add(requestPayment(loginId, password, request));
+                    } catch (Throwable throwable) {
+                        failures.add(throwable);
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
+            startLatch.countDown();
+            assertThat(doneLatch.await(15, TimeUnit.SECONDS)).isTrue();
+            assertThat(failures).isEmpty();
+
+            return responses;
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
     @TestConfiguration
     static class FakePaymentGatewayConfig {
 
@@ -300,10 +460,13 @@ class PaymentV1ApiE2ETest {
         private final AtomicInteger getByOrderCount = new AtomicInteger();
         private PaymentGatewayResult requestResult = PaymentGatewayResult.pending("20260625:TR:test", null);
         private PaymentGatewayResult lookupResult = PaymentGatewayResult.pending("20260625:TR:test", null);
+        private long requestDelayMillis = 0L;
+        private boolean requestAvailable = true;
 
         @Override
         public PaymentGatewayResult request(PaymentGatewayCommand command) {
             requestCount.incrementAndGet();
+            sleepRequestDelay();
             return requestResult;
         }
 
@@ -321,6 +484,19 @@ class PaymentV1ApiE2ETest {
             this.lookupResult = lookupResult;
         }
 
+        void setRequestDelayMillis(long requestDelayMillis) {
+            this.requestDelayMillis = requestDelayMillis;
+        }
+
+        void setRequestAvailable(boolean requestAvailable) {
+            this.requestAvailable = requestAvailable;
+        }
+
+        @Override
+        public boolean isRequestAvailable() {
+            return requestAvailable;
+        }
+
         int requestCount() {
             return requestCount.get();
         }
@@ -334,6 +510,20 @@ class PaymentV1ApiE2ETest {
             getByOrderCount.set(0);
             requestResult = PaymentGatewayResult.pending("20260625:TR:test", null);
             lookupResult = PaymentGatewayResult.pending("20260625:TR:test", null);
+            requestDelayMillis = 0L;
+            requestAvailable = true;
+        }
+
+        private void sleepRequestDelay() {
+            if (requestDelayMillis <= 0) {
+                return;
+            }
+            try {
+                Thread.sleep(requestDelayMillis);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(exception);
+            }
         }
     }
 }
