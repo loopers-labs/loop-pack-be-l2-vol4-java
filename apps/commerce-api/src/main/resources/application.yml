@@ -29,6 +29,40 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# PG 시뮬레이터 주소
+pg-simulator:
+  url: http://localhost:8082
+
+# Feign 타임아웃 — 동기 호출이라 타임아웃은 HTTP 클라이언트 레벨에서 건다 (@TimeLimiter 아님)
+feign:
+  client:
+    config:
+      pgPayment:                # @FeignClient(name = "pgPayment") 와 일치
+        connect-timeout: 1000   # 연결 수립 제한 (ms) — 못 닿으면 빨리 실패
+        read-timeout: 2000      # 응답 대기 제한 (ms) — PG 지연 100~500ms 대비 여유
+
+resilience4j:
+  retry:
+    instances:
+      pgPayment:
+        max-attempts: 3                       # 최초 1회 + 재시도 2회
+        wait-duration: 500ms                  # 재시도 간 대기
+        enable-exponential-backoff: true      # 대기시간 점증 (500ms -> 1s)
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException          # timeout/connection refused + ErrorDecoder가 5xx를 이걸로 변환
+  circuitbreaker:
+    instances:
+      pgPayment:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10               # 최근 10건으로 실패율 판단
+        minimum-number-of-calls: 5            # 최소 5건은 모여야 회로 개폐 판단
+        failure-rate-threshold: 50            # 실패율 50% 초과 시 Open
+        wait-duration-in-open-state: 10s      # Open 유지 후 Half-Open 전환
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-duration-threshold: 2s      # 이 시간 넘으면 '느린 호출'
+        slow-call-rate-threshold: 50          # 느린 호출 50% 초과도 Open
+
 ---
 spring:
   config:

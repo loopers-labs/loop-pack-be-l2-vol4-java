@@ -14,6 +14,12 @@ dependencies {
     // security (BCrypt)
     implementation("org.springframework.security:spring-security-crypto")
 
+    // external (PG 호출) - 선언형 HTTP 클라이언트
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+    // resilience - 재시도/서킷브레이커 (@Retry, @CircuitBreaker)
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
