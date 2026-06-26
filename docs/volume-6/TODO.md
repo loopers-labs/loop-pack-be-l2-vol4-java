@@ -161,16 +161,18 @@ flowchart TD
 
 **목표:** 계속 실패하는 PG를 "이제 그만 두드린다"로 차단해 자원 고갈을 원천 차단한다. → `reports/04-circuit.md`
 
-- [ ] CircuitBreaker 설정 — 집계 단위(COUNT/TIME, 트래픽 근거) · sliding-window · failure-rate · **slow-call**(느린 응답도 실패) · wait-in-open · half-open permitted
-- [ ] **설정값 역산** — 요청 성공 60% × 처리 성공 70% 등 PG 사양에서 초기값 근거를 잡고, **k6 민감도 테스트로 과민/둔감 검증**해 조정
-- [ ] **record/ignore-exceptions** — 5xx/타임아웃/네트워크는 record, **4xx·비즈니스 예외는 ignore**(의도된 거절로 서킷이 열리지 않게)
-- [ ] **(Stage 3 이월) request-time 4xx 분류 빈틈 정리** — 현재 `PaymentGatewayImpl.isConfirmedFailure`가 `status() >= 500`만 확정 실패로 보아 **4xx가 UNKNOWN(→PENDING)으로 흡수**된다. 4xx는 *결과 불명*이 아니라 *확정 거절*(돈 안 빠짐·거래키 없음·재시도해도 동일)이므로 **REJECTED(→FAILED)로 분류**해야 한다. record/ignore와 한 묶음으로 정리하고(서킷 집계에선 ignore), 재시도 제외(영구 실패)는 Stage 5와 연결. *우리 pg-simulator는 접수 단계에서 4xx를 내지 않아 현재는 데드 패스라 미룬 항목*
-- [ ] **aspect-order CB(1) > Retry(2)** + **fallbackMethod는 최외곽(CB)에 부착** — 재시도 묶음을 서킷이 1회로 카운트하고, **재시도가 모두 소진된 뒤에야 fallback이 발동**하게 한다(안쪽 어노테이션에 fallback을 달면 예외를 먼저 삼켜 Retry가 동작하지 않는 함정 회피). Retry 본체는 Stage 5
-- [ ] **서킷 메트릭을 actuator/prometheus로 노출**(상태/오픈 횟수)
-- [ ] k6 장면 2: 부하 중 `CLOSED→OPEN` 전이 + OPEN 동안 PG 미호출·즉시 fallback 관찰 → `reports/04-circuit.md`
-- [ ] 통합테스트: `transitionToOpenState()`로 강제 OPEN 후 fallback 계약 단언
+- [X] CircuitBreaker 설정 — **COUNT_BASED**(window 50, min-calls 20) · failure-rate **50%** · **slow-call** 250ms/50% · wait-in-open 10s · half-open permitted 5. *집계 단위 근거: k6 부하는 bursty라 최근 N건 기준이 OPEN 타이밍·민감도 해석에 결정론적*
+- [X] **설정값 역산**(초기값) — PG 사양 코드 확인: 접수 지연 균등 100~500ms + 40% 500. read-timeout 300ms 기준 → **P(타임아웃)=50%**, 완료분 중 40% 500 → **전체 5xx 20%** → CB가 보는 **유효 실패율 ≈70%**(타임아웃 50% record + 5xx 20% record). 70% > 임계 50% → 부하 중 확실히 OPEN. *k6 민감도 검증은 Phase B(아래)*
+- [X] **record/ignore-exceptions** — record: `RetryableException`(타임아웃/네트워크) + `FeignException$FeignServerException`(5xx). ignore: `FeignException$FeignClientException`(4xx 의도된 거절 → 집계 제외)
+- [X] **(Stage 3 이월) request-time 4xx 분류 빈틈 정리** — `isConfirmedFailure`를 `status()>=500` → `status()>=400`으로 내려 **4xx도 REJECTED(→FAILED) 확정**. RetryableException(응답 못 받음)만 UNKNOWN, 그 외 HTTP 에러 응답은 확정 실패. *pg-simulator는 4xx 미발생(데드 패스)이나 분류는 정합하게 정리*
+- [X] **aspect-order CB(2) > Retry(1)** + **fallbackMethod는 최외곽(CB)에 부착** — `circuit-breaker-aspect-order: 2` / `retry-aspect-order: 1`로 CB를 Retry 바깥에 둠(재시도 묶음을 1회로 집계, 소진 후 fallback). fallback은 이미 `@CircuitBreaker`(유일한 resilience 어노테이션)에 부착돼 최외곽. *Retry 본체 배선은 Stage 5*
+- [X] **서킷 메트릭을 actuator/prometheus로 노출**(상태/오픈 횟수) — resilience4j-micrometer 자동 바인딩. `/actuator/prometheus`에 `resilience4j_circuitbreaker_state`(상태 게이지) · `_not_permitted_calls_total`(단락 수) · `_failure_rate` · `_slow_call_rate` · `_calls_seconds_count{kind=...}` 실측 확인(추가 코드 0)
+- [X] k6 장면 2: 부하 중 `CLOSED→OPEN` 전이 + OPEN 동안 PG 미호출·즉시 fallback 관찰 → `reports/04-circuit.md` — `stage2-circuit.js`(payment 40/s, 톰캣 10스레드). **`t+22s` 전이(failure_rate 80.95%), 결제 2001건 중 1932건(96.5%) 단락(PG 미호출), prober load p50 5.92ms·0% 실패, payment_500 0%**
+- [X] 통합테스트: `transitionToOpenState()`로 강제 OPEN 후 fallback 계약 단언 — `PaymentGatewayResilienceIntegrationTest`에 4xx→REJECTED · 반복 타임아웃 자연 `CLOSED→OPEN` 후 PG 미호출·UNKNOWN · 강제 OPEN 단락 3건 추가(총 5건 통과)
 
 **검증:** 부하 중 서킷이 열리고, OPEN 동안 PG를 부르지 않고 즉시 PENDING으로 떨군다. 메트릭에 오픈 횟수가 보인다.
+> **Stage 4 완료.** 코드·설정(CB COUNT·50% 역산값 + record/ignore + 4xx→REJECTED + aspect-order) + 통합테스트(강제/자연 OPEN, 5건) + 런타임 측정(`reports/04-circuit.md`). `./gradlew :apps:commerce-api:test` 결제 스위트 전체 통과.
+> **측정으로 드러난 사실(plan 보정):** ① **역산이 임계 설정의 출발점으로 유효** — 사양 역산 ≈70%가 실측 80.95%로 근사, 임계 50%가 결정적으로 갈랐다. ② **저스루풋 + COUNT_BASED는 OPEN이 늦다** — 10스레드가 PG에 묶여 *완료* 호출이 초당 ~3건뿐이라 window(min 20)가 더디게 차 전이에 22s 소요. 고스루풋이면 1~2s. → TIME_BASED/작은 min-calls가 OPEN을 앞당김(민감도 후속). ③ **단락은 HTTP 지연으로 안 보임** — 10스레드 큐 대기가 더해져 `payment_open` p50 108ms. 단락의 증거는 `not_permitted_calls`(1932)와 prober 보호(p50 5.92ms). ④ **slow-call(250ms)은 300ms 하드 타임아웃과 대체로 중복**(보조적). ⑤ request-time 4xx는 여전히 데드 패스(ignored=0).
 
 ---
 
@@ -255,10 +257,13 @@ flowchart TD
 ```
 docs/volume-6/
   TODO.md                 ← (이 문서, 작업 계획·진행 체크)
-  measurement/k6/         ← 장애 전파·서킷 시나리오 스크립트
+  measurement/k6/
+    seed.sh               ← 측정 공통 시드(유저+주문 3000)
+    stage1-baseline.js    ← 장면 1: 스레드 고갈 전파(baseline/timeout 공용)
+    stage2-circuit.js     ← 장면 2: 부하 중 서킷 CLOSED→OPEN·단락·prober 보호
   reports/
     01-baseline.md        ← 무방비 As-Is (스레드 고갈)
     02-timeout.md         ← 타임아웃 적용 후
     03-fallback.md        ← fallback 응답 분기 검증 (502→0, payment_500 39.4%→0%)
-    04-circuit.md         ← 부하 중 서킷 OPEN
+    04-circuit.md         ← 부하 중 서킷 OPEN (t+22s 전이, 1932건 단락, prober p50 5.92ms)
 ```
