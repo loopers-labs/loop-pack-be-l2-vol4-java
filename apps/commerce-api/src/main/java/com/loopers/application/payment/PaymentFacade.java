@@ -30,6 +30,7 @@ public class PaymentFacade {
     private final ProductFacade productFacade;
     private final CouponRepository couponRepository;
     private final NotificationService notificationService;
+    private final io.github.resilience4j.circuitbreaker.CircuitBreaker pgCircuitBreaker;
 
     public PaymentStatus getPaymentStatus(Long paymentId) {
         return paymentRepository.findById(paymentId)
@@ -38,6 +39,8 @@ public class PaymentFacade {
     }
 
     public Long processPayment(Long orderId, PaymentMethod method, BigDecimal amount) {
+        pgCircuitBreaker.acquirePermission();
+
         // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
         PaymentModel payment = new PaymentModel(orderId, method, amount);
         payment = paymentRepository.save(payment);
