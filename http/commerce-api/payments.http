@@ -1,0 +1,76 @@
+###############################################################################
+# Round 6 — 결제(PG 연동) API
+#
+# ▶ 실행 절차 (주말 복기용)
+#   1) 인프라 기동:   docker compose -f docker/infra-compose.yml up -d
+#   2) PG 전용 DB:    docker exec -i docker-mysql-1 mysql -uroot -proot -e \
+#                       "CREATE DATABASE IF NOT EXISTS paymentgateway; \
+#                        GRANT ALL ON paymentgateway.* TO 'application'@'%'; FLUSH PRIVILEGES;"
+#   3) Gradle JVM:    JDK 21 사용 (IntelliJ: Settings > Build Tools > Gradle > Gradle JVM = temurin-21)
+#                     CLI: JAVA_HOME=.../temurin-21.0.11/Contents/Home
+#   4) PG 기동:       ./gradlew :apps:pg-simulator:bootRun    (8082)
+#   5) commerce 기동: ./gradlew :apps:commerce-api:bootRun    (8080)
+#
+# ▶ 결제는 PENDING 주문이 있어야 함. 테스트용 주문 생성(SQL):
+#   docker exec -i docker-mysql-1 mysql -uroot -proot loopers -e \
+#     "INSERT INTO orders (created_at,updated_at,discount_amount,final_amount,total_amount,user_id,status)
+#      VALUES (now(6),now(6),0,5000,5000,1,'PENDING'); SELECT LAST_INSERT_ID();"
+###############################################################################
+
+@commerceApi = http://localhost:8080
+@pgSimulator = http://localhost:8082
+
+### 1. 결제 요청 (orderId 는 위에서 만든 PENDING 주문 id 로 교체)
+#   - 접수 성공: status=PROCESSING + transactionKey
+#   - PG 장애/CB OPEN: status=PENDING (HTTP 는 항상 200 — Fallback)
+POST {{commerceApi}}/api/v1/payments
+X-Loopers-UserId: 1
+Content-Type: application/json
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451"
+}
+
+### 2. 상태 수동 복구 (콜백 유실/타임아웃 건을 PG에 재조회해 동기화)
+POST {{commerceApi}}/api/v1/payments/recover
+
+### 3. (참고) PG 콜백 — 보통 PG가 자동 호출. 수동 재현용.
+POST {{commerceApi}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20260626:TR:xxxxxx",
+  "orderId": "000001",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "status": "SUCCESS",
+  "reason": "정상 승인되었습니다."
+}
+
+###############################################################################
+# PG-Simulator 직접 호출 (디버깅용)
+###############################################################################
+
+### 4. PG 결제 요청 직접 (약 60% 성공 / 40% 500)
+POST {{pgSimulator}}/api/v1/payments
+X-USER-ID: loopers-commerce
+Content-Type: application/json
+
+{
+  "orderId": "000001",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 5000,
+  "callbackUrl": "http://localhost:8080/api/v1/payments/callback"
+}
+
+### 5. PG 결제 단건 조회 (txKey 교체)
+GET {{pgSimulator}}/api/v1/payments/20260626:TR:xxxxxx
+X-USER-ID: loopers-commerce
+
+### 6. PG 주문별 결제 조회
+GET {{pgSimulator}}/api/v1/payments?orderId=000001
+X-USER-ID: loopers-commerce
