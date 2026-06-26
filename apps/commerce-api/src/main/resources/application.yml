@@ -29,6 +29,48 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+pg-simulator:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 500ms
+  read-timeout: 800ms
+
+loopers:
+  payment:
+    lookup-empty-failure-delay: 10s
+    reconciliation-enabled: true
+    reconciliation-delay: 10s
+    reconciliation-batch-size: 20
+
+resilience4j.circuitbreaker:
+  instances:
+    pgPaymentRequest:
+      registerHealthIndicator: true
+      slidingWindowType: COUNT_BASED
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 5
+      failureRateThreshold: 50
+      permittedNumberOfCallsInHalfOpenState: 2
+      waitDurationInOpenState: 10s
+      eventConsumerBufferSize: 20
+    pgPaymentLookup:
+      registerHealthIndicator: true
+      slidingWindowType: COUNT_BASED
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 5
+      failureRateThreshold: 50
+      permittedNumberOfCallsInHalfOpenState: 2
+      waitDurationInOpenState: 10s
+      eventConsumerBufferSize: 20
+
+resilience4j.retry:
+  instances:
+    pgPaymentStatusLookup:
+      maxAttempts: 3
+      waitDuration: 300ms
+      retryExceptions:
+        - org.springframework.web.client.RestClientException
+
 ---
 spring:
   config:
