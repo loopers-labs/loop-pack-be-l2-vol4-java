@@ -66,7 +66,7 @@ public class Order extends BaseEntity {
         validate(items);
         Money totalAmount = totalOf(items);
         Money paymentAmount = totalAmount.minus(discountAmount);
-        return new Order(userId, OrderStatus.COMPLETED, totalAmount, discountAmount, paymentAmount, items);
+        return new Order(userId, OrderStatus.PENDING, totalAmount, discountAmount, paymentAmount, items);
     }
 
     public static Money totalOf(List<OrderItem> items) {

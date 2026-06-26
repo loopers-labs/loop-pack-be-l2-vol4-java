@@ -21,10 +21,4 @@ public interface PaymentGateway {
         PaymentStatus status,
         String reason
     ) {}
-
-    enum PaymentStatus {
-        PENDING,   // 결과 미확정 — 폴백 포함, 이후 상태조회/콜백으로 정합성 보정
-        SUCCESS,
-        FAILED,
-    }
 }

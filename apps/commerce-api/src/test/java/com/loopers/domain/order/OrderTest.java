@@ -19,7 +19,7 @@ class OrderTest {
     @DisplayName("주문을 접수할 때, ")
     @Nested
     class Place {
-        @DisplayName("items의 lineAmount 합으로 totalAmount가 계산되고, 상태는 COMPLETED 다.")
+        @DisplayName("items의 lineAmount 합으로 totalAmount가 계산되고, 상태는 PENDING 다.")
         @Test
         void calculatesTotalAmount_fromItems() {
             // arrange
@@ -35,7 +35,7 @@ class OrderTest {
             // assert
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(userId),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(order.getTotalAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500)),
                 () -> assertThat(order.getDiscountAmount().getAmount()).isEqualByComparingTo(BigDecimal.ZERO),
                 () -> assertThat(order.getPaymentAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500))

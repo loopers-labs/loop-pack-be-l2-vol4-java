@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.domain.payment.PaymentStatus;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
