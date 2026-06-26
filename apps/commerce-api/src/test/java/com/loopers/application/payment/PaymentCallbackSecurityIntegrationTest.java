@@ -82,18 +82,33 @@ class PaymentCallbackSecurityIntegrationTest {
             );
         }
 
-        @DisplayName("본문이 SUCCESS를 주장해도 PG 재조회가 FAILED면 결제는 FAILED·주문은 CANCELED로 확정된다")
+        @DisplayName("PG 재조회가 FAILED면 결제는 FAILED·주문은 CANCELED로 확정되고 재고가 복원된다")
         @Test
-        void confirmsFailedByGatewayQuery_ignoringBodyClaim() {
+        void confirmsFailedByGatewayRequery() {
             stockRepository.save(new StockModel(100L, 10));
             Long orderId = givenPendingPayment("tx-cb");
-            // 콜백 본문이 SUCCESS라 우겨도 facade는 본문을 안 쓰고 PG 재조회 결과(FAILED)로만 확정한다
             when(paymentGateway.queryStatus(eq("tx-cb"), eq(USER_ID))).thenReturn(Optional.of(new GatewayStatus("FAILED", "한도 초과")));
 
             paymentFacade.handleCallback("tx-cb");
 
             assertAll(
                 () -> assertThat(paymentRepository.findByTransactionKey("tx-cb").orElseThrow().getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.CANCELED),
+                () -> assertThat(stockRepository.findByProductId(100L).orElseThrow().getQuantity()).isEqualTo(11)
+            );
+        }
+
+        @DisplayName("같은 거래키 콜백이 중복 수신돼도 재고는 한 번만 복원된다 (멱등 — 12가 아니라 11)")
+        @Test
+        void restoresStockOnce_whenCallbackDuplicated() {
+            stockRepository.save(new StockModel(100L, 10));
+            Long orderId = givenPendingPayment("tx-cb");
+            when(paymentGateway.queryStatus(eq("tx-cb"), eq(USER_ID))).thenReturn(Optional.of(new GatewayStatus("FAILED", "한도 초과")));
+
+            paymentFacade.handleCallback("tx-cb");
+            paymentFacade.handleCallback("tx-cb"); // 중복 콜백 — 이미 FAILED라 재조회·보상 없이 no-op
+
+            assertAll(
                 () -> assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.CANCELED),
                 () -> assertThat(stockRepository.findByProductId(100L).orElseThrow().getQuantity()).isEqualTo(11)
             );

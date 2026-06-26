@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
     "resilience4j.circuitbreaker.instances.pgCircuit.failure-rate-threshold=50",
     "resilience4j.circuitbreaker.instances.pgCircuit.wait-duration-in-open-state=60s",
     "resilience4j.circuitbreaker.instances.pgCircuit.permitted-number-of-calls-in-half-open-state=3",
-    "resilience4j.retry.instances.pgRetry.max-attempts=1"
+    "resilience4j.retry.instances.pgRequestRetry.max-attempts=1"  // requestPayment 흐름의 재시도 인스턴스(@Retry name)와 일치시켜 호출:집계 1:1 보장
 })
 class PgPaymentGatewayCircuitTest {
 

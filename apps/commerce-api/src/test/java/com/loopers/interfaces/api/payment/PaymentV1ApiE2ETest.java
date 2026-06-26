@@ -5,9 +5,16 @@ import com.loopers.domain.common.Money;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.GatewayResult;
+import com.loopers.domain.payment.GatewayStatus;
 import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.domain.payment.PaymentModel;
+import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.stock.StockModel;
+import com.loopers.domain.stock.StockRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.payment.dto.PaymentCallbackV1Request;
 import com.loopers.interfaces.api.payment.dto.PaymentV1Request;
@@ -31,6 +38,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -53,17 +61,22 @@ class PaymentV1ApiE2ETest {
     @Autowired
     private OrderRepository orderRepository;
     @Autowired
+    private PaymentRepository paymentRepository;
+    @Autowired
+    private StockRepository stockRepository;
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @MockitoBean
     private PaymentGateway paymentGateway;
 
     private Long orderId;
+    private Long userId;
 
     @BeforeEach
     void setUp() {
         userFacade.signUp(LOGIN_ID, PASSWORD, "홍길동", LocalDate.of(1990, 1, 15), "test@loopers.com");
-        Long userId = userFacade.authenticate(LOGIN_ID, PASSWORD);
+        userId = userFacade.authenticate(LOGIN_ID, PASSWORD);
         OrderModel order = orderRepository.save(
             new OrderModel(userId, List.of(new OrderItem(1L, "후드", 50_000L, 1)), null, Money.ZERO));
         orderId = order.getId();
@@ -162,6 +175,29 @@ class PaymentV1ApiE2ETest {
             );
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("본문이 SUCCESS를 주장해도 PG 재조회가 FAILED면 결제는 FAILED·주문은 CANCELED로 확정된다 (위조 본문 무시)")
+        @Test
+        void ignoresForgedSuccessBody_whenRequeryFailed() {
+            stockRepository.save(new StockModel(1L, 10));
+            PaymentModel payment = new PaymentModel(orderId, userId, CardType.SAMSUNG, Money.of(50_000L));
+            payment.assignTransactionKey("tx-forged");
+            paymentRepository.save(payment);
+            when(paymentGateway.queryStatus("tx-forged", userId)).thenReturn(Optional.of(new GatewayStatus("FAILED", "한도 초과")));
+
+            // 콜백 본문은 SUCCESS라 우긴다 — 컨트롤러/Facade는 본문을 신뢰하지 않고 transactionKey만 쓴다
+            PaymentCallbackV1Request forged = new PaymentCallbackV1Request("tx-forged", "SUCCESS", "정상 결제");
+            ResponseEntity<ApiResponse<Object>> response = restTemplate.exchange(
+                ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(forged, new HttpHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(paymentRepository.findByOrderId(orderId).orElseThrow().getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.CANCELED)
+            );
         }
     }
 }
