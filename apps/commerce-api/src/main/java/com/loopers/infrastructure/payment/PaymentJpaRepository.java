@@ -5,14 +5,27 @@ import com.loopers.domain.payment.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Long> {
     Optional<PaymentJpaEntity> findByIdAndUserLoginId(Long id, String userLoginId);
     Optional<PaymentJpaEntity> findByOrderIdAndUserLoginId(Long orderId, String userLoginId);
     Optional<PaymentJpaEntity> findByOrderId(Long orderId);
+
+    @Query("""
+        select p
+        from PaymentJpaEntity p
+        where p.status = :status
+        order by p.createdAt asc
+        """)
+    List<PaymentJpaEntity> findPendingPaymentsForReconciliation(
+        @Param("status") PaymentStatus status,
+        Pageable pageable
+    );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

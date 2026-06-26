@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.payment;
 
 import com.loopers.application.payment.PaymentGateway;
 import com.loopers.application.payment.PaymentGatewayCommand;
+import com.loopers.application.payment.PaymentReconciliationScheduler;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.payment.PaymentGatewayResult;
@@ -56,6 +57,7 @@ class PaymentV1ApiE2ETest {
     private final OrderJpaRepository orderJpaRepository;
     private final PaymentJpaRepository paymentJpaRepository;
     private final CountingPaymentGateway paymentGateway;
+    private final PaymentReconciliationScheduler paymentReconciliationScheduler;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -64,12 +66,14 @@ class PaymentV1ApiE2ETest {
         OrderJpaRepository orderJpaRepository,
         PaymentJpaRepository paymentJpaRepository,
         CountingPaymentGateway paymentGateway,
+        PaymentReconciliationScheduler paymentReconciliationScheduler,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.orderJpaRepository = orderJpaRepository;
         this.paymentJpaRepository = paymentJpaRepository;
         this.paymentGateway = paymentGateway;
+        this.paymentReconciliationScheduler = paymentReconciliationScheduler;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -310,6 +314,46 @@ class PaymentV1ApiE2ETest {
                 () -> assertThat(response.getBody().meta().message()).isEqualTo("PG 결제 요청이 일시적으로 차단되었습니다. 잠시 후 다시 시도해주세요."),
                 () -> assertThat(paymentGateway.requestCount()).isZero(),
                 () -> assertThat(paymentJpaRepository.count()).isZero()
+            );
+        }
+
+        @DisplayName("reconciliation scheduler는 PENDING 결제를 PG 상태 조회로만 복구하고, PG 생성 요청을 반복하지 않는다.")
+        @Test
+        void reconcilesPendingPaymentByLookup_withoutRetryingPaymentCreation() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderJpaEntity order = saveOrder("user1234", 5_000L);
+            paymentGateway.setRequestResult(PaymentGatewayResult.pending(
+                null,
+                PaymentPendingReason.TIMEOUT_UNKNOWN,
+                "PG 요청 결과를 확인하지 못했습니다: Read timed out"
+            ));
+            PaymentDto.RequestPayment.V1.Request request = new PaymentDto.RequestPayment.V1.Request(
+                order.getId(),
+                com.loopers.domain.payment.PaymentCardType.SAMSUNG,
+                "1234-5678-9814-1451"
+            );
+            ResponseEntity<ApiResponse<PaymentDto.RequestPayment.V1.Response>> firstResponse =
+                requestPayment("user1234", "abc123!?", request);
+
+            paymentGateway.setLookupResult(PaymentGatewayResult.success(
+                "20260625:TR:reconciled",
+                "정상 승인되었습니다."
+            ));
+
+            // act
+            paymentReconciliationScheduler.reconcilePendingPayments();
+
+            // assert
+            PaymentDto.RequestPayment.V1.Response firstData = firstResponse.getBody().data();
+            PaymentStatus savedStatus = paymentJpaRepository.findById(firstData.id()).orElseThrow().toDomain().getStatus();
+            assertAll(
+                () -> assertThat(firstData.status()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(firstData.pendingReason()).isEqualTo(PaymentPendingReason.TIMEOUT_UNKNOWN),
+                () -> assertThat(savedStatus).isEqualTo(PaymentStatus.PAID),
+                () -> assertThat(paymentGateway.requestCount()).isEqualTo(1),
+                () -> assertThat(paymentGateway.getByOrderCount()).isEqualTo(1),
+                () -> assertThat(paymentJpaRepository.count()).isEqualTo(1)
             );
         }
     }

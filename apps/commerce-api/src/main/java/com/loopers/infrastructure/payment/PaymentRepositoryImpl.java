@@ -8,10 +8,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -73,6 +75,17 @@ public class PaymentRepositoryImpl implements PaymentRepository {
         return paymentJpaRepository.findById(payment.getId())
             .orElseThrow()
             .toDomain();
+    }
+
+    @Override
+    public List<Payment> findPendingPaymentsForReconciliation(int limit) {
+        return paymentJpaRepository.findPendingPaymentsForReconciliation(
+                PaymentStatus.PENDING,
+                PageRequest.of(0, limit)
+            )
+            .stream()
+            .map(PaymentJpaEntity::toDomain)
+            .toList();
     }
 
     @Override

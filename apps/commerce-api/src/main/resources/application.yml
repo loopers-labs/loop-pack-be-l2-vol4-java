@@ -38,6 +38,9 @@ pg-simulator:
 loopers:
   payment:
     lookup-empty-failure-delay: 10s
+    reconciliation-enabled: true
+    reconciliation-delay: 10s
+    reconciliation-batch-size: 20
 
 resilience4j.circuitbreaker:
   instances:

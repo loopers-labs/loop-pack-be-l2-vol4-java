@@ -5,6 +5,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -25,5 +26,9 @@ public class PaymentReader {
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentRepository.findByOrderId(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 결제 정보를 찾을 수 없습니다."));
+    }
+
+    public List<Payment> findPendingPaymentsForReconciliation(int limit) {
+        return paymentRepository.findPendingPaymentsForReconciliation(limit);
     }
 }

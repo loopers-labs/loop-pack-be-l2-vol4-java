@@ -12,9 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
-import java.time.ZonedDateTime;
-
 @RequiredArgsConstructor
 @Component
 public class PaymentFacade {
@@ -22,8 +19,7 @@ public class PaymentFacade {
     private final OrderService orderService;
     private final PaymentService paymentService;
     private final PaymentGateway paymentGateway;
-    private final PaymentProperties paymentProperties;
-    private final Clock clock;
+    private final PaymentStatusSynchronizer paymentStatusSynchronizer;
 
     @Transactional
     public PaymentInfo requestPayment(String userLoginId, PaymentGatewayCommand command) {
@@ -35,14 +31,7 @@ public class PaymentFacade {
 
     @Transactional
     public PaymentInfo syncPayment(String userLoginId, Long orderId) {
-        Payment payment = paymentService.getPayment(orderId, userLoginId);
-        PaymentGatewayResult result = paymentGateway.getByOrder(userLoginId, orderId);
-        payment.applyGatewayResult(result);
-        payment.failIfLookupEmptyGracePeriodElapsed(
-            ZonedDateTime.now(clock),
-            paymentProperties.lookupEmptyFailureDelay()
-        );
-        return PaymentInfo.from(saveGatewayResult(payment));
+        return paymentStatusSynchronizer.syncPayment(userLoginId, orderId);
     }
 
     @Transactional

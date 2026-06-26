@@ -3,6 +3,7 @@ package com.loopers.domain.payment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -22,6 +23,10 @@ public class PaymentService {
 
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentReader.getPaymentByOrderId(orderId);
+    }
+
+    public List<Payment> findPendingPaymentsForReconciliation(int limit) {
+        return paymentReader.findPendingPaymentsForReconciliation(limit);
     }
 
     public Payment save(Payment payment) {
