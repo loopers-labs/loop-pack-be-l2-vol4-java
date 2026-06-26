@@ -18,7 +18,6 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class PaymentFacade {
 
@@ -27,6 +26,17 @@ public class PaymentFacade {
     private final PaymentGateway paymentGateway;
 
     public PaymentInfo createPayment(Long userId, Long orderId, CardType cardType, String cardNo, ZonedDateTime now) {
+        PaymentModel acceptedPayment = acceptPayment(userId, orderId, cardType, cardNo, now);
+
+        String transactionKey = paymentGateway.requestPayment(acceptedPayment);
+
+        acceptedPayment.recordTransactionKey(transactionKey);
+        PaymentModel mappedPayment = paymentRepository.save(acceptedPayment);
+
+        return PaymentInfo.from(mappedPayment);
+    }
+
+    private PaymentModel acceptPayment(Long userId, Long orderId, CardType cardType, String cardNo, ZonedDateTime now) {
         OrderModel order = orderRepository.getActiveByIdAndUserId(orderId, userId);
 
         if (paymentRepository.existsByOrderId(orderId)) {
@@ -41,14 +51,11 @@ public class PaymentFacade {
             .rawCardNo(cardNo)
             .requestedAt(now)
             .build();
-        PaymentModel savedPayment = paymentRepository.save(payment);
 
-        String transactionKey = paymentGateway.requestPayment(savedPayment);
-        savedPayment.recordTransactionKey(transactionKey);
-
-        return PaymentInfo.from(savedPayment);
+        return paymentRepository.save(payment);
     }
 
+    @Transactional
     public void handleCallback(Long orderId, String transactionKey, PaymentStatus result, String reason) {
         PaymentModel payment = paymentRepository.getByOrderId(orderId);
 

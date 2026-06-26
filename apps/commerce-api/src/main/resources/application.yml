@@ -23,6 +23,13 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-simulator:
+            connect-timeout: 1000 # 연결 타임아웃 (ms)
+            read-timeout: 300 # 응답(접수) 타임아웃 (ms) — PG 접수 분포(100~500ms)의 슬로우 테일을 끊어 스레드 회수, 초과분은 PENDING→폴링
 
 springdoc:
   use-fqn: true
