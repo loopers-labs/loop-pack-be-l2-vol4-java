@@ -2,9 +2,9 @@ package com.loopers.interfaces.api.payment;
 
 import com.loopers.application.payment.PaymentFacade;
 import com.loopers.application.payment.PaymentInfo;
-import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -33,8 +33,15 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
     @PostMapping("/callback")
     @Override
     public ApiResponse<Object> handleCallback(@RequestBody PaymentV1Dto.CallbackRequest request) {
-        paymentFacade.handleCallback(
-            request.transactionKey(), PaymentStatus.valueOf(request.status()), request.reason());
+        // 본문 status는 신뢰하지 않는다 — transactionKey만 사용해 PG 재조회로 검증(보안 #3)
+        paymentFacade.handleCallback(request.transactionKey());
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/{transactionKey}/sync")
+    @Override
+    public ApiResponse<Object> sync(@PathVariable("transactionKey") String transactionKey) {
+        paymentFacade.reconcile(transactionKey);
         return ApiResponse.success(null);
     }
 }

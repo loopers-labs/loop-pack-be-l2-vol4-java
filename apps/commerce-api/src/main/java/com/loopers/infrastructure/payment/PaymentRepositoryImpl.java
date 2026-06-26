@@ -2,9 +2,11 @@ package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
+import com.loopers.domain.payment.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -26,5 +28,10 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     @Override
     public Optional<PaymentModel> findByTransactionKey(String transactionKey) {
         return paymentJpaRepository.findByTransactionKey(transactionKey);
+    }
+
+    @Override
+    public List<PaymentModel> findPendingWithTransactionKey() {
+        return paymentJpaRepository.findByStatusAndTransactionKeyIsNotNull(PaymentStatus.PENDING);
     }
 }

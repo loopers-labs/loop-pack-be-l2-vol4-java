@@ -4,6 +4,7 @@ import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
@@ -54,5 +55,21 @@ public class PgPaymentGateway implements PaymentGateway {
     private Result requestPaymentFallback(Command command, Throwable t) {
         log.warn("PG 결제 요청 실패(재시도/서킷 처리 후): {}", t.toString());
         throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 요청이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    /**
+     * PG에 결제 진짜 상태를 조회한다. GET은 멱등하므로 콜백 검증·복구에서 안전하게 재호출 가능.
+     * 조회 실패는 도메인 예외로 변환(호출자가 건너뛰거나 다음 주기에 재시도).
+     */
+    @Override
+    public Result getTransaction(Long userId, String transactionKey) {
+        try {
+            PgV1Dto.PaymentResponse response = pgClient.getTransaction(String.valueOf(userId), transactionKey);
+            PgV1Dto.PaymentResponse.Data data = response.data();
+            return new Result(data.transactionKey(), PaymentStatus.valueOf(data.status()), data.reason());
+        } catch (FeignException e) {
+            log.warn("PG 결제 조회 실패: transactionKey={}, httpStatus={}", transactionKey, e.status());
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 조회에 실패했습니다.");
+        }
     }
 }

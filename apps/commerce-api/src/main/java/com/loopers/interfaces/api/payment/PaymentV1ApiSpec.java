@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.payment;
 import com.loopers.interfaces.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
@@ -16,6 +17,9 @@ public interface PaymentV1ApiSpec {
         @RequestBody PaymentV1Dto.PaymentRequest request
     );
 
-    @Operation(summary = "결제 콜백 수신", description = "PG가 비동기 결제 결과를 통지하는 콜백 엔드포인트.")
+    @Operation(summary = "결제 콜백 수신", description = "PG 콜백 수신. 본문 status를 신뢰하지 않고 PG 재조회로 검증한다.")
     ApiResponse<Object> handleCallback(@RequestBody PaymentV1Dto.CallbackRequest request);
+
+    @Operation(summary = "결제 상태 수동 동기화", description = "transactionKey로 PG를 재조회해 결제·주문 상태를 정정한다.")
+    ApiResponse<Object> sync(@PathVariable("transactionKey") String transactionKey);
 }

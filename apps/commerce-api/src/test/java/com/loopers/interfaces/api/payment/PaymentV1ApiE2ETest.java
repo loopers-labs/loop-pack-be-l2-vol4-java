@@ -26,9 +26,11 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -77,6 +79,12 @@ class PaymentV1ApiE2ETest {
         )));
     }
 
+    private void stubPgGetSuccess() {
+        wiremock.stubFor(get(urlPathMatching("/api/v1/payments/.*")).willReturn(okJson(
+            "{\"meta\":{\"result\":\"SUCCESS\"},\"data\":{\"transactionKey\":\"" + TX_KEY + "\",\"status\":\"SUCCESS\",\"reason\":\"정상 승인되었습니다.\"}}"
+        )));
+    }
+
     private HttpHeaders authHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -119,6 +127,7 @@ class PaymentV1ApiE2ETest {
             rest.exchange("/api/v1/payments", HttpMethod.POST,
                 new HttpEntity<>(Map.of("orderId", order.getId(), "cardType", "SAMSUNG", "cardNo", CARD_NO), authHeaders()),
                 JsonNode.class);
+            stubPgGetSuccess();   // 콜백이 재조회하는 PG GET 응답(SUCCESS)
 
             Map<String, Object> callback = Map.of(
                 "transactionKey", TX_KEY, "orderId", String.valueOf(order.getId()),

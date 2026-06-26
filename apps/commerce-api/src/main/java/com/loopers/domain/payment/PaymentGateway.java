@@ -8,6 +8,9 @@ public interface PaymentGateway {
 
     Result requestPayment(Command command);
 
+    /** transactionKey로 PG에 결제 진짜 상태를 조회한다 (콜백 검증·정합성 복구에 사용). */
+    Result getTransaction(Long userId, String transactionKey);
+
     record Command(
         Long userId,
         Long orderId,

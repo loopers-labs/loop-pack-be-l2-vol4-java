@@ -22,9 +22,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,6 +84,13 @@ class PaymentFacadeIntegrationTest {
         )));
     }
 
+    /** 콜백/복구가 재조회하는 PG GET /{transactionKey} 응답을 status로 스텁한다. */
+    private void stubPgGet(String status) {
+        wiremock.stubFor(get(urlPathMatching("/api/v1/payments/.*")).willReturn(okJson(
+            "{\"meta\":{\"result\":\"SUCCESS\"},\"data\":{\"transactionKey\":\"" + TX_KEY + "\",\"status\":\"" + status + "\",\"reason\":\"정상 승인되었습니다.\"}}"
+        )));
+    }
+
     @DisplayName("결제를 요청할 때, ")
     @Nested
     class RequestPayment {
@@ -122,15 +131,16 @@ class PaymentFacadeIntegrationTest {
     @Nested
     class HandleCallback {
 
-        @DisplayName("SUCCESS 콜백이면, 결제는 SUCCESS, 주문은 PAID가 된다.")
+        @DisplayName("콜백이 오면 PG를 재조회해, 실제 SUCCESS면 결제 SUCCESS·주문 PAID가 된다.")
         @Test
         void marksPaymentSuccess_andConfirmsOrder() {
             UserModel user = givenUser();
             OrderModel order = givenPendingOrder(user.getId(), 5000L);
             stubPgSuccess();
             paymentFacade.requestPayment(LOGIN_ID, LOGIN_PW, order.getId(), CardType.SAMSUNG, CARD_NO);
+            stubPgGet("SUCCESS");   // 재조회 시 PG가 SUCCESS 응답
 
-            paymentFacade.handleCallback(TX_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다.");
+            paymentFacade.handleCallback(TX_KEY);
 
             assertAll(
                 () -> assertThat(paymentJpaRepository.findByTransactionKey(TX_KEY).orElseThrow().getStatus())
@@ -140,16 +150,17 @@ class PaymentFacadeIntegrationTest {
             );
         }
 
-        @DisplayName("같은 SUCCESS 콜백이 두 번 와도, 멱등하게 주문은 PAID를 유지한다.")
+        @DisplayName("같은 콜백이 두 번 와도, 멱등하게 주문은 PAID를 유지한다.")
         @Test
         void isIdempotent_onDuplicateCallback() {
             UserModel user = givenUser();
             OrderModel order = givenPendingOrder(user.getId(), 5000L);
             stubPgSuccess();
             paymentFacade.requestPayment(LOGIN_ID, LOGIN_PW, order.getId(), CardType.SAMSUNG, CARD_NO);
-            paymentFacade.handleCallback(TX_KEY, PaymentStatus.SUCCESS, "정상 승인되었습니다.");
+            stubPgGet("SUCCESS");
+            paymentFacade.handleCallback(TX_KEY);
 
-            paymentFacade.handleCallback(TX_KEY, PaymentStatus.SUCCESS, "중복 콜백");
+            paymentFacade.handleCallback(TX_KEY);
 
             assertThat(orderJpaRepository.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);

@@ -13,11 +13,15 @@ import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
 @Component
 public class PaymentFacade {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentFacade.class);
 
     private final UserService userService;
     private final OrderService orderService;
@@ -54,14 +58,42 @@ public class PaymentFacade {
     }
 
     /**
-     * PG 결과(콜백)를 반영한다. 결제 상태 전이는 멱등(PaymentService.applyResult)하며,
-     * SUCCESS일 때만 주문을 확정한다. OrderService.confirm 도 멱등이라 중복 콜백에 안전하다.
+     * PG 콜백을 처리한다. 콜백 본문의 status를 신뢰하지 않고 PG에 재조회해 검증한다(위조 콜백 차단).
+     * 콜백은 "결과가 나왔다"는 트리거로만 쓰고, 진실은 reconcile의 PG 조회로 확정한다.
      */
-    public void handleCallback(String transactionKey, PaymentStatus status, String reason) {
-        PaymentModel payment = paymentService.applyResult(transactionKey, status, reason);
-        // SUCCESS일 때만 주문을 확정한다.
-        if (status == PaymentStatus.SUCCESS) {
+    public void handleCallback(String transactionKey) {
+        reconcile(transactionKey);
+    }
+
+    /**
+     * PG에 transactionKey를 재조회해 실제 상태로 정정한다. (콜백 검증·정합성 복구의 공통 경로)
+     * GET은 멱등, applyResult/confirm도 멱등이라 여러 번 호출해도 안전하다.
+     * PG가 아직 PENDING이면(처리 미완) 아무것도 하지 않는다.
+     */
+    public void reconcile(String transactionKey) {
+        PaymentModel payment = paymentService.getByTransactionKey(transactionKey);
+        PaymentGateway.Result real = paymentGateway.getTransaction(payment.getUserId(), transactionKey);
+
+        if (real.status() == PaymentStatus.PENDING) {
+            return;
+        }
+        paymentService.applyResult(transactionKey, real.status(), real.reason());
+        if (real.status() == PaymentStatus.SUCCESS) {
             orderService.confirm(payment.getOrderId());
         }
+    }
+
+    /**
+     * 콜백 누락 대비 — PENDING(키 보유) 결제건들을 PG 조회로 일괄 정정한다. (스케줄러/수동 복구가 호출)
+     * 한 건 실패가 전체를 막지 않도록 건별로 격리한다.
+     */
+    public void reconcileAll() {
+        paymentService.findRecoverable().forEach(payment -> {
+            try {
+                reconcile(payment.getTransactionKey());
+            } catch (Exception e) {
+                log.warn("결제 정합성 복구 실패: transactionKey={}", payment.getTransactionKey(), e);
+            }
+        });
     }
 }

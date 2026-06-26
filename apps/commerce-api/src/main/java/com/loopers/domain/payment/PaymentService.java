@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Component
 public class PaymentService {
@@ -68,5 +70,11 @@ public class PaymentService {
     public PaymentModel getByTransactionKey(String transactionKey) {
         return paymentRepository.findByTransactionKey(transactionKey)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[transactionKey = " + transactionKey + "] 결제건을 찾을 수 없습니다."));
+    }
+
+    /** 정합성 복구 대상(PENDING + transactionKey 보유)을 조회한다. */
+    @Transactional(readOnly = true)
+    public List<PaymentModel> findRecoverable() {
+        return paymentRepository.findPendingWithTransactionKey();
     }
 }
