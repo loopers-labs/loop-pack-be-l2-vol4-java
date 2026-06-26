@@ -1,0 +1,6 @@
+### 관리자 결제 정합성 수동 복구 - 정상 (200 OK, 외부 조회로 재확정)
+POST http://localhost:8080/api-admin/v1/payments/1/reconcile
+X-Loopers-Ldap: loopers.admin
+
+### 관리자 결제 정합성 수동 복구 - 관리자 헤더 누락 (403 Forbidden)
+POST http://localhost:8080/api-admin/v1/payments/1/reconcile

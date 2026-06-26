@@ -197,15 +197,17 @@ flowchart TD
 
 **목표:** 콜백이 오지 않아도, 타임아웃으로 결과를 못 받았어도 정합성을 복구한다.
 
-- [ ] **`@Scheduled` 폴러** — "일정 시간 경과한 `PENDING`만" 조회(grace period: 처리 지연 1~5s를 역산해 "정상이면 끝났어야 할 시간" 이후부터)
-- [ ] **건별 `REQUIRES_NEW`** 로 부분 실패 격리 (한 건 실패가 다른 건에 영향 없게)
-- [ ] **PG 조회 결과 분기** — 처리 중 → 다음 주기 재확인 / 주문 없음(미도달=돈 안 빠짐) → 재요청 안전 / 성공·실패 → 그 결과로 확정
-- [ ] **콜백 PG 교차검증** — 콜백 데이터를 그대로 믿지 않고 PG 조회로 재확인
-- [ ] **상한 초과 PENDING → `STUCK` 격리 + 알림**(영원한 PENDING 방지, 자동 취소는 하지 않음)
-- [ ] **수동 reconcile API**(관리자) — 주기 폴링 외에 수동으로도 상태 복구
-- [ ] **보정 경로에 Retry 배선** — 폴링/스케줄러의 PG 재조회·재요청에 Stage 5에서 정의한 Exponential backoff + jitter를 적용(유저 경로의 빠른 실패와 분리)
+- [X] **`@Scheduled` 폴러** — `PaymentReconciliationScheduler`(fixedDelay 10s). grace period 5s(처리 지연 1~5s 역산) — `requestedAt ≤ now-5s`인 `PENDING`만 조회. `@EnableScheduling`은 `SchedulingConfig`(`@Profile("!test")`)로 테스트 격리
+- [X] **건별 `REQUIRES_NEW`** 로 부분 실패 격리 — DB 쓰기(`PaymentTransactionWriter.confirm/reapplyRequest/isolate`)를 각각 `REQUIRES_NEW`로. *오케스트레이션(`PaymentReconciliationService`)은 트랜잭션 밖에 두어 **PG 호출(조회·재요청)이 DB 트랜잭션 밖**에서 일어나게 분리(횡단 규약 준수)*
+- [X] **PG 조회 결과 분기** — `queryTransaction`→`PaymentTransactionStatus`(FOUND/NOT_FOUND/UNKNOWN). FOUND·처리 중 → 유예(상한 초과 시 격리) / FOUND·종료 → 그 결과로 확정 / NOT_FOUND(미도달) → 재요청 / UNKNOWN → 유예(상한 초과 시 격리)
+- [X] **콜백 PG 교차검증** — `handleCallback`이 콜백 payload의 status를 믿지 않고 `queryTransaction`으로 재조회해 **PG 권위값**으로 확정. 처리 중·결과 불명이면 확정하지 않고 폴링에 위임
+- [X] **상한 초과 PENDING → `STUCK` 격리 + 알림** — 상한 10분 초과 미해결 건 `markStuck` + `log.warn`(자동 취소 안 함). *실 알림 채널(Slack 등)은 범위 밖, 로깅으로 대체*
+- [X] **수동 reconcile API**(관리자) — `POST /api-admin/v1/payments/{orderId}/reconcile`. 격리된 `STUCK` 건도 다시 확정(조건부 UPDATE 대상에 STUCK 포함)
+- [X] **보정 경로에 Retry 배선** — `queryTransaction`에 `@Retry("pg-reconciliation")`(Exponential backoff + jitter). 유저 경로(`@CircuitBreaker("pg-simulator")` fast-fail)와 인스턴스 분리
 
 **검증:** 콜백을 의도적으로 누락시켜도 폴링이 `PENDING`을 정합성 복구한다. (체크리스트: 콜백 미수신 복구 / 타임아웃 실패건도 조회로 정상 반영)
+> **Stage 6 완료.** 코드(포트 `queryTransaction` + 어댑터 단건/주문별 조회·`@Retry`·NOT_FOUND 판정 + 스케줄러/서비스/writer + 콜백 교차검증 + 수동 reconcile API) + 테스트(어댑터 조회 분기·재시도 통합 / 서비스 분기 단위 / 콜백 교차검증 단위·E2E / 수동 reconcile E2E) 전체 통과. 측정 리포트 없음(k6 대상 아님 — 통합/단위 테스트로 계약 검증).
+> **측정/구현으로 드러난 plan 보정:** ① **PG `GET ?orderId=`는 거래가 없으면 404** — 이를 *미도달(NOT_FOUND)* 신호로 사용(txKey 없는 UNKNOWN 결제 한정). txKey 있으면 단건 조회, 없으면 주문별 조회로 디스패치. ② **콜백 시그니처에서 status/reason 제거** — 교차검증이 PG 권위값을 쓰므로 콜백의 claimed status는 사용 안 함(`handleCallback(orderId, transactionKey)`). DTO `CallbackRequest`는 외부 계약 형태로 status/reason 보존하되 미사용. ③ **외부 I/O를 트랜잭션 밖으로** — `@Scheduled`+`REQUIRES_NEW`를 한 메서드에 두면 PG 호출이 트랜잭션 안에 갇히므로, 오케스트레이션(무트랜잭션)/writer(REQUIRES_NEW) 2빈으로 분리해 self-invocation 함정도 회피.
 
 ---
 
@@ -213,11 +215,13 @@ flowchart TD
 
 **목표:** 콜백 스레드와 폴링 스레드가 같은 결제건을 동시에 확정해도 후처리가 중복되지 않게 한다.
 
-- [ ] **조건부 UPDATE** — `UPDATE payment SET status=? WHERE id=? AND status='PENDING'` 로 전이를 원자화
-- [ ] **affected rows로 승자 판별** — 1이면 내가 전이시킨 것 → 후처리(주문 상태 전이) 실행 / 0이면 남이 이미 함 → 후처리 스킵
-- [ ] 통합테스트: 콜백+폴링 동시 진입에도 주문 전이/후처리가 **정확히 1회**
+- [X] **조건부 UPDATE** — `confirmIfUnresolved`: `UPDATE payment SET status=?, reason=? WHERE id=? AND status IN (PENDING, STUCK)`로 전이를 원자화. *대상에 STUCK 포함 → 격리 건도 콜백/수동/폴링이 복구 가능*
+- [X] **affected rows로 승자 판별** — `PaymentTransactionWriter.confirm`: affected==1이면 내가 전이시킨 것 → 주문 상태 전이 실행 / 0이면 남이 이미 확정 → 후처리 스킵. 콜백·폴링·수동 reconcile이 **모두 이 한 경로**를 공유
+- [X] 통합테스트: `PaymentConfirmConcurrencyIntegrationTest` — 같은 결제에 `confirm` 2스레드 동시 진입 → 승자 **정확히 1**, 결제 SUCCESS·주문 PAID 1회
 
 **검증:** 동시 확정 상황에서도 주문 상태 전이가 한 번만 일어난다(중복 후처리 없음).
+> **Stage 7 완료.** 코드(`confirmIfUnresolved` 조건부 UPDATE + `PaymentTransactionWriter`로 콜백·폴링·수동 단일 경로화) + 동시성 통합테스트(승자 1·주문 1회 전이) 통과.
+> **plan 보정:** ① 조건부 UPDATE의 WHERE를 `status='PENDING'`이 아니라 `status IN (PENDING, STUCK)`으로 — 격리(STUCK)된 건도 뒤늦은 콜백/수동 reconcile로 복구 가능해야 하므로. ② **한계(정직)**: 핵심 확정 race(콜백 vs 폴링이 동시에 종료 확정)는 조건부 UPDATE로 차단하지만, `markStuck`/`reapplyRequest`는 dirty-check save라 *격리 전이와 뒤늦은 확정이 같은 순간 겹치는* 희귀 race는 last-writer-wins(낙관락 미도입). 결제 확정의 정확성엔 영향 없고 STUCK은 수동 reconcile로 회수 가능.
 
 ---
 
