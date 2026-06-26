@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.net.SocketTimeoutException;
@@ -132,6 +133,25 @@ class PaymentGatewayResilienceIntegrationTest {
 
         // assert
         assertThat(result.outcome()).isEqualTo(PaymentRequestResult.Outcome.REJECTED);
+    }
+
+    @DisplayName("유저 결제 요청은 타임아웃이어도 재시도하지 않고 PG를 정확히 한 번만 호출한 뒤 결과 불명으로 빠르게 응답한다.")
+    @Test
+    void userPath_failsFast_withoutRetry() {
+        // arrange
+        RetryableException timeout = new RetryableException(
+            -1, "read timed out", Request.HttpMethod.POST,
+            new SocketTimeoutException("Read timed out"), (Long) null, request());
+        given(pgSimulatorClient.requestPayment(any(), any())).willThrow(timeout);
+
+        // act
+        PaymentRequestResult result = paymentGateway.requestPayment(payment());
+
+        // assert
+        assertAll(
+            () -> assertThat(result.outcome()).isEqualTo(PaymentRequestResult.Outcome.UNKNOWN),
+            () -> verify(pgSimulatorClient, times(1)).requestPayment(any(), any())
+        );
     }
 
     @DisplayName("타임아웃이 임계치를 넘으면 서킷이 열리고, 이후 호출은 PG를 부르지 않고 결과 불명으로 흡수한다.")
