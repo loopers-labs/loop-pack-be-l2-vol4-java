@@ -15,6 +15,10 @@ dependencies {
     // security (apps/commerce-api에서만 선언)
     implementation("org.springframework.security:spring-security-crypto")
 
+    // resilience4j
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // querydsl
     annotationProcessor("com.querydsl:querydsl-apt::jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
