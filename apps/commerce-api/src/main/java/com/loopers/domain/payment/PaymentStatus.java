@@ -9,7 +9,8 @@ public enum PaymentStatus {
 
     PENDING("접수 대기"),
     SUCCESS("결제 성공"),
-    FAILED("결제 실패");
+    FAILED("결제 실패"),
+    STUCK("정합성 복구 보류");
 
     private final String description;
 }

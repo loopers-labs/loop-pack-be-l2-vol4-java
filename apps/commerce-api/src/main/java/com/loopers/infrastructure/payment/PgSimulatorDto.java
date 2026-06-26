@@ -1,5 +1,7 @@
 package com.loopers.infrastructure.payment;
 
+import java.util.List;
+
 public class PgSimulatorDto {
 
     public record PaymentRequest(
@@ -28,6 +30,12 @@ public class PgSimulatorDto {
         String transactionKey,
         String status,
         String reason
+    ) {
+    }
+
+    public record OrderResponse(
+        String orderId,
+        List<TransactionResponse> transactions
     ) {
     }
 }

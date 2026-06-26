@@ -3,7 +3,6 @@ package com.loopers.application.payment;
 import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
@@ -12,7 +11,7 @@ import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentRequestResult;
-import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.PaymentTransactionStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -25,6 +24,7 @@ public class PaymentFacade {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
+    private final PaymentTransactionWriter paymentTransactionWriter;
 
     public PaymentInfo createPayment(Long userId, Long orderId, CardType cardType, String cardNo, ZonedDateTime now) {
         PaymentModel acceptedPayment = acceptPayment(userId, orderId, cardType, cardNo, now);
@@ -56,8 +56,7 @@ public class PaymentFacade {
         return paymentRepository.save(payment);
     }
 
-    @Transactional
-    public void handleCallback(Long orderId, String transactionKey, PaymentStatus result, String reason) {
+    public void handleCallback(Long orderId, String transactionKey) {
         PaymentModel payment = paymentRepository.getByOrderId(orderId);
 
         if (!payment.matchesTransactionKey(transactionKey)) {
@@ -68,12 +67,11 @@ public class PaymentFacade {
             return;
         }
 
-        payment.confirm(result, reason);
-
-        if (payment.isSuccess()) {
-            orderRepository.getActiveById(orderId).markPaid();
-        } else if (payment.isFailed()) {
-            orderRepository.getActiveById(orderId).markPaymentFailed();
+        PaymentTransactionStatus verified = paymentGateway.queryTransaction(payment);
+        if (!verified.isFound() || verified.isStillProcessing()) {
+            return;
         }
+
+        paymentTransactionWriter.confirm(payment, verified);
     }
 }
