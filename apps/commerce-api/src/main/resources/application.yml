@@ -51,7 +51,20 @@ resilience4j:
         ignore-exceptions: # 4xx 확정 거절은 의도된 실패 → 서킷이 열리면 안 됨(집계 제외)
           - feign.FeignException$FeignClientException
   retry:
-    retry-aspect-order: 1 # CB(2)보다 안쪽 — Stage 5 Retry 도입 시 재시도→소진 후에야 CB/ fallback 발동
+    retry-aspect-order: 1 # CB(2)보다 안쪽 — 재시도→소진 후에야 CB/fallback 발동
+    instances:
+      pg-reconciliation: # 보정(폴링) 경로 전용. 유저 경로(pg-simulator CB)와 이름 분리 → 유저 요청엔 재시도 미적용(빠른 실패). 배선은 Stage 6 스케줄러
+        max-attempts: 3 # 최초 1 + 재시도 2. 폴링은 다음 주기가 또 있으니 한 주기에선 과하게 매달리지 않음
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2 # 1s → 2s → 4s
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5 # ±50% jitter — 동시 만료된 PENDING들이 같은 순간 재조회하는 Thundering Herd 회피
+        retry-exceptions: # 일시적 실패만 재시도 — 결과 불명(타임아웃/네트워크) + PG 5xx
+          - feign.RetryableException
+          - feign.FeignException$FeignServerException
+        ignore-exceptions: # 4xx 확정 거절은 백 번 재시도해도 동일 → 재시도 금지
+          - feign.FeignException$FeignClientException
 
 springdoc:
   use-fqn: true
