@@ -12,10 +12,13 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Comparator;
 import java.util.List;
@@ -27,7 +30,7 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
     private static final String PAYMENT_REQUEST_CIRCUIT_BREAKER_NAME = "pgPaymentRequest";
     private static final String PAYMENT_LOOKUP_CIRCUIT_BREAKER_NAME = "pgPaymentLookup";
 
-    private final RestClient pgSimulatorRestClient;
+    private final RestTemplate pgSimulatorRestTemplate;
     private final PgSimulatorProperties properties;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 
@@ -49,12 +52,13 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
             properties.callbackUrl()
         );
 
-        PgTransactionResponse response = pgSimulatorRestClient.post()
-            .uri("/api/v1/payments")
-            .header("X-USER-ID", command.userLoginId())
-            .body(request)
-            .retrieve()
-            .body(PgApiResponseOfTransaction.class)
+        PgTransactionResponse response = pgSimulatorRestTemplate.exchange(
+                "/api/v1/payments",
+                HttpMethod.POST,
+                new HttpEntity<>(request, userIdHeaders(command.userLoginId())),
+                PgApiResponseOfTransaction.class
+            )
+            .getBody()
             .data();
 
         return response.toGatewayResult();
@@ -66,13 +70,14 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
     public PaymentGatewayResult getByOrder(String userLoginId, Long orderId) {
         PgOrderResponse response;
         try {
-            response = pgSimulatorRestClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/v1/payments")
-                    .queryParam("orderId", PaymentOrderIdMapper.toPgOrderId(orderId))
-                    .build())
-                .header("X-USER-ID", userLoginId)
-                .retrieve()
-                .body(PgApiResponseOfOrder.class)
+            response = pgSimulatorRestTemplate.exchange(
+                    "/api/v1/payments?orderId={orderId}",
+                    HttpMethod.GET,
+                    new HttpEntity<>(userIdHeaders(userLoginId)),
+                    PgApiResponseOfOrder.class,
+                    PaymentOrderIdMapper.toPgOrderId(orderId)
+                )
+                .getBody()
                 .data();
         } catch (HttpClientErrorException.NotFound ignored) {
             return PaymentGatewayResult.pending(
@@ -106,6 +111,12 @@ public class PgSimulatorPaymentGateway implements PaymentGateway {
             pendingReasonOfLookupFailure(throwable),
             "PG 조회 결과를 확인하지 못했습니다: " + throwable.getClass().getSimpleName()
         );
+    }
+
+    private HttpHeaders userIdHeaders(String userLoginId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", userLoginId);
+        return headers;
     }
 
     private PaymentPendingReason pendingReasonOfRequestFailure(Throwable throwable) {
