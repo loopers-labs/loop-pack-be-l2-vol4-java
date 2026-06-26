@@ -13,6 +13,8 @@ public interface OrderRepository {
 
     Optional<OrderModel> findById(Long id);
 
+    Optional<OrderModel> findByOrderNumber(String orderNumber);
+
     Optional<OrderModel> findByIdWithItems(Long id);
 
     List<OrderModel> findAllByUserIdAndCreatedAtBetween(Long userId, ZonedDateTime startAt, ZonedDateTime endAt);

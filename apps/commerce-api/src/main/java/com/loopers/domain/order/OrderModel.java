@@ -83,4 +83,20 @@ public class OrderModel extends BaseEntity {
             throw new CoreException(ErrorType.FORBIDDEN, "해당 주문에 접근할 수 없습니다.");
         }
     }
+
+    /** 결제 성공 확정 시 호출. 멱등하며, 항상 결제 완료가 우선한다(재결제 성공 포함). */
+    public void markPaid() {
+        if (this.status == OrderStatus.PAID) {
+            return;
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    /** 결제 실패 확정 시 호출. 이미 결제 완료된 주문은 실패로 되돌리지 않는다. */
+    public void markPaymentFailed() {
+        if (this.status == OrderStatus.PAID) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 결제 완료된 주문은 실패 처리할 수 없습니다.");
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
+    }
 }
