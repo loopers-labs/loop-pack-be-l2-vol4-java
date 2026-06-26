@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Component
+// @Component // 실제 연동(HttpPaymentGateway) 테스트를 위해 주석 처리
 public class MockPaymentGateway implements PaymentGateway {
 
     @Override

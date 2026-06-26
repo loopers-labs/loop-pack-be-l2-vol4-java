@@ -34,7 +34,7 @@ public class HttpPaymentGateway implements PaymentGateway {
     @Override
     public PaymentGatewayResult requestPayment(Long orderId, BigDecimal amount, PaymentMethod method) {
         return circuitBreaker.executeSupplier(() -> {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = createHeaders(1L, amount.longValue());
             String formattedOrderId = String.format("%06d", orderId);
 
             String requestJson = String.format(
@@ -72,7 +72,7 @@ public class HttpPaymentGateway implements PaymentGateway {
                     .queryParam("orderId", formattedOrderId)
                     .toUriString();
 
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = createHeaders(1L, null);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             try {
@@ -100,10 +100,13 @@ public class HttpPaymentGateway implements PaymentGateway {
         });
     }
 
-    private HttpHeaders createHeaders() {
+    private HttpHeaders createHeaders(Long userId, Long amount) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Loopers-UserId", "1");
+        headers.set("X-USER-ID", String.valueOf(userId));
+        if (amount != null && amount == 502502L) {
+            headers.set("X-Force-Fail", "true");
+        }
         return headers;
     }
 
