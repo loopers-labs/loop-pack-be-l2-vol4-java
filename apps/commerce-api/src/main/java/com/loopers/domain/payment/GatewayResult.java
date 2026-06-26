@@ -11,7 +11,7 @@ public record GatewayResult(Outcome outcome, String transactionKey) {
     public enum Outcome { ACCEPTED, PENDING, REJECTED }
 
     public GatewayResult {
-        if (outcome == Outcome.ACCEPTED && transactionKey == null) {
+        if (outcome == Outcome.ACCEPTED && (transactionKey == null || transactionKey.isBlank())) {
             throw new IllegalArgumentException("접수(ACCEPTED)된 결과는 transactionKey가 있어야 합니다.");
         }
         if (outcome != Outcome.ACCEPTED && transactionKey != null) {

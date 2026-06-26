@@ -2,6 +2,8 @@ package com.loopers.domain.payment;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,6 +14,14 @@ class GatewayResultTest {
     @Test
     void throws_whenAcceptedWithoutKey() {
         assertThatThrownBy(() -> new GatewayResult(GatewayResult.Outcome.ACCEPTED, null))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @DisplayName("ACCEPTED인데 transactionKey가 비어 있거나 공백이면 생성 시 예외가 발생한다")
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void throws_whenAcceptedWithBlankKey(String blank) {
+        assertThatThrownBy(() -> GatewayResult.accepted(blank))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
