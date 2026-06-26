@@ -21,7 +21,7 @@ public class PaymentGatewayImpl implements PaymentGateway {
     private static final String CIRCUIT_BREAKER_NAME = "pg-simulator";
     private static final String EXTERNAL_ORDER_ID_FORMAT = "%06d";
     private static final String REJECTED_REASON = "결제가 거절되었습니다.";
-    private static final int SERVER_ERROR_STATUS = 500;
+    private static final int HTTP_ERROR_STATUS = 400;
 
     private final PgSimulatorClient pgSimulatorClient;
 
@@ -61,7 +61,7 @@ public class PaymentGatewayImpl implements PaymentGateway {
             return false;
         }
 
-        return throwable instanceof FeignException feignException && feignException.status() >= SERVER_ERROR_STATUS;
+        return throwable instanceof FeignException feignException && feignException.status() >= HTTP_ERROR_STATUS;
     }
 
     private String toExternalOrderId(Long orderId) {

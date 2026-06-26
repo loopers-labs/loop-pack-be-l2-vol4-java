@@ -33,12 +33,25 @@ spring:
 
 resilience4j:
   circuitbreaker:
+    circuit-breaker-aspect-order: 2 # CB가 Retry 바깥(더 큰 order = 외곽) — 재시도 묶음을 1회로 집계, fallback은 최외곽 CB에 부착. Retry 본체는 Stage 5
     instances:
       pg-simulator:
         register-health-indicator: true
-        failure-rate-threshold: 90 # 느슨한 기본값 — fallback 흡수만 검증, 본격 임계치 튜닝은 Stage 4
-        sliding-window-size: 100
+        sliding-window-type: COUNT_BASED # 부하 테스트는 bursty라 최근 N건 기준이 OPEN 타이밍 재현·민감도 해석에 결정론적
+        sliding-window-size: 50
+        minimum-number-of-calls: 20 # 표본 20건 차기 전엔 판정 보류(소표본 과민 방지)
+        failure-rate-threshold: 50 # 역산: 접수 유효 실패율 ≈70%(타임아웃 50% + 5xx 20%) > 50% → 부하 중 확실히 OPEN. 정상 PG(95%+ 성공)라면 안 열림
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 250ms # read-timeout 300ms 하드컷 안쪽 [250,300ms] 밴드만 추가 포착(대부분의 느린 호출은 이미 타임아웃 예외로 record)
         wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        record-exceptions: # 결과 불명(타임아웃/네트워크) + PG 5xx만 서킷 실패로 집계
+          - feign.RetryableException
+          - feign.FeignException$FeignServerException
+        ignore-exceptions: # 4xx 확정 거절은 의도된 실패 → 서킷이 열리면 안 됨(집계 제외)
+          - feign.FeignException$FeignClientException
+  retry:
+    retry-aspect-order: 1 # CB(2)보다 안쪽 — Stage 5 Retry 도입 시 재시도→소진 후에야 CB/ fallback 발동
 
 springdoc:
   use-fqn: true
