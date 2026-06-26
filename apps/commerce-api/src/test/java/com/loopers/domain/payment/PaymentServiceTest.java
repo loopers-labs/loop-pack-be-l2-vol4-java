@@ -1,136 +1,265 @@
 package com.loopers.domain.payment;
 
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 class PaymentServiceTest {
 
-    private static final String USER_NUMBER = "user1";
-    private static final Long ORDER_ID = 1L;
-    private static final String ORDER_NUMBER = "order1";
-    private static final CardType CARD_TYPE = CardType.SAMSUNG;
-    private static final String CARD_NO = "1234-5678-1234-5678";
-    private static final BigDecimal AMOUNT = BigDecimal.valueOf(1000);
+    private static final String CARD_NO = "1234-5678-9814-1451";
+    private static final String MASKED = "1234-****-****-1451";
 
-    private PaymentRepository paymentRepository;
-    private PaymentGateway paymentGateway;
+    private FakePaymentRepository repository;
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
-        paymentRepository = mock(PaymentRepository.class);
-        paymentGateway = mock(PaymentGateway.class);
-        paymentService = new PaymentService(paymentRepository, paymentGateway);
-        when(paymentRepository.save(any(PaymentModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        repository = new FakePaymentRepository();
+        paymentService = new PaymentService(repository);
     }
 
-    private PaymentGatewayRequest expectedRequest() {
-        return new PaymentGatewayRequest(USER_NUMBER, ORDER_NUMBER, CARD_TYPE, CARD_NO, AMOUNT);
+    private PaymentModel savePendingWithKey(Long orderId, String key) {
+        PaymentModel payment = paymentService.createPending(orderId, "ORD" + orderId, 10L, CardType.SAMSUNG, CARD_NO, 5000L);
+        if (key != null) {
+            paymentService.attachTransactionKey(payment.getId(), key);
+        }
+        return payment;
     }
 
-    private PaymentModel pay() {
-        return paymentService.pay(USER_NUMBER, ORDER_ID, ORDER_NUMBER, CARD_TYPE, CARD_NO, AMOUNT);
-    }
-
-    @DisplayName("결제를 요청할 때, ")
+    @DisplayName("결제를 접수(createPending)할 때,")
     @Nested
-    class Pay {
+    class CreatePending {
 
-        @DisplayName("PG가 SUCCESS를 응답하면, 결제 상태가 PAID로 저장된다.")
+        @DisplayName("PENDING 결제가 저장되고 카드 번호는 마스킹된다.")
         @Test
-        void marksPaymentAsPaid_whenGatewayRespondsSuccess() {
-            // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenReturn(new PaymentGatewayResponse("txn-1", TransactionStatus.SUCCESS));
-
+        void savesPendingPayment() {
             // when
-            PaymentModel result = pay();
+            PaymentModel payment = paymentService.createPending(
+                    1L, "ORD1", 10L, CardType.SAMSUNG, CARD_NO, 5000L);
 
             // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.PAID);
-            assertThat(result.getTransactionKey()).isEqualTo("txn-1");
-        }
-
-        @DisplayName("PG가 FAILED를 응답하면, 결제 상태가 FAILED로 저장된다.")
-        @Test
-        void marksPaymentAsFailed_whenGatewayRespondsFailed() {
-            // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenReturn(new PaymentGatewayResponse("txn-2", TransactionStatus.FAILED));
-
-            // when
-            PaymentModel result = pay();
-
-            // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        }
-
-        @DisplayName("PG가 PENDING을 응답하면, 결제 상태는 PENDING으로 유지된다.")
-        @Test
-        void keepsPaymentPending_whenGatewayRespondsPending() {
-            // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenReturn(new PaymentGatewayResponse("txn-3", TransactionStatus.PENDING));
-
-            // when
-            PaymentModel result = pay();
-
-            // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
-        }
-
-        @DisplayName("PG 재시도가 모두 실패(RETRY_FAILED)하면, 예외 없이 결제 상태가 UNKNOWN으로 저장된다.")
-        @Test
-        void marksPaymentAsUnknown_whenGatewayRetryFails() {
-            // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenThrow(
-                    new PaymentGatewayException(FailureReason.RETRY_FAILED, "PG 결제 요청이 재시도 후에도 실패했습니다.")
+            assertAll(
+                    () -> assertThat(payment.getId()).isNotNull(),
+                    () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                    () -> assertThat(payment.getOrderId()).isEqualTo(1L),
+                    () -> assertThat(payment.getAmount()).isEqualTo(5000L),
+                    () -> assertThat(payment.getCardNo()).isEqualTo(MASKED)
             );
+        }
+    }
+
+    @DisplayName("접수 응답/격리/폴링 조회를 할 때,")
+    @Nested
+    class AttachAndQuery {
+
+        @DisplayName("attachTransactionKey 후에도 PENDING 이 유지되고 키가 저장된다.")
+        @Test
+        void attachesKey_keepingPending() {
+            // given
+            PaymentModel payment = paymentService.createPending(1L, "ORD1", 10L, CardType.SAMSUNG, CARD_NO, 5000L);
 
             // when
-            PaymentModel result = pay();
+            paymentService.attachTransactionKey(payment.getId(), "20260626:TR:abc");
 
             // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+            PaymentModel found = repository.findById(payment.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(found.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                    () -> assertThat(found.getTransactionKey()).isEqualTo("20260626:TR:abc")
+            );
         }
 
-        @DisplayName("PG 결제 상태 조회 자체가 실패(UNKNOWN)하면, 예외 없이 결제 상태가 UNKNOWN으로 저장된다.")
+        @DisplayName("markUnknown 은 PENDING 결제를 UNKNOWN 으로 격리한다.")
         @Test
-        void marksPaymentAsUnknown_whenGatewayQueryFails() {
+        void isolatesPendingToUnknown() {
             // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenThrow(
-                    new PaymentGatewayException(FailureReason.UNKNOWN, "PG 결제 상태를 확인할 수 없어 재시도를 중단했습니다.")
-            );
+            PaymentModel payment = paymentService.createPending(1L, "ORD1", 10L, CardType.SAMSUNG, CARD_NO, 5000L);
 
             // when
-            PaymentModel result = pay();
+            paymentService.markUnknown(payment.getId());
 
             // then
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+            assertThat(repository.findById(payment.getId()).orElseThrow().getStatus())
+                    .isEqualTo(PaymentStatus.UNKNOWN);
         }
 
-        @DisplayName("PG 응답 디코딩에 실패(DECODE_FAILED)하면, CoreException이 발생한다.")
+        @DisplayName("findPendingForReconcile 은 threshold 이전 PENDING 만 반환한다.")
         @Test
-        void throwsCoreException_whenGatewayDecodeFails() {
+        void returnsPendingOlderThanThreshold() {
             // given
-            when(paymentGateway.requestPayment(expectedRequest())).thenThrow(
-                    new PaymentGatewayException(FailureReason.DECODE_FAILED, "PG 결제 요청 응답 디코딩에 실패했습니다.")
-            );
+            PaymentModel old = paymentService.createPending(1L, "ORD1", 10L, CardType.SAMSUNG, CARD_NO, 5000L);
+            PaymentModel fresh = paymentService.createPending(2L, "ORD2", 10L, CardType.SAMSUNG, CARD_NO, 5000L);
+            ReflectionTestUtils.setField(old, "createdAt", ZonedDateTime.now().minusMinutes(1));
+            ReflectionTestUtils.setField(fresh, "createdAt", ZonedDateTime.now().plusMinutes(1));
 
             // when
-            CoreException result = assertThrows(CoreException.class, PaymentServiceTest.this::pay);
+            List<PaymentModel> result = paymentService.findPendingForReconcile(ZonedDateTime.now());
 
             // then
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.INTERNAL_ERROR);
+            assertThat(result).extracting(PaymentModel::getId).containsExactly(old.getId());
+        }
+    }
+
+    @DisplayName("결과를 확정(confirm)할 때,")
+    @Nested
+    class Confirm {
+
+        @DisplayName("무결성 일치 + PENDING 이면 PAID 로 전이하고 PAID 후처리 신호를 반환한다.")
+        @Test
+        void transitionsToPaid_whenMatchAndPending() {
+            // given
+            PaymentModel payment = savePendingWithKey(1L, "20260626:TR:abc");
+
+            // when
+            ConfirmOutcome outcome = paymentService.confirm(
+                    "20260626:TR:abc", PaymentStatus.PAID, "정상 승인", 5000L, CARD_NO);
+
+            // then
+            assertAll(
+                    () -> assertThat(outcome.result()).isEqualTo(ConfirmOutcome.Result.PAID),
+                    () -> assertThat(outcome.orderId()).isEqualTo(1L),
+                    () -> assertThat(repository.findById(payment.getId()).orElseThrow().getStatus())
+                            .isEqualTo(PaymentStatus.PAID)
+            );
+        }
+
+        @DisplayName("이미 전이된 결제(affected=0)면 후처리를 스킵한다(멱등).")
+        @Test
+        void skipsPostProcessing_whenAlreadyTransitioned() {
+            // given
+            PaymentModel payment = savePendingWithKey(1L, "20260626:TR:abc");
+            repository.transitionToPaid(payment.getId(), "20260626:TR:abc"); // 이미 누군가 전이시킴
+
+            // when
+            ConfirmOutcome outcome = paymentService.confirm(
+                    "20260626:TR:abc", PaymentStatus.PAID, "정상 승인", 5000L, CARD_NO);
+
+            // then
+            assertThat(outcome.result()).isEqualTo(ConfirmOutcome.Result.SKIPPED);
+        }
+
+        @DisplayName("amount 가 불일치하면 전이를 거부하고 UNKNOWN 으로 격리한다.")
+        @Test
+        void isolatesToUnknown_whenAmountMismatch() {
+            // given
+            PaymentModel payment = savePendingWithKey(1L, "20260626:TR:abc");
+
+            // when
+            ConfirmOutcome outcome = paymentService.confirm(
+                    "20260626:TR:abc", PaymentStatus.PAID, "정상 승인", 9999L, CARD_NO);
+
+            // then
+            assertAll(
+                    () -> assertThat(outcome.result()).isEqualTo(ConfirmOutcome.Result.ISOLATED),
+                    () -> assertThat(repository.findById(payment.getId()).orElseThrow().getStatus())
+                            .isEqualTo(PaymentStatus.UNKNOWN)
+            );
+        }
+
+        @DisplayName("cardNo 가 불일치하면 전이를 거부하고 UNKNOWN 으로 격리한다.")
+        @Test
+        void isolatesToUnknown_whenCardNoMismatch() {
+            // given
+            PaymentModel payment = savePendingWithKey(1L, "20260626:TR:abc");
+
+            // when
+            ConfirmOutcome outcome = paymentService.confirm(
+                    "20260626:TR:abc", PaymentStatus.PAID, "정상 승인", 5000L, "9999-8888-7777-6666");
+
+            // then
+            assertAll(
+                    () -> assertThat(outcome.result()).isEqualTo(ConfirmOutcome.Result.ISOLATED),
+                    () -> assertThat(repository.findById(payment.getId()).orElseThrow().getStatus())
+                            .isEqualTo(PaymentStatus.UNKNOWN)
+            );
+        }
+    }
+
+    /** 단위 테스트용 in-memory Fake (write-then-read 케이스, CLAUDE.md 허용). */
+    static class FakePaymentRepository implements PaymentRepository {
+        private final Map<Long, PaymentModel> store = new HashMap<>();
+        private long seq = 0;
+
+        @Override
+        public PaymentModel save(PaymentModel payment) {
+            if (payment.getId() == null) {
+                seq++;
+                ReflectionTestUtils.setField(payment, "id", seq);
+                if (payment.getCreatedAt() == null) {
+                    ReflectionTestUtils.setField(payment, "createdAt", ZonedDateTime.now());
+                }
+            }
+            store.put(payment.getId(), payment);
+            return payment;
+        }
+
+        @Override
+        public Optional<PaymentModel> findById(Long id) {
+            return Optional.ofNullable(store.get(id));
+        }
+
+        @Override
+        public Optional<PaymentModel> findByTransactionKey(String transactionKey) {
+            return store.values().stream()
+                    .filter(p -> transactionKey.equals(p.getTransactionKey()))
+                    .findFirst();
+        }
+
+        @Override
+        public Optional<PaymentModel> findActiveByOrderId(Long orderId) {
+            return store.values().stream()
+                    .filter(p -> orderId.equals(p.getOrderId())
+                            && (p.getStatus() == PaymentStatus.PENDING || p.getStatus() == PaymentStatus.PAID))
+                    .findFirst();
+        }
+
+        @Override
+        public int transitionToPaid(Long id, String transactionKey) {
+            PaymentModel p = store.get(id);
+            if (p != null && p.getStatus() == PaymentStatus.PENDING) {
+                p.markPaid(transactionKey);
+                return 1;
+            }
+            return 0;
+        }
+
+        @Override
+        public int transitionToFailed(Long id, String reason) {
+            PaymentModel p = store.get(id);
+            if (p != null && p.getStatus() == PaymentStatus.PENDING) {
+                p.markFailed(reason);
+                return 1;
+            }
+            return 0;
+        }
+
+        @Override
+        public int transitionToUnknown(Long id) {
+            PaymentModel p = store.get(id);
+            if (p != null && p.getStatus() == PaymentStatus.PENDING) {
+                p.markUnknown();
+                return 1;
+            }
+            return 0;
+        }
+
+        @Override
+        public List<PaymentModel> findPendingOlderThan(ZonedDateTime threshold) {
+            return store.values().stream()
+                    .filter(p -> p.getStatus() == PaymentStatus.PENDING
+                            && p.getCreatedAt() != null && p.getCreatedAt().isBefore(threshold))
+                    .toList();
         }
     }
 }
