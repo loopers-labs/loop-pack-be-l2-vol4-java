@@ -8,6 +8,8 @@ import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentResult;
 import com.loopers.domain.payment.PaymentService;
 import com.loopers.domain.payment.PgGateway;
+import com.loopers.domain.payment.PgIndeterminateException;
+import com.loopers.domain.payment.PgRequestRejectedException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.error.PaymentFailedException;
@@ -114,20 +116,28 @@ public class PaymentApplicationService {
         } catch (Exception e) {
             // DB 저장 실패 — 점유 자원 원복
             orderTransactionService.releaseAndFail(orderId);
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 기록 저장 중 오류가 발생했습니다.");
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 기록 저장 중 오류가 발생했습니다.", e);
         }
 
-        // 4. PG 요청 (Feign timeout + CircuitBreaker + Fallback, 트랜잭션 밖)
+        // 4. PG 요청 (CircuitBreaker + 500-only 재시도, 트랜잭션 밖)
         String callbackUrl = callbackBaseUrl + "/api/v1/payments/callback";
         try {
             String transactionKey = pgGateway.requestPayment(
                 userId.toString(), orderId, cardType, cardNo, amount, callbackUrl);
             paymentService.storePendingTransactionKey(orderId, transactionKey);
             return new PaymentRequestInfo(transactionKey);
-        } catch (Exception e) {
-            // PG 요청 실패 (40% 재시도 소진 / CB open) — 결제 FAILED + 자원 원복 (단일 트랜잭션)
-            self.handleRequestFailure(orderId, "PG 요청 실패");
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 요청에 실패했습니다.");
+
+        } catch (PgRequestRejectedException e) {
+            // 500 재시도 소진 = 트랜잭션 미생성 확정 → 결제 FAILED + 자원 원복 (단일 트랜잭션)
+            self.handleRequestFailure(orderId, "PG 요청 거부");
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 요청에 실패했습니다.", e);
+
+        } catch (PgIndeterminateException e) {
+            // 타임아웃/연결오류 = 요청은 나갔으나 응답 미수신 → 결과 미확정 → 실패 처리 금지.
+            // (서킷 open 은 요청 미전송이라 미확정이 아니며 위 PgRequestRejected 로 처리된다.)
+            // 결제는 REQUESTED, 주문은 PAYMENT_IN_PROGRESS 로 남겨 콜백/대사 스케줄러가 보정한다.
+            log.warn("[Payment] PG 결과 미확정 — 스케줄러 보정 대기. orderId={}, cause={}", orderId, e.getMessage());
+            return new PaymentRequestInfo(null);
         }
     }
 
