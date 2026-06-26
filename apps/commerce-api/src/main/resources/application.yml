@@ -23,6 +23,49 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg:                          # @FeignClient(name = "pg") 와 매칭
+            connect-timeout: 1000      # 커넥션 수립 타임아웃 1s
+            read-timeout: 3000         # 응답 대기 타임아웃 3s (PG 요청지연 p99 500ms 대비 여유)
+            logger-level: basic
+
+# ===== 외부 PG(pg-simulator) 연동 설정 =====
+pg:
+  base-url: http://localhost:8082                                # pg-simulator 주소
+  user-id: loopers-commerce                                      # PG 호출 시 X-USER-ID (상점 식별자, 모든 호출 동일)
+  callback-url: http://localhost:8080/api/v1/payments/callback   # PG가 결과를 보낼 우리 콜백 (http://localhost:8080 로 시작해야 PG가 허용)
+
+# ===== Resilience4j =====
+resilience4j:
+  circuitbreaker:
+    circuit-breaker-aspect-order: 2   # CB 를 바깥(outer)으로 — Retry 를 감싼다 (CB(Retry(call)))
+    instances:
+      pg:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20                          # 최근 20건으로 실패율 집계
+        minimum-number-of-calls: 10                      # 최소 10건은 모여야 OPEN 판단 시작
+        failure-rate-threshold: 50                       # 실패율 50% 초과 시 OPEN
+        slow-call-duration-threshold: 3s                 # 3s 넘으면 '느린 호출'로 간주
+        slow-call-rate-threshold: 50                     # 느린 호출 50% 초과 시 OPEN
+        wait-duration-in-open-state: 10s                 # OPEN 10s 유지 후 HALF_OPEN
+        permitted-number-of-calls-in-half-open-state: 3  # 간보기 호출 3건
+        # ★ 핵심: '시스템 장애'만 실패로 집계, '비즈니스 실패(한도/카드)'는 무시
+        record-exceptions:
+          - com.loopers.infrastructure.payment.PgServerException
+        ignore-exceptions:
+          - com.loopers.infrastructure.payment.PgClientException
+  retry:                                                 # (Nice-to-have) 일시적 시스템 장애만 재시도
+    retry-aspect-order: 1                                 # Retry 를 안쪽(inner)으로 — CB 가 재시도 결과만 집계
+    instances:
+      pg:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - com.loopers.infrastructure.payment.PgServerException
 
 springdoc:
   use-fqn: true
