@@ -12,6 +12,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // resilience (외부 PG 연동 회복 — Spring Cloud BOM이 버전 관리)
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // security (password encoding)
     implementation("org.springframework.security:spring-security-crypto")
 

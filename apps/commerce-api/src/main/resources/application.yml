@@ -29,6 +29,46 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+payment:
+  pg:
+    base-url: http://localhost:8082
+    callback-url: http://localhost:8080/api/v1/payments/callback
+    connect-timeout-ms: 1000   # 연결 타임아웃
+    read-timeout-ms: 2000      # 응답(접수) 타임아웃 — PG 요청지연 100~500ms 위 여유
+  recovery:
+    fixed-delay-ms: 30000      # 복구 스케줄러 주기
+    pending-grace: PT30S       # 거래키 없는 PENDING을 orderId로 역조회 시작하기까지 유예 (PG 처리지연 1~5s 역산)
+    stuck-threshold: PT10M     # 이 시간 넘게 PENDING이면 자동복구로 못 푼 건 — 격리 대상으로 로그/알림(사람이 점검)
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgCircuit:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10          # 표본이 충분할 때만 판단 (초기 소수 호출로 open 방지)
+        failure-rate-threshold: 50           # 표본 대비 실패 비율 기준 (도메인 거절은 ignore-exceptions로 제외)
+        slow-call-duration-threshold: 1s     # PG 정상 지연(100~500ms) 위
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 20s     # 결제 매출 영향 고려 — 분 대신 초
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+        ignore-exceptions:
+          - com.loopers.support.error.CoreException   # 도메인/검증 실패는 서킷 집계 제외
+  retry:
+    instances:
+      pgRetry:                              # 조회(거래키·orderId) 전용 — 멱등이라 응답유실에도 재시도 안전
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true    # 200ms → 400ms → 800ms — 실패 누적 시 더 물러나 부하 완화
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true        # jitter — 다중 인스턴스의 동시 재시도(thundering herd) 분산
+        randomized-wait-factor: 0.5
+        ignore-exceptions:
+          - com.loopers.support.error.CoreException
+      pgRequestRetry:                       # 결제 접수(POST) 전용 — 비멱등 쓰기라 재시도하지 않는다(max-attempts=1).
+        max-attempts: 1                     # 5xx가 '거래 생성 後'면 재전송 시 이중 접수/이중 청구 위험. 응답유실·5xx는 폴링이 orderId로 메꿈.
+
 ---
 spring:
   config:

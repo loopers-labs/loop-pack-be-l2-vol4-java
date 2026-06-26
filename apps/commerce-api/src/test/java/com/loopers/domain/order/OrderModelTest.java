@@ -132,4 +132,78 @@ class OrderModelTest {
                 () -> order.getItems().add(item(2L, 200L, 1)));
         }
     }
+
+    @DisplayName("결제 확정(pay) 시")
+    @Nested
+    class Pay {
+
+        @DisplayName("CREATED 주문에 pay하면 PAID로 전이된다")
+        @Test
+        void createdToPaid() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+
+            order.pay();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("이미 PAID인 주문에 다시 pay해도 예외 없이 PAID를 유지한다 (멱등)")
+        @Test
+        void payIsIdempotent() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            order.pay();
+
+            order.pay();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("이미 CANCELED인 주문에 pay하면 CONFLICT 예외가 발생한다")
+        @Test
+        void throwsConflict_whenPayCanceled() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            order.cancel();
+
+            CoreException ex = assertThrows(CoreException.class, order::pay);
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    @DisplayName("취소(cancel) 시")
+    @Nested
+    class Cancel {
+
+        @DisplayName("CREATED 주문을 cancel하면 CANCELED로 전이된다")
+        @Test
+        void createdToCanceled() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+
+            order.cancel();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        }
+
+        @DisplayName("이미 CANCELED인 주문을 다시 cancel해도 예외 없이 CANCELED를 유지한다 (멱등)")
+        @Test
+        void cancelIsIdempotent() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            order.cancel();
+
+            order.cancel();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        }
+
+        @DisplayName("이미 PAID인 주문을 cancel하면 CONFLICT 예외가 발생한다")
+        @Test
+        void throwsConflict_whenCancelPaid() {
+            OrderModel order = new OrderModel(USER_ID, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            order.pay();
+
+            CoreException ex = assertThrows(CoreException.class, order::cancel);
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
 }

@@ -25,4 +25,18 @@ public class OrderService {
         return orderRepository.findById(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 주문을 찾을 수 없습니다."));
     }
+
+    @Transactional
+    public void pay(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
+        order.pay();
+    }
+
+    @Transactional
+    public void cancel(Long orderId) {
+        OrderModel order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
+        order.cancel();
+    }
 }

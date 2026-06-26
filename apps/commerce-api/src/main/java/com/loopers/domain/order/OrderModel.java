@@ -13,6 +13,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -49,6 +50,10 @@ public class OrderModel extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<OrderItem> items = new ArrayList<>();
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected OrderModel() {}
 
     public OrderModel(Long userId, List<OrderItem> items, Long issuedCouponId, Money discountAmount) {
@@ -74,6 +79,26 @@ public class OrderModel extends BaseEntity {
 
     public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
+    }
+
+    public void pay() {
+        if (this.status == OrderStatus.PAID) {
+            return;
+        }
+        if (this.status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.CONFLICT, "결제 확정할 수 없는 주문 상태입니다: " + this.status);
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void cancel() {
+        if (this.status == OrderStatus.CANCELED) {
+            return;
+        }
+        if (this.status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.CONFLICT, "취소할 수 없는 주문 상태입니다: " + this.status);
+        }
+        this.status = OrderStatus.CANCELED;
     }
 
     private void addItem(OrderItem item) {

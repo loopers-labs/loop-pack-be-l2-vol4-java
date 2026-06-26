@@ -93,4 +93,56 @@ class OrderServiceTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
+
+    @DisplayName("결제 확정(pay) 시")
+    @Nested
+    class Pay {
+
+        @DisplayName("존재하는 주문이면 상태가 PAID로 전이된다")
+        @Test
+        void marksPaid_whenExists() {
+            OrderModel order = new OrderModel(1L, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            orderService.pay(1L);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenMissing() {
+            when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+            CoreException ex = assertThrows(CoreException.class, () -> orderService.pay(999L));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("취소(cancel) 시")
+    @Nested
+    class Cancel {
+
+        @DisplayName("존재하는 주문이면 상태가 CANCELED로 전이된다")
+        @Test
+        void marksCanceled_whenExists() {
+            OrderModel order = new OrderModel(1L, List.of(item(1L, 100L, 1)), null, Money.ZERO);
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            orderService.cancel(1L);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        }
+
+        @DisplayName("존재하지 않으면 NOT_FOUND 예외가 발생한다")
+        @Test
+        void throwsNotFound_whenMissing() {
+            when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+            CoreException ex = assertThrows(CoreException.class, () -> orderService.cancel(999L));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
 }
