@@ -60,6 +60,11 @@ public class OrderService {
         return orderRepository.findPendingBeforeForUpdate(before);
     }
 
+    /** PG 동기화 배치용 — 락 없음, 처리 시 개별 락 */
+    public List<OrderModel> findPendingOlderThan(ZonedDateTime before) {
+        return orderRepository.findPendingBefore(before);
+    }
+
     public Page<OrderModel> getListByUser(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderRepository.findAllByUserId(userId, startAt, endAt, pageable);
     }

@@ -93,7 +93,26 @@
       "Bash(./gradlew :apps:commerce-api:cleanTest :apps:commerce-api:test)",
       "PowerShell($file = \"C:\\\\loopers\\\\apps\\\\commerce-api\\\\build\\\\test-results\\\\test\\\\binary\\\\output.bin\"; $processes = Get-Process | Where-Object { try { $_.Modules | Where-Object { $_.FileName -eq $file } } catch {} }; if \\($processes\\) { $processes | ForEach-Object { Write-Output \"Killing $\\($_.Name\\) PID $\\($_.Id\\)\"; Stop-Process -Id $_.Id -Force } } else { Write-Output \"No process found via modules, trying handle scan...\" }; Get-Process java -ErrorAction SilentlyContinue | Select-Object Id, Name | Format-Table)",
       "PowerShell(Stop-Process -Name java -Force -ErrorAction SilentlyContinue)",
-      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.product.ProductServiceCacheIntegrationTest\")"
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.domain.product.ProductServiceCacheIntegrationTest\")",
+      "WebFetch(domain:velog.io)",
+      "Bash(rm \"C:/loopers/apps/commerce-api/src/main/java/com/loopers/config/PgHmacProperties.java\" \"C:/loopers/apps/commerce-api/src/main/java/com/loopers/support/pg/PgHmacVerifier.java\" \"C:/loopers/apps/commerce-api/src/main/java/com/loopers/interfaces/api/payment/PaymentAdminV1ApiSpec.java\" \"C:/loopers/apps/commerce-api/src/main/java/com/loopers/interfaces/api/payment/PaymentAdminV1Controller.java\" \"C:/loopers/apps/commerce-api/src/main/java/com/loopers/interfaces/api/payment/PaymentV1Dto.java\")",
+      "Bash(xargs grep -l \"FAILED\\\\|failure\")",
+      "Bash(xargs grep -l \"failed\\\\|FAILED\")",
+      "Bash(xargs grep -l 'failures=\"[^0]\"\\\\|errors=\"[^0]\"')",
+      "Bash(grep -A 20 \"failure\\\\|error\" \"C:/loopers/apps/commerce-api/build/test-results/test/TEST-com.loopers.interfaces.api.PaymentV1ApiE2ETest\\\\$Pay.xml\")",
+      "Bash(mkdir -p \"C:/Users/iieor/.claude/skills/analyze-external-integration\")",
+      "Bash(git commit -m 'feat: PG RestTemplate 타임아웃 설정 추가 *)",
+      "Bash(git commit -m 'feat: PG 연동 Retry + Circuit Breaker 적용 *)",
+      "Bash(git commit -m 'fix: Retry/CircuitBreaker 어노테이션 구조 수정 *)",
+      "Bash(./gradlew :apps:commerce-api:build -x test)",
+      "Bash(Read C:\\\\Users\\\\iieor\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--loopers\\\\e34edf91-5823-4717-805a-3a073a30b510\\\\tasks\\\\ba9qo3e9h.output)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\")",
+      "Bash(cat \"C:/loopers/apps/commerce-api/build/reports/tests/test/classes/com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\\\\$RetryTest.html\" | grep -A 30 \"failure\\\\|Wanted\\\\|invocations\\\\|Actually\" | head -80)",
+      "Bash(cat \"C:/loopers/apps/commerce-api/build/reports/tests/test/classes/com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\\\\$RetryTest.html\" | grep -A 20 \"noRetry_on_4xx\\\\|Wanted\\\\|interaction\\\\|invoked\" | head -50)",
+      "Bash(./gradlew :apps:commerce-api:test --tests \"com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\" --rerun)",
+      "Bash(cat \"C:/loopers/apps/commerce-api/build/reports/tests/test/classes/com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\\\\$RetryTest.html\" | grep -E \"counter|failures|tests|passed\" | head -10)",
+      "Bash(cat \"C:/loopers/apps/commerce-api/build/reports/tests/test/classes/com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\\\\$CircuitBreakerTest.html\" | grep -E \"counter|failures|tests|passed\" | head -10)",
+      "Bash(cat \"C:/loopers/apps/commerce-api/build/reports/tests/test/classes/com.loopers.infrastructure.pg.PgSimulatorGatewayResilienceTest\\\\$CircuitBreakerTest.html\" | grep -E \"counter|failures|tests|passed|failed\" | head -10)"
     ]
   }
 }

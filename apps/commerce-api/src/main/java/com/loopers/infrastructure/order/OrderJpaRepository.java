@@ -32,6 +32,9 @@ public interface OrderJpaRepository extends JpaRepository<OrderModel, UUID> {
     @Query("SELECT o FROM OrderModel o WHERE o.status = 'PENDING' AND o.createdAt < :before")
     List<OrderModel> findPendingBeforeForUpdate(@Param("before") ZonedDateTime before);
 
+    @Query("SELECT o FROM OrderModel o WHERE o.status = 'PENDING' AND o.createdAt < :before")
+    List<OrderModel> findPendingBefore(@Param("before") ZonedDateTime before);
+
     @Query("SELECT o FROM OrderModel o WHERE o.userId = :userId AND o.createdAt BETWEEN :startAt AND :endAt")
     Page<OrderModel> findAllByUserIdAndCreatedAtBetween(
         @Param("userId") UUID userId,
