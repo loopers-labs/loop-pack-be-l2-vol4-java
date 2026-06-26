@@ -24,7 +24,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/v1/products/*/likes",
                 "/api/v1/orders",
                 "/api/v1/orders/**",
-                "/api/v1/coupons/**"
+                "/api/v1/coupons/**",
+                "/api/v1/payments",
+                "/api/v1/payments/*/sync"
             );
         registry.addInterceptor(adminInterceptor)
             .addPathPatterns("/api-admin/v1/**");
