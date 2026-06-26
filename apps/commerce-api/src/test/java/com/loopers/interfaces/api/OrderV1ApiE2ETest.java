@@ -8,9 +8,6 @@ import com.loopers.domain.coupon.Discount;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.money.Money;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.domain.payment.CardType;
-import com.loopers.domain.payment.PaymentGateway;
-import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
 import com.loopers.domain.user.LoginId;
@@ -25,13 +22,11 @@ import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -48,16 +43,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OrderV1ApiE2ETest {
 
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
     private static final String ENDPOINT_ORDER = "/api/v1/orders";
-    private static final CardType CARD_TYPE = CardType.SAMSUNG;
-    private static final String CARD_NO = "1234-1234-1234-1234";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandJpaRepository brandJpaRepository;
@@ -68,10 +59,6 @@ class OrderV1ApiE2ETest {
     private final CouponJpaRepository couponJpaRepository;
     private final UserCouponJpaRepository userCouponJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
-
-    // 외부 PG 호출을 막고 결제 결과를 결정적으로 고정한다(실제 연동은 별도 검증).
-    @MockitoBean
-    private PaymentGateway paymentGateway;
 
     @Autowired
     public OrderV1ApiE2ETest(
@@ -94,12 +81,6 @@ class OrderV1ApiE2ETest {
         this.couponJpaRepository = couponJpaRepository;
         this.userCouponJpaRepository = userCouponJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
-    }
-
-    @BeforeEach
-    void stubPaymentGateway() {
-        given(paymentGateway.requestPayment(any()))
-            .willReturn(new PaymentGateway.PaymentResult("tx-test", PaymentStatus.PENDING, null));
     }
 
     @AfterEach
@@ -143,7 +124,7 @@ class OrderV1ApiE2ETest {
             Product product = saveProduct(10);
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), null, CARD_TYPE, CARD_NO
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), null
             );
 
             // act
@@ -178,7 +159,7 @@ class OrderV1ApiE2ETest {
             UserCoupon userCoupon = userCouponJpaRepository.save(new UserCoupon(userId, coupon.getId()));
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), userCoupon.getId(), CARD_TYPE, CARD_NO
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), userCoupon.getId()
             );
 
             // act
@@ -207,7 +188,7 @@ class OrderV1ApiE2ETest {
             Product product = saveProduct(5);
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 10)), null, CARD_TYPE, CARD_NO
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 10)), null
             );
 
             // act
@@ -232,7 +213,7 @@ class OrderV1ApiE2ETest {
             signup("minwoo01", "Passw0rd!");
             HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(999L, 1)), null, CARD_TYPE, CARD_NO
+                List.of(new OrderV1Dto.OrderLineRequest(999L, 1)), null
             );
 
             // act
@@ -252,7 +233,7 @@ class OrderV1ApiE2ETest {
             // arrange
             Product product = saveProduct(10);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1)), null, CARD_TYPE, CARD_NO
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1)), null
             );
 
             // act

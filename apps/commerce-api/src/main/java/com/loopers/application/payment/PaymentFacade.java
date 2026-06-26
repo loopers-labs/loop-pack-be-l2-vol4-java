@@ -3,20 +3,24 @@ package com.loopers.application.payment;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.Payment;
+import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * PG가 콜백/폴링으로 전해온 최종 결제 상태를 우리 시스템에 반영한다.
- * 콜백과 폴링(Phase 3)이 같은 결제를 동시에 건드릴 수 있으므로, 이미 확정된 결제는 멱등하게 무시한다.
- * 실패면 주문을 FAILED 로 전이하고 재고·쿠폰을 보상(원복)한다 — 한 트랜잭션으로 묶는다.
+ * 결제 오케스트레이션. 결제 요청(pay)과, PG가 콜백/폴링으로 전해온 결과 반영(confirm)을 담당한다.
+ * 외부(PG) 호출은 트랜잭션 밖에서 한다(외부 지연이 DB 커넥션을 점유하지 않도록).
+ * 콜백과 폴링이 같은 결제를 동시에 건드릴 수 있으므로, 이미 확정된 결제는 멱등하게 무시한다.
  */
 @RequiredArgsConstructor
 @Component
@@ -25,6 +29,39 @@ public class PaymentFacade {
     private final OrderRepository orderRepository;
     private final ProductService productService;
     private final CouponService couponService;
+    private final PaymentGateway paymentGateway;
+
+    @Value("${payment.callback-url}")
+    private String callbackUrl;
+
+    /**
+     * 주문에 대한 결제를 요청한다. 주문을 PG에 결제 요청하고(트랜잭션 밖), 결과로 Payment 를 기록한다.
+     * 결과는 보통 PENDING — 최종 확정은 콜백/폴링이 confirm 으로 처리한다.
+     */
+    public PaymentInfo pay(Long userId, Long orderId, CardType cardType, String cardNo) {
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+        if (!order.getUserId().equals(userId)) {
+            // 타인 주문 존재 비노출 — 동일하게 NOT_FOUND
+            throw new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다.");
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new CoreException(ErrorType.CONFLICT, "결제 대기 상태의 주문만 결제할 수 있습니다. 현재 상태: " + order.getStatus());
+        }
+
+        PaymentGateway.PaymentResult result = paymentGateway.requestPayment(new PaymentGateway.PaymentRequest(
+            String.valueOf(userId),
+            String.format("%06d", order.getId()),   // 시뮬레이터는 orderId 를 6자리 이상 문자열로 요구
+            cardType.name(),
+            cardNo,
+            order.getPaymentAmount().getAmount().longValue(),
+            callbackUrl
+        ));
+        Payment payment = paymentRepository.save(new Payment(
+            order.getId(), userId, result.transactionKey(),
+            order.getPaymentAmount(), result.status(), result.reason()));
+        return PaymentInfo.from(payment);
+    }
 
     @Transactional
     public void confirm(String transactionKey, PaymentStatus status, String reason) {

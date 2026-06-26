@@ -96,9 +96,11 @@ class PaymentFacadeIntegrationTest {
         return userCouponJpaRepository.save(new UserCoupon(userId, coupon.getId()));
     }
 
-    private OrderInfo placeOrder(Long userId, Long productId, int quantity, Long couponId) {
-        return orderFacade.place(userId,
-            List.of(new OrderLineCommand(productId, quantity)), couponId, CardType.SAMSUNG, CARD_NO);
+    private OrderInfo placeAndPay(Long userId, Long productId, int quantity, Long couponId) {
+        OrderInfo info = orderFacade.place(userId,
+            List.of(new OrderLineCommand(productId, quantity)), couponId);
+        paymentFacade.pay(userId, info.id(), CardType.SAMSUNG, CARD_NO);
+        return info;
     }
 
     @DisplayName("결제 성공 콜백이 오면, ")
@@ -110,7 +112,7 @@ class PaymentFacadeIntegrationTest {
             // arrange
             Long userId = 1L;
             Product product = saveProduct(10);
-            OrderInfo info = placeOrder(userId, product.getId(), 3, null);
+            OrderInfo info = placeAndPay(userId, product.getId(), 3, null);
 
             // act
             paymentFacade.confirm(TX, PaymentStatus.SUCCESS, null);
@@ -137,7 +139,7 @@ class PaymentFacadeIntegrationTest {
             Long userId = 1L;
             Product product = saveProduct(10);
             UserCoupon userCoupon = issueFixedCoupon(userId, 1000L);
-            OrderInfo info = placeOrder(userId, product.getId(), 3, userCoupon.getId());
+            OrderInfo info = placeAndPay(userId, product.getId(), 3, userCoupon.getId());
 
             // act
             paymentFacade.confirm(TX, PaymentStatus.FAILED, "카드 한도 초과");
@@ -163,7 +165,7 @@ class PaymentFacadeIntegrationTest {
             // arrange
             Long userId = 1L;
             Product product = saveProduct(10);
-            placeOrder(userId, product.getId(), 3, null);
+            placeAndPay(userId, product.getId(), 3, null);
 
             // act
             paymentFacade.confirm(TX, PaymentStatus.FAILED, "실패");

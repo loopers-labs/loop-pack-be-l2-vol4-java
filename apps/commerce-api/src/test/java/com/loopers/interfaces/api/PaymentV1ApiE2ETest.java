@@ -3,6 +3,7 @@ package com.loopers.interfaces.api;
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderLineCommand;
+import com.loopers.application.payment.PaymentFacade;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.money.Money;
 import com.loopers.domain.order.Order;
@@ -52,6 +53,8 @@ class PaymentV1ApiE2ETest {
     @Autowired
     private OrderFacade orderFacade;
     @Autowired
+    private PaymentFacade paymentFacade;
+    @Autowired
     private BrandJpaRepository brandJpaRepository;
     @Autowired
     private ProductJpaRepository productJpaRepository;
@@ -78,8 +81,10 @@ class PaymentV1ApiE2ETest {
         Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
         Product product = productJpaRepository.save(new Product("에어맥스", "편한 러닝화",
             new Money(BigDecimal.valueOf(1000)), new Stock(10), brand.getId()));
-        return orderFacade.place(1L,
-            List.of(new OrderLineCommand(product.getId(), 3)), null, CardType.SAMSUNG, CARD_NO);
+        OrderInfo info = orderFacade.place(1L,
+            List.of(new OrderLineCommand(product.getId(), 3)), null);
+        paymentFacade.pay(1L, info.id(), CardType.SAMSUNG, CARD_NO);
+        return info;
     }
 
     @DisplayName("POST /api/v1/payments/callback")
