@@ -5,12 +5,12 @@ import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.application.product.ProductService;
+import com.loopers.application.stock.StockService;
 import com.loopers.domain.product.ProductFilter;
 import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.stock.StockModel;
-import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,14 +35,14 @@ class OrderServiceTest {
 
     private OrderService orderService;
     private FakeOrderRepository fakeOrderRepository;
-    private FakeProductRepository fakeProductRepository;
-    private FakeStockRepository fakeStockRepository;
+    private FakeProductService fakeProductRepository;
+    private FakeStockService fakeStockRepository;
 
     @BeforeEach
     void setUp() {
         fakeOrderRepository = new FakeOrderRepository();
-        fakeProductRepository = new FakeProductRepository();
-        fakeStockRepository = new FakeStockRepository();
+        fakeProductRepository = new FakeProductService();
+        fakeStockRepository = new FakeStockService();
         orderService = new OrderService(fakeOrderRepository, fakeProductRepository, fakeStockRepository, new OrderDomainService());
     }
 
@@ -328,12 +328,15 @@ class OrderServiceTest {
         }
     }
 
-    private static class FakeProductRepository implements ProductRepository {
+    private static class FakeProductService extends ProductService {
 
         private final Map<Long, ProductModel> store = new HashMap<>();
         private final AtomicLong seq = new AtomicLong(1L);
 
-        @Override
+        FakeProductService() {
+            super(null);
+        }
+
         public ProductModel save(ProductModel product) {
             setId(product, seq.getAndIncrement());
             store.put(product.getId(), product);
@@ -341,29 +344,11 @@ class OrderServiceTest {
         }
 
         @Override
-        public Optional<ProductModel> findById(Long id) {
+        public ProductModel getById(Long id) {
             return Optional.ofNullable(store.get(id))
-                .filter(p -> p.getDeletedAt() == null);
-        }
-
-        @Override
-        public Optional<ProductModel> findByIdForUpdate(Long id) {
-            return findById(id);
-        }
-
-        @Override
-        public List<ProductModel> findAllByBrandId(Long brandId) {
-            return store.values().stream().filter(p -> p.getBrandId().equals(brandId)).toList();
-        }
-
-        @Override
-        public Page<ProductModel> findAll(ProductFilter filter, ProductSort sort, PageRequest pageRequest) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<ProductModel> findAllByIds(List<Long> ids) {
-            return ids.stream().map(store::get).filter(p -> p != null && p.getDeletedAt() == null).toList();
+                .filter(p -> p.getDeletedAt() == null)
+                .orElseThrow(() -> new com.loopers.support.error.CoreException(
+                    com.loopers.support.error.ErrorType.NOT_FOUND, "[productId = " + id + "] 상품을 찾을 수 없습니다."));
         }
 
         private void setId(ProductModel product, long id) {
@@ -377,25 +362,29 @@ class OrderServiceTest {
         }
     }
 
-    private static class FakeStockRepository implements StockRepository {
+    private static class FakeStockService extends StockService {
 
         private final Map<Long, StockModel> store = new HashMap<>();
 
-        @Override
+        FakeStockService() {
+            super(null);
+        }
+
         public StockModel save(StockModel stock) {
             store.put(stock.getProductId(), stock);
             return stock;
         }
 
-        @Override
         public Optional<StockModel> findByProductId(Long productId) {
             return Optional.ofNullable(store.get(productId))
                 .filter(s -> s.getDeletedAt() == null);
         }
 
         @Override
-        public Optional<StockModel> findByProductIdForUpdate(Long productId) {
-            return findByProductId(productId);
+        public StockModel getByProductIdForUpdate(Long productId) {
+            return findByProductId(productId)
+                .orElseThrow(() -> new com.loopers.support.error.CoreException(
+                    com.loopers.support.error.ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
         }
     }
 }
