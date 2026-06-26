@@ -54,7 +54,7 @@ resilience4j:
         max-attempts: 3
         wait-duration: 100ms
         retry-exceptions:
-          - feign.FeignException.InternalServerError
+          - feign.FeignException$InternalServerError
   circuitbreaker:
     instances:
       pg-payment:

@@ -4,6 +4,7 @@ import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
@@ -13,6 +14,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Component
 public class PaymentRepositoryImpl implements PaymentRepository {
+
+    private static final int PENDING_RECOVERY_BATCH_SIZE = 100;
 
     private final PaymentJpaRepository paymentJpaRepository;
 
@@ -38,6 +41,8 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public List<PaymentModel> findPendingBefore(ZonedDateTime threshold) {
-        return paymentJpaRepository.findAllByStatusAndCreatedAtBefore(PaymentStatus.PENDING, threshold);
+        return paymentJpaRepository.findAllByStatusAndCreatedAtBefore(
+            PaymentStatus.PENDING, threshold, PageRequest.of(0, PENDING_RECOVERY_BATCH_SIZE)
+        );
     }
 }

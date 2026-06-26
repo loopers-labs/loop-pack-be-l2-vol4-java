@@ -89,7 +89,7 @@ class PaymentApiE2ETest {
                 .thenReturn(new PgResponse.TransactionResponse("20250626:TR:abc123", "PENDING", null));
 
             PaymentDto.CreateRequest request = new PaymentDto.CreateRequest(
-                savedOrder.getId(), "SAMSUNG", "1234-5678-9012-3456", 10000L
+                savedOrder.getId(), CardType.SAMSUNG, "1234-5678-9012-3456", 10000L
             );
 
             // act
@@ -111,7 +111,7 @@ class PaymentApiE2ETest {
             // act
             ResponseEntity<ApiResponse<PaymentDto.PaymentResponse>> response = testRestTemplate.exchange(
                 BASE_URL, HttpMethod.POST,
-                new HttpEntity<>(new PaymentDto.CreateRequest(1L, "SAMSUNG", "1234-5678-9012-3456", 10000L)),
+                new HttpEntity<>(new PaymentDto.CreateRequest(1L, CardType.SAMSUNG, "1234-5678-9012-3456", 10000L)),
                 new ParameterizedTypeReference<>() {}
             );
 

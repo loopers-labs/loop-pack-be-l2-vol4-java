@@ -4,7 +4,7 @@ import com.loopers.application.order.OrderService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.PaymentModel;
-import com.loopers.infrastructure.pg.PgClient;
+import com.loopers.infrastructure.pg.PgClientWrapper;
 import com.loopers.infrastructure.pg.PgResponse;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,8 @@ public class PaymentBatchService {
 
     private final PaymentService paymentService;
     private final OrderService orderService;
-    private final PgClient pgClient;
+    private final PgClientWrapper pgClient;
+    private final PaymentFacade paymentFacade;
 
     @Scheduled(fixedDelay = 30000)
     public void recoverPendingPayments() {
@@ -45,6 +46,10 @@ public class PaymentBatchService {
             String userId = String.valueOf(order.getMemberId());
 
             PgResponse.OrderResponse pgResult = pgClient.getTransactionsByOrderId(userId, pgOrderId);
+            if (pgResult.transactions().isEmpty()) {
+                log.info("[orderId={}] PG 거래 내역 없음 - 다음 배치에서 재시도", orderId);
+                return;
+            }
             PgResponse.TransactionResponse latest = pgResult.transactions().get(0);
 
             switch (latest.status()) {
@@ -53,21 +58,18 @@ public class PaymentBatchService {
                         log.warn("[orderId={}] PG SUCCESS이나 주문이 이미 취소됨 - CONFLICT 마킹", orderId);
                         paymentService.markConflictByOrderId(orderId);
                     } else {
-                        paymentService.successByOrderId(orderId, latest.transactionKey());
-                        orderService.confirmBySystem(orderId);
+                        paymentFacade.recoverAsSuccess(orderId, latest.transactionKey());
                     }
                 }
                 case "FAILED" -> {
-                    paymentService.failByOrderId(orderId, latest.reason());
-                    orderService.cancelBySystem(orderId);
+                    paymentFacade.recoverAsFailure(orderId, latest.reason());
                 }
                 default -> log.info("[orderId={}] PG PENDING - 다음 배치에서 재시도", orderId);
             }
         } catch (FeignException e) {
             if (e.status() == 404) {
                 log.warn("[orderId={}] PG 결제 기록 없음 - 실패 처리", orderId);
-                paymentService.failByOrderId(orderId, "PG 결제 기록 없음");
-                orderService.cancelBySystem(orderId);
+                paymentFacade.recoverAsFailure(orderId, "PG 결제 기록 없음");
             } else {
                 log.error("[orderId={}] PG 조회 중 오류 발생 - 다음 배치에서 재시도", orderId, e);
             }

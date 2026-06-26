@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.payment;
 
 import com.loopers.application.payment.PaymentFacade;
 import com.loopers.application.payment.PaymentService;
-import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.interfaces.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -27,13 +26,15 @@ public class PaymentController {
         PaymentModel payment = paymentFacade.requestPayment(
             userId,
             request.orderId(),
-            CardType.valueOf(request.cardType()),
+            request.cardType(),
             request.cardNo(),
             request.amount()
         );
         return ApiResponse.success(PaymentDto.PaymentResponse.from(payment));
     }
 
+    // PG 시뮬레이터가 서명 헤더를 전송하지 않아 현재 콜백 인증을 구현할 수 없음.
+    // 실제 운영 환경에서는 PG사와 협의해 HMAC 서명 또는 공유 시크릿 헤더를 추가해야 함.
     @PostMapping("/callback")
     public ApiResponse<Void> handleCallback(
         @RequestBody PaymentDto.CallbackRequest request

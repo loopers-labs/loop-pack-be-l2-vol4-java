@@ -31,24 +31,26 @@ public class PaymentService {
     }
 
     @Transactional
-    public void success(String transactionKey) {
+    public PaymentModel success(String transactionKey) {
         PaymentModel payment = paymentRepository.findByTransactionKey(transactionKey)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
         payment.success(transactionKey);
+        return payment;
     }
 
     @Transactional
-    public void failByTransactionKey(String transactionKey, String reason) {
+    public PaymentModel failByTransactionKey(String transactionKey, String reason) {
         PaymentModel payment = paymentRepository.findByTransactionKey(transactionKey)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[transactionKey = " + transactionKey + "] 결제를 찾을 수 없습니다."));
         payment.fail(transactionKey, reason);
+        return payment;
     }
 
     @Transactional
     public void failByOrderId(Long orderId, String reason) {
         PaymentModel payment = paymentRepository.findByOrderId(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 결제를 찾을 수 없습니다."));
-        payment.fail(null, reason);
+        payment.fail(payment.getTransactionKey(), reason);
     }
 
     @Transactional(readOnly = true)

@@ -16,6 +16,28 @@
 
 ---
 
+## ⚠️ 설계 트레이드오프
+
+### 1. `recoverAsFailure()` split-commit: 주문 취소 미처리 가능성
+
+`recoverAsFailure()`에서 `@Transactional`을 제거해 `failByOrderId()`가 먼저 독립 커밋된다.
+
+**문제 상황**: `@Transactional`로 묶으면 `cancelBySystem()` 예외 시 `failByOrderId()`도 롤백 → 결제가 PENDING 유지 → 다음 배치에서 무한 재시도 루프 발생
+
+**선택한 트레이드오프**: `failByOrderId()` 커밋 후 `cancelBySystem()`이 실패하면 결제는 FAILED이지만 주문이 CANCELLED 되지 않은 불일치 상태가 일시적으로 발생할 수 있다.
+
+**허용 근거**: 결제가 FAILED로 확정되면 배치 재시도는 없다. 주문 미취소는 운영팀 수동 보정 또는 별도 보상 트랜잭션으로 대응 가능하며, 무한 재시도 루프보다 덜 치명적이다. 완전한 해결을 위해서는 Outbox Pattern 도입이 필요하다.
+
+### 2. `handleCallback()` FAILED 경로: TOCTOU 레이스 컨디션
+
+`@Transactional` 내에서 `getById()` (잠금 없음) → `cancelBySystem()` (FOR UPDATE) 사이에 사용자 수동 취소가 끼어들 수 있다.
+
+**문제 상황**: 사용자 취소와 콜백 FAILED 처리가 동시에 진입하면, `cancelBySystem()` 내 비관적 락 충돌로 예외 발생 → 트랜잭션 전체 롤백 → `failByTransactionKey()`로 처리했던 FAILED 상태까지 롤백 → 결제가 PENDING으로 복귀
+
+**허용 근거**: 30초 배치가 PENDING을 재확인하여 최종 상태로 수렴된다. 완전한 해결을 위해서는 Outbox Pattern 도입이 필요하다.
+
+---
+
 # Round 5 체크리스트
 
 ## 🔖 Index

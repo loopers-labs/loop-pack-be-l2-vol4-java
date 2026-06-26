@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.payment;
 
+import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,7 +10,7 @@ public class PaymentDto {
 
     public record CreateRequest(
         @NotNull Long orderId,
-        @NotBlank String cardType,
+        @NotNull CardType cardType,
         @NotBlank String cardNo,
         @NotNull @Positive Long amount
     ) {}
