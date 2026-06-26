@@ -23,11 +23,40 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pgClient:
+            connect-timeout: 1000   # 연결 타임아웃 (ms)
+            read-timeout: 2000      # 응답 타임아웃 (ms) — PG 요청 ACK(100~500ms) + 여유
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  retry:
+    instances:
+      pgRetry:
+        max-attempts: 3
+        wait-duration: 100ms
+        retry-exceptions:
+          - feign.FeignException$FeignServerException   # 요청단계 5xx만 재시도 (타임아웃=RetryableException 제외 → 이중 결제 방지)
+  circuitbreaker:
+    instances:
+      pgCircuit:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 6
+        minimum-number-of-calls: 6
+        failure-rate-threshold: 50          # 실패율 50% 초과 시 open
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
 
 ---
 spring:
