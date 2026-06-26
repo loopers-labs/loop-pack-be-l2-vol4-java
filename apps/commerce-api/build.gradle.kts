@@ -14,6 +14,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // feign
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+
+    // resilience
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
+
     // querydsl
     annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:${project.properties["openFeignQuerydslVersion"]}:jakarta")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")

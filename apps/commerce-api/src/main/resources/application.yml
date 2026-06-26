@@ -29,6 +29,61 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+payment-gateway:
+  url: http://localhost:8082                                  # pg-simulator (pg-simulator/application.yml: server.port=8082)
+  callback-url: http://localhost:8080/api/v1/payments/callback
+  user-id: loopers                                            # PG 는 X-USER-ID 헤더만 요구 — 모든 호출에 동일 값 사용(조회 일관성)
+
+# Feign 타임아웃 (Connect/Read) — 자동 재시도는 끄고(Retryer.NEVER_RETRY) resilience4j 로 일원화
+feign:
+  client:
+    config:
+      pgSimulator:
+        connect-timeout: 1000   # TCP 연결 수립 한도(ms)
+        read-timeout: 2000      # 응답 대기 한도(ms) - PG 요청 지연 스펙(100~500ms)의 약 4배 여유
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentRequest:                    # POST (보호 핵심 경로)
+        sliding-window-type: TIME_BASED
+        sliding-window-size: 30
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 60
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          # 상위 타입 하나로 미도달(5xx)과 Read Timeout(하위 타입) 모두 실패 집계
+          - com.loopers.domain.payment.PaymentGatewayException
+        ignore-exceptions:
+          - com.loopers.support.error.CoreException              # 4xx 입력 검증 등 우리 측 버그
+      paymentQuery:                      # GET (폴링/조회 — 분리: 평균에 묻힘 방지)
+        sliding-window-type: TIME_BASED
+        sliding-window-size: 30
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+  retry:
+    instances:
+      paymentRequest:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true     # Jitter (Thundering Herd 방지)
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          # 미도달(5xx·Connect Timeout)만 자동 재시도 — "돈 안 빠짐"이 증명되어 이중결제 없음
+          - com.loopers.domain.payment.PaymentGatewayException
+        ignore-exceptions:
+          - com.loopers.support.error.CoreException                     # 4xx 영구 실패
+          # Read Timeout 은 "응답만 유실" 가능 → 블라인드 재시도 금지(이중결제 위험).
+          # 하위 타입을 ignore 해 부모(PaymentGatewayException) 매칭에서 제외 → PENDING 유지 후 폴링 확정.
+          - com.loopers.domain.payment.PaymentGatewayTimeoutException
+
 ---
 spring:
   config:
