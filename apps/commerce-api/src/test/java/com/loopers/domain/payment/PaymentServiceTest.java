@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
@@ -71,6 +72,19 @@ class PaymentServiceTest {
             PaymentModel confirmed = pending();
             confirmed.markSuccess();
             when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.of(confirmed));
+
+            CoreException ex = assertThrows(CoreException.class,
+                () -> paymentService.createPending(1L, 10L, CardType.SAMSUNG, Money.of(5_000L)));
+
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("동시 최초 생성 경합으로 UNIQUE 충돌이 발생하면 CONFLICT로 변환한다")
+        @Test
+        void throwsConflict_whenUniqueViolation() {
+            when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.empty());
+            when(paymentRepository.save(any(PaymentModel.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_payment_order_id"));
 
             CoreException ex = assertThrows(CoreException.class,
                 () -> paymentService.createPending(1L, 10L, CardType.SAMSUNG, Money.of(5_000L)));

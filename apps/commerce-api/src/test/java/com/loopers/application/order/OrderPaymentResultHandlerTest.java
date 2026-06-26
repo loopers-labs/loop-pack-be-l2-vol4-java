@@ -98,5 +98,19 @@ class OrderPaymentResultHandlerTest {
             verify(couponService, never()).cancel(anyLong());
             verify(orderService, never()).cancel(any());
         }
+
+        @DisplayName("이미 PAID 주문이면 재고·쿠폰 복원도 취소도 하지 않는다 (오보상 방지)")
+        @Test
+        void isNoOp_whenAlreadyPaid() {
+            OrderModel order = new OrderModel(1L, List.of(item(100L, 1_000L, 2)), null, Money.ZERO);
+            order.pay();
+            when(orderService.getById(1L)).thenReturn(order);
+
+            handler.onFailed(1L);
+
+            verify(stockService, never()).increase(anyLong(), anyInt());
+            verify(couponService, never()).cancel(anyLong());
+            verify(orderService, never()).cancel(any());
+        }
     }
 }

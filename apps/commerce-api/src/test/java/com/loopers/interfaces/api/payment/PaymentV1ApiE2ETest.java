@@ -9,6 +9,7 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.GatewayResult;
 import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.payment.dto.PaymentCallbackV1Request;
 import com.loopers.interfaces.api.payment.dto.PaymentV1Request;
 import com.loopers.interfaces.api.payment.dto.PaymentV1Response;
 import com.loopers.utils.DatabaseCleanUp;
@@ -34,6 +35,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -125,6 +128,36 @@ class PaymentV1ApiE2ETest {
 
             ResponseEntity<ApiResponse<PaymentV1Response>> response = restTemplate.exchange(
                 ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, userHeaders()),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("같은 주문으로 두 번 연속 요청해도 PG 접수는 한 번만 호출된다 (이중 접수 방지)")
+        @Test
+        void callsGatewayOnce_whenRequestedTwice() {
+            PaymentV1Request request = new PaymentV1Request(orderId, CardType.SAMSUNG, "1234-5678-9012-3456");
+            HttpEntity<PaymentV1Request> entity = new HttpEntity<>(request, userHeaders());
+
+            restTemplate.exchange(ENDPOINT, HttpMethod.POST, entity, new ParameterizedTypeReference<ApiResponse<PaymentV1Response>>() {});
+            restTemplate.exchange(ENDPOINT, HttpMethod.POST, entity, new ParameterizedTypeReference<ApiResponse<PaymentV1Response>>() {});
+
+            verify(paymentGateway, times(1)).requestPayment(any());
+        }
+    }
+
+    @DisplayName("POST /api/v1/payments/callback — 결제 콜백 수신 시")
+    @Nested
+    class HandleCallback {
+
+        @DisplayName("transactionKey가 비어 있으면 400 BAD_REQUEST 를 반환한다")
+        @Test
+        void returns400_whenTransactionKeyBlank() {
+            PaymentCallbackV1Request request = new PaymentCallbackV1Request("  ", "SUCCESS", null);
+
+            ResponseEntity<ApiResponse<Object>> response = restTemplate.exchange(
+                ENDPOINT + "/callback", HttpMethod.POST, new HttpEntity<>(request, new HttpHeaders()),
                 new ParameterizedTypeReference<>() {}
             );
 

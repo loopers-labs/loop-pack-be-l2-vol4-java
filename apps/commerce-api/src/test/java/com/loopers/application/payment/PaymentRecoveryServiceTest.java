@@ -10,6 +10,8 @@ import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentService;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -80,6 +82,22 @@ class PaymentRecoveryServiceTest {
             recoveryService.reconcilePending();
 
             verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
+        }
+
+        @DisplayName("한 건이 예외를 던져도 루프를 멈추지 않고 다음 PENDING 건을 계속 처리한다")
+        @Test
+        void continuesWhenOneItemFails() {
+            PaymentModel first = new PaymentModel(1L, 10L, CardType.SAMSUNG, Money.of(5_000L));
+            first.assignTransactionKey("tx-a");
+            PaymentModel second = new PaymentModel(2L, 10L, CardType.SAMSUNG, Money.of(5_000L));
+            second.assignTransactionKey("tx-b");
+            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(first, second));
+            when(paymentGateway.queryStatus("tx-a", 10L)).thenThrow(new CoreException(ErrorType.INTERNAL_ERROR, "PG 오류"));
+            when(paymentGateway.queryStatus("tx-b", 10L)).thenReturn(Optional.of(new GatewayStatus("SUCCESS", null)));
+
+            recoveryService.reconcilePending();
+
+            verify(paymentService).confirmFromGatewayStatus("tx-b", "SUCCESS", null);
         }
     }
 
