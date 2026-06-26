@@ -4,7 +4,8 @@ import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +24,14 @@ public class PgPaymentGateway implements PaymentGateway {
         this.callbackUrl = callbackUrl;
     }
 
+    /**
+     * 예외를 잡지 않고 그대로 전파한다 → resilience4j가 본다.
+     * 기본 aspect 순서상 Retry가 CircuitBreaker를 감싸며(Retry 최외곽), 최종 실패는 fallback이 도메인 예외로 변환한다.
+     * - 재시도: 요청단계 5xx(FeignServerException)만 (yml). 타임아웃(RetryableException)은 제외 → 이중 결제 방지.
+     * - 서킷: 반복 실패 시 open → 빠른 실패 + fallback.
+     */
+    @Retry(name = "pgRetry", fallbackMethod = "requestPaymentFallback")
+    @CircuitBreaker(name = "pgCircuit")
     @Override
     public Result requestPayment(Command command) {
         PgV1Dto.PaymentRequest request = new PgV1Dto.PaymentRequest(
@@ -32,14 +41,18 @@ public class PgPaymentGateway implements PaymentGateway {
             command.amount(),
             callbackUrl
         );
-        try {
-            PgV1Dto.PaymentResponse response = pgClient.requestPayment(String.valueOf(command.userId()), request);
-            PgV1Dto.PaymentResponse.Data data = response.data();
-            return new Result(data.transactionKey(), PaymentStatus.valueOf(data.status()), data.reason());
-        } catch (FeignException e) {
-            // 타임아웃(RetryableException)·5xx 모두 FeignException으로 수렴 → 도메인 의미 예외로 변환
-            log.warn("PG 결제 요청 실패: httpStatus={}, message={}", e.status(), e.getMessage());
-            throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 요청에 실패했습니다.");
-        }
+        PgV1Dto.PaymentResponse response = pgClient.requestPayment(String.valueOf(command.userId()), request);
+        PgV1Dto.PaymentResponse.Data data = response.data();
+        return new Result(data.transactionKey(), PaymentStatus.valueOf(data.status()), data.reason());
+    }
+
+    /**
+     * 재시도 소진/서킷 open/타임아웃 등 모든 PG 호출 실패의 최종 착지점.
+     * 외부 장애를 도메인 예외로 변환해 내부 시스템이 정상 응답하도록 한다.
+     */
+    @SuppressWarnings("unused")
+    private Result requestPaymentFallback(Command command, Throwable t) {
+        log.warn("PG 결제 요청 실패(재시도/서킷 처리 후): {}", t.toString());
+        throw new CoreException(ErrorType.INTERNAL_ERROR, "결제 요청이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
     }
 }
