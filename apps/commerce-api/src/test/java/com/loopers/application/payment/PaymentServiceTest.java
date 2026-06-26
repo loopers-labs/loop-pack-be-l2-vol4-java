@@ -73,7 +73,7 @@ class PaymentServiceTest {
         void createsAndSavesPending() {
             // arrange
             Order order = payableOrder(5000L);
-            when(orderRepository.find(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
             when(paymentRepository.findActiveByOrderId(ORDER_ID)).thenReturn(Optional.empty());
             when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -95,7 +95,7 @@ class PaymentServiceTest {
             // arrange
             Payment existing = Payment.pending(USER_ID, ORDER_ID, Money.of(5000L), CardType.SAMSUNG);
             Order order = payableOrder(5000L);
-            when(orderRepository.find(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
             when(paymentRepository.findActiveByOrderId(ORDER_ID)).thenReturn(Optional.of(existing));
 
             // act
@@ -110,7 +110,7 @@ class PaymentServiceTest {
         @Test
         void throwsNotFound_whenOrderMissing() {
             // arrange
-            when(orderRepository.find(ORDER_ID)).thenReturn(Optional.empty());
+            when(orderRepository.findForUpdate(ORDER_ID)).thenReturn(Optional.empty());
 
             // act + assert
             CoreException ex = assertThrows(CoreException.class,
@@ -124,7 +124,7 @@ class PaymentServiceTest {
             // arrange
             Order order = mock(Order.class);
             when(order.isOwnedBy(USER_ID)).thenReturn(false);
-            when(orderRepository.find(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
             // act + assert
             CoreException ex = assertThrows(CoreException.class,
@@ -139,7 +139,7 @@ class PaymentServiceTest {
             Order order = mock(Order.class);
             when(order.isOwnedBy(USER_ID)).thenReturn(true);
             when(order.getStatus()).thenReturn(OrderStatus.PAID);
-            when(orderRepository.find(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
             // act + assert
             CoreException ex = assertThrows(CoreException.class,
@@ -248,6 +248,18 @@ class PaymentServiceTest {
             paymentService.applyResult("TKEY", PaymentStatus.SUCCESS, null);
 
             // assert
+            verify(orderRepository, never()).find(anyLong());
+            verify(paymentRepository, never()).save(any());
+        }
+
+        @DisplayName("비종결 상태(PENDING 등)가 들어오면, 조회조차 않고 아무 것도 바꾸지 않는다.")
+        @Test
+        void nonTerminal_isNoOp() {
+            // act — 폴링/지연으로 아직 미확정(PENDING)인 결과가 들어온 경우
+            paymentService.applyResult("TKEY", PaymentStatus.PENDING, null);
+
+            // assert
+            verify(paymentRepository, never()).findByTransactionKey(any());
             verify(orderRepository, never()).find(anyLong());
             verify(paymentRepository, never()).save(any());
         }

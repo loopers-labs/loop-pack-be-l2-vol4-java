@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -44,7 +45,8 @@ public class PaymentService {
      */
     @Transactional
     public Payment createPending(Long userId, Long orderId, CardType cardType) {
-        Order order = orderRepository.find(orderId)
+        // 비관적 락: 동시 결제 접수를 직렬화 → 두 번째 요청은 첫 번째의 활성 결제를 보고 새로 만들지 않는다.
+        Order order = orderRepository.findForUpdate(orderId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + orderId + "] 주문을 찾을 수 없습니다."));
         if (!order.isOwnedBy(userId)) {
             // 타 유저 주문은 존재를 드러내지 않는다
@@ -70,6 +72,12 @@ public class PaymentService {
         return payment;
     }
 
+    /** 거래키로 결제 조회 (콜백 트리거용). */
+    @Transactional(readOnly = true)
+    public Optional<Payment> findByTransactionKey(String transactionKey) {
+        return paymentRepository.findByTransactionKey(transactionKey);
+    }
+
     /** PG 가 접수해 발급한 거래키를 결제에 기록한다 (PG 호출 성공 직후, TX2). */
     @Transactional
     public Payment attachTransactionKey(Long paymentId, String transactionKey) {
@@ -85,6 +93,9 @@ public class PaymentService {
      */
     @Transactional
     public void applyResult(String transactionKey, PaymentStatus result, String reason) {
+        if (result != PaymentStatus.SUCCESS && result != PaymentStatus.FAILED) {
+            return; // 비종결(PENDING 등)은 실패로 단정하지 않는다 — PG 처리 진행 중일 수 있음
+        }
         Payment payment = paymentRepository.findByTransactionKey(transactionKey)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "(transactionKey: " + transactionKey + ") 결제건을 찾을 수 없습니다."));

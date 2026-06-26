@@ -21,4 +21,9 @@ public class OrderRepositoryImpl implements OrderRepository {
     public Optional<Order> find(Long id) {
         return orderJpaRepository.findByIdAndDeletedAtIsNull(id);
     }
+
+    @Override
+    public Optional<Order> findForUpdate(Long id) {
+        return orderJpaRepository.findForUpdateByIdAndDeletedAtIsNull(id);
+    }
 }

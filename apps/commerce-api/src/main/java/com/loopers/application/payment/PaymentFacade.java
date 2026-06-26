@@ -2,7 +2,6 @@ package com.loopers.application.payment;
 
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.Payment;
-import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
@@ -54,20 +53,13 @@ public class PaymentFacade {
     }
 
     /**
-     * PG 콜백 처리. status 를 우리 PaymentStatus 로 매핑해 결과를 반영한다(터미널만).
-     * 알 수 없거나 미확정(PENDING) 상태는 무시한다.
+     * PG 콜백 처리. 콜백 페이로드(status/reason)는 신뢰하지 않는다 — 위조 가능하므로 콜백은 '확인하라'는
+     * 신호로만 쓰고, 진실은 reconcile 가 PG 재조회로 확정한다(위조 콜백을 보내도 PG가 실제 그 상태여야 반영).
+     * (pg-simulator 가 서명을 제공하지 않아 HMAC/mTLS 검증은 미구현 — 실 PG라면 서명 검증 추가)
      */
-    public void handleCallback(String transactionKey, String status, String reason) {
-        PaymentStatus result;
-        try {
-            result = PaymentStatus.valueOf(status);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            return; // 알 수 없는 상태 — 무시
-        }
-        if (result == PaymentStatus.PENDING) {
-            return; // 아직 미확정 — 반영하지 않음
-        }
-        paymentService.applyResult(transactionKey, result, reason);
+    public void handleCallback(String transactionKey) {
+        paymentService.findByTransactionKey(transactionKey)
+            .ifPresent(paymentReconciler::reconcile);
     }
 
     /** 우리 Order id(Long) → PG orderId(문자열, 6자 이상 규칙). */

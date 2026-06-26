@@ -141,6 +141,12 @@ class PaymentV1ApiE2ETest {
                 transactionKey, "000001", "SAMSUNG", "1234-5678-9814-1451", 5000L, "SUCCESS", null));
     }
 
+    private PgDto.Envelope<PgDto.TransactionDetailResponse> detailFailed(String transactionKey, String reason) {
+        return new PgDto.Envelope<>(new PgDto.Envelope.Meta("SUCCESS", null, null),
+            new PgDto.TransactionDetailResponse(
+                transactionKey, "000001", "SAMSUNG", "1234-5678-9814-1451", 5000L, "FAILED", reason));
+    }
+
     @DisplayName("POST /api/v1/payments")
     @Nested
     class RequestPayment {
@@ -205,6 +211,8 @@ class PaymentV1ApiE2ETest {
             // arrange
             Long orderId = persistPendingOrder(5000L);
             persistPendingPayment(orderId, "TKEY-CB-1");
+            // 콜백은 트리거일 뿐 — 진실은 PG 재조회로 확정
+            when(pgPaymentClient.getTransaction(anyString(), eq("TKEY-CB-1"))).thenReturn(detailSuccess("TKEY-CB-1"));
 
             // act
             ResponseEntity<ApiResponse<Object>> response = postCallback("TKEY-CB-1", "SUCCESS", null);
@@ -225,6 +233,7 @@ class PaymentV1ApiE2ETest {
             // arrange
             Long orderId = persistPendingOrder(5000L);
             persistPendingPayment(orderId, "TKEY-CB-2");
+            when(pgPaymentClient.getTransaction(anyString(), eq("TKEY-CB-2"))).thenReturn(detailFailed("TKEY-CB-2", "한도 초과"));
 
             // act
             ResponseEntity<ApiResponse<Object>> response = postCallback("TKEY-CB-2", "FAILED", "한도 초과");
@@ -245,6 +254,7 @@ class PaymentV1ApiE2ETest {
             // arrange
             Long orderId = persistPendingOrder(5000L);
             persistPendingPayment(orderId, "TKEY-CB-3");
+            when(pgPaymentClient.getTransaction(anyString(), eq("TKEY-CB-3"))).thenReturn(detailSuccess("TKEY-CB-3"));
 
             // act
             postCallback("TKEY-CB-3", "SUCCESS", null);

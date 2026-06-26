@@ -124,4 +124,37 @@ class PaymentFacadeTest {
             verify(pgClient, never()).requestPayment(anyString(), any());
         }
     }
+
+    @DisplayName("PG 콜백을 받을 때, ")
+    @Nested
+    class HandleCallback {
+
+        @DisplayName("페이로드를 신뢰하지 않고, 해당 결제를 PG에 재조회(reconcile)하도록 트리거한다.")
+        @Test
+        void triggersReconcile_notTrustingPayload() {
+            // arrange
+            Payment payment = mock(Payment.class);
+            when(paymentService.findByTransactionKey("TKEY")).thenReturn(Optional.of(payment));
+
+            // act
+            paymentFacade.handleCallback("TKEY");
+
+            // assert — applyResult 를 직접 호출하지 않고 reconcile 로만 (위조 페이로드 무력화)
+            verify(paymentReconciler).reconcile(payment);
+            verify(paymentService, never()).applyResult(anyString(), any(), any());
+        }
+
+        @DisplayName("키에 해당하는 결제가 없으면(타임아웃 고아 등), 무시한다.")
+        @Test
+        void ignores_whenPaymentNotFound() {
+            // arrange
+            when(paymentService.findByTransactionKey("X")).thenReturn(Optional.empty());
+
+            // act
+            paymentFacade.handleCallback("X");
+
+            // assert
+            verify(paymentReconciler, never()).reconcile(any());
+        }
+    }
 }
