@@ -185,5 +185,19 @@ class PgSimulatorGatewayResilienceTest {
             // postForObject 한 번도 호출 안 됨
             verifyPostForObjectNeverCalled();
         }
+
+        @Test
+        @DisplayName("CB OPEN 시 CallNotPermittedException ignore → 재시도 없이 CB 거절 1회만")
+        void callNotPermitted_onlyOnce_whenCircuitOpen() {
+            // CB 강제 OPEN
+            circuitBreakerRegistry.circuitBreaker("pgCircuit").transitionToOpenState();
+
+            assertThrows(CoreException.class, () -> request());
+
+            // 재시도했다면 3, ignore-exceptions 적용으로 재시도 없으면 1
+            long notPermitted = circuitBreakerRegistry.circuitBreaker("pgCircuit")
+                .getMetrics().getNumberOfNotPermittedCalls();
+            assertThat(notPermitted).isEqualTo(1L);
+        }
     }
 }
