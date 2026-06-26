@@ -1,5 +1,7 @@
 package com.loopers.application.product;
 
+import java.util.Objects;
+
 /**
  * 상품 캐시 무효화 이벤트.
  *
@@ -15,6 +17,7 @@ package com.loopers.application.product;
 public record ProductCacheEvictEvent(Long productId, boolean evictList) {
 
     public static ProductCacheEvictEvent detailAndList(Long productId) {
+        Objects.requireNonNull(productId, "detailAndList 는 productId 가 필요합니다.");
         return new ProductCacheEvictEvent(productId, true);
     }
 

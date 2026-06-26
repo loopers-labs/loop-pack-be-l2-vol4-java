@@ -34,7 +34,7 @@ public interface OrderJpaRepository extends JpaRepository<OrderModel, Long> {
 
     List<OrderModel> findByStatusAndOrderedAtBefore(OrderStatus status, ZonedDateTime before);
 
-    List<OrderModel> findByStatusAndPaymentStartedAtBefore(OrderStatus status, ZonedDateTime before);
+    List<OrderModel> findByStatus(OrderStatus status);
 
     /** 비관적 쓰기 락 조회 — 중복 confirm / 스케줄러 경합 직렬화용. items 는 트랜잭션 내 lazy 로딩. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
