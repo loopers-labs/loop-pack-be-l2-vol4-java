@@ -124,7 +124,7 @@ class PaymentServiceTest {
             verify(eventPublisher, never()).publishEvent(any());
         }
 
-        @DisplayName("success=false이면 결제가 FAILED로 확정되고 사유가 기록된다")
+        @DisplayName("success=false이면 결제가 FAILED로 확정되고 사유가 기록되며 PaymentFailed 이벤트가 발행된다")
         @Test
         void marksFailed() {
             PaymentModel payment = pending();
@@ -135,6 +135,7 @@ class PaymentServiceTest {
 
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
             assertThat(payment.getReason()).isEqualTo("한도 초과");
+            verify(eventPublisher).publishEvent(any(PaymentFailed.class));
         }
 
         @DisplayName("거래키에 해당하는 결제가 없으면 NOT_FOUND 예외가 발생한다")
@@ -152,6 +153,17 @@ class PaymentServiceTest {
     @DisplayName("주문 기준 조회(getByOrderId) 시")
     @Nested
     class GetByOrderId {
+
+        @DisplayName("결제가 있으면 해당 결제를 그대로 반환한다")
+        @Test
+        void returnsPayment_whenExists() {
+            PaymentModel payment = pending();
+            when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.of(payment));
+
+            PaymentModel result = paymentService.getByOrderId(1L);
+
+            assertThat(result).isSameAs(payment);
+        }
 
         @DisplayName("결제가 없으면 NOT_FOUND 예외가 발생한다")
         @Test

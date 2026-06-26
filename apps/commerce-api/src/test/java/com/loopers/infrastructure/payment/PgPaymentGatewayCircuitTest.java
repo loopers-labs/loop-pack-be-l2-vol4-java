@@ -115,4 +115,46 @@ class PgPaymentGatewayCircuitTest {
             verify(pgClient, times(10)).requestPayment(any());
         }
     }
+
+    /** wait 타이밍에 의존하지 않도록 HALF_OPEN으로 직접 전이시켜 시험 호출 결과만 또렷이 검증한다. */
+    @DisplayName("HALF_OPEN에서 시험 호출(permitted=3)이")
+    @Nested
+    class HalfOpenRecovery {
+
+        private void openCircuit() {
+            stubFailFirst(10);
+            for (int i = 0; i < 10; i++) {
+                paymentGateway.requestPayment(CMD);
+            }
+            assertThat(circuit().getState()).isEqualTo(CircuitBreaker.State.OPEN);
+        }
+
+        @DisplayName("모두 성공하면 CLOSED로 복귀한다")
+        @Test
+        void closesAfterSuccessfulProbes() {
+            openCircuit();
+            circuit().transitionToHalfOpenState();
+            when(pgClient.requestPayment(any())).thenReturn("tx-recovered"); // PG 복구
+
+            for (int i = 0; i < 3; i++) {
+                paymentGateway.requestPayment(CMD);
+            }
+
+            assertThat(circuit().getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        }
+
+        @DisplayName("실패하면 다시 OPEN된다 (PG가 아직 회복 전)")
+        @Test
+        void reopensAfterFailedProbes() {
+            openCircuit();
+            circuit().transitionToHalfOpenState();
+            when(pgClient.requestPayment(any())).thenThrow(new RuntimeException("PG 여전히 다운"));
+
+            for (int i = 0; i < 3; i++) {
+                paymentGateway.requestPayment(CMD);
+            }
+
+            assertThat(circuit().getState()).isEqualTo(CircuitBreaker.State.OPEN);
+        }
+    }
 }

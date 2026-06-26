@@ -20,8 +20,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -77,6 +79,7 @@ class PaymentConfirmConcurrencyIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        List<Throwable> unexpected = new CopyOnWriteArrayList<>();
 
         // when - 같은 결제를 동시에 실패 확정
         for (int i = 0; i < threadCount; i++) {
@@ -84,10 +87,12 @@ class PaymentConfirmConcurrencyIntegrationTest {
                 try {
                     startGate.await();
                     paymentService.confirm("tx-fail", false, "한도 초과");
+                } catch (ObjectOptimisticLockingFailureException ignored) {
+                    // 낙관락 충돌 — 승자만 확정·발행, 패자는 예상된 실패
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                } catch (Exception ignored) {
-                    // 낙관락 충돌 등 — 승자만 확정·발행
+                } catch (Throwable t) {
+                    unexpected.add(t); // NPE·매핑 오류 등 예상 밖 예외는 테스트를 실패시킨다
                 } finally {
                     doneLatch.countDown();
                 }
@@ -100,7 +105,8 @@ class PaymentConfirmConcurrencyIntegrationTest {
             executor.shutdownNow();
         }
 
-        // then - 재고는 10 + 2(1회 복원) = 12, 주문 CANCELED, 쿠폰 복원
+        // then - 예상 밖 예외 없음 + 재고는 10 + 2(1회 복원) = 12, 주문 CANCELED, 쿠폰 복원
+        assertThat(unexpected).isEmpty();
         assertAll(
             () -> assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.CANCELED),
             () -> assertThat(stockRepository.findByProductId(PRODUCT_ID).orElseThrow().getQuantity()).isEqualTo(12),

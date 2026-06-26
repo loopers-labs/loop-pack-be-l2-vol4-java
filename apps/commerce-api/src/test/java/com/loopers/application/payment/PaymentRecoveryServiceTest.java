@@ -73,6 +73,28 @@ class PaymentRecoveryServiceTest {
             verify(paymentService).confirmFromGatewayStatus("tx-1", "SUCCESS", null);
         }
 
+        @DisplayName("PG 조회 결과가 FAILED이면 실패로 확정한다")
+        @Test
+        void confirmsFailed() {
+            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(payment("tx-1")));
+            when(paymentGateway.queryStatus("tx-1", 10L)).thenReturn(Optional.of(new GatewayStatus("FAILED", "한도 초과")));
+
+            recoveryService.reconcilePending();
+
+            verify(paymentService).confirmFromGatewayStatus("tx-1", "FAILED", "한도 초과");
+        }
+
+        @DisplayName("거래키가 없는(null) PENDING은 건너뛴다 (recoverKeyless가 담당)")
+        @Test
+        void skipsWhenNoTransactionKey() {
+            when(paymentRepository.findAllByStatus(PaymentStatus.PENDING)).thenReturn(List.of(payment(null)));
+
+            recoveryService.reconcilePending();
+
+            verify(paymentGateway, never()).queryStatus(any(), any());
+            verify(paymentService, never()).confirmFromGatewayStatus(any(), any(), any());
+        }
+
         @DisplayName("PG가 응답하지 않으면(empty) 확정하지 않고 다음 주기로 미룬다")
         @Test
         void skipsWhenGatewayUnavailable() {
@@ -115,6 +137,18 @@ class PaymentRecoveryServiceTest {
 
             verify(paymentService).assignTransactionKey(1L, "tx-2");
             verify(paymentService).confirmFromGatewayStatus("tx-2", "SUCCESS", null);
+        }
+
+        @DisplayName("PG에 거래가 있고 결과가 FAILED이면 거래키 backfill 후 실패로 확정한다")
+        @Test
+        void backfillsAndConfirmsFailed_whenFoundFailed() {
+            when(paymentRepository.findKeylessPendingBefore(any())).thenReturn(List.of(payment(null)));
+            when(paymentGateway.queryByOrderId(1L, 10L)).thenReturn(GatewayLookup.found("tx-2", "FAILED", "한도 초과"));
+
+            recoveryService.recoverKeyless();
+
+            verify(paymentService).assignTransactionKey(1L, "tx-2");
+            verify(paymentService).confirmFromGatewayStatus("tx-2", "FAILED", "한도 초과");
         }
 
         @DisplayName("PG에 거래가 없으면(NOT_FOUND) 미접수로 보고 실패 처리(취소)한다")
