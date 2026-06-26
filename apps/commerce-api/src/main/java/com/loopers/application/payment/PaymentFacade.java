@@ -38,9 +38,13 @@ public class PaymentFacade {
         if (payment.getTransactionKey() == null) {
             GatewayResult result = paymentGateway.requestPayment(
                 new GatewayCommand(orderId, userId, cardType, cardNo, amount));
-            if (result.accepted()) {
+            if (result.isAccepted()) {
                 paymentService.assignTransactionKey(orderId, result.transactionKey());
+            } else if (result.isRejected()) {
+                // 서킷 OPEN — PG에 호출조차 못 감(미접수 확정). PENDING으로 두고 폴링하면 헛조회만 쌓이므로 즉시 실패 처리.
+                paymentService.failByOrderId(orderId, "결제 일시 차단 (PG 서킷 OPEN)");
             }
+            // PENDING(접수 여부 불명)은 그대로 두고 폴링/복구가 확정한다.
         }
 
         return PaymentInfo.from(paymentService.getByOrderId(orderId));

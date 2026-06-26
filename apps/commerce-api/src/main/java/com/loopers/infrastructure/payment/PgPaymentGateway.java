@@ -5,6 +5,7 @@ import com.loopers.domain.payment.GatewayLookup;
 import com.loopers.domain.payment.GatewayResult;
 import com.loopers.domain.payment.GatewayStatus;
 import com.loopers.domain.payment.PaymentGateway;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +30,14 @@ public class PgPaymentGateway implements PaymentGateway {
         return GatewayResult.accepted(transactionKey);
     }
 
-    /** 타임아웃·서킷 Open 등 접수 결과 불명 — 실패로 단정하지 않고 PENDING 유지. 폴링/복구가 확정한다. */
+    /**
+     * 서킷 OPEN(CallNotPermittedException)은 PG에 호출조차 못 간 미접수 확정 → REJECTED(즉시 실패 처리).
+     * 그 외(타임아웃·IO)는 접수 여부 불명 → PENDING 유지, 폴링/복구가 확정한다.
+     */
     private GatewayResult requestFallback(GatewayCommand command, Throwable t) {
+        if (t instanceof CallNotPermittedException) {
+            return GatewayResult.rejected();
+        }
         return GatewayResult.pending();
     }
 
