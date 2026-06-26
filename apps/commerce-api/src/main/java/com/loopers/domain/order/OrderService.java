@@ -46,7 +46,12 @@ public class OrderService {
 
     @Transactional
     public Order complete(Long userId, List<OrderItem> items, Money discountAmount) {
-        Order order = Order.place(userId, items, discountAmount);
+        return complete(userId, items, discountAmount, null);
+    }
+
+    @Transactional
+    public Order complete(Long userId, List<OrderItem> items, Money discountAmount, Long couponId) {
+        Order order = Order.place(userId, items, discountAmount, couponId);
         return orderRepository.save(order);
     }
 }

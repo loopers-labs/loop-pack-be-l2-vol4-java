@@ -7,6 +7,9 @@ import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.Discount;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.money.Money;
+import com.loopers.domain.payment.CardType;
+import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
@@ -17,11 +20,13 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,14 +41,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 
 @SpringBootTest
 class OrderFacadeIntegrationTest {
 
     private static final LocalDateTime VALID_EXPIRED_AT = LocalDateTime.of(2099, 12, 31, 23, 59, 59);
+    private static final CardType CARD_TYPE = CardType.SAMSUNG;
+    private static final String CARD_NO = "1234-1234-1234-1234";
 
     @Autowired
     private OrderFacade orderFacade;
+
+    // 외부 PG 호출을 막고 결제 결과를 결정적으로 고정한다(실제 연동은 별도 검증).
+    @MockitoBean
+    private PaymentGateway paymentGateway;
+
+    @BeforeEach
+    void stubPaymentGateway() {
+        given(paymentGateway.requestPayment(any()))
+            .willReturn(new PaymentGateway.PaymentResult("tx-test", PaymentStatus.PENDING, null));
+    }
 
     @Autowired
     private BrandJpaRepository brandJpaRepository;
@@ -93,7 +112,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             OrderInfo info = orderFacade.place(userId,
-                List.of(new OrderLineCommand(product.getId(), 3)), userCoupon.getId());
+                List.of(new OrderLineCommand(product.getId(), 3)), userCoupon.getId(), CARD_TYPE, CARD_NO);
 
             // assert
             UserCoupon reloadedCoupon = userCouponJpaRepository.findById(userCoupon.getId()).orElseThrow();
@@ -115,7 +134,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             assertThrows(CoreException.class, () -> orderFacade.place(userId,
-                List.of(new OrderLineCommand(product.getId(), 3)), expiredCoupon.getId()));
+                List.of(new OrderLineCommand(product.getId(), 3)), expiredCoupon.getId(), CARD_TYPE, CARD_NO));
 
             // assert
             Product reloadedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
@@ -150,7 +169,7 @@ class OrderFacadeIntegrationTest {
                     try {
                         startLatch.await();
                         orderFacade.place(userId,
-                            List.of(new OrderLineCommand(product.getId(), 1)), null);
+                            List.of(new OrderLineCommand(product.getId(), 1)), null, CARD_TYPE, CARD_NO);
                         successCount.incrementAndGet();
                     } catch (Throwable e) {
                         failureCount.incrementAndGet();
@@ -197,7 +216,7 @@ class OrderFacadeIntegrationTest {
                     try {
                         startLatch.await();
                         orderFacade.place(userId,
-                            List.of(new OrderLineCommand(product.getId(), 1)), userCoupon.getId());
+                            List.of(new OrderLineCommand(product.getId(), 1)), userCoupon.getId(), CARD_TYPE, CARD_NO);
                         successCount.incrementAndGet();
                     } catch (Throwable e) {
                         failureCount.incrementAndGet();

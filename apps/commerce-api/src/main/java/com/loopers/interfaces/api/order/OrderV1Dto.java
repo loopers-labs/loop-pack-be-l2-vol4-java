@@ -3,13 +3,14 @@ package com.loopers.interfaces.api.order;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderLineCommand;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.payment.CardType;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 public class OrderV1Dto {
 
-    public record PlaceOrderRequest(List<OrderLineRequest> items, Long couponId) {
+    public record PlaceOrderRequest(List<OrderLineRequest> items, Long couponId, CardType cardType, String cardNo) {
         public List<OrderLineCommand> toCommands() {
             return items.stream()
                 .map(line -> new OrderLineCommand(line.productId(), line.quantity()))

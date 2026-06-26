@@ -33,6 +33,6 @@ public class OrderRegistrationService {
         Money discountAmount = couponId == null
             ? Money.ZERO
             : couponService.use(userId, couponId, Order.totalOf(items));
-        return orderService.complete(userId, items, discountAmount);
+        return orderService.complete(userId, items, discountAmount, couponId);
     }
 }

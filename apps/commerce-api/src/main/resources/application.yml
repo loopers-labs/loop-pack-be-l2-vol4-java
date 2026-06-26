@@ -33,6 +33,10 @@ springdoc:
 pg-simulator:
   url: http://localhost:8082
 
+# PG가 결제 최종 상태를 통보할 우리 콜백 주소 (http://localhost:8080 으로 시작해야 시뮬레이터가 허용)
+payment:
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
 # Feign 타임아웃 — 동기 호출이라 타임아웃은 HTTP 클라이언트 레벨에서 건다 (@TimeLimiter 아님)
 feign:
   client:

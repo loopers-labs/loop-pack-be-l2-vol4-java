@@ -34,4 +34,8 @@ public class Stock {
         }
         return new Stock(this.quantity - quantity.getValue());
     }
+
+    public Stock increase(Quantity quantity) {
+        return new Stock(this.quantity + quantity.getValue());
+    }
 }
