@@ -96,4 +96,33 @@ public class PaymentFacade {
             }
         });
     }
+
+    /**
+     * 키가 끝내 안 붙은 미아 PENDING(cutoff 이전)을 종결한다. orderId로 PG에 대사(對査)해:
+     * - PG에 결제건이 있으면 → 키를 입양하고 결과 반영(SUCCESS면 주문 확정).  "미아 → 정상 귀속"
+     * - PG에 결제건이 없으면 → EXPIRED로 만료 종결.  (시간만으로 죽이지 않고 조회로 확인 후 종결)
+     */
+    public void recoverOrphans(java.time.ZonedDateTime cutoff) {
+        paymentService.findExpirableOrphans(cutoff).forEach(orphan -> {
+            try {
+                java.util.List<PaymentGateway.Result> pgTransactions =
+                    paymentGateway.findTransactionsByOrderId(orphan.getUserId(), orphan.getOrderId());
+
+                if (pgTransactions.isEmpty()) {
+                    paymentService.expire(orphan.getId(), "PG에 결제건 없음 — 미아 만료 종결");
+                    return;
+                }
+                PaymentGateway.Result tx = pgTransactions.get(0);
+                paymentService.linkTransactionKey(orphan.getId(), tx.transactionKey());
+                if (tx.status() != PaymentStatus.PENDING) {
+                    paymentService.applyResult(tx.transactionKey(), tx.status(), tx.reason());
+                    if (tx.status() == PaymentStatus.SUCCESS) {
+                        orderService.confirm(orphan.getOrderId());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("미아 결제 복구 실패: paymentId={}, orderId={}", orphan.getId(), orphan.getOrderId(), e);
+            }
+        });
+    }
 }

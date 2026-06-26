@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -76,5 +77,20 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public List<PaymentModel> findRecoverable() {
         return paymentRepository.findPendingWithTransactionKey();
+    }
+
+    /** 미아 종결 후보(PENDING + 키 없음 + cutoff 이전 생성)를 조회한다. */
+    @Transactional(readOnly = true)
+    public List<PaymentModel> findExpirableOrphans(ZonedDateTime cutoff) {
+        return paymentRepository.findExpirableOrphans(cutoff);
+    }
+
+    /** 미아 결제건을 만료(EXPIRED) 종결한다. (PG 대사 결과 결제건이 없을 때) */
+    @Transactional
+    public void expire(Long paymentId, String reason) {
+        PaymentModel payment = paymentRepository.findById(paymentId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + paymentId + "] 결제건을 찾을 수 없습니다."));
+        payment.markExpired(reason);
+        paymentRepository.save(payment);
     }
 }

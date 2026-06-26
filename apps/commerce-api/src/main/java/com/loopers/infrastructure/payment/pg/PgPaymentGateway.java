@@ -72,4 +72,22 @@ public class PgPaymentGateway implements PaymentGateway {
             throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 조회에 실패했습니다.");
         }
     }
+
+    /**
+     * orderId로 PG 결제건 목록을 조회한다. PG가 404(결제건 없음)면 빈 목록을 반환해 호출자가 "미아 만료"로 판단하게 한다.
+     */
+    @Override
+    public java.util.List<Result> findTransactionsByOrderId(Long userId, Long orderId) {
+        try {
+            PgV1Dto.OrderResponse response = pgClient.findByOrderId(String.valueOf(userId), String.valueOf(orderId));
+            return response.data().transactions().stream()
+                .map(t -> new Result(t.transactionKey(), PaymentStatus.valueOf(t.status()), t.reason()))
+                .toList();
+        } catch (FeignException.NotFound e) {
+            return java.util.List.of();
+        } catch (FeignException e) {
+            log.warn("PG 주문별 결제 조회 실패: orderId={}, httpStatus={}", orderId, e.status());
+            throw new CoreException(ErrorType.INTERNAL_ERROR, "PG 결제 조회에 실패했습니다.");
+        }
+    }
 }

@@ -127,6 +127,21 @@ public class PaymentModel extends BaseEntity {
         this.reason = reason;
     }
 
+    /**
+     * 키가 끝내 안 붙은 미아 PENDING을 만료 종결한다. PENDING에서만 전이하며, 이미 EXPIRED면 멱등.
+     * 이미 SUCCESS/FAILED인 경우(역전)는 CONFLICT.
+     */
+    public void markExpired(String reason) {
+        if (this.status == PaymentStatus.EXPIRED) {
+            return;
+        }
+        if (this.status != PaymentStatus.PENDING) {
+            throw new CoreException(ErrorType.CONFLICT, "대기 상태의 결제만 만료할 수 있습니다.");
+        }
+        this.status = PaymentStatus.EXPIRED;
+        this.reason = reason;
+    }
+
     public Long getUserId() {
         return userId;
     }
