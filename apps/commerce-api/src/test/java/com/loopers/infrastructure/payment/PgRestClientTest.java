@@ -4,14 +4,20 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PgPaymentRequest;
 import com.loopers.domain.payment.PgTransactionResponse;
 import com.loopers.domain.payment.PgTransactionStatus;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -85,6 +91,41 @@ class PgRestClientTest {
         assertThat(response.transactionKey()).isEqualTo("20250816:TR:9577c5");
         assertThat(response.status()).isEqualTo(PgTransactionStatus.PENDING);
         requestServer.verify();
+    }
+
+    @DisplayName("서킷브레이커 OPEN(CallNotPermittedException) 으로 차단되면 CIRCUIT_OPEN(503) 으로 매핑한다.")
+    @Test
+    void requestPaymentFallback_circuitOpen_mapsTo503() {
+        // Arrange
+        CircuitBreaker breaker = CircuitBreaker.ofDefaults("pgClient");
+        breaker.transitionToOpenState();
+        CallNotPermittedException notPermitted = CallNotPermittedException.createCallNotPermittedException(breaker);
+        var request = new PgPaymentRequest("1", CardType.SAMSUNG, "1234-5678-9814-1451", 10000L,
+            "http://localhost:8080/api/v1/payments/callback");
+
+        // Act
+        CoreException thrown = catchThrowableOfType(
+            () -> pgRestClient.requestPaymentFallback(request, USER_ID, notPermitted), CoreException.class);
+
+        // Assert
+        assertThat(thrown.getErrorType()).isEqualTo(ErrorType.CIRCUIT_OPEN);
+        assertThat(thrown.getErrorType().getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @DisplayName("PG 요청 실패(그 외 예외) 는 PAYMENT_GATEWAY_ERROR(500) 으로 매핑한다.")
+    @Test
+    void requestPaymentFallback_otherError_mapsTo500() {
+        // Arrange
+        var request = new PgPaymentRequest("1", CardType.SAMSUNG, "1234-5678-9814-1451", 10000L,
+            "http://localhost:8080/api/v1/payments/callback");
+
+        // Act
+        CoreException thrown = catchThrowableOfType(
+            () -> pgRestClient.requestPaymentFallback(request, USER_ID, new RuntimeException("boom")), CoreException.class);
+
+        // Assert
+        assertThat(thrown.getErrorType()).isEqualTo(ErrorType.PAYMENT_GATEWAY_ERROR);
+        assertThat(thrown.getErrorType().getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @DisplayName("getTransaction 호출 시 X-USER-ID 헤더에 userId가 담겨 전송된다.")
