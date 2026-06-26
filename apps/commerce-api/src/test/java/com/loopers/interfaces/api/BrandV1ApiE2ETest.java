@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -50,7 +50,7 @@ class BrandV1ApiE2ETest {
         @Test
         void returnsBrand_whenExists() {
             // arrange
-            BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
+            Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
 
             // act
             ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType =

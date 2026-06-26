@@ -1,9 +1,9 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.like.ProductLikeCount;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.like.ProductLikeCountJpaRepository;
@@ -58,9 +58,9 @@ class LikeV1ApiE2ETest {
 
     @BeforeEach
     void setUp() {
-        userJpaRepository.save(new UserModel("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
-        ProductModel product = productJpaRepository.save(new ProductModel(brand.getId(), "에어맥스", "운동화", 1000L, 10));
+        userJpaRepository.save(new User("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
+        Product product = productJpaRepository.save(new Product(brand.getId(), "에어맥스", "운동화", 1000L, 10));
         this.productId = product.getId();
     }
 

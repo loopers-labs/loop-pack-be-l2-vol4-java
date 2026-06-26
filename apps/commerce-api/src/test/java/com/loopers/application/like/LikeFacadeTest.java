@@ -1,11 +1,11 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.like.LikeCountRepository;
-import com.loopers.domain.like.LikeModel;
+import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeRepository;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -36,18 +36,18 @@ class LikeFacadeTest {
         new LikeFacade(likeRepository, productRepository, userRepository, likeCountRepository);
 
     private void givenUser(long id) {
-        UserModel user = mock(UserModel.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(id);
         when(userRepository.findByLoginId(LOGIN_ID)).thenReturn(Optional.of(user));
     }
 
-    private ProductModel product() {
-        return new ProductModel(1L, "에어맥스", "운동화", 1000L, 10);
+    private Product product() {
+        return new Product(1L, "에어맥스", "운동화", 1000L, 10);
     }
 
     @DisplayName("좋아요를 등록할 때, ")
     @Nested
-    class Like {
+    class Liking {
 
         @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 좋아요 집계를 증가시킨다.")
         @Test
@@ -61,7 +61,7 @@ class LikeFacadeTest {
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
             // assert
-            verify(likeRepository).save(any(LikeModel.class));
+            verify(likeRepository).save(any(Like.class));
             verify(likeCountRepository).increase(PRODUCT_ID);
             verify(productRepository, never()).save(any());
         }

@@ -1,13 +1,13 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.coupon.Coupon;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
@@ -72,10 +72,10 @@ class OrderV1ApiE2ETest {
 
     @BeforeEach
     void setUp() {
-        UserModel user = userJpaRepository.save(
-            new UserModel("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
+        User user = userJpaRepository.save(
+            new User("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
         this.userId = user.getId();
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
         this.brandId = brand.getId();
     }
 
@@ -85,7 +85,7 @@ class OrderV1ApiE2ETest {
     }
 
     private Long persistProduct(int stock) {
-        return productJpaRepository.save(new ProductModel(brandId, "에어맥스", "운동화", 1000L, stock)).getId();
+        return productJpaRepository.save(new Product(brandId, "에어맥스", "운동화", 1000L, stock)).getId();
     }
 
     private HttpHeaders authHeaders(String loginId) {
@@ -291,7 +291,7 @@ class OrderV1ApiE2ETest {
         @Test
         void returnsNotFound_whenNotOwner() {
             // arrange
-            userJpaRepository.save(new UserModel("tester02", "Password2!", "김철수", "1992-03-03", "other@example.com", Gender.M));
+            userJpaRepository.save(new User("tester02", "Password2!", "김철수", "1992-03-03", "other@example.com", Gender.M));
             Long productId = persistProduct(10);
             Long orderId = createOrder("tester01", productId, 2).getBody().data().id();
 

@@ -4,7 +4,7 @@ import com.loopers.domain.coupon.CouponSnapshot;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponStatus;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
@@ -24,8 +24,8 @@ class OrderServiceTest {
 
     private final OrderService orderService = new OrderService(); // 순수 POJO — 레포 의존 없음
 
-    private ProductModel product(String name, long price, int stock) {
-        return new ProductModel(1L, name, "설명", price, stock);
+    private Product product(String name, long price, int stock) {
+        return new Product(1L, name, "설명", price, stock);
     }
 
     @DisplayName("주문을 조립할 때, ")
@@ -36,10 +36,10 @@ class OrderServiceTest {
         @Test
         void decreasesStockAndAssembles() {
             // arrange
-            ProductModel product = product("에어맥스", 1000L, 10);
+            Product product = product("에어맥스", 1000L, 10);
 
             // act
-            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)));
+            Order order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)));
 
             // assert
             assertAll(
@@ -55,11 +55,11 @@ class OrderServiceTest {
         @Test
         void handlesMultipleLines() {
             // arrange
-            ProductModel p1 = product("상품1", 1000L, 10);
-            ProductModel p2 = product("상품2", 500L, 10);
+            Product p1 = product("상품1", 1000L, 10);
+            Product p2 = product("상품2", 500L, 10);
 
             // act
-            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(p1, 2), new OrderLine(p2, 3)));
+            Order order = orderService.place(USER_ID, List.of(new OrderLine(p1, 2), new OrderLine(p2, 3)));
 
             // assert
             assertAll(
@@ -74,13 +74,13 @@ class OrderServiceTest {
         @Test
         void preservesSnapshot() {
             // arrange
-            ProductModel product = product("에어맥스", 1000L, 10);
+            Product product = product("에어맥스", 1000L, 10);
 
             // act
-            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)));
+            Order order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)));
 
             // assert
-            OrderItemModel item = order.getItems().get(0);
+            OrderItem item = order.getItems().get(0);
             assertAll(
                 () -> assertThat(item.getProductNameSnapshot()).isEqualTo("에어맥스"),
                 () -> assertThat(item.getPriceSnapshot()).isEqualTo(1000L),
@@ -92,7 +92,7 @@ class OrderServiceTest {
         @Test
         void throwsBadRequest_whenStockInsufficient() {
             // arrange
-            ProductModel product = product("에어맥스", 1000L, 1);
+            Product product = product("에어맥스", 1000L, 1);
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -106,7 +106,7 @@ class OrderServiceTest {
         @Test
         void throwsBadRequest_whenQuantityNegative() {
             // arrange
-            ProductModel product = product("에어맥스", 1000L, 10);
+            Product product = product("에어맥스", 1000L, 10);
 
             // act
             CoreException ex = assertThrows(CoreException.class,
@@ -142,11 +142,11 @@ class OrderServiceTest {
         @Test
         void usesCouponAndAppliesDiscount() {
             // arrange
-            ProductModel product = product("에어맥스", 10000L, 10);
+            Product product = product("에어맥스", 10000L, 10);
             UserCoupon userCoupon = fixedCoupon(5000L);
 
             // act
-            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)), userCoupon, NOW);
+            Order order = orderService.place(USER_ID, List.of(new OrderLine(product, 2)), userCoupon, NOW);
 
             // assert
             assertAll(
@@ -162,7 +162,7 @@ class OrderServiceTest {
         @Test
         void throws_whenCouponAlreadyUsed() {
             // arrange
-            ProductModel product = product("에어맥스", 10000L, 10);
+            Product product = product("에어맥스", 10000L, 10);
             UserCoupon userCoupon = fixedCoupon(5000L);
             userCoupon.use(USER_ID, NOW);
 
@@ -178,7 +178,7 @@ class OrderServiceTest {
         @Test
         void throws_whenNotOwner() {
             // arrange
-            ProductModel product = product("에어맥스", 10000L, 10);
+            Product product = product("에어맥스", 10000L, 10);
             CouponSnapshot snapshot = new CouponSnapshot("정액 할인", CouponType.FIXED, 5000L, null);
             UserCoupon othersCoupon = new UserCoupon(999L, 10L, snapshot, NOW, NOW.plusDays(30));
 
@@ -194,10 +194,10 @@ class OrderServiceTest {
         @Test
         void assemblesWithoutDiscount_whenCouponNull() {
             // arrange
-            ProductModel product = product("에어맥스", 10000L, 10);
+            Product product = product("에어맥스", 10000L, 10);
 
             // act
-            OrderModel order = orderService.place(USER_ID, List.of(new OrderLine(product, 1)), null, NOW);
+            Order order = orderService.place(USER_ID, List.of(new OrderLine(product, 1)), null, NOW);
 
             // assert
             assertAll(

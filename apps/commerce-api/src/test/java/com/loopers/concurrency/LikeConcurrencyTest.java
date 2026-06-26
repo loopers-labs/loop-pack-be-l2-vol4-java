@@ -1,11 +1,11 @@
 package com.loopers.concurrency;
 
 import com.loopers.application.like.LikeFacade;
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.like.ProductLikeCount;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.infrastructure.like.ProductLikeCountJpaRepository;
@@ -75,12 +75,12 @@ class LikeConcurrencyTest {
         loginIds = new ArrayList<>();
         for (int i = 1; i <= USER_COUNT; i++) {
             String loginId = String.format("user%02d", i);
-            userJpaRepository.save(new UserModel(
+            userJpaRepository.save(new User(
                 loginId, "Password1!", "유저" + i, "1990-05-14", loginId + "@example.com", Gender.M));
             loginIds.add(loginId);
         }
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
-        productId = productJpaRepository.save(new ProductModel(brand.getId(), "에어맥스", "운동화", 1000L, 10)).getId();
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
+        productId = productJpaRepository.save(new Product(brand.getId(), "에어맥스", "운동화", 1000L, 10)).getId();
     }
 
     @AfterEach

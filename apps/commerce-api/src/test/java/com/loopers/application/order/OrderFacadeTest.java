@@ -5,13 +5,13 @@ import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.coupon.UserCouponStatus;
-import com.loopers.domain.order.OrderItemModel;
-import com.loopers.domain.order.OrderModel;
+import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.vo.Money;
 import com.loopers.domain.vo.Quantity;
@@ -48,7 +48,7 @@ class OrderFacadeTest {
         new OrderFacade(orderService, orderRepository, productRepository, userRepository, userCouponRepository);
 
     private void givenUser(long id) {
-        UserModel user = mock(UserModel.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(id);
         when(userRepository.findByLoginId(LOGIN_ID)).thenReturn(Optional.of(user));
     }
@@ -62,8 +62,8 @@ class OrderFacadeTest {
     }
 
     /** 단위 테스트에선 JPA 가 id 를 채우지 않으므로(항상 0), spy 로 id 만 스텁한다. */
-    private ProductModel productWithId(Long id, long price, int stock) {
-        ProductModel product = spy(new ProductModel(1L, "에어맥스", "운동화", price, stock));
+    private Product productWithId(Long id, long price, int stock) {
+        Product product = spy(new Product(1L, "에어맥스", "운동화", price, stock));
         doReturn(id).when(product).getId();
         return product;
     }
@@ -76,10 +76,10 @@ class OrderFacadeTest {
         @Test
         void createsOrder() {
             // arrange
-            ProductModel product = productWithId(11L, 1000L, 10);
+            Product product = productWithId(11L, 1000L, 10);
             givenUser(7L);
             when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
-            when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
             OrderInfo info = orderFacade.createOrder(LOGIN_ID, command(11L, 2));
@@ -91,7 +91,7 @@ class OrderFacadeTest {
                 () -> assertThat(info.totalAmount()).isEqualTo(2000L)
             );
             verify(productRepository).save(product);
-            verify(orderRepository).save(any(OrderModel.class));
+            verify(orderRepository).save(any(Order.class));
         }
 
         @DisplayName("유저가 없으면 NOT_FOUND 이고 주문은 저장되지 않는다.")
@@ -129,7 +129,7 @@ class OrderFacadeTest {
         @Test
         void throwsBadRequest_whenStockInsufficient() {
             // arrange
-            ProductModel product = productWithId(11L, 1000L, 1);
+            Product product = productWithId(11L, 1000L, 1);
             givenUser(7L);
             when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
 
@@ -157,12 +157,12 @@ class OrderFacadeTest {
         @Test
         void appliesCouponAndSaves() {
             // arrange
-            ProductModel product = productWithId(11L, 10000L, 10);
+            Product product = productWithId(11L, 10000L, 10);
             UserCoupon userCoupon = couponOwnedBy(7L);
             givenUser(7L);
             when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(userCouponRepository.find(42L)).thenReturn(Optional.of(userCoupon));
-            when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
             OrderInfo info = orderFacade.createOrder(LOGIN_ID, commandWithCoupon(11L, 2, 42L));
@@ -181,7 +181,7 @@ class OrderFacadeTest {
         @Test
         void throwsNotFound_whenCouponMissing() {
             // arrange
-            ProductModel product = productWithId(11L, 10000L, 10);
+            Product product = productWithId(11L, 10000L, 10);
             givenUser(7L);
             when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
             when(userCouponRepository.find(42L)).thenReturn(Optional.empty());
@@ -199,10 +199,10 @@ class OrderFacadeTest {
         @Test
         void skipsCouponSave_whenNoCoupon() {
             // arrange
-            ProductModel product = productWithId(11L, 1000L, 10);
+            Product product = productWithId(11L, 1000L, 10);
             givenUser(7L);
             when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
-            when(orderRepository.save(any(OrderModel.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // act
             orderFacade.createOrder(LOGIN_ID, command(11L, 1));
@@ -216,9 +216,9 @@ class OrderFacadeTest {
     @Nested
     class GetOrder {
 
-        private OrderModel orderOwnedBy(long ownerId) {
-            return new OrderModel(ownerId,
-                List.of(new OrderItemModel(11L, "에어맥스", Money.of(1000L), Quantity.of(2))));
+        private Order orderOwnedBy(long ownerId) {
+            return new Order(ownerId,
+                List.of(new OrderItem(11L, "에어맥스", Money.of(1000L), Quantity.of(2))));
         }
 
         @DisplayName("본인 주문이면 반환한다.")
