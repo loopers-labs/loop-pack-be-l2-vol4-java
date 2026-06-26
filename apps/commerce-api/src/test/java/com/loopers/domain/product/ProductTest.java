@@ -99,4 +99,40 @@ class ProductTest {
             assertThat(product.isOrderable(6)).isFalse();
         }
     }
+
+    @DisplayName("restoreStock 호출 시, ")
+    @Nested
+    class RestoreStock {
+
+        @DisplayName("정상 수량으로 호출하면 재고가 증가한다 (결제 실패 → 재고 복구).")
+        @Test
+        void increasesStock_whenRestored() {
+            Product product = sampleProduct(3);
+
+            product.restoreStock(2);
+
+            assertThat(product.getStock()).isEqualTo(5);
+        }
+
+        @DisplayName("복구 수량이 0 이하이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenQuantityIsNonPositive() {
+            Product product = sampleProduct(3);
+
+            CoreException ex = assertThrows(CoreException.class,
+                () -> product.restoreStock(0));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("decreaseStock → restoreStock 흐름이 재고를 원상복구한다.")
+        @Test
+        void restoresOriginalStock_afterDecrease() {
+            Product product = sampleProduct(10);
+
+            product.decreaseStock(3);
+            product.restoreStock(3);
+
+            assertThat(product.getStock()).isEqualTo(10);
+        }
+    }
 }

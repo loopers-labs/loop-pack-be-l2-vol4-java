@@ -15,6 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OrderTest {
 
+    private static Order createdOrder() {
+        return Order.create(
+            1L,
+            List.of(OrderItem.of(1L, "상품A", Money.of(1_000L), Quantity.of(1))),
+            null, null
+        );
+    }
+
     @DisplayName("주문을 생성할 때, ")
     @Nested
     class Create {
@@ -88,6 +96,62 @@ class OrderTest {
                 () -> Order.create(null, items, null, null));
 
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("주문 상태를 PAID/FAILED 로 전이할 때, ")
+    @Nested
+    class StateTransition {
+
+        @DisplayName("CREATED 에서 markPaid 하면 PAID 로 전이된다.")
+        @Test
+        void transitionsToPaid_fromCreated() {
+            Order order = createdOrder();
+
+            order.markPaid();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("CREATED 에서 markFailed 하면 FAILED 로 전이된다.")
+        @Test
+        void transitionsToFailed_fromCreated() {
+            Order order = createdOrder();
+
+            order.markFailed();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        }
+
+        @DisplayName("이미 PAID 면 markPaid 는 멱등하게 동작한다.")
+        @Test
+        void markPaid_isIdempotent() {
+            Order order = createdOrder();
+            order.markPaid();
+
+            order.markPaid();
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("FAILED 상태에서 markPaid 호출 시 CONFLICT 가 발생한다 (위험 차단).")
+        @Test
+        void throwsConflict_whenFailedToPaid() {
+            Order order = createdOrder();
+            order.markFailed();
+
+            CoreException ex = assertThrows(CoreException.class, order::markPaid);
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("PAID 상태에서 markFailed 호출 시 CONFLICT 가 발생한다.")
+        @Test
+        void throwsConflict_whenPaidToFailed() {
+            Order order = createdOrder();
+            order.markPaid();
+
+            CoreException ex = assertThrows(CoreException.class, order::markFailed);
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 }

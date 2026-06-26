@@ -116,4 +116,16 @@ public class Product extends BaseEntity {
         this.stock -= quantity;
     }
 
+    /**
+     * 결제 실패 시 차감했던 재고를 복구한다.
+     * 호출자(주문 실패 핸들러) 가 멱등성을 보장해야 한다 — 같은 주문에 대해 중복 복구되지 않도록
+     * Order 의 상태 전이를 기준으로 트리거한다.
+     */
+    public void restoreStock(int quantity) {
+        if (quantity <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "복구 수량은 1 이상이어야 합니다.");
+        }
+        this.stock += quantity;
+    }
+
 }

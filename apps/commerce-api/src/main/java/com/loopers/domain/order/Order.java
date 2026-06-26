@@ -85,4 +85,43 @@ public class Order extends BaseEntity {
     public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
     }
+
+    /**
+     * 결제 성공 → 주문 확정. 멱등하게 동작 (이미 PAID 면 무시).
+     * PAID ↔ FAILED 교차 전이는 위험 (이미 후속 처리가 진행됐을 수 있음) → 예외로 차단.
+     */
+    public void markPaid() {
+        if (this.status == OrderStatus.PAID) {
+            return; // 멱등
+        }
+        if (this.status == OrderStatus.FAILED) {
+            throw new CoreException(ErrorType.CONFLICT,
+                "FAILED 상태에서 PAID 전이는 불가합니다. 운영 확인 필요. [orderId = " + getId() + "]");
+        }
+        if (this.status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.CONFLICT,
+                "PAID 로 전이할 수 없는 상태입니다. [현재 = " + this.status + "]");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    /**
+     * 결제 실패 / 타임아웃 → 주문 실패 확정. 멱등하게 동작.
+     * 이 메서드가 멱등이라는 사실이 재고 복구의 멱등성도 지켜준다.
+     * (이미 FAILED 면 재고 복구 이벤트도 다시 발행되지 않는다)
+     */
+    public void markFailed() {
+        if (this.status == OrderStatus.FAILED) {
+            return; // 멱등
+        }
+        if (this.status == OrderStatus.PAID) {
+            throw new CoreException(ErrorType.CONFLICT,
+                "PAID 상태에서 FAILED 전이는 불가합니다. [orderId = " + getId() + "]");
+        }
+        if (this.status != OrderStatus.CREATED) {
+            throw new CoreException(ErrorType.CONFLICT,
+                "FAILED 로 전이할 수 없는 상태입니다. [현재 = " + this.status + "]");
+        }
+        this.status = OrderStatus.FAILED;
+    }
 }

@@ -23,6 +23,7 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+      - payment.yml
 
 springdoc:
   use-fqn: true

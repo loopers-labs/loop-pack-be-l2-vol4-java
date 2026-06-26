@@ -1,0 +1,75 @@
+# 결제(PG) 연동 + Resilience4j 설정.
+# 외부 시스템(PG-Simulator) 호출에 대한 timeout / retry / circuit-breaker / bulkhead 정책을 정의한다.
+#
+#  - pgPaymentRequest  : POST /payments    — 결제 요청 (멱등 안 됨 → retry 매우 보수적)
+#  - pgPaymentStatus   : GET  /payments/.. — 상태 조회 (멱등 → retry 자유)
+
+pg:
+  simulator:
+    base-url: http://localhost:8082
+    connect-timeout: 1s            # TCP 연결 자체에 1초면 충분
+    read-timeout: 3s               # 정상 100~500ms × 안전 마진 6배
+
+payment:
+  callback-url: http://localhost:8080/api/v1/payments/callback   # PG 가 결과를 통보할 우리 엔드포인트
+  polling:
+    initial-delay: 30s             # 첫 폴링까지 대기
+    backoff-multiplier: 2.0        # 30s → 1m → 2m → 4m (exponential)
+    max-delay: 4m
+  timeout: 15m                     # IN_PROGRESS / UNKNOWN 상태가 이 시간 넘으면 강제 FAILED + 재고 복구
+
+resilience4j:
+  retry:
+    instances:
+      # 결제 요청 — PG 가 멱등키를 받지 않으므로 retry 는 "요청 도달 전 실패" 만 한정.
+      # ConnectException 은 Spring 의 ResourceAccessException 으로 wrap 되므로 어댑터가 직접 PgConnectFailedException 으로 변환해 던진다.
+      # exponential backoff + jitter — 동시 retry 가 한 점에 몰리는 retry storm 방지.
+      pgPaymentRequest:
+        max-attempts: 2
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          - com.loopers.domain.payment.PgConnectFailedException
+        fail-after-max-attempts: true
+      # 상태 조회 — 멱등이라 통신 예외(PgUnknownException) 까지 안전하게 재시도 가능
+      pgPaymentStatus:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          - com.loopers.domain.payment.PgUnknownException
+          - com.loopers.domain.payment.PgConnectFailedException
+        fail-after-max-attempts: true
+
+  circuitbreaker:
+    instances:
+      pgPaymentRequest:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10          # 통계 평가 전 최소 호출 수
+        failure-rate-threshold: 70           # 70% 이상 실패해야 Open (PG 40% 실패가 일상이라 임계값 높임)
+        slow-call-duration-threshold: 2s     # 2s 넘으면 slow
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+      pgPaymentStatus:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 70
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
+  bulkhead:
+    instances:
+      # PG 호출이 다른 서비스 자원을 잠식하지 않도록 동시 호출 수 제한
+      pgPaymentRequest:
+        max-concurrent-calls: 20
+        max-wait-duration: 0           # 풀 가득차면 즉시 fallback (대기 X)

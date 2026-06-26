@@ -48,4 +48,11 @@ public record Money(BigDecimal amount) {
         }
         return new Money(this.amount.multiply(BigDecimal.valueOf(quantity)));
     }
+
+    /**
+     * 금액이 0 인지 판정한다. Money 는 음수를 허용하지 않으므로 isZero 만 두어도 양수 여부 판정에 충분하다.
+     */
+    public boolean isZero() {
+        return this.amount.compareTo(BigDecimal.ZERO) == 0;
+    }
 }
