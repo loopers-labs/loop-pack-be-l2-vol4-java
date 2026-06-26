@@ -31,6 +31,15 @@ spring:
             connect-timeout: 1000 # 연결 타임아웃 (ms)
             read-timeout: 300 # 응답(접수) 타임아웃 (ms) — PG 접수 분포(100~500ms)의 슬로우 테일을 끊어 스레드 회수, 초과분은 PENDING→폴링
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg-simulator:
+        register-health-indicator: true
+        failure-rate-threshold: 90 # 느슨한 기본값 — fallback 흡수만 검증, 본격 임계치 튜닝은 Stage 4
+        sliding-window-size: 100
+        wait-duration-in-open-state: 10s
+
 springdoc:
   use-fqn: true
   swagger-ui:
