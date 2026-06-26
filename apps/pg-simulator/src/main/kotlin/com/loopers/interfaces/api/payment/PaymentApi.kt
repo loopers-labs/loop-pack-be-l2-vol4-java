@@ -5,6 +5,7 @@ import com.loopers.interfaces.api.ApiResponse
 import com.loopers.domain.user.UserInfo
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -17,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/payments")
 class PaymentApi(
     private val paymentApplicationService: PaymentApplicationService,
+    @Value("\${pg-simulator.delay-min-ms:100}") private val delayMinMs: Long,
+    @Value("\${pg-simulator.delay-max-ms:500}") private val delayMaxMs: Long,
+    @Value("\${pg-simulator.fail-rate:40}") private val failRate: Int,
 ) {
     @PostMapping
     fun request(
@@ -25,11 +29,11 @@ class PaymentApi(
     ): ApiResponse<PaymentDto.TransactionResponse> {
         request.validate()
 
-        // 100ms ~ 500ms 지연
-        Thread.sleep((100..500L).random())
+        // 응답 지연 (기본 100~500ms, env로 조절)
+        Thread.sleep((delayMinMs..delayMaxMs).random())
 
-        // 40% 확률로 요청 실패
-        if ((1..100).random() <= 40) {
+        // 요청 실패 확률 (기본 40%, env로 조절 — 0이면 항상 성공)
+        if (failRate > 0 && (1..100).random() <= failRate) {
             throw CoreException(ErrorType.INTERNAL_ERROR, "현재 서버가 불안정합니다. 잠시 후 다시 시도해주세요.")
         }
 
