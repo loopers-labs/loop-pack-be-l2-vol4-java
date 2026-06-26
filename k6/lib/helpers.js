@@ -1,7 +1,38 @@
 import http from 'k6/http';
 import { fail } from 'k6';
+import { Counter, Trend } from 'k6/metrics';
 
 export const PG_CARDS = ['SAMSUNG', 'KB', 'HYUNDAI']; // pg-simulator 허용 카드만
+
+// 결제 결과 집계 메트릭. status 태그로 결과 카테고리를 구분한다.
+export const payResult = new Counter('pay_result');       // 카테고리별 건수
+export const payDuration = new Trend('pay_duration', true); // 카테고리별 응답시간(ms)
+
+// classifyPayment 이 낼 수 있는 결과 카테고리(요약 분해용).
+export const PAY_STATUSES = [
+  'SUCCESS', 'PENDING',
+  'FAILED_LIMIT_EXCEEDED', 'FAILED_INVALID_CARD', 'FAILED_OTHER',
+  'PG_REQUEST_FAILED', 'CIRCUIT_OPEN',
+];
+
+/** 결제 응답을 카테고리별 건수 + 응답시간 메트릭으로 기록한다. */
+export function recordPayment(res, status) {
+  payResult.add(1, { status });
+  payDuration.add(res.timings.duration, { status });
+}
+
+/**
+ * 결과 카테고리별 서브메트릭을 end-of-test 요약에 노출시키기 위한 no-op threshold.
+ * (k6 는 threshold 가 걸린 sub-metric 만 요약에 분해 출력한다.)
+ */
+export function paySubThresholds() {
+  const thresholds = {};
+  for (const status of PAY_STATUSES) {
+    thresholds[`pay_result{status:${status}}`] = ['count>=0'];
+    thresholds[`pay_duration{status:${status}}`] = ['p(95)>=0'];
+  }
+  return thresholds;
+}
 const ADMIN = { 'X-Loopers-Ldap': 'loopers.admin', 'Content-Type': 'application/json' };
 const JSON_HDR = { 'Content-Type': 'application/json' };
 

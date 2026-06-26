@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { Counter } from 'k6/metrics';
-import { seed, orderAndPay } from './lib/helpers.js';
+import { seed, orderAndPay, recordPayment, paySubThresholds } from './lib/helpers.js';
 
 /**
  * 서킷브레이커 OPEN 전이를 "확실히" 유발하는 프로파일.
@@ -33,10 +33,10 @@ const MGMT = __ENV.MGMT_URL || 'http://localhost:8081';
 const RUN = __ENV.RUN_ID || `cb${Date.now()}`;
 const USERS = Number(__ENV.USERS || 100);
 
-const payResult = new Counter('pay_result');
 const cbState = new Counter('cb_state');        // tag(state) 별 관측 횟수
 
 export const options = {
+  thresholds: paySubThresholds(),
   scenarios: {
     // (a) 낮은→높은 부하 버스트로 PG 실패/타임아웃을 몰아 친다.
     burst: {
@@ -72,7 +72,7 @@ export function setup() {
 export default function (data) {
   const r = orderAndPay(BASE, data);
   if (r.orderFailed) return;
-  payResult.add(1, { status: r.status });
+  recordPayment(r.res, r.status);
 }
 
 let lastState = null;
