@@ -42,13 +42,12 @@ payment:
 
 resilience4j:
   circuitbreaker:
-    circuit-breaker-aspect-order: 1   # Retry보다 바깥(order 낮을수록 바깥) — 재시도 끝난 최종 결과만 서킷에 집계
     instances:
       pgCircuit:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 20
         minimum-number-of-calls: 10          # 표본이 충분할 때만 판단 (초기 소수 호출로 open 방지)
-        failure-rate-threshold: 50           # Retry로 transient 흡수 후 기준
+        failure-rate-threshold: 50           # 표본 대비 실패 비율 기준 (도메인 거절은 ignore-exceptions로 제외)
         slow-call-duration-threshold: 1s     # PG 정상 지연(100~500ms) 위
         slow-call-rate-threshold: 50
         wait-duration-in-open-state: 20s     # 결제 매출 영향 고려 — 분 대신 초
@@ -57,7 +56,6 @@ resilience4j:
         ignore-exceptions:
           - com.loopers.support.error.CoreException   # 도메인/검증 실패는 서킷 집계 제외
   retry:
-    retry-aspect-order: 2            # CircuitBreaker 안쪽 — 재시도는 서킷 내부에서 수행
     instances:
       pgRetry:                              # 조회(거래키·orderId) 전용 — 멱등이라 응답유실에도 재시도 안전
         max-attempts: 3
