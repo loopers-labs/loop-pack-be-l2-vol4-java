@@ -62,6 +62,10 @@ public class Payment extends DomainEntity {
         return status == PaymentStatus.REQUESTED;
     }
 
+    public boolean isProcessing() {
+        return status == PaymentStatus.PROCESSING;
+    }
+
     public String getTransactionKey() {
         return transactionKey;
     }
@@ -70,8 +74,19 @@ public class Payment extends DomainEntity {
         return failureReason;
     }
 
-    public void markSuccess(String transactionKey) {
+    public void markProcessing(String transactionKey) {
         ensureRequested();
+        if (transactionKey == null || transactionKey.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "결제 거래 키는 필수입니다.");
+        }
+
+        this.status = PaymentStatus.PROCESSING;
+        this.transactionKey = transactionKey;
+        this.failureReason = null;
+    }
+
+    public void markSuccess(String transactionKey) {
+        ensureCompletable();
         if (transactionKey == null || transactionKey.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "결제 거래 키는 필수입니다.");
         }
@@ -82,13 +97,13 @@ public class Payment extends DomainEntity {
     }
 
     public void markFailed(String failureReason) {
-        ensureRequested();
+        ensureCompletable();
         this.status = PaymentStatus.FAILED;
         this.failureReason = failureReason;
     }
 
     public void markCanceled(String failureReason) {
-        ensureRequested();
+        ensureCompletable();
         this.status = PaymentStatus.CANCELED;
         this.failureReason = failureReason;
     }
@@ -96,6 +111,12 @@ public class Payment extends DomainEntity {
     private void ensureRequested() {
         if (status != PaymentStatus.REQUESTED) {
             throw new CoreException(ErrorType.BAD_REQUEST, "요청 상태 결제만 변경할 수 있습니다.");
+        }
+    }
+
+    private void ensureCompletable() {
+        if (status != PaymentStatus.REQUESTED && status != PaymentStatus.PROCESSING) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "요청 또는 처리 중 상태 결제만 변경할 수 있습니다.");
         }
     }
 

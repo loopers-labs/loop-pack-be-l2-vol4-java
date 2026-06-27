@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.catalog;
 
+import com.loopers.CommerceApiApplication;
 import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.product.Product;
@@ -14,48 +15,67 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = CommerceApiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CatalogApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     CatalogApiE2ETest(
         TestRestTemplate testRestTemplate,
         BrandRepository brandRepository,
         ProductRepository productRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp,
+        @Qualifier("redisTemplateMaster")
+        RedisTemplate<String, String> redisTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
+        this.redisTemplate = redisTemplate;
+    }
+
+    @BeforeEach
+    void setUp() {
+        redisCleanUp.truncateAll();
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("GET /api/v1/brands/{brandId}")
@@ -132,6 +152,58 @@ class CatalogApiE2ETest {
                 () -> assertThat(response.getBody().data().items().get(0).status()).isEqualTo(ProductStatus.ON_SALE)
             );
         }
+
+        @DisplayName("좋아요 순 정렬 결과를 반환하고 상품 목록 캐시를 생성한다.")
+        @Test
+        void returnsProductsSortedByLikesDescAndCreatesListCache() {
+            // arrange
+            Brand brand = saveBrand("Loopers", "테스트 브랜드");
+            Product lowLikedProduct = saveProductWithLikeCount(brand, "좋아요 1개", 1_000L, 10, 1);
+            Product highLikedProduct = saveProductWithLikeCount(brand, "좋아요 3개", 2_000L, 10, 3);
+            Product middleLikedProduct = saveProductWithLikeCount(brand, "좋아요 2개", 3_000L, 10, 2);
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductListItemResponse>>> response =
+                getProducts("/api/v1/products?brandId=" + brand.getId() + "&page=0&size=20&sort=likes_desc");
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().items())
+                    .extracting(ProductV1Dto.ProductListItemResponse::productId)
+                    .containsExactly(highLikedProduct.getId(), middleLikedProduct.getId(), lowLikedProduct.getId()),
+                () -> assertThat(response.getBody().data().items())
+                    .extracting(ProductV1Dto.ProductListItemResponse::likeCount)
+                    .containsExactly(3L, 2L, 1L),
+                () -> assertThat(listCacheKeys()).isNotEmpty()
+            );
+        }
+
+        @DisplayName("좋아요 변경 후 상품 목록 캐시를 무효화하고 최신 좋아요 순 정렬을 반환한다.")
+        @Test
+        void evictsListCache_whenLikeCountChanges() {
+            // arrange
+            Brand brand = saveBrand("Loopers", "테스트 브랜드");
+            Product firstProduct = saveProductWithLikeCount(brand, "기존 인기 상품", 1_000L, 10, 1);
+            Product secondProduct = saveProduct(brand, "새 인기 상품", 2_000L, 10);
+            String url = "/api/v1/products?brandId=" + brand.getId() + "&page=0&size=20&sort=likes_desc";
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductListItemResponse>>> cachedResponse = getProducts(url);
+            assertThat(cachedResponse.getBody().data().items().get(0).productId()).isEqualTo(firstProduct.getId());
+            assertThat(listCacheKeys()).isNotEmpty();
+
+            // act
+            likeProduct("user1", secondProduct.getId());
+            likeProduct("user2", secondProduct.getId());
+            ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductListItemResponse>>> response = getProducts(url);
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().items().get(0).productId()).isEqualTo(secondProduct.getId()),
+                () -> assertThat(response.getBody().data().items().get(0).likeCount()).isEqualTo(2L),
+                () -> assertThat(response.getBody().data().items().get(1).productId()).isEqualTo(firstProduct.getId())
+            );
+        }
     }
 
     @DisplayName("GET /api/v1/products/{productId}")
@@ -162,6 +234,29 @@ class CatalogApiE2ETest {
                 () -> assertThat(response.getBody().data().stockQuantity()).isEqualTo(10),
                 () -> assertThat(response.getBody().data().brand().brandId()).isEqualTo(brand.getId()),
                 () -> assertThat(response.getBody().data().brand().name()).isEqualTo("Loopers")
+            );
+        }
+
+        @DisplayName("좋아요 변경 후 상품 상세 캐시를 무효화하고 최신 좋아요 수와 사용자 좋아요 여부를 반환한다.")
+        @Test
+        void evictsDetailCache_whenLikeCountChanges() {
+            // arrange
+            Product product = saveProduct("상품", 1_000L, 10);
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductDetailResponse>> cachedResponse =
+                getProduct(product.getId(), null);
+            assertThat(cachedResponse.getBody().data().likeCount()).isZero();
+
+            // act
+            ResponseEntity<ApiResponse<ProductLikeDto.ProductLikeResponse>> likeResponse = likeProduct("user1", product.getId());
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductDetailResponse>> response = getProduct(product.getId(), "user1");
+
+            // assert
+            assertAll(
+                () -> assertTrue(likeResponse.getStatusCode().is2xxSuccessful()),
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().productId()).isEqualTo(product.getId()),
+                () -> assertThat(response.getBody().data().likeCount()).isEqualTo(1L),
+                () -> assertThat(response.getBody().data().liked()).isTrue()
             );
         }
     }
@@ -326,6 +421,42 @@ class CatalogApiE2ETest {
     private Product saveProduct(String name, Long price, Integer stockQuantity) {
         Brand brand = saveBrand("Loopers", "테스트 브랜드");
         return saveProduct(brand, name, price, stockQuantity);
+    }
+
+    private Product saveProductWithLikeCount(
+        Brand brand,
+        String name,
+        Long price,
+        Integer stockQuantity,
+        int likeCount
+    ) {
+        Product product = new Product(brand.getId(), name, "설명", price, stockQuantity);
+        for (int i = 0; i < likeCount; i++) {
+            product.increaseLikeCount();
+        }
+        return productRepository.save(product);
+    }
+
+    private ResponseEntity<ApiResponse<PageResponse<ProductV1Dto.ProductListItemResponse>>> getProducts(String url) {
+        ParameterizedTypeReference<ApiResponse<PageResponse<ProductV1Dto.ProductListItemResponse>>> responseType =
+            new ParameterizedTypeReference<>() {};
+        return testRestTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, responseType);
+    }
+
+    private ResponseEntity<ApiResponse<ProductV1Dto.ProductDetailResponse>> getProduct(Long productId, String userId) {
+        ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductDetailResponse>> responseType =
+            new ParameterizedTypeReference<>() {};
+        HttpEntity<?> entity = userId == null ? HttpEntity.EMPTY : new HttpEntity<>(userHeaders(userId));
+        return testRestTemplate.exchange(
+            "/api/v1/products/" + productId,
+            HttpMethod.GET,
+            entity,
+            responseType
+        );
+    }
+
+    private Set<String> listCacheKeys() {
+        return redisTemplate.opsForSet().members("commerce:product:list:v1:keys");
     }
 
     private ResponseEntity<ApiResponse<BrandAdminDto.BrandResponse>> createBrand(

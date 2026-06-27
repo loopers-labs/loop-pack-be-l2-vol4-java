@@ -27,20 +27,21 @@ public class ProductQueryService {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductLikeRepository productLikeRepository;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional(readOnly = true)
     public ProductResult getOnSaleProduct(Long productId, String userId) {
-        Product product = productRepository.findOnSale(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
-        Brand brand = getBrand(product.getBrandId());
-
-        return ProductResult.from(product, brand, isLiked(userId, productId));
+        ProductResult product = productCacheRepository.getDetail(productId)
+            .orElseGet(() -> cacheOnSaleProduct(productId));
+        return product.withLiked(isLiked(userId, productId));
     }
 
     @Transactional(readOnly = true)
     public PageResult<ProductResult> searchOnSaleProducts(ProductQuery.Search query) {
         var condition = query.toCondition();
-        return searchProducts(condition, query.userId());
+        PageResult<ProductResult> products = productCacheRepository.getList(condition)
+            .orElseGet(() -> cacheOnSaleProducts(condition));
+        return withLiked(products, query.userId());
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +74,43 @@ public class ProductQueryService {
             .toList();
 
         return PageResult.of(items, condition.page(), condition.size(), totalElements);
+    }
+
+    private ProductResult cacheOnSaleProduct(Long productId) {
+        Product product = productRepository.findOnSale(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + productId + "] 상품을 찾을 수 없습니다."));
+        Brand brand = getBrand(product.getBrandId());
+        ProductResult result = ProductResult.from(product, brand);
+        productCacheRepository.putDetail(productId, result);
+        return result;
+    }
+
+    private PageResult<ProductResult> cacheOnSaleProducts(ProductSearchCondition condition) {
+        PageResult<ProductResult> result = searchProducts(condition, null);
+        productCacheRepository.putList(condition, result);
+        return result;
+    }
+
+    private PageResult<ProductResult> withLiked(PageResult<ProductResult> products, String userId) {
+        if (userId == null || userId.isBlank() || products.items().isEmpty()) {
+            return products;
+        }
+
+        Set<Long> likedProductIds = productLikeRepository.findLikedProductIds(
+            userId,
+            products.items().stream().map(ProductResult::id).distinct().toList()
+        );
+        return new PageResult<>(
+            products.items()
+                .stream()
+                .map(product -> product.withLiked(likedProductIds.contains(product.id())))
+                .toList(),
+            products.page(),
+            products.size(),
+            products.totalElements(),
+            products.totalPages(),
+            products.hasNext()
+        );
     }
 
     private Brand getBrand(Long brandId) {

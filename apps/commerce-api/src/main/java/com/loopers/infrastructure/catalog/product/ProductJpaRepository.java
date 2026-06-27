@@ -18,6 +18,14 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, Lo
 
     List<ProductJpaEntity> findByBrandId(Long brandId);
 
+    List<ProductJpaEntity> findByStatus(ProductStatus status, Pageable pageable);
+
+    List<ProductJpaEntity> findByStatusAndBrandId(ProductStatus status, Long brandId, Pageable pageable);
+
+    long countByStatus(ProductStatus status);
+
+    long countByStatusAndBrandId(ProductStatus status, Long brandId);
+
     @Query("""
         select p
         from ProductJpaEntity p

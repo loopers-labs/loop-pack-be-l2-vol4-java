@@ -7,10 +7,19 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "product")
+@Table(
+    name = "product",
+    indexes = {
+        @Index(name = "idx_product_status_brand_like", columnList = "status, brand_id, like_count"),
+        @Index(name = "idx_product_status_like", columnList = "status, like_count"),
+        @Index(name = "idx_product_status_brand_created", columnList = "status, brand_id, created_at"),
+        @Index(name = "idx_product_status_brand_price", columnList = "status, brand_id, price")
+    }
+)
 public class ProductJpaEntity extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false)

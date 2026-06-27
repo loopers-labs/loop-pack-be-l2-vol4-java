@@ -1,12 +1,11 @@
 package com.loopers;
 
-import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 
-@SpringBootConfiguration
 @EnableAutoConfiguration
 @ConfigurationPropertiesScan(basePackages = "com.loopers")
 @ComponentScan(

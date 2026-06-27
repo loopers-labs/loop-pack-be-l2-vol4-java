@@ -2,6 +2,8 @@ package com.loopers.application.catalog.like;
 
 import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
+import com.loopers.application.catalog.product.ProductCacheRepository;
+import com.loopers.application.catalog.product.ProductResult;
 import com.loopers.domain.catalog.like.ProductLike;
 import com.loopers.domain.catalog.like.ProductLikeRepository;
 import com.loopers.domain.catalog.product.Product;
@@ -10,10 +12,12 @@ import com.loopers.domain.catalog.product.ProductSearchCondition;
 import com.loopers.domain.catalog.product.ProductStatus;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.pagination.PageResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +50,9 @@ class ProductLikeCommandServiceTest {
             assertAll(
                 () -> assertThat(result.liked()).isTrue(),
                 () -> assertThat(product.getLikeCount()).isEqualTo(1L),
-                () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isTrue()
+                () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isTrue(),
+                () -> assertThat(fixture.productCacheRepository.evictedDetailProductIds).containsExactly(1L),
+                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(1)
             );
         }
 
@@ -104,7 +110,9 @@ class ProductLikeCommandServiceTest {
             assertAll(
                 () -> assertThat(result.liked()).isFalse(),
                 () -> assertThat(product.getLikeCount()).isZero(),
-                () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isFalse()
+                () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isFalse(),
+                () -> assertThat(fixture.productCacheRepository.evictedDetailProductIds).containsExactly(1L, 1L),
+                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(2)
             );
         }
 
@@ -150,10 +158,12 @@ class ProductLikeCommandServiceTest {
         private final Map<Long, Product> products = new HashMap<>();
         private final Map<Long, Brand> brands = new HashMap<>();
         private final FakeProductLikeRepository productLikeRepository = new FakeProductLikeRepository();
+        private final FakeProductCacheRepository productCacheRepository = new FakeProductCacheRepository();
         private final ProductLikeCommandService service = new ProductLikeCommandService(
             productLikeRepository,
             new FakeProductRepository(products),
-            new FakeBrandRepository(brands)
+            new FakeBrandRepository(brands),
+            productCacheRepository
         );
 
         private TestFixture() {
@@ -230,6 +240,39 @@ class ProductLikeCommandServiceTest {
                 .stream()
                 .filter(productLike -> productLike.getUserId().equals(userId))
                 .count();
+        }
+    }
+
+    private static class FakeProductCacheRepository implements ProductCacheRepository {
+        private final List<Long> evictedDetailProductIds = new ArrayList<>();
+        private int evictListsCallCount = 0;
+
+        @Override
+        public Optional<ProductResult> getDetail(Long productId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void putDetail(Long productId, ProductResult product) {
+        }
+
+        @Override
+        public Optional<PageResult<ProductResult>> getList(ProductSearchCondition condition) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void putList(ProductSearchCondition condition, PageResult<ProductResult> products) {
+        }
+
+        @Override
+        public void evictDetail(Long productId) {
+            evictedDetailProductIds.add(productId);
+        }
+
+        @Override
+        public void evictLists() {
+            evictListsCallCount++;
         }
     }
 

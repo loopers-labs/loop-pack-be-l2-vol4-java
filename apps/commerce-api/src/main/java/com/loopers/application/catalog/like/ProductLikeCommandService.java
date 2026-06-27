@@ -4,6 +4,7 @@ import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.like.ProductLike;
 import com.loopers.domain.catalog.like.ProductLikeRepository;
+import com.loopers.application.catalog.product.ProductCacheRepository;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -19,6 +20,7 @@ public class ProductLikeCommandService {
     private final ProductLikeRepository productLikeRepository;
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
+    private final ProductCacheRepository productCacheRepository;
 
     @Transactional
     public ProductLikeResult like(ProductLikeCommand.Like command) {
@@ -30,6 +32,7 @@ public class ProductLikeCommandService {
         boolean created = productLikeRepository.saveIfAbsent(new ProductLike(command.userId(), command.productId()));
         if (created) {
             productRepository.increaseLikeCount(command.productId());
+            evictProductCaches(command.productId());
             product = getProduct(command.productId());
         }
 
@@ -43,6 +46,7 @@ public class ProductLikeCommandService {
 
         if (deleted) {
             productRepository.decreaseLikeCount(command.productId());
+            evictProductCaches(command.productId());
             product = getProduct(command.productId());
         }
 
@@ -57,5 +61,10 @@ public class ProductLikeCommandService {
     private Brand getBrand(Long brandId) {
         return brandRepository.find(brandId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + brandId + "] 브랜드를 찾을 수 없습니다."));
+    }
+
+    private void evictProductCaches(Long productId) {
+        productCacheRepository.evictDetail(productId);
+        productCacheRepository.evictLists();
     }
 }

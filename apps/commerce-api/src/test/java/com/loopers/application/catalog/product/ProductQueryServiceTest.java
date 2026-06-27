@@ -49,7 +49,8 @@ class ProductQueryServiceTest {
             ProductQueryService service = new ProductQueryService(
                 new FakeProductRepository(products),
                 new FakeBrandRepository(brands),
-                productLikeRepository
+                productLikeRepository,
+                new FakeProductCacheRepository()
             );
 
             // act
@@ -84,7 +85,8 @@ class ProductQueryServiceTest {
             ProductQueryService service = new ProductQueryService(
                 new FakeProductRepository(products),
                 new FakeBrandRepository(brands),
-                productLikeRepository
+                productLikeRepository,
+                new FakeProductCacheRepository()
             );
 
             // act
@@ -97,6 +99,48 @@ class ProductQueryServiceTest {
                 () -> assertThat(results.items()).hasSize(1),
                 () -> assertThat(results.items().get(0).brandId()).isEqualTo(2L),
                 () -> assertThat(results.totalElements()).isEqualTo(1)
+            );
+        }
+
+        @DisplayName("캐시된 목록이 있으면 상품/브랜드 조회 없이 사용자별 좋아요 여부만 계산한다.")
+        @Test
+        void returnsCachedProductsWithUserLikedFlags() {
+            // arrange
+            FakeProductCacheRepository cacheRepository = new FakeProductCacheRepository();
+            FakeProductLikeRepository productLikeRepository = new FakeProductLikeRepository();
+            productLikeRepository.save(new ProductLike("user1", 2L));
+            ProductSearchCondition condition = new ProductQuery.Search(null, 0, 20, "latest", "user1").toCondition();
+            cacheRepository.putList(
+                condition,
+                PageResult.of(
+                    List.of(
+                        new ProductResult(1L, 1L, "Loopers", "상품1", "설명1", 1_000L, 10, 0L, ProductStatus.ON_SALE, false),
+                        new ProductResult(2L, 1L, "Loopers", "상품2", "설명2", 2_000L, 10, 0L, ProductStatus.ON_SALE, false)
+                    ),
+                    0,
+                    20,
+                    2
+                )
+            );
+
+            ProductQueryService service = new ProductQueryService(
+                new FakeProductRepository(Map.of()),
+                new FakeBrandRepository(Map.of()),
+                productLikeRepository,
+                cacheRepository
+            );
+
+            // act
+            PageResult<ProductResult> results = service.searchOnSaleProducts(
+                new ProductQuery.Search(null, 0, 20, "latest", "user1")
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(results.items()).hasSize(2),
+                () -> assertThat(results.items().get(0).liked()).isFalse(),
+                () -> assertThat(results.items().get(1).liked()).isTrue(),
+                () -> assertThat(productLikeRepository.findLikedProductIdsCallCount).isEqualTo(1)
             );
         }
     }
@@ -121,7 +165,8 @@ class ProductQueryServiceTest {
             ProductQueryService service = new ProductQueryService(
                 new FakeProductRepository(products),
                 new FakeBrandRepository(brands),
-                new FakeProductLikeRepository()
+                new FakeProductLikeRepository(),
+                new FakeProductCacheRepository()
             );
 
             // act
@@ -135,6 +180,41 @@ class ProductQueryServiceTest {
                 () -> assertThat(results.items()).extracting(ProductResult::status)
                     .containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.STOPPED),
                 () -> assertThat(results.totalElements()).isEqualTo(2)
+            );
+        }
+    }
+
+    @DisplayName("상품 상세를 조회할 때, ")
+    @Nested
+    class GetOnSaleProduct {
+
+        @DisplayName("캐시된 상세가 있으면 상품/브랜드 조회 없이 사용자별 좋아요 여부만 계산한다.")
+        @Test
+        void returnsCachedProductWithUserLikedFlag() {
+            // arrange
+            FakeProductCacheRepository cacheRepository = new FakeProductCacheRepository();
+            FakeProductLikeRepository productLikeRepository = new FakeProductLikeRepository();
+            productLikeRepository.save(new ProductLike("user1", 1L));
+            cacheRepository.putDetail(
+                1L,
+                new ProductResult(1L, 1L, "Loopers", "상품1", "설명1", 1_000L, 10, 0L, ProductStatus.ON_SALE, false)
+            );
+
+            ProductQueryService service = new ProductQueryService(
+                new FakeProductRepository(Map.of()),
+                new FakeBrandRepository(Map.of()),
+                productLikeRepository,
+                cacheRepository
+            );
+
+            // act
+            ProductResult result = service.getOnSaleProduct(1L, "user1");
+
+            // assert
+            assertAll(
+                () -> assertThat(result.id()).isEqualTo(1L),
+                () -> assertThat(result.liked()).isTrue(),
+                () -> assertThat(productLikeRepository.existsCallCount).isEqualTo(1)
             );
         }
     }
@@ -272,6 +352,46 @@ class ProductQueryServiceTest {
         public int decreaseLikeCount(Long productId) {
             products.get(productId).decreaseLikeCount();
             return 1;
+        }
+    }
+
+    private static class FakeProductCacheRepository implements ProductCacheRepository {
+        private final Map<Long, ProductResult> details = new HashMap<>();
+        private final Map<String, PageResult<ProductResult>> lists = new HashMap<>();
+
+        @Override
+        public Optional<ProductResult> getDetail(Long productId) {
+            return Optional.ofNullable(details.get(productId));
+        }
+
+        @Override
+        public void putDetail(Long productId, ProductResult product) {
+            details.put(productId, product);
+        }
+
+        @Override
+        public Optional<PageResult<ProductResult>> getList(ProductSearchCondition condition) {
+            return Optional.ofNullable(lists.get(key(condition)));
+        }
+
+        @Override
+        public void putList(ProductSearchCondition condition, PageResult<ProductResult> products) {
+            lists.put(key(condition), products);
+        }
+
+        @Override
+        public void evictDetail(Long productId) {
+            details.remove(productId);
+        }
+
+        @Override
+        public void evictLists() {
+            lists.clear();
+        }
+
+        private String key(ProductSearchCondition condition) {
+            return condition.status() + ":" + condition.brandId() + ":" + condition.sort()
+                + ":" + condition.page() + ":" + condition.size();
         }
     }
 
