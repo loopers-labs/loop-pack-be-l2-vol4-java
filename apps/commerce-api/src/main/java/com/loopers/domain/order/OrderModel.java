@@ -45,4 +45,12 @@ public class OrderModel extends BaseEntity {
 
     @Column(name = "user_coupon_id")
     private Long userCouponId;
+
+    public void markPaid() {
+        this.status = OrderStatus.PAID;
+    }
+
+    public void markPaymentFailed() {
+        this.status = OrderStatus.PAYMENT_FAILED;
+    }
 }

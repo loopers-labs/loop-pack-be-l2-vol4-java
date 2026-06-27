@@ -23,11 +23,57 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-simulator:
+            connect-timeout: 1000 # 연결 타임아웃 (ms)
+            read-timeout: 300 # 응답(접수) 타임아웃 (ms) — PG 접수 분포(100~500ms)의 슬로우 테일을 끊어 스레드 회수, 초과분은 PENDING→폴링
+
+resilience4j:
+  circuitbreaker:
+    circuit-breaker-aspect-order: 2 # CB가 Retry 바깥(더 큰 order = 외곽) — 재시도 묶음을 1회로 집계, fallback은 최외곽 CB에 부착. Retry 본체는 Stage 5
+    instances:
+      pg-simulator:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED # 부하 테스트는 bursty라 최근 N건 기준이 OPEN 타이밍 재현·민감도 해석에 결정론적
+        sliding-window-size: 50
+        minimum-number-of-calls: 20 # 표본 20건 차기 전엔 판정 보류(소표본 과민 방지)
+        failure-rate-threshold: 50 # 역산: 접수 유효 실패율 ≈70%(타임아웃 50% + 5xx 20%) > 50% → 부하 중 확실히 OPEN. 정상 PG(95%+ 성공)라면 안 열림
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 250ms # read-timeout 300ms 하드컷 안쪽 [250,300ms] 밴드만 추가 포착(대부분의 느린 호출은 이미 타임아웃 예외로 record)
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        record-exceptions: # 결과 불명(타임아웃/네트워크) + PG 5xx만 서킷 실패로 집계
+          - feign.RetryableException
+          - feign.FeignException$FeignServerException
+        ignore-exceptions: # 4xx 확정 거절은 의도된 실패 → 서킷이 열리면 안 됨(집계 제외)
+          - feign.FeignException$FeignClientException
+  retry:
+    retry-aspect-order: 1 # CB(2)보다 안쪽 — 재시도→소진 후에야 CB/fallback 발동
+    instances:
+      pg-reconciliation: # 보정(폴링) 경로 전용. 유저 경로(pg-simulator CB)와 이름 분리 → 유저 요청엔 재시도 미적용(빠른 실패). 배선은 Stage 6 스케줄러
+        max-attempts: 3 # 최초 1 + 재시도 2. 폴링은 다음 주기가 또 있으니 한 주기에선 과하게 매달리지 않음
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2 # 1s → 2s → 4s
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5 # ±50% jitter — 동시 만료된 PENDING들이 같은 순간 재조회하는 Thundering Herd 회피
+        retry-exceptions: # 일시적 실패만 재시도 — 결과 불명(타임아웃/네트워크) + PG 5xx
+          - feign.RetryableException
+          - feign.FeignException$FeignServerException
+        ignore-exceptions: # 4xx 확정 거절은 백 번 재시도해도 동일 → 재시도 금지
+          - feign.FeignException$FeignClientException
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg-simulator:
+  base-url: ${PG_SIMULATOR_URL:http://localhost:8082}
+  callback-url: ${PG_CALLBACK_URL:http://localhost:8080/api/v1/payments/callback}
 
 ---
 spring:

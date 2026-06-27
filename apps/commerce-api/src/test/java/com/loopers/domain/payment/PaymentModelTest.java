@@ -1,0 +1,244 @@
+package com.loopers.domain.payment;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+
+import java.time.ZonedDateTime;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+class PaymentModelTest {
+
+    private static final String CARD_NO = "1234-5678-9012-3456";
+
+    private PaymentModel payment(ZonedDateTime requestedAt) {
+        return PaymentModel.builder()
+            .orderId(1L)
+            .userId(2L)
+            .amount(78_000)
+            .cardType(CardType.SAMSUNG)
+            .rawCardNo(CARD_NO)
+            .requestedAt(requestedAt)
+            .build();
+    }
+
+    @DisplayName("결제를 생성할 때,")
+    @Nested
+    class Create {
+
+        @DisplayName("접수 대기 상태로 시작하고 입력한 결제 정보와 접수 시각을 보존한다.")
+        @Test
+        void createsPendingPayment_withRequestedAt() {
+            // arrange
+            ZonedDateTime requestedAt = ZonedDateTime.now();
+
+            // act
+            PaymentModel payment = payment(requestedAt);
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getOrderId()).isEqualTo(1L),
+                () -> assertThat(payment.getUserId()).isEqualTo(2L),
+                () -> assertThat(payment.getAmount()).isEqualTo(78_000),
+                () -> assertThat(payment.getCardType()).isEqualTo(CardType.SAMSUNG),
+                () -> assertThat(payment.getCardNo().value()).isEqualTo(CARD_NO),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING),
+                () -> assertThat(payment.isPending()).isTrue(),
+                () -> assertThat(payment.getRequestedAt()).isEqualTo(requestedAt)
+            );
+        }
+
+        @DisplayName("거래 식별자는 부재 상태로 시작한다.")
+        @Test
+        void startsWithoutTransactionKey() {
+            // act
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // assert
+            assertThat(payment.getTransactionKey()).isNull();
+        }
+    }
+
+    @DisplayName("거래 식별자를 기록할 때,")
+    @Nested
+    class RecordTransactionKey {
+
+        @DisplayName("접수 응답의 거래 식별자를 결제에 기록한다.")
+        @Test
+        void recordsTransactionKey() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.recordTransactionKey("TX-0001");
+
+            // assert
+            assertThat(payment.getTransactionKey()).isEqualTo("TX-0001");
+        }
+    }
+
+    @DisplayName("거래 식별자 일치를 검증할 때,")
+    @Nested
+    class MatchesTransactionKey {
+
+        @DisplayName("기록된 거래 식별자와 같으면 참이다.")
+        @Test
+        void returnsTrue_whenSame() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.recordTransactionKey("TX-0001");
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-0001")).isTrue();
+        }
+
+        @DisplayName("다른 거래 식별자이면 거짓이다.")
+        @Test
+        void returnsFalse_whenDifferent() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.recordTransactionKey("TX-0001");
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-FORGED")).isFalse();
+        }
+
+        @DisplayName("거래 식별자가 아직 없으면 어떤 값과도 일치하지 않는다.")
+        @Test
+        void returnsFalse_whenKeyAbsent() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act & assert
+            assertThat(payment.matchesTransactionKey("TX-0001")).isFalse();
+        }
+    }
+
+    @DisplayName("외부 결제 시스템의 접수 결과를 반영할 때,")
+    @Nested
+    class ApplyRequestResult {
+
+        @DisplayName("접수에 성공하면 거래 식별자를 기록하고 PENDING을 유지한다.")
+        @Test
+        void recordsTransactionKey_andStaysPending_whenAccepted() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.accepted("TX-0001"));
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getTransactionKey()).isEqualTo("TX-0001"),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING)
+            );
+        }
+
+        @DisplayName("결과가 불명이면 거래 식별자 없이 PENDING을 유지한다.")
+        @Test
+        void staysPending_withoutTransactionKey_whenUnknown() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.unknown());
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getTransactionKey()).isNull(),
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING)
+            );
+        }
+
+        @DisplayName("접수가 거절되면 FAILED로 확정하고 사유를 기록한다.")
+        @Test
+        void fails_withReason_whenRejected() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.applyRequestResult(PaymentRequestResult.rejected("결제가 거절되었습니다."));
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getReason()).isEqualTo("결제가 거절되었습니다."),
+                () -> assertThat(payment.getTransactionKey()).isNull()
+            );
+        }
+    }
+
+    @DisplayName("결제를 실패로 확정할 때,")
+    @Nested
+    class Fail {
+
+        @DisplayName("PENDING이면 FAILED로 전이하고 사유를 기록한다.")
+        @Test
+        void fails_whenPending() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.fail("한도 초과");
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED),
+                () -> assertThat(payment.getReason()).isEqualTo("한도 초과"),
+                () -> assertThat(payment.isTerminal()).isTrue()
+            );
+        }
+
+        @DisplayName("이미 종료된 결제면 사유를 덮어쓰지 않는다.")
+        @Test
+        void ignoresFail_whenAlreadyTerminal() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.fail("먼저 기록된 사유");
+
+            // act
+            payment.fail("나중에 들어온 사유");
+
+            // assert
+            assertThat(payment.getReason()).isEqualTo("먼저 기록된 사유");
+        }
+    }
+
+    @DisplayName("결제를 STUCK으로 격리할 때,")
+    @Nested
+    class MarkStuck {
+
+        @DisplayName("PENDING이면 STUCK으로 전이한다.")
+        @Test
+        void marksStuck_whenPending() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+
+            // act
+            payment.markStuck();
+
+            // assert
+            assertAll(
+                () -> assertThat(payment.getStatus()).isEqualTo(PaymentStatus.STUCK),
+                () -> assertThat(payment.isStuck()).isTrue(),
+                () -> assertThat(payment.isTerminal()).isFalse()
+            );
+        }
+
+        @DisplayName("이미 종료된 결제면 STUCK으로 바뀌지 않는다.")
+        @Test
+        void ignoresMarkStuck_whenAlreadyTerminal() {
+            // arrange
+            PaymentModel payment = payment(ZonedDateTime.now());
+            payment.fail("한도 초과");
+
+            // act
+            payment.markStuck();
+
+            // assert
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        }
+    }
+}
