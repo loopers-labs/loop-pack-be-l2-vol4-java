@@ -47,6 +47,16 @@ public class CouponService {
         return discountAmount;
     }
 
+    /** 결제 실패 보상: 주문에 사용했던 쿠폰을 다시 사용 가능 상태로 되돌린다. */
+    @Transactional
+    public void restore(Long userId, Long userCouponId) {
+        UserCoupon userCoupon = userCouponRepository.findById(userCouponId)
+            .filter(issued -> issued.getUserId().equals(userId))
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[userCouponId = " + userCouponId + "] 쿠폰을 찾을 수 없습니다."));
+        userCoupon.restore();
+        userCouponRepository.save(userCoupon);
+    }
+
     @Transactional
     public Coupon update(Long couponId, String name, Discount discount, Money minOrderAmount, LocalDateTime expiredAt) {
         Coupon coupon = getCoupon(couponId);

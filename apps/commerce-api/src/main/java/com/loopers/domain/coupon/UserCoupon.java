@@ -72,4 +72,9 @@ public class UserCoupon extends BaseEntity {
         }
         this.status = CouponStatus.USED;
     }
+
+    /** 결제 실패 보상: 사용 처리했던 쿠폰을 다시 사용 가능 상태로 되돌린다. 같은 값 재기록이라 멱등하다. */
+    public void restore() {
+        this.status = CouponStatus.AVAILABLE;
+    }
 }

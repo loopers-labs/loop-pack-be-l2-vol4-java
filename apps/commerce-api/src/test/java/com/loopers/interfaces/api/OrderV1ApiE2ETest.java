@@ -138,7 +138,7 @@ class OrderV1ApiE2ETest {
             Product reloaded = productJpaRepository.findById(product.getId()).orElseThrow();
             assertAll(
                 () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                () -> assertThat(response.getBody().data().status()).isEqualTo(OrderStatus.COMPLETED),
+                () -> assertThat(response.getBody().data().status()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(response.getBody().data().totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(3000)),
                 () -> assertThat(response.getBody().data().items()).hasSize(1),
                 () -> assertThat(orderJpaRepository.findAll()).hasSize(1),

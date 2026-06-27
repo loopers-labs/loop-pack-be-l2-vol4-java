@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import com.loopers.domain.quantity.Quantity;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,13 @@ public class ProductService {
             throw new CoreException(ErrorType.NOT_FOUND, "[id = " + missingId + "] 상품을 찾을 수 없습니다.");
         }
         return products;
+    }
+
+    /** 결제 실패 보상: 차감했던 재고를 되돌린다. 동시 보상의 lost update 를 막기 위해 비관적 락으로 읽는다. */
+    @Transactional
+    public void restoreStock(Long productId, int quantity) {
+        Product product = getProductsForUpdate(List.of(productId)).get(0);
+        product.restoreStock(new Quantity(quantity));
     }
 
     @Transactional(readOnly = true)

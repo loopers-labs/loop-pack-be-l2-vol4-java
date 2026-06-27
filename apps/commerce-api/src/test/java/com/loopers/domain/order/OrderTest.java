@@ -19,7 +19,7 @@ class OrderTest {
     @DisplayName("주문을 접수할 때, ")
     @Nested
     class Place {
-        @DisplayName("items의 lineAmount 합으로 totalAmount가 계산되고, 상태는 COMPLETED 다.")
+        @DisplayName("items의 lineAmount 합으로 totalAmount가 계산되고, 상태는 PENDING 다.")
         @Test
         void calculatesTotalAmount_fromItems() {
             // arrange
@@ -35,7 +35,7 @@ class OrderTest {
             // assert
             assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(userId),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
                 () -> assertThat(order.getTotalAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500)),
                 () -> assertThat(order.getDiscountAmount().getAmount()).isEqualByComparingTo(BigDecimal.ZERO),
                 () -> assertThat(order.getPaymentAmount().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(2500))
@@ -77,6 +77,56 @@ class OrderTest {
 
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("결제 결과를 반영할 때, ")
+    @Nested
+    class Transition {
+        private Order pendingOrder() {
+            return Order.place(1L, List.of(
+                new OrderItem(10L, "에어맥스", new Money(BigDecimal.valueOf(1000)), new Quantity(1))
+            ));
+        }
+
+        @DisplayName("markPaid 는 PENDING 주문을 PAID 로 전이한다.")
+        @Test
+        void marksPaid_whenPending() {
+            // arrange
+            Order order = pendingOrder();
+
+            // act
+            order.markPaid();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("markFailed 는 PENDING 주문을 FAILED 로 전이한다.")
+        @Test
+        void marksFailed_whenPending() {
+            // arrange
+            Order order = pendingOrder();
+
+            // act
+            order.markFailed();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        }
+
+        @DisplayName("이미 확정된 주문을 다시 전이하면, CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenAlreadyDecided() {
+            // arrange
+            Order order = pendingOrder();
+            order.markPaid();
+
+            // act
+            CoreException result = assertThrows(CoreException.class, order::markFailed);
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
     }
 }
