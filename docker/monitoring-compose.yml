@@ -7,6 +7,16 @@ services:
     volumes:
       - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
 
+  tempo:
+    image: grafana/tempo:latest
+    ports:
+      - "3200:3200"   # Tempo HTTP API
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ./grafana/tempo.yml:/etc/tempo/tempo.yml
+    command: [ "-config.file=/etc/tempo/tempo.yml" ]
+
   grafana:
     image: grafana/grafana
     ports:
@@ -16,6 +26,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+      - tempo
 
 networks:
   default:

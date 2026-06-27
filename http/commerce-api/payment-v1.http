@@ -1,0 +1,31 @@
+### 결제 요청
+POST http://localhost:8080/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: testuser
+X-Loopers-LoginPw: pAssWord1!
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### PG 콜백 수신 (SUCCESS)
+POST http://localhost:8080/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20260624:TR:abc123",
+  "status": "SUCCESS",
+  "reason": "정상 승인되었습니다."
+}
+
+### PG 콜백 수신 (FAILED)
+POST http://localhost:8080/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20260624:TR:abc123",
+  "status": "FAILED",
+  "reason": "한도초과입니다."
+}

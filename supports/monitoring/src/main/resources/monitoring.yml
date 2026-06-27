@@ -1,4 +1,10 @@
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
   metrics:
     distribution:
       percentiles-histogram:

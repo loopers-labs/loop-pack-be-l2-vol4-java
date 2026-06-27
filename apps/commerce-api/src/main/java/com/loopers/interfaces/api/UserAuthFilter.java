@@ -77,6 +77,14 @@ public class UserAuthFilter extends OncePerRequestFilter {
             return false;
         }
 
+        if (uri.equals("/api/v1/payments/callback")) {
+            return true;
+        }
+
+        if (uri.startsWith("/api/v1/payments")) {
+            return false;
+        }
+
         return true;
     }
 

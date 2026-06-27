@@ -9,6 +9,12 @@ dependencies {
     // security
     implementation("org.springframework.security:spring-security-crypto")
 
+    // feign
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+
+    // resilience4j
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -22,4 +28,7 @@ dependencies {
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
+
+    // wiremock
+    testImplementation("org.springframework.cloud:spring-cloud-contract-wiremock")
 }

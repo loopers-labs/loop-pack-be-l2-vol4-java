@@ -24,6 +24,46 @@ spring:
       - logging.yml
       - monitoring.yml
 
+pg:
+  base-url: http://127.0.0.1:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  retry:
+    retry-aspect-order: 2
+    instances:
+      pg-payment:
+        max-attempts: 3
+        wait-duration: 250ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          - feign.RetryableException
+          - java.io.IOException
+        ignore-exceptions:
+          - feign.FeignException$BadRequest
+          - feign.FeignException$Unauthorized
+          - feign.FeignException$Forbidden
+          - feign.FeignException$NotFound
+          - feign.FeignException$Conflict
+  circuit-breaker:
+    circuit-breaker-aspect-order: 1
+    instances:
+      pg-payment:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 50
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 1s
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        record-exceptions:
+          - feign.RetryableException
+          - java.io.IOException
+
 springdoc:
   use-fqn: true
   swagger-ui:
