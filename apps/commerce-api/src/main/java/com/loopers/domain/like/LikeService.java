@@ -14,14 +14,18 @@ public class LikeService {
 
     @Transactional
     public boolean addLike(Long userId, Long productId) {
-        if (likeRepository.existsBy(userId, productId)) return false;
+        if (likeRepository.existsBy(userId, productId)) {
+            return false;
+        }
         likeRepository.save(new Like(userId, productId));
         return true;
     }
 
     @Transactional
     public boolean removeLike(Long userId, Long productId) {
-        if (!likeRepository.existsBy(userId, productId)) return false;
+        if (!likeRepository.existsBy(userId, productId)) {
+            return false;
+        }
         likeRepository.deleteBy(userId, productId);
         return true;
     }
@@ -33,7 +37,9 @@ public class LikeService {
 
     @Transactional
     public void bulkDeleteByProductIds(List<Long> productIds) {
-        if (productIds.isEmpty()) return;
+        if (productIds.isEmpty()) {
+            return;
+        }
         likeRepository.deleteAllByProductIdIn(productIds);
     }
 }

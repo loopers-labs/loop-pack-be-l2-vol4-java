@@ -40,7 +40,9 @@ public class LikeFacade {
                 try {
                     return ProductInfo.from(productService.getProduct(like.getProductId()));
                 } catch (CoreException e) {
-                    if (e.getErrorType() == ErrorType.NOT_FOUND) return null;
+                    if (e.getErrorType() == ErrorType.NOT_FOUND) {
+                        return null;
+                    }
                     throw e;
                 }
             })

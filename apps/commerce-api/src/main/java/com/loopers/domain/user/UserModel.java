@@ -40,14 +40,18 @@ public class UserModel extends BaseEntity {
     }
 
     private void validate(String loginId, String loginPw, String email, String nickname) {
-        if (loginId == null || loginId.isBlank())
+        if (loginId == null || loginId.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "아이디는 비어있을 수 없습니다.");
-        if (loginPw == null || loginPw.isBlank())
+        }
+        if (loginPw == null || loginPw.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
-        if (email == null || !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
+        }
+        if (email == null || !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이메일 형식이 유효하지 않습니다.");
-        if (nickname == null || nickname.isBlank())
+        }
+        if (nickname == null || nickname.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "닉네임은 비어있을 수 없습니다.");
+        }
     }
 
     public boolean authenticate(String loginId, String loginPw) {
@@ -55,10 +59,12 @@ public class UserModel extends BaseEntity {
     }
 
     public void changePassword(String oldPw, String newPw) {
-        if (!this.loginPw.equals(oldPw))
+        if (!this.loginPw.equals(oldPw)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
-        if (newPw == null || newPw.isBlank())
+        }
+        if (newPw == null || newPw.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 비어있을 수 없습니다.");
+        }
         this.loginPw = newPw;
     }
 
