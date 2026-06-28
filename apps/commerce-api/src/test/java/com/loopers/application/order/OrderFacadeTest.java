@@ -54,6 +54,9 @@ class OrderFacadeTest {
     @Mock
     private com.loopers.application.payment.PaymentFacade paymentFacade;
 
+    @Mock
+    private IdempotencyManager idempotencyManager;
+
     @Test
     @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다. (쿠폰 없음)")
     void createOrder_Success_WithoutCoupon() {
@@ -61,11 +64,14 @@ class OrderFacadeTest {
         Long userId = 1L;
         Long productId = 10L;
         int quantity = 2;
+        String idempotencyKey = "key-success-1";
         OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)), null);
         
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
         
+        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
+        given(idempotencyManager.lock(idempotencyKey)).willReturn(true);
         given(productRepository.findByIds(List.of(productId))).willReturn(List.of(product));
         given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> {
             OrderModel order = invocation.getArgument(0);
@@ -74,12 +80,14 @@ class OrderFacadeTest {
         });
 
         // when
-        Long orderId = orderFacade.createOrder(userId, request);
+        Long orderId = orderFacade.createOrder(userId, request, idempotencyKey);
 
         // then
         assertThat(orderId).isEqualTo(100L);
         verify(productFacade).decreaseStocks(anyList());
         verify(orderRepository).save(any(OrderModel.class));
+        verify(idempotencyManager).saveSuccess(idempotencyKey, 100L);
+        verify(idempotencyManager).unlock(idempotencyKey);
     }
 
     @Test
@@ -90,6 +98,7 @@ class OrderFacadeTest {
         Long productId = 10L;
         Long couponIssueId = 42L;
         int quantity = 2;
+        String idempotencyKey = "key-success-2";
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderCreateRequest.Item(productId, quantity)),
                 couponIssueId
@@ -97,6 +106,8 @@ class OrderFacadeTest {
 
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
+        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
+        given(idempotencyManager.lock(idempotencyKey)).willReturn(true);
         given(productRepository.findByIds(anyList())).willReturn(List.of(product));
 
         CouponTemplate template = new CouponTemplate("test", CouponType.FIXED, new BigDecimal("40000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(1));
@@ -111,12 +122,48 @@ class OrderFacadeTest {
         });
 
         // when
-        Long orderId = orderFacade.createOrder(userId, request);
+        Long orderId = orderFacade.createOrder(userId, request, idempotencyKey);
 
         // then
         assertThat(orderId).isEqualTo(100L);
         verify(productFacade).decreaseStocks(anyList());
         verify(couponRepository).findIssueById(couponIssueId);
         verify(orderRepository).save(any(OrderModel.class));
+        verify(idempotencyManager).saveSuccess(idempotencyKey, 100L);
+        verify(idempotencyManager).unlock(idempotencyKey);
+    }
+
+    @Test
+    @DisplayName("이미 성공 처리되어 캐싱된 Idempotency-Key로 요청 시 DB 트랜잭션을 타지 않고 캐싱된 orderId를 반환한다.")
+    void createOrder_WithDuplicateSuccessKey_ShouldReturnCachedOrderId() {
+        // given
+        Long userId = 1L;
+        String idempotencyKey = "key-cached-1";
+        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(10L, 2)), null);
+        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(999L);
+
+        // when
+        Long orderId = orderFacade.createOrder(userId, request, idempotencyKey);
+
+        // then
+        assertThat(orderId).isEqualTo(999L);
+        org.mockito.Mockito.verifyNoInteractions(productFacade, orderRepository);
+    }
+
+    @Test
+    @DisplayName("다른 스레드가 이미 락을 획득하여 처리 중인 키로 진입 시 409 CONFLICT 예외가 발생한다.")
+    void createOrder_WithConcurrentKey_ShouldThrowConflict() {
+        // given
+        Long userId = 1L;
+        String idempotencyKey = "key-locked-1";
+        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(10L, 2)), null);
+        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
+        given(idempotencyManager.lock(idempotencyKey)).willReturn(false);
+
+        // when & then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderFacade.createOrder(userId, request, idempotencyKey))
+                .isInstanceOf(com.loopers.support.error.CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(com.loopers.support.error.ErrorType.CONFLICT);
     }
 }

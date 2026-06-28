@@ -34,9 +34,39 @@ public class OrderFacade {
     private final ProductFacade productFacade;
     private final CouponRepository couponRepository;
     private final PaymentFacade paymentFacade;
+    private final IdempotencyManager idempotencyManager;
+
+    public Long createOrder(Long userId, OrderCreateRequest request) {
+        return createOrder(userId, request, null);
+    }
+
+    public Long createOrder(Long userId, OrderCreateRequest request, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Long cachedOrderId = idempotencyManager.getSuccess(idempotencyKey);
+            if (cachedOrderId != null) {
+                return cachedOrderId;
+            }
+            boolean locked = idempotencyManager.lock(idempotencyKey);
+            if (!locked) {
+                throw new CoreException(ErrorType.CONFLICT, "동시 요청이 처리 중입니다.");
+            }
+        }
+
+        try {
+            Long orderId = processCreateOrder(userId, request);
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                idempotencyManager.saveSuccess(idempotencyKey, orderId);
+            }
+            return orderId;
+        } finally {
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                idempotencyManager.unlock(idempotencyKey);
+            }
+        }
+    }
 
     @Transactional
-    public Long createOrder(Long userId, OrderCreateRequest request) {
+    public Long processCreateOrder(Long userId, OrderCreateRequest request) {
         List<StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockRequest(item.productId(), item.quantity()))
                 .toList();

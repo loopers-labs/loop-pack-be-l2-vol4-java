@@ -218,7 +218,7 @@ class OrderFacadeConcurrencyTest {
         // 결제 승인에 1.5초가 걸린다고 가정
         Mockito.doAnswer(invocation -> {
             Thread.sleep(1500);
-            return invocation.callRealMethod();
+            return new com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult("tx-boundary-123", LocalDateTime.now());
         }).when(paymentGateway).requestPayment(Mockito.anyLong(), Mockito.any(), Mockito.any());
 
         OrderCreateRequest request = new OrderCreateRequest(
