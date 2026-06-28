@@ -6,9 +6,15 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.Getter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
 @Entity
 @Table(name = "product")
+@SQLDelete(sql = "UPDATE product SET deleted_at = NOW() WHERE id = ?")
+@Where(clause = "deleted_at IS NULL")
+@Getter
 public class ProductModel extends BaseEntity {
 
     @Column(nullable = false)
@@ -50,10 +56,14 @@ public class ProductModel extends BaseEntity {
         this.likeCount = 0;
     }
 
+    public boolean hasEnoughStock(int quantity) {
+        return this.stock >= quantity;
+    }
+
     public void decreaseStock(int quantity) {
         if (quantity <= 0)
             throw new CoreException(ErrorType.BAD_REQUEST, "차감 수량은 1 이상이어야 합니다.");
-        if (this.stock < quantity)
+        if (!hasEnoughStock(quantity))
             throw new CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.");
         this.stock -= quantity;
     }
@@ -83,10 +93,7 @@ public class ProductModel extends BaseEntity {
         this.stock = stock;
     }
 
-    public String getName() { return name; }
-    public String getDescription() { return description; }
-    public Long getPrice() { return price; }
-    public Integer getStock() { return stock; }
-    public Long getBrandId() { return brandId; }
-    public Integer getLikeCount() { return likeCount; }
+    public StockStatus stockStatus() {
+        return this.stock == 0 ? StockStatus.SOLD_OUT : StockStatus.ON_SALE;
+    }
 }

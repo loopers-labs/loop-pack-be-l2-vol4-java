@@ -14,28 +14,32 @@ public class OrderItem extends BaseEntity {
     @Column(nullable = false)
     private Long productId;
 
-    @Column(nullable = false)
-    private String productName;
+    @Column(name = "product_name_snapshot", nullable = false)
+    private String productNameSnapshot;
 
-    @Column(nullable = false)
-    private Long productPrice;
+    @Column(name = "product_price_snapshot", nullable = false)
+    private Long productPriceSnapshot;
 
     @Column(nullable = false)
     private Integer quantity;
 
     protected OrderItem() {}
 
-    public OrderItem(Long productId, String productName, Long productPrice, Integer quantity) {
+    public OrderItem(Long productId, String productNameSnapshot, Long productPriceSnapshot, Integer quantity) {
         this.productId = productId;
-        this.productName = productName;
-        this.productPrice = productPrice;
+        this.productNameSnapshot = productNameSnapshot;
+        this.productPriceSnapshot = productPriceSnapshot;
         this.quantity = quantity;
     }
 
     void assignOrder(Order order) { this.order = order; }
 
+    public long subtotal() {
+        return productPriceSnapshot * quantity;
+    }
+
     public Long getProductId() { return productId; }
-    public String getProductName() { return productName; }
-    public Long getProductPrice() { return productPrice; }
+    public String getProductNameSnapshot() { return productNameSnapshot; }
+    public Long getProductPriceSnapshot() { return productPriceSnapshot; }
     public Integer getQuantity() { return quantity; }
 }

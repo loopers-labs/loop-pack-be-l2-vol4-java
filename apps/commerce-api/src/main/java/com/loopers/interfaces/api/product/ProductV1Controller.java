@@ -32,7 +32,7 @@ public class ProductV1Controller {
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-        @PathVariable(value = "productId") Long productId
+        @PathVariable Long productId
     ) {
         ProductInfo info = productFacade.getProduct(productId);
         return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
@@ -50,7 +50,7 @@ public class ProductV1Controller {
 
     @PutMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
+        @PathVariable Long productId,
         @RequestBody ProductV1Dto.UpdateProductRequest request
     ) {
         ProductInfo info = productFacade.updateProduct(
@@ -65,7 +65,7 @@ public class ProductV1Controller {
 
     @DeleteMapping("/{productId}")
     public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
+        @PathVariable Long productId
     ) {
         productFacade.deleteProduct(productId);
         return ApiResponse.success(null);

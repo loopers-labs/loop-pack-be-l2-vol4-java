@@ -1,6 +1,7 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.StockStatus;
 
 public record ProductInfo(
     Long id,
@@ -8,6 +9,7 @@ public record ProductInfo(
     String description,
     Long price,
     Integer stock,
+    StockStatus stockStatus,
     Long brandId,
     Integer likeCount
 ) {
@@ -18,6 +20,7 @@ public record ProductInfo(
             product.getDescription(),
             product.getPrice(),
             product.getStock(),
+            product.stockStatus(),
             product.getBrandId(),
             product.getLikeCount()
         );

@@ -7,6 +7,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "users")
 public class UserModel extends BaseEntity {
@@ -23,14 +25,18 @@ public class UserModel extends BaseEntity {
     @Column(nullable = false)
     private String nickname;
 
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
     protected UserModel() {}
 
-    public UserModel(String loginId, String loginPw, String email, String nickname) {
+    public UserModel(String loginId, String loginPw, String email, String nickname, LocalDate birthDate) {
         validate(loginId, loginPw, email, nickname);
         this.loginId = loginId;
         this.loginPw = loginPw;
         this.email = email;
         this.nickname = nickname;
+        this.birthDate = birthDate;
     }
 
     private void validate(String loginId, String loginPw, String email, String nickname) {
@@ -44,14 +50,21 @@ public class UserModel extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "닉네임은 비어있을 수 없습니다.");
     }
 
-    public void changePassword(String newPassword) {
-        if (newPassword == null || newPassword.isBlank())
-            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.");
-        this.loginPw = newPassword;
+    public boolean authenticate(String loginId, String loginPw) {
+        return this.loginId.equals(loginId) && this.loginPw.equals(loginPw);
+    }
+
+    public void changePassword(String oldPw, String newPw) {
+        if (!this.loginPw.equals(oldPw))
+            throw new CoreException(ErrorType.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
+        if (newPw == null || newPw.isBlank())
+            throw new CoreException(ErrorType.BAD_REQUEST, "새 비밀번호는 비어있을 수 없습니다.");
+        this.loginPw = newPw;
     }
 
     public String getLoginId() { return loginId; }
     public String getLoginPw() { return loginPw; }
     public String getEmail() { return email; }
     public String getNickname() { return nickname; }
+    public LocalDate getBirthDate() { return birthDate; }
 }

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -20,6 +21,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     @Override
     public ProductModel save(ProductModel product) {
         return productJpaRepository.save(product);
+    }
+
+    @Override
+    public List<ProductModel> saveAll(List<ProductModel> products) {
+        return productJpaRepository.saveAll(products);
     }
 
     @Override
@@ -39,8 +45,23 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAllByIdsWithLock(List<Long> ids) {
+        return productJpaRepository.findAllByIdsWithLock(ids);
+    }
+
+    @Override
+    public List<Long> findIdsByBrandId(Long brandId) {
+        return productJpaRepository.findIdsByBrandId(brandId);
+    }
+
+    @Override
     public void delete(Long id) {
         productJpaRepository.deleteById(id);
+    }
+
+    @Override
+    public void bulkSoftDelete(Long brandId) {
+        productJpaRepository.bulkSoftDeleteByBrandId(brandId);
     }
 
     @Override
