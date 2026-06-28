@@ -5,13 +5,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BrandRepository {
-    BrandModel save(BrandModel brand);
+    Brand save(Brand brand);
 
-    Optional<BrandModel> find(Long id);
+    Optional<Brand> find(Long id);
 
-    List<BrandModel> findAll();
+    List<Brand> findAll();
 
-    List<BrandModel> findAllByIds(Collection<Long> ids);
+    List<Brand> findAllByIds(Collection<Long> ids);
 
     boolean existsById(Long id);
 }

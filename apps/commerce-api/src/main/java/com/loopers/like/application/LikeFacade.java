@@ -1,12 +1,12 @@
 package com.loopers.like.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.member.application.MemberService;
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductDisplayService;
 import com.loopers.product.application.ProductService;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductSortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -46,11 +46,11 @@ public class LikeFacade {
             return List.of();
         }
 
-        List<ProductModel> products = productService.getExistingByIds(likedProductIds);
-        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
-        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        List<Product> products = productService.getExistingByIds(likedProductIds);
+        List<Long> brandIds = products.stream().map(Product::getBrandId).distinct().toList();
+        List<Long> productIds = products.stream().map(Product::getId).toList();
 
-        Map<Long, BrandModel> brandMap = brandService.getMapByIds(brandIds);
+        Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, Long> likeCountMap = likeService.getLikeCounts(productIds);
 
         return productDisplayService

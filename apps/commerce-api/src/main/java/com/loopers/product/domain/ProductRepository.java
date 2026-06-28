@@ -5,13 +5,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository {
-    ProductModel save(ProductModel product);
+    Product save(Product product);
 
-    Optional<ProductModel> find(Long id);
+    Optional<Product> find(Long id);
 
-    List<ProductModel> findAll();
+    List<Product> findAll();
 
-    List<ProductModel> findByBrandId(Long brandId);
+    List<Product> findByBrandId(Long brandId);
 
-    List<ProductModel> findAllByIds(Collection<Long> ids);
+    List<Product> findAllByIds(Collection<Long> ids);
 }

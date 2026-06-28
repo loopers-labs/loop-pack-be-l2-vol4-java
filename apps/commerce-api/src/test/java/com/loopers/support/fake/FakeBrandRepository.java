@@ -1,6 +1,6 @@
 package com.loopers.support.fake;
 
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
 
 import java.util.*;
@@ -8,11 +8,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class FakeBrandRepository implements BrandRepository {
 
-    private final Map<Long, BrandModel> store = new HashMap<>();
+    private final Map<Long, Brand> store = new HashMap<>();
     private final AtomicLong seq = new AtomicLong(0);
 
     @Override
-    public BrandModel save(BrandModel brand) {
+    public Brand save(Brand brand) {
         if (brand.getId() == null || brand.getId() == 0L) {
             IdFixtures.assignId(brand, seq.incrementAndGet());
         }
@@ -21,17 +21,17 @@ public class FakeBrandRepository implements BrandRepository {
     }
 
     @Override
-    public Optional<BrandModel> find(Long id) {
+    public Optional<Brand> find(Long id) {
         return Optional.ofNullable(store.get(id)).filter(b -> b.getDeletedAt() == null);
     }
 
     @Override
-    public List<BrandModel> findAll() {
+    public List<Brand> findAll() {
         return store.values().stream().filter(b -> b.getDeletedAt() == null).toList();
     }
 
     @Override
-    public List<BrandModel> findAllByIds(Collection<Long> ids) {
+    public List<Brand> findAllByIds(Collection<Long> ids) {
         return ids.stream()
             .map(store::get)
             .filter(b -> b != null && b.getDeletedAt() == null)

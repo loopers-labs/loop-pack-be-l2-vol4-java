@@ -13,7 +13,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "product")
 @SQLRestriction("deleted_at is null")
-public class ProductModel extends BaseEntity {
+public class Product extends BaseEntity {
 
     @Column(name = "brand_id", nullable = false, updatable = false)
     private Long brandId;
@@ -23,9 +23,9 @@ public class ProductModel extends BaseEntity {
     private Long price;
     private Integer stock;
 
-    protected ProductModel() {}
+    protected Product() {}
 
-    public ProductModel(Long brandId, String name, String description, Long price, Integer stock) {
+    public Product(Long brandId, String name, String description, Long price, Integer stock) {
         if (brandId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "브랜드는 필수입니다.");
         }

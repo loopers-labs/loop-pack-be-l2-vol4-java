@@ -1,13 +1,13 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.member.application.MemberService;
-import com.loopers.member.domain.MemberModel;
+import com.loopers.member.domain.Member;
+import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderLine;
-import com.loopers.order.domain.OrderModel;
 import com.loopers.product.application.ProductService;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.fake.*;
@@ -49,10 +49,10 @@ class OrderFacadeTest {
         orderFacade =
             new OrderFacade(memberService, productService, brandService, orderService);
 
-        MemberModel member = memberRepository.save(new MemberModel("member01", "pw123456"));
-        BrandModel brand = brandRepository.save(new BrandModel("브랜드", "설명"));
-        ProductModel p1 = productRepository.save(new ProductModel(brand.getId(), "A", "설명", 1_000L, 10));
-        ProductModel p2 = productRepository.save(new ProductModel(brand.getId(), "B", "설명", 2_000L, 5));
+        Member member = memberRepository.save(new Member("member01", "pw123456"));
+        Brand brand = brandRepository.save(new Brand("브랜드", "설명"));
+        Product p1 = productRepository.save(new Product(brand.getId(), "A", "설명", 1_000L, 10));
+        Product p2 = productRepository.save(new Product(brand.getId(), "B", "설명", 2_000L, 5));
         memberId = member.getId();
         productId1 = p1.getId();
         productId2 = p2.getId();
@@ -135,7 +135,7 @@ class OrderFacadeTest {
     class DateFilter {
 
         private void seedOrder(long id, String date) {
-            OrderModel order = OrderModel.create(memberId);
+            Order order = Order.create(memberId);
             IdFixtures.assignId(order, id);
             ReflectionTestUtils.setField(
                 order,

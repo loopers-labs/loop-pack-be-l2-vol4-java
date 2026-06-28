@@ -1,7 +1,7 @@
 package com.loopers.example.interfaces.api;
 
 import com.loopers.common.interfaces.api.ApiResponse;
-import com.loopers.example.domain.ExampleModel;
+import com.loopers.example.domain.Example;
 import com.loopers.example.infrastructure.ExampleJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -55,8 +55,8 @@ class ExampleV1ApiE2ETest {
         @Test
         void returnsExampleInfo_whenValidIdIsProvided() {
             // arrange
-            ExampleModel exampleModel = exampleJpaRepository.save(
-                new ExampleModel("예시 제목", "예시 설명")
+            Example exampleModel = exampleJpaRepository.save(
+                new Example("예시 제목", "예시 설명")
             );
             String requestUrl = ENDPOINT_GET.apply(exampleModel.getId());
 

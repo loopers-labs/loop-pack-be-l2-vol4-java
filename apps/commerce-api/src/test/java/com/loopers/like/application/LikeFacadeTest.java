@@ -1,11 +1,11 @@
 package com.loopers.like.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.member.application.MemberService;
-import com.loopers.member.domain.MemberModel;
+import com.loopers.member.domain.Member;
 import com.loopers.product.application.ProductService;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.fake.FakeBrandRepository;
@@ -43,10 +43,10 @@ class LikeFacadeTest {
         likeFacade =
             new LikeFacade(likeService, memberService, productService, brandService);
 
-        MemberModel member = memberRepository.save(new MemberModel("member01", "pw123456"));
-        BrandModel brand = brandRepository.save(new BrandModel("브랜드", "설명"));
-        ProductModel product =
-            productRepository.save(new ProductModel(brand.getId(), "상품", "설명", 1_000L, 10));
+        Member member = memberRepository.save(new Member("member01", "pw123456"));
+        Brand brand = brandRepository.save(new Brand("브랜드", "설명"));
+        Product product =
+            productRepository.save(new Product(brand.getId(), "상품", "설명", 1_000L, 10));
         memberId = member.getId();
         productId = product.getId();
     }

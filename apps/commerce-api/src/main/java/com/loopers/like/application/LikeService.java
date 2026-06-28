@@ -1,6 +1,6 @@
 package com.loopers.like.application;
 
-import com.loopers.like.domain.LikeModel;
+import com.loopers.like.domain.Like;
 import com.loopers.like.domain.LikeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ public class LikeService {
     /** 좋아요를 등록한다. 이미 등록되어 있으면 멱등하게 아무 동작도 하지 않는다. */
     public void like(Long memberId, Long productId) {
         if (!likeRepository.exists(memberId, productId)) {
-            likeRepository.save(new LikeModel(memberId, productId));
+            likeRepository.save(new Like(memberId, productId));
         }
     }
 
@@ -41,7 +41,7 @@ public class LikeService {
 
     public List<Long> getLikedProductIds(Long memberId) {
         return likeRepository.findByMemberId(memberId).stream()
-            .map(LikeModel::getProductId)
+            .map(Like::getProductId)
             .toList();
     }
 }

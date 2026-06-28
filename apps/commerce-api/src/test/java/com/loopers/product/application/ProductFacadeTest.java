@@ -1,10 +1,10 @@
 package com.loopers.product.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.like.application.LikeService;
-import com.loopers.like.domain.LikeModel;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.like.domain.Like;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductSortType;
 import com.loopers.support.fake.FakeBrandRepository;
 import com.loopers.support.fake.FakeLikeRepository;
@@ -39,11 +39,11 @@ class ProductFacadeTest {
     @DisplayName("상품 상세 조회 시 브랜드 정보와 좋아요 수가 함께 제공된다.")
     @Test
     void getProductDetail_combinesBrandAndLikeCount() {
-        BrandModel brand = brandRepository.save(new BrandModel("나이키", "브랜드"));
-        ProductModel product =
-            productRepository.save(new ProductModel(brand.getId(), "운동화", "설명", 50_000L, 10));
-        likeRepository.save(new LikeModel(1L, product.getId()));
-        likeRepository.save(new LikeModel(2L, product.getId()));
+        Brand brand = brandRepository.save(new Brand("나이키", "브랜드"));
+        Product product =
+            productRepository.save(new Product(brand.getId(), "운동화", "설명", 50_000L, 10));
+        likeRepository.save(new Like(1L, product.getId()));
+        likeRepository.save(new Like(2L, product.getId()));
 
         ProductDetailInfo detail = productFacade.getProductDetail(product.getId());
 
@@ -55,13 +55,13 @@ class ProductFacadeTest {
     @DisplayName("상품 목록을 likes_desc 로 조회하면 좋아요 수 내림차순으로 정렬된다.")
     @Test
     void getProducts_sortsByLikesDesc() {
-        BrandModel brand = brandRepository.save(new BrandModel("브랜드", "설명"));
-        ProductModel a = productRepository.save(new ProductModel(brand.getId(), "A", "설명", 1_000L, 10));
-        ProductModel b = productRepository.save(new ProductModel(brand.getId(), "B", "설명", 1_000L, 10));
+        Brand brand = brandRepository.save(new Brand("브랜드", "설명"));
+        Product a = productRepository.save(new Product(brand.getId(), "A", "설명", 1_000L, 10));
+        Product b = productRepository.save(new Product(brand.getId(), "B", "설명", 1_000L, 10));
 
-        likeRepository.save(new LikeModel(1L, b.getId()));
-        likeRepository.save(new LikeModel(2L, b.getId()));
-        likeRepository.save(new LikeModel(3L, a.getId()));
+        likeRepository.save(new Like(1L, b.getId()));
+        likeRepository.save(new Like(2L, b.getId()));
+        likeRepository.save(new Like(3L, a.getId()));
 
         Page<ProductDetailInfo> result =
             productFacade.getProducts(null, ProductSortType.LIKES_DESC, 0, 20);
@@ -74,9 +74,9 @@ class ProductFacadeTest {
     @DisplayName("상품 목록은 page/size 로 페이지네이션된다.")
     @Test
     void getProducts_paginates() {
-        BrandModel brand = brandRepository.save(new BrandModel("브랜드", "설명"));
+        Brand brand = brandRepository.save(new Brand("브랜드", "설명"));
         for (int i = 0; i < 5; i++) {
-            productRepository.save(new ProductModel(brand.getId(), "P" + i, "설명", 1_000L, 10));
+            productRepository.save(new Product(brand.getId(), "P" + i, "설명", 1_000L, 10));
         }
 
         Page<ProductDetailInfo> page0 =
@@ -98,10 +98,10 @@ class ProductFacadeTest {
     @DisplayName("관리자 상품 목록은 brandId 로 필터링되고 운영용 상품 정보를 반환한다.")
     @Test
     void getProductsForAdmin_filtersByBrand() {
-        BrandModel brandA = brandRepository.save(new BrandModel("A", "설명"));
-        BrandModel brandB = brandRepository.save(new BrandModel("B", "설명"));
-        productRepository.save(new ProductModel(brandA.getId(), "a1", "설명", 1_000L, 3));
-        productRepository.save(new ProductModel(brandB.getId(), "b1", "설명", 1_000L, 7));
+        Brand brandA = brandRepository.save(new Brand("A", "설명"));
+        Brand brandB = brandRepository.save(new Brand("B", "설명"));
+        productRepository.save(new Product(brandA.getId(), "a1", "설명", 1_000L, 3));
+        productRepository.save(new Product(brandB.getId(), "b1", "설명", 1_000L, 7));
 
         Page<ProductInfo> result = productFacade.getProductsForAdmin(brandA.getId(), 0, 20);
 

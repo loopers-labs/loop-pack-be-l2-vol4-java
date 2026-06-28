@@ -1,13 +1,13 @@
 package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.member.application.MemberService;
+import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderCreationService;
 import com.loopers.order.domain.OrderLine;
-import com.loopers.order.domain.OrderModel;
 import com.loopers.product.application.ProductService;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.product.domain.Product;
 import com.loopers.support.PageSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,14 +40,14 @@ public class OrderFacade {
         memberService.get(memberId);
 
         List<Long> productIds = lines.stream().map(OrderLine::productId).distinct().toList();
-        List<ProductModel> products = productService.getAllByIds(productIds);
-        Map<Long, ProductModel> productMap =
-            products.stream().collect(Collectors.toMap(ProductModel::getId, Function.identity()));
+        List<Product> products = productService.getAllByIds(productIds);
+        Map<Long, Product> productMap =
+            products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
-        Map<Long, BrandModel> brandMap = brandService.getMapByIds(brandIds);
+        List<Long> brandIds = products.stream().map(Product::getBrandId).distinct().toList();
+        Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
 
-        OrderModel order = orderCreationService.create(memberId, lines, productMap, brandMap);
+        Order order = orderCreationService.create(memberId, lines, productMap, brandMap);
 
         productService.saveAll(products);
         return OrderInfo.from(orderService.save(order));
@@ -71,7 +71,7 @@ public class OrderFacade {
     public Page<OrderInfo> getAllOrders(int page, int size) {
         List<OrderInfo> infos =
             orderService.getAll().stream()
-                .sorted(Comparator.comparing(OrderModel::getId).reversed())
+                .sorted(Comparator.comparing(Order::getId).reversed())
                 .map(OrderInfo::from)
                 .toList();
         return PageSupport.paginate(infos, page, size);

@@ -1,10 +1,10 @@
 package com.loopers.product.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.like.application.LikeService;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDetail;
-import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductSortType;
 import com.loopers.support.PageSupport;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +35,8 @@ public class ProductFacade {
     /** 상품 상세 = Product + Brand + 좋아요 수를 도메인 서비스에서 조합한다. */
     @Transactional(readOnly = true)
     public ProductDetailInfo getProductDetail(Long productId) {
-        ProductModel product = productService.get(productId);
-        BrandModel brand = brandService.get(product.getBrandId());
+        Product product = productService.get(productId);
+        Brand brand = brandService.get(product.getBrandId());
         long likeCount = likeService.getLikeCount(productId);
 
         ProductDetail detail = productDisplayService.assembleDetail(product, brand, likeCount);
@@ -49,13 +49,13 @@ public class ProductFacade {
     @Transactional(readOnly = true)
     public Page<ProductDetailInfo> getProducts(
         Long brandId, ProductSortType sortType, int page, int size) {
-        List<ProductModel> products =
+        List<Product> products =
             brandId != null ? productService.getByBrandId(brandId) : productService.getAll();
 
-        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
-        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        List<Long> brandIds = products.stream().map(Product::getBrandId).distinct().toList();
+        List<Long> productIds = products.stream().map(Product::getId).toList();
 
-        Map<Long, BrandModel> brandMap = brandService.getMapByIds(brandIds);
+        Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, Long> likeCountMap = likeService.getLikeCounts(productIds);
 
         List<ProductDetailInfo> assembled =
@@ -68,12 +68,12 @@ public class ProductFacade {
     /** 관리자 상품 목록 = 운영용 상품 정보(재고 포함), 최신순 + page/size 페이지네이션. */
     @Transactional(readOnly = true)
     public Page<ProductInfo> getProductsForAdmin(Long brandId, int page, int size) {
-        List<ProductModel> products =
+        List<Product> products =
             brandId != null ? productService.getByBrandId(brandId) : productService.getAll();
 
         List<ProductInfo> infos =
             products.stream()
-                .sorted(Comparator.comparing(ProductModel::getId).reversed())
+                .sorted(Comparator.comparing(Product::getId).reversed())
                 .map(ProductInfo::from)
                 .toList();
         return PageSupport.paginate(infos, page, size);

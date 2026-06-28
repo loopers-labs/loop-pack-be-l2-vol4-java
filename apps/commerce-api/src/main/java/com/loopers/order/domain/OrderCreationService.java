@@ -1,7 +1,7 @@
 package com.loopers.order.domain;
 
-import com.loopers.brand.domain.BrandModel;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.brand.domain.Brand;
+import com.loopers.product.domain.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -16,25 +16,25 @@ import java.util.Map;
  */
 public class OrderCreationService {
 
-    public OrderModel create(
+    public Order create(
         Long memberId,
         List<OrderLine> lines,
-        Map<Long, ProductModel> productMap,
-        Map<Long, BrandModel> brandMap) {
+        Map<Long, Product> productMap,
+        Map<Long, Brand> brandMap) {
 
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목이 비어있습니다.");
         }
 
-        OrderModel order = OrderModel.create(memberId);
+        Order order = Order.create(memberId);
         for (OrderLine line : lines) {
-            ProductModel product = productMap.get(line.productId());
+            Product product = productMap.get(line.productId());
             if (product == null) {
                 throw new CoreException(
                     ErrorType.NOT_FOUND, "[id = " + line.productId() + "] 상품을 찾을 수 없습니다.");
             }
 
-            BrandModel brand = brandMap.get(product.getBrandId());
+            Brand brand = brandMap.get(product.getBrandId());
             product.deductStock(line.quantity());
 
             OrderItemSnapshot snapshot =

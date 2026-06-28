@@ -1,7 +1,7 @@
 package com.loopers.order.domain;
 
-import com.loopers.brand.domain.BrandModel;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.brand.domain.Brand;
+import com.loopers.product.domain.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.fake.IdFixtures;
@@ -19,11 +19,11 @@ class OrderCreationServiceTest {
 
     private final OrderCreationService service = new OrderCreationService();
 
-    private ProductModel product(long id, long price, int stock) {
-        return IdFixtures.assignId(new ProductModel(1L, "상품" + id, "설명", price, stock), id);
+    private Product product(long id, long price, int stock) {
+        return IdFixtures.assignId(new Product(1L, "상품" + id, "설명", price, stock), id);
     }
 
-    private final BrandModel brand = IdFixtures.assignId(new BrandModel("브랜드", "설명"), 1L);
+    private final Brand brand = IdFixtures.assignId(new Brand("브랜드", "설명"), 1L);
 
     @DisplayName("정상 주문 생성 시,")
     @Nested
@@ -31,11 +31,11 @@ class OrderCreationServiceTest {
         @DisplayName("여러 상품의 라인 금액 합으로 총액이 계산되고 재고가 차감된다.")
         @Test
         void createsOrder_andDeductsStock() {
-            ProductModel p1 = product(1L, 1_000L, 10);
-            ProductModel p2 = product(2L, 2_000L, 5);
+            Product p1 = product(1L, 1_000L, 10);
+            Product p2 = product(2L, 2_000L, 5);
             List<OrderLine> lines = List.of(new OrderLine(1L, 2), new OrderLine(2L, 3));
 
-            OrderModel order =
+            Order order =
                 service.create(100L, lines, Map.of(1L, p1, 2L, p2), Map.of(1L, brand));
 
             assertThat(order.getMemberId()).isEqualTo(100L);
@@ -48,8 +48,8 @@ class OrderCreationServiceTest {
         @DisplayName("주문 항목에 주문 당시 상품 정보가 스냅샷으로 보존된다.")
         @Test
         void preservesSnapshot() {
-            ProductModel p1 = product(1L, 1_000L, 10);
-            OrderModel order =
+            Product p1 = product(1L, 1_000L, 10);
+            Order order =
                 service.create(100L, List.of(new OrderLine(1L, 1)), Map.of(1L, p1), Map.of(1L, brand));
 
             OrderItem item = order.getItems().get(0);
@@ -65,7 +65,7 @@ class OrderCreationServiceTest {
         @DisplayName("재고가 부족하면 CONFLICT 예외가 발생한다.")
         @Test
         void throwsConflict_whenStockInsufficient() {
-            ProductModel p1 = product(1L, 1_000L, 1);
+            Product p1 = product(1L, 1_000L, 1);
             CoreException result =
                 assertThrows(
                     CoreException.class,

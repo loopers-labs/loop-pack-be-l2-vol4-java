@@ -8,14 +8,14 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "example")
-public class ExampleModel extends BaseEntity {
+public class Example extends BaseEntity {
 
     private String name;
     private String description;
 
-    protected ExampleModel() {}
+    protected Example() {}
 
-    public ExampleModel(String name, String description) {
+    public Example(String name, String description) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.");
         }

@@ -13,7 +13,7 @@ import java.util.List;
 @Getter
 @Entity
 @Table(name = "orders")
-public class OrderModel extends BaseEntity {
+public class Order extends BaseEntity {
 
     @Column(name = "member_id", nullable = false, updatable = false)
     private Long memberId;
@@ -24,17 +24,17 @@ public class OrderModel extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount = 0L;
 
-    protected OrderModel() {}
+    protected Order() {}
 
-    private OrderModel(Long memberId) {
+    private Order(Long memberId) {
         if (memberId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문자는 필수입니다.");
         }
         this.memberId = memberId;
     }
 
-    public static OrderModel create(Long memberId) {
-        return new OrderModel(memberId);
+    public static Order create(Long memberId) {
+        return new Order(memberId);
     }
 
     /** 주문 항목을 추가한다. 내부 OrderItem 생성은 Aggregate Root 를 통해서만 이루어진다. */

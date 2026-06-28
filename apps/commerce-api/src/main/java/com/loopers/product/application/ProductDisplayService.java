@@ -1,8 +1,8 @@
 package com.loopers.product.application;
 
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDetail;
-import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductSortType;
 
 import java.util.Comparator;
@@ -16,13 +16,13 @@ import java.util.Map;
  */
 public class ProductDisplayService {
 
-    public ProductDetail assembleDetail(ProductModel product, BrandModel brand, long likeCount) {
+    public ProductDetail assembleDetail(Product product, Brand brand, long likeCount) {
         return toDetail(product, brand, likeCount);
     }
 
     public List<ProductDetail> assembleList(
-        List<ProductModel> products,
-        Map<Long, BrandModel> brandMap,
+        List<Product> products,
+        Map<Long, Brand> brandMap,
         Map<Long, Long> likeCountMap,
         ProductSortType sortType) {
 
@@ -35,7 +35,7 @@ public class ProductDisplayService {
             .toList();
     }
 
-    static ProductDetail toDetail(ProductModel product, BrandModel brand, long likeCount) {
+    static ProductDetail toDetail(Product product, Brand brand, long likeCount) {
         return new ProductDetail(
             product.getId(),
             product.getBrandId(),

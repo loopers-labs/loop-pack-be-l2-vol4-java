@@ -1,6 +1,6 @@
 package com.loopers.support.fake;
 
-import com.loopers.order.domain.OrderModel;
+import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderRepository;
 
 import java.util.HashMap;
@@ -11,11 +11,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class FakeOrderRepository implements OrderRepository {
 
-    private final Map<Long, OrderModel> store = new HashMap<>();
+    private final Map<Long, Order> store = new HashMap<>();
     private final AtomicLong seq = new AtomicLong(0);
 
     @Override
-    public OrderModel save(OrderModel order) {
+    public Order save(Order order) {
         if (order.getId() == null || order.getId() == 0L) {
             IdFixtures.assignId(order, seq.incrementAndGet());
         }
@@ -24,17 +24,17 @@ public class FakeOrderRepository implements OrderRepository {
     }
 
     @Override
-    public Optional<OrderModel> find(Long id) {
+    public Optional<Order> find(Long id) {
         return Optional.ofNullable(store.get(id));
     }
 
     @Override
-    public List<OrderModel> findByMemberId(Long memberId) {
+    public List<Order> findByMemberId(Long memberId) {
         return store.values().stream().filter(o -> o.getMemberId().equals(memberId)).toList();
     }
 
     @Override
-    public List<OrderModel> findAll() {
+    public List<Order> findAll() {
         return store.values().stream().toList();
     }
 }

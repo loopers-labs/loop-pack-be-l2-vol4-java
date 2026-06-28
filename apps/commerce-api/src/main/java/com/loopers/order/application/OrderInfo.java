@@ -1,14 +1,14 @@
 package com.loopers.order.application;
 
+import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemSnapshot;
-import com.loopers.order.domain.OrderModel;
 
 import java.util.List;
 
 public record OrderInfo(Long id, Long memberId, Long totalAmount, List<OrderItemInfo> items) {
 
-    public static OrderInfo from(OrderModel order) {
+    public static OrderInfo from(Order order) {
         List<OrderItemInfo> items = order.getItems().stream().map(OrderItemInfo::from).toList();
         return new OrderInfo(order.getId(), order.getMemberId(), order.getTotalAmount(), items);
     }
