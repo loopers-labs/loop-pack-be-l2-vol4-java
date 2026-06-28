@@ -18,7 +18,7 @@ class UserModelTest {
         @DisplayName("유효한 정보가 주어지면, 정상적으로 생성된다.")
         @Test
         void createsUser_whenValidInfoProvided() {
-            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임");
+            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임", null);
             assertAll(
                 () -> assertThat(user.getLoginId()).isEqualTo("testId"),
                 () -> assertThat(user.getEmail()).isEqualTo("test@email.com"),
@@ -30,7 +30,7 @@ class UserModelTest {
         @Test
         void throwsBadRequest_whenLoginIdIsBlank() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new UserModel("", "password1!", "test@email.com", "닉네임"));
+                () -> new UserModel("", "password1!", "test@email.com", "닉네임", null));
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
@@ -38,7 +38,7 @@ class UserModelTest {
         @Test
         void throwsBadRequest_whenEmailIsInvalid() {
             CoreException ex = assertThrows(CoreException.class,
-                () -> new UserModel("testId", "password1!", "not-an-email", "닉네임"));
+                () -> new UserModel("testId", "password1!", "not-an-email", "닉네임", null));
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
@@ -47,19 +47,27 @@ class UserModelTest {
     @Nested
     class ChangePassword {
 
-        @DisplayName("새 비밀번호가 유효하면 변경된다.")
+        @DisplayName("현재 비밀번호가 일치하면 변경된다.")
         @Test
-        void changesPassword_whenNewPasswordIsValid() {
-            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임");
-            user.changePassword("newPassword1!");
+        void changesPassword_whenOldPasswordMatches() {
+            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임", null);
+            user.changePassword("password1!", "newPassword1!");
             assertThat(user.getLoginPw()).isEqualTo("newPassword1!");
+        }
+
+        @DisplayName("현재 비밀번호가 틀리면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequest_whenOldPasswordIsWrong() {
+            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임", null);
+            CoreException ex = assertThrows(CoreException.class, () -> user.changePassword("wrongPw", "newPw"));
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
         @DisplayName("새 비밀번호가 비어있으면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenNewPasswordIsBlank() {
-            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임");
-            CoreException ex = assertThrows(CoreException.class, () -> user.changePassword(""));
+            UserModel user = new UserModel("testId", "password1!", "test@email.com", "닉네임", null);
+            CoreException ex = assertThrows(CoreException.class, () -> user.changePassword("password1!", ""));
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }

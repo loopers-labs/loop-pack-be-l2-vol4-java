@@ -81,4 +81,21 @@ class ProductModelTest {
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @DisplayName("재고 상태(stockStatus)를 조회할 때,")
+    @Nested
+    class StockStatusTest {
+
+        @DisplayName("재고가 0이면 SOLD_OUT이다.")
+        @Test
+        void returnsSoldOut_whenStockIsZero() {
+            assertThat(createProduct(0).stockStatus()).isEqualTo(StockStatus.SOLD_OUT);
+        }
+
+        @DisplayName("재고가 1 이상이면 ON_SALE이다.")
+        @Test
+        void returnsOnSale_whenStockIsPositive() {
+            assertThat(createProduct(1).stockStatus()).isEqualTo(StockStatus.ON_SALE);
+        }
+    }
 }
