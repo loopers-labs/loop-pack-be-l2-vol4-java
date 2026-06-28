@@ -1,5 +1,8 @@
 package com.loopers.domain.order;
 
 public enum OrderStatus {
-    CREATED
+    CREATED,
+    PAYMENT_PENDING,
+    PAYMENT_FAILED,
+    PAID
 }

@@ -189,4 +189,168 @@ class OrderModelTest {
             );
         }
     }
+
+    @DisplayName("결제를 시작할 때, ")
+    @Nested
+    class StartPayment {
+
+        @DisplayName("CREATED 상태이면, PAYMENT_PENDING 으로 전이된다.")
+        @Test
+        void transitionsToPaymentPending_whenStatusIsCreated() {
+            // given
+            OrderModel order = createdOrder();
+
+            // when
+            order.startPayment();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        }
+
+        @DisplayName("PAYMENT_FAILED 상태이면(재결제), 다시 PAYMENT_PENDING 으로 전이된다.")
+        @Test
+        void transitionsToPaymentPending_whenStatusIsPaymentFailed() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+            order.markPaymentFailed();
+
+            // when
+            order.startPayment();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        }
+
+        @DisplayName("이미 PAYMENT_PENDING 상태이면, ORDER_NOT_PAYABLE 예외가 발생한다.")
+        @Test
+        void throwsOrderNotPayable_whenStatusIsPaymentPending() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+
+            // when
+            CoreException result = assertThrows(CoreException.class, order::startPayment);
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.ORDER_NOT_PAYABLE);
+        }
+
+        @DisplayName("이미 PAID 상태이면, ORDER_NOT_PAYABLE 예외가 발생한다.")
+        @Test
+        void throwsOrderNotPayable_whenStatusIsPaid() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+            order.markPaid();
+
+            // when
+            CoreException result = assertThrows(CoreException.class, order::startPayment);
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.ORDER_NOT_PAYABLE);
+        }
+    }
+
+    @DisplayName("결제 완료를 반영할 때, ")
+    @Nested
+    class MarkPaid {
+
+        @DisplayName("PAYMENT_PENDING 상태이면, PAID 로 전이된다.")
+        @Test
+        void transitionsToPaid_whenStatusIsPaymentPending() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+
+            // when
+            order.markPaid();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("이미 PAID 상태에서 다시 호출되면(중복 수렴), 예외 없이 PAID 를 유지한다.")
+        @Test
+        void staysPaid_whenAlreadyPaid() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+            order.markPaid();
+
+            // when
+            order.markPaid();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        }
+
+        @DisplayName("PAYMENT_PENDING 이 아닌 상태(CREATED)에서 호출되면, INVALID_ORDER_STATUS 예외가 발생한다.")
+        @Test
+        void throwsInvalidOrderStatus_whenStatusIsCreated() {
+            // given
+            OrderModel order = createdOrder();
+
+            // when
+            CoreException result = assertThrows(CoreException.class, order::markPaid);
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.INVALID_ORDER_STATUS);
+        }
+    }
+
+    @DisplayName("결제 실패를 반영할 때, ")
+    @Nested
+    class MarkPaymentFailed {
+
+        @DisplayName("PAYMENT_PENDING 상태이면, PAYMENT_FAILED 로 전이된다.")
+        @Test
+        void transitionsToPaymentFailed_whenStatusIsPaymentPending() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+
+            // when
+            order.markPaymentFailed();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        }
+
+        @DisplayName("이미 PAYMENT_FAILED 상태에서 다시 호출되면(중복 수렴), 예외 없이 PAYMENT_FAILED 를 유지한다.")
+        @Test
+        void staysPaymentFailed_whenAlreadyPaymentFailed() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+            order.markPaymentFailed();
+
+            // when
+            order.markPaymentFailed();
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        }
+
+        @DisplayName("이미 PAID 상태에서 호출되면, INVALID_ORDER_STATUS 예외가 발생한다.")
+        @Test
+        void throwsInvalidOrderStatus_whenStatusIsPaid() {
+            // given
+            OrderModel order = createdOrder();
+            order.startPayment();
+            order.markPaid();
+
+            // when
+            CoreException result = assertThrows(CoreException.class, order::markPaymentFailed);
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.INVALID_ORDER_STATUS);
+        }
+    }
+
+    private OrderModel createdOrder() {
+        return OrderModel.create(1L, OrderLines.of(List.of(
+            new OrderLine(100L, 1, "에어맥스 270", 100_000L, "나이키")
+        )));
+    }
 }

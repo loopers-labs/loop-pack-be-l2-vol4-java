@@ -347,6 +347,124 @@ class OrderServiceTest {
         }
     }
 
+    @DisplayName("결제를 시작할 때, ")
+    @Nested
+    class StartPayment {
+
+        @DisplayName("본인 소유의 결제 가능한 주문이면, PAYMENT_PENDING 으로 전이되고 저장된다.")
+        @Test
+        void transitionsToPaymentPending_whenOwnedAndPayable() {
+            // given
+            Long userId = 1L;
+            Long orderId = 10L;
+            given(orderRepository.findById(orderId)).willReturn(Optional.of(orderOf(orderId, userId)));
+            given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            OrderModel result = orderService.startPayment(userId, orderId);
+
+            // then
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+            verify(orderRepository).save(any(OrderModel.class));
+        }
+
+        @DisplayName("주문이 존재하지 않으면, ORDER_NOT_FOUND 예외가 발생하고 저장하지 않는다.")
+        @Test
+        void throwsOrderNotFound_whenMissing() {
+            // given
+            Long userId = 1L;
+            Long orderId = 10L;
+            given(orderRepository.findById(orderId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderService.startPayment(userId, orderId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.ORDER_NOT_FOUND);
+            verify(orderRepository, never()).save(any(OrderModel.class));
+        }
+
+        @DisplayName("타인 소유의 주문이면, ORDER_NOT_FOUND 예외가 발생한다 (존재 자체 숨김).")
+        @Test
+        void throwsOrderNotFound_whenOwnedByAnother() {
+            // given
+            Long userId = 1L;
+            Long ownerId = 2L;
+            Long orderId = 10L;
+            given(orderRepository.findById(orderId)).willReturn(Optional.of(orderOf(orderId, ownerId)));
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderService.startPayment(userId, orderId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.ORDER_NOT_FOUND);
+            verify(orderRepository, never()).save(any(OrderModel.class));
+        }
+    }
+
+    @DisplayName("결제 완료를 반영할 때, ")
+    @Nested
+    class MarkPaid {
+
+        @DisplayName("결제대기 주문이면, PAID 로 전이되고 저장된다.")
+        @Test
+        void transitionsToPaid_whenPaymentPending() {
+            // given
+            Long orderId = 10L;
+            OrderModel order = orderOf(orderId, 1L);
+            order.startPayment();
+            given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+            given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            orderService.markPaid(orderId);
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            verify(orderRepository).save(order);
+        }
+
+        @DisplayName("주문이 존재하지 않으면, ORDER_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsOrderNotFound_whenMissing() {
+            // given
+            Long orderId = 10L;
+            given(orderRepository.findById(orderId)).willReturn(Optional.empty());
+
+            // when
+            CoreException exception = assertThrows(CoreException.class,
+                () -> orderService.markPaid(orderId));
+
+            // then
+            assertThat(exception.getErrorType()).isEqualTo(ErrorType.ORDER_NOT_FOUND);
+        }
+    }
+
+    @DisplayName("결제 실패를 반영할 때, ")
+    @Nested
+    class MarkPaymentFailed {
+
+        @DisplayName("결제대기 주문이면, PAYMENT_FAILED 로 전이되고 저장된다.")
+        @Test
+        void transitionsToPaymentFailed_whenPaymentPending() {
+            // given
+            Long orderId = 10L;
+            OrderModel order = orderOf(orderId, 1L);
+            order.startPayment();
+            given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+            given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            orderService.markPaymentFailed(orderId);
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+            verify(orderRepository).save(order);
+        }
+    }
+
     private OrderModel orderOf(Long id, Long userId) {
         OrderModel order = OrderModel.create(userId, OrderLines.of(List.of(
             new OrderLine(100L, 1, "에어맥스", 100_000L, "나이키")
