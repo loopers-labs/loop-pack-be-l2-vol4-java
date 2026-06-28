@@ -39,4 +39,15 @@ public class RedisIdempotencyManager implements IdempotencyManager {
         defaultRedisTemplate.opsForValue()
                 .set(SUCCESS_PREFIX + idempotencyKey, String.valueOf(orderId), Duration.ofHours(24));
     }
+
+    @Override
+    public void savePayloadHash(String idempotencyKey, String payloadHash) {
+        defaultRedisTemplate.opsForValue()
+                .set("idempotency:hash:" + idempotencyKey, payloadHash, Duration.ofHours(24));
+    }
+
+    @Override
+    public String getPayloadHash(String idempotencyKey) {
+        return defaultRedisTemplate.opsForValue().get("idempotency:hash:" + idempotencyKey);
+    }
 }

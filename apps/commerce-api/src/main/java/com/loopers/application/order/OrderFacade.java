@@ -41,12 +41,20 @@ public class OrderFacade {
     }
 
     public Long createOrder(Long userId, OrderCreateRequest request, String idempotencyKey) {
+        String namespacedKey = null;
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Long cachedOrderId = idempotencyManager.getSuccess(idempotencyKey);
+            namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
+            Long cachedOrderId = idempotencyManager.getSuccess(namespacedKey);
+            String currentHash = org.springframework.util.DigestUtils.md5DigestAsHex(request.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
             if (cachedOrderId != null) {
+                String storedHash = idempotencyManager.getPayloadHash(namespacedKey);
+                if (storedHash != null && !storedHash.equals(currentHash)) {
+                    throw new CoreException(ErrorType.UNPROCESSABLE_ENTITY, "동일한 멱등키에 다른 요청 본문이 포함되어 있습니다.");
+                }
                 return cachedOrderId;
             }
-            boolean locked = idempotencyManager.lock(idempotencyKey);
+            boolean locked = idempotencyManager.lock(namespacedKey);
             if (!locked) {
                 throw new CoreException(ErrorType.CONFLICT, "동시 요청이 처리 중입니다.");
             }
@@ -54,13 +62,15 @@ public class OrderFacade {
 
         try {
             Long orderId = transactionTemplate.execute(status -> processCreateOrder(userId, request));
-            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-                idempotencyManager.saveSuccess(idempotencyKey, orderId);
+            if (namespacedKey != null) {
+                String currentHash = org.springframework.util.DigestUtils.md5DigestAsHex(request.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                idempotencyManager.savePayloadHash(namespacedKey, currentHash);
+                idempotencyManager.saveSuccess(namespacedKey, orderId);
             }
             return orderId;
         } finally {
-            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-                idempotencyManager.unlock(idempotencyKey);
+            if (namespacedKey != null) {
+                idempotencyManager.unlock(namespacedKey);
             }
         }
     }

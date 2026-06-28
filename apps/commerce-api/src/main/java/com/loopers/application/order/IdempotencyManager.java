@@ -5,4 +5,6 @@ public interface IdempotencyManager {
     boolean lock(String idempotencyKey);
     void unlock(String idempotencyKey);
     void saveSuccess(String idempotencyKey, Long orderId);
+    void savePayloadHash(String idempotencyKey, String payloadHash);
+    String getPayloadHash(String idempotencyKey);
 }

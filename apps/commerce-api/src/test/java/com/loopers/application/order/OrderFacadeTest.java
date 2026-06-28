@@ -76,13 +76,14 @@ class OrderFacadeTest {
         Long productId = 10L;
         int quantity = 2;
         String idempotencyKey = "key-success-1";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
         OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(productId, quantity)), null);
         
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
         
-        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
-        given(idempotencyManager.lock(idempotencyKey)).willReturn(true);
+        given(idempotencyManager.getSuccess(namespacedKey)).willReturn(null);
+        given(idempotencyManager.lock(namespacedKey)).willReturn(true);
         given(productRepository.findByIds(List.of(productId))).willReturn(List.of(product));
         given(orderRepository.save(any(OrderModel.class))).willAnswer(invocation -> {
             OrderModel order = invocation.getArgument(0);
@@ -97,8 +98,9 @@ class OrderFacadeTest {
         assertThat(orderId).isEqualTo(100L);
         verify(productFacade).decreaseStocks(anyList());
         verify(orderRepository).save(any(OrderModel.class));
-        verify(idempotencyManager).saveSuccess(idempotencyKey, 100L);
-        verify(idempotencyManager).unlock(idempotencyKey);
+        verify(idempotencyManager).saveSuccess(namespacedKey, 100L);
+        verify(idempotencyManager).savePayloadHash(eq(namespacedKey), any(String.class));
+        verify(idempotencyManager).unlock(namespacedKey);
     }
 
     @Test
@@ -110,6 +112,7 @@ class OrderFacadeTest {
         Long couponIssueId = 42L;
         int quantity = 2;
         String idempotencyKey = "key-success-2";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderCreateRequest.Item(productId, quantity)),
                 couponIssueId
@@ -117,8 +120,8 @@ class OrderFacadeTest {
 
         ProductModel product = new ProductModel(100L, "Air Jordan", new BigDecimal("200000"));
         ReflectionTestUtils.setField(product, "id", productId);
-        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
-        given(idempotencyManager.lock(idempotencyKey)).willReturn(true);
+        given(idempotencyManager.getSuccess(namespacedKey)).willReturn(null);
+        given(idempotencyManager.lock(namespacedKey)).willReturn(true);
         given(productRepository.findByIds(anyList())).willReturn(List.of(product));
 
         CouponTemplate template = new CouponTemplate("test", CouponType.FIXED, new BigDecimal("40000"), BigDecimal.ZERO, null, LocalDateTime.now().plusDays(1));
@@ -140,18 +143,23 @@ class OrderFacadeTest {
         verify(productFacade).decreaseStocks(anyList());
         verify(couponRepository).findIssueById(couponIssueId);
         verify(orderRepository).save(any(OrderModel.class));
-        verify(idempotencyManager).saveSuccess(idempotencyKey, 100L);
-        verify(idempotencyManager).unlock(idempotencyKey);
+        verify(idempotencyManager).saveSuccess(namespacedKey, 100L);
+        verify(idempotencyManager).savePayloadHash(eq(namespacedKey), any(String.class));
+        verify(idempotencyManager).unlock(namespacedKey);
     }
 
     @Test
-    @DisplayName("이미 성공 처리되어 캐싱된 Idempotency-Key로 요청 시 DB 트랜잭션을 타지 않고 캐싱된 orderId를 반환한다.")
-    void createOrder_WithDuplicateSuccessKey_ShouldReturnCachedOrderId() {
+    @DisplayName("이미 성공 처리되어 캐싱된 Idempotency-Key로 동일한 요청 시 캐싱된 orderId를 반환한다.")
+    void createOrder_WithDuplicateSuccessKey_AndSamePayload_ShouldReturnCachedOrderId() {
         // given
         Long userId = 1L;
         String idempotencyKey = "key-cached-1";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
         OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(10L, 2)), null);
-        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(999L);
+        String hash = org.springframework.util.DigestUtils.md5DigestAsHex(request.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        given(idempotencyManager.getSuccess(namespacedKey)).willReturn(999L);
+        given(idempotencyManager.getPayloadHash(namespacedKey)).willReturn(hash);
 
         // when
         Long orderId = orderFacade.createOrder(userId, request, idempotencyKey);
@@ -162,14 +170,34 @@ class OrderFacadeTest {
     }
 
     @Test
+    @DisplayName("이미 성공 처리된 Idempotency-Key에 대해 다른 페이로드로 요청 시 422 UNPROCESSABLE_ENTITY가 발생한다.")
+    void createOrder_WithDuplicateSuccessKey_ButDifferentPayload_ShouldThrowConflict() {
+        // given
+        Long userId = 1L;
+        String idempotencyKey = "key-cached-2";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
+        OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(10L, 2)), null);
+
+        given(idempotencyManager.getSuccess(namespacedKey)).willReturn(999L);
+        given(idempotencyManager.getPayloadHash(namespacedKey)).willReturn("different-hash-value");
+
+        // when & then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderFacade.createOrder(userId, request, idempotencyKey))
+                .isInstanceOf(com.loopers.support.error.CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(com.loopers.support.error.ErrorType.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     @DisplayName("다른 스레드가 이미 락을 획득하여 처리 중인 키로 진입 시 409 CONFLICT 예외가 발생한다.")
     void createOrder_WithConcurrentKey_ShouldThrowConflict() {
         // given
         Long userId = 1L;
         String idempotencyKey = "key-locked-1";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
         OrderCreateRequest request = new OrderCreateRequest(List.of(new OrderCreateRequest.Item(10L, 2)), null);
-        given(idempotencyManager.getSuccess(idempotencyKey)).willReturn(null);
-        given(idempotencyManager.lock(idempotencyKey)).willReturn(false);
+        given(idempotencyManager.getSuccess(namespacedKey)).willReturn(null);
+        given(idempotencyManager.lock(namespacedKey)).willReturn(false);
 
         // when & then
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderFacade.createOrder(userId, request, idempotencyKey))
