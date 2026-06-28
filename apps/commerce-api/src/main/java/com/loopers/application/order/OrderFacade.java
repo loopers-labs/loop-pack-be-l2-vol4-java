@@ -17,7 +17,6 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +34,7 @@ public class OrderFacade {
     private final CouponRepository couponRepository;
     private final PaymentFacade paymentFacade;
     private final IdempotencyManager idempotencyManager;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     public Long createOrder(Long userId, OrderCreateRequest request) {
         return createOrder(userId, request, null);
@@ -53,7 +53,7 @@ public class OrderFacade {
         }
 
         try {
-            Long orderId = processCreateOrder(userId, request);
+            Long orderId = transactionTemplate.execute(status -> processCreateOrder(userId, request));
             if (idempotencyKey != null && !idempotencyKey.isBlank()) {
                 idempotencyManager.saveSuccess(idempotencyKey, orderId);
             }
@@ -65,8 +65,7 @@ public class OrderFacade {
         }
     }
 
-    @Transactional
-    public Long processCreateOrder(Long userId, OrderCreateRequest request) {
+    private Long processCreateOrder(Long userId, OrderCreateRequest request) {
         List<StockRequest> stockRequests = request.items().stream()
                 .map(item -> new StockRequest(item.productId(), item.quantity()))
                 .toList();

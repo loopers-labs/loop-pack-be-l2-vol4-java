@@ -57,6 +57,17 @@ class OrderFacadeTest {
     @Mock
     private IdempotencyManager idempotencyManager;
 
+    @Mock
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(transactionTemplate.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(new org.springframework.transaction.support.SimpleTransactionStatus());
+        });
+    }
+
     @Test
     @DisplayName("주문 요청 시 상품 정보 조회, 재고 차감, 주문 생성이 순차적으로 수행된다. (쿠폰 없음)")
     void createOrder_Success_WithoutCoupon() {
