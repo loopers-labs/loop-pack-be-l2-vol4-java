@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.product.StockStatus;
 
 public class ProductV1Dto {
     public record CreateProductRequest(
@@ -24,6 +25,7 @@ public class ProductV1Dto {
         String description,
         Long price,
         Integer stock,
+        StockStatus stockStatus,
         Long brandId,
         Integer likeCount
     ) {
@@ -34,6 +36,7 @@ public class ProductV1Dto {
                 info.description(),
                 info.price(),
                 info.stock(),
+                info.stockStatus(),
                 info.brandId(),
                 info.likeCount()
             );
