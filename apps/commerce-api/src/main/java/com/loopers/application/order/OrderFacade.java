@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.application.activity.UserActivityEvent;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.coupon.CouponService;
@@ -10,12 +11,14 @@ import com.loopers.domain.order.OrderLines;
 import com.loopers.domain.order.OrderPeriod;
 import com.loopers.domain.order.OrderResult;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.event.OrderPlacedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,7 @@ public class OrderFacade {
     private final OrderService orderService;
     private final StockService stockService;
     private final CouponService couponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo placeOrder(Long userId, OrderCommand.Place command) {
@@ -58,7 +62,10 @@ public class OrderFacade {
             .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
         stockService.decreaseAll(quantitiesByProductId);
 
-        return OrderInfo.from(result.order(), result.items());
+        OrderInfo orderInfo = OrderInfo.from(result.order(), result.items());
+        eventPublisher.publishEvent(OrderPlacedEvent.of(orderInfo.id(), userId, orderInfo.finalAmount()));
+        eventPublisher.publishEvent(UserActivityEvent.of(userId, UserActivityEvent.Type.ORDER_PLACED, orderInfo.id()));
+        return orderInfo;
     }
 
     @Transactional(readOnly = true)

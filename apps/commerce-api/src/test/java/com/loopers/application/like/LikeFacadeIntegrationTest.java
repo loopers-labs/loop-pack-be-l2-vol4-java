@@ -4,6 +4,7 @@ import com.loopers.application.brand.BrandFacade;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductService;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -17,12 +18,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class LikeFacadeIntegrationTest {
@@ -34,6 +39,10 @@ class LikeFacadeIntegrationTest {
     private final ProductJpaRepository productJpaRepository;
     private final BrandJpaRepository brandJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+
+    // 집계(좋아요 수 증가)만 골라 실패시키기 위해 spy. getActive 등 나머지는 실제 동작에 위임된다.
+    @MockitoSpyBean
+    private ProductService productService;
 
     private Long productId;
 
@@ -84,6 +93,25 @@ class LikeFacadeIntegrationTest {
             assertAll(
                 () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
                 () -> assertThat(loadLikeCount(productId)).isEqualTo(1L)
+            );
+        }
+
+        @DisplayName("집계(like_count 증가)가 실패해도, 좋아요(likes 행)는 커밋되어 살아남는다 — 트랜잭션 분리.")
+        @Test
+        void likeRowSurvives_whenCountAggregationFails() {
+            // given
+            Long userId = 1L;
+            doThrow(new RuntimeException("집계 실패"))
+                .when(productService).incrementLikeCount(productId);
+
+            // when : 좋아요 커밋 후 AFTER_COMMIT 리스너에서 집계가 실패한다 (예외가 전파될 수 있음)
+            catchThrowable(() -> likeFacade.like(userId, productId));
+
+            // then : 집계는 실패했지만 좋아요 자체는 살아남고, 집계는 '분리된 뒤' 분명히 시도되었다
+            assertAll(
+                () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
+                () -> assertThat(loadLikeCount(productId)).isZero(),
+                () -> verify(productService).incrementLikeCount(productId)
             );
         }
 
