@@ -141,6 +141,57 @@ class PaymentFacadeTest {
     }
 
     @Test
+    @DisplayName("동일한 주문(orderId)에 대해 동시에 결제가 요청되면 한 건만 저장되고 나머지는 CONFLICT 예외로 실패한다.")
+    void processPayment_ConcurrentRequests_ShouldPreventDuplicateActivePayments() throws InterruptedException {
+        // given
+        Long orderId = 300L;
+        BigDecimal amount = new BigDecimal("10000");
+        PaymentMethod method = PaymentMethod.CARD;
+
+        Mockito.doReturn(new PaymentGatewayResult("tx_concurrent", LocalDateTime.now()))
+                .when(paymentGateway).requestPayment(Mockito.eq(orderId), Mockito.any(), Mockito.any());
+
+        int threadCount = 5;
+        java.util.concurrent.ExecutorService executorService = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(threadCount);
+        java.util.concurrent.CountDownLatch doneLatch = new java.util.concurrent.CountDownLatch(threadCount);
+
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger();
+
+        try {
+            // when
+            for (int i = 0; i < threadCount; i++) {
+                executorService.submit(() -> {
+                    try {
+                        barrier.await();
+                        paymentFacade.processPayment(orderId, method, amount);
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        if (e instanceof CoreException && ((CoreException) e).getErrorType() == ErrorType.CONFLICT) {
+                            failCount.incrementAndGet();
+                        } else {
+                            e.printStackTrace();
+                        }
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+            doneLatch.await();
+
+            // then
+            assertThat(successCount.get()).isEqualTo(1);
+            assertThat(failCount.get()).isEqualTo(threadCount - 1);
+
+            boolean activeExists = paymentRepository.existsByOrderIdAndStatusIn(orderId, java.util.List.of(PaymentStatus.READY, PaymentStatus.APPROVED));
+            assertThat(activeExists).isTrue();
+        } finally {
+            executorService.shutdown();
+        }
+    }
+
+    @Test
     @DisplayName("PG API 호출 시 예외(Timeout 등)가 발생하면, 트랜잭션이 롤백되지 않고 결제가 READY 상태를 유지하며 Redis에 retry 키가 존재한다.")
     void processPayment_PgTimeout_ShouldKeepReadyStatus() {
         // given

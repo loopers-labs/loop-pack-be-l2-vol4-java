@@ -31,4 +31,17 @@ public class RedisPaymentTempStorage implements PaymentTempStorage {
         String val = defaultRedisTemplate.opsForValue().get(key);
         return val != null ? Integer.parseInt(val) : null;
     }
+
+    @Override
+    public boolean lockOrder(Long orderId) {
+        String key = "payment_lock:order:" + orderId;
+        Boolean success = defaultRedisTemplate.opsForValue().setIfAbsent(key, "LOCKED", Duration.ofSeconds(10));
+        return Boolean.TRUE.equals(success);
+    }
+
+    @Override
+    public void unlockOrder(Long orderId) {
+        String key = "payment_lock:order:" + orderId;
+        defaultRedisTemplate.delete(key);
+    }
 }

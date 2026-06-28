@@ -42,15 +42,25 @@ public class PaymentFacade {
     }
 
     public Long processPayment(Long orderId, PaymentMethod method, BigDecimal amount) {
-        // 0. 결제 상태 방어: 이미 READY 또는 APPROVED 상태인 결제가 존재하는 경우 409 CONFLICT 발생
-        boolean existsPendingOrApproved = paymentRepository.existsByOrderIdAndStatusIn(orderId, BLOCKED_PAYMENT_STATUSES);
-        if (existsPendingOrApproved) {
-            throw new CoreException(ErrorType.CONFLICT, "이미 진행 중이거나 완료된 결제가 존재합니다.");
+        boolean locked = paymentTempStorage.lockOrder(orderId);
+        if (!locked) {
+            throw new CoreException(ErrorType.CONFLICT, "현재 주문에 대한 결제가 처리 중입니다.");
         }
 
-        // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
-        PaymentModel payment = paymentRepository.save(new PaymentModel(orderId, method, amount));
-        Long paymentId = payment.getId();
+        Long paymentId;
+        try {
+            // 0. 결제 상태 방어: 이미 READY 또는 APPROVED 상태인 결제가 존재하는 경우 409 CONFLICT 발생
+            boolean existsPendingOrApproved = paymentRepository.existsByOrderIdAndStatusIn(orderId, BLOCKED_PAYMENT_STATUSES);
+            if (existsPendingOrApproved) {
+                throw new CoreException(ErrorType.CONFLICT, "이미 진행 중이거나 완료된 결제가 존재합니다.");
+            }
+
+            // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
+            PaymentModel payment = paymentRepository.save(new PaymentModel(orderId, method, amount));
+            paymentId = payment.getId();
+        } finally {
+            paymentTempStorage.unlockOrder(orderId);
+        }
 
         // 2. Redis에 TTL 10초 설정 (추상화된 TempStorage 사용)
         try {
