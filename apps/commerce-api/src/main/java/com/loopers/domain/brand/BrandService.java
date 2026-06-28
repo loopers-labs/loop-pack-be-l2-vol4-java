@@ -15,8 +15,8 @@ public class BrandService {
     private final BrandRepository brandRepository;
 
     @Transactional
-    public BrandModel createBrand(String name, String description) {
-        return brandRepository.save(new BrandModel(name, description));
+    public BrandModel createBrand(String name, String description, String imageUrl) {
+        return brandRepository.save(new BrandModel(name, description, imageUrl));
     }
 
     @Transactional(readOnly = true)
@@ -31,17 +31,16 @@ public class BrandService {
     }
 
     @Transactional
-    public BrandModel updateBrand(Long id, String name, String description) {
+    public BrandModel updateBrand(Long id, String name, String description, String imageUrl) {
         BrandModel brand = getBrand(id);
-        brand.update(name, description);
+        brand.update(name, description, imageUrl);
         return brandRepository.save(brand);
     }
 
     @Transactional
-    public void deleteBrand(Long id) {
-        if (!brandRepository.existsById(id)) {
-            throw new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다.");
-        }
-        brandRepository.delete(id);
+    public void softDeleteBrand(Long id) {
+        BrandModel brand = getBrand(id);
+        brand.delete();
+        brandRepository.save(brand);
     }
 }

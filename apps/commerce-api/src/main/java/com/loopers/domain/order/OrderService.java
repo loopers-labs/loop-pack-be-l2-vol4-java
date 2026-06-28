@@ -1,11 +1,11 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.product.ProductModel;
-import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.UserRepository;
+import com.loopers.domain.product.ProductSnapshot;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,30 +16,18 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository;
-
-    public record OrderItemCommand(Long productId, int quantity) {}
 
     @Transactional
-    public Order createOrder(Long userId, List<OrderItemCommand> commands) {
-        userRepository.findById(userId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다."));
+    public Order createOrder(Long userId, List<ProductSnapshot> snapshots) {
+        List<OrderItem> items = snapshots.stream()
+            .map(s -> new OrderItem(s.productId(), s.productName(), s.productPrice(), s.quantity()))
+            .toList();
 
-        List<OrderItem> items = commands.stream().map(cmd -> {
-            ProductModel product = productRepository.findById(cmd.productId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
-                    "[id = " + cmd.productId() + "] 상품을 찾을 수 없습니다."));
-            product.decreaseStock(cmd.quantity());
-            productRepository.save(product);
-            return new OrderItem(product.getId(), product.getName(), product.getPrice(), cmd.quantity());
-        }).toList();
-
-        long totalPrice = items.stream()
-            .mapToLong(item -> item.getProductPrice() * item.getQuantity())
+        long totalAmount = snapshots.stream()
+            .mapToLong(s -> s.productPrice() * s.quantity())
             .sum();
 
-        return orderRepository.save(new Order(userId, totalPrice, items));
+        return orderRepository.save(new Order(userId, totalAmount, items));
     }
 
     @Transactional(readOnly = true)
@@ -51,5 +39,10 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<Order> getOrders(Long userId, String startAt, String endAt) {
         return orderRepository.findByUserId(userId, startAt, endAt);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Order> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable);
     }
 }
