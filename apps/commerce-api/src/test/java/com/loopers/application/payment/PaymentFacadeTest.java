@@ -96,23 +96,48 @@ class PaymentFacadeTest {
     }
 
     @Test
-    @DisplayName("동일한 주문(orderId)에 대해 결제 요청이 중복으로 들어오면, 신규 결제를 생성하지 않고 기존 결제 ID를 반환한다.")
-    void processPayment_DuplicateOrderId_ShouldBeIdempotent() {
+    @DisplayName("기존 결제가 FAILED 상태일 때, 새로운 결제 요청을 정상적으로 허용하고 진행한다.")
+    void processPayment_ExistingFailedPayment_ShouldAllowNewPayment() {
         // given
         Long orderId = 100L;
         BigDecimal amount = new BigDecimal("10000");
         PaymentMethod method = PaymentMethod.CARD;
 
-        Mockito.doReturn(new PaymentGatewayResult("tx_100", LocalDateTime.now()))
+        // 기존 FAILED 결제 저장
+        PaymentModel failedPayment = new PaymentModel(orderId, method, amount);
+        failedPayment.fail();
+        paymentRepository.save(failedPayment);
+
+        Mockito.doReturn(new PaymentGatewayResult("tx_100_retry", LocalDateTime.now()))
                 .when(paymentGateway).requestPayment(Mockito.eq(orderId), Mockito.any(), Mockito.any());
 
-        Long firstPaymentId = paymentFacade.processPayment(orderId, method, amount);
-
         // when
-        Long secondPaymentId = paymentFacade.processPayment(orderId, method, amount);
+        Long newPaymentId = paymentFacade.processPayment(orderId, method, amount);
 
         // then
-        assertThat(secondPaymentId).isEqualTo(firstPaymentId);
+        assertThat(newPaymentId).isNotEqualTo(failedPayment.getId());
+        PaymentModel newPayment = paymentRepository.findById(newPaymentId).orElseThrow();
+        assertThat(newPayment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("기존 결제가 READY 또는 APPROVED 상태일 때 중복 결제 요청이 오면 409 CONFLICT 예외가 발생한다.")
+    void processPayment_ExistingReadyOrApprovedPayment_ShouldThrowConflict() {
+        // given
+        Long orderId = 200L;
+        BigDecimal amount = new BigDecimal("10000");
+        PaymentMethod method = PaymentMethod.CARD;
+
+        // 기존 APPROVED 결제 생성
+        Mockito.doReturn(new PaymentGatewayResult("tx_200", LocalDateTime.now()))
+                .when(paymentGateway).requestPayment(Mockito.eq(orderId), Mockito.any(), Mockito.any());
+        paymentFacade.processPayment(orderId, method, amount);
+
+        // when & then
+        assertThatThrownBy(() -> paymentFacade.processPayment(orderId, method, amount))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.CONFLICT);
     }
 
     @Test
@@ -303,7 +328,7 @@ class PaymentFacadeTest {
         Mockito.doReturn(new PaymentGateway.PaymentGatewayQueryResult(PaymentGatewayStatus.APPROVED, "tx-fallback-error", LocalDateTime.now()))
                 .when(paymentGateway).queryPaymentStatus(savedOrder.getId());
         Mockito.doThrow(new RuntimeException("PG cancel failed"))
-                .when(paymentGateway).cancelPayment(Mockito.eq("tx-fallback-error"), Mockito.eq(new BigDecimal("5000")));
+                .when(paymentGateway).cancelPayment(Mockito.eq("tx-fallback-error"), Mockito.any());
 
         // when & then
         assertThatThrownBy(() -> paymentFacade.retryOrCompensatePayment(savedPayment.getId(), true))

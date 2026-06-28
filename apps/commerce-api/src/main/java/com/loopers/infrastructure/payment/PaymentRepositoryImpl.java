@@ -1,9 +1,12 @@
 package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.PaymentModel;
+import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.application.payment.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -23,12 +26,12 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
-    public Optional<PaymentModel> findByOrderId(Long orderId) {
-        return paymentJpaRepository.findByOrderId(orderId);
+    public boolean existsByOrderIdAndStatusIn(Long orderId, List<PaymentStatus> statuses) {
+        return paymentJpaRepository.existsByOrderIdAndStatusIn(orderId, statuses);
     }
 
     @Override
-    public java.util.List<PaymentModel> findAllByStatusAndCreatedAtBefore(com.loopers.domain.payment.PaymentStatus status, java.time.ZonedDateTime time) {
+    public List<PaymentModel> findAllByStatusAndCreatedAtBefore(PaymentStatus status, ZonedDateTime time) {
         return paymentJpaRepository.findAllByStatusAndCreatedAtBefore(status, time);
     }
 }

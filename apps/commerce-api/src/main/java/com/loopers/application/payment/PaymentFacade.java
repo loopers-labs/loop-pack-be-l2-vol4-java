@@ -17,11 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PaymentFacade {
+
+    private static final List<PaymentStatus> BLOCKED_PAYMENT_STATUSES = List.of(PaymentStatus.READY, PaymentStatus.APPROVED);
 
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
@@ -39,22 +42,14 @@ public class PaymentFacade {
     }
 
     public Long processPayment(Long orderId, PaymentMethod method, BigDecimal amount) {
-        // 0. 멱등성 체크: 이미 존재하는 결제 건이 있는 경우 기존 결제 ID 반환
-        java.util.Optional<PaymentModel> existingPayment = paymentRepository.findByOrderId(orderId);
-        if (existingPayment.isPresent()) {
-            return existingPayment.get().getId();
+        // 0. 결제 상태 방어: 이미 READY 또는 APPROVED 상태인 결제가 존재하는 경우 409 CONFLICT 발생
+        boolean existsPendingOrApproved = paymentRepository.existsByOrderIdAndStatusIn(orderId, BLOCKED_PAYMENT_STATUSES);
+        if (existsPendingOrApproved) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 진행 중이거나 완료된 결제가 존재합니다.");
         }
 
         // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
-        PaymentModel payment = new PaymentModel(orderId, method, amount);
-        try {
-            payment = paymentRepository.save(payment);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Duplicate payment request for orderId: {}", orderId, e);
-            return paymentRepository.findByOrderId(orderId)
-                    .map(PaymentModel::getId)
-                    .orElseThrow(() -> e);
-        }
+        PaymentModel payment = paymentRepository.save(new PaymentModel(orderId, method, amount));
         Long paymentId = payment.getId();
 
         // 2. Redis에 TTL 10초 설정 (추상화된 TempStorage 사용)
