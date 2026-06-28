@@ -114,13 +114,14 @@ public class PaymentFacade {
                     try {
                         log.info("Fallback correction: Canceling actual PG payment for payment: {}", paymentId);
                         paymentGateway.cancelPayment(queryResult.transactionId(), payment.getAmount());
-                        try {
-                            notificationService.sendPaymentRefund(order.getUserId(), paymentId);
-                        } catch (Exception ne) {
-                            log.error("Failed to send payment refund notification for user: {}, payment: {}", order.getUserId(), paymentId, ne);
-                        }
                     } catch (Exception e) {
                         log.error("Failed to cancel PG payment for payment: {}", paymentId, e);
+                        throw e;
+                    }
+                    try {
+                        notificationService.sendPaymentRefund(order.getUserId(), paymentId);
+                    } catch (Exception ne) {
+                        log.error("Failed to send payment refund notification for user: {}, payment: {}", order.getUserId(), paymentId, ne);
                     }
                 }
 

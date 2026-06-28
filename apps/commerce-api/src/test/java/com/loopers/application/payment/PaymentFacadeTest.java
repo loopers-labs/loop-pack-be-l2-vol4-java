@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @org.springframework.test.context.ContextConfiguration(initializers = com.loopers.testcontainers.RedisTestContainersConfig.class)
@@ -261,5 +262,37 @@ class PaymentFacadeTest {
 
         // Redis retry 키 삭제 확인
         assertThat(defaultRedisTemplate.hasKey(redisKey)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Fallback 보정 시 PG 결제 취소가 실패하면 로컬 보정이 중단되고 결제 상태 및 Redis retry 키가 유지된다.")
+    void retryOrCompensatePayment_FallbackPgCancelFailed_ShouldAbortLocalCompensationAndKeepStatus() {
+        // given
+        var order = new com.loopers.domain.order.OrderModel(1L, null, new BigDecimal("5000"), BigDecimal.ZERO, new BigDecimal("5000"));
+        var savedOrder = orderRepository.save(order);
+
+        var payment = new PaymentModel(savedOrder.getId(), PaymentMethod.CARD, new BigDecimal("5000"));
+        var savedPayment = paymentRepository.save(payment);
+
+        String redisKey = "payment_retry:" + savedPayment.getId();
+        defaultRedisTemplate.opsForValue().set(redisKey, "0");
+
+        Mockito.doReturn(new PaymentGateway.PaymentGatewayQueryResult(PaymentGatewayStatus.APPROVED, "tx-fallback-error", LocalDateTime.now()))
+                .when(paymentGateway).queryPaymentStatus(savedOrder.getId());
+        Mockito.doThrow(new RuntimeException("PG cancel failed"))
+                .when(paymentGateway).cancelPayment(Mockito.eq("tx-fallback-error"), Mockito.eq(new BigDecimal("5000")));
+
+        // when & then
+        assertThatThrownBy(() -> paymentFacade.retryOrCompensatePayment(savedPayment.getId(), true))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("PG cancel failed");
+
+        var updatedPayment = paymentRepository.findById(savedPayment.getId()).orElseThrow();
+        assertThat(updatedPayment.getStatus()).isEqualTo(PaymentStatus.READY);
+
+        var updatedOrder = orderRepository.findById(savedOrder.getId()).orElseThrow();
+        assertThat(updatedOrder.getStatus()).isEqualTo(com.loopers.domain.order.OrderStatus.PENDING);
+
+        assertThat(defaultRedisTemplate.hasKey(redisKey)).isTrue();
     }
 }
