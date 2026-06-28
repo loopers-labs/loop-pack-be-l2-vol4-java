@@ -1,20 +1,14 @@
 package com.loopers.application.event.relay;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.loopers.domain.event.dataplatform.DataPlatformClient;
-import com.loopers.domain.event.dataplatform.DataPlatformResult;
-import com.loopers.domain.event.order.OrderPaidEvent;
-import com.loopers.domain.event.outbox.OrderEventOutbox;
-import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
+import com.loopers.domain.event.outbox.EventOutbox;
+import com.loopers.domain.event.outbox.EventOutboxRepository;
 import com.loopers.domain.event.outbox.OutboxStatus;
+import com.loopers.support.monitoring.EventMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,16 +17,16 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 class EventRelayWorkerTest {
 
-    @DisplayName("Pending outbox를 전송할 때, ")
+    @DisplayName("Pending outbox를 Kafka로 발행할 때, ")
     @Nested
     class RelayPendingEvents {
 
-        @DisplayName("데이터 플랫폼 전송이 성공하면 outbox를 SENT로 변경한다.")
+        @DisplayName("발행이 성공하면 outbox를 SENT로 변경하고 성공 지표를 증가시킨다.")
         @Test
-        void marksSent_whenDataPlatformSendSucceeds() {
+        void marksSent_whenKafkaPublishSucceeds() {
             // arrange
             TestFixture fixture = new TestFixture();
-            OrderEventOutbox outbox = fixture.saveOrderPaidOutbox(1L);
+            EventOutbox outbox = fixture.saveOrderPaidOutbox("1");
 
             // act
             List<EventRelayWorker.RelayResult> results = fixture.worker.relayPendingEvents();
@@ -42,19 +36,23 @@ class EventRelayWorkerTest {
                 () -> assertThat(results).hasSize(1),
                 () -> assertThat(results.get(0).status()).isEqualTo(EventRelayWorker.RelayResult.Status.SENT),
                 () -> assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT),
-                () -> assertThat(fixture.dataPlatformClient.sentEvents).hasSize(1),
-                () -> assertThat(fixture.dataPlatformClient.sentEvents.get(0).orderId()).isEqualTo(1L),
-                () -> assertThat(fixture.outboxRepository.lockedQueryCallCount).isEqualTo(1)
+                () -> assertThat(fixture.publisher.published).containsExactly(outbox),
+                () -> assertThat(fixture.meterRegistry.counter(
+                    "loopers.outbox.relay.success.count",
+                    "topic", EventOutbox.TOPIC_ORDER_EVENTS,
+                    "eventType", EventOutbox.EVENT_ORDER_PAID,
+                    "result", "success"
+                ).count()).isEqualTo(1.0)
             );
         }
 
-        @DisplayName("데이터 플랫폼 전송이 실패하면 retry_count를 증가시키고 재시도 대상으로 남긴다.")
+        @DisplayName("발행이 실패하면 retry_count를 증가시키고 재시도 대상으로 남긴다.")
         @Test
         void increasesRetryCountAndKeepsPending_whenFailureIsRetryable() {
             // arrange
             TestFixture fixture = new TestFixture();
-            fixture.dataPlatformClient.result = DataPlatformResult.failed("전송 실패");
-            OrderEventOutbox outbox = fixture.saveOrderPaidOutbox(1L);
+            fixture.publisher.result = EventPublishResult.failed("전송 실패");
+            EventOutbox outbox = fixture.saveOrderPaidOutbox("1");
 
             // act
             List<EventRelayWorker.RelayResult> results = fixture.worker.relayPendingEvents();
@@ -64,7 +62,13 @@ class EventRelayWorkerTest {
                 () -> assertThat(results).hasSize(1),
                 () -> assertThat(results.get(0).status()).isEqualTo(EventRelayWorker.RelayResult.Status.RETRY),
                 () -> assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING),
-                () -> assertThat(outbox.getRetryCount()).isEqualTo(1)
+                () -> assertThat(outbox.getRetryCount()).isEqualTo(1),
+                () -> assertThat(fixture.meterRegistry.counter(
+                    "loopers.outbox.relay.failure.count",
+                    "topic", EventOutbox.TOPIC_ORDER_EVENTS,
+                    "eventType", EventOutbox.EVENT_ORDER_PAID,
+                    "result", "failure"
+                ).count()).isEqualTo(1.0)
             );
         }
 
@@ -73,8 +77,8 @@ class EventRelayWorkerTest {
         void marksFailed_whenRetryLimitIsReached() {
             // arrange
             TestFixture fixture = new TestFixture();
-            fixture.dataPlatformClient.result = DataPlatformResult.failed("전송 실패");
-            OrderEventOutbox outbox = fixture.saveOrderPaidOutbox(1L);
+            fixture.publisher.result = EventPublishResult.failed("전송 실패");
+            EventOutbox outbox = fixture.saveOrderPaidOutbox("1");
 
             // act
             fixture.worker.relayPendingEvents();
@@ -92,50 +96,36 @@ class EventRelayWorkerTest {
     }
 
     private static class TestFixture {
-        private final ObjectMapper objectMapper = objectMapper();
-        private final FakeOrderEventOutboxRepository outboxRepository = new FakeOrderEventOutboxRepository();
-        private final FakeDataPlatformClient dataPlatformClient = new FakeDataPlatformClient();
+        private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        private final FakeEventOutboxRepository outboxRepository = new FakeEventOutboxRepository();
+        private final FakeEventMessagePublisher publisher = new FakeEventMessagePublisher();
         private final EventRelayResultService resultService = new EventRelayResultService(outboxRepository);
         private final EventRelayWorker worker = new EventRelayWorker(
             outboxRepository,
-            dataPlatformClient,
-            objectMapper,
-            resultService
+            publisher,
+            resultService,
+            new EventMetrics(meterRegistry)
         );
 
-        private OrderEventOutbox saveOrderPaidOutbox(Long orderId) {
-            OrderEventOutbox outbox = new OrderEventOutbox(
+        private EventOutbox saveOrderPaidOutbox(String orderId) {
+            EventOutbox outbox = new EventOutbox(
+                EventOutbox.TOPIC_ORDER_EVENTS,
                 orderId,
-                OrderEventOutbox.ORDER_PAID,
-                serialize(new OrderPaidEvent(
-                    orderId,
-                    "user1",
-                    2_000L,
-                    0L,
-                    2_000L,
-                    ZonedDateTime.now(),
-                    List.of(new OrderPaidEvent.Item(1L, "상품", 2, 1_000L, 2_000L))
-                ))
+                EventOutbox.EVENT_ORDER_PAID,
+                EventOutbox.AGGREGATE_ORDER,
+                orderId,
+                "{\"orderId\":" + orderId + "}"
             );
             outboxRepository.save(outbox);
             return outbox;
         }
-
-        private String serialize(OrderPaidEvent event) {
-            try {
-                return objectMapper.writeValueAsString(event);
-            } catch (JsonProcessingException e) {
-                throw new IllegalStateException(e);
-            }
-        }
     }
 
-    private static class FakeOrderEventOutboxRepository implements OrderEventOutboxRepository {
-        private final List<OrderEventOutbox> outboxes = new ArrayList<>();
-        private int lockedQueryCallCount = 0;
+    private static class FakeEventOutboxRepository implements EventOutboxRepository {
+        private final List<EventOutbox> outboxes = new ArrayList<>();
 
         @Override
-        public OrderEventOutbox save(OrderEventOutbox outbox) {
+        public EventOutbox save(EventOutbox outbox) {
             if (!outboxes.contains(outbox)) {
                 outboxes.add(outbox);
             }
@@ -143,33 +133,22 @@ class EventRelayWorkerTest {
         }
 
         @Override
-        public List<OrderEventOutbox> findPendingEvents() {
+        public List<EventOutbox> findPendingEvents(int limit) {
             return outboxes.stream()
-                .filter(OrderEventOutbox::isPending)
+                .filter(EventOutbox::isPending)
+                .limit(limit)
                 .toList();
         }
-
-        @Override
-        public List<OrderEventOutbox> findPendingEventsForUpdate(int limit) {
-            lockedQueryCallCount++;
-            return findPendingEvents();
-        }
     }
 
-    private static class FakeDataPlatformClient implements DataPlatformClient {
-        private DataPlatformResult result = DataPlatformResult.success();
-        private final List<OrderPaidEvent> sentEvents = new ArrayList<>();
+    private static class FakeEventMessagePublisher implements EventMessagePublisher {
+        private EventPublishResult result = EventPublishResult.success();
+        private final List<EventOutbox> published = new ArrayList<>();
 
         @Override
-        public DataPlatformResult sendOrderPaid(OrderPaidEvent event) {
-            sentEvents.add(event);
+        public EventPublishResult publish(EventOutbox outbox) {
+            published.add(outbox);
             return result;
         }
-    }
-
-    private static ObjectMapper objectMapper() {
-        return new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }

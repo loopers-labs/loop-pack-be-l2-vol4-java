@@ -28,6 +28,9 @@ public class CouponTemplateJpaEntity extends BaseEntity {
     @Column(name = "min_order_amount")
     private Long minOrderAmount;
 
+    @Column(name = "total_issue_limit")
+    private Long totalIssueLimit;
+
     @Column(name = "max_issues_per_user", nullable = false)
     private Integer maxIssuesPerUser;
 
@@ -41,6 +44,7 @@ public class CouponTemplateJpaEntity extends BaseEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {
@@ -48,6 +52,7 @@ public class CouponTemplateJpaEntity extends BaseEntity {
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
+        this.totalIssueLimit = totalIssueLimit;
         this.maxIssuesPerUser = maxIssuesPerUser;
         this.expiredAt = expiredAt;
     }
@@ -58,6 +63,7 @@ public class CouponTemplateJpaEntity extends BaseEntity {
             couponTemplate.getType(),
             couponTemplate.getValue(),
             couponTemplate.getMinOrderAmount(),
+            couponTemplate.getTotalIssueLimit(),
             couponTemplate.getMaxIssuesPerUser(),
             couponTemplate.getExpiredAt()
         );
@@ -70,6 +76,7 @@ public class CouponTemplateJpaEntity extends BaseEntity {
             type,
             value,
             minOrderAmount,
+            totalIssueLimit,
             maxIssuesPerUser,
             expiredAt,
             getCreatedAt(),
@@ -83,6 +90,7 @@ public class CouponTemplateJpaEntity extends BaseEntity {
         this.type = couponTemplate.getType();
         this.value = couponTemplate.getValue();
         this.minOrderAmount = couponTemplate.getMinOrderAmount();
+        this.totalIssueLimit = couponTemplate.getTotalIssueLimit();
         this.maxIssuesPerUser = couponTemplate.getMaxIssuesPerUser();
         this.expiredAt = couponTemplate.getExpiredAt();
         if (couponTemplate.getDeletedAt() == null) {

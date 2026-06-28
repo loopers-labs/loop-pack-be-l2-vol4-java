@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.coupon;
 
-import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
@@ -41,14 +41,15 @@ class CouponApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("Admin이 쿠폰 템플릿을 관리하고 사용자는 쿠폰을 발급받아 목록에서 조회한다.")
+    @DisplayName("Admin이 쿠폰 템플릿을 관리하고 사용자는 쿠폰 발급 요청을 접수한 뒤 상태를 조회한다.")
     @Test
-    void managesTemplateAndIssuesCoupon() {
+    void managesTemplateAndRequestsCouponIssue() {
         CouponAdminDto.UpsertCouponTemplateRequest createRequest = new CouponAdminDto.UpsertCouponTemplateRequest(
             "신규가입 10% 할인",
             CouponType.RATE,
             10L,
             10_000L,
+            null,
             1,
             ZonedDateTime.now().plusDays(1)
         );
@@ -66,6 +67,7 @@ class CouponApiE2ETest {
             CouponType.RATE,
             15L,
             10_000L,
+            null,
             1,
             ZonedDateTime.now().plusDays(2)
         );
@@ -76,15 +78,16 @@ class CouponApiE2ETest {
             new ParameterizedTypeReference<>() {}
         );
 
-        ResponseEntity<ApiResponse<CouponV1Dto.IssuedCouponResponse>> issueResponse = exchange(
+        ResponseEntity<ApiResponse<CouponV1Dto.CouponIssueRequestResponse>> issueResponse = exchange(
             "/api/v1/coupons/" + couponTemplateId + "/issue",
             HttpMethod.POST,
             new HttpEntity<>(userHeaders("user1")),
             new ParameterizedTypeReference<>() {}
         );
+        Long requestId = issueResponse.getBody().data().requestId();
 
-        ResponseEntity<ApiResponse<PageResponse<CouponV1Dto.IssuedCouponResponse>>> myCouponsResponse = exchange(
-            "/api/v1/users/me/coupons?page=0&size=20",
+        ResponseEntity<ApiResponse<CouponV1Dto.CouponIssueRequestResponse>> issueRequestResponse = exchange(
+            "/api/v1/coupons/issues/" + requestId,
             HttpMethod.GET,
             new HttpEntity<>(userHeaders("user1")),
             new ParameterizedTypeReference<>() {}
@@ -113,10 +116,10 @@ class CouponApiE2ETest {
         assertAll(
             () -> assertTrue(createResponse.getStatusCode().is2xxSuccessful()),
             () -> assertThat(updateResponse.getBody().data().name()).isEqualTo("신규가입 15% 할인"),
-            () -> assertThat(issueResponse.getBody().data().status()).isEqualTo(CouponStatus.AVAILABLE),
-            () -> assertThat(myCouponsResponse.getBody().data().pageInfo().totalElements()).isEqualTo(1L),
-            () -> assertThat(myCouponsResponse.getBody().data().items().get(0).couponName()).isEqualTo("신규가입 15% 할인"),
-            () -> assertThat(issuesResponse.getBody().data().pageInfo().totalElements()).isEqualTo(1L),
+            () -> assertThat(issueResponse.getBody().data().status()).isEqualTo(CouponIssueRequestStatus.PENDING),
+            () -> assertThat(issueRequestResponse.getBody().data().requestId()).isEqualTo(requestId),
+            () -> assertThat(issueRequestResponse.getBody().data().status()).isEqualTo(CouponIssueRequestStatus.PENDING),
+            () -> assertThat(issuesResponse.getBody().data().pageInfo().totalElements()).isZero(),
             () -> assertTrue(deleteResponse.getStatusCode().is2xxSuccessful()),
             () -> assertThat(detailResponse.getBody().data().active()).isFalse()
         );

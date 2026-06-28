@@ -18,6 +18,8 @@ public class CouponTemplate extends DomainEntity {
 
     private Long minOrderAmount;
 
+    private Long totalIssueLimit;
+
     private Integer maxIssuesPerUser;
 
     private ZonedDateTime expiredAt;
@@ -27,11 +29,12 @@ public class CouponTemplate extends DomainEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {
-        validate(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt, true);
-        apply(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt);
+        validate(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt, true);
+        apply(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt);
     }
 
     public static CouponTemplate reconstruct(
@@ -40,6 +43,7 @@ public class CouponTemplate extends DomainEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt,
         ZonedDateTime createdAt,
@@ -47,8 +51,8 @@ public class CouponTemplate extends DomainEntity {
         ZonedDateTime deletedAt
     ) {
         CouponTemplate couponTemplate = new CouponTemplate();
-        couponTemplate.validate(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt, false);
-        couponTemplate.apply(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt);
+        couponTemplate.validate(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt, false);
+        couponTemplate.apply(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt);
         couponTemplate.assignMetadata(id, createdAt, updatedAt, deletedAt);
         return couponTemplate;
     }
@@ -60,12 +64,13 @@ public class CouponTemplate extends DomainEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {
         ensureActive();
-        validate(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt, true);
-        apply(name, type, value, minOrderAmount, maxIssuesPerUser, expiredAt);
+        validate(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt, true);
+        apply(name, type, value, minOrderAmount, totalIssueLimit, maxIssuesPerUser, expiredAt);
     }
 
     public void ensureIssuable(ZonedDateTime now) {
@@ -122,6 +127,14 @@ public class CouponTemplate extends DomainEntity {
         return maxIssuesPerUser;
     }
 
+    public Long getTotalIssueLimit() {
+        return totalIssueLimit;
+    }
+
+    public boolean hasTotalIssueLimit() {
+        return totalIssueLimit != null;
+    }
+
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
     }
@@ -135,6 +148,7 @@ public class CouponTemplate extends DomainEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {
@@ -142,6 +156,7 @@ public class CouponTemplate extends DomainEntity {
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
+        this.totalIssueLimit = totalIssueLimit;
         this.maxIssuesPerUser = maxIssuesPerUser;
         this.expiredAt = expiredAt;
     }
@@ -151,6 +166,7 @@ public class CouponTemplate extends DomainEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt,
         boolean requireFutureExpiration
@@ -169,6 +185,9 @@ public class CouponTemplate extends DomainEntity {
         }
         if (minOrderAmount != null && minOrderAmount < 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액은 0 이상이어야 합니다.");
+        }
+        if (totalIssueLimit != null && totalIssueLimit <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "전체 발급 한도는 1 이상이어야 합니다.");
         }
         if (maxIssuesPerUser == null || maxIssuesPerUser <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "사용자별 최대 발급 횟수는 1 이상이어야 합니다.");

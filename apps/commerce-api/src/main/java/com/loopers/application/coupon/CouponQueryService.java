@@ -2,6 +2,7 @@ package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponTemplateRepository;
+import com.loopers.domain.coupon.CouponIssueRequestRepository;
 import com.loopers.domain.coupon.IssuedCoupon;
 import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.support.error.CoreException;
@@ -20,6 +21,7 @@ public class CouponQueryService {
 
     private final CouponTemplateRepository couponTemplateRepository;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final CouponIssueRequestRepository couponIssueRequestRepository;
 
     @Transactional(readOnly = true)
     public PageResult<CouponResult.Template> getAdminTemplates(int page, int size) {
@@ -62,6 +64,19 @@ public class CouponQueryService {
         return PageResult.of(items, page, size, issuedCouponRepository.countByUserId(userId));
     }
 
+    @Transactional(readOnly = true)
+    public CouponResult.IssueRequest getMyIssueRequest(Long requestId, String userId) {
+        validateRequestId(requestId);
+        validateUserId(userId);
+
+        return couponIssueRequestRepository.findByIdAndUserId(requestId, userId)
+            .map(CouponResult.IssueRequest::from)
+            .orElseThrow(() -> new CoreException(
+                ErrorType.NOT_FOUND,
+                "[id = " + requestId + "] 쿠폰 발급 요청을 찾을 수 없습니다."
+            ));
+    }
+
     private List<CouponResult.Issued> toIssuedResults(List<IssuedCoupon> issuedCoupons, String couponName) {
         ZonedDateTime now = ZonedDateTime.now();
         return issuedCoupons.stream()
@@ -92,6 +107,12 @@ public class CouponQueryService {
         }
         if (size <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "페이지 크기는 1 이상이어야 합니다.");
+        }
+    }
+
+    private void validateRequestId(Long requestId) {
+        if (requestId == null || requestId <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 발급 요청 ID는 필수입니다.");
         }
     }
 }

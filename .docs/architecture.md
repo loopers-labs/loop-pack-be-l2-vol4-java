@@ -1,6 +1,6 @@
 # Architecture Decision
 
-이 문서는 현재 4주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 7주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 결정
 
@@ -39,10 +39,10 @@ com.loopers
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
-| `coupon` | `CouponTemplate`, `IssuedCoupon` | 쿠폰 템플릿 관리, 발급, 할인 계산, 사용과 복구 |
+| `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine` | 주문 생성, 주문 상태, 주문 항목 스냅샷 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
-| `event` | `OrderEventOutbox`, `DataPlatformClient` | 주문 성공 이벤트 저장, 외부 데이터 플랫폼 전송 |
+| `event` | `EventOutbox`, Kafka relay | 주문/카탈로그 이벤트 저장, Kafka 전파, relay 상태 관리 |
 
 ## 4주차 핵심 트랜잭션
 
@@ -50,7 +50,7 @@ com.loopers
 
 | 유스케이스 | 단일 DB 트랜잭션 처리 순서 |
 | --- | --- |
-| 쿠폰 발급 | 쿠폰 템플릿 row `PESSIMISTIC_WRITE` 조회 -> soft delete/만료 검증 -> 사용자별 발급 수 확인 -> 발급 쿠폰 저장 |
+| 쿠폰 발급 | 쿠폰 템플릿 row `PESSIMISTIC_WRITE` 조회 -> soft delete/만료 검증 -> 전체 발급 수와 사용자별 발급 수 확인 -> 발급 쿠폰 저장 |
 | 주문 생성 | 상품 ID 오름차순 상품 row `PESSIMISTIC_WRITE` 조회 -> 재고 검증 및 차감 -> optional 발급 쿠폰 row `PESSIMISTIC_WRITE` 조회 -> 소유권/상태/만료/최소 주문 금액 검증 및 `USED` 전이 -> 할인 스냅샷 주문 저장 |
 | 주문 실패 | 재고 차감 또는 쿠폰 처리 중 하나라도 실패하면 주문 생성 트랜잭션 전체 롤백 |
 
@@ -60,14 +60,28 @@ com.loopers
 
 ## 기존 확장 설계
 
-결제와 Outbox는 기존 구현을 유지하지만 4주차 필수 설계와 분리한다.
+결제 흐름은 기존 구현을 유지하지만 7주차 이벤트 파이프라인 필수 설계와 분리한다.
 
 | 영역 | 현재 처리 |
 | --- | --- |
 | 유상 주문 | 주문 생성 트랜잭션에서 `PaymentStatus.REQUESTED` 결제 row를 저장한다. |
 | 0원 주문 | 결제 row 없이 즉시 `PAID`로 전이하고 `ORDER_PAID` outbox를 저장한다. 조회 시 `PaymentStatus.NOT_REQUIRED`를 계산한다. |
 | 결제 실패/취소/timeout | 주문 row 잠금 -> 상품 ID 오름차순 상품 row 잠금 및 재고 복구 -> optional 발급 쿠폰 row 잠금 및 `AVAILABLE` 복구 -> 주문 상태 전이 순서로 처리한다. |
-| Outbox | 주문 `PAID` 전이와 `ORDER_PAID` 저장을 같은 DB 트랜잭션으로 처리하고 외부 데이터 플랫폼 전송은 분리한다. |
+| Outbox | 도메인 상태 변경과 이벤트 저장을 같은 DB 트랜잭션으로 처리하고 Kafka 발행은 relay로 분리한다. |
+
+## 7주차 이벤트 파이프라인 기준
+
+7주차 구현은 기존 주문 전용 Outbox를 범용 `EventOutbox`로 확장한다.
+
+| 영역 | 처리 |
+| --- | --- |
+| ApplicationEvent | 좋아요 등록/취소 성공 후 Spring `ApplicationEvent`를 발행하고 `BEFORE_COMMIT` 리스너가 Outbox를 저장한다. |
+| Kafka relay | `EventRelayWorker`가 pending Outbox를 읽어 Kafka로 발행하고 성공 시 `SENT`, 실패 시 retry 또는 `FAILED`로 전이한다. |
+| Consumer 멱등성 | `commerce-streamer`와 `commerce-api` 쿠폰 발급 consumer는 `event_handled(event_id PK)`로 중복 소비를 방지한다. |
+| 상품 집계 | 좋아요 이벤트는 `product_metrics`에 최신 이벤트 시각 기준으로 반영한다. |
+| 선착순 쿠폰 발급 | 발급 API는 `CouponIssueRequest(PENDING)`와 `coupon-issue-requests` Outbox를 같은 트랜잭션에 저장하고, consumer가 요청 row와 템플릿 row를 잠근 뒤 `IssuedCoupon` 생성 또는 실패 확정을 처리한다. |
+| 결과 조회 | 사용자는 `GET /api/v1/coupons/issues/{requestId}`로 `PENDING`/`SUCCEEDED`/`FAILED` 상태를 polling한다. |
+| 모니터링 | Outbox relay, Kafka consumer, product metrics update 지표를 Micrometer/Prometheus로 노출한다. |
 
 ## 외부 경계
 
@@ -102,7 +116,7 @@ com.loopers
 | 관점 | 기준 |
 | --- | --- |
 | Onion | 도메인 엔티티와 VO가 중심이며, application/infrastructure가 바깥에서 의존한다. |
-| Hexagonal | Repository, PaymentGateway, DataPlatformClient는 domain port이고 구현체는 infrastructure adapter다. |
+| Hexagonal | Repository, PaymentGateway, Kafka event publisher는 port이고 구현체는 infrastructure adapter다. |
 | CQRS | command service와 query service를 분리해 변경 유스케이스와 조회 조합의 책임을 나눈다. |
 | Persistence 분리 | `domain.catalog`, `domain.coupon`, `domain.ordering`, `domain.payment`, `domain.event` 도메인 객체는 JPA 어노테이션을 갖지 않고, infrastructure JPA entity가 DB 스키마를 담당한다. |
 
