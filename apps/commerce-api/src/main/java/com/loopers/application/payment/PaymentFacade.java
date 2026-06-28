@@ -39,10 +39,22 @@ public class PaymentFacade {
     }
 
     public Long processPayment(Long orderId, PaymentMethod method, BigDecimal amount) {
+        // 0. 멱등성 체크: 이미 존재하는 결제 건이 있는 경우 기존 결제 ID 반환
+        java.util.Optional<PaymentModel> existingPayment = paymentRepository.findByOrderId(orderId);
+        if (existingPayment.isPresent()) {
+            return existingPayment.get().getId();
+        }
 
         // 1. READY 상태로 저장 (단일 데이터 변경 작업, save API 자체 트랜잭션으로 바로 커밋)
         PaymentModel payment = new PaymentModel(orderId, method, amount);
-        payment = paymentRepository.save(payment);
+        try {
+            payment = paymentRepository.save(payment);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Duplicate payment request for orderId: {}", orderId, e);
+            return paymentRepository.findByOrderId(orderId)
+                    .map(PaymentModel::getId)
+                    .orElseThrow(() -> e);
+        }
         Long paymentId = payment.getId();
 
         // 2. Redis에 TTL 10초 설정 (추상화된 TempStorage 사용)

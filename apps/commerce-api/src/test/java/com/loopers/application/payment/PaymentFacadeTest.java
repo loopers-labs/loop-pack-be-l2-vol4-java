@@ -78,6 +78,9 @@ class PaymentFacadeTest {
         BigDecimal amount = new BigDecimal("5000");
         PaymentMethod method = PaymentMethod.CARD;
 
+        Mockito.doReturn(new PaymentGatewayResult("tx_default", LocalDateTime.now()))
+                .when(paymentGateway).requestPayment(Mockito.eq(orderId), Mockito.any(), Mockito.any());
+
         // when
         Long paymentId = paymentFacade.processPayment(orderId, method, amount);
 
@@ -90,6 +93,26 @@ class PaymentFacadeTest {
         String redisKey = "payment_retry:" + paymentId;
         Boolean hasKey = defaultRedisTemplate.hasKey(redisKey);
         assertThat(hasKey).isFalse();
+    }
+
+    @Test
+    @DisplayName("동일한 주문(orderId)에 대해 결제 요청이 중복으로 들어오면, 신규 결제를 생성하지 않고 기존 결제 ID를 반환한다.")
+    void processPayment_DuplicateOrderId_ShouldBeIdempotent() {
+        // given
+        Long orderId = 100L;
+        BigDecimal amount = new BigDecimal("10000");
+        PaymentMethod method = PaymentMethod.CARD;
+
+        Mockito.doReturn(new PaymentGatewayResult("tx_100", LocalDateTime.now()))
+                .when(paymentGateway).requestPayment(Mockito.eq(orderId), Mockito.any(), Mockito.any());
+
+        Long firstPaymentId = paymentFacade.processPayment(orderId, method, amount);
+
+        // when
+        Long secondPaymentId = paymentFacade.processPayment(orderId, method, amount);
+
+        // then
+        assertThat(secondPaymentId).isEqualTo(firstPaymentId);
     }
 
     @Test
