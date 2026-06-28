@@ -12,6 +12,7 @@ public class CouponAdminDto {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {}
@@ -22,6 +23,7 @@ public class CouponAdminDto {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt,
         boolean active,
@@ -34,6 +36,7 @@ public class CouponAdminDto {
                 result.type(),
                 result.value(),
                 result.minOrderAmount(),
+                result.totalIssueLimit(),
                 result.maxIssuesPerUser(),
                 result.expiredAt(),
                 result.active(),

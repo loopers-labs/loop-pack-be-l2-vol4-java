@@ -10,7 +10,7 @@ import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
+import com.loopers.domain.event.outbox.EventOutboxRepository;
 import com.loopers.domain.ordering.order.OrderStatus;
 import com.loopers.domain.payment.payment.PaymentRepository;
 import com.loopers.domain.payment.payment.PaymentStatus;
@@ -35,7 +35,7 @@ class CouponOrderIntegrationTest {
     private final OrderFacade orderFacade;
     private final PaymentResultService paymentResultService;
     private final PaymentRepository paymentRepository;
-    private final OrderEventOutboxRepository orderEventOutboxRepository;
+    private final EventOutboxRepository eventOutboxRepository;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final DatabaseCleanUp databaseCleanUp;
@@ -47,7 +47,7 @@ class CouponOrderIntegrationTest {
         OrderFacade orderFacade,
         PaymentResultService paymentResultService,
         PaymentRepository paymentRepository,
-        OrderEventOutboxRepository orderEventOutboxRepository,
+        EventOutboxRepository eventOutboxRepository,
         BrandRepository brandRepository,
         ProductRepository productRepository,
         DatabaseCleanUp databaseCleanUp
@@ -57,7 +57,7 @@ class CouponOrderIntegrationTest {
         this.orderFacade = orderFacade;
         this.paymentResultService = paymentResultService;
         this.paymentRepository = paymentRepository;
-        this.orderEventOutboxRepository = orderEventOutboxRepository;
+        this.eventOutboxRepository = eventOutboxRepository;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
         this.databaseCleanUp = databaseCleanUp;
@@ -87,7 +87,7 @@ class CouponOrderIntegrationTest {
             () -> assertThat(result.discountAmount()).isEqualTo(2_000L),
             () -> assertThat(result.finalAmount()).isZero(),
             () -> assertThat(paymentRepository.findByOrderId(result.orderId())).isEmpty(),
-            () -> assertThat(orderEventOutboxRepository.findPendingEvents()).hasSize(1)
+            () -> assertThat(eventOutboxRepository.findPendingEvents()).hasSize(1)
         );
     }
 
@@ -117,6 +117,7 @@ class CouponOrderIntegrationTest {
             "테스트 쿠폰",
             type,
             value,
+            null,
             null,
             1,
             ZonedDateTime.now().plusDays(1)

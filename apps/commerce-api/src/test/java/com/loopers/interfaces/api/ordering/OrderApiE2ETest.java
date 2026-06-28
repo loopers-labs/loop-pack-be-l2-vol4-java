@@ -116,6 +116,7 @@ class OrderApiE2ETest {
                 CouponType.FIXED,
                 500L,
                 null,
+                null,
                 1,
                 ZonedDateTime.now().plusDays(1)
             )).couponId();
