@@ -2,11 +2,12 @@ package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.like.LikeService;
-import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -15,21 +16,35 @@ import java.util.List;
 public class LikeFacade {
 
     private final LikeService likeService;
-    private final ProductRepository productRepository;
+    private final ProductService productService;
 
+    @Transactional
     public void like(Long userId, Long productId) {
-        likeService.like(userId, productId);
+        boolean added = likeService.addLike(userId, productId);
+        if (added) {
+            productService.incrementLikeCount(productId);
+        }
     }
 
+    @Transactional
     public void unlike(Long userId, Long productId) {
-        likeService.unlike(userId, productId);
+        boolean removed = likeService.removeLike(userId, productId);
+        if (removed) {
+            productService.decrementLikeCount(productId);
+        }
     }
 
     public List<ProductInfo> getLikedProducts(Long userId) {
         return likeService.getLikedProducts(userId).stream()
-            .map(like -> productRepository.findById(like.getProductId())
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.")))
-            .map(ProductInfo::from)
+            .map(like -> {
+                try {
+                    return ProductInfo.from(productService.getProduct(like.getProductId()));
+                } catch (CoreException e) {
+                    if (e.getErrorType() == ErrorType.NOT_FOUND) return null;
+                    throw e;
+                }
+            })
+            .filter(info -> info != null)
             .toList();
     }
 }

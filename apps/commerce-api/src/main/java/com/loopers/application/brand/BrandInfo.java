@@ -2,8 +2,8 @@ package com.loopers.application.brand;
 
 import com.loopers.domain.brand.BrandModel;
 
-public record BrandInfo(Long id, String name, String description) {
+public record BrandInfo(Long id, String name, String description, String imageUrl) {
     public static BrandInfo from(BrandModel brand) {
-        return new BrandInfo(brand.getId(), brand.getName(), brand.getDescription());
+        return new BrandInfo(brand.getId(), brand.getName(), brand.getDescription(), brand.getImageUrl());
     }
 }

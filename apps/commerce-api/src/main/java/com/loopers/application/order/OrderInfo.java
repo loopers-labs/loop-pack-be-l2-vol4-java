@@ -2,21 +2,30 @@ package com.loopers.application.order;
 
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderItem;
+import com.loopers.domain.order.OrderStatus;
 
 import java.util.List;
 
-public record OrderInfo(Long id, Long userId, Long totalPrice, List<OrderItemInfo> items) {
+public record OrderInfo(Long id, Long userId, OrderStatus status, Long totalAmount, List<OrderItemInfo> items) {
 
-    public record OrderItemInfo(Long productId, String productName, Long productPrice, Integer quantity) {
+    public record OrderItemInfo(Long productId, String productNameSnapshot, Long productPriceSnapshot, Integer quantity) {
         public static OrderItemInfo from(OrderItem item) {
-            return new OrderItemInfo(item.getProductId(), item.getProductName(), item.getProductPrice(), item.getQuantity());
+            return new OrderItemInfo(
+                item.getProductId(),
+                item.getProductNameSnapshot(),
+                item.getProductPriceSnapshot(),
+                item.getQuantity()
+            );
         }
     }
 
     public static OrderInfo from(Order order) {
-        List<OrderItemInfo> itemInfos = order.getItems().stream()
-            .map(OrderItemInfo::from)
-            .toList();
-        return new OrderInfo(order.getId(), order.getUserId(), order.getTotalPrice(), itemInfos);
+        return new OrderInfo(
+            order.getId(),
+            order.getUserId(),
+            order.getStatus(),
+            order.getTotalAmount(),
+            order.getItems().stream().map(OrderItemInfo::from).toList()
+        );
     }
 }
