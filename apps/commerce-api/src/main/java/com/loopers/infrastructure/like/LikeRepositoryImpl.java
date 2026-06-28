@@ -29,6 +29,11 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
+    public void deleteAllByProductIdIn(List<Long> productIds) {
+        likeJpaRepository.deleteAllByProductIdIn(productIds);
+    }
+
+    @Override
     public List<Like> findByUserId(Long userId) {
         return likeJpaRepository.findByUserId(userId);
     }
