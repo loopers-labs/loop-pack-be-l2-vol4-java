@@ -4,9 +4,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import java.util.TimeZone;
 
+@EnableFeignClients
 @EnableScheduling   // PENDING 주문 만료 스케줄러 (PendingOrderExpirationScheduler)
 @ConfigurationPropertiesScan
 @SpringBootApplication

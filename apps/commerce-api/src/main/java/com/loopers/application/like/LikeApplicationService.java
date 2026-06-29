@@ -13,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 
 /**
@@ -59,8 +60,23 @@ public class LikeApplicationService {
             // INSERT 가 실제 성공한 경로에서만 원자 증가
             productRepository.increaseLikeCount(productId);
         } catch (DataIntegrityViolationException e) {
-            // 동시 요청 UK 위반 - 다른 요청이 이미 등록 완료. likes 무변경이므로 count 도 건드리지 않음.
+            if (!isDuplicateKeyViolation(e)) {
+                throw e;
+            }
+            // UK 위반(MySQL 1062) = 동시 요청으로 이미 등록됨. likes 무변경이므로 count 도 건드리지 않음.
         }
+    }
+
+    private static boolean isDuplicateKeyViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause instanceof SQLIntegrityConstraintViolationException sqlEx
+                && sqlEx.getErrorCode() == 1062) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     /**

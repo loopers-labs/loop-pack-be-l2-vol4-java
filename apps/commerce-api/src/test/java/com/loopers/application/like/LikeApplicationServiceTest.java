@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,7 +93,9 @@ class LikeApplicationServiceTest {
             ProductModel product = new ProductModel(1L, "신발", "러닝화", 50_000L);
             when(productRepository.findById(100L)).thenReturn(Optional.of(product));
             when(likeRepository.existsByUserIdAndProductId(10L, 100L)).thenReturn(false);
-            when(likeRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uk violation"));
+            SQLIntegrityConstraintViolationException sqlEx =
+                new SQLIntegrityConstraintViolationException("Duplicate entry", "23000", 1062);
+            when(likeRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uk violation", sqlEx));
 
             // act & assert — likes 무변경이므로 count 도 건드리지 않음
             assertDoesNotThrow(() -> sut.like(10L, 100L));

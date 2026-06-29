@@ -1,0 +1,57 @@
+### 비동기 결제 요청 (pg-simulator)
+# orderId 는 사전에 생성된 PENDING 주문의 id, amount 는 그 주문의 결제 금액과 일치해야 한다(위변조 검증).
+# 성공 시 transactionKey 와 status="PENDING" 을 즉시 반환하고, 최종 결과는 콜백으로 도착한다.
+POST {{commerce-api}}/api/v1/payments
+Content-Type: application/json
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+{
+  "orderId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-1234-5678",
+  "amount": 100000
+}
+
+### pg-simulator 콜백 수신 (인증 불필요 — pg-simulator 가 직접 호출)
+# 실제로는 pg-simulator 가 결제 처리 완료 후 callbackUrl 로 보낸다. 아래는 수동 재현용.
+# status: SUCCESS / FAILED, FAILED 시 reason 동반.
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "TX-0000000001",
+  "orderId": "1",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-1234-5678",
+  "amount": 100000,
+  "status": "SUCCESS",
+  "reason": null
+}
+
+### pg-simulator 콜백 — 실패 케이스
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "TX-0000000001",
+  "orderId": "1",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-1234-5678",
+  "amount": 100000,
+  "status": "FAILED",
+  "reason": "LIMIT_EXCEEDED"
+}
+
+### (참고) Toss 스타일 동기 결제 확정
+# 결제창 인증 완료 후 successUrl 에서 받은 paymentKey 로 승인. amount 는 DB 주문 금액과 대조된다.
+POST {{commerce-api}}/api/v1/payments/confirm
+Content-Type: application/json
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+{
+  "paymentKey": "fake-payment-key",
+  "orderId": 1,
+  "amount": 100000
+}

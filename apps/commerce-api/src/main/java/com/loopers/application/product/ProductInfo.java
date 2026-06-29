@@ -6,6 +6,7 @@ import com.loopers.domain.stock.StockModel;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -95,7 +96,9 @@ public record ProductInfo(
         Map<Long, StockModel> stockMap = stocks.stream()
             .collect(Collectors.toMap(StockModel::getProductId, Function.identity()));
         return products.stream()
-            .map(p -> forUserList(p, stockMap.get(p.getId())))
+            .map(p -> forUserList(p, Optional.ofNullable(stockMap.get(p.getId()))
+                .orElseThrow(() -> new IllegalStateException(
+                    "[productId=" + p.getId() + "] 재고 정보 누락 — 상품-재고 정합성 오류"))))
             .toList();
     }
 

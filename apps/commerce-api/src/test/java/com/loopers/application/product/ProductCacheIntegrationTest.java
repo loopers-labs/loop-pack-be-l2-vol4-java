@@ -37,7 +37,7 @@ class ProductCacheIntegrationTest {
 
     @Container
     static final GenericContainer<?> redisContainer =
-        new GenericContainer<>(DockerImageName.parse("redis:latest")).withExposedPorts(6379);
+        new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379);
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {

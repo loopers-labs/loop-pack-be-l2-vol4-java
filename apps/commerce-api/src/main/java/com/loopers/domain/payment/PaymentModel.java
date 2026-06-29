@@ -56,6 +56,14 @@ public class PaymentModel extends BaseEntity {
         this.requestedAt = ZonedDateTime.now();
     }
 
+    /** PG 즉시 응답으로 받은 TID를 저장한다. 상태는 REQUESTED 유지 — 콜백 대기 중. */
+    public void storePendingTransactionKey(String pgTransactionId) {
+        if (this.status != PaymentStatus.REQUESTED) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "REQUESTED 상태에서만 TID를 저장할 수 있습니다.");
+        }
+        this.pgTransactionId = pgTransactionId;
+    }
+
     public void markSuccess(String pgTransactionId) {
         if (this.status != PaymentStatus.REQUESTED) {
             throw new CoreException(ErrorType.BAD_REQUEST, "REQUESTED 상태의 결제만 성공 처리할 수 있습니다.");
@@ -76,6 +84,10 @@ public class PaymentModel extends BaseEntity {
 
     public boolean isSuccess() {
         return this.status == PaymentStatus.SUCCESS;
+    }
+
+    public boolean isTerminal() {
+        return this.status == PaymentStatus.SUCCESS || this.status == PaymentStatus.FAILED;
     }
 
     public Long getOrderId() {

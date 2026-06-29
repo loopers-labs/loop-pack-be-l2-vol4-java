@@ -48,7 +48,7 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public List<OrderModel> findByStatusAndPaymentStartedAtBefore(OrderStatus status, ZonedDateTime before) {
-        return orderJpaRepository.findByStatusAndPaymentStartedAtBefore(status, before);
+    public List<OrderModel> findByStatus(OrderStatus status) {
+        return orderJpaRepository.findByStatus(status);
     }
 }
