@@ -162,13 +162,26 @@ classDiagram
     CouponIssue "1" -- "0..1" Order : applied to
     Order "1" ..> "0..1" Payment : reference (id)
 
-    %% 인프라스트럭처 (Repository)
+    %% 인프라스트럭처 (Repository 및 기타 관리)
     class OrderRepository { <<interface>> }
     class ProductRepository { <<interface>> }
     class StockRepository { <<interface>> }
     class CouponRepository { <<interface>> }
     class LikeRepository { <<interface>> }
     class PaymentRepository { <<interface>> }
+
+    class IdempotencyManager {
+        <<interface>>
+        +lock(idempotencyKey) boolean
+        +unlock(idempotencyKey)
+        +saveSuccess(idempotencyKey, orderId)
+        +getSuccess(idempotencyKey)
+    }
+    
+    class RedisIdempotencyManager {
+        -RedissonClient redissonClient
+    }
+    RedisIdempotencyManager ..|> IdempotencyManager
 
     %% 파사드(Facade) 계층 (트랜잭션 및 흐름 제어)
     class OrderFacade {
@@ -209,6 +222,7 @@ classDiagram
     OrderFacade ..> StockRepository
     OrderFacade ..> CouponRepository
     OrderFacade ..> OrderDomainService
+    OrderFacade ..> IdempotencyManager
 
     PaymentFacade ..> PaymentRepository
     PaymentFacade ..> OrderRepository
@@ -216,6 +230,7 @@ classDiagram
     PaymentFacade ..> StockRepository
     PaymentFacade ..> CouponRepository
     PaymentFacade ..> NotificationService
+    PaymentFacade ..> IdempotencyManager
     
     PaymentExpirationListener ..> PaymentFacade
     PaymentFallbackScheduler ..> PaymentFacade

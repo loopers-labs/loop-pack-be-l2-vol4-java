@@ -58,17 +58,17 @@ sequenceDiagram
     User->>Client: 주문하기 클릭
     Client->>OrderFacade: POST /orders (Idempotency-Key: K123)
     activate OrderFacade
-    OrderFacade->>Redis: SETNX order:create:{userId}:K123 (락 획득)
+    OrderFacade->>Redis: tryLock order:create:{userId}:K123 (Redisson Watchdog)
     OrderFacade->>DB: 주문 처리 시도... (일시적 장애 발생)
     DB--xOrderFacade: Exception
-    OrderFacade->>Redis: DEL order:create:{userId}:K123 (실패 시 락 해제)
+    OrderFacade->>Redis: unlock (토큰 검증 후 해제)
     OrderFacade-->>Client: 500 Error
     deactivate OrderFacade
 
     User->>Client: 당황하지 않고 다시 주문하기 클릭
     Client->>OrderFacade: POST /orders (Idempotency-Key: K123)
     activate OrderFacade
-    OrderFacade->>Redis: SETNX order:create:{userId}:K123 (이전 락이 없으므로 성공)
+    OrderFacade->>Redis: tryLock order:create:{userId}:K123 (이전 락이 없으므로 성공)
     OrderFacade->>DB: 주문 정상 처리 완료
     DB-->>OrderFacade: Order ID: 100
     OrderFacade->>Redis: UPDATE order:create:{userId}:K123 = "100" 및 해시 저장
@@ -88,11 +88,11 @@ sequenceDiagram
     User->>Client: 결제 수단 선택 후 결제 요청
     Client->>PaymentFacade: POST /payments (Order ID: 100)
     activate PaymentFacade
-    PaymentFacade->>Redis: SETNX payment:lock:100 (결제 처리 락 획득)
+    PaymentFacade->>Redis: tryLock payment:lock:100 (Redisson Watchdog)
     PaymentFacade->>DB: SELECT status FROM payments WHERE order_id=100 AND status IN ('READY','APPROVED')
     DB-->>PaymentFacade: 결과 없음 (최초 결제)
     PaymentFacade->>DB: INSERT payments (status='READY')
-    PaymentFacade->>Redis: DEL payment:lock:100 (결제 처리 락 해제)
+    PaymentFacade->>Redis: unlock (토큰 검증 후 해제)
     Note over PaymentFacade, DB: PG 연동 중 잔고 부족 등으로 실패
     PaymentFacade->>DB: UPDATE payments SET status='FAILED'
     PaymentFacade-->>Client: 400 Bad Request (결제 실패)
@@ -101,12 +101,12 @@ sequenceDiagram
     User->>Client: 다른 카드로 재결제 요청
     Client->>PaymentFacade: POST /payments (Order ID: 100)
     activate PaymentFacade
-    PaymentFacade->>Redis: SETNX payment:lock:100 (결제 처리 락 획득)
+    PaymentFacade->>Redis: tryLock payment:lock:100 (Redisson Watchdog)
     PaymentFacade->>DB: SELECT status FROM payments WHERE order_id=100 AND status IN ('READY','APPROVED')
     Note right of DB: 실패(FAILED)한 이력만 존재함
     DB-->>PaymentFacade: 결과 없음
     PaymentFacade->>DB: INSERT 새 payments (status='READY') (통과!)
-    PaymentFacade->>Redis: DEL payment:lock:100 (결제 처리 락 해제)
+    PaymentFacade->>Redis: unlock (토큰 검증 후 해제)
     PaymentFacade-->>Client: 200 OK (결제 성공)
     deactivate PaymentFacade
 
@@ -114,10 +114,10 @@ sequenceDiagram
     User->>Client: 결제 요청 (연타)
     Client->>PaymentFacade: POST /payments (Order ID: 100)
     activate PaymentFacade
-    PaymentFacade->>Redis: SETNX payment:lock:100 (결제 처리 락 획득)
+    PaymentFacade->>Redis: tryLock payment:lock:100 (Redisson Watchdog)
     PaymentFacade->>DB: SELECT status FROM payments WHERE order_id=100 AND status IN ('READY','APPROVED')
     DB-->>PaymentFacade: READY 상태 내역 발견! (중복 감지)
-    PaymentFacade->>Redis: DEL payment:lock:100 (결제 처리 락 해제)
+    PaymentFacade->>Redis: unlock (토큰 검증 후 해제)
     PaymentFacade-->>Client: 409 Conflict (에러 반환)
     deactivate PaymentFacade
 ```
