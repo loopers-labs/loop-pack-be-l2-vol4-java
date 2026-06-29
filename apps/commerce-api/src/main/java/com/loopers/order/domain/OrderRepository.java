@@ -7,5 +7,6 @@ import java.util.Optional;
 public interface OrderRepository {
     OrderModel save(OrderModel order);
     Optional<OrderModel> find(Long id);
+    Optional<OrderModel> findWithLock(Long id);
     List<OrderModel> findAllByUserId(Long userId, ZonedDateTime startAt, ZonedDateTime endAt);
 }

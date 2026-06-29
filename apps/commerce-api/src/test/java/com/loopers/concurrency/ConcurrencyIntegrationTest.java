@@ -105,7 +105,7 @@ class ConcurrencyIntegrationTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId());
+                    orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId());
                     successCount.incrementAndGet();
                 } catch (Exception ignored) {
                     failCount.incrementAndGet();
@@ -145,7 +145,7 @@ class ConcurrencyIntegrationTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+                    orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
                     successCount.incrementAndGet();
                 } catch (Exception ignored) {
                     failCount.incrementAndGet();

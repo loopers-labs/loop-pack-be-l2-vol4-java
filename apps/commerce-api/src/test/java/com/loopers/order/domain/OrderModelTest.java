@@ -142,6 +142,21 @@ class OrderModelTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
+
+        @DisplayName("PAYMENT_FAILED 상태이면, status가 IN_PAYMENT로 변경된다.")
+        @Test
+        void changesStatusToInPayment_whenStatusIsPaymentFailed() {
+            // arrange
+            OrderModel order = new OrderModel(1L, List.of(new OrderItemModel(1L, "에어맥스", 150000L, 1)));
+            order.startPayment();
+            order.failPayment();
+
+            // act
+            order.startPayment();
+
+            // assert
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.IN_PAYMENT);
+        }
     }
 
 }

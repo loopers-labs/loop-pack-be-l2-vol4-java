@@ -24,11 +24,11 @@ public class OrderService {
         }
     }
 
-    public OrderModel createOrder(Long userId, List<ProductModel> products, Map<Long, Integer> quantities) {
-        return createOrder(userId, products, quantities, null, null);
+    public OrderModel createOrder(Long userId, String loginId, List<ProductModel> products, Map<Long, Integer> quantities) {
+        return createOrder(userId, loginId, products, quantities, null, null);
     }
 
-    public OrderModel createOrder(Long userId, List<ProductModel> products, Map<Long, Integer> quantities, CouponModel coupon, Long couponIssueId) {
+    public OrderModel createOrder(Long userId, String loginId, List<ProductModel> products, Map<Long, Integer> quantities, CouponModel coupon, Long couponIssueId) {
         List<OrderItemModel> items = products.stream()
             .map(p -> {
                 int qty = quantities.getOrDefault(p.getId(), 0);
@@ -37,6 +37,6 @@ public class OrderService {
             .toList();
         long originalAmount = items.stream().mapToLong(i -> i.getPrice() * i.getQuantity()).sum();
         long discountAmount = coupon != null ? coupon.calculateDiscount(originalAmount) : 0L;
-        return new OrderModel(userId, items, couponIssueId, discountAmount);
+        return new OrderModel(userId, loginId, items, couponIssueId, discountAmount);
     }
 }

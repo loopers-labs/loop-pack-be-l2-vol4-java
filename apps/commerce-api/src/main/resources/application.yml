@@ -23,6 +23,32 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          default:
+            connectTimeout: 1000  # TCP 연결 수립 대기 (ms)
+            readTimeout: 3000     # 응답 대기 (ms) — timelimiter(600ms)가 먼저 끊지만 소켓 정리 보장용
+
+resilience4j:
+  circuitbreaker:
+    # Feign이 자동 생성하는 CB 이름(PgPaymentClient#requestPayment...)이 instances 키와 달라
+    # configs.default로 설정해야 실제 Feign CB에 적용된다
+    configs:
+      default:
+        sliding-window-size: 20
+        failure-rate-threshold: 60
+        slow-call-duration-threshold: 100ms  # 100ms 초과 응답을 '느린 호출'로 간주
+        slow-call-rate-threshold: 50          # 느린 호출이 50% 넘으면 OPEN — 에러 없이 느리기만 해도 CB가 열림
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 600ms
 
 springdoc:
   use-fqn: true
@@ -34,6 +60,10 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+pg:
+  url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
 
 ---
 spring:

@@ -38,3 +38,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### k6 ###
+k6/tmp_*.json

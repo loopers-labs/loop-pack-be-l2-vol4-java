@@ -83,7 +83,7 @@ class OrderFacadeIntegrationTest {
             ProductModel product = savedProduct(100);
 
             // act
-            OrderInfo result = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 2)));
+            OrderInfo result = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 2)));
 
             // assert
             assertAll(
@@ -104,7 +104,7 @@ class OrderFacadeIntegrationTest {
         void throwsNotFound_whenProductNotExists() {
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(999L, 1)))
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(999L, 1)))
             );
 
             // assert
@@ -120,7 +120,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)))
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 5)))
             );
 
             // assert
@@ -136,7 +136,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)))
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)))
             );
 
             // assert
@@ -158,7 +158,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             OrderInfo result = orderFacade.createOrder(
-                1L, List.of(new OrderItemCommand(product.getId(), 2)), coupon.getId()
+                1L, "user1", List.of(new OrderItemCommand(product.getId(), 2)), coupon.getId()
             );
 
             // assert
@@ -179,7 +179,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             OrderInfo result = orderFacade.createOrder(
-                1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId()
+                1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId()
             );
 
             // assert
@@ -199,7 +199,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
             );
 
             // assert
@@ -216,7 +216,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
             );
 
             // assert
@@ -234,7 +234,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
             );
 
             // assert
@@ -251,7 +251,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId())
             );
 
             // assert
@@ -267,7 +267,7 @@ class OrderFacadeIntegrationTest {
             CouponIssueModel issue = savedCouponIssue(coupon.getId(), 1L);
 
             // act
-            orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId());
+            orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)), coupon.getId());
 
             // assert
             CouponIssueModel updatedIssue = couponIssueJpaRepository.findById(issue.getId()).orElseThrow();
@@ -284,7 +284,7 @@ class OrderFacadeIntegrationTest {
 
             // act
             assertThrows(CoreException.class, () ->
-                orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)), coupon.getId())
+                orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 5)), coupon.getId())
             );
 
             // assert
@@ -302,7 +302,7 @@ class OrderFacadeIntegrationTest {
         void doesNotChangeStockReservation_whenRequestIsValid() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 5)));
 
             StockModel stockAfterCreate = stockJpaRepository.findByProductId(product.getId()).orElseThrow();
             assertThat(stockAfterCreate.getReservedStock()).isEqualTo(5);
@@ -335,7 +335,7 @@ class OrderFacadeIntegrationTest {
         void changesStatusToInPayment_whenRequestIsValid() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
             OrderInfo result = orderFacade.startPayment(1L, order.id());
@@ -349,7 +349,7 @@ class OrderFacadeIntegrationTest {
         void throwsBadRequest_andDoesNotReserveStockAgain_whenStartPaymentIsCalledTwice() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 5)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 5)));
             orderFacade.startPayment(1L, order.id());
 
             // act
@@ -369,7 +369,7 @@ class OrderFacadeIntegrationTest {
         void throwsForbidden_whenOrderBelongsToAnotherUser() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->
@@ -391,7 +391,7 @@ class OrderFacadeIntegrationTest {
         void confirmsStockAndChangesStatusToConfirmed_whenRequestIsValid() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 3)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 3)));
             orderFacade.startPayment(1L, order.id());
 
             // act
@@ -424,7 +424,7 @@ class OrderFacadeIntegrationTest {
         void throwsForbidden_whenOrderBelongsToAnotherUser() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo order = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderInfo order = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
             orderFacade.startPayment(1L, order.id());
 
             // act
@@ -446,7 +446,7 @@ class OrderFacadeIntegrationTest {
         void returnsOrderInfo_whenOrderExists() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderInfo created = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
             OrderInfo result = orderFacade.getOrder(1L, created.id());
@@ -476,7 +476,7 @@ class OrderFacadeIntegrationTest {
         void throwsForbidden_whenOrderBelongsToAnotherUser() {
             // arrange
             ProductModel product = savedProduct(100);
-            OrderInfo created = orderFacade.createOrder(1L, List.of(new OrderItemCommand(product.getId(), 1)));
+            OrderInfo created = orderFacade.createOrder(1L, "user1", List.of(new OrderItemCommand(product.getId(), 1)));
 
             // act
             CoreException exception = assertThrows(CoreException.class, () ->

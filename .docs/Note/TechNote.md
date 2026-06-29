@@ -1,275 +1,268 @@
-# [Benchmark] 상품 목록 조회 인덱스 설계 — 단일 vs 복합, 데이터 분포에 따른 선택 기준 (5주차 · 6팀 · 변승진)
+# [Challenge Story] Resilience4j CB, 설정만 믿으면 안 된다 (6주차 · 6팀 · 변승진)
 
 ## TL;DR
 
-인덱스 추가만으로 `type: ALL` → `type: index/ref`, rows: 99,516 → 20, filesort 제거를 달성했다.
-단, 인덱스보다 먼저 해결해야 할 것이 있었다 — OR 조건이 남아 있으면 인덱스를 추가해도 옵티마이저가 풀스캔을 선택한다.
-1M 건으로 확장하면 브랜드 분포에 따라 옵티마이저 선택이 달라지고, 딥 페이지에서는 인덱스 전략 자체가 뒤집힌다.
+Resilience4j 서킷브레이커(이하 CB)를 PG 연동에 붙이면서 "설정만 하면 될 줄 알았던" 두 가지 함정을 발견했다. ① `slowCallDurationThreshold` 실험에서 PG 응답이 TimeLimiter(600ms)를 초과하는 순간 slow call이 아닌 failure로 집계되어 실험 전제 자체가 무너졌다. ② retry가 활성화된 상태에서 CB 슬라이딩 윈도우는 결제 요청이 아닌 PG 호출 단위로 채워지기 때문에, 예상보다 빠르게 CB가 열렸다. 두 현상 모두 k6로 직접 측정해 수치로 확인했다.
 
 ---
 
-## Question (무엇을 비교하는가)
+## Context (배경 및 목표)
 
-브랜드 필터(`brand_id`) + 정렬(`like_count`, `created_at`, `price`) 조합 조회에서,
-어떤 인덱스 설계가 실행 계획을 최적화하는가.
+- **어떤 시스템을 만드는가**: PG(Payment Gateway) 외부 연동. pg-simulator는 40% 확률로 즉시 에러를 반환하고, 60%는 100~500ms 후 성공한다. PG가 불안정할 때 그 장애가 commerce-api 전체로 번지지 않도록 Resilience4j CB + TimeLimiter + Retry를 조합해 붙였다.
 
-후보:
-
-- A: 인덱스 없음 (기존)
-- B: 단일 컬럼 인덱스 (`like_count`, `created_at`, `price` 각각)
-- C: 복합 인덱스 (`brand_id + 정렬 컬럼`)
+- **가장 큰 기술적 도전 과제**: CB가 "설정대로" 동작하는지 확인하는 것. 설정값을 바꿔가며 실험하는 과정에서 예상과 다른 동작이 두 차례 발견됐다. 두 경우 모두 원인을 모르면 CB가 올바르게 동작한다고 착각하게 만드는 함정이었다.
 
 ---
 
-## Setup (측정 환경)
+## Design & Implementation (설계 및 구현)
 
-측정은 두 가지 데이터 구성으로 나눠 진행했다.
+### Resilience4j 핵심 개념 — CB가 OPEN되는 두 가지 경로
 
-**소규모 — 인덱스 설계 검증용**
-
-| 테이블 | 건수 | 분포 |
-|--------|-----:|------|
-| brands | 20 | 균등 |
-| products | 100,000 | 브랜드당 약 5,000건, like_count 제곱 분포, created_at 최근 2년 균등 랜덤 |
-| stocks | 100,000 | 상품 1:1 |
-
-**대규모 — 데이터 분포·OFFSET 영향 검증용**
-
-| 테이블 | 건수 | 분포 |
-|--------|-----:|------|
-| brands | 100 | 균등 / 비균등 두 가지로 실험 |
-| products | 1,000,000 | 균등: 브랜드당 약 10,000건 / 비균등: 오래된 브랜드일수록 상품 많고 created_at이 과거에 집중 |
-| stocks | 1,000,000 | 상품 1:1 |
-
-- **DB**: MySQL 8.x (InnoDB)
-- **측정 방법**: `EXPLAIN` 실행 계획 분석 (`type`, `key`, `rows`, `Extra`), `EXPLAIN ANALYZE`로 추정치 대비 실제 실행 시간 검증
-- **쿼리 조건**: `WHERE deleted_at IS NULL`, `ORDER BY {정렬 컬럼}`, `LIMIT 20`
-
----
-
-## Results (측정 결과)
-
-### 1단계 — 인덱스 없음 (10만 건 기준)
-
-| 케이스 | type | key | rows | filesort |
-|--------|------|-----|-----:|:--------:|
-| 전체 좋아요순 | ALL | - | 99,516 | ✅ |
-| 전체 최신순 | ALL | - | 99,516 | ✅ |
-| 전체 가격순 | ALL | - | 99,516 | ✅ |
-| 브랜드 + 좋아요순 | ALL | - | 99,516 | ✅ |
-| 브랜드 + 최신순 | ALL | - | 99,516 | ✅ |
-| 브랜드 + 가격순 | ALL | - | 99,516 | ✅ |
-
-모든 케이스에서 풀스캔 + filesort. 10만 건 전체를 읽고 메모리에서 정렬한다.
-
----
-
-### 2단계 — like_count 인덱스 추가 (10만 건 기준)
-
-`idx_products_likes_desc (like_count DESC, created_at DESC)`,
-`idx_products_brand_likes (brand_id, like_count DESC, created_at DESC)` 추가.
-
-| 케이스 | type | key | rows | filesort |
-|--------|------|-----|-----:|:--------:|
-| 전체 좋아요순 | index | idx_products_likes_desc | **20** | ❌ |
-| 브랜드 + 좋아요순 | ref | idx_products_brand_likes | **9,116** | ❌ |
-
-좋아요순에서 filesort가 제거됐다. 최신순·가격순은 여전히 풀스캔이라 추가 분석이 필요하다.
-
----
-
-### 3단계 — 정렬 컬럼별 인덱스 전부 추가 (10만 건 기준, 최종)
-
-`idx_products_created_at`, `idx_products_brand_created_at`,
-`idx_products_price`, `idx_products_brand_price` 추가.
-
-| 케이스 | type | key | rows | filesort |
-|--------|------|-----|-----:|:--------:|
-| 전체 좋아요순 | index | idx_products_likes_desc | **20** | ❌ |
-| 전체 최신순 | index | idx_products_created_at | **20** | ❌ |
-| 전체 가격순 | index | idx_products_price | **20** | ❌ |
-| 브랜드 + 좋아요순 | ref | idx_products_brand_likes | **9,116** | ❌ |
-| 브랜드 + 최신순 | ref | idx_products_brand_created_at | **5,032** | ❌ |
-| 브랜드 + 가격순 | ref | idx_products_brand_price | **5,032** | ❌ |
-
-전체 6개 케이스에서 filesort 제거. `type: index`는 인덱스 순서대로 스캔하며 LIMIT에서 조기 종료, `type: ref`는 brand_id로 좁힌 뒤 정렬 인덱스를 활용한다.
-
----
-
-### 4단계 — 1M 건으로 확장, 데이터 분포별 비교
-
-인덱스 설계를 10만 건에서 검증한 뒤, 100만 건으로 확장해 데이터 분포가 옵티마이저 선택에 어떤 영향을 주는지 확인했다.
-
-| 케이스 | 20브랜드 균등 1M | 100브랜드 비균등 1M |
-|--------|:---------------:|:-------------------:|
-| 전체 좋아요순 | index / 20 | index / 20 |
-| 전체 최신순 | index / 20 | index / 20 |
-| 전체 가격순 | index / 20 | index / 20 |
-| 브랜드 + 좋아요순 | ref / 93,736 | ref / 18,916 |
-| 브랜드 + **최신순** | **index / 211** | **index / 1,050** |
-| 브랜드 + 가격순 | ref / 93,736 | ref / 18,916 |
-
-전체 정렬 3종은 데이터 규모·분포와 무관하게 rows = 20으로 안정적이다. 브랜드 필터 조합에서는 rows가 크게 늘어나고, 유독 **브랜드 + 최신순**만 동작이 다르다.
-
-**브랜드 + 최신순이 나머지와 다른 이유:**
-
-- **20브랜드 균등** — `created_at` 인덱스를 순서대로 스캔하면 brand_id=1이 1/20 확률로 고르게 분포해 있다. rows=211만 훑으면 20건을 찾을 수 있다고 옵티마이저가 추정. `idx_products_brand_created_at`(ref / 93,736)보다 저렴하다고 판단해 단일 인덱스 스캔 선택.
-
-- **100브랜드 비균등** — brand_id=1은 가장 오래된 브랜드라 최근 구간의 `created_at` 범위에서 희박하다(filtered=0.19%). rows=1,050으로 늘어나지만 여전히 `idx_products_brand_created_at`(ref / 18,916)보다 낮아 단일 인덱스 스캔 유지.
-
-**결론:** 10만 건 균등 분포에서 rows=5,032로 `idx_products_brand_created_at`을 쓰던 것이 1M 균등에서는 rows=211로 단일 인덱스로 바뀌었다. 이는 인위적 균등 분포가 만든 현상이다. 실 운영에서 brand_id와 created_at 간 상관관계가 강해질수록 단일 인덱스 스캔 비용이 올라가 복합 인덱스로 전환되는 임계점에 가까워진다. `idx_products_brand_created_at`이 필요한 이유다.
-
----
-
-### 5단계 — EXPLAIN ANALYZE로 본 실제 실행 시간 (1M 건 실측)
-
-`rows`는 옵티마이저의 추정치일 뿐, 실제 비용과 비례하는지는 별도로 확인해야 한다. MySQL 8 컨테이너에 브랜드 100개·상품 100만 건(브랜드 1이 전체의 약 10%를 차지하도록 치우치게 생성, 최종 인덱스 6종 적용)을 직접 적재하고 `EXPLAIN ANALYZE`로 `actual rows`·`actual time`을 측정했다.
-
-| 케이스 | 추정 rows | actual rows | actual time | key |
-|--------|----------:|------------:|------------:|-----|
-| 전체 좋아요순 | 20 | 20 | 0.34 ms | `idx_products_likes_desc` |
-| 전체 최신순 | 20 | 20 | 0.07 ms | `idx_products_created_at` |
-| 전체 가격순 | 20 | 20 | 0.16 ms | `idx_products_price` |
-| 브랜드(1) + 좋아요순 (`ref`) | 207,606 | 20 | 0.63 ms | `idx_products_brand_likes` |
-| 브랜드(1) + 가격순 (`ref`) | 207,606 | 20 | 0.58 ms | `idx_products_brand_price` |
-| 브랜드(1) + 최신순, OFFSET 0 | 207,606 | 20 | 0.43 ms | `idx_products_brand_created_at` |
-| 브랜드(1) + 최신순, OFFSET 100 | 207,606 | 120 | 0.63 ms | `idx_products_brand_created_at` |
-| 브랜드(1) + 최신순, OFFSET 1,000 | 207,606 | 1,020 | 6.94 ms | `idx_products_brand_created_at` |
-
-**확인된 것:**
-
-- 추정 rows(207,606)는 옵티마이저가 "브랜드 1 전체"를 가정한 상한값이고, `LIMIT`이 있으면 실제로는 `actual rows = OFFSET + LIMIT`만큼만 읽고 멈춘다. 추정치와 실측치가 크게 벌어지는 게 비정상이 아니라, `LIMIT` 조기 종료가 정상 동작하고 있다는 신호다.
-- OFFSET 0 → 100 → 1,000으로 갈수록 actual rows가 20 → 120 → 1,020으로, actual time이 0.43 → 0.63 → 6.94ms로 거의 선형으로 늘었다. 딥 페이지 비용이 rows 증가와 함께 실제 시간으로도 그대로 나타난다.
-- 이 데이터셋에서는 브랜드 1이 "최근 30일 생성 상품 0건"으로 극단적으로 분리돼 있어, OFFSET이 커져도 `idx_products_brand_created_at` ref 전략이 끝까지 유지됐다(4단계에서 본 "단일 인덱스로 전략이 뒤집히는" 현상은 brand-date 상관관계가 이보다 약할 때 나타난다 — 상관관계가 강할수록 ref가 처음부터 유리해 뒤집힐 여지조차 없어진다는 뜻으로, 4단계 결론을 반대 방향에서 재확인한 셈이다).
-- 측정은 컨테이너 기동 직후 데이터 적재 → `ANALYZE TABLE` → 곧바로 실행한 값으로, 별도 워밍업 없이 1회 측정한 값이다. 반복 측정으로 분산까지 보는 건 Future Work로 남긴다.
-
----
-
-## 인덱스보다 먼저 해결해야 했던 것 — OR 조건
-
-인덱스를 추가하기 전에 쿼리에 OR 조건이 있었다.
-
-```sql
-WHERE deleted_at IS NULL AND (:brandId IS NULL OR brand_id = :brandId)
-```
-
-이 상태에서 인덱스를 추가해도 EXPLAIN 결과가 바뀌지 않았다. 옵티마이저는 "brandId가 null일 수도 있다"고 판단해 인덱스를 타지 않고 풀스캔을 선택했다.
-
-**해결**: 쿼리를 두 메서드로 분리했다.
-
-```java
-findAllActive(pageable)                    // WHERE deleted_at IS NULL
-findAllActiveByBrandId(brandId, pageable)  // WHERE deleted_at IS NULL AND brand_id = ?
-```
-
-OR 조건 자체를 없애자 옵티마이저가 비로소 인덱스를 선택했다. 인덱스 설계보다 쿼리 구조가 선행 조건이었다.
-
----
-
-## deleted_at IS NULL — selectivity가 낮아도 인덱스가 효과적인 이유
-
-`deleted_at IS NULL`은 삭제되지 않은 상품, 즉 거의 전체에 해당한다. selectivity가 매우 낮은 컬럼이다. 처음에는 "이 컬럼이 조건에 있으면 LIMIT이 있어도 인덱스가 비효율적이지 않을까"라는 의문이 있었다.
-
-EXPLAIN으로 확인해보니 `LIMIT 20`이 있으면 인덱스를 정렬 순서대로 읽다가 조건에 맞는 20개를 찾는 즉시 멈춘다(`type: index`). selectivity가 낮아도 LIMIT이 조기 종료 조건으로 작동해 실질 읽기 비용이 작았다.
-
-selectivity 문제는 LIMIT 없는 전체 스캔에서만 인덱스를 무력화한다. 페이지네이션 쿼리에서는 정렬 인덱스가 충분히 효과적이다.
-
----
-
-## OFFSET이 커지면 결과가 달라진다 (1M 100브랜드 비균등 기준)
-
-지금까지 EXPLAIN은 모두 OFFSET 없는 1페이지 기준이었다. 실제 Pageable은 `LIMIT 20 OFFSET (page * 20)`을 생성한다.
-
-### 전체 최신순 — OFFSET에 정비례
-
-| OFFSET | rows |
-|-------:|-----:|
-| 0 | 20 |
-| 1,000 | 1,020 |
-| 10,000 | 10,020 |
-| 50,000 | 50,020 |
-
-rows = OFFSET + LIMIT. 페이지가 깊어질수록 인덱스 스캔 범위가 선형으로 늘어난다.
-
-### 브랜드 + 최신순 — OFFSET에 따라 전략 자체가 바뀐다
-
-| OFFSET | type | key | rows | filesort |
-|-------:|------|-----|-----:|:--------:|
-| 0 | index | idx_products_created_at | 1,050 | ❌ |
-| 100 | index | idx_products_created_at | 6,304 | ❌ |
-| 1,000 | ref | idx_products_brand_likes | 18,916 | ✅ |
-
-OFFSET 1,000에서 옵티마이저가 `created_at` 인덱스 스캔을 포기하고 brand ref + filesort로 전략을 바꿨다. brand_id=1인 행을 1,020개 찾으려면 `created_at` 인덱스를 100만 행 가까이 스캔해야 하는데, brand ref로 18,916행을 가져와 정렬하는 쪽이 더 저렴하다고 판단한 것이다. filesort가 다시 등장했다.
-
-이것이 OFFSET 페이지네이션의 구조적 한계다. 인덱스를 아무리 잘 설계해도 딥 페이지에서는 rows가 선형 증가하고, 특정 조합에서는 인덱스 전략 자체가 뒤집혀 filesort까지 부활한다.
-
----
-
-## Decision
-
-### 최종 인덱스 구성
-
-| 인덱스명 | 컬럼 | 커버 케이스 |
-|----------|------|-------------|
-| `idx_products_likes_desc` | `(like_count DESC, created_at DESC)` | 전체 좋아요순 |
-| `idx_products_brand_likes` | `(brand_id, like_count DESC, created_at DESC)` | 브랜드 + 좋아요순 |
-| `idx_products_created_at` | `(created_at DESC)` | 전체 최신순 |
-| `idx_products_brand_created_at` | `(brand_id, created_at DESC)` | 브랜드 + 최신순 |
-| `idx_products_price` | `(price ASC)` | 전체 가격순 |
-| `idx_products_brand_price` | `(brand_id, price ASC)` | 브랜드 + 가격순 |
-
-### 쓰기 비용 트레이드오프
-
-| 인덱스 | 갱신 시점 | 빈도 | 허용 근거 |
-|--------|-----------|:----:|----------|
-| like_count 관련 2개 | 좋아요 등록/취소 | 높음 | 서비스 크리티컬도 낮음 + Redis 캐시가 읽기 흡수 |
-| created_at 관련 2개 | INSERT/DELETE | 낮음 | 불변값 |
-| price 관련 2개 | 가격 수정 (관리자) | 낮음 | 변경 빈도 낮아 허용 |
-
-### 포기한 것
-
-필터 조건이 하나 추가될 때마다 인덱스 조합이 배로 늘어난다. 현재 `brandId × 정렬(3)`으로도 6개인데, 카테고리 필터가 추가되면 수십 개가 필요해진다.
-
-**필터가 늘어날 때의 전환 전략**
-
-임계점에 도달했을 때 두 방향을 고려할 수 있다.
-
-**방향 1 — DB 내에서 버티기 (필터 3~4개 수준)**
-
-조합별 복합 인덱스 대신 정렬 인덱스만 유지하고, 나머지 필터는 WHERE 조건으로만 처리한다.
-
-```sql
--- idx_products_likes_desc 하나로 커버
-SELECT ... FROM products
-WHERE deleted_at IS NULL AND brand_id = ? AND category_id = ?
-ORDER BY like_count DESC
-LIMIT 20
-```
-
-인덱스 수가 정렬 종류(3개)로 고정되어 필터가 늘어도 인덱스를 추가할 필요가 없다. 대신 브랜드·카테고리 조합에서 rows가 늘어나는데, Redis 캐시가 읽기를 흡수하는 구조라면 캐시 미스 시의 비용만 감수하면 된다.
-
-**방향 2 — 검색 계층 분리 (필터가 그 이상으로 늘어날 때)**
-
-Elasticsearch를 도입해 검색·필터·정렬을 위임하고, DB는 원본 저장 전용으로만 쓴다.
+Resilience4j CB는 슬라이딩 윈도우로 최근 N건의 호출 이력을 유지하면서, 두 가지 조건 중 하나라도 임계값을 초과하면 OPEN 상태로 전환한다.
 
 ```
-쓰기: DB 저장 → ES 동기화 (이벤트 or 배치)
-읽기: 목록 조회 → ES → 결과 반환
+경로 1 — failureRate:   최근 N 호출 중 '예외가 발생한 호출'의 비율이 threshold 초과
+경로 2 — slowCallRate:  최근 N 호출 중 '응답 시간이 X ms를 넘긴 호출'의 비율이 threshold 초과
 ```
 
-필터 조합이 아무리 복잡해져도 인덱스를 추가할 필요 없고, 역인덱스 구조라 다중 필터에 유연하게 대응한다. 대신 DB-ES 동기화 지연과 운영 복잡도가 증가한다.
+두 경로는 서로 독립적이다. 에러가 없어도 느리기만 하면 CB가 열릴 수 있고, 느리지 않아도 에러율이 높으면 열린다.
 
-**전환 타이밍**
+### 최종 설정값
 
-필터 수보다 **텍스트 검색 요구사항이 들어오는 순간**이 더 자연스러운 트리거라고 생각한다. DB 인덱스로는 텍스트 검색을 구조적으로 감당하기 어렵기 때문이다. 그 시점에 ES를 도입하면서 필터·정렬도 함께 위임하는 것이 한 번의 전환으로 두 문제를 해결하는 방법이다.
+```yaml
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 20           # 최근 20건 기준으로 평가
+        failure-rate-threshold: 60        # 60% 이상 실패 시 OPEN
+        slow-call-duration-threshold: 100ms  # 100ms 초과 응답을 'slow call'로 간주
+        slow-call-rate-threshold: 50      # slow call이 50% 이상이면 OPEN
+        wait-duration-in-open-state: 10s  # OPEN 후 10초 대기 → HALF-OPEN
+        permitted-number-of-calls-in-half-open-state: 5
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 600ms           # PG 응답이 600ms를 넘으면 강제 종료
+```
+
+> **왜 `instances.pg-simulator`가 아닌 `configs.default`인가**
+>
+> Spring Cloud OpenFeign이 CB를 자동 생성할 때 이름을 `PgPaymentClient#requestPayment(String,PaymentRequest)` 형식으로 만든다. `instances.pg-simulator` 키는 이 이름과 매칭되지 않아 설정 자체가 적용되지 않는다. `configs.default`는 이름에 관계없이 모든 CB 인스턴스의 기본값으로 적용된다.
+
+### PG 호출 전체 흐름
+
+```
+PaymentFacade.requestPaymentWithRetry()
+  └─ attempt 1: pgPaymentClient.requestPayment()  ← Resilience4j CB가 감싸고 있음
+       ├─ 성공 (60%)
+       │    → CB 윈도우에 'success' 1건 기록
+       │
+       ├─ PG 즉시 에러 (40%)
+       │    → CB 윈도우에 'failure' 1건 기록
+       │    → PgRetriableException → attempt 2 재시도
+       │         └─ attempt 2: pgPaymentClient.requestPayment()  ← 이것도 CB 호출
+       │
+       └─ PG 응답이 600ms 초과
+            → TimeLimiter가 TimeoutException을 던짐
+            → CB 윈도우에 'failure' 1건 기록  ← slow call이 아님!
+```
 
 ---
 
-## Future Work
+## Engineering Challenges (트러블슈팅 및 최적화)
 
-OFFSET 페이지네이션의 딥 페이지 문제는 인덱스로 해결할 수 없다. 커버링 인덱스로 row lookup을 줄여도 OFFSET 50,000 기준 여전히 50,020번 스캔이고, 이는 1페이지 20번 대비 2,500배다.
+### 함정 1 — TimeLimiter가 끊어낸 호출은 slowCallRate가 아닌 failureRate에 쌓인다
 
-구조적 해결 방향은 OFFSET 자체를 없애는 것이라고 생각한다. 커서 기반 페이지네이션(`WHERE id < :lastId LIMIT 20`)이 그 방법 중 하나인데, 페이지 깊이와 무관하게 항상 rows = 20으로 고정된다. 다만 정렬 기준이 `like_count`처럼 중복 가능한 컬럼이면 커서 설계가 복잡해지므로, 도입 시 정렬 조건별 커서 전략을 별도로 고민해야 할 것 같다.
+#### 예상치 못한 현상
+
+`slowCallDurationThreshold: 100ms` 실험이 목표였다. "에러 없이 느리기만 해도 CB가 열린다"는 것을 직접 확인하고 싶었다.
+
+실험 설계는 간단했다. pg-simulator에 slow mode(150~300ms 지연, 에러 없음)를 켜면, 모든 PG 응답이 100ms를 초과해 slow call로 집계되고, slow-call-rate-threshold(50%)를 금방 넘어 CB가 열릴 것이라고 예상했다.
+
+결과는? CB가 열리긴 했다. 그런데 Spring Actuator(서버 내부 상태 모니터링 도구) 메트릭을 보니 `slow_call`이 아니라 `failure`가 쌓이고 있었다. PG는 에러를 반환하지 않는데, 어떻게 failure가 발생하고 있는 것인가?
+
+#### 원인 분석
+
+문제는 TimeLimiter와 slowCallRate가 기록되는 방식이 다르다는 것이었다.
+
+```
+[slowCallRate로 집계되는 경우]
+PG 요청 발송 ──────────────────────── 250ms 후 PG 응답 도착
+                                      └─ 응답 시간 250ms > 100ms(threshold)
+                                      → CB: slowCall + 1
+
+[failureRate로 집계되는 경우]
+PG 요청 발송 ─── 600ms 후 TimeLimiter 발동 ──→ PG 아직 응답 안 옴
+                  └─ TimeoutException 발생
+                  → CB: failure + 1  ← 'slow'가 아니라 '예외'로 분류됨
+```
+
+slow mode PG(150~300ms) + DB 오버헤드를 합산하면 전체 처리 시간이 600ms TimeLimiter를 초과하는 케이스가 생긴다. TimeLimiter가 먼저 끊어버리면 Resilience4j는 그 호출이 "느렸다"는 것을 알 방법이 없다. 응답이 오지 않은 채 예외가 발생했으므로 단순히 failure로 기록한다.
+
+즉, slowCallRate로 열린 게 아니라 failureRate로 열린 것이었다. 실험 전제("에러 없이 느리기만 할 때")가 성립하지 않고 있었다.
+
+#### 해결 — TimeLimiter를 실험 기간만 1000ms로 올리기
+
+PG 응답(최대 300ms) + 오버헤드가 TimeLimiter보다 확실히 아래에 있어야 slow call이 정확히 집계된다.
+
+```yaml
+# 실험 중에만 적용, 이후 600ms로 복원
+timelimiter:
+  configs:
+    default:
+      timeout-duration: 1000ms
+```
+
+이 상태에서 k6로 재실행하자 slow call만으로 CB가 열리는 것을 확인했다.
+
+```
+[k6 스크립트: slow-call-cb-test.js — 15 req/s, 40초]
+
+구간          응답 시간    HTTP 상태  설명
+0~3초 (~20건) 380~900ms   200        CB 윈도우 채우는 중
+3초 이후      300~500ms   503        slowCallRate 100% > 50% → CB OPEN
+```
+
+503 응답 시간이 300~500ms인 이유: CB가 열려 PG 호출 자체는 차단됐지만, 내부에서 TX1(주문 상태 업데이트) + TX C(결제 실패 처리) 트랜잭션이 실행되기 때문이다.
+
+> **핵심**: PG가 에러를 전혀 반환하지 않았음에도 CB가 열렸다. TimeLimiter를 올리지 않았다면 "slowCallRate로 CB가 열렸다"고 잘못 해석했을 것이다.
 
 ---
 
+### 함정 2 — Retry가 활성화되면 CB 윈도우는 결제 요청 수가 아니라 PG 호출 수 기준으로 채워진다
+
+#### 예상치 못한 현상
+
+`sliding-window-size: 20`이면 "사용자 입장에서 20번 결제를 시도한 후에 CB가 평가를 시작한다"고 생각했다.
+
+그런데 retry=3(현재 설정)에서 k6로 직접 세어보니 14번째 결제 요청에서 CB가 열렸다. 예상(20번)보다 6번 일찍 열린 것이다.
+
+#### 원인 분석
+
+retry는 PG 호출 실패 시 같은 결제 요청을 다시 시도한다. 이때 각 attempt는 CB 슬라이딩 윈도우에 독립적인 항목으로 기록된다. 즉, "결제 요청 1건 = CB 호출 1건"이 아니다.
+
+```
+[결제 요청 1건이 CB 윈도우에 남기는 기록 — PG 실패율 40%]
+
+케이스                              확률    CB 기록
+성공(1회만에)                       60%    success 1건
+실패 → 성공(2번째에)                24%    failure 1건 + success 1건 = 2건
+실패 → 실패 → 성공(3번째에)         9.6%   failure 2건 + success 1건 = 3건
+실패 → 실패 → 실패(전부 실패)        6.4%   failure 3건               = 3건
+
+결제 요청 1건당 평균 CB 호출 수:
+  1×0.60 + 2×0.24 + 3×0.096 + 3×0.064 = 1.56건
+```
+
+따라서 최근 20건 윈도우를 채우는 데 필요한 결제 요청 수는 `20 ÷ 1.56 ≈ 13건`이다.
+
+```
+retry=3: 결제 요청 ~13건 → 윈도우 20건 채워짐 → CB 평가 → OPEN
+retry=1: 결제 요청 ~20건 → 윈도우 20건 채워짐 → CB 평가 → OPEN
+```
+
+#### k6로 직접 측정
+
+가상 유저 1명이 순차적으로 실행하며 "몇 번째 결제 요청에서 CB가 처음 열리는가"를 추적했다. `pg.retry-max-attempts` 설정으로 retry 횟수를 전환해 두 번 실행했다.
+
+```
+[retry=3 로그]
+#1~#13:  [200] — 정상 응답
+#14:     [CB 최초 OPEN] — CB 열림
+#15~#40: [CB OPEN] — 이후 전부 차단
+
+[retry=1 로그]
+#1, #3, #4: [503] — PG 에러 즉시 503 (CB는 아직 OPEN 아님*)
+#5~#11:     [200]
+#12, #15, #18: [503] — PG 에러
+#19~#20:    [200]
+#21~#40:    [503] — 연속 503 시작 → CB 진짜 OPEN
+```
+
+> *retry=1에서 초반 503은 CB OPEN이 아니다. PG 에러 → 재시도 소진 → SERVICE_UNAVAILABLE(503)이다. "연속 503이 시작되는 지점"을 CB OPEN 시점으로 봐야 한다.
+
+**결과 비교**
+
+| 구분 | CB 최초 OPEN 결제 요청 | 이론값 |
+|------|----------------------|--------|
+| retry=3 | **#14** | 20 ÷ 1.56 ≈ 13 → **#14 ✓** |
+| retry=1 | **#21** | 20 ÷ 1.00 = 20 → **#21 ✓** |
+
+이론값과 실측값이 정확히 일치했다.
+
+---
+
+## Verification & Insight (검증)
+
+세 가지 k6 실험을 통해 CB 동작을 수치로 확인했다.
+
+### 실험 1 — slowCallDurationThreshold
+
+```
+스크립트: k6/slow-call-cb-test.js
+환경: pg.slow-mode=true (150~300ms, 에러 없음), timelimiter=1000ms
+```
+
+| 구간 | 응답 시간 | HTTP 상태 | 설명 |
+|------|----------|-----------|------|
+| 0~3초 (~20건) | 380~900ms | 200 | CB 윈도우 채우는 중 |
+| 3초 이후 | 300~500ms | 503 | slowCallRate 100% > 50% → CB OPEN |
+
+**얻은 것**: `slowCallDurationThreshold`를 설정하지 않으면 "에러는 없는데 느린" 장애를 CB가 전혀 감지하지 못한다. DB 슬로우 쿼리, 외부 API 지연처럼 예외 없이 느린 장애 유형이 여기에 해당한다.
+
+---
+
+### 실험 2 — COUNT_BASED vs TIME_BASED 슬라이딩 윈도우
+
+```
+스크립트: k6/sliding-window-type-test.js
+시나리오: Phase1(15 req/s, 5초 폭발적인 요청) → Phase2(15초 중단) → Phase3(5 req/s 재개)
+```
+
+두 타입의 핵심 차이는 "트래픽 중단이 윈도우에 영향을 주는가"다.
+
+- **COUNT_BASED**: 최근 N건 기준. 새 요청이 없으면 기존 이력이 그대로 유지된다. 15초 중단 동안 Phase1의 실패 기록이 창에 그대로 남아있다.
+- **TIME_BASED**: 최근 N초 기준. 시간이 흐르면 오래된 호출이 자동으로 만료된다. 10초 윈도우 설정이면 15초 중단 동안 창이 완전히 비워진다.
+
+| 지표 | COUNT_BASED (size=20) | TIME_BASED (size=10초) |
+|------|----------------------|----------------------|
+| `cb_open_rate` | 94.90% | 6.12% |
+| `phase1_success` | 0.00% | 89.13% |
+| `phase3_success` | **8.00%** | **96.03%** |
+
+Phase3 성공률 격차(8% vs 96%)가 핵심이다.
+
+COUNT_BASED에서 Phase3 성공률이 8%에 불과한 이유: 15초 중단 후 Phase3이 재개될 때 CB는 여전히 OPEN 상태다. `wait-duration-in-open-state: 10s`가 경과하면 HALF-OPEN으로 전환되어 `permitted-number-of-calls-in-half-open-state: 5`건만 통과시키는데, 그 5건 중 일부가 성공해도 실패율이 여전히 threshold를 넘어 다시 OPEN으로 돌아간다. 40번 Phase3 요청 중 단 8번만 통과한 것이다.
+
+TIME_BASED에서 Phase3 성공률이 96%인 이유: 15초 중단 동안 10초 윈도우가 만료되어 창이 비어있다. Phase3 재개 시 CB는 CLOSED 상태에서 출발한다. Phase3 로그를 보면 첫 번째 요청부터 `[200] 531ms`로 정상 응답한다. Phase3 도중 새로운 실패가 쌓일 때만 간헐적으로 CB가 열리는(6.12%) 수준이다.
+
+**얻은 것**: COUNT_BASED는 "트래픽이 없어도 과거 이력을 기억"하고, TIME_BASED는 "트래픽이 없으면 윈도우가 자연스럽게 초기화"된다. 재배포·점검 후 재개 시에는 TIME_BASED가 유리하지만, 저트래픽 환경에서는 창이 비어 CB가 예기치 않게 CLOSED로 판단할 수 있다. COUNT_BASED가 기본값인 이유다.
+
+---
+
+### 실험 3 — Retry × CB 상호작용
+
+```
+스크립트: k6/retry-cb-test.js
+환경: 가상 유저 1명 순차, 40회 반복
+```
+
+| 구분 | CB 최초 OPEN 결제 요청 | HTTP 요청 / 40 결제 요청 |
+|------|----------------------|--------------------------|
+| retry=3 | **#14** | 80건 |
+| retry=1 | **#21** | 80건 |
+
+HTTP 요청 수가 동일한 이유: retry는 commerce-api → pg-simulator 사이의 내부 재시도다. k6가 측정하는 HTTP 요청은 k6 → commerce-api 구간이므로 retry 횟수와 무관하게 결제 요청당 2건(주문 생성 + 결제)이다.
+
+**얻은 것**: retry를 늘리면 CB가 더 민감해진다. retry=3이 retry=1보다 약 1.5배 빠르게 CB를 열었다. retry 횟수를 결정할 때 `sliding-window-size`와 함께 고려해야 한다.
+
+---
+
+## Lessons Learned
+
+1. **TimeLimiter와 slowCallRate는 기록되는 방식이 다르다.** TimeLimiter가 끊어낸 호출은 "응답이 느렸다"는 정보 없이 예외로만 처리되어 failure로 집계된다. `slowCallDurationThreshold` 실험을 하려면 TimeLimiter를 충분히 크게 잡아야 실험 전제가 성립한다. 더 일반적으로, CB 실험 전에 "어느 경로(failureRate vs slowCallRate)로 열리는가"를 Spring Actuator(서버 내부 상태 모니터링 도구) 메트릭으로 먼저 확인하는 습관이 필요하다.
+
+2. **Retry는 CB 민감도를 높인다.** retry 횟수를 늘리면 결제 요청 1건이 CB 윈도우에 여러 건으로 기록되어 CB가 예상보다 빨리 열린다. retry 횟수를 올릴 때는 `sliding-window-size`를 함께 키우거나, retry 대상 예외를 좁게 설정해야 한다. CB OPEN 상태에서 retry하면 HALF-OPEN 상태에서 허용된 시험 요청 횟수를 소진해 CB 회복을 방해하므로, CB OPEN 예외는 retry 대상에서 반드시 제외해야 한다.
+
+3. **COUNT_BASED vs TIME_BASED는 "트래픽 중단이 CB를 복구시키는가"로 구분된다.** COUNT_BASED는 트래픽이 없어도 과거 실패를 기억하고, TIME_BASED는 윈도우 시간이 지나면 과거가 사라진다. 어느 쪽이 맞다는 게 아니라, 운영 패턴(재배포 빈도, 트래픽 특성)에 맞게 선택해야 한다.
