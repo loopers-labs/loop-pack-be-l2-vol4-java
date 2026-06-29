@@ -32,7 +32,7 @@ public class PaymentFacade {
     private final TransactionTemplate transactionTemplate;
 
     public PaymentInfo createPayment(String orderNumber, Long userId, CardType cardType, String cardNo) {
-        OrderModel order = orderService.getByOrderNumber(orderNumber);
+        OrderModel order = orderService.getByOrderNumberAndUserId(orderNumber, userId);
         paymentPolicy.validatePayable(order, ZonedDateTime.now());
 
         PaymentModel payment = paymentService.create(order.getId(), order.getTotalMoney());
@@ -49,7 +49,6 @@ public class PaymentFacade {
             throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "PG 일시 점검 중입니다. 잠시 후 다시 시도해주세요.");
         } catch (Exception e) {
             log.warn("PG 결제 요청 실패 [paymentId={}]: {}", payment.getId(), e.getMessage());
-            // FAILED 커밋
             paymentService.fail(payment.getId());
         }
 
@@ -58,6 +57,7 @@ public class PaymentFacade {
 
     public PaymentInfo syncPayment(String transactionKey, Long userId) {
         PaymentModel payment = paymentService.getByTransactionKey(transactionKey);
+        orderService.getByUser(payment.getOrderId(), userId);
         if (payment.getStatus() != PaymentStatus.PENDING) {
             return PaymentInfo.from(payment);
         }

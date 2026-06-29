@@ -15,14 +15,20 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "payments", indexes = {
-        @Index(name = "idx_payments_status_created_at", columnList = "status, created_at"),
-        @Index(name = "idx_payments_order_id_status", columnList = "order_id, status")
-})
+@Table(name = "payments",
+        indexes = {
+                @Index(name = "idx_payments_status_created_at", columnList = "status, created_at"),
+                @Index(name = "idx_payments_order_id_status", columnList = "order_id, status")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_payments_transaction_key", columnNames = "transaction_key")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentModel extends BaseEntity {
 

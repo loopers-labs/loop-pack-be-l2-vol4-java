@@ -52,8 +52,8 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public OrderModel getByOrderNumber(String orderNumber) {
-        return orderRepository.findByOrderNumber(orderNumber)
+    public OrderModel getByOrderNumberAndUserId(String orderNumber, Long userId) {
+        return orderRepository.findByOrderNumberAndUserId(orderNumber, userId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderNumber = " + orderNumber + "] 주문을 찾을 수 없습니다."));
     }
 
