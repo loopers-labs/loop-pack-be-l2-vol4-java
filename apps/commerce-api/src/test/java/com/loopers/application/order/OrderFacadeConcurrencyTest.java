@@ -6,6 +6,7 @@ import com.loopers.domain.coupon.*;
 import com.loopers.application.coupon.CouponRepository;
 import com.loopers.application.order.OrderRepository;
 import com.loopers.domain.payment.PaymentMethod;
+import com.loopers.domain.payment.PaymentGateway;
 import com.loopers.application.payment.PaymentRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.application.product.ProductRepository;
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@org.springframework.test.context.ContextConfiguration(initializers = com.loopers.testcontainers.RedisTestContainersConfig.class)
 class OrderFacadeConcurrencyTest {
 
     @Autowired
@@ -50,6 +52,9 @@ class OrderFacadeConcurrencyTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private com.loopers.application.payment.PaymentFacade paymentFacade;
 
     @SpyBean
     private PaymentGateway paymentGateway;
@@ -87,12 +92,11 @@ class OrderFacadeConcurrencyTest {
                 executorService.submit(() -> {
                     try {
                         barrier.await();
-                        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                                null,
-                                PaymentMethod.CARD
+                        OrderCreateRequest request = new OrderCreateRequest(
+                                List.of(new OrderCreateRequest.Item(productId, 1)),
+                                null
                         );
-                        orderFacade.checkout(userId, request);
+                        orderFacade.createOrder(userId, request);
                         successCount.incrementAndGet();
                     } catch (Exception e) {
                         failCount.incrementAndGet();
@@ -156,12 +160,11 @@ class OrderFacadeConcurrencyTest {
                 executorService.submit(() -> {
                     try {
                         barrier.await();
-                        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                                couponIssueId,
-                                PaymentMethod.CARD
+                        OrderCreateRequest request = new OrderCreateRequest(
+                                List.of(new OrderCreateRequest.Item(productId, 1)),
+                                couponIssueId
                         );
-                        orderFacade.checkout(userId, request);
+                        orderFacade.createOrder(userId, request);
                         successCount.incrementAndGet();
                     } catch (Exception e) {
                         failCount.incrementAndGet();
@@ -215,21 +218,69 @@ class OrderFacadeConcurrencyTest {
         // 결제 승인에 1.5초가 걸린다고 가정
         Mockito.doAnswer(invocation -> {
             Thread.sleep(1500);
-            return invocation.callRealMethod();
+            return new com.loopers.domain.payment.PaymentGateway.PaymentGatewayResult("tx-boundary-123", LocalDateTime.now());
         }).when(paymentGateway).requestPayment(Mockito.anyLong(), Mockito.any(), Mockito.any());
 
-        OrderCheckoutRequest request = new OrderCheckoutRequest(
-                List.of(new OrderCheckoutRequest.Item(productId, 1)),
-                couponIssueId,
-                PaymentMethod.CARD
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderCreateRequest.Item(productId, 1)),
+                couponIssueId
         );
 
         // when
-        Long orderId = orderFacade.checkout(userId, request);
+        Long orderId = orderFacade.createOrder(userId, request);
+        Long paymentId = paymentFacade.processPayment(orderId, PaymentMethod.CARD, new BigDecimal("190000"));
 
         // then
         assertThat(orderId).isNotNull();
+        com.loopers.domain.payment.PaymentStatus paymentStatus = paymentFacade.getPaymentStatus(paymentId);
+        assertThat(paymentStatus).isEqualTo(com.loopers.domain.payment.PaymentStatus.APPROVED);
         CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
         assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
+    }
+
+    @Autowired
+    private IdempotencyManager idempotencyManager;
+
+    @Test
+    @DisplayName("멱등키를 사용한 첫 번째 요청이 진행 중일 때, 동일한 멱등키의 두 번째 요청은 Conflict 예외가 발생한다.")
+    void checkout_Idempotency_ShouldPreventConcurrentRequests() throws Exception {
+        // given
+        Long userId = 1L;
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        ProductModel product = new ProductModel(brand.getId(), "Air Jordan", new BigDecimal("200000"));
+        product.assignStock(10);
+        product = productRepository.save(product);
+        Long productId = product.getId();
+
+        String idempotencyKey = "idem-key-123";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
+
+        // 메인 스레드에서 먼저 락을 획득하여 첫 번째 요청이 길어지는 상황을 시뮬레이션
+        boolean locked = idempotencyManager.lock(namespacedKey);
+        assertThat(locked).isTrue();
+
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderCreateRequest.Item(productId, 1)),
+                null
+        );
+
+        // when & then
+        // 다른 스레드에서 같은 멱등키로 주문 생성을 시도하면 락을 획득하지 못하고 즉시 CONFLICT 발생
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var future = executor.submit(() -> {
+            return orderFacade.createOrder(userId, request, idempotencyKey);
+        });
+
+        try {
+            future.get();
+            org.junit.jupiter.api.Assertions.fail("예외가 발생해야 합니다.");
+        } catch (java.util.concurrent.ExecutionException e) {
+            assertThat(e.getCause()).isInstanceOf(CoreException.class);
+            CoreException ce = (CoreException) e.getCause();
+            assertThat(ce.getErrorType()).isEqualTo(com.loopers.support.error.ErrorType.CONFLICT);
+        } finally {
+            idempotencyManager.unlock(namespacedKey);
+            executor.shutdown();
+        }
     }
 }

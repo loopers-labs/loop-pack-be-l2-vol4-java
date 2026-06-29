@@ -21,11 +21,10 @@ class CouponIssueTest {
         // template에 id 세팅을 시뮬레이션하기 위해 reflection 사용 (JPA 의존성 없이)
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         CouponIssue issue = new CouponIssue(1L, template);
-        // 1번 케이스: 5000원 주문에 1000원 할인
         // when & then
-        assertThrows(CoreException.class, () -> issue.use(new BigDecimal("9999"), now));
+        assertThrows(CoreException.class, () -> issue.calculateDiscount(new BigDecimal("9999"), now));
     }
-        // 2번 케이스: 500원 주문에 500원 할인 (주문 금액 초과 불가)
+
     @Test
     @DisplayName("이미 사용된(USED) 쿠폰을 사용하려고 하면 예외가 발생한다.")
     void use_AlreadyUsed_ShouldThrowException() {
@@ -36,10 +35,10 @@ class CouponIssueTest {
         CouponIssue issue = new CouponIssue(1L, template);
 
         // 첫 번째 사용으로 USED 상태가 됨
-        issue.use(new BigDecimal("5000"), now);
+        issue.markUsed();
 
-        // ??踰덉㎏ ?ъ슜 ?쒕룄 ???덉쇅 諛쒖깮
-        assertThrows(CoreException.class, () -> issue.use(new BigDecimal("5000"), now));
+        // 두 번째 사용 시도 시 예외 발생
+        assertThrows(CoreException.class, () -> issue.calculateDiscount(new BigDecimal("5000"), now));
     }
 
     @Test
@@ -50,14 +49,16 @@ class CouponIssueTest {
         CouponTemplate template = new CouponTemplate("천원할인", CouponType.FIXED, new BigDecimal("1000"), BigDecimal.ZERO, null, now.plusDays(1));
         org.springframework.test.util.ReflectionTestUtils.setField(template, "id", 10L);
         
-        // 1踰?耳?댁뒪: 5000??二쇰Ц??1000???좎씤
+        // 1번 케이스: 5000원 주문에 1000원 할인
         CouponIssue issue1 = new CouponIssue(1L, template);
-        BigDecimal discount = issue1.use(new BigDecimal("5000"), now);
+        BigDecimal discount = issue1.calculateDiscount(new BigDecimal("5000"), now);
+        issue1.markUsed();
         assertThat(discount).isEqualByComparingTo("1000");
 
-        // 2踰?耳?댁뒪: 500??二쇰Ц??500???좎씤 (二쇰Ц 湲덉븸 珥덇낵 遺덇?)
+        // 2번 케이스: 500원 주문에 500원 할인 (주문 금액 초과 불가)
         CouponIssue issue2 = new CouponIssue(1L, template);
-        BigDecimal discountExceed = issue2.use(new BigDecimal("500"), now);
+        BigDecimal discountExceed = issue2.calculateDiscount(new BigDecimal("500"), now);
+        issue2.markUsed();
         assertThat(discountExceed).isEqualByComparingTo("500");
     }
 
@@ -73,8 +74,10 @@ class CouponIssueTest {
         CouponIssue issue2 = new CouponIssue(1L, template);
 
         // when
-        BigDecimal discount1 = issue1.use(new BigDecimal("10000"), now);
-        BigDecimal discount2 = issue2.use(new BigDecimal("30000"), now);
+        BigDecimal discount1 = issue1.calculateDiscount(new BigDecimal("10000"), now);
+        issue1.markUsed();
+        BigDecimal discount2 = issue2.calculateDiscount(new BigDecimal("30000"), now);
+        issue2.markUsed();
 
         // then
         assertThat(discount1).isEqualByComparingTo("1000");

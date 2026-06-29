@@ -79,7 +79,7 @@ erDiagram
 
     PAYMENTS {
         bigint id PK
-        bigint order_id FK "ORDERS 테이블의 ID 간접 참조"
+        bigint order_id FK "ORDERS 참조 (Unique Index: 중복 결제 방지)"
         varchar method "CARD, TRANSFER"
         varchar status "READY, APPROVED, FAILED"
         decimal_15_4 amount "실제 결제액"

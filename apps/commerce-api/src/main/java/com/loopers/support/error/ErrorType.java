@@ -12,6 +12,8 @@ public enum ErrorType {
     BAD_REQUEST(HttpStatus.BAD_REQUEST, HttpStatus.BAD_REQUEST.getReasonPhrase(), "잘못된 요청입니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.getReasonPhrase(), "존재하지 않는 요청입니다."),
     CONFLICT(HttpStatus.CONFLICT, HttpStatus.CONFLICT.getReasonPhrase(), "이미 존재하는 리소스입니다."),
+    UNPROCESSABLE_ENTITY(HttpStatus.UNPROCESSABLE_ENTITY, HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(), "처리할 수 없는 데이터입니다."),
+    SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT-503", "현재 외부 결제 시스템 장애로 결제가 일시 중단되었습니다."),
 
     /** 회원 관련 에러 */
     DUPLICATE_LOGIN_ID(HttpStatus.CONFLICT, "USER-001", "이미 존재하는 아이디입니다."),

@@ -30,6 +30,12 @@ public class ApiControllerAdvice {
     }
 
     @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handle(io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+        log.warn("Circuit Breaker Blocked Request - CallNotPermittedException : {}", e.getMessage(), e);
+        return failureResponse(ErrorType.SERVICE_UNAVAILABLE, null);
+    }
+
+    @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handleBadRequest(MethodArgumentTypeMismatchException e) {
         String name = e.getName();
         String type = e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "unknown";

@@ -1,7 +1,6 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderFacade;
-import com.loopers.application.order.OrderCheckoutRequest;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -13,20 +12,18 @@ public class OrderV1Controller {
 
     private final OrderFacade orderFacade;
 
-    @PostMapping("/checkout")
-    public ApiResponse<OrderV1Dto.CheckoutResponse> checkout(
+    @PostMapping
+    public ApiResponse<OrderV1Dto.OrderCreateResponse> createOrder(
             @RequestHeader("X-Loopers-UserId") Long userId,
-            @RequestBody OrderV1Dto.CheckoutRequest request
+            @RequestBody OrderV1Dto.OrderCreateRequest request
     ) {
-        OrderCheckoutRequest checkoutRequest = new OrderCheckoutRequest(
+        com.loopers.application.order.OrderCreateRequest createRequest = new com.loopers.application.order.OrderCreateRequest(
                 request.items().stream()
-                        .map(item -> new OrderCheckoutRequest.Item(item.productId(), item.quantity()))
+                        .map(item -> new com.loopers.application.order.OrderCreateRequest.Item(item.productId(), item.quantity()))
                         .toList(),
-                request.couponIssueId(),
-                request.paymentMethod()
+                request.couponIssueId()
         );
-
-        Long orderId = orderFacade.checkout(userId, checkoutRequest);
-        return ApiResponse.success(new OrderV1Dto.CheckoutResponse(orderId));
+        Long orderId = orderFacade.createOrder(userId, createRequest);
+        return ApiResponse.success(new OrderV1Dto.OrderCreateResponse(orderId));
     }
 }

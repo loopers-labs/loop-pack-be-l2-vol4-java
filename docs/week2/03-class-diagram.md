@@ -141,6 +141,16 @@ classDiagram
         +LocalDateTime approvedAt
     }
 
+    class NotificationService {
+        <<interface>>
+        +sendPaymentTimeout(userId, paymentId)
+        +sendPaymentRefund(userId, paymentId)
+    }
+
+    class PaymentFallbackScheduler {
+        +run()
+    }
+
     %% 도메인 간 관계
     Brand "1" -- "*" Product : contains
     User "1" -- "*" Order : places
@@ -152,7 +162,7 @@ classDiagram
     CouponIssue "1" -- "0..1" Order : applied to
     Order "1" ..> "0..1" Payment : reference (id)
 
-    %% 인프라스트럭처 (Repository)
+    %% 인프라스트럭처 (Repository 및 기타 관리)
     class OrderRepository { <<interface>> }
     class ProductRepository { <<interface>> }
     class StockRepository { <<interface>> }
@@ -160,9 +170,30 @@ classDiagram
     class LikeRepository { <<interface>> }
     class PaymentRepository { <<interface>> }
 
+    class IdempotencyManager {
+        <<interface>>
+        +lock(idempotencyKey) boolean
+        +unlock(idempotencyKey)
+        +saveSuccess(idempotencyKey, orderId)
+        +getSuccess(idempotencyKey)
+    }
+    
+    class RedisIdempotencyManager {
+        -RedissonClient redissonClient
+    }
+    RedisIdempotencyManager ..|> IdempotencyManager
+
     %% 파사드(Facade) 계층 (트랜잭션 및 흐름 제어)
     class OrderFacade {
-        +checkout(userId, request, method)
+        +createOrder(userId, request)
+    }
+    class PaymentFacade {
+        +processPayment(userId, orderId, method)
+        +handleCallback(paymentId, status)
+        +retryOrCompensatePayment(paymentId)
+    }
+    class PaymentExpirationListener {
+        +onMessage(message, pattern)
     }
     class BrandAdminFacade {
         +deleteBrand(brandId)
@@ -190,9 +221,19 @@ classDiagram
     OrderFacade ..> ProductRepository
     OrderFacade ..> StockRepository
     OrderFacade ..> CouponRepository
-    OrderFacade ..> PaymentRepository
     OrderFacade ..> OrderDomainService
-    OrderFacade ..> PaymentGateway
+    OrderFacade ..> IdempotencyManager
+
+    PaymentFacade ..> PaymentRepository
+    PaymentFacade ..> OrderRepository
+    PaymentFacade ..> PaymentGateway
+    PaymentFacade ..> StockRepository
+    PaymentFacade ..> CouponRepository
+    PaymentFacade ..> NotificationService
+    PaymentFacade ..> IdempotencyManager
+    
+    PaymentExpirationListener ..> PaymentFacade
+    PaymentFallbackScheduler ..> PaymentFacade
     
     BrandAdminFacade ..> ProductRepository
     

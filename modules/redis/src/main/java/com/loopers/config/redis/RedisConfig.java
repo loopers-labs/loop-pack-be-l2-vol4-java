@@ -2,6 +2,9 @@ package com.loopers.config.redis;
 
 
 import io.lettuce.core.ReadFrom;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +29,15 @@ public class RedisConfig{
 
     public RedisConfig(RedisProperties redisProperties){
         this.redisProperties = redisProperties;
+    }
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        RedisNodeInfo master = redisProperties.master();
+        String address = "redis://" + master.host() + ":" + master.port();
+        config.useSingleServer().setAddress(address).setDatabase(redisProperties.database());
+        return Redisson.create(config);
     }
 
     @Primary
@@ -78,12 +90,19 @@ public class RedisConfig{
         LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder();
         if(customizer != null) customizer.accept(builder);
         LettuceClientConfiguration clientConfig = builder.build();
-        RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
-        masterReplicaConfig.setDatabase(database);
-        for(RedisNodeInfo r : replicas){
-            masterReplicaConfig.addNode(r.host(), r.port());
+        if (replicas == null || replicas.isEmpty()) {
+            org.springframework.data.redis.connection.RedisStandaloneConfiguration standaloneConfig = 
+                new org.springframework.data.redis.connection.RedisStandaloneConfiguration(master.host(), master.port());
+            standaloneConfig.setDatabase(database);
+            return new LettuceConnectionFactory(standaloneConfig, clientConfig);
+        } else {
+            RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
+            masterReplicaConfig.setDatabase(database);
+            for(RedisNodeInfo r : replicas){
+                masterReplicaConfig.addNode(r.host(), r.port());
+            }
+            return new LettuceConnectionFactory(masterReplicaConfig, clientConfig);
         }
-        return new LettuceConnectionFactory(masterReplicaConfig, clientConfig);
     }
 
     private <K,V> RedisTemplate<K,V> defaultRedisTemplate(
