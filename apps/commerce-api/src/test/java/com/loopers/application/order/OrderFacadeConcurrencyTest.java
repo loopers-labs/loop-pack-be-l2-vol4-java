@@ -237,4 +237,50 @@ class OrderFacadeConcurrencyTest {
         CouponIssue updatedIssue = couponRepository.findIssueById(couponIssueId).orElseThrow();
         assertThat(updatedIssue.getStatus()).isEqualTo(CouponStatus.USED);
     }
+
+    @Autowired
+    private IdempotencyManager idempotencyManager;
+
+    @Test
+    @DisplayName("멱등키를 사용한 첫 번째 요청이 진행 중일 때, 동일한 멱등키의 두 번째 요청은 Conflict 예외가 발생한다.")
+    void checkout_Idempotency_ShouldPreventConcurrentRequests() throws Exception {
+        // given
+        Long userId = 1L;
+        BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+        ProductModel product = new ProductModel(brand.getId(), "Air Jordan", new BigDecimal("200000"));
+        product.assignStock(10);
+        product = productRepository.save(product);
+        Long productId = product.getId();
+
+        String idempotencyKey = "idem-key-123";
+        String namespacedKey = "order:create:" + userId + ":" + idempotencyKey;
+
+        // 메인 스레드에서 먼저 락을 획득하여 첫 번째 요청이 길어지는 상황을 시뮬레이션
+        boolean locked = idempotencyManager.lock(namespacedKey);
+        assertThat(locked).isTrue();
+
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderCreateRequest.Item(productId, 1)),
+                null
+        );
+
+        // when & then
+        // 다른 스레드에서 같은 멱등키로 주문 생성을 시도하면 락을 획득하지 못하고 즉시 CONFLICT 발생
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var future = executor.submit(() -> {
+            return orderFacade.createOrder(userId, request, idempotencyKey);
+        });
+
+        try {
+            future.get();
+            org.junit.jupiter.api.Assertions.fail("예외가 발생해야 합니다.");
+        } catch (java.util.concurrent.ExecutionException e) {
+            assertThat(e.getCause()).isInstanceOf(CoreException.class);
+            CoreException ce = (CoreException) e.getCause();
+            assertThat(ce.getErrorType()).isEqualTo(com.loopers.support.error.ErrorType.CONFLICT);
+        } finally {
+            idempotencyManager.unlock(namespacedKey);
+            executor.shutdown();
+        }
+    }
 }

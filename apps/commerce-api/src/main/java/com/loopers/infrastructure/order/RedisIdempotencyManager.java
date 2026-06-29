@@ -2,16 +2,20 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.application.order.IdempotencyManager;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 public class RedisIdempotencyManager implements IdempotencyManager {
 
     private final RedisTemplate<String, String> defaultRedisTemplate;
+    private final RedissonClient redissonClient;
 
     private static final String LOCK_PREFIX = "idempotency:lock:";
     private static final String SUCCESS_PREFIX = "idempotency:success:";
@@ -24,14 +28,24 @@ public class RedisIdempotencyManager implements IdempotencyManager {
 
     @Override
     public boolean lock(String idempotencyKey) {
-        Boolean success = defaultRedisTemplate.opsForValue()
-                .setIfAbsent(LOCK_PREFIX + idempotencyKey, "LOCKED", Duration.ofSeconds(10));
-        return Boolean.TRUE.equals(success);
+        RLock lock = redissonClient.getLock(LOCK_PREFIX + idempotencyKey);
+        try {
+            // waitTime = 0: 즉시 락 획득 시도 (대기 안함)
+            // leaseTime = -1: Redisson Watchdog 활성화 (자동 갱신)
+            return lock.tryLock(0, -1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     @Override
     public void unlock(String idempotencyKey) {
-        defaultRedisTemplate.delete(LOCK_PREFIX + idempotencyKey);
+        RLock lock = redissonClient.getLock(LOCK_PREFIX + idempotencyKey);
+        // 토큰(Thread ID)이 일치하고 현재 락이 걸려있을 때만 해제
+        if (lock.isLocked() && lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
     }
 
     @Override
