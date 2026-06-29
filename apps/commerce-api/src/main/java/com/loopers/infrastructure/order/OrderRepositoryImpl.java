@@ -38,6 +38,16 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public Optional<OrderModel> findByOrderNumberAndUserId(String orderNumber, Long userId) {
+        QOrderModel order = QOrderModel.orderModel;
+        return Optional.ofNullable(
+                queryFactory.selectFrom(order)
+                        .where(order.orderNumber.eq(orderNumber).and(order.userId.eq(userId)))
+                        .fetchOne()
+        );
+    }
+
+    @Override
     public Optional<OrderModel> findByIdAndUserId(Long id, Long userId) {
         QOrderModel order = QOrderModel.orderModel;
         return Optional.ofNullable(
