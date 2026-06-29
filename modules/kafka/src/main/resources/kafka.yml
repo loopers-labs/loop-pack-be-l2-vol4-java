@@ -14,7 +14,11 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                  # 모든 ISR 복제 확인 후 ack — 유실 방지 (.get() 으로 기다리는 ack 의 의미를 강하게)
       retries: 3
+      properties:
+        enable.idempotence: true                   # 프로듀서 재시도가 만드는 브로커 중복 제거 (acks=all + retries>0 전제)
+        max.in.flight.requests.per.connection: 5   # 멱등 프로듀서가 in-flight 순서를 보장할 수 있는 상한
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer

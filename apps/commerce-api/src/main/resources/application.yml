@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
@@ -38,6 +39,10 @@ pg-client:
 payment-recovery:
   pending-threshold: 10s
   scan-interval: 30s
+
+# Relay 스케줄러는 enabled=true 인 프로파일(dev/qa/prd)에서만 동작. local/test 는 미설정(off) → 테스트 간섭·브로커 블로킹 방지.
+outbox-relay:
+  scan-interval: 2s
 
 resilience4j:
   circuitbreaker:
@@ -66,17 +71,26 @@ spring:
     activate:
       on-profile: dev
 
+outbox-relay:
+  enabled: true
+
 ---
 spring:
   config:
     activate:
       on-profile: qa
 
+outbox-relay:
+  enabled: true
+
 ---
 spring:
   config:
     activate:
       on-profile: prd
+
+outbox-relay:
+  enabled: true
 
 springdoc:
   api-docs:
