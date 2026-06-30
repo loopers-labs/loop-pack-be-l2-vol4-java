@@ -38,7 +38,7 @@ class OrderTest {
         assertAll(
                 () -> assertThat(order.getUserId()).isEqualTo(USER_ID),
                 () -> assertThat(order.getOrderNumber()).isEqualTo(ORDER_NUMBER),
-                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING),
+                () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT),
                 () -> assertThat(order.getShippingDestination().getRecipientName()).isEqualTo("김루퍼"),
                 () -> assertThat(order.getOrderedAt()).isNotNull()
         );
@@ -128,12 +128,33 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("markFailed 로 주문을 FAILED 상태로 전이한다")
-    void givenOrder_whenMarkFailed_thenStatusIsFailed() {
+    @DisplayName("PENDING_PAYMENT 에서 markPaid 하면 PAID 로 전이한다")
+    void givenPendingPaymentOrder_whenMarkPaid_thenStatusIsPaid() {
         Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
 
-        order.markFailed();
+        order.markPaid();
 
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("PENDING_PAYMENT 에서 markPaymentFailed 하면 PAYMENT_FAILED 로 전이한다")
+    void givenPendingPaymentOrder_whenMarkPaymentFailed_thenStatusIsPaymentFailed() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+
+        order.markPaymentFailed();
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+    }
+
+    @Test
+    @DisplayName("이미 terminal 인 주문은 다시 전이하지 않는다 (멱등 가드)")
+    void givenTerminalOrder_whenMarkPaidAgain_thenIgnored() {
+        Order order = Order.create(USER_ID, ORDER_NUMBER, shipping(), items());
+        order.markPaymentFailed();
+
+        order.markPaid();
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
     }
 }

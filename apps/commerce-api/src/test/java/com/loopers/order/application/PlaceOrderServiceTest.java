@@ -86,7 +86,7 @@ class PlaceOrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         Order savedOrder = orderCaptor.getValue();
         assertAll(
-                () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING),
+                () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT),
                 () -> assertThat(savedOrder.getOrderNumber()).isEqualTo("20260528-000001"),
                 () -> assertThat(savedOrder.getTotalAmount().value()).isEqualTo(58_000L),
                 () -> assertThat(result.totalAmount()).isEqualTo(58_000L),

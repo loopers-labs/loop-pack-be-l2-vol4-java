@@ -4,9 +4,11 @@ import com.loopers.like.domain.Like;
 import com.loopers.like.domain.LikeErrorCode;
 import com.loopers.like.domain.LikeRepository;
 import com.loopers.product.application.ProductReader;
+import com.loopers.product.application.event.ProductLikeChangedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +19,23 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
     private final ProductReader productReader;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void register(Long userId, Long productId) {
         productReader.ensureActiveExists(productId);
         likeRepository.findByUserIdAndProductId(userId, productId)
                 .ifPresentOrElse(
-                        Like::restore,
-                        () -> saveNewLike(userId, productId)
+                        existing -> {
+                            if (existing.getDeletedAt() != null) {
+                                existing.restore();
+                                publishChanged(productId, 1L);
+                            }
+                        },
+                        () -> {
+                            saveNewLike(userId, productId);
+                            publishChanged(productId, 1L);
+                        }
                 );
     }
 
@@ -39,6 +50,15 @@ public class LikeService {
     @Transactional
     public void cancel(Long userId, Long productId) {
         likeRepository.findByUserIdAndProductId(userId, productId)
-                .ifPresent(Like::delete);
+                .ifPresent(existing -> {
+                    if (existing.getDeletedAt() == null) {
+                        existing.delete();
+                        publishChanged(productId, -1L);
+                    }
+                });
+    }
+
+    private void publishChanged(Long productId, long delta) {
+        eventPublisher.publishEvent(new ProductLikeChangedEvent(productId, delta));
     }
 }

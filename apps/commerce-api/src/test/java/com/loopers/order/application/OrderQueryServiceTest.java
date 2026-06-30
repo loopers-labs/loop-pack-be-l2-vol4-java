@@ -35,7 +35,7 @@ class OrderQueryServiceTest {
         assertAll(
                 () -> assertThat(result).hasSize(1),
                 () -> assertThat(result.get(0).orderNumber()).isEqualTo("20260528-000001"),
-                () -> assertThat(result.get(0).status()).isEqualTo(OrderStatus.PENDING),
+                () -> assertThat(result.get(0).status()).isEqualTo(OrderStatus.PENDING_PAYMENT),
                 () -> assertThat(result.get(0).totalAmount()).isEqualTo(29_000L)
         );
     }

@@ -35,6 +35,14 @@ class ProductTest {
     }
 
     @Test
+    @DisplayName("create 직후 likeCount 는 0 으로 초기화된다")
+    void givenNewProduct_whenCreate_thenLikeCountIsZero() {
+        Product product = Product.create(BRAND_ID, NAME, DESCRIPTION, PRICE, THUMBNAIL);
+
+        assertThat(product.getLikeCount()).isZero();
+    }
+
+    @Test
     @DisplayName("description 과 thumbnailUrl 은 null 이어도 생성된다")
     void givenNullOptionalFields_whenCreate_thenStoresNull() {
         Product product = Product.create(BRAND_ID, NAME, null, PRICE, null);

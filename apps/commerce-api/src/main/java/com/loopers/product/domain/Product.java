@@ -10,13 +10,21 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "products")
+@Table(
+        name = "products",
+        indexes = {
+                @Index(name = "idx_products_brand_status", columnList = "brand_id, status"),
+                @Index(name = "idx_products_like_count", columnList = "like_count DESC, id DESC"),
+                @Index(name = "idx_products_brand_like", columnList = "brand_id, like_count DESC, id DESC")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseEntity {
@@ -40,6 +48,9 @@ public class Product extends BaseEntity {
 
     @Column
     private String thumbnailUrl;
+
+    @Column(name = "like_count", nullable = false)
+    private long likeCount;
 
     private Product(Long brandId, String name, String description, long price, String thumbnailUrl) {
         this.brandId = brandId;
