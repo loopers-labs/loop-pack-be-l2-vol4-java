@@ -7,15 +7,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Payment V1 API", description = "결제 API")
 public interface PaymentV1ApiSpec {
 
-    @Operation(summary = "결제 요청", description = "주문에 대한 결제를 요청합니다.")
-    ApiResponse<PaymentV1Dto.PaymentResponse> createPayment(PaymentV1Dto.CreateRequest request);
+    @Operation(summary = "결제 요청", description = "주문에 대한 결제를 PG에 요청합니다.")
+    ApiResponse<PaymentV1Dto.PaymentResponse> createPayment(PaymentV1Dto.CreateRequest request, Long userId);
 
-    @Operation(summary = "결제 승인", description = "결제를 승인합니다. 승인 시 주문이 완료 처리됩니다.")
-    ApiResponse<PaymentV1Dto.PaymentResponse> approve(Long paymentId);
+    @Operation(summary = "결제 상태 동기화", description = "PG에 결제 상태를 조회하여 PENDING 결제를 동기화합니다.")
+    ApiResponse<PaymentV1Dto.PaymentResponse> syncPayment(String transactionKey, Long userId);
 
-    @Operation(summary = "결제 실패", description = "결제를 실패 처리합니다.")
-    ApiResponse<PaymentV1Dto.PaymentResponse> fail(Long paymentId);
+    @Operation(summary = "PG 콜백", description = "PG로부터 결제 결과를 수신합니다.")
+    ApiResponse<Void> callback(PaymentV1Dto.CallbackRequest request);
 
-    @Operation(summary = "결제 만료", description = "결제를 만료 처리합니다.")
-    ApiResponse<PaymentV1Dto.PaymentResponse> expire(Long paymentId);
 }

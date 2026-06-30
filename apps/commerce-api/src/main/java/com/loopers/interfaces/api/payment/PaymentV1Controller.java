@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -23,26 +24,28 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
     @ResponseStatus(HttpStatus.CREATED)
     @Override
     public ApiResponse<PaymentV1Dto.PaymentResponse> createPayment(
-            @Valid @RequestBody PaymentV1Dto.CreateRequest request
+            @Valid @RequestBody PaymentV1Dto.CreateRequest request,
+            @RequestAttribute("authenticatedUserId") Long userId
     ) {
-        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(paymentFacade.createPayment(request.orderId())));
+        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(
+                paymentFacade.createPayment(request.orderNumber(), userId, request.cardType(), request.cardNo())
+        ));
     }
 
-    @PostMapping("/{paymentId}/approve")
+    @PostMapping("/{transactionKey}/sync")
     @Override
-    public ApiResponse<PaymentV1Dto.PaymentResponse> approve(@PathVariable Long paymentId) {
-        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(paymentFacade.approve(paymentId)));
+    public ApiResponse<PaymentV1Dto.PaymentResponse> syncPayment(
+            @PathVariable String transactionKey,
+            @RequestAttribute("authenticatedUserId") Long userId
+    ) {
+        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(paymentFacade.syncPayment(transactionKey, userId)));
     }
 
-    @PostMapping("/{paymentId}/fail")
+    @PostMapping("/callback")
     @Override
-    public ApiResponse<PaymentV1Dto.PaymentResponse> fail(@PathVariable Long paymentId) {
-        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(paymentFacade.fail(paymentId)));
+    public ApiResponse<Void> callback(@RequestBody PaymentV1Dto.CallbackRequest request) {
+        paymentFacade.handleCallback(request.transactionKey(), request.status());
+        return ApiResponse.success(null);
     }
 
-    @PostMapping("/{paymentId}/expire")
-    @Override
-    public ApiResponse<PaymentV1Dto.PaymentResponse> expire(@PathVariable Long paymentId) {
-        return ApiResponse.success(PaymentV1Dto.PaymentResponse.from(paymentFacade.expire(paymentId)));
-    }
 }
