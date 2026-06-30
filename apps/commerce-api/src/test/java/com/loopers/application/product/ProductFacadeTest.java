@@ -1,9 +1,9 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.like.LikeCountRepository;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.support.error.CoreException;
@@ -29,7 +29,7 @@ class ProductFacadeTest {
     private final BrandRepository brandRepository = mock(BrandRepository.class);
     private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
     private final ProductRankRepository productRankRepository = mock(ProductRankRepository.class);
-    private final ProductCachePort productCache = mock(ProductCachePort.class);
+    private final ProductCache productCache = mock(ProductCache.class);
     private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache);
 
     @DisplayName("상품 상세를 조회할 때, ")
@@ -40,8 +40,8 @@ class ProductFacadeTest {
         @Test
         void combinesProductAndBrand() {
             // arrange
-            ProductModel product = new ProductModel(5L, "에어맥스", "운동화", 1000L, 10);
-            BrandModel brand = new BrandModel("나이키", "Just Do It");
+            Product product = new Product(5L, "에어맥스", "운동화", 1000L, 10);
+            Brand brand = new Brand("나이키", "Just Do It");
             when(productRepository.find(1L)).thenReturn(Optional.of(product));
             when(brandRepository.find(5L)).thenReturn(Optional.of(brand));
             when(likeCountRepository.find(1L)).thenReturn(Optional.empty());

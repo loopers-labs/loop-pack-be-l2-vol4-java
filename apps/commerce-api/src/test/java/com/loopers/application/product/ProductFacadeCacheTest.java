@@ -1,7 +1,7 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
@@ -34,8 +34,8 @@ class ProductFacadeCacheTest {
     @DisplayName("상세는 캐시되고(두번째 조회는 stale), 상품 수정 시 evict 되어 최신값이 보인다")
     @Test
     void detail_is_cached_and_evicted_on_update() {
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
-        ProductModel product = productJpaRepository.save(new ProductModel(brand.getId(), "원래이름", "설명", 1000L, 10));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
+        Product product = productJpaRepository.save(new Product(brand.getId(), "원래이름", "설명", 1000L, 10));
         Long id = product.getId();
 
         ProductDetailInfo first = facade.getProductDetail(id); // 캐시 적재

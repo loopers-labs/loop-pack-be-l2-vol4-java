@@ -2,10 +2,10 @@ package com.loopers.concurrency;
 
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.PlaceOrderCommand;
-import com.loopers.domain.brand.BrandModel;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.brand.Brand;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -66,11 +66,11 @@ class StockConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        userJpaRepository.save(new UserModel(
+        userJpaRepository.save(new User(
             "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
-        BrandModel brand = brandJpaRepository.save(new BrandModel("나이키", "Just Do It"));
+        Brand brand = brandJpaRepository.save(new Brand("나이키", "Just Do It"));
         productId = productJpaRepository.save(
-            new ProductModel(brand.getId(), "에어맥스", "운동화", 1000L, STOCK)).getId();
+            new Product(brand.getId(), "에어맥스", "운동화", 1000L, STOCK)).getId();
     }
 
     @AfterEach

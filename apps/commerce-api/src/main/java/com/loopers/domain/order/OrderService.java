@@ -1,7 +1,7 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.coupon.UserCoupon;
-import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.Product;
 import com.loopers.domain.vo.Money;
 import com.loopers.domain.vo.Quantity;
 import com.loopers.support.error.CoreException;
@@ -21,21 +21,21 @@ import java.util.List;
 public class OrderService {
 
     /** 쿠폰 없는 주문 조립. */
-    public OrderModel place(Long userId, List<OrderLine> lines) {
+    public Order place(Long userId, List<OrderLine> lines) {
         return place(userId, lines, null, ZonedDateTime.now());
     }
 
-    public OrderModel place(Long userId, List<OrderLine> lines, UserCoupon userCoupon, ZonedDateTime now) {
+    public Order place(Long userId, List<OrderLine> lines, UserCoupon userCoupon, ZonedDateTime now) {
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목은 1개 이상이어야 합니다.");
         }
 
-        List<OrderItemModel> items = new ArrayList<>();
+        List<OrderItem> items = new ArrayList<>();
         for (OrderLine line : lines) {
-            ProductModel product = line.product();
+            Product product = line.product();
             Quantity quantity = Quantity.of(line.quantity());
             product.decreaseStock(quantity);
-            items.add(new OrderItemModel(
+            items.add(new OrderItem(
                 product.getId(),
                 product.getName(),
                 Money.of(product.getPrice()),
@@ -44,14 +44,14 @@ public class OrderService {
         }
 
         if (userCoupon == null) {
-            return new OrderModel(userId, items);
+            return new Order(userId, items);
         }
 
         Money totalAmount = items.stream()
-            .map(OrderItemModel::subtotal)
+            .map(OrderItem::subtotal)
             .reduce(Money.ZERO, Money::plus);
         userCoupon.use(userId, now);                                 // 소유자/사용됨/만료 검증 + USED 전이
         Money discount = userCoupon.calculateDiscount(totalAmount);  // 최소 주문 금액 검증 + 할인 계산
-        return new OrderModel(userId, items, discount, userCoupon.getId());
+        return new Order(userId, items, discount, userCoupon.getId());
     }
 }

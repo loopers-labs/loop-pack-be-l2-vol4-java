@@ -1,6 +1,6 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.OrderItemModel;
+import com.loopers.domain.order.OrderItem;
 
 public record OrderItemInfo(
     Long productId,
@@ -9,7 +9,7 @@ public record OrderItemInfo(
     Integer quantity,
     Long subtotal
 ) {
-    public static OrderItemInfo from(OrderItemModel item) {
+    public static OrderItemInfo from(OrderItem item) {
         return new OrderItemInfo(
             item.getProductId(),
             item.getProductNameSnapshot(),

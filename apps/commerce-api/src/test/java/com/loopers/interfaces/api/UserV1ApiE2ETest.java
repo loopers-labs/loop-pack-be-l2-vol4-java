@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -114,7 +114,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsMaskedUserInfo_whenAuthenticated() {
             // arrange
-            userJpaRepository.save(new UserModel(
+            userJpaRepository.save(new User(
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
 
@@ -218,7 +218,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsOk_whenRequestIsValid() {
             // arrange
-            UserModel saved = userJpaRepository.save(new UserModel(
+            User saved = userJpaRepository.save(new User(
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
@@ -243,7 +243,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenNewPasswordInvalid() {
             // arrange
-            userJpaRepository.save(new UserModel(
+            userJpaRepository.save(new User(
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();
@@ -265,7 +265,7 @@ class UserV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenAuthPasswordMismatch() {
             // arrange
-            userJpaRepository.save(new UserModel(
+            userJpaRepository.save(new User(
                 "tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M
             ));
             HttpHeaders headers = new HttpHeaders();

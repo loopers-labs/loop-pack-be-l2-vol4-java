@@ -2,7 +2,7 @@ package com.loopers.infrastructure.cache;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.application.product.ProductCachePort;
+import com.loopers.application.product.ProductCache;
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.domain.productrank.RankedProduct;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ import java.util.Optional;
  */
 @RequiredArgsConstructor
 @Component
-public class ProductCacheStore implements ProductCachePort {
+public class ProductCacheStore implements ProductCache {
 
     private static final Logger log = LoggerFactory.getLogger(ProductCacheStore.class);
 

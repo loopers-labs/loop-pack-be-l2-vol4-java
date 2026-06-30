@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api;
 
-import com.loopers.domain.example.ExampleModel;
+import com.loopers.domain.example.Example;
 import com.loopers.infrastructure.example.ExampleJpaRepository;
 import com.loopers.interfaces.api.example.ExampleV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -55,8 +55,8 @@ class ExampleV1ApiE2ETest {
         @Test
         void returnsExampleInfo_whenValidIdIsProvided() {
             // arrange
-            ExampleModel exampleModel = exampleJpaRepository.save(
-                new ExampleModel("예시 제목", "예시 설명")
+            Example exampleModel = exampleJpaRepository.save(
+                new Example("예시 제목", "예시 설명")
             );
             String requestUrl = ENDPOINT_GET.apply(exampleModel.getId());
 

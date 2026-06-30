@@ -91,6 +91,12 @@ public class UserCoupon extends BaseEntity {
         this.usedAt = now;
     }
 
+    /** 결제 실패 보상: 사용을 취소해 다시 사용 가능 상태로 되돌린다. 멱등(AVAILABLE 이면 그대로). */
+    public void restore() {
+        this.status = UserCouponStatus.AVAILABLE;
+        this.usedAt = null;
+    }
+
     public Money calculateDiscount(Money orderAmount) {
         return snapshot.calculateDiscount(orderAmount);
     }

@@ -4,7 +4,7 @@ import com.loopers.domain.coupon.Coupon;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 import com.loopers.infrastructure.coupon.CouponJpaRepository;
 import com.loopers.infrastructure.coupon.UserCouponJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
@@ -59,8 +59,8 @@ class CouponV1ApiE2ETest {
 
     @BeforeEach
     void setUp() {
-        UserModel user = userJpaRepository.save(
-            new UserModel("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
+        User user = userJpaRepository.save(
+            new User("tester01", "Password1!", "홍길동", "1990-05-14", "test@example.com", Gender.M));
         this.userId = user.getId();
     }
 

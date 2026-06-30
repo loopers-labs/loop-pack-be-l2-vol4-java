@@ -1,7 +1,7 @@
 package com.loopers.application.user;
 
 import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.UserModel;
+import com.loopers.domain.user.User;
 
 public record SignUpCommand(
     String loginId,
@@ -11,7 +11,7 @@ public record SignUpCommand(
     String email,
     Gender gender
 ) {
-    public UserModel toModel() {
-        return new UserModel(loginId, password, name, birthDate, email, gender);
+    public User toModel() {
+        return new User(loginId, password, name, birthDate, email, gender);
     }
 }
