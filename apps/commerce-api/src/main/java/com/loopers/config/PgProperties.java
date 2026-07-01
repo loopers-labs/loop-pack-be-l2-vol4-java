@@ -7,6 +7,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "pg")
-public class PgHmacProperties {
-    private String hmacSecret;
+public class PgProperties {
+    private String simulatorUrl;
+    private String callbackUrl;
+    private int connectTimeout;
+    private int readTimeout;
 }

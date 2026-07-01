@@ -30,7 +30,37 @@ springdoc:
     path: /swagger-ui.html
 
 pg:
-  hmac-secret: change-me
+  simulator-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 1000
+  read-timeout: 3000
+
+resilience4j:
+  retry:
+    instances:
+      pgRetry:
+        max-attempts: 3                   # 최초 1회 + 재시도 2회 = 총 3번
+        wait-duration: 500ms              # 재시도 초기 대기 시간
+        enable-exponential-backoff: true  # 재시도마다 대기 시간 지수 증가 (PG 과부하 시 부하 분산)
+        exponential-backoff-multiplier: 2 # 500ms → 1000ms → (fallback)
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException  # 5xx — PG 서버 오류, 재시도 가치 있음
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException  # CB Open 시 재시도 없이 즉시 fallback
+        # retry-exceptions 화이트리스트 외 예외는 재시도 없이 전파 (4xx 등)
+  circuitbreaker:
+    instances:
+      pgCircuit:
+        sliding-window-type: TIME_BASED   # 시간 기준 (COUNT_BASED는 저트래픽 시 오래된 데이터 잔류 문제)
+        sliding-window-size: 60           # 최근 60초 슬라이딩 윈도우
+        minimum-number-of-calls: 5        # 최소 5건 이상 쌓여야 실패율 계산 시작
+        failure-rate-threshold: 50        # 실패율 50% 이상이면 Open
+        wait-duration-in-open-state: 10s  # Open 후 최소 10초 대기, 이후 다음 요청 도달 시 Half-Open 전환
+        permitted-number-of-calls-in-half-open-state: 3  # Half-Open 테스트 요청 수, 결과로 Closed/Open 결정
+        record-exceptions:
+          - org.springframework.web.client.HttpServerErrorException  # 5xx만 실패 카운트
+          - org.springframework.web.client.ResourceAccessException   # 네트워크 오류/타임아웃
+        # record-exceptions 화이트리스트 방식 — 목록 외 예외는 실패 카운트 안 됨
 
 ---
 spring:
@@ -39,7 +69,10 @@ spring:
       on-profile: local, test
 
 pg:
-  hmac-secret: test-pg-secret
+  simulator-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+  connect-timeout: 1000
+  read-timeout: 3000
 
 ---
 spring:

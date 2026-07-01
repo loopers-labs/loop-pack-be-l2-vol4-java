@@ -1,0 +1,25 @@
+### 결제 요청
+POST {{commerce-api}}/api/v1/payments
+X-Loopers-LoginId: user@loopers.com
+X-Loopers-LoginPw: password123!
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451"
+}
+
+### 결제 결과 콜백 (PG → commerce-api, 테스트용 직접 호출)
+POST {{commerce-api}}/api/v1/payments/callback
+Content-Type: application/json
+
+{
+  "transactionKey": "20260624:TR:abc123",
+  "orderId": "{{orderId}}",
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9814-1451",
+  "amount": 10000,
+  "status": "SUCCESS",
+  "reason": "정상 승인되었습니다."
+}

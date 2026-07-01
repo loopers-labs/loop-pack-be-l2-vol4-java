@@ -26,7 +26,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/v1/orders/*",
                 "/api/v1/orders/*/cancel",
                 "/api/v1/coupons/*/issue",
-                "/api/v1/users/me/coupons"
+                "/api/v1/users/me/coupons",
+                "/api/v1/payments"
             );
 
         // 어드민 API — LDAP 헤더 검증 (payment은 HMAC 보안이므로 제외)

@@ -49,6 +49,11 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public List<OrderModel> findPendingBefore(ZonedDateTime before) {
+        return orderJpaRepository.findPendingBefore(before);
+    }
+
+    @Override
     public Page<OrderModel> findAllByUserId(UUID userId, ZonedDateTime startAt, ZonedDateTime endAt, Pageable pageable) {
         return orderJpaRepository.findAllByUserIdAndCreatedAtBetween(userId, startAt, endAt, pageable);
     }
