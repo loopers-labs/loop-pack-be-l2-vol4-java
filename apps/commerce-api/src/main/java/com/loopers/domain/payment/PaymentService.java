@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Slf4j
@@ -74,8 +75,8 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentModel> findRecoverable() {
-        return paymentRepository.findRecoverable(MAX_RECOVERY_ATTEMPTS);
+    public List<PaymentModel> findRecoverable(ZonedDateTime createdBefore) {
+        return paymentRepository.findRecoverable(MAX_RECOVERY_ATTEMPTS, createdBefore);
     }
 
     /**

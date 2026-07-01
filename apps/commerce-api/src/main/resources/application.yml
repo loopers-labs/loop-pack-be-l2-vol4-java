@@ -36,6 +36,12 @@ pg-simulator:
   connect-timeout: 1s   # 연결 자체가 안 되는 경우 빠르게 끊어 스레드/커넥션 점유 방지
   read-timeout: 2s      # 요청 지연 100~500ms 대비 여유. 처리 지연(1~5s)은 콜백이므로 여기서 안 기다림
 
+# 결제 복구 스케줄러
+payment:
+  recovery:
+    interval: 30s   # 폴링 주기(스케줄러 fixedDelay)
+    grace: 30s      # 생성 후 이 시간이 지난 PENDING 만 폴링 대상(정상 콜백이 도착할 유예)
+
 resilience4j:
   circuitbreaker:
     instances:
