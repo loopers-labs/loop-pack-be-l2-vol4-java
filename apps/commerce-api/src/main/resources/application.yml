@@ -34,6 +34,34 @@ spring:
   config:
     activate:
       on-profile: local, test
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-client:
+            connect-timeout: 1000
+            read-timeout: 400
+
+pg:
+  client:
+    url: http://localhost:8082
+    callback-url: http://localhost:8080/api/v1/payments/callback
+
+resilience4j:
+  retry:
+    instances:
+      pg-payment:
+        max-attempts: 3
+        wait-duration: 100ms
+        retry-exceptions:
+          - feign.FeignException$InternalServerError
+  circuitbreaker:
+    instances:
+      pg-payment:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
 
 ---
 spring:

@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 @Component
 public class ProductFacade {
 
+    private static final int CACHE_PAGE_SIZE = 20;
+
     private final ProductService productService;
     private final StockService stockService;
     private final BrandService brandService;
@@ -34,12 +36,12 @@ public class ProductFacade {
 
     @Transactional
     public ProductInfo createProduct(String name, Long price, Long brandId, int stockQuantity) {
-        brandService.getById(brandId);
+        BrandModel brand = brandService.getById(brandId);
         ProductModel product = productService.create(new ProductModel(name, price, brandId));
         stockService.create(new StockModel(product.getId(), stockQuantity));
         productLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
         productCacheService.evictAllList();
-        return ProductInfo.from(product, 0);
+        return ProductInfo.from(productDomainService.combineWithBrand(product, brand, 0, stockQuantity));
     }
 
     public ProductInfo getProduct(Long id) {
@@ -62,12 +64,13 @@ public class ProductFacade {
     }
 
     public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, Long minPrice, Long maxPrice, Boolean inStock, int page, int size) {
-        boolean cacheable = brandId == null && minPrice == null && maxPrice == null && !Boolean.TRUE.equals(inStock) && page < 3;
+        boolean cacheable = brandId == null && minPrice == null && maxPrice == null && inStock == null && page < 3 && size == CACHE_PAGE_SIZE;
 
         if (cacheable) {
             List<ProductInfo> cached = productCacheService.getList(sort, page).orElse(null);
-            if (cached != null) {
-                return new PageImpl<>(cached, PageRequest.of(page, size), (long) page * size + cached.size());
+            Long cachedTotal = productCacheService.getListTotal(sort, page).orElse(null);
+            if (cached != null && cachedTotal != null) {
+                return new PageImpl<>(cached, PageRequest.of(page, size), cachedTotal);
             }
         }
 
@@ -83,7 +86,7 @@ public class ProductFacade {
             ProductInfo.from(product, likeCountMap.getOrDefault(product.getId(), 0)));
 
         if (cacheable) {
-            productCacheService.putList(sort, page, result.getContent());
+            productCacheService.putList(sort, page, result.getContent(), result.getTotalElements());
         }
 
         return result;
@@ -92,12 +95,14 @@ public class ProductFacade {
     @Transactional
     public ProductInfo updateProduct(Long id, String name, Long price) {
         ProductModel product = productService.update(id, name, price);
+        BrandModel brand = brandService.getById(product.getBrandId());
         int likeCount = productLikeViewRepository.findByProductId(id)
             .map(ProductLikeViewModel::getLikeCount)
             .orElse(0);
+        int stockQuantity = stockService.getByProductId(id).getQuantity();
         productCacheService.evictDetail(id);
         productCacheService.evictAllList();
-        return ProductInfo.from(product, likeCount);
+        return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity));
     }
 
     @Transactional

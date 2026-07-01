@@ -10,6 +10,7 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +37,11 @@ public class LikeService {
             return;
         }
 
-        likeRepository.save(new LikeModel(memberId, productId));
+        try {
+            likeRepository.save(new LikeModel(memberId, productId));
+        } catch (DataIntegrityViolationException e) {
+            return;
+        }
         ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
         view.increment();
@@ -54,6 +59,12 @@ public class LikeService {
         ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
         view.decrement();
+    }
+
+    @Transactional
+    public void deleteAllByProductId(Long productId) {
+        likeRepository.deleteAllByProductId(productId);
+        productLikeViewRepository.deleteByProductId(productId);
     }
 
     @Transactional(readOnly = true)

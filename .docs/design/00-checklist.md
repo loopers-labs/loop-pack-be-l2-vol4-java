@@ -1,3 +1,43 @@
+# Round 6 체크리스트
+
+## ⚡ PG 연동 대응
+
+- [ ] PG 연동 API는 FeignClient로 외부 시스템을 호출한다
+- [ ] 응답 지연에 대해 타임아웃을 설정하고, 실패 시 적절한 예외 처리 로직을 구현한다
+- [ ] 결제 요청에 대한 실패 응답에 대해 적절한 시스템 연동을 진행한다
+- [ ] 콜백 방식 + PG 결제 상태 확인 API를 활용해 적절하게 시스템과 결제정보를 연동한다
+
+## 🛡 Resilience 설계
+
+- [ ] 서킷 브레이커를 적용하여 장애 확산을 방지한다
+- [ ] 외부 시스템 장애 시에도 내부 시스템은 정상적으로 응답하도록 보호한다
+- [ ] 콜백이 오지 않더라도, 일정 주기(30초 배치)로 상태를 복구할 수 있다
+- [ ] PG에 대한 요청이 타임아웃에 의해 실패되더라도 해당 결제건에 대한 정보를 확인하여 정상적으로 시스템에 반영한다
+
+---
+
+## ⚠️ 설계 트레이드오프
+
+### 1. `recoverAsFailure()` split-commit: 주문 취소 미처리 가능성
+
+`recoverAsFailure()`에서 `@Transactional`을 제거해 `failByOrderId()`가 먼저 독립 커밋된다.
+
+**문제 상황**: `@Transactional`로 묶으면 `cancelBySystem()` 예외 시 `failByOrderId()`도 롤백 → 결제가 PENDING 유지 → 다음 배치에서 무한 재시도 루프 발생
+
+**선택한 트레이드오프**: `failByOrderId()` 커밋 후 `cancelBySystem()`이 실패하면 결제는 FAILED이지만 주문이 CANCELLED 되지 않은 불일치 상태가 일시적으로 발생할 수 있다.
+
+**허용 근거**: 결제가 FAILED로 확정되면 배치 재시도는 없다. 주문 미취소는 운영팀 수동 보정 또는 별도 보상 트랜잭션으로 대응 가능하며, 무한 재시도 루프보다 덜 치명적이다. 완전한 해결을 위해서는 Outbox Pattern 도입이 필요하다.
+
+### 2. `handleCallback()` FAILED 경로: TOCTOU 레이스 컨디션
+
+`@Transactional` 내에서 `getById()` (잠금 없음) → `cancelBySystem()` (FOR UPDATE) 사이에 사용자 수동 취소가 끼어들 수 있다.
+
+**문제 상황**: 사용자 취소와 콜백 FAILED 처리가 동시에 진입하면, `cancelBySystem()` 내 비관적 락 충돌로 예외 발생 → 트랜잭션 전체 롤백 → `failByTransactionKey()`로 처리했던 FAILED 상태까지 롤백 → 결제가 PENDING으로 복귀
+
+**허용 근거**: 30초 배치가 PENDING을 재확인하여 최종 상태로 수렴된다. 완전한 해결을 위해서는 Outbox Pattern 도입이 필요하다.
+
+---
+
 # Round 5 체크리스트
 
 ## 🔖 Index

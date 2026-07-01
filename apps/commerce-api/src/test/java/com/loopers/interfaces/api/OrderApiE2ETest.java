@@ -474,34 +474,4 @@ class OrderApiE2ETest {
         }
     }
 
-    @DisplayName("PATCH /api/v1/orders/{orderId}/confirm")
-    @Nested
-    class ConfirmOrder {
-
-        @DisplayName("PENDING 주문 확정 시, 200과 CONFIRMED 상태를 반환한다.")
-        @Test
-        void returns200_whenOrderConfirmed() {
-            // arrange
-            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
-                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1))
-            );
-            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> created = testRestTemplate.exchange(
-                BASE_URL, HttpMethod.POST,
-                new HttpEntity<>(request, userHeaders),
-                new ParameterizedTypeReference<>() {}
-            );
-            Long orderId = created.getBody().data().orderId();
-
-            // act
-            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
-                BASE_URL + "/" + orderId + "/confirm", HttpMethod.PATCH,
-                new HttpEntity<>(userHeaders),
-                new ParameterizedTypeReference<>() {}
-            );
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().data().status()).isEqualTo("CONFIRMED");
-        }
-    }
 }

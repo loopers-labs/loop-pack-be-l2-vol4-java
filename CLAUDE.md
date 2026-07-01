@@ -38,13 +38,6 @@ TESTCONTAINERS_FALLBACK_ENABLED=true ./gradlew :apps:commerce-api:test
 - **커밋 금지** : git commit 은 항상 개발자가 직접 수행한다. AI 는 어떠한 경우에도 커밋하지 않는다.
 - **작업 완료 후** : 작업이 끝나면 무엇을 했는지 간단히 설명하고, 다음 단계를 제안한 뒤 개발자의 확인을 받고 진행한다.
 
-### 스터디 세션 Workflow
-- 테스트 케이스 목록은 **표(table) 형식**으로 제시, 사용자 승인 후 진행
-- **RED 후 반드시 HARD STOP** — 사용자가 직접 테스트 실행해 실패 확인
-- GREEN은 사용자 승인 후에만 진행
-- GREEN 완료 후 → `/design-qna` 스킬 실행 → 결과를 `MyStudy/week3/03-concepts-qna.md`에 Q번호 이어서 기록
-- 세션 마무리 → `/study-log` 스킬 실행 → 결과를 `MyStudy/week3/02-design-decisions.md`에 추가
-
 ### 개발 Workflow - TDD (Red > Green > Refactor)
 - 모든 테스트는 3A 원칙으로 작성할 것 (Arrange - Act - Assert)
 

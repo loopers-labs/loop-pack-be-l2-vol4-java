@@ -66,10 +66,21 @@ public class ProductCacheService {
         }
     }
 
-    public void putList(ProductSort sort, int page, List<ProductInfo> items) {
+    public Optional<Long> getListTotal(ProductSort sort, int page) {
+        try {
+            String total = redisTemplate.opsForValue().get(totalKey(sort, page));
+            if (total == null) return Optional.empty();
+            return Optional.of(Long.parseLong(total));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    public void putList(ProductSort sort, int page, List<ProductInfo> items, long totalElements) {
         try {
             String json = objectMapper.writeValueAsString(items);
             redisTemplate.opsForValue().set(listKey(sort, page), json, TTL_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(totalKey(sort, page), String.valueOf(totalElements), TTL_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
             // ignore
         }
@@ -80,6 +91,7 @@ public class ProductCacheService {
             for (ProductSort sort : ProductSort.values()) {
                 for (int page = 0; page < 3; page++) {
                     redisTemplate.delete(listKey(sort, page));
+                    redisTemplate.delete(totalKey(sort, page));
                 }
             }
         } catch (Exception e) {
@@ -93,5 +105,9 @@ public class ProductCacheService {
 
     private String listKey(ProductSort sort, int page) {
         return LIST_KEY_PREFIX + "sort=" + sort.name() + ":page=" + page;
+    }
+
+    private String totalKey(ProductSort sort, int page) {
+        return LIST_KEY_PREFIX + "sort=" + sort.name() + ":page=" + page + ":total";
     }
 }

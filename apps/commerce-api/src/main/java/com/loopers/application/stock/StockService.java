@@ -45,6 +45,12 @@ public class StockService {
         stock.update(quantity);
     }
 
+    @Transactional
+    public StockModel getByProductIdForUpdate(Long productId) {
+        return stockRepository.findByProductIdForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 재고를 찾을 수 없습니다."));
+    }
+
     @Transactional(readOnly = true)
     public Optional<StockModel> findByProductId(Long productId) {
         return stockRepository.findByProductId(productId);

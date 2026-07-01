@@ -28,8 +28,8 @@ BEGIN
   DROP INDEX idx_products_like_count          ON products;
   DROP INDEX idx_products_like_covering       ON products;
   DROP INDEX idx_products_created_at          ON products;
-  DROP INDEX idx_plv_like_count               ON product_like_view;
-  DROP INDEX idx_plv_covering                 ON product_like_view;
+  DROP INDEX idx_plv_like_count               ON bench_product_like_view;
+  DROP INDEX idx_plv_covering                 ON bench_product_like_view;
   DROP INDEX idx_likes_member_created         ON likes;
   DROP INDEX idx_likes_member_created_product ON likes;
   DROP INDEX idx_likes_member_id              ON likes;
@@ -264,37 +264,38 @@ SHOW PROFILES;
 DROP INDEX idx_products_covering ON products;
 
 -- =============================================================
--- [5] Round 5 — 분리 테이블 (product_like_view)
+-- [5] Round 5 — 분리 테이블 (bench_product_like_view)
 -- =============================================================
 
-CREATE TABLE product_like_view (
+DROP TABLE IF EXISTS bench_product_like_view;
+CREATE TABLE bench_product_like_view (
     product_id BIGINT PRIMARY KEY,
     like_count INT NOT NULL DEFAULT 0,
     version    BIGINT NOT NULL DEFAULT 0
 );
 
-INSERT INTO product_like_view (product_id, like_count)
+INSERT INTO bench_product_like_view (product_id, like_count)
 SELECT product_id, COUNT(*) FROM likes GROUP BY product_id;
 
 -- 5-1. 인덱스 없음 / OFFSET 0
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 -- 5-2. 인덱스 없음 / OFFSET 500000
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
@@ -302,80 +303,80 @@ SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_m
 CREATE INDEX idx_products_brand_id ON products(brand_id);
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 -- 5-4. 복합 인덱스
 DROP INDEX idx_products_brand_id ON products;
 CREATE INDEX idx_products_brand_like ON products(brand_id, like_count DESC);
-CREATE INDEX idx_plv_like_count ON product_like_view(like_count DESC);
+CREATE INDEX idx_plv_like_count ON bench_product_like_view(like_count DESC);
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 -- 5-5. 커버링 인덱스
 DROP INDEX idx_products_brand_like ON products;
-DROP INDEX idx_plv_like_count ON product_like_view;
+DROP INDEX idx_plv_like_count ON bench_product_like_view;
 CREATE INDEX idx_products_covering ON products(brand_id, id, name, price);
-CREATE INDEX idx_plv_covering ON product_like_view(like_count DESC, product_id);
+CREATE INDEX idx_plv_covering ON bench_product_like_view(like_count DESC, product_id);
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 
 SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
-FROM products p INNER JOIN product_like_view plv ON p.id = plv.product_id
+FROM products p INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE p.brand_id = 1 AND p.deleted_at IS NULL ORDER BY plv.like_count DESC LIMIT 20 OFFSET 500000;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 SHOW PROFILES;
 DROP INDEX idx_products_covering ON products;
-DROP INDEX idx_plv_covering ON product_like_view;
-DROP TABLE product_like_view;
+DROP INDEX idx_plv_covering ON bench_product_like_view;
+DROP TABLE bench_product_like_view;
 
 -- =============================================================
 -- [6] 다양한 정렬 조건
@@ -734,7 +735,7 @@ SHOW PROFILES;
 -- =============================================================
 -- [12] 내가 좋아요 누른 상품 — 좋아요 수 순 정렬
 -- [7]과 동일한 JOIN이지만 ORDER BY p.like_count DESC (liked_at이 아님)
--- product_like_view 비교도 포함
+-- bench_product_like_view 비교도 포함
 -- =============================================================
 
 -- 12-1. 인덱스 없음
@@ -783,13 +784,13 @@ SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_m
 DROP INDEX idx_likes_member_id ON likes;
 DROP INDEX idx_products_like_count ON products;
 
--- 12-4. product_like_view JOIN (분리 테이블) + likes (member_id)
--- [5]에서 DROP TABLE 했으므로 재생성
-CREATE TABLE product_like_view (
+-- 12-4. bench_product_like_view JOIN (분리 테이블) + likes (member_id)
+DROP TABLE IF EXISTS bench_product_like_view;
+CREATE TABLE bench_product_like_view (
     product_id BIGINT NOT NULL PRIMARY KEY,
     like_count INT NOT NULL DEFAULT 0
 );
-INSERT INTO product_like_view (product_id, like_count)
+INSERT INTO bench_product_like_view (product_id, like_count)
 SELECT id, like_count FROM products;
 
 CREATE INDEX idx_likes_member_id ON likes(member_id);
@@ -797,7 +798,7 @@ CREATE INDEX idx_likes_member_id ON likes(member_id);
 EXPLAIN FORMAT=TRADITIONAL SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
 FROM likes l
   INNER JOIN products p ON l.product_id = p.id
-  INNER JOIN product_like_view plv ON p.id = plv.product_id
+  INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE l.member_id = 1 AND l.deleted_at IS NULL AND p.deleted_at IS NULL
 ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 
@@ -805,13 +806,13 @@ SET @t = NOW(6);
 SELECT p.id, p.name, p.price, p.brand_id, plv.like_count
 FROM likes l
   INNER JOIN products p ON l.product_id = p.id
-  INNER JOIN product_like_view plv ON p.id = plv.product_id
+  INNER JOIN bench_product_like_view plv ON p.id = plv.product_id
 WHERE l.member_id = 1 AND l.deleted_at IS NULL AND p.deleted_at IS NULL
 ORDER BY plv.like_count DESC LIMIT 20 OFFSET 0;
 SELECT ROUND(TIMESTAMPDIFF(MICROSECOND, @t, NOW(6)) / 1000, 2) AS 실행시간_ms;
 
 DROP INDEX idx_likes_member_id ON likes;
-DROP TABLE product_like_view;
+DROP TABLE bench_product_like_view;
 
 SHOW PROFILES;
 

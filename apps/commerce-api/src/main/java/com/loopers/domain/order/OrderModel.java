@@ -66,6 +66,12 @@ public class OrderModel extends BaseEntity {
     }
 
     public void confirm() {
+        if (this.status == OrderStatus.CANCELLED) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "취소된 주문은 확정할 수 없습니다.");
+        }
+        if (this.status == OrderStatus.CONFIRMED) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "이미 확정된 주문입니다.");
+        }
         this.status = OrderStatus.CONFIRMED;
     }
 
