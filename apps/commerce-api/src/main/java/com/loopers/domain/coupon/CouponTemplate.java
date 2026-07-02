@@ -19,11 +19,12 @@ import java.time.ZonedDateTime;
  * 발급 시 {@link UserCoupon} 이 이 템플릿의 할인 정책·이름·만료일을 복사(스냅샷)하므로,
  * 이후 템플릿이 수정·삭제돼도 이미 발급된 쿠폰의 가치는 변하지 않는다.
  *
- * <p><b>선착순 한도</b>: {@code issueLimit} 이 있으면(=한정) 발급은 async 발급요청 경로(파티션 직렬화)로만 진행되며
- * {@link #issueOne()} 이 {@code issuedCount < issueLimit} 를 강제한다. {@code null} 이면 무제한 — 기존 동기 발급 경로가
- * 담당한다. 카운터는 파티션 단일 소비자만 증가시키므로 락/{@code @Version} 없이 안전하다.</p>
+ * <p><b>선착순 한도</b>: {@code issueLimit} 이 있으면(=한정) 발급은 async 발급요청 경로로만 진행된다({@code null} 이면
+ * 무제한 — 기존 동기 발급 경로). {@link #isLimited()} 가 이 경로 판정에 쓰인다. 실제 슬롯 확보({@code issued_count <
+ * issue_limit} 강제)는 발급 소비자(commerce-streamer)가 <b>조건부 원자 UPDATE</b>로 수행하므로 이 엔티티에는 증가
+ * 메서드를 두지 않는다(한도 규칙이 소비자 SQL 에 있음).</p>
  *
- * <p><b>{@code @DynamicUpdate}</b>: 어드민의 정의 수정(name 등)과 발급의 카운터 증가(issued_count)가 서로 다른
+ * <p><b>{@code @DynamicUpdate}</b>: 어드민의 정의 수정(name 등)과 소비자의 카운터 증가(issued_count)가 서로 다른
  * 컬럼만 UPDATE 하도록 해, 두 쓰기가 교차해도 서로의 컬럼을 덮어쓰지 않게 한다(cross-column lost update 방지).</p>
  */
 @Getter
@@ -46,7 +47,7 @@ public class CouponTemplate extends BaseEntity {
     @Column(name = "issue_limit")
     private Integer issueLimit;
 
-    /** 지금까지 발급된 수. 파티션 직렬화된 단일 소비자만 증가시킨다. */
+    /** 지금까지 발급된 수. 발급 소비자(commerce-streamer)가 조건부 원자 UPDATE로 증가시킨다. */
     @Column(name = "issued_count", nullable = false)
     private int issuedCount;
 
@@ -75,23 +76,6 @@ public class CouponTemplate extends BaseEntity {
     /** 선착순 한도가 걸린 템플릿인지 — 동기 발급 경로가 이 템플릿을 거부하는 판정에도 쓰인다. */
     public boolean isLimited() {
         return issueLimit != null;
-    }
-
-    /**
-     * 선착순 슬롯을 하나 소비한다 — 파티션 직렬화(단일 writer)를 전제로 하므로 락 없이 안전하다.
-     * 한도 소진은 <b>예상된 결과</b>이므로 예외가 아니라 반환값으로 알린다.
-     *
-     * @return 슬롯을 확보하고 {@code issuedCount} 를 1 증가시켰으면 {@code true}, 한도 소진(SOLD_OUT)이면 {@code false}
-     */
-    public boolean issueOne() {
-        if (!isLimited()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "발급 한도가 없는 템플릿에는 선착순 발급을 적용할 수 없습니다.");
-        }
-        if (issuedCount >= issueLimit) {
-            return false;
-        }
-        issuedCount++;
-        return true;
     }
 
     public void modify(String name, DiscountPolicy discountPolicy, int validDays) {
