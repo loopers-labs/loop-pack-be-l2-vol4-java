@@ -1,8 +1,9 @@
 package com.loopers.application.like;
 
-import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.like.event.LikeAdded;
+import com.loopers.domain.like.event.LikeRemoved;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.user.User;
@@ -12,6 +13,8 @@ import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
@@ -31,9 +34,9 @@ class LikeFacadeTest {
     private final LikeRepository likeRepository = mock(LikeRepository.class);
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
-    private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final LikeFacade likeFacade =
-        new LikeFacade(likeRepository, productRepository, userRepository, likeCountRepository);
+        new LikeFacade(likeRepository, productRepository, userRepository, eventPublisher);
 
     private void givenUser(long id) {
         User user = mock(User.class);
@@ -49,67 +52,46 @@ class LikeFacadeTest {
     @Nested
     class Liking {
 
-        @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 좋아요 집계를 증가시킨다.")
+        @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 LikeAdded 이벤트를 발행한다.")
         @Test
-        void savesAndIncrements() {
-            // arrange
+        void savesAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product()));
 
-            // act
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
-            // assert
             verify(likeRepository).save(any(Like.class));
-            verify(likeCountRepository).increase(PRODUCT_ID);
-            verify(productRepository, never()).save(any());
+            ArgumentCaptor<LikeAdded> captor = ArgumentCaptor.forClass(LikeAdded.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertThat(captor.getValue().userId()).isEqualTo(7L);
+            assertThat(captor.getValue().productId()).isEqualTo(PRODUCT_ID);
         }
 
-        @DisplayName("이미 좋아요한 경우, 아무 것도 하지 않는다. (멱등)")
+        @DisplayName("이미 좋아요한 경우, 저장/발행 모두 하지 않는다. (멱등)")
         @Test
         void idempotent() {
-            // arrange
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(true);
 
-            // act
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
-            // assert
             verify(likeRepository, never()).save(any());
-            verify(likeCountRepository, never()).increase(any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
-        @DisplayName("상품이 없으면 NOT_FOUND 이고 Like 저장·집계 증가도 하지 않는다.")
+        @DisplayName("상품이 없으면 NOT_FOUND 이고 저장·발행도 하지 않는다.")
         @Test
         void throwsNotFound_whenProductMissing() {
-            // arrange
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.empty());
 
-            // act
             CoreException ex = assertThrows(CoreException.class, () -> likeFacade.like(LOGIN_ID, PRODUCT_ID));
 
-            // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeRepository, never()).save(any());
-            verify(likeCountRepository, never()).increase(any());
-        }
-
-        @DisplayName("유저가 없으면 NOT_FOUND 이고 좋아요 처리도 하지 않는다.")
-        @Test
-        void throwsNotFound_whenUserMissing() {
-            // arrange
-            when(userRepository.findByLoginId(LOGIN_ID)).thenReturn(Optional.empty());
-
-            // act
-            CoreException ex = assertThrows(CoreException.class, () -> likeFacade.like(LOGIN_ID, PRODUCT_ID));
-
-            // assert
-            assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
-            verify(likeRepository, never()).existsBy(any(), any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
     }
 
@@ -117,34 +99,28 @@ class LikeFacadeTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요한 상태면, Like 삭제 후 좋아요 집계를 감소시킨다.")
+        @DisplayName("좋아요한 상태면, Like 삭제 후 LikeRemoved 이벤트를 발행한다.")
         @Test
-        void deletesAndDecrements() {
-            // arrange
+        void deletesAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(true);
 
-            // act
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 
-            // assert
             verify(likeRepository).deleteBy(7L, PRODUCT_ID);
-            verify(likeCountRepository).decrease(PRODUCT_ID);
+            verify(eventPublisher).publishEvent(any(LikeRemoved.class));
         }
 
-        @DisplayName("좋아요하지 않은 상태면, 아무 것도 하지 않는다. (멱등)")
+        @DisplayName("좋아요하지 않은 상태면, 삭제/발행 모두 하지 않는다. (멱등)")
         @Test
         void idempotent() {
-            // arrange
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
 
-            // act
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 
-            // assert
             verify(likeRepository, never()).deleteBy(any(), any());
-            verify(likeCountRepository, never()).decrease(any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
     }
 }

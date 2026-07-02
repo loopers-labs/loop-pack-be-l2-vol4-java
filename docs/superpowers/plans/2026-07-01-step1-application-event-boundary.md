@@ -377,21 +377,21 @@ public class LikeFacade {
 
 - [ ] **Step 4: LikeCountRepositoryImpl.increase/decrease 에 `@Transactional` 추가**
 
-`infrastructure/like/LikeCountRepositoryImpl.java` — import 추가 `import org.springframework.transaction.annotation.Transactional;`, 그리고:
+`infrastructure/like/LikeCountRepositoryImpl.java` — import 추가 `import org.springframework.transaction.annotation.Propagation;` / `import org.springframework.transaction.annotation.Transactional;`, 그리고:
 ```java
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void increase(Long productId) {
         jpaRepository.increase(productId);
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void decrease(Long productId) {
         jpaRepository.decrease(productId);
     }
 ```
-(리스너의 AFTER_COMMIT 는 원래 tx 종료 후라 별도 tx 가 필요 — @Modifying 네이티브 쿼리는 트랜잭션 필수. 별도 빈의 @Transactional 이라 리스너 try/catch 시 rollback-only 누수 없음.)
+**REQUIRES_NEW 필수** — AFTER_COMMIT 리스너는 원래 tx 가 *커밋된 뒤* 실행되므로 기본 REQUIRED 는 이미 끝나가는 tx 에 합류하려다 `TransactionRequiredException("Executing an update/delete query")` 로 실패한다. 새 물리 트랜잭션(REQUIRES_NEW)이 필요. 별도 빈의 트랜잭션이라 실패 시 독립 롤백되고 리스너 try/catch 로 깔끔히 삼켜짐(rollback-only 누수 없음). increase/decrease 는 이제 리스너에서만 호출되므로 REQUIRES_NEW 가 안전.
 
 - [ ] **Step 5: LikeCountListener 작성**
 
