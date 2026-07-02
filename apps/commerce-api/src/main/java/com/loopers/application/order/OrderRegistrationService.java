@@ -38,7 +38,7 @@ public class OrderRegistrationService {
             : couponService.use(userId, couponId, Order.totalOf(items));
         Order order = orderService.complete(userId, items, discountAmount, couponId);
         // 생성 이벤트는 저장 전엔 ID 가 없어(IDENTITY) 애그리거트에 등록하지 못한다 — 저장 직후 응용 레이어에서 발행한다.
-        eventPublisher.publishEvent(OrderCreatedEvent.from(order));
+        eventPublisher.publishEvent(OrderCreatedEvent.from(order, items));
         return order;
     }
 }
