@@ -163,6 +163,8 @@ git commit -m "feat: 애플리케이션 이벤트 인프라 — 도메인 이벤
 
 ---
 
+> **구현 개정 (Option A):** 아래 원안(likeCount 를 AFTER_COMMIT 리스너로 이전)은 `LikeConcurrencyTest`(즉시·정확 카운트)와 충돌 + 동기 REQUIRES_NEW 커넥션 풀 고갈로 폐기. **최종 구현:** `LikeFacade.like/unlike` 가 `likeCountRepository.increase/decrease` 를 **트랜잭션 안에서 그대로** 호출(즉시·정확) **+** `LikeAdded/LikeRemoved` 도 발행. `LikeCountListener` 는 **생성하지 않음**(이벤트는 `UserActionLogListener` 로깅과 Step2 metrics 가 소비). `LikeCountRepositoryImpl` 는 원상(@Transactional 없음). 단위 테스트는 increase + publishEvent 둘 다 검증.
+
 ## Task 2: Slice A — 좋아요–집계 분리 (동기 AFTER_COMMIT)
 
 **Files:**

@@ -1,6 +1,7 @@
 package com.loopers.application.like;
 
 import com.loopers.domain.like.Like;
+import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.like.event.LikeAdded;
 import com.loopers.domain.like.event.LikeRemoved;
@@ -34,9 +35,10 @@ class LikeFacadeTest {
     private final LikeRepository likeRepository = mock(LikeRepository.class);
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
+    private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final LikeFacade likeFacade =
-        new LikeFacade(likeRepository, productRepository, userRepository, eventPublisher);
+        new LikeFacade(likeRepository, productRepository, userRepository, likeCountRepository, eventPublisher);
 
     private void givenUser(long id) {
         User user = mock(User.class);
@@ -52,9 +54,9 @@ class LikeFacadeTest {
     @Nested
     class Liking {
 
-        @DisplayName("아직 좋아요하지 않았으면, Like 저장 후 LikeAdded 이벤트를 발행한다.")
+        @DisplayName("아직 좋아요하지 않았으면, Like 저장 + 카운트 증가 + LikeAdded 이벤트를 발행한다.")
         @Test
-        void savesAndPublishes() {
+        void savesIncrementsAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product()));
@@ -62,13 +64,14 @@ class LikeFacadeTest {
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
             verify(likeRepository).save(any(Like.class));
+            verify(likeCountRepository).increase(PRODUCT_ID);
             ArgumentCaptor<LikeAdded> captor = ArgumentCaptor.forClass(LikeAdded.class);
             verify(eventPublisher).publishEvent(captor.capture());
             assertThat(captor.getValue().userId()).isEqualTo(7L);
             assertThat(captor.getValue().productId()).isEqualTo(PRODUCT_ID);
         }
 
-        @DisplayName("이미 좋아요한 경우, 저장/발행 모두 하지 않는다. (멱등)")
+        @DisplayName("이미 좋아요한 경우, 저장/증가/발행 모두 하지 않는다. (멱등)")
         @Test
         void idempotent() {
             givenUser(7L);
@@ -77,10 +80,11 @@ class LikeFacadeTest {
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
             verify(likeRepository, never()).save(any());
+            verify(likeCountRepository, never()).increase(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
 
-        @DisplayName("상품이 없으면 NOT_FOUND 이고 저장·발행도 하지 않는다.")
+        @DisplayName("상품이 없으면 NOT_FOUND 이고 저장·증가·발행도 하지 않는다.")
         @Test
         void throwsNotFound_whenProductMissing() {
             givenUser(7L);
@@ -91,6 +95,7 @@ class LikeFacadeTest {
 
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             verify(likeRepository, never()).save(any());
+            verify(likeCountRepository, never()).increase(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
     }
@@ -99,19 +104,20 @@ class LikeFacadeTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요한 상태면, Like 삭제 후 LikeRemoved 이벤트를 발행한다.")
+        @DisplayName("좋아요한 상태면, Like 삭제 + 카운트 감소 + LikeRemoved 이벤트를 발행한다.")
         @Test
-        void deletesAndPublishes() {
+        void deletesDecrementsAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(true);
 
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 
             verify(likeRepository).deleteBy(7L, PRODUCT_ID);
+            verify(likeCountRepository).decrease(PRODUCT_ID);
             verify(eventPublisher).publishEvent(any(LikeRemoved.class));
         }
 
-        @DisplayName("좋아요하지 않은 상태면, 삭제/발행 모두 하지 않는다. (멱등)")
+        @DisplayName("좋아요하지 않은 상태면, 삭제/감소/발행 모두 하지 않는다. (멱등)")
         @Test
         void idempotent() {
             givenUser(7L);
@@ -120,6 +126,7 @@ class LikeFacadeTest {
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 
             verify(likeRepository, never()).deleteBy(any(), any());
+            verify(likeCountRepository, never()).decrease(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
     }

@@ -8,6 +8,9 @@
 
 주문/좋아요 유스케이스의 **부가 후속 로직을 Spring ApplicationEvent 로 분리**한다. 핵심 트랜잭션(주문 저장·재고·쿠폰, 좋아요 저장)은 그대로 커밋 보장하고, 집계·데이터플랫폼 전송·행동 로깅은 커밋 이후 리스너로 뺀다. 리스너 실행 정책은 **후속의 성격에 맞춰 혼합**한다(빠른 로컬 집계=동기 AFTER_COMMIT, 외부·부가=@Async). 이벤트는 **도메인별 과거형 record**로 두어 Step 2 Kafka 토픽과 1:1 로 잇는다.
 
+> **구현 개정 (2026-07-02, Option A) — slice A 재설계**
+> 구현 중 발견: `product_like_count` 증가를 AFTER_COMMIT 리스너(REQUIRES_NEW)로 빼자 기존 `LikeConcurrencyTest`(즉시·정확 카운트)와 충돌했다. 동기 리스너의 REQUIRES_NEW 가 afterCommit 시점에 원래 커넥션과 겹쳐 **커넥션 풀 고갈 → 증분 유실**. 판단(과제의 "무조건 분리 아님"): **운영 카운트(`product_like_count`)는 API 가 즉시 정확해야 하므로 like 트랜잭션 안에서 원자적 upsert 로 유지**하고, `LikeAdded`/`LikeRemoved` 이벤트만 발행해 **로깅(Step 1) + 분석집계(Step 2 `product_metrics`)로 분리**한다. → `LikeCountListener` 제거. 아래 "알려진 갭"의 like_count 드리프트는 **해소됨**(카운트가 tx 안이라 정확). 나머지 슬라이스(B/C)는 설계대로.
+
 ## 배경 — 현재 코드 상태 (탐색 결과)
 
 | 항목 | 현재 |
