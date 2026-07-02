@@ -70,6 +70,9 @@ public class KafkaConfig {
         factory.setBatchMessageConverter(new BatchMessagingMessageConverter(converter));
         factory.setConcurrency(3);
         factory.setBatchListener(true);
+        factory.setCommonErrorHandler(
+            new org.springframework.kafka.listener.DefaultErrorHandler(
+                new org.springframework.util.backoff.FixedBackOff(1000L, 5L))); // 1s 간격 5회 재시도 후 recover(로그) — 일시 장애 복구, 지속 실패 DLQ는 후속
         return factory;
     }
 }
