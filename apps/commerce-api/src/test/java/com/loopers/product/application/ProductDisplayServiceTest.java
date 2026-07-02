@@ -4,7 +4,7 @@ import com.loopers.brand.domain.Brand;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDetail;
 import com.loopers.product.domain.ProductSortType;
-import com.loopers.support.fake.IdFixtures;
+import com.loopers.support.IdFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,12 @@ class ProductDisplayServiceTest {
     private final ProductDisplayService service = new ProductDisplayService();
 
     private Product product(long id, long brandId, long price) {
-        return IdFixtures.assignId(new Product(brandId, "상품" + id, "설명", price, 10), id);
+        return IdFixtures.assignId(new Product(brandId, "상품" + id, "설명", price), id);
+    }
+
+    private Map<Long, Integer> zeroStock(List<Product> products) {
+        return products.stream()
+            .collect(java.util.stream.Collectors.toMap(Product::getId, p -> 0));
     }
 
     private Brand brand(long id, String name) {
@@ -31,11 +36,12 @@ class ProductDisplayServiceTest {
         Product product = product(1L, 1L, 1_000L);
         Brand brand = brand(1L, "나이키");
 
-        ProductDetail detail = service.assembleDetail(product, brand, 42L);
+        ProductDetail detail = service.assembleDetail(product, brand, 42L, 7);
 
         assertThat(detail.productId()).isEqualTo(1L);
         assertThat(detail.brandName()).isEqualTo("나이키");
         assertThat(detail.likeCount()).isEqualTo(42L);
+        assertThat(detail.stock()).isEqualTo(7);
     }
 
     @DisplayName("price_asc 정렬은 가격 오름차순으로 정렬한다.")
@@ -47,7 +53,8 @@ class ProductDisplayServiceTest {
         Map<Long, Long> likeCounts = Map.of(1L, 0L, 2L, 0L, 3L, 0L);
 
         List<ProductDetail> result =
-            service.assembleList(products, brandMap, likeCounts, ProductSortType.PRICE_ASC);
+            service.assembleList(
+                products, brandMap, likeCounts, zeroStock(products), ProductSortType.PRICE_ASC);
 
         assertThat(result).extracting(ProductDetail::price).containsExactly(1_000L, 2_000L, 3_000L);
     }
@@ -61,7 +68,8 @@ class ProductDisplayServiceTest {
         Map<Long, Long> likeCounts = Map.of(1L, 5L, 2L, 30L, 3L, 10L);
 
         List<ProductDetail> result =
-            service.assembleList(products, brandMap, likeCounts, ProductSortType.LIKES_DESC);
+            service.assembleList(
+                products, brandMap, likeCounts, zeroStock(products), ProductSortType.LIKES_DESC);
 
         assertThat(result).extracting(ProductDetail::productId).containsExactly(2L, 3L, 1L);
     }
@@ -75,7 +83,8 @@ class ProductDisplayServiceTest {
         Map<Long, Long> likeCounts = Map.of(1L, 0L, 2L, 0L, 3L, 0L);
 
         List<ProductDetail> result =
-            service.assembleList(products, brandMap, likeCounts, ProductSortType.LATEST);
+            service.assembleList(
+                products, brandMap, likeCounts, zeroStock(products), ProductSortType.LATEST);
 
         assertThat(result).extracting(ProductDetail::productId).containsExactly(3L, 2L, 1L);
     }

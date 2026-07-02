@@ -16,26 +16,28 @@ import java.util.Map;
  */
 public class ProductDisplayService {
 
-    public ProductDetail assembleDetail(Product product, Brand brand, long likeCount) {
-        return toDetail(product, brand, likeCount);
+    public ProductDetail assembleDetail(Product product, Brand brand, long likeCount, int stock) {
+        return toDetail(product, brand, likeCount, stock);
     }
 
     public List<ProductDetail> assembleList(
         List<Product> products,
         Map<Long, Brand> brandMap,
         Map<Long, Long> likeCountMap,
+        Map<Long, Integer> stockMap,
         ProductSortType sortType) {
 
         return products.stream()
             .map(product -> toDetail(
                 product,
                 brandMap.get(product.getBrandId()),
-                likeCountMap.getOrDefault(product.getId(), 0L)))
+                likeCountMap.getOrDefault(product.getId(), 0L),
+                stockMap.getOrDefault(product.getId(), 0)))
             .sorted(comparator(sortType))
             .toList();
     }
 
-    static ProductDetail toDetail(Product product, Brand brand, long likeCount) {
+    static ProductDetail toDetail(Product product, Brand brand, long likeCount, int stock) {
         return new ProductDetail(
             product.getId(),
             product.getBrandId(),
@@ -43,7 +45,7 @@ public class ProductDisplayService {
             product.getName(),
             product.getDescription(),
             product.getPrice(),
-            product.getStock(),
+            stock,
             likeCount);
     }
 

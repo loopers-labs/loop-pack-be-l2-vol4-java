@@ -11,8 +11,8 @@ import java.util.Map;
 /**
  * 주문 생성을 담당하는 무상태 도메인 서비스.
  *
- * <p>Repository 에 의존하지 않는다. 호출자(Application)가 이미 로드한 상품/브랜드를 받아 주문 항목 스냅샷 생성, 총액 계산, 재고
- * 차감(도메인 객체 협력)만 수행한다.
+ * <p>Repository 에 의존하지 않는다. 호출자(Application)가 이미 로드한 상품/브랜드를 받아 주문 항목 스냅샷 생성과 총액 계산만 수행한다.
+ * 재고 차감은 호출자(OrderFacade)가 Inventory 비관적 락 경로로 별도 수행한다.
  */
 public class OrderCreationService {
 
@@ -35,7 +35,6 @@ public class OrderCreationService {
             }
 
             Brand brand = brandMap.get(product.getBrandId());
-            product.deductStock(line.quantity());
 
             OrderItemSnapshot snapshot =
                 new OrderItemSnapshot(

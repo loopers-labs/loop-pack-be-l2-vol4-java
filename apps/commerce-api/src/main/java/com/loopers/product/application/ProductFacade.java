@@ -2,6 +2,7 @@ package com.loopers.product.application;
 
 import com.loopers.brand.application.BrandService;
 import com.loopers.brand.domain.Brand;
+import com.loopers.inventory.application.InventoryService;
 import com.loopers.like.application.LikeService;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDetail;
@@ -24,22 +25,26 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final LikeService likeService;
+    private final InventoryService inventoryService;
     private final ProductDisplayService productDisplayService = new ProductDisplayService();
 
     public ProductInfo createProduct(
         Long brandId, String name, String description, Long price, Integer stock) {
         brandService.ensureExists(brandId);
-        return ProductInfo.from(productService.create(brandId, name, description, price, stock));
+        Product product = productService.create(brandId, name, description, price);
+        inventoryService.create(product.getId(), stock);
+        return ProductInfo.from(product, stock);
     }
 
-    /** 상품 상세 = Product + Brand + 좋아요 수를 도메인 서비스에서 조합한다. */
+    /** 상품 상세 = Product + Brand + 좋아요 수 + 재고(Inventory) 를 조합한다. */
     @Transactional(readOnly = true)
     public ProductDetailInfo getProductDetail(Long productId) {
         Product product = productService.get(productId);
         Brand brand = brandService.get(product.getBrandId());
         long likeCount = likeService.getLikeCount(productId);
+        int stock = inventoryService.getByProductId(productId).getAvailableQuantity();
 
-        ProductDetail detail = productDisplayService.assembleDetail(product, brand, likeCount);
+        ProductDetail detail = productDisplayService.assembleDetail(product, brand, likeCount, stock);
         return ProductDetailInfo.from(detail);
     }
 
@@ -57,9 +62,12 @@ public class ProductFacade {
 
         Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, Long> likeCountMap = likeService.getLikeCounts(productIds);
+        Map<Long, Integer> stockMap = inventoryService.getQuantityMap(productIds);
 
         List<ProductDetailInfo> assembled =
-            productDisplayService.assembleList(products, brandMap, likeCountMap, sortType).stream()
+            productDisplayService
+                .assembleList(products, brandMap, likeCountMap, stockMap, sortType)
+                .stream()
                 .map(ProductDetailInfo::from)
                 .toList();
         return PageSupport.paginate(assembled, page, size);
@@ -71,22 +79,29 @@ public class ProductFacade {
         List<Product> products =
             brandId != null ? productService.getByBrandId(brandId) : productService.getAll();
 
+        List<Long> productIds = products.stream().map(Product::getId).toList();
+        Map<Long, Integer> stockMap = inventoryService.getQuantityMap(productIds);
+
         List<ProductInfo> infos =
             products.stream()
                 .sorted(Comparator.comparing(Product::getId).reversed())
-                .map(ProductInfo::from)
+                .map(product -> ProductInfo.from(product, stockMap.getOrDefault(product.getId(), 0)))
                 .toList();
         return PageSupport.paginate(infos, page, size);
     }
 
     @Transactional(readOnly = true)
     public ProductInfo getProductForAdmin(Long productId) {
-        return ProductInfo.from(productService.get(productId));
+        Product product = productService.get(productId);
+        int stock = inventoryService.getByProductId(productId).getAvailableQuantity();
+        return ProductInfo.from(product, stock);
     }
 
     public ProductInfo updateProduct(
         Long id, String name, String description, Long price, Integer stock) {
-        return ProductInfo.from(productService.update(id, name, description, price, stock));
+        Product product = productService.update(id, name, description, price);
+        inventoryService.setQuantity(id, stock);
+        return ProductInfo.from(product, stock);
     }
 
     public void deleteProduct(Long id) {

@@ -6,11 +6,25 @@ import com.loopers.order.domain.OrderItemSnapshot;
 
 import java.util.List;
 
-public record OrderInfo(Long id, Long memberId, Long totalAmount, List<OrderItemInfo> items) {
+public record OrderInfo(
+    Long id,
+    Long memberId,
+    Long totalAmount,
+    Long discountAmount,
+    Long paymentAmount,
+    Long appliedMemberCouponId,
+    List<OrderItemInfo> items) {
 
     public static OrderInfo from(Order order) {
         List<OrderItemInfo> items = order.getItems().stream().map(OrderItemInfo::from).toList();
-        return new OrderInfo(order.getId(), order.getMemberId(), order.getTotalAmount(), items);
+        return new OrderInfo(
+            order.getId(),
+            order.getMemberId(),
+            order.getTotalAmount(),
+            order.getDiscountAmount(),
+            order.getPaymentAmount(),
+            order.getAppliedMemberCouponId(),
+            items);
     }
 
     public record OrderItemInfo(

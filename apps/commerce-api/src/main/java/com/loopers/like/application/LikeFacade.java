@@ -2,6 +2,7 @@ package com.loopers.like.application;
 
 import com.loopers.brand.application.BrandService;
 import com.loopers.brand.domain.Brand;
+import com.loopers.inventory.application.InventoryService;
 import com.loopers.member.application.MemberService;
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductDisplayService;
@@ -24,6 +25,7 @@ public class LikeFacade {
     private final MemberService memberService;
     private final ProductService productService;
     private final BrandService brandService;
+    private final InventoryService inventoryService;
     private final ProductDisplayService productDisplayService = new ProductDisplayService();
 
     public void registerLike(Long memberId, Long productId) {
@@ -52,9 +54,10 @@ public class LikeFacade {
 
         Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, Long> likeCountMap = likeService.getLikeCounts(productIds);
+        Map<Long, Integer> stockMap = inventoryService.getQuantityMap(productIds);
 
         return productDisplayService
-            .assembleList(products, brandMap, likeCountMap, ProductSortType.LATEST)
+            .assembleList(products, brandMap, likeCountMap, stockMap, ProductSortType.LATEST)
             .stream()
             .map(ProductDetailInfo::from)
             .toList();

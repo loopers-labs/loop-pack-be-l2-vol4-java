@@ -16,8 +16,8 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-    public Product create(Long brandId, String name, String description, Long price, Integer stock) {
-        return productRepository.save(new Product(brandId, name, description, price, stock));
+    public Product create(Long brandId, String name, String description, Long price) {
+        return productRepository.save(new Product(brandId, name, description, price));
     }
 
     public void saveAll(List<Product> products) {
@@ -51,9 +51,9 @@ public class ProductService {
         return productRepository.findAllByIds(ids);
     }
 
-    public Product update(Long id, String name, String description, Long price, Integer stock) {
+    public Product update(Long id, String name, String description, Long price) {
         Product product = get(id);
-        product.update(name, description, price, stock);
+        product.update(name, description, price);
         return productRepository.save(product);
     }
 

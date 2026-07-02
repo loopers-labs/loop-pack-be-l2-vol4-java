@@ -2,6 +2,8 @@ package com.loopers.order.application;
 
 import com.loopers.brand.application.BrandService;
 import com.loopers.brand.domain.Brand;
+import com.loopers.coupon.application.MemberCouponService;
+import com.loopers.inventory.application.InventoryService;
 import com.loopers.member.application.MemberService;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderCreationService;
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -33,10 +36,19 @@ public class OrderFacade {
     private final MemberService memberService;
     private final ProductService productService;
     private final BrandService brandService;
+    private final InventoryService inventoryService;
+    private final MemberCouponService memberCouponService;
     private final OrderCreationService orderCreationService = new OrderCreationService();
     private final OrderService orderService;
 
-    public OrderInfo createOrder(Long memberId, List<OrderLine> lines) {
+    /**
+     * 주문을 생성한다. 재고 비관적 락 차감 → 주문 생성/저장 → 쿠폰(선택) 비관적 락 사용 → 할인/결제금액 확정을 하나의 트랜잭션으로 처리한다.
+     *
+     * <p>재고 부족, 쿠폰 검증 실패 등 어느 단계가 실패해도 전체가 롤백되어 정합성을 보장한다.
+     *
+     * @param couponId 적용할 회원 쿠폰 ID. null 이면 쿠폰 미적용.
+     */
+    public OrderInfo createOrder(Long memberId, List<OrderLine> lines, Long couponId) {
         memberService.get(memberId);
 
         List<Long> productIds = lines.stream().map(OrderLine::productId).distinct().toList();
@@ -47,10 +59,34 @@ public class OrderFacade {
         List<Long> brandIds = products.stream().map(Product::getBrandId).distinct().toList();
         Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
 
-        Order order = orderCreationService.create(memberId, lines, productMap, brandMap);
+        // 1) 재고 비관적 락 차감 (productId 오름차순으로 락 획득 → 데드락 방지)
+        Map<Long, Integer> quantityByProductId = aggregateQuantities(lines);
+        inventoryService.deductForOrder(quantityByProductId);
 
-        productService.saveAll(products);
-        return OrderInfo.from(orderService.save(order));
+        // 2) 주문 생성 + 1차 저장(id 확보)
+        Order order = orderCreationService.create(memberId, lines, productMap, brandMap);
+        order = orderService.save(order);
+
+        // 3) 쿠폰 적용(선택). 비관적 락으로 1회 사용 보장. 실패 시 전체 롤백.
+        if (couponId != null) {
+            long discount =
+                memberCouponService.useForOrder(
+                    couponId, memberId, order.getTotalAmount(), order.getId());
+            order.applyCoupon(couponId, discount);
+        } else {
+            order.applyDiscount(0L);
+        }
+
+        return OrderInfo.from(order);
+    }
+
+    /** 동일 상품이 여러 라인으로 들어와도 수량을 합산한다. */
+    private static Map<Long, Integer> aggregateQuantities(List<OrderLine> lines) {
+        Map<Long, Integer> quantities = new LinkedHashMap<>();
+        for (OrderLine line : lines) {
+            quantities.merge(line.productId(), line.quantity(), Integer::sum);
+        }
+        return quantities;
     }
 
     /** 본인 주문 목록을 조회한다. startAt/endAt 이 주어지면 주문 생성일(Asia/Seoul) 기준으로 필터링한다. */

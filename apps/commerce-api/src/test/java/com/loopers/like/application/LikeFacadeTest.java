@@ -1,54 +1,50 @@
 package com.loopers.like.application;
 
-import com.loopers.brand.application.BrandService;
 import com.loopers.brand.domain.Brand;
-import com.loopers.member.application.MemberService;
+import com.loopers.brand.infrastructure.BrandJpaRepository;
 import com.loopers.member.domain.Member;
-import com.loopers.product.application.ProductService;
+import com.loopers.member.infrastructure.MemberJpaRepository;
 import com.loopers.product.domain.Product;
+import com.loopers.product.infrastructure.ProductJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import com.loopers.support.fake.FakeBrandRepository;
-import com.loopers.support.fake.FakeLikeRepository;
-import com.loopers.support.fake.FakeMemberRepository;
-import com.loopers.support.fake.FakeProductRepository;
+import com.loopers.utils.DatabaseCleanUp;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@SpringBootTest
 class LikeFacadeTest {
 
-    private FakeLikeRepository likeRepository;
-    private LikeService likeService;
-    private LikeFacade likeFacade;
+    @Autowired private LikeFacade likeFacade;
+    @Autowired private LikeService likeService;
+    @Autowired private MemberJpaRepository memberJpaRepository;
+    @Autowired private BrandJpaRepository brandJpaRepository;
+    @Autowired private ProductJpaRepository productJpaRepository;
+    @Autowired private DatabaseCleanUp databaseCleanUp;
+
     private Long memberId;
     private Long productId;
 
     @BeforeEach
     void setUp() {
-        likeRepository = new FakeLikeRepository();
-        FakeMemberRepository memberRepository = new FakeMemberRepository();
-        FakeProductRepository productRepository = new FakeProductRepository();
-        FakeBrandRepository brandRepository = new FakeBrandRepository();
-
-        likeService = new LikeService(likeRepository);
-        MemberService memberService = new MemberService(memberRepository);
-        ProductService productService = new ProductService(productRepository);
-        BrandService brandService = new BrandService(brandRepository);
-
-        likeFacade =
-            new LikeFacade(likeService, memberService, productService, brandService);
-
-        Member member = memberRepository.save(new Member("member01", "pw123456"));
-        Brand brand = brandRepository.save(new Brand("브랜드", "설명"));
-        Product product =
-            productRepository.save(new Product(brand.getId(), "상품", "설명", 1_000L, 10));
+        Member member = memberJpaRepository.save(new Member("member01", "pw123456"));
+        Brand brand = brandJpaRepository.save(new Brand("브랜드", "설명"));
+        Product product = productJpaRepository.save(new Product(brand.getId(), "상품", "설명", 1_000L));
         memberId = member.getId();
         productId = product.getId();
+    }
+
+    @AfterEach
+    void tearDown() {
+        databaseCleanUp.truncateAllTables();
     }
 
     @DisplayName("좋아요 등록/취소 흐름에서,")
