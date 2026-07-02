@@ -14,7 +14,7 @@ spring:
   main:
     web-application-type: servlet
   application:
-    name: commerce-api
+    name: commerce-streamer
   profiles:
     active: local
   config:
@@ -34,6 +34,16 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트는 브로커 없이 돈다 — 집계 로직은 서비스 직접 호출로 검증한다
+metrics-consumer:
+  auto-startup: false
 
 ---
 spring:
