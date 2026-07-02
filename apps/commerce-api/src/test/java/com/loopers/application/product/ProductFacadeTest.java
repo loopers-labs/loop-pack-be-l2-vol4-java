@@ -7,6 +7,7 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.support.error.CoreException;
+import org.springframework.context.ApplicationEventPublisher;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,7 +31,8 @@ class ProductFacadeTest {
     private final LikeCountRepository likeCountRepository = mock(LikeCountRepository.class);
     private final ProductRankRepository productRankRepository = mock(ProductRankRepository.class);
     private final ProductCache productCache = mock(ProductCache.class);
-    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache, eventPublisher);
 
     @DisplayName("상품 상세를 조회할 때, ")
     @Nested
