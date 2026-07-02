@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.coupon;
 
 import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.CouponIssueFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.AuthHeaders;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.List;
 public class CouponV1Controller implements CouponV1ApiSpec {
 
     private final CouponFacade couponFacade;
+    private final CouponIssueFacade couponIssueFacade;
 
     @PostMapping("/coupons/{couponId}/issue")
     @Override
@@ -38,5 +40,18 @@ public class CouponV1Controller implements CouponV1ApiSpec {
                 .map(CouponV1Dto.UserCouponResponse::from)
                 .toList()
         );
+    }
+
+    @PostMapping("/coupons/{couponId}/issue-requests")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueRequestResponse> requestIssue(AuthHeaders auth, @PathVariable Long couponId) {
+        String requestId = couponIssueFacade.requestIssue(auth.loginId(), couponId);
+        return ApiResponse.success(new CouponV1Dto.IssueRequestResponse(requestId));
+    }
+
+    @GetMapping("/coupons/issue-requests/{requestId}")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueResultResponse> getIssueResult(@PathVariable String requestId) {
+        return ApiResponse.success(CouponV1Dto.IssueResultResponse.from(couponIssueFacade.getResult(requestId)));
     }
 }

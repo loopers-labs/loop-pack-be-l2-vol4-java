@@ -19,6 +19,7 @@ public class OutboxKafkaConfig {
 
     public static final String CATALOG_EVENTS = "catalog-events";
     public static final String ORDER_EVENTS = "order-events";
+    public static final String COUPON_ISSUE_REQUESTS = "coupon-issue-requests";
 
     @Bean
     public ProducerFactory<String, String> outboxProducerFactory(KafkaProperties kafkaProperties) {
@@ -43,5 +44,10 @@ public class OutboxKafkaConfig {
     @Bean
     public NewTopic orderEventsTopic() {
         return TopicBuilder.name(ORDER_EVENTS).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic couponIssueRequestsTopic() {
+        return TopicBuilder.name(COUPON_ISSUE_REQUESTS).partitions(3).replicas(1).build();
     }
 }

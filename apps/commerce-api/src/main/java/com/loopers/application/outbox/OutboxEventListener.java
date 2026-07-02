@@ -2,6 +2,7 @@ package com.loopers.application.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.coupon.event.CouponIssueRequested;
 import com.loopers.domain.like.event.LikeAdded;
 import com.loopers.domain.like.event.LikeRemoved;
 import com.loopers.domain.order.event.OrderPlaced;
@@ -19,6 +20,7 @@ public class OutboxEventListener {
 
     private static final String CATALOG = "catalog-events";
     private static final String ORDER = "order-events";
+    private static final String COUPON_ISSUE = "coupon-issue-requests";
 
     private final OutboxEventRepository outboxRepository;
     private final ObjectMapper objectMapper;
@@ -48,6 +50,14 @@ public class OutboxEventListener {
             .toList();
         OrderEventPayload payload = new OrderEventPayload(eventId, "OrderPlaced", e.orderId(), lines, e.occurredAt().toString());
         append(ORDER, String.valueOf(e.orderId()), "OrderPlaced", eventId, payload);
+    }
+
+    // 선착순 발급요청 — eventId 는 requestId 를 그대로 사용(consumer 멱등 키 = requestId 통일)
+    @EventListener
+    public void on(CouponIssueRequested e) {
+        CouponIssuePayload payload = new CouponIssuePayload(
+            e.requestId(), e.couponId(), e.userId(), e.occurredAt().toString());
+        append(COUPON_ISSUE, String.valueOf(e.couponId()), "CouponIssueRequested", e.requestId(), payload);
     }
 
     private void append(String topic, String key, String type, String eventId, Object payload) {
