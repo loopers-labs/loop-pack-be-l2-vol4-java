@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
@@ -28,6 +29,12 @@ springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+# Outbox 릴레이 — PENDING 이벤트를 주기적으로 Kafka 로 발행
+outbox:
+  relay:
+    enabled: true
+    interval-ms: 1000
 
 # PG 시뮬레이터 주소
 pg-simulator:
@@ -75,6 +82,17 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트는 브로커 없이 돈다 — 릴레이 검증은 KafkaTemplate 목으로 직접 호출한다
+outbox:
+  relay:
+    enabled: false
 
 ---
 spring:
