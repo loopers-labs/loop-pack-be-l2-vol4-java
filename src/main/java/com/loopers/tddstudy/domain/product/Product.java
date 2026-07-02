@@ -1,10 +1,20 @@
 package com.loopers.tddstudy.domain.product;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
-@Table(name = "product")
+@Table(name = "product",
+        indexes = {
+                @Index(name = "idx_product_brand_like", columnList = "brand_id, like_count"),
+                @Index(name = "idx_product_brand_id", columnList = "brand_id")
+        }
+)
 public class Product {
 
     @Id

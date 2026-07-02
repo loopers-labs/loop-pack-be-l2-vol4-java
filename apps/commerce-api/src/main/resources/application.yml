@@ -35,6 +35,24 @@ spring:
     activate:
       on-profile: local, test
 
+pg:
+  base-url: http://localhost:8082
+  user-id: loopers
+  timeout:
+    connect: 2000
+    read: 1000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 3
+        failure-rate-threshold: 100
+        minimum-number-of-calls: 3
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 1
+
 ---
 spring:
   config:

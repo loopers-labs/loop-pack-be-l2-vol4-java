@@ -35,4 +35,12 @@ public class OrderRepositoryImpl implements OrderRepository {
     public List<Order> findAll() {
         return jpaRepository.findAll();
     }
+
+    @Override
+    public List<Order> findAllByStatus(String status) {
+        return jpaRepository.findAllByStatus(status);
+    }
+
+
+
 }

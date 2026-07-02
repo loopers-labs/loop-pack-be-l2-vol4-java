@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import com.loopers.tddstudy.application.coupon.CouponRequestService;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -13,38 +14,34 @@ public class CouponV1Controller {
 
     private final UserCouponRepository userCouponRepository;
     private final CouponRepository couponRepository;
+    private final CouponRequestService couponRequestService;
 
 
     public CouponV1Controller(UserCouponRepository userCouponRepository,
-                              CouponRepository couponRepository) {
+                              CouponRepository couponRepository,
+                              CouponRequestService couponRequestService) {   // ← 추가
         this.userCouponRepository = userCouponRepository;
         this.couponRepository = couponRepository;
+        this.couponRequestService = couponRequestService;                    // ← 추가
     }
 
-    // 쿠폰 발급
+    // 발급 "요청"만 (실제 발급은 Consumer가)
     @PostMapping("/coupons/{couponId}/issue")
-    public ResponseEntity<Void> issueCoupon(
+    public ResponseEntity<CouponV1Dto.IssueAcceptedResponse> issueCoupon(
             @PathVariable Long couponId,
             @RequestHeader("X-USER-ID") Long userId) {
+        String requestId = couponRequestService.request(couponId, userId);
+        return ResponseEntity.accepted()
+                .body(new CouponV1Dto.IssueAcceptedResponse(requestId, "PENDING"));
+    }
 
-        // 쿠폰 존재 확인
-        Coupon coupon = couponRepository.findById(couponId)
-                .orElseThrow(() -> new IllegalArgumentException("쿠폰을 찾을 수 없습니다."));
-
-        // 만료 확인
-        if (coupon.isExpired()) {
-            throw new IllegalArgumentException("만료된 쿠폰입니다.");
-        }
-
-        // 중복 발급 확인
-        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
-            throw new IllegalArgumentException("이미 발급받은 쿠폰입니다.");
-        }
-
-        UserCoupon userCoupon = new UserCoupon(userId, couponId);
-        userCouponRepository.save(userCoupon);
-
-        return ResponseEntity.ok().build();
+    // 발급 결과 폴링
+    @GetMapping("/coupons/issue-result/{requestId}")
+    public ResponseEntity<CouponV1Dto.IssueResultResponse> issueResult(
+            @PathVariable String requestId) {
+        var r = couponRequestService.getResult(requestId);
+        return ResponseEntity.ok(
+                new CouponV1Dto.IssueResultResponse(r.getRequestId(), r.getStatus(), r.getReason()));
     }
 
     // 내 쿠폰 목록

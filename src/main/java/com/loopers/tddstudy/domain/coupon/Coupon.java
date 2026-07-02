@@ -14,6 +14,9 @@ public class Coupon {
 
     private String name;
 
+    private int maxCount;      // 발급 한도 (0 이하면 무제한)
+    private int issuedCount;   // 발급된 수량
+
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "varchar(20)")
     private CouponType type;
@@ -34,6 +37,23 @@ public class Coupon {
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
     }
+
+    public Coupon(String name, CouponType type, int value, int minOrderAmount,
+                  LocalDateTime expiredAt, int maxCount) {
+        this(name, type, value, minOrderAmount, expiredAt);   // 기존 생성자 재사용
+        this.maxCount = maxCount;
+        this.issuedCount = 0;
+    }
+
+    public void issue() {
+        if (maxCount > 0 && issuedCount >= maxCount) {
+            throw new IllegalStateException("쿠폰이 모두 소진되었습니다.");
+        }
+        this.issuedCount++;
+    }
+
+    public int getMaxCount() { return maxCount; }
+    public int getIssuedCount() { return issuedCount; }
 
     public int discount(int orderAmount) {
         if (orderAmount < minOrderAmount) {
