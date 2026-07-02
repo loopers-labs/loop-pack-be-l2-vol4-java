@@ -87,20 +87,20 @@ Phase 1 (Step 1)  이벤트 경계 — 인프라 0, in-process ApplicationEvent
 
 **완료 기준**: `compileJava`/`compileTestJava` 통과 확인함. **`./gradlew :apps:commerce-api:test` 전체 실행은 아직 안 함** — 다음 세션에서 먼저 돌려볼 것.
 
-### ▶ 작업 1-2. 유저 행동 로깅 이벤트 (체크리스트 미구현 — 현재 전무)
+### ▶ 작업 1-2. 유저 행동 로깅 이벤트 — 완료
 
-- 이벤트: `UserActivityEvent`(가칭), 조회·클릭·좋아요·주문 등
-- phase: `AFTER_COMMIT` + `@Async`
-- 판정: 분석·추천용이면 C, 감사·컴플라이언스용이면 B (map §4). **요구사항 확인 필요** — 기본은 C.
-- 배치: 이벤트 `domain/`, 리스너 `interfaces/event/`
+- `domain/UserActivityEvent`(마커, `userId()` 하나만 추가 요구) — `DomainEvent`를 확장. `LikedEvent`/`UnlikedEvent`/`OrderCreatedEvent`가 이를 함께 구현해 **새 이벤트를 중복 발행하지 않고 재사용**한다(좋아요·주문).
+- 조회(`GET /products/{id}`)·목록조회(`GET /products`, 클릭으로 간주)는 비로그인 호출이라 `userId=null`인 신규 이벤트 `domain/product/ProductViewedEvent`/`ProductListViewedEvent`로 발행.
+- 리스너 `interfaces/event/activity/UserActivityLogListener` 하나가 `@TransactionalEventListener(AFTER_COMMIT, fallbackExecution=true)` + `@Async`로 트랜잭션 유무와 무관하게 전부 처리(좋아요/주문=트랜잭션 있음, 조회/목록조회=트랜잭션 없음). 지금은 SLF4J 로깅만, Step 2의 `event_log` 적재로 대체될 자리.
+- 판정: C(best-effort) — 분석용 기본값 확정, 별도 요구사항 없어 유실 허용.
 
-### ▶ 작업 1-3. 결제 결과 이벤트 (미구현)
+**⚠ Step 2 진입 시 주의**: §3 순서 6번이 "조회수 집계용 `ProductViewedEvent` 신규"라고 적어뒀는데, **이미 위에서 만들어졌다.** Step 2에서는 새로 만들지 말고 기존 `ProductViewedEvent`가 `OutboxableEvent`도 함께 구현하도록 확장(+ 집계 리스너 추가)하면 된다 — `OrderCreatedEvent`가 로깅과 판매량 집계 양쪽에 리스너만 얹는 것과 같은 패턴.
 
-- 이벤트: `PaymentResultEvent`(가칭), `domain/payment/`
-- 지점: `PaymentFacade.confirmResolved`
-- phase: `AFTER_COMMIT` + `ConfirmOutcome.result()` 값으로 성공/실패 분기 (`AFTER_ROLLBACK` 아님 — step1 §2.2)
+### ▶ 작업 1-3. 결제 결과 이벤트 — 스코프 아님 (체크리스트에 없음)
 
-**Step 1 완료 시 체크리스트 충족**: 주문–결제 부가 로직 분리 ✅ / 좋아요 처리·집계 분리 ✅(기존) / 유저 행동 로깅 ✅ / 동작 주체·트랜잭션 상관관계 ✅(phase 매핑).
+`PaymentResultEvent`는 이전 세션에서 문서 작성자가 확장한 계획이었을 뿐, `round7-quests.md`의 실제 체크리스트 4항목엔 없다. 체크리스트 4항목이 이미 전부 충족되어 **Step 1은 이걸 만들지 않고 완료 처리한다.** 필요해지면(결제 성공/실패 알림 등 실제 요구사항이 생기면) 그때 `PaymentFacade.confirmResolved`에 `AFTER_COMMIT` + `ConfirmOutcome.result()` 분기로 추가한다(`AFTER_ROLLBACK` 아님 — step1 §2.2).
+
+**Step 1 체크리스트 충족 확인 (`round7-quests.md`에 체크 완료)**: 주문–결제 부가 로직 분리 ✅ / 좋아요 처리·집계 분리 ✅ / 유저 행동 로깅 ✅ / 동작 주체·트랜잭션 상관관계 ✅(phase 매핑). **Step 1 완료.**
 
 ## 3. Phase 2 — Step 2 (Kafka 파이프라인)
 
@@ -120,7 +120,7 @@ Phase 1 (Step 1)  이벤트 경계 — 인프라 0, in-process ApplicationEvent
    - `event_handled`(멱등, 제어) vs `event_log`(데이터) **분리** — map §2.3
 4. **집계 consumer**: manual Ack + `event_handled` 멱등 + `updated_at`/`version` 최신만 반영 → `product_metrics` upsert.
 5. **좋아요 집계를 Kafka로 이관**: like outbox는 유지, 릴레이 발행 대상만 in-JVM → Kafka. `increaseLikeCount`가 streamer consumer로 이동 (map §2.2).
-6. **판매량·조회수 집계 신규**: 판매량은 `OrderCreated`에 **리스너만 추가**(별도 이벤트 불필요, map §2.1). 조회수는 `ProductFacade.getProduct`에 `ProductViewedEvent` 신규.
+6. **판매량·조회수 집계 신규**: 판매량은 `OrderCreated`에 **리스너만 추가**(별도 이벤트 불필요, map §2.1). 조회수는 Step 1에서 이미 만든 `ProductViewedEvent`(`domain/product/`)에 `OutboxableEvent` 구현을 추가하고 집계 리스너를 얹는다 — 새 이벤트 클래스를 만들지 않는다.
 
 ## 4. Phase 3 — Step 3 (선착순 쿠폰)
 
@@ -133,4 +133,6 @@ Phase 1 (Step 1)  이벤트 경계 — 인프라 0, in-process ApplicationEvent
 
 ## 5. 다음 세션 시작점 (TL;DR)
 
-> 작업 1-1 (a)/(b)/(c)/(d) 전부 완료. 캐시 무효화 리스너는 (d)에서 제거하고 추후 도입 목표로 보류했다 — fact 이벤트 발행 자체(6종)는 그대로 살아있으니 나중에 리스너만 새로 붙이면 된다. **다음은 전체 테스트(`./gradlew :apps:commerce-api:test`)로 회귀 확인 → 통과하면 작업 1-2(유저 행동 로깅) 착수**, 그다음 1-3(결제 결과 이벤트) 순.
+> **Step 1 완료.** 작업 1-1(이벤트 이름 정리)·1-2(유저 행동 로깅) 모두 끝났고, `round7-quests.md` Step 1 체크리스트 4항목 전부 체크됨. 1-3(결제 결과 이벤트)은 체크리스트에 없는 항목이라 스코프 아님으로 확정, 만들지 않음. 캐시 무효화 리스너는 (d)에서 제거하고 추후 도입 목표로 보류했다 — fact 이벤트 발행 자체는 그대로 살아있으니 나중에 리스너만 새로 붙이면 된다.
+>
+> **다음은 Step 2(Kafka 파이프라인) 진입.** 시작 전 §3 "진입 전 결정할 것"부터: (1) `product_stats` 폐기 vs 유지, (2) `modules/kafka/kafka.yml` consumer deserializer 오설정 확인. 조회수 집계는 새 이벤트를 만들지 말고 기존 `ProductViewedEvent`를 확장할 것(§2 작업 1-2 노트 참조). 전체 테스트(`./gradlew :apps:commerce-api:test`)는 Testcontainers 기반이라 로컬에서 임의 실행하지 않는다 — 필요하면 사용자가 직접 실행.
