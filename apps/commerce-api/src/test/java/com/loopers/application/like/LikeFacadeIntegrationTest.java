@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 @SpringBootTest
 class LikeFacadeIntegrationTest {
@@ -78,9 +79,11 @@ class LikeFacadeIntegrationTest {
             doneLatch.await(10, TimeUnit.SECONDS);
             executor.shutdown();
 
-            // assert
-            Product reloaded = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertThat(reloaded.getLikeCount()).isEqualTo(10L);
+            // assert — 집계는 커밋 후 비동기(@Async 리스너)로 반영되므로, 즉시가 아니라 수렴할 때까지 기다려 검증한다.
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                Product reloaded = productJpaRepository.findById(product.getId()).orElseThrow();
+                assertThat(reloaded.getLikeCount()).isEqualTo(10L);
+            });
         }
 
         @DisplayName("좋아요한 유저 10명이 동시에 취소해도, 좋아요 수가 0으로 정상 반영된다.")
@@ -92,6 +95,11 @@ class LikeFacadeIntegrationTest {
             for (int i = 0; i < threadCount; i++) {
                 likeFacade.like(i + 1L, product.getId());
             }
+            // 증가 집계가 다 반영되기 전에 취소가 시작되면, likeCount > 0 가드 때문에 감소가 스킵될 수 있어 수렴을 기다린다.
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                Product settled = productJpaRepository.findById(product.getId()).orElseThrow();
+                assertThat(settled.getLikeCount()).isEqualTo(10L);
+            });
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
             CountDownLatch startLatch = new CountDownLatch(1);
             CountDownLatch doneLatch = new CountDownLatch(threadCount);
@@ -113,9 +121,11 @@ class LikeFacadeIntegrationTest {
             doneLatch.await(10, TimeUnit.SECONDS);
             executor.shutdown();
 
-            // assert
-            Product reloaded = productJpaRepository.findById(product.getId()).orElseThrow();
-            assertThat(reloaded.getLikeCount()).isEqualTo(0L);
+            // assert — 집계는 커밋 후 비동기(@Async 리스너)로 반영되므로, 즉시가 아니라 수렴할 때까지 기다려 검증한다.
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                Product reloaded = productJpaRepository.findById(product.getId()).orElseThrow();
+                assertThat(reloaded.getLikeCount()).isEqualTo(0L);
+            });
         }
     }
 }
