@@ -24,12 +24,14 @@ public class OrderEventConsumer {
     @KafkaListener(topics = "order-events", groupId = "product-metrics", containerFactory = KafkaConfig.BATCH_LISTENER)
     public void consume(List<ConsumerRecord<String, byte[]>> records, Acknowledgment ack) {
         for (ConsumerRecord<String, byte[]> record : records) {
+            OrderEventMessage msg;
             try {
-                OrderEventMessage msg = objectMapper.readValue(record.value(), OrderEventMessage.class);
-                metricsProcessor.handleOrder(msg);
+                msg = objectMapper.readValue(record.value(), OrderEventMessage.class);
             } catch (Exception e) {
-                log.error("order-events 처리 실패(skip) offset={}", record.offset(), e);
+                log.error("order-events 파싱 실패(skip) offset={}", record.offset(), e); // poison: skip
+                continue;
             }
+            metricsProcessor.handleOrder(msg); // 처리 실패는 전파 → 배치 미-ack → 재전달(멱등 재처리)
         }
         ack.acknowledge();
     }

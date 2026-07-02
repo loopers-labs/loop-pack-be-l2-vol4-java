@@ -19,8 +19,8 @@ public interface ProductMetricsJpaRepository extends JpaRepository<ProductMetric
         VALUES (:productId, :likeCount, 0, :version, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
           like_count   = IF(:version > like_version, :likeCount, like_count),
-          like_version = IF(:version > like_version, :version, like_version),
-          updated_at   = IF(:version > like_version, NOW(), updated_at)
+          updated_at   = IF(:version > like_version, NOW(), updated_at),
+          like_version = IF(:version > like_version, :version, like_version)
         """, nativeQuery = true)
     void applyLike(@Param("productId") Long productId, @Param("likeCount") long likeCount, @Param("version") long version);
 

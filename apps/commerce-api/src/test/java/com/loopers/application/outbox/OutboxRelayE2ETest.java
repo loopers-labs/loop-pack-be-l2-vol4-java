@@ -25,7 +25,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -61,16 +61,19 @@ class OutboxRelayE2ETest {
     void likePublishesToCatalogEvents() {
         likeFacade.like("tester01", productId);
 
-        AtomicReference<String> value = new AtomicReference<>();
+        AtomicBoolean found = new AtomicBoolean(false);
         try (KafkaConsumer<String, String> consumer = newConsumer()) {
             consumer.subscribe(List.of("catalog-events"));
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
                 var records = consumer.poll(Duration.ofMillis(500));
-                records.forEach(r -> value.set(r.value()));
-                assertThat(value.get()).isNotNull();
+                records.forEach(r -> {
+                    if (r.value().contains("\"type\":\"LikeAdded\"") && r.value().contains("\"productId\":" + productId)) {
+                        found.set(true);
+                    }
+                });
+                assertThat(found.get()).isTrue();
             });
         }
-        assertThat(value.get()).contains("\"type\":\"LikeAdded\"").contains("\"productId\":" + productId);
     }
 
     private KafkaConsumer<String, String> newConsumer() {
