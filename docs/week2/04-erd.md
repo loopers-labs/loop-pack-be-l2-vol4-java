@@ -295,7 +295,7 @@ erDiagram
 
 **제약** — 브랜드·상품과 동일하게 논리 삭제(`deleted_at IS NULL` 필터)를 따른다. 템플릿 수정·삭제는 이후 발급분에만 영향을 주고, 이미 발급된 `user_coupons` 행에는 영향이 없다(발급 시점 스냅샷).
 
-**선착순(Round 7)** — `issue_limit`이 `NULL`이면 무제한 템플릿(동기 발급, US-19), 값이 있으면 선착순 템플릿(비동기 요청 경로, US-34)이다. `issued_count`는 소비자가 `templateId` 파티션 직렬화로 단일 스레드에서만 증가시키므로 락 없이 `issued_count <= issue_limit`이 지켜진다. **행 갱신 경합 방지로 `@DynamicUpdate`** 를 둔다 — 어드민의 템플릿 수정(name/정책)과 소비자의 카운터 증가가 서로 다른 컬럼을 만질 때 교차 lost update를 막는다(`product_metrics`·`inventories`와 같은 컬럼 단위 쓰기 패턴).
+**선착순(Round 7)** — `issue_limit`이 `NULL`이면 무제한 템플릿(동기 발급, US-19), 값이 있으면 선착순 템플릿(비동기 요청 경로, US-34)이다. `issued_count`는 소비자(`commerce-streamer`)가 **조건부 원자 UPDATE**(`SET issued_count = issued_count + 1 WHERE issued_count < issue_limit`, JdbcTemplate)로 증가시키므로, 동시 요청이 몰려도 영향 행 수 판정으로 `issued_count <= issue_limit`이 지켜진다(재고 차감과 같은 패턴, 락 불필요). 이 증분은 `issued_count` 컬럼만 건드리고, 어드민의 템플릿 수정(name/정책)은 api 의 JPA **`@DynamicUpdate`**(변경 컬럼만 UPDATE)로 나가므로 서로의 컬럼을 덮어쓰지 않는다(교차 lost update 방지, `product_metrics`·`inventories`와 같은 컬럼 단위 쓰기 결).
 
 ### 내 쿠폰 — `user_coupons`
 
@@ -326,7 +326,7 @@ erDiagram
 
 ### 선착순 발급 요청 — `coupon_issue_requests` (Round 7)
 
-한도가 걸린(선착순) 쿠폰 발급 **시도 한 건**의 생애주기를 기록한다. api가 `PENDING`으로 접수(INSERT)하고, 발급 소비자(같은 api 호스팅, 파티션 직렬화)가 결과로 전이시킨다. 클라이언트는 `request_id`로 상태를 폴링한다.
+한도가 걸린(선착순) 쿠폰 발급 **시도 한 건**의 생애주기를 기록한다. `commerce-api`가 `PENDING`으로 접수(INSERT)하고, 발급 소비자(`commerce-streamer`, JdbcTemplate)가 같은 MySQL에서 결과로 전이시킨다(shared DB). 클라이언트는 `request_id`로 상태를 폴링한다(api, 본인 요청만).
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|

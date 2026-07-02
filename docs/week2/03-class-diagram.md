@@ -153,7 +153,6 @@ classDiagram
         +isDeleted() bool
         +issueExpiresAt(now) datetime
         +isLimited() bool
-        +issueOne() bool
     }
     class UserCoupon {
         <<AggregateRoot>>
@@ -351,7 +350,6 @@ classDiagram
         +isDeleted() bool
         +issueExpiresAt(now) datetime
         +isLimited() bool
-        +issueOne() bool
     }
     class UserCoupon {
         <<AggregateRoot>>
@@ -423,7 +421,7 @@ classDiagram
     CouponIssueRequest ..> CouponTemplate : templateId 참조
 ```
 
-- **`CouponTemplate`** (AggregateRoot) — 어드민이 정의하는 쿠폰의 원형. 할인 정책(`DiscountPolicy`)과 유효일수(`validDays`)를 가진다. `issueExpiresAt(now)` = `now + validDays`로 발급될 쿠폰의 만료일을 계산해 준다. `Brand`처럼 논리 삭제(`BaseEntity.deletedAt`, `isDeleted()`)를 따른다. 템플릿 수정·삭제는 **이후 발급분에만** 영향을 주고, 이미 발급된 `UserCoupon`은 스냅샷이라 영향받지 않는다(AC-22-2·AC-23-2). **(Round 7)** 선착순 한도를 위해 `issueLimit`(nullable — `null`이면 무제한)과 `issuedCount`를 가진다. `isLimited()`는 한도 유무를, `issueOne()`은 `issuedCount < issueLimit`이면 카운터를 1 증가시키고 `true`(슬롯 확보), 소진이면 `false`를 돌려주는 **발급 슬롯 확보 도메인 메서드**다(무제한 템플릿에 호출하면 `BAD_REQUEST` — 선착순 경로 오용 방지). 이 검사·증가는 소비자가 파티션 직렬화로 단일 스레드에서 부르므로 락 없이 원자적이다(US-34).
+- **`CouponTemplate`** (AggregateRoot) — 어드민이 정의하는 쿠폰의 원형. 할인 정책(`DiscountPolicy`)과 유효일수(`validDays`)를 가진다. `issueExpiresAt(now)` = `now + validDays`로 발급될 쿠폰의 만료일을 계산해 준다. `Brand`처럼 논리 삭제(`BaseEntity.deletedAt`, `isDeleted()`)를 따른다. 템플릿 수정·삭제는 **이후 발급분에만** 영향을 주고, 이미 발급된 `UserCoupon`은 스냅샷이라 영향받지 않는다(AC-22-2·AC-23-2). **(Round 7)** 선착순 한도를 위해 `issueLimit`(nullable — `null`이면 무제한)과 `issuedCount`를 가진다. `isLimited()`는 한도 유무 판정(동기 발급 경로가 한정 템플릿을 거부하는 데 쓰임)이다. **한도 강제(`issued_count < issue_limit`)는 이 엔티티가 아니라 발급 소비자(`commerce-streamer`)의 조건부 원자 UPDATE**(`SET issued_count = issued_count + 1 WHERE issued_count < issue_limit`, shared DB·JdbcTemplate)가 수행하므로, 카운터 증가 메서드는 도메인에 두지 않는다 — 한도 규칙은 소비자 SQL 한 곳에만 산다(원래 도메인 `issueOne()` 이 있었으나 소비자 분리로 프로덕션 미사용이 되어 제거).
 - **`UserCoupon`** (AggregateRoot) — 사용자가 발급받은 쿠폰 한 장. 발급 시 `issue(userId, template, now)`가 템플릿의 **할인 정책·쿠폰명을 복사(스냅샷)** 하고 만료일(`expiresAt = template.issueExpiresAt(now)`)을 확정한다. 템플릿은 `templateId`로 ID 참조만 하므로, 발급 이후 템플릿이 수정·삭제돼도 이 쿠폰의 가치는 변하지 않는다(`OrderItem`의 상품명·단가 스냅샷과 같은 원칙). `calculateDiscount(orderAmount)`는 스냅샷한 `DiscountPolicy`에 위임해 할인액을 구한다. `assertUsableBy(userId, now)`는 본인 소유·사용 가능(미사용·미만료) 여부를 검증해 위반 시 `CoreException`(FORBIDDEN/BAD_REQUEST)으로 거부하는데 — 주문 흐름은 이를 **재고 비관락보다 앞서** 호출해 무효 쿠폰이 핫 로우 락을 점유하지 않게 한다(fail-cheap-first, 2단계 시퀀스). `use(orderId, now)`는 사용 가능(미사용·미만료)일 때만 `USED`로 전이하고 `usedAt`·`orderId`를 기록하며, 위반 시 `CoreException`으로 거부한다(재사용·만료 사용 방지). 동시에 두 주문이 같은 쿠폰을 쓰는 **중복 사용**은 `version`(`@Version`) **낙관적 락**으로 막는다 — 저경합이라 커밋 시 충돌 검출이 가장 싸며, 충돌한 쪽은 주문 트랜잭션 전체가 롤백된다(재고(`Inventory`)의 비관적 락과 대비 — 쿠폰은 저경합이라 무는 비용이 거의 없는 낙관 락을 택했다; 4단계 ERD 참조).
 - **`DiscountPolicy`** (VO, `@Embeddable`) — 할인 종류(`type`)·값(`value`)과 사용 조건(`minOrderAmount`)을 묶고 **할인 계산 규칙을 캡슐화**한 불변 값 객체. `calculate(orderAmount)`는 먼저 적용 전 금액이 `minOrderAmount` 미만이면 `BAD_REQUEST`로 거부(주문 자체가 성립하지 않음, `0`이면 제한 없음)하고, 통과하면 `FIXED`면 `min(value, orderAmount)`(적용 전 금액을 넘지 않음), `RATE`면 `floor(orderAmount × value / 100)`(원 단위 절사)를 돌려준다. 어느 쪽도 적용 전 금액을 초과하지 않아 "최종 금액 ≥ 0" 불변식을 타입 안에서 지킨다. `minOrderAmount`는 사용 조건이지만 자기가 게이트하는 할인과 같은 VO에 두어, 같은 VO를 보유한 `CouponTemplate`(원형 정의)·`UserCoupon`(발급 스냅샷)에 별도 컬럼·복사 없이 함께 전파된다.
 - **`CouponIssueRequest`** (AggregateRoot, Round 7) — **선착순 발급 "시도" 한 건의 생애주기**를 소유한다. `pending(requestId, userId, templateId)`로 접수(`PENDING`) 저장되고, 소비자가 결과로 전이시킨다: `PENDING → SUCCESS / SOLD_OUT / ALREADY_ISSUED / FAILED`(`CouponIssueStatus`). 전이는 **`PENDING`에서만** 허용되고 터미널은 되돌릴 수 없어(`markXxx()` 내부 `assertPending()`), 이 불변식이 "이미 처리된 요청의 재처리(이중발급)"를 막는다 — 덕분에 `requestId`는 클라이언트 폴링 핸들이자 **소비자 멱등 키**를 겸한다(재전달 메시지는 이미 터미널인 요청을 만나 skip). 순차 Long PK를 노출하지 않도록 `requestId`는 UUID다. `CouponTemplate`은 `templateId`로 ID 참조만 한다(다른 애그리거트).

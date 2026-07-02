@@ -555,11 +555,11 @@ sequenceDiagram
 
 ---
 
-## 6. 선착순 쿠폰 발급 (Kafka 파티션 직렬화) — Round 7 Step 3
+## 6. 선착순 쿠폰 발급 (commerce-streamer · 조건부 원자 UPDATE) — Round 7 Step 3
 
 **시나리오 개요**
 
-- **목적**: 수량이 한정된 쿠폰을 폭주하는 요청 속에서도 **한도까지만** 발급한다. Kafka를 전파가 아니라 **동시성 제어** 수단으로 써서, `templateId` 키 → 단일 파티션 → 단일 소비자 스레드로 요청을 직렬화해 락 없이 `발급 수 < 한도`를 강제한다.
+- **목적**: 수량이 한정된 쿠폰을 폭주하는 요청 속에서도 **한도까지만** 발급한다. `commerce-api`가 요청을 접수·발행하고, **`commerce-streamer`가 소비**해 발급 슬롯을 **조건부 원자 UPDATE**(`issued_count < issue_limit`)로 확보한다.
 - **선행조건**: 로그인 상태, 한도(`issueLimit`)가 설정된 템플릿 존재.
 - **관련 요구사항**: US-34 (AC-34-1 ~ AC-34-7).
 
@@ -568,17 +568,17 @@ sequenceDiagram
 | 약어 | 정식명 | 역할 |
 |------|--------|------|
 | U | 사용자 | 발급을 요청하고, `requestId`로 결과를 **폴링**한다 |
-| A | 쿠폰 접수 (commerce-api) | 요청을 `PENDING` 저장 + outbox 적재(한 트랜잭션), `requestId` 반환 |
+| A | 쿠폰 접수 (commerce-api) | 요청을 `PENDING` 저장 + outbox 적재(한 트랜잭션), `requestId` 반환. 폴링 응답(소유자 검증) |
 | OB | Outbox + Relay (api) | `coupon-issue-requests` 로 `key=templateId` 발행 |
 | K | Kafka | `coupon-issue-requests` 토픽(+ `.DLT`) |
-| CC | 발급 소비자 (commerce-api) | 파티션 직렬화 순차 처리 — 멱등·중복·한도·발급, manual ack |
-| DB | api DB | `coupon_templates` · `coupon_issue_requests` · `user_coupons` |
+| CC | 발급 소비자 (commerce-streamer) | JdbcTemplate 로 멱등·중복·한도(원자 UPDATE)·발급, manual ack |
+| DB | shared MySQL | `coupon_templates` · `coupon_issue_requests` · `user_coupons` (api 소유, streamer 도 씀) |
 
-> **경계** — 발급 소비자가 `commerce-streamer`가 아니라 **`commerce-api`에 사는 것**이 핵심 결정이다. 발급은 `product_metrics` 같은 read model 투영이 아니라 `CouponTemplate.issuedCount`·`UserCoupon` 스냅샷·유니크라는 **기존 write 도메인의 불변식**을 바꾸는 일이고, 발급된 쿠폰은 곧 주문 흐름에서 다시 쓰인다. 그래서 도메인을 소유한 앱이 소비까지 호스팅한다 — Kafka는 실행 경로(버퍼링·직렬화)만 제공한다.
+> **경계** — 발급 소비자는 **`commerce-streamer`가 호스팅**한다(Kafka consumer 앱이 실제로 처리 = 과제 요건). streamer 는 쿠폰 도메인(엔티티·불변식)을 복제하지 않고, 발급이 필요로 하는 최소 쿼리만 **JdbcTemplate 으로 같은 MySQL(shared DB)** 에 실행한다. 대가는 발급 규칙(스냅샷·만료·한도)이 SQL 로 재표현되어 api 의 `UserCoupon.issue()`/`CouponTemplate` 불변식과 **드리프트**할 수 있다는 것(컴파일러 미검출) + `user_coupons` write 소유권이 두 앱에 걸친다는 것. 그 대신 한도 강제는 조건부 원자 UPDATE 라 소비 위치와 무관하게 안전하다.
 
 ### 6-1. 요청 접수 → 발급 처리 → 폴링
 
-접수는 요청 행(`PENDING`)과 outbox를 **한 트랜잭션**으로 저장하고 `requestId`를 즉시 돌려준다(US-31 원자성). relay가 `key=templateId`로 발행하면 한 템플릿의 요청이 한 파티션에 모여 소비자 단일 스레드가 순차 처리한다. 소비자는 **요청 상태로 멱등 판정** 후, 처리 대상(`userId`·`templateId`)을 **메시지가 아니라 DB 요청 행**을 진실로 삼아 중복→한도→발급 순으로 결과를 확정한다.
+접수는 요청 행(`PENDING`)과 outbox를 **한 트랜잭션**으로 저장하고 `requestId`를 즉시 돌려준다(US-31 원자성). relay가 `key=templateId`로 발행하면 한 템플릿의 요청이 한 파티션에 모여 streamer 소비자가 순차 처리한다. 소비자는 **요청 상태로 멱등 판정** 후, 처리 대상(`userId`·`templateId`)을 **메시지가 아니라 DB 요청 행**을 진실로 삼아 중복→한도(조건부 원자 UPDATE)→발급 순으로 결과를 확정한다.
 
 ```mermaid
 sequenceDiagram
@@ -587,8 +587,8 @@ sequenceDiagram
     participant A as 쿠폰 접수 (api)
     participant OB as Outbox+Relay (api)
     participant K as Kafka (coupon-issue-requests)
-    participant CC as 발급 소비자 (api)
-    participant DB as api DB
+    participant CC as 발급 소비자 (streamer)
+    participant DB as shared MySQL
 
     U->>A: 발급 요청 {templateId}
     activate A
@@ -613,9 +613,9 @@ sequenceDiagram
         alt 이미 발급받음
             CC->>DB: 요청 = ALREADY_ISSUED (슬롯 미소모)
         else 미발급
-            alt 발급 수 < 한도
-                CC->>DB: issuedCount++ · user_coupons INSERT · 요청 = SUCCESS
-            else 한도 소진
+            alt 조건부 UPDATE 성공 (issued_count < issue_limit)
+                CC->>DB: issued_count+1 · user_coupons INSERT · 요청 = SUCCESS
+            else 영향 행 0 (한도 소진)
                 CC->>DB: 요청 = SOLD_OUT
             end
         end
@@ -630,4 +630,4 @@ sequenceDiagram
     deactivate A
 ```
 
-**해석** — 세 겹의 안전장치가 겹친다. ① **접수의 원자성**: 요청과 outbox가 한 트랜잭션이라 "접수됐는데 발행 안 됨"이 없다(US-31). ② **파티션 직렬화**: `key=templateId`로 한 템플릿의 read-modify-write(`발급 수 < 한도` 검사·증가)가 단일 스레드에 직렬화돼 락 없이 초과 발급이 차단된다(AC-34-3) — 서로 다른 템플릿은 다른 파티션에서 병렬. ③ **멱등 + DB 진실**: 요청 상태가 `PENDING`일 때만 처리하고(재전달 흡수, AC-34-5), 처리 대상을 외부 경계인 메시지가 아니라 DB 요청 행에서 읽어 "요청과 발급 결과가 갈리는" 무결성 균열을 원천 차단한다. `ack`는 발급 트랜잭션이 커밋된 뒤에만 호출하므로(manual ack), 처리 중 장애가 나면 오프셋이 전진하지 않아 재시도→DLQ로 흐른다(성공 시에만 전진 = at-least-once). 결정적 실패(템플릿 삭제/무제한)만 `FAILED`로 확정하고 일시 장애는 상태를 남기지 않는다(AC-34-7). 중복 방지의 최후 방어선은 `user_coupons (user_id, template_id)` 유니크다(US-19와 공유).
+**해석** — 세 겹의 안전장치가 겹친다. ① **접수의 원자성**: 요청과 outbox가 한 트랜잭션이라 "접수됐는데 발행 안 됨"이 없다(US-31). ② **조건부 원자 UPDATE**: 한도 강제는 `UPDATE ... SET issued_count = issued_count + 1 WHERE issued_count < issue_limit`의 영향 행 수로 판정한다(AC-34-3) — 재고 차감과 같은 패턴이라 파티션 직렬화(순서·멱등을 돕는 `key=templateId`)가 없어도 초과 발급이 불가능하다. ③ **멱등 + DB 진실**: 요청 상태가 `PENDING`일 때만 처리하고(재전달 흡수, AC-34-5), 처리 대상을 외부 경계인 메시지가 아니라 DB 요청 행에서 읽어 "요청과 발급 결과가 갈리는" 무결성 균열을 원천 차단한다. `ack`는 발급 트랜잭션이 커밋된 뒤에만 호출하므로(manual ack), 처리 중 장애가 나면 오프셋이 전진하지 않아 재시도→DLQ로 흐른다(성공 시에만 전진 = at-least-once). 결정적 실패(템플릿 삭제/무제한)만 `FAILED`로 확정하고 일시 장애는 상태를 남기지 않는다(AC-34-7). 중복 방지의 최후 방어선은 `user_coupons (user_id, template_id)` 유니크다(US-19와 공유). 발급 규칙(스냅샷·만료·한도)은 streamer JdbcTemplate SQL 에 재표현되므로, api 의 `UserCoupon.issue()`가 바뀌면 이 SQL 도 함께 맞춰야 한다(shared DB 분리의 대가).
