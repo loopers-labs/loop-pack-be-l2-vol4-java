@@ -121,4 +121,72 @@ class CouponTemplateTest {
         template.delete();
         assertThat(template.isDeleted()).isTrue();
     }
+
+    @DisplayName("선착순 한도(issueLimit) 를 다룰 때, ")
+    @Nested
+    class IssueLimit {
+
+        @DisplayName("한도 없이 생성하면 무제한(isLimited=false) 이고 issuedCount 는 0 이다.")
+        @Test
+        void unlimited_whenCreatedWithoutLimit() {
+            CouponTemplate template = CouponTemplate.create("무제한", fixed(1_000L), 30);
+
+            assertThat(template.isLimited()).isFalse();
+            assertThat(template.getIssueLimit()).isNull();
+            assertThat(template.getIssuedCount()).isZero();
+        }
+
+        @DisplayName("한도를 지정해 생성하면 한정(isLimited=true) 이고 한도가 설정된다.")
+        @Test
+        void limited_whenCreatedWithLimit() {
+            CouponTemplate template = CouponTemplate.create("선착순 100명", fixed(1_000L), 30, 100);
+
+            assertThat(template.isLimited()).isTrue();
+            assertThat(template.getIssueLimit()).isEqualTo(100);
+            assertThat(template.getIssuedCount()).isZero();
+        }
+
+        @DisplayName("한도가 1 미만이면 BAD_REQUEST 예외가 발생한다.")
+        @ParameterizedTest
+        @ValueSource(ints = {0, -1})
+        void throwsBadRequest_whenIssueLimitIsNotPositive(int limit) {
+            CoreException result = assertThrows(CoreException.class,
+                    () -> CouponTemplate.create("쿠폰", fixed(1_000L), 30, limit));
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("issueOne 은 ")
+    @Nested
+    class IssueOne {
+
+        @DisplayName("한도가 남아 있으면 슬롯을 확보(true) 하고 issuedCount 를 1 증가시킨다.")
+        @Test
+        void returnsTrueAndIncrements_whenSlotAvailable() {
+            CouponTemplate template = CouponTemplate.create("선착순 2명", fixed(1_000L), 30, 2);
+
+            assertThat(template.issueOne()).isTrue();
+            assertThat(template.getIssuedCount()).isEqualTo(1);
+        }
+
+        @DisplayName("한도만큼 발급된 뒤에는 소진(false) 을 돌려주고 issuedCount 를 넘기지 않는다.")
+        @Test
+        void returnsFalseAndDoesNotExceed_whenSoldOut() {
+            CouponTemplate template = CouponTemplate.create("선착순 2명", fixed(1_000L), 30, 2);
+
+            assertThat(template.issueOne()).isTrue();
+            assertThat(template.issueOne()).isTrue();
+            assertThat(template.issueOne()).as("소진 후에는 false").isFalse();
+            assertThat(template.getIssuedCount()).as("한도를 넘기지 않는다").isEqualTo(2);
+        }
+
+        @DisplayName("무제한 템플릿에 호출하면 BAD_REQUEST 예외가 발생한다(선착순 경로 오용 방지).")
+        @Test
+        void throwsBadRequest_whenUnlimited() {
+            CouponTemplate template = CouponTemplate.create("무제한", fixed(1_000L), 30);
+
+            CoreException result = assertThrows(CoreException.class, template::issueOne);
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }
