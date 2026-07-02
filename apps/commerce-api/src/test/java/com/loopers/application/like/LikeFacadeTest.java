@@ -54,12 +54,14 @@ class LikeFacadeTest {
     @Nested
     class Liking {
 
-        @DisplayName("아직 좋아요하지 않았으면, Like 저장 + 카운트 증가 + LikeAdded 이벤트를 발행한다.")
+        @DisplayName("아직 좋아요하지 않았으면, Like 저장 + 카운트 증가 + LikeAdded(스냅샷) 발행.")
         @Test
         void savesIncrementsAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(false);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product()));
+            when(likeCountRepository.find(PRODUCT_ID))
+                .thenReturn(Optional.of(new com.loopers.domain.like.ProductLikeCount(PRODUCT_ID, 5L)));
 
             likeFacade.like(LOGIN_ID, PRODUCT_ID);
 
@@ -67,8 +69,8 @@ class LikeFacadeTest {
             verify(likeCountRepository).increase(PRODUCT_ID);
             ArgumentCaptor<LikeAdded> captor = ArgumentCaptor.forClass(LikeAdded.class);
             verify(eventPublisher).publishEvent(captor.capture());
-            assertThat(captor.getValue().userId()).isEqualTo(7L);
             assertThat(captor.getValue().productId()).isEqualTo(PRODUCT_ID);
+            assertThat(captor.getValue().likeCount()).isEqualTo(5L);
         }
 
         @DisplayName("이미 좋아요한 경우, 저장/증가/발행 모두 하지 않는다. (멱등)")
@@ -104,11 +106,13 @@ class LikeFacadeTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요한 상태면, Like 삭제 + 카운트 감소 + LikeRemoved 이벤트를 발행한다.")
+        @DisplayName("좋아요한 상태면, Like 삭제 + 카운트 감소 + LikeRemoved(스냅샷) 발행.")
         @Test
         void deletesDecrementsAndPublishes() {
             givenUser(7L);
             when(likeRepository.existsBy(7L, PRODUCT_ID)).thenReturn(true);
+            when(likeCountRepository.find(PRODUCT_ID))
+                .thenReturn(Optional.of(new com.loopers.domain.like.ProductLikeCount(PRODUCT_ID, 4L)));
 
             likeFacade.unlike(LOGIN_ID, PRODUCT_ID);
 

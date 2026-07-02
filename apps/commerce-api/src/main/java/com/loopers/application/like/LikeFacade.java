@@ -3,6 +3,7 @@ package com.loopers.application.like;
 import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeCountRepository;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.like.ProductLikeCount;
 import com.loopers.domain.like.event.LikeAdded;
 import com.loopers.domain.like.event.LikeRemoved;
 import com.loopers.domain.product.ProductRepository;
@@ -39,7 +40,10 @@ public class LikeFacade {
         // 운영 카운트: API 가 즉시 정확해야 하므로 트랜잭션 안에서 원자적 upsert (동시성 정합성 보장)
         likeCountRepository.increase(productId);
         // 이벤트: 로깅/분석집계(Step2 product_metrics)로 분리 — 후속 처리는 좋아요 성공과 무관
-        eventPublisher.publishEvent(new LikeAdded(userId, productId, ZonedDateTime.now()));
+        ProductLikeCount snapshot = likeCountRepository.find(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 집계를 찾을 수 없습니다."));
+        eventPublisher.publishEvent(new LikeAdded(
+            userId, productId, snapshot.getCount(), snapshot.getVersion(), ZonedDateTime.now()));
     }
 
     @Transactional
@@ -50,7 +54,10 @@ public class LikeFacade {
         }
         likeRepository.deleteBy(userId, productId);
         likeCountRepository.decrease(productId);
-        eventPublisher.publishEvent(new LikeRemoved(userId, productId, ZonedDateTime.now()));
+        ProductLikeCount snapshot = likeCountRepository.find(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 집계를 찾을 수 없습니다."));
+        eventPublisher.publishEvent(new LikeRemoved(
+            userId, productId, snapshot.getCount(), snapshot.getVersion(), ZonedDateTime.now()));
     }
 
     private Long resolveUserId(String loginId) {
