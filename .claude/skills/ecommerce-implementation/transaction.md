@@ -2,6 +2,8 @@
 
 트랜잭션 경계와 조회 전용 트랜잭션 기본 원칙은 `.claude/rules/code-conventions.md` 를 따른다.
 
+> 본 문서는 **구현 시 따를 규칙**이다. 이미 작성된 코드의 트랜잭션 범위·영속성·동시성을 사후 점검(리뷰)하려면 `../transaction-concurrency-review/SKILL.md` 를 사용한다.
+
 ## 주문 생성
 
 주문 생성 트랜잭션은 다음 일관성을 보장한다.

@@ -1,6 +1,6 @@
 package com.loopers.brand.application;
 
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.product.application.ProductService;
 import com.loopers.support.PageSupport;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ public class BrandFacade {
     public Page<BrandInfo> getBrands(int page, int size) {
         List<BrandInfo> infos =
             brandService.getAll().stream()
-                .sorted(Comparator.comparing(BrandModel::getId).reversed())
+                .sorted(Comparator.comparing(Brand::getId).reversed())
                 .map(BrandInfo::from)
                 .toList();
         return PageSupport.paginate(infos, page, size);

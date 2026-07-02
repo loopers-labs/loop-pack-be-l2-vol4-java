@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 @Getter
 @Entity
 @Table(name = "member")
-public class MemberModel extends BaseEntity {
+public class Member extends BaseEntity {
 
     private static final Pattern LOGIN_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]{4,20}$");
 
@@ -25,9 +25,9 @@ public class MemberModel extends BaseEntity {
     @Column(name = "status", nullable = false)
     private MemberStatus status;
 
-    protected MemberModel() {}
+    protected Member() {}
 
-    public MemberModel(String loginId, String password) {
+    public Member(String loginId, String password) {
         if (loginId == null || !LOGIN_ID_PATTERN.matcher(loginId).matches()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 ID는 영문/숫자 4~20자여야 합니다.");
         }

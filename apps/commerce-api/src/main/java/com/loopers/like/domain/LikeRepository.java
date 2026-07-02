@@ -3,7 +3,7 @@ package com.loopers.like.domain;
 import java.util.List;
 
 public interface LikeRepository {
-    LikeModel save(LikeModel like);
+    Like save(Like like);
 
     boolean exists(Long memberId, Long productId);
 
@@ -11,5 +11,5 @@ public interface LikeRepository {
 
     long countByProductId(Long productId);
 
-    List<LikeModel> findByMemberId(Long memberId);
+    List<Like> findByMemberId(Long memberId);
 }

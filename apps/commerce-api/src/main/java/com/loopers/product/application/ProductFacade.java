@@ -1,10 +1,11 @@
 package com.loopers.product.application;
 
 import com.loopers.brand.application.BrandService;
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
+import com.loopers.inventory.application.InventoryService;
 import com.loopers.like.application.LikeService;
+import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductDetail;
-import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductSortType;
 import com.loopers.support.PageSupport;
 import lombok.RequiredArgsConstructor;
@@ -24,22 +25,26 @@ public class ProductFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final LikeService likeService;
+    private final InventoryService inventoryService;
     private final ProductDisplayService productDisplayService = new ProductDisplayService();
 
     public ProductInfo createProduct(
         Long brandId, String name, String description, Long price, Integer stock) {
         brandService.ensureExists(brandId);
-        return ProductInfo.from(productService.create(brandId, name, description, price, stock));
+        Product product = productService.create(brandId, name, description, price);
+        inventoryService.create(product.getId(), stock);
+        return ProductInfo.from(product, stock);
     }
 
-    /** 상품 상세 = Product + Brand + 좋아요 수를 도메인 서비스에서 조합한다. */
+    /** 상품 상세 = Product + Brand + 좋아요 수 + 재고(Inventory) 를 조합한다. */
     @Transactional(readOnly = true)
     public ProductDetailInfo getProductDetail(Long productId) {
-        ProductModel product = productService.get(productId);
-        BrandModel brand = brandService.get(product.getBrandId());
+        Product product = productService.get(productId);
+        Brand brand = brandService.get(product.getBrandId());
         long likeCount = likeService.getLikeCount(productId);
+        int stock = inventoryService.getByProductId(productId).getAvailableQuantity();
 
-        ProductDetail detail = productDisplayService.assembleDetail(product, brand, likeCount);
+        ProductDetail detail = productDisplayService.assembleDetail(product, brand, likeCount, stock);
         return ProductDetailInfo.from(detail);
     }
 
@@ -49,17 +54,20 @@ public class ProductFacade {
     @Transactional(readOnly = true)
     public Page<ProductDetailInfo> getProducts(
         Long brandId, ProductSortType sortType, int page, int size) {
-        List<ProductModel> products =
+        List<Product> products =
             brandId != null ? productService.getByBrandId(brandId) : productService.getAll();
 
-        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
-        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        List<Long> brandIds = products.stream().map(Product::getBrandId).distinct().toList();
+        List<Long> productIds = products.stream().map(Product::getId).toList();
 
-        Map<Long, BrandModel> brandMap = brandService.getMapByIds(brandIds);
+        Map<Long, Brand> brandMap = brandService.getMapByIds(brandIds);
         Map<Long, Long> likeCountMap = likeService.getLikeCounts(productIds);
+        Map<Long, Integer> stockMap = inventoryService.getQuantityMap(productIds);
 
         List<ProductDetailInfo> assembled =
-            productDisplayService.assembleList(products, brandMap, likeCountMap, sortType).stream()
+            productDisplayService
+                .assembleList(products, brandMap, likeCountMap, stockMap, sortType)
+                .stream()
                 .map(ProductDetailInfo::from)
                 .toList();
         return PageSupport.paginate(assembled, page, size);
@@ -68,25 +76,32 @@ public class ProductFacade {
     /** 관리자 상품 목록 = 운영용 상품 정보(재고 포함), 최신순 + page/size 페이지네이션. */
     @Transactional(readOnly = true)
     public Page<ProductInfo> getProductsForAdmin(Long brandId, int page, int size) {
-        List<ProductModel> products =
+        List<Product> products =
             brandId != null ? productService.getByBrandId(brandId) : productService.getAll();
+
+        List<Long> productIds = products.stream().map(Product::getId).toList();
+        Map<Long, Integer> stockMap = inventoryService.getQuantityMap(productIds);
 
         List<ProductInfo> infos =
             products.stream()
-                .sorted(Comparator.comparing(ProductModel::getId).reversed())
-                .map(ProductInfo::from)
+                .sorted(Comparator.comparing(Product::getId).reversed())
+                .map(product -> ProductInfo.from(product, stockMap.getOrDefault(product.getId(), 0)))
                 .toList();
         return PageSupport.paginate(infos, page, size);
     }
 
     @Transactional(readOnly = true)
     public ProductInfo getProductForAdmin(Long productId) {
-        return ProductInfo.from(productService.get(productId));
+        Product product = productService.get(productId);
+        int stock = inventoryService.getByProductId(productId).getAvailableQuantity();
+        return ProductInfo.from(product, stock);
     }
 
     public ProductInfo updateProduct(
         Long id, String name, String description, Long price, Integer stock) {
-        return ProductInfo.from(productService.update(id, name, description, price, stock));
+        Product product = productService.update(id, name, description, price);
+        inventoryService.setQuantity(id, stock);
+        return ProductInfo.from(product, stock);
     }
 
     public void deleteProduct(Long id) {

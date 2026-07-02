@@ -1,5 +1,7 @@
 # 동시성 지침
 
+> 본 문서는 **구현 시 따를 규칙**이다. 작성된 코드의 락·격리수준(MySQL InnoDB 기본 REPEATABLE READ)·데드락·lost update 위험을 사후 점검(리뷰)하려면 `../transaction-concurrency-review/SKILL.md` 를 사용한다.
+
 ## 재고 차감
 
 - 주문 생성 시 재고 확인과 차감은 초과 판매가 발생하지 않도록 보장한다.

@@ -11,7 +11,7 @@ public class OrderItem extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
-    private OrderModel order;
+    private Order order;
 
     @Embedded private OrderItemSnapshot snapshot;
 
@@ -20,7 +20,7 @@ public class OrderItem extends BaseEntity {
 
     protected OrderItem() {}
 
-    OrderItem(OrderModel order, OrderItemSnapshot snapshot, int quantity) {
+    OrderItem(Order order, OrderItemSnapshot snapshot, int quantity) {
         this.order = order;
         this.snapshot = snapshot;
         this.quantity = quantity;

@@ -1,6 +1,6 @@
 package com.loopers.member.application;
 
-import com.loopers.member.domain.MemberModel;
+import com.loopers.member.domain.Member;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ public class MemberFacade {
 
     @Transactional(readOnly = true)
     public Long authenticate(String loginId, String password) {
-        MemberModel member = memberService.getByLoginId(loginId);
+        Member member = memberService.getByLoginId(loginId);
         if (!member.verifyPassword(password)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "로그인 정보가 올바르지 않습니다.");
         }

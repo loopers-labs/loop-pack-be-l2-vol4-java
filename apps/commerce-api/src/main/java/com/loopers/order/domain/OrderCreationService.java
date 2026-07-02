@@ -1,7 +1,7 @@
 package com.loopers.order.domain;
 
-import com.loopers.brand.domain.BrandModel;
-import com.loopers.product.domain.ProductModel;
+import com.loopers.brand.domain.Brand;
+import com.loopers.product.domain.Product;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 
@@ -11,31 +11,30 @@ import java.util.Map;
 /**
  * 주문 생성을 담당하는 무상태 도메인 서비스.
  *
- * <p>Repository 에 의존하지 않는다. 호출자(Application)가 이미 로드한 상품/브랜드를 받아 주문 항목 스냅샷 생성, 총액 계산, 재고
- * 차감(도메인 객체 협력)만 수행한다.
+ * <p>Repository 에 의존하지 않는다. 호출자(Application)가 이미 로드한 상품/브랜드를 받아 주문 항목 스냅샷 생성과 총액 계산만 수행한다.
+ * 재고 차감은 호출자(OrderFacade)가 Inventory 비관적 락 경로로 별도 수행한다.
  */
 public class OrderCreationService {
 
-    public OrderModel create(
+    public Order create(
         Long memberId,
         List<OrderLine> lines,
-        Map<Long, ProductModel> productMap,
-        Map<Long, BrandModel> brandMap) {
+        Map<Long, Product> productMap,
+        Map<Long, Brand> brandMap) {
 
         if (lines == null || lines.isEmpty()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 항목이 비어있습니다.");
         }
 
-        OrderModel order = OrderModel.create(memberId);
+        Order order = Order.create(memberId);
         for (OrderLine line : lines) {
-            ProductModel product = productMap.get(line.productId());
+            Product product = productMap.get(line.productId());
             if (product == null) {
                 throw new CoreException(
                     ErrorType.NOT_FOUND, "[id = " + line.productId() + "] 상품을 찾을 수 없습니다.");
             }
 
-            BrandModel brand = brandMap.get(product.getBrandId());
-            product.deductStock(line.quantity());
+            Brand brand = brandMap.get(product.getBrandId());
 
             OrderItemSnapshot snapshot =
                 new OrderItemSnapshot(

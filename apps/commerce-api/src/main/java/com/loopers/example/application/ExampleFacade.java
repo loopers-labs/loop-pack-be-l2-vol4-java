@@ -1,6 +1,6 @@
 package com.loopers.example.application;
 
-import com.loopers.example.domain.ExampleModel;
+import com.loopers.example.domain.Example;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +13,7 @@ public class ExampleFacade {
 
     @Transactional(readOnly = true)
     public ExampleInfo getExample(Long id) {
-        ExampleModel example = exampleService.getExample(id);
+        Example example = exampleService.getExample(id);
         return ExampleInfo.from(example);
     }
 }

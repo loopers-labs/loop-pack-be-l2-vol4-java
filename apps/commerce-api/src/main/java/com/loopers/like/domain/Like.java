@@ -15,7 +15,7 @@ import lombok.Getter;
     name = "product_like",
     uniqueConstraints =
         @UniqueConstraint(name = "uk_product_like_member_product", columnNames = {"member_id", "product_id"}))
-public class LikeModel extends BaseEntity {
+public class Like extends BaseEntity {
 
     @Column(name = "member_id", nullable = false, updatable = false)
     private Long memberId;
@@ -23,9 +23,9 @@ public class LikeModel extends BaseEntity {
     @Column(name = "product_id", nullable = false, updatable = false)
     private Long productId;
 
-    protected LikeModel() {}
+    protected Like() {}
 
-    public LikeModel(Long memberId, Long productId) {
+    public Like(Long memberId, Long productId) {
         if (memberId == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "회원 식별자는 필수입니다.");
         }

@@ -13,7 +13,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "brand")
 @SQLRestriction("deleted_at is null")
-public class BrandModel extends BaseEntity {
+public class Brand extends BaseEntity {
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -21,9 +21,9 @@ public class BrandModel extends BaseEntity {
     @Column(name = "description")
     private String description;
 
-    protected BrandModel() {}
+    protected Brand() {}
 
-    public BrandModel(String name, String description) {
+    public Brand(String name, String description) {
         validate(name, description);
         this.name = name;
         this.description = description;

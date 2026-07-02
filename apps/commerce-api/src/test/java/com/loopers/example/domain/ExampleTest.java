@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class ExampleModelTest {
+class ExampleTest {
     @DisplayName("예시 모델을 생성할 때, ")
     @Nested
     class Create {
@@ -22,7 +22,7 @@ class ExampleModelTest {
             String description = "설명";
 
             // act
-            ExampleModel exampleModel = new ExampleModel(name, description);
+            Example exampleModel = new Example(name, description);
 
             // assert
             assertAll(
@@ -40,7 +40,7 @@ class ExampleModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ExampleModel(name, "설명");
+                new Example(name, "설명");
             });
 
             // assert
@@ -55,7 +55,7 @@ class ExampleModelTest {
 
             // act
             CoreException result = assertThrows(CoreException.class, () -> {
-                new ExampleModel("제목", description);
+                new Example("제목", description);
             });
 
             // assert

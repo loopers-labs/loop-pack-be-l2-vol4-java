@@ -1,6 +1,6 @@
 package com.loopers.brand.application;
 
-import com.loopers.brand.domain.BrandModel;
+import com.loopers.brand.domain.Brand;
 import com.loopers.brand.domain.BrandRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -19,32 +19,32 @@ public class BrandService {
 
     private final BrandRepository brandRepository;
 
-    public BrandModel create(String name, String description) {
-        return brandRepository.save(new BrandModel(name, description));
+    public Brand create(String name, String description) {
+        return brandRepository.save(new Brand(name, description));
     }
 
-    public BrandModel get(Long id) {
+    public Brand get(Long id) {
         return brandRepository.find(id)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[id = " + id + "] 브랜드를 찾을 수 없습니다."));
     }
 
-    public List<BrandModel> getAll() {
+    public List<Brand> getAll() {
         return brandRepository.findAll();
     }
 
-    public Map<Long, BrandModel> getMapByIds(Collection<Long> ids) {
+    public Map<Long, Brand> getMapByIds(Collection<Long> ids) {
         return brandRepository.findAllByIds(ids).stream()
-            .collect(Collectors.toMap(BrandModel::getId, Function.identity()));
+            .collect(Collectors.toMap(Brand::getId, Function.identity()));
     }
 
-    public BrandModel update(Long id, String name, String description) {
-        BrandModel brand = get(id);
+    public Brand update(Long id, String name, String description) {
+        Brand brand = get(id);
         brand.update(name, description);
         return brandRepository.save(brand);
     }
 
     public void delete(Long id) {
-        BrandModel brand = get(id);
+        Brand brand = get(id);
         brand.delete();
         brandRepository.save(brand);
     }

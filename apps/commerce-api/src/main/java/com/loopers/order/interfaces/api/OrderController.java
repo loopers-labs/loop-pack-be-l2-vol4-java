@@ -32,7 +32,7 @@ public class OrderController {
                 .map(item -> new OrderLine(item.productId(), item.quantity() == null ? 0 : item.quantity()))
                 .toList();
 
-        OrderInfo info = orderFacade.createOrder(memberId, lines);
+        OrderInfo info = orderFacade.createOrder(memberId, lines, request.couponId());
         return ApiResponse.success(OrderResponse.from(info));
     }
 

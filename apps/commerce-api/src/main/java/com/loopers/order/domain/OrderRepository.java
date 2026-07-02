@@ -4,11 +4,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository {
-    OrderModel save(OrderModel order);
+    Order save(Order order);
 
-    Optional<OrderModel> find(Long id);
+    Optional<Order> find(Long id);
 
-    List<OrderModel> findByMemberId(Long memberId);
+    List<Order> findByMemberId(Long memberId);
 
-    List<OrderModel> findAll();
+    List<Order> findAll();
 }
