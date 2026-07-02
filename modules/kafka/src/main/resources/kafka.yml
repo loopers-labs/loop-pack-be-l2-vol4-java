@@ -14,18 +14,21 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all # 모든 ISR 복제 확인 후 ack → 리더 장애에도 유실 없음
       retries: 3
+      properties:
+        enable.idempotence: true # producer→broker 재전송 중복을 파티션 단위로 제거(구간 exactly-once)
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       properties:
         enable-auto-commit: false
     listener:
       ack-mode: manual
 
 ---
-spring.config.activate.on-profile: local, test
+spring.config.activate.on-profile: local
 
 spring:
   kafka:
@@ -33,6 +36,14 @@ spring:
     admin:
       properties:
         bootstrap.servers: kafka:9092
+
+---
+spring.config.activate.on-profile: test
+
+spring:
+  kafka:
+    # 실제 값은 KafkaTestContainersConfig 가 시스템 프로퍼티로 덮어쓴다. admin 은 override 없이 이 값을 상속.
+    bootstrap-servers: localhost:19092
 
 ---
 spring.config.activate.on-profile: dev
