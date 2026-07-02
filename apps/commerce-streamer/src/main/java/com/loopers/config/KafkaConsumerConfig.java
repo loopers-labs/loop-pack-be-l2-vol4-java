@@ -2,6 +2,7 @@ package com.loopers.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,13 +35,15 @@ public class KafkaConsumerConfig {
 
     @Bean(name = METRICS_LISTENER)
     public ConcurrentKafkaListenerContainerFactory<String, String> metricsListenerFactory(
-            ConsumerFactory<String, String> stringConsumerFactory
+            ConsumerFactory<String, String> stringConsumerFactory,
+            @Value("${spring.kafka.listener.auto-startup:true}") boolean autoStartup
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(stringConsumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.getContainerProperties().setMissingTopicsFatal(false);
         factory.setConcurrency(3);
+        factory.setAutoStartup(autoStartup);
         return factory;
     }
 }

@@ -1,5 +1,6 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueService;
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.CouponType;
@@ -20,6 +21,7 @@ public class CouponFacade {
 
     private final CouponService couponService;
     private final UserCouponService userCouponService;
+    private final CouponIssueService couponIssueService;
     private final UserService userService;
 
     // 쿠폰 등록 (admin)
@@ -59,6 +61,17 @@ public class CouponFacade {
         UserCouponModel userCoupon = userCouponService.issue(userId, couponId);
         CouponModel coupon = couponService.getCoupon(couponId);
         return MyCouponInfo.from(userCoupon, coupon, LocalDateTime.now());
+    }
+
+    // 선착순 쿠폰 발급 요청 (client) — Kafka 발행만, 실제 발급은 commerce-streamer 가 수행
+    public CouponIssueRequestInfo requestIssue(String loginId, Long couponId) {
+        Long userId = userService.getMyInfo(loginId).getId();
+        return CouponIssueRequestInfo.from(couponIssueService.request(userId, couponId));
+    }
+
+    // 선착순 발급 결과 조회 (client, polling)
+    public CouponIssueRequestInfo getIssueRequest(String requestId) {
+        return CouponIssueRequestInfo.from(couponIssueService.getRequest(requestId));
     }
 
     // 내 쿠폰 목록 조회 (client)

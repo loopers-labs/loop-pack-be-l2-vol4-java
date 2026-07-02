@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.coupon;
 
 import com.loopers.application.coupon.CouponFacade;
+import com.loopers.application.coupon.CouponIssueRequestInfo;
 import com.loopers.application.coupon.MyCouponInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.auth.LoginUser;
@@ -27,6 +28,25 @@ public class CouponV1Controller {
 
         CouponV1Dto.MyCouponResponse response = CouponV1Dto.MyCouponResponse.from(myCouponInfo);
         return ApiResponse.success(response);
+    }
+
+    // 선착순 쿠폰 발급 요청 — Kafka 발행만 하고 requestId 즉시 반환(비동기)
+    @PostMapping("/api/v1/coupons/{couponId}/issue-requests")
+    public ApiResponse<CouponV1Dto.IssueRequestResponse> requestIssue(
+            @LoginUser String loginId,
+            @PathVariable(value = "couponId") Long couponId
+    ) {
+        CouponIssueRequestInfo info = couponFacade.requestIssue(loginId, couponId);
+        return ApiResponse.success(CouponV1Dto.IssueRequestResponse.from(info));
+    }
+
+    // 선착순 발급 결과 조회 (polling)
+    @GetMapping("/api/v1/coupons/issue-requests/{requestId}")
+    public ApiResponse<CouponV1Dto.IssueRequestResponse> getIssueRequest(
+            @PathVariable(value = "requestId") String requestId
+    ) {
+        CouponIssueRequestInfo info = couponFacade.getIssueRequest(requestId);
+        return ApiResponse.success(CouponV1Dto.IssueRequestResponse.from(info));
     }
 
     @GetMapping("/api/v1/users/me/coupons")

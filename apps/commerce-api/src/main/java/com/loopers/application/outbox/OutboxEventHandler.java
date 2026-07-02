@@ -2,6 +2,7 @@ package com.loopers.application.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.coupon.CouponIssueRequestedEvent;
 import com.loopers.domain.like.LikeChangedEvent;
 import com.loopers.domain.order.OrderPaidEvent;
 import com.loopers.domain.outbox.OutboxModel;
@@ -25,9 +26,11 @@ public class OutboxEventHandler {
 
     static final String TOPIC_CATALOG = "catalog-events";
     static final String TOPIC_ORDER = "order-events";
+    static final String TOPIC_COUPON_ISSUE = "coupon-issue-requests";
     static final String TYPE_LIKE_CHANGED = "LIKE_CHANGED";
     static final String TYPE_PRODUCT_VIEWED = "PRODUCT_VIEWED";
     static final String TYPE_ORDER_PAID = "ORDER_PAID";
+    static final String TYPE_COUPON_ISSUE_REQUESTED = "COUPON_ISSUE_REQUESTED";
 
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
@@ -45,6 +48,11 @@ public class OutboxEventHandler {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(OrderPaidEvent event) {
         append(event.eventId(), "order", event.orderId(), TOPIC_ORDER, TYPE_ORDER_PAID, event);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void on(CouponIssueRequestedEvent event) {
+        append(event.eventId(), "coupon", event.couponId(), TOPIC_COUPON_ISSUE, TYPE_COUPON_ISSUE_REQUESTED, event);
     }
 
     private void append(String eventId, String aggregateType, Long aggregateId, String topic, String eventType, Object payload) {
