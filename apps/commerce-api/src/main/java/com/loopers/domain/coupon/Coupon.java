@@ -39,12 +39,26 @@ public class Coupon extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private LocalDateTime expiredAt;
 
+    // 선착순 발급 한도. null 이면 무제한(기존 어드민 쿠폰과의 호환).
+    @Column(name = "total_quantity")
+    private Long totalQuantity;
+
+    // 기존 행 호환을 위해 DDL 기본값 0 (ddl-auto update 로 컬럼 추가 시 기존 행이 0 으로 채워지도록)
+    @Column(name = "issued_quantity", nullable = false, columnDefinition = "bigint not null default 0")
+    private Long issuedQuantity;
+
     public Coupon(String name, Discount discount, Money minOrderAmount, LocalDateTime expiredAt) {
+        this(name, discount, minOrderAmount, expiredAt, null);
+    }
+
+    public Coupon(String name, Discount discount, Money minOrderAmount, LocalDateTime expiredAt, Long totalQuantity) {
         validate(name, expiredAt);
         this.name = name;
         this.discount = discount;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+        this.totalQuantity = totalQuantity;
+        this.issuedQuantity = 0L;
     }
 
     private static void validate(String name, LocalDateTime expiredAt) {
@@ -69,5 +83,22 @@ public class Coupon extends BaseEntity {
             throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액을 충족하지 않습니다.");
         }
         return discount.apply(orderAmount);
+    }
+
+    /** 발급 여력이 남아 있는가. totalQuantity 가 null 이면 무제한. */
+    public boolean canIssue() {
+        if (totalQuantity == null) {
+            return true;
+        }
+        long issued = issuedQuantity == null ? 0 : issuedQuantity;
+        return issued < totalQuantity;
+    }
+
+    /** 발급 수량을 1 소진한다. 수량 검증을 우회한 호출을 막는 마지막 안전망으로 초과 시 예외를 던진다. */
+    public void issueOne() {
+        if (!canIssue()) {
+            throw new CoreException(ErrorType.CONFLICT, "쿠폰 수량이 모두 소진되었습니다.");
+        }
+        this.issuedQuantity = (issuedQuantity == null ? 0 : issuedQuantity) + 1;
     }
 }
