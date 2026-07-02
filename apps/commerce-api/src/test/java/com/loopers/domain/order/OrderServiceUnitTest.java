@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +42,9 @@ class OrderServiceUnitTest {
 
     @Mock
     private UserCouponService userCouponService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private OrderService orderService;
@@ -109,6 +113,7 @@ class OrderServiceUnitTest {
 
             // then
             assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
+            verify(eventPublisher).publishEvent(any(OrderPaidEvent.class));
         }
 
         @DisplayName("존재하지 않는 주문이면, 예외가 발생한다.")
@@ -147,6 +152,7 @@ class OrderServiceUnitTest {
             verify(productStockService).increaseStock(1L, 2);
             verify(productStockService).increaseStock(2L, 3);
             assertThat(result.getStatus()).isEqualTo(OrderStatus.FAILED);
+            verify(eventPublisher).publishEvent(any(OrderFailedEvent.class));
         }
     }
 }
