@@ -2,8 +2,8 @@ package com.loopers.infrastructure.payment;
 
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentGateway;
+import com.loopers.domain.payment.PaymentRequestException;
 import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,29 +62,30 @@ class PgPaymentGatewayResilienceIntegrationTest {
                 "1", "100", CardType.SAMSUNG, "1234-5678-9814-1451", 5_000L, "http://localhost/callback");
     }
 
-    @DisplayName("재시도하는 실패(빠른 실패)는 최초 1 + 재시도 2 = 총 3회 시도 후 503 으로 떨어진다. ")
+    @DisplayName("재시도하는 실패(빠른 실패)는 최초 1 + 재시도 2 = 총 3회 시도 후 PaymentRequestException 으로 떨어진다. ")
     @Nested
     class RetriedFailures {
 
-        @DisplayName("5xx 는 3회까지 시도한다. (이 PG 에선 깨끗한 롤백 → 재시도 안전)")
+        @DisplayName("5xx 는 3회까지 시도하고, 부수효과 가능성이 있어 in-doubt 로 표면화한다. (재시도 안전하나 청구 여부 모름)")
         @Test
         void serverError5xx_retriesUpToThreeAttempts() {
             stub.mode(StubPgInterceptor.Mode.SERVER_ERROR);
 
             assertThatThrownBy(() -> paymentGateway.request(command()))
-                    .isInstanceOf(CoreException.class)
-                    .satisfies(e -> assertThat(((CoreException) e).getErrorType()).isEqualTo(ErrorType.SERVICE_UNAVAILABLE));
+                    .isInstanceOf(PaymentRequestException.class)
+                    .satisfies(e -> assertThat(((PaymentRequestException) e).isInDoubt()).isTrue());
 
             assertThat(stub.count()).isEqualTo(3);
         }
 
-        @DisplayName("연결 거부(ConnectException)도 3회까지 시도한다. (요청이 PG 에 닿지 못함 → not in-doubt)")
+        @DisplayName("연결 거부(ConnectException)도 3회까지 시도하고, 요청이 PG 에 닿지 못했으니 not-in-doubt 로 표면화한다.")
         @Test
         void connectRefused_retriesUpToThreeAttempts() {
             stub.mode(StubPgInterceptor.Mode.CONNECT_REFUSED);
 
             assertThatThrownBy(() -> paymentGateway.request(command()))
-                    .isInstanceOf(CoreException.class);
+                    .isInstanceOf(PaymentRequestException.class)
+                    .satisfies(e -> assertThat(((PaymentRequestException) e).isInDoubt()).isFalse());
 
             assertThat(stub.count()).isEqualTo(3);
         }
@@ -101,29 +102,30 @@ class PgPaymentGatewayResilienceIntegrationTest {
         }
     }
 
-    @DisplayName("재시도하지 않는 실패는 단 1회만 시도하고 즉시 503 으로 떨어진다. ")
+    @DisplayName("재시도하지 않는 실패는 단 1회만 시도하고 PaymentRequestException 으로 떨어진다. ")
     @Nested
     class NonRetriedFailures {
 
-        @DisplayName("read 타임아웃(SocketTimeoutException)은 재시도하지 않는다. (in-doubt → 중복 위험)")
+        @DisplayName("read 타임아웃(SocketTimeoutException)은 재시도하지 않고, 청구 여부를 모르니 in-doubt 로 표면화한다. (중복 위험)")
         @Test
         void readTimeout_singleAttemptNoRetry() {
             stub.mode(StubPgInterceptor.Mode.READ_TIMEOUT);
 
             assertThatThrownBy(() -> paymentGateway.request(command()))
-                    .isInstanceOf(CoreException.class);
+                    .isInstanceOf(PaymentRequestException.class)
+                    .satisfies(e -> assertThat(((PaymentRequestException) e).isInDoubt()).isTrue());
 
             assertThat(stub.count()).isEqualTo(1);
         }
 
-        @DisplayName("4xx(결정론적 실패)는 재시도하지 않고, in-doubt 와 구분되도록 BAD_REQUEST 로 표면화한다.")
+        @DisplayName("4xx(결정론적 실패)는 재시도하지 않고, 청구가 없음이 확실하므로 not-in-doubt 로 표면화한다.")
         @Test
         void clientError4xx_singleAttemptNoRetry() {
             stub.mode(StubPgInterceptor.Mode.CLIENT_ERROR);
 
             assertThatThrownBy(() -> paymentGateway.request(command()))
-                    .isInstanceOf(CoreException.class)
-                    .satisfies(e -> assertThat(((CoreException) e).getErrorType()).isEqualTo(ErrorType.BAD_REQUEST));
+                    .isInstanceOf(PaymentRequestException.class)
+                    .satisfies(e -> assertThat(((PaymentRequestException) e).isInDoubt()).isFalse());
 
             assertThat(stub.count()).isEqualTo(1);
         }
@@ -136,7 +138,7 @@ class PgPaymentGatewayResilienceIntegrationTest {
 
         PaymentGateway.Command shortOrder = new PaymentGateway.Command(
                 "1", "100", CardType.SAMSUNG, "1234-5678-9814-1451", 5_000L, "http://localhost/callback");
-        assertThatThrownBy(() -> paymentGateway.request(shortOrder)).isInstanceOf(CoreException.class);
+        assertThatThrownBy(() -> paymentGateway.request(shortOrder)).isInstanceOf(PaymentRequestException.class);
 
         assertThat(stub.lastBody()).contains("\"orderId\":\"000100\"");
     }

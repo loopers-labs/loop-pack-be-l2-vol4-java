@@ -9,11 +9,13 @@ import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderCommand;
 import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.event.OrderPlacedEvent;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +33,7 @@ public class OrderApplicationService {
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
     private final UserCouponRepository userCouponRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo.Created place(OrderCriteria.Place command) {
@@ -64,6 +67,9 @@ public class OrderApplicationService {
         if (userCoupon != null) {
             userCoupon.use(saved.getId(), now);
         }
+
+        // 주문 생성(주요 로직)은 위에서 끝났다. 행동 로깅 같은 부가 로직은 이벤트로 분리해 커밋 후 처리한다.
+        eventPublisher.publishEvent(new OrderPlacedEvent(saved.getId(), command.userId(), now));
         return OrderInfo.Created.from(saved);
     }
 

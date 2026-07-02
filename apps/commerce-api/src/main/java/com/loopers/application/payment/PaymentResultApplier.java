@@ -5,11 +5,15 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.payment.Payment;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.event.PaymentCompletedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZonedDateTime;
 
 /**
  * PG 결제 결과를 우리 상태에 확정(반영)하는 공유 컴포넌트.
@@ -24,6 +28,7 @@ public class PaymentResultApplier {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * transactionKey 에 해당하는 결제를 주어진 결과로 확정한다.
@@ -58,6 +63,11 @@ public class PaymentResultApplier {
                             "주문을 찾을 수 없습니다. (orderId: " + payment.getOrderId() + ")"));
             order.pay();
             orderRepository.save(order);
+
+            // 결제 성공 확정(주요 로직)이 일어난 이 한 지점에서만 발행한다. 알림·행동 로깅 같은 부가 로직과
+            // 판매량 전파(Step 2)가 커밋 후 이 이벤트를 듣는다. 멱등 가드(transitioned) 안이라 중복 콜백엔 발행되지 않는다.
+            eventPublisher.publishEvent(new PaymentCompletedEvent(
+                    order.getId(), order.getUserId(), payment.getAmount().getAmount(), ZonedDateTime.now()));
         }
     }
 }

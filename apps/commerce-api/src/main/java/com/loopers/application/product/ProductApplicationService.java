@@ -10,13 +10,16 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductCommand;
 import com.loopers.domain.product.ProductDetail;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.event.ProductViewedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +34,7 @@ public class ProductApplicationService {
     private final InventoryRepository inventoryRepository;
     private final BrandRepository brandRepository;
     private final ProductCacheRepository productCacheRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ProductInfo.Created register(ProductCriteria.Register command) {
@@ -53,6 +57,9 @@ public class ProductApplicationService {
     public ProductInfo.Detail getProduct(Long id) {
         Optional<ProductInfo.Detail> cached = productCacheRepository.findDetail(id);
         if (cached.isPresent()) {
+            // 캐시 히트도 유효한 조회다 → 행동 로깅 대상. (조회는 비로그인이 가능해 userId 는 null.)
+            // 이 경로는 트랜잭션이 없을 수 있어, 듣는 리스너는 fallbackExecution=true 로 즉시 실행돼야 한다.
+            eventPublisher.publishEvent(new ProductViewedEvent(id, null, ZonedDateTime.now()));
             return cached.get();
         }
         // 캐시 미스 → 실제 DB 재계산. PK 단건 키라 likeCount/재고 변동은 evict 없이 짧은 TTL 로 흡수한다.
@@ -67,6 +74,7 @@ public class ProductApplicationService {
                 product, brand.getId(), brand.getName(), product.getLikeCount(),
                 inventory.getQuantity(), inventory.isSoldOut()));
         productCacheRepository.putDetail(detail);
+        eventPublisher.publishEvent(new ProductViewedEvent(id, null, ZonedDateTime.now()));
         return detail;
     }
 
