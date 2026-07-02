@@ -552,3 +552,82 @@ sequenceDiagram
 ```
 
 **해석** — 두 축으로 실패를 가른다. **시간축**: 일시 장애는 backoff 재시도로 흡수하고, 소진되면 격리. **타입축**: 결정적 실패(필수값 null 등 `IllegalArgumentException` 계열, 역직렬화 불가)는 재시도해도 반드시 실패하므로 재시도 없이 즉시 DLQ로 보낸다 — 결제의 "확정 실패 vs in-doubt"와 같은 렌즈다. 격리는 **원문+실패 메타**를 보존해(DLQ는 버리는 곳이 아니라 재처리소) 운영자가 원인을 확인·재처리할 수 있고, offset을 전진시켜 poison이 파티션을 막지 않게 한다. DLT 목적지는 `원본토픽 + ".DLT"` 로 소스별 분기되어 `catalog`·`order` collector가 에러 핸들러를 공유해도 격리가 뒤섞이지 않는다.
+
+---
+
+## 6. 선착순 쿠폰 발급 (Kafka 파티션 직렬화) — Round 7 Step 3
+
+**시나리오 개요**
+
+- **목적**: 수량이 한정된 쿠폰을 폭주하는 요청 속에서도 **한도까지만** 발급한다. Kafka를 전파가 아니라 **동시성 제어** 수단으로 써서, `templateId` 키 → 단일 파티션 → 단일 소비자 스레드로 요청을 직렬화해 락 없이 `발급 수 < 한도`를 강제한다.
+- **선행조건**: 로그인 상태, 한도(`issueLimit`)가 설정된 템플릿 존재.
+- **관련 요구사항**: US-34 (AC-34-1 ~ AC-34-7).
+
+**참여자**
+
+| 약어 | 정식명 | 역할 |
+|------|--------|------|
+| U | 사용자 | 발급을 요청하고, `requestId`로 결과를 **폴링**한다 |
+| A | 쿠폰 접수 (commerce-api) | 요청을 `PENDING` 저장 + outbox 적재(한 트랜잭션), `requestId` 반환 |
+| OB | Outbox + Relay (api) | `coupon-issue-requests` 로 `key=templateId` 발행 |
+| K | Kafka | `coupon-issue-requests` 토픽(+ `.DLT`) |
+| CC | 발급 소비자 (commerce-api) | 파티션 직렬화 순차 처리 — 멱등·중복·한도·발급, manual ack |
+| DB | api DB | `coupon_templates` · `coupon_issue_requests` · `user_coupons` |
+
+> **경계** — 발급 소비자가 `commerce-streamer`가 아니라 **`commerce-api`에 사는 것**이 핵심 결정이다. 발급은 `product_metrics` 같은 read model 투영이 아니라 `CouponTemplate.issuedCount`·`UserCoupon` 스냅샷·유니크라는 **기존 write 도메인의 불변식**을 바꾸는 일이고, 발급된 쿠폰은 곧 주문 흐름에서 다시 쓰인다. 그래서 도메인을 소유한 앱이 소비까지 호스팅한다 — Kafka는 실행 경로(버퍼링·직렬화)만 제공한다.
+
+### 6-1. 요청 접수 → 발급 처리 → 폴링
+
+접수는 요청 행(`PENDING`)과 outbox를 **한 트랜잭션**으로 저장하고 `requestId`를 즉시 돌려준다(US-31 원자성). relay가 `key=templateId`로 발행하면 한 템플릿의 요청이 한 파티션에 모여 소비자 단일 스레드가 순차 처리한다. 소비자는 **요청 상태로 멱등 판정** 후, 처리 대상(`userId`·`templateId`)을 **메시지가 아니라 DB 요청 행**을 진실로 삼아 중복→한도→발급 순으로 결과를 확정한다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant A as 쿠폰 접수 (api)
+    participant OB as Outbox+Relay (api)
+    participant K as Kafka (coupon-issue-requests)
+    participant CC as 발급 소비자 (api)
+    participant DB as api DB
+
+    U->>A: 발급 요청 {templateId}
+    activate A
+    A->>DB: 템플릿 조회 (한도 있음 확인)
+    alt 템플릿 없음/삭제 or 선착순 대상 아님
+        A-->>U: 거부 (찾을 수 없음 / 선착순 아님)
+    else 한도 있는 템플릿
+        A->>DB: coupon_issue_requests INSERT (PENDING) + outbox INSERT
+        Note over A,DB: 요청 기록 ↔ 전파 기록 한 트랜잭션 (원자성)
+        A-->>U: 접수됨 {requestId} (즉시 반환)
+    end
+    deactivate A
+
+    OB->>K: publish key=templateId (PENDING outbox → PUBLISHED)
+    K->>CC: consume {requestId, ...} (한 템플릿=한 파티션=단일 스레드)
+    activate CC
+    CC->>DB: requestId 로 요청 행 조회
+    alt 이미 종결됨 (멱등)
+        Note over CC,DB: 재전달 — PENDING 아니면 skip
+    else PENDING
+        CC->>DB: (userId·templateId 는 DB 요청 행 기준) 기존 발급 조회
+        alt 이미 발급받음
+            CC->>DB: 요청 = ALREADY_ISSUED (슬롯 미소모)
+        else 미발급
+            alt 발급 수 < 한도
+                CC->>DB: issuedCount++ · user_coupons INSERT · 요청 = SUCCESS
+            else 한도 소진
+                CC->>DB: 요청 = SOLD_OUT
+            end
+        end
+    end
+    CC->>K: ack (발급 트랜잭션 커밋 후에만 — manual ack)
+    deactivate CC
+
+    U->>A: 상태 폴링 {requestId}
+    activate A
+    A->>DB: 요청 조회 (본인 소유 확인)
+    A-->>U: status (PENDING/SUCCESS/SOLD_OUT/ALREADY_ISSUED/FAILED)
+    deactivate A
+```
+
+**해석** — 세 겹의 안전장치가 겹친다. ① **접수의 원자성**: 요청과 outbox가 한 트랜잭션이라 "접수됐는데 발행 안 됨"이 없다(US-31). ② **파티션 직렬화**: `key=templateId`로 한 템플릿의 read-modify-write(`발급 수 < 한도` 검사·증가)가 단일 스레드에 직렬화돼 락 없이 초과 발급이 차단된다(AC-34-3) — 서로 다른 템플릿은 다른 파티션에서 병렬. ③ **멱등 + DB 진실**: 요청 상태가 `PENDING`일 때만 처리하고(재전달 흡수, AC-34-5), 처리 대상을 외부 경계인 메시지가 아니라 DB 요청 행에서 읽어 "요청과 발급 결과가 갈리는" 무결성 균열을 원천 차단한다. `ack`는 발급 트랜잭션이 커밋된 뒤에만 호출하므로(manual ack), 처리 중 장애가 나면 오프셋이 전진하지 않아 재시도→DLQ로 흐른다(성공 시에만 전진 = at-least-once). 결정적 실패(템플릿 삭제/무제한)만 `FAILED`로 확정하고 일시 장애는 상태를 남기지 않는다(AC-34-7). 중복 방지의 최후 방어선은 `user_coupons (user_id, template_id)` 유니크다(US-19와 공유).

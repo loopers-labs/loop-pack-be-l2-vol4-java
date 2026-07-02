@@ -13,6 +13,8 @@ erDiagram
     products ||--o{ order_items : "담긴다"
     orders ||--|{ order_items : "포함한다"
     coupon_templates ||--o{ user_coupons : "발급 원형"
+    coupon_templates ||--o{ coupon_issue_requests : "선착순 발급 대상"
+    users ||--o{ coupon_issue_requests : "발급 요청"
     user_coupons |o--o| orders : "사용된다"
     orders ||--o{ payments : "결제 시도(N:1)"
 
@@ -88,6 +90,8 @@ erDiagram
         varchar(20) discount_type "NOT NULL / FIXED | RATE"
         bigint discount_value "NOT NULL / CHECK >= 1 / FIXED=원, RATE=%"
         int valid_days "NOT NULL / CHECK >= 1 / 발급일 기준 유효일수"
+        int issue_limit "NULL / 선착순 한도(NULL=무제한) / Round 7"
+        int issued_count "NOT NULL / DEFAULT 0 / 발급 수 카운터 / Round 7"
         timestamp deleted_at "NULL / soft delete"
         timestamp created_at "NOT NULL"
         timestamp updated_at "NOT NULL"
@@ -106,6 +110,16 @@ erDiagram
         bigint order_id "NULL / 사용된 주문"
         bigint version "NOT NULL / 낙관적 락 @Version"
         timestamp created_at "NOT NULL / 발급 시각"
+        timestamp updated_at "NOT NULL"
+    }
+
+    coupon_issue_requests {
+        bigint id PK
+        varchar(36) request_id UK "NOT NULL / UUID / 폴링 핸들 · 소비자 멱등 키 / Round 7"
+        bigint user_id FK "NOT NULL / 요청 사용자"
+        bigint template_id FK "NOT NULL / 선착순 템플릿 ID 참조"
+        varchar(20) status "NOT NULL / PENDING | SUCCESS | SOLD_OUT | ALREADY_ISSUED | FAILED"
+        timestamp created_at "NOT NULL / 접수 시각"
         timestamp updated_at "NOT NULL"
     }
 
@@ -273,11 +287,15 @@ erDiagram
 | discount_value | BIGINT | NOT NULL, CHECK (discount_value >= 1) | 할인 값 (FIXED=원, RATE=%·1~100) |
 | min_order_amount | BIGINT | NOT NULL, DEFAULT 0, CHECK (min_order_amount >= 0) | 최소 주문 금액(원, `0`=제한 없음) |
 | valid_days | INTEGER | NOT NULL, CHECK (valid_days >= 1) | 발급일 기준 유효일수 |
+| issue_limit | INTEGER | NULL, CHECK (issue_limit >= 1) | **(Round 7)** 선착순 한도(`NULL`=무제한) |
+| issued_count | INTEGER | NOT NULL, DEFAULT 0 | **(Round 7)** 발급 수 카운터(`<= issue_limit`) |
 | deleted_at | TIMESTAMP | NULL | 삭제 시각 (논리 삭제) |
 | created_at | TIMESTAMP | NOT NULL | 생성 시각 |
 | updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
 
 **제약** — 브랜드·상품과 동일하게 논리 삭제(`deleted_at IS NULL` 필터)를 따른다. 템플릿 수정·삭제는 이후 발급분에만 영향을 주고, 이미 발급된 `user_coupons` 행에는 영향이 없다(발급 시점 스냅샷).
+
+**선착순(Round 7)** — `issue_limit`이 `NULL`이면 무제한 템플릿(동기 발급, US-19), 값이 있으면 선착순 템플릿(비동기 요청 경로, US-34)이다. `issued_count`는 소비자가 `templateId` 파티션 직렬화로 단일 스레드에서만 증가시키므로 락 없이 `issued_count <= issue_limit`이 지켜진다. **행 갱신 경합 방지로 `@DynamicUpdate`** 를 둔다 — 어드민의 템플릿 수정(name/정책)과 소비자의 카운터 증가가 서로 다른 컬럼을 만질 때 교차 lost update를 막는다(`product_metrics`·`inventories`와 같은 컬럼 단위 쓰기 패턴).
 
 ### 내 쿠폰 — `user_coupons`
 
@@ -305,6 +323,24 @@ erDiagram
 **동시성(쿠폰)** — 한 쿠폰이 동시에 두 주문에 사용되는 것(중복 사용)은 **낙관적 락(`version` 컬럼, `@Version`)** 으로 막는다. `AVAILABLE→USED` 전이는 한 유저·한 쿠폰끼리의 **저경합**이라, "충돌은 드물다"고 가정하고 커밋 시점에 버전으로 검출하는 낙관적 락이 가장 싸다 — 동시 사용 시 한쪽만 성공하고 나머지는 충돌(`OptimisticLockingFailureException`)로 전체 주문 트랜잭션이 롤백된다(재고 차감·주문 저장까지 함께 취소 = AC-07-8의 처리 단위 유지). 재고가 **비관적 락**(주문마다 거의 확실히 잠그는 핫 로우)을 쓰는 것과 대비된다 — 쿠폰은 한 유저·한 쿠폰의 저경합이라 "충돌은 드물다"고 가정하고 무는 비용이 거의 없는 낙관 락을, 재고는 어차피 로드하는 행에 락을 얹는 비관 락을 택했다. 같은 "lost update 방지"라도 경합 정도와 연산 성격이 달라 기법을 달리한 것이다.
 
 > **최소 주문 금액(`min_order_amount`)** — `DiscountPolicy` VO의 일부로 발급 시점에 스냅샷된다. 주문 시 적용 전 금액이 이 값 미만이면 `DiscountPolicy.calculate()`가 `BAD_REQUEST`로 거부해 주문이 성립하지 않는다(`0`이면 제한 없음). 사용 조건이지만 자기가 게이트하는 할인(`discount_type`/`value`)과 같은 VO에 두어 발급 스냅샷으로 함께 전파된다.
+
+### 선착순 발급 요청 — `coupon_issue_requests` (Round 7)
+
+한도가 걸린(선착순) 쿠폰 발급 **시도 한 건**의 생애주기를 기록한다. api가 `PENDING`으로 접수(INSERT)하고, 발급 소비자(같은 api 호스팅, 파티션 직렬화)가 결과로 전이시킨다. 클라이언트는 `request_id`로 상태를 폴링한다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| id | BIGINT | PK, IDENTITY | 대리키 |
+| request_id | VARCHAR(36) | UNIQUE, NOT NULL | UUID — 폴링 핸들 · 소비자 멱등 키(순차 PK 비노출) |
+| user_id | BIGINT | FK→users.id, NOT NULL | 요청 사용자 |
+| template_id | BIGINT | FK→coupon_templates.id, NOT NULL | 선착순 템플릿 (ID 참조) |
+| status | VARCHAR(20) | NOT NULL, CHECK (status IN ('PENDING','SUCCESS','SOLD_OUT','ALREADY_ISSUED','FAILED')) | 처리 상태 |
+| created_at | TIMESTAMP | NOT NULL | 접수 시각 |
+| updated_at | TIMESTAMP | NOT NULL | 상태 갱신 시각 |
+
+**상태기계** — `PENDING → SUCCESS / SOLD_OUT / ALREADY_ISSUED / FAILED`. 전이는 **`PENDING`에서만** 허용되고 터미널은 되돌릴 수 없다(도메인 `assertPending()`). 이 불변식이 재전달 메시지의 재처리(이중발급)를 막아, `request_id`가 곧 **소비자 멱등 키**가 된다(별도 `event_handled` 원장을 두지 않는다 — 요청 행 자체가 원장). 소비자는 처리 대상(`user_id`·`template_id`)을 외부 경계인 Kafka payload가 아니라 **이 행**을 진실로 삼는다(무결성 균열 차단, AC-34-5).
+
+> **왜 `SUCCESS`에 발급된 쿠폰 ID를 안 두나** — `coupon_issue_requests`는 "요청의 결과 상태"만 소유하고, 발급된 실물은 `user_coupons`가 소유한다. `SUCCESS`면 `(user_id, template_id)`로 `user_coupons`에서 조회되므로 역참조 컬럼을 두지 않는다(단방향 · 중복 제거).
 
 ### 결제 — `payments` (Round 6)
 
