@@ -40,4 +40,18 @@ public class KafkaTopicConfig {
     public NewTopic orderEventsDltTopic() {
         return TopicBuilder.name(KafkaErrorHandlingConfig.ORDER_EVENTS_DLT).partitions(PARTITIONS).replicas(REPLICAS).build();
     }
+
+    /**
+     * 선착순 발급 요청 토픽 + DLQ. producer(commerce-api)가 진짜 소유자지만, streamer 단독 부팅/테스트 시 리스너가
+     * 즉시 붙도록 동일 스펙(partitions=3)으로 함께 선언한다(이미 있으면 KafkaAdmin 이 건너뜀).
+     */
+    @Bean
+    public NewTopic couponIssueRequestsTopic() {
+        return TopicBuilder.name(CouponIssueConsumer.COUPON_ISSUE_REQUESTS).partitions(PARTITIONS).replicas(REPLICAS).build();
+    }
+
+    @Bean
+    public NewTopic couponIssueRequestsDltTopic() {
+        return TopicBuilder.name(KafkaErrorHandlingConfig.COUPON_ISSUE_REQUESTS_DLT).partitions(PARTITIONS).replicas(REPLICAS).build();
+    }
 }

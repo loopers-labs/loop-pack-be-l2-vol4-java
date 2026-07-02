@@ -34,16 +34,11 @@ public class KafkaTopicConfig {
     }
 
     /**
-     * 선착순 발급 요청 토픽. key=templateId 로 발행되어 같은 템플릿 요청이 한 파티션에 모이고,
-     * 단일 소비자 스레드가 순차 처리해 락 없이 한도를 강제한다(파티션 직렬화). 실패 격리용 {@code .DLT} 도 함께 선언.
+     * 선착순 발급 요청 토픽. api 는 이 토픽의 <b>producer</b>다(OutboxRelay 가 key=templateId 로 발행). 소비·실패
+     * 격리(.DLT)는 소비자 앱(commerce-streamer)이 소유·선언한다.
      */
     @Bean
     public NewTopic couponIssueRequestsTopic() {
         return TopicBuilder.name(COUPON_ISSUE_REQUESTS).partitions(PARTITIONS).replicas(REPLICAS).build();
-    }
-
-    @Bean
-    public NewTopic couponIssueRequestsDltTopic() {
-        return TopicBuilder.name(COUPON_ISSUE_REQUESTS + ".DLT").partitions(PARTITIONS).replicas(REPLICAS).build();
     }
 }

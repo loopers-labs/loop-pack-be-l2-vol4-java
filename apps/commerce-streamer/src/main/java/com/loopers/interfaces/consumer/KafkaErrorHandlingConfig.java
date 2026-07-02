@@ -42,6 +42,9 @@ public class KafkaErrorHandlingConfig {
     /** 모든 record collector(catalog·order)가 공유하는 record 리스너 팩토리 이름. */
     public static final String RECORD_LISTENER = "recordListenerFactory";
 
+    /** 선착순 발급 consumer 전용 record 리스너 팩토리 이름(manual ack). */
+    public static final String COUPON_RECORD_LISTENER = "couponRecordListenerFactory";
+
     /** DLQ 토픽 접미사. 실패 레코드는 원본 토픽 이름 + 이 접미사로 격리된다(소스별 자동 분기). */
     public static final String DLT_SUFFIX = ".DLT";
 
@@ -50,6 +53,9 @@ public class KafkaErrorHandlingConfig {
 
     /** order-events 의 DLQ 토픽. */
     public static final String ORDER_EVENTS_DLT = OrderSalesConsumer.ORDER_EVENTS + DLT_SUFFIX;
+
+    /** coupon-issue-requests 의 DLQ 토픽. */
+    public static final String COUPON_ISSUE_REQUESTS_DLT = CouponIssueConsumer.COUPON_ISSUE_REQUESTS + DLT_SUFFIX;
 
     /**
      * DLT 재발행 전용 템플릿. consumer 의 value 는 byte[](ByteArrayDeserializer)이므로 원문 바이트를 그대로 실어야 한다
@@ -109,6 +115,35 @@ public class KafkaErrorHandlingConfig {
         factory.setConcurrency(3);
         factory.setCommonErrorHandler(dlqErrorHandler);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        return factory;
+    }
+
+    /**
+     * 선착순 발급 consumer 전용 팩토리 — collector 팩토리와 튜닝·에러 핸들러(재시도→DLT)는 공유하되,
+     * ack 를 <b>manual</b>({@link ContainerProperties.AckMode#MANUAL_IMMEDIATE})로 둔다. 발급 트랜잭션이 커밋된 뒤
+     * consumer 가 명시적으로 {@code acknowledge()} 할 때만 오프셋이 전진한다(성공 시에만 전진 = at-least-once).
+     * {@code dlqErrorHandler} 는 토픽에 무관하게 {@code <원본토픽>.DLT} 로 격리하므로 그대로 재사용한다.
+     */
+    @Bean(name = COUPON_RECORD_LISTENER)
+    public ConcurrentKafkaListenerContainerFactory<String, byte[]> couponRecordListenerFactory(
+            KafkaProperties kafkaProperties,
+            ByteArrayJsonMessageConverter converter,
+            CommonErrorHandler dlqErrorHandler
+    ) {
+        Map<String, Object> consumerConfig = new HashMap<>(kafkaProperties.buildConsumerProperties());
+        consumerConfig.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, KafkaConfig.MAX_POLLING_SIZE);
+        consumerConfig.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, KafkaConfig.FETCH_MIN_BYTES);
+        consumerConfig.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, KafkaConfig.FETCH_MAX_WAIT_MS);
+        consumerConfig.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, KafkaConfig.SESSION_TIMEOUT_MS);
+        consumerConfig.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, KafkaConfig.HEARTBEAT_INTERVAL_MS);
+        consumerConfig.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, KafkaConfig.MAX_POLL_INTERVAL_MS);
+
+        ConcurrentKafkaListenerContainerFactory<String, byte[]> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(consumerConfig));
+        factory.setRecordMessageConverter(converter);
+        factory.setConcurrency(3);
+        factory.setCommonErrorHandler(dlqErrorHandler);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         return factory;
     }
 }
