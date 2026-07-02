@@ -449,3 +449,98 @@ classDiagram
 > - `CardType`: 카드사(예: `SAMSUNG`/`KB`/`HYUNDAI`) — pg-simulator가 받는 카드 종류에 맞춘다.
 
 > **기법 선택(결제 동시성)** — 결제는 ⓐ 요청 중복(따닥)을 **주문 행 비관락**(예약 시 FOR UPDATE로 검사+삽입 직렬화, PG 호출 전 해제)으로, ⓑ 콜백 중복·콜백↔정산 경쟁을 **종결 no-op 가드**(값-멱등 전이 + 실제 전이 시에만 `order.pay()`)로 막는다. 재고(비관 락)·쿠폰(낙관 락)·좋아요(원자 UPDATE)에 이어, 결제 ⓑ는 **"외부 시스템과의 멱등"** 이라 결이 또 다르다 — 경합 상대가 내부 트랜잭션이 아니라 *재전송·중복 통지*이기 때문이다. 지금은 `order.pay()`가 순수 상태 전이라 ⓑ에 별도 락이 불필요하지만, `PAID`에 부작용이 붙으면 그때 낙관락(`@Version`)을 도입한다(현재 미적용). cf. ⓐ에서 멱등키(클라이언트 키 유니크) 대신 비관락을 택했다 — orderId가 이미 자연 키이고, 외부 청구가 트랜잭션 한가운데 있어 "호출 전 직렬화"가 필요하기 때문(낙관락은 commit=청구 이후 감지라 부적합).
+
+---
+
+### 이벤트 · 지표 read model — `도메인 이벤트` / `ProductMetrics` / `EventHandled` / `OutboxEvent` (Round 7)
+
+> Round 7이 더하는 타입은 **새 비즈니스 Aggregate가 아니다** — 위 9개 Aggregate에서 일어난 사실을 (a) **도메인 이벤트**로 발행하고, (b) 별도 앱(`commerce-streamer`)이 소비해 **지표 read model**(`ProductMetrics`, 이벤트 투영)로 집계하며, (c) 그 전파를 **outbox 장부**(`OutboxEvent`, 기술적 아티팩트)로 유실 없이 나른다. 도메인 행위가 얇거나(이벤트=불변 사실 record) 기술 장부(outbox)라 통합 다이어그램과 분리해 여기 둔다.
+
+```mermaid
+classDiagram
+    class ProductLikedEvent {
+        <<record>>
+        +Long userId
+        +Long productId
+        +ZonedDateTime occurredAt
+    }
+    class ProductUnlikedEvent {
+        <<record>>
+        +Long userId
+        +Long productId
+        +ZonedDateTime occurredAt
+    }
+    class PaymentCompletedEvent {
+        <<record>>
+        +Long orderId
+        +Long userId
+        +Long amount
+        +ZonedDateTime occurredAt
+    }
+    class ProductViewedEvent {
+        <<record>>
+        +Long productId
+        +Long userId
+        +ZonedDateTime occurredAt
+    }
+    class OrderPlacedEvent {
+        <<record>>
+        +Long orderId
+        +Long userId
+        +ZonedDateTime occurredAt
+    }
+
+    class ProductMetrics {
+        <<ReadModel / Projection>>
+        -Long productId
+        -long likeCount
+        -long salesCount
+        -long viewCount
+        -ZonedDateTime updatedAt
+        +of(productId)$ ProductMetrics
+        +increaseLike()
+        +decreaseLike()
+        +increaseSales(quantity)
+        +increaseView()
+    }
+    class EventHandled {
+        <<IdempotencyLedger>>
+        -EventHandledId id
+        -ZonedDateTime handledAt
+        +of(eventId, handler)$ EventHandled
+    }
+    class EventHandledId {
+        <<EmbeddedId>>
+        -String eventId
+        -String handler
+    }
+    class OutboxEvent {
+        <<Infrastructure Ledger>>
+        -Long id
+        -String eventId
+        -String aggregateId
+        -String topic
+        -String payload
+        -OutboxStatus status
+        -ZonedDateTime publishedAt
+        +pending(eventId, aggregateId, topic, payload)$ OutboxEvent
+        +markPublished()
+    }
+    class OutboxStatus {
+        <<enumeration>>
+        PENDING
+        PUBLISHED
+    }
+    EventHandled *-- EventHandledId : 복합 PK
+    OutboxEvent ..> OutboxStatus : 상태
+    note for OutboxEvent "commerce-api 소유(기술 장부). 상태변경과 같은 TX로 적재, relay가 Kafka 발행 후 PUBLISHED. eventId=소비자 멱등 기준."
+    note for ProductMetrics "commerce-streamer 소유. product_id 자연 PK, BaseEntity 상속 안 함. @DynamicUpdate=컬럼 단위 UPDATE로 다중 writer 교차 clobber 방지."
+```
+
+- **도메인 이벤트(record)** — `ProductLikedEvent`/`ProductUnlikedEvent`(좋아요), `OrderPlacedEvent`(주문 생성), `PaymentCompletedEvent`(결제 성공), `ProductViewedEvent`(조회). 각 도메인의 `event/` 패키지에 두는 **불변 사실**이라 행위가 없다. 발행 지점은 해당 사실이 확정되는 응용 서비스 한 곳이다(좋아요 등록/취소, 주문 생성, 결제 성공 확정, 상품 조회). `PaymentCompletedEvent`는 **주문 단위로 얇게**(orderId/amount) 두고, 판매량 집계에 필요한 상품 분해는 outbox 리스너가 주문 재조회로 조립한다(이벤트를 알림·로깅과 공유하므로 items로 오염시키지 않음).
+- **`ProductMetrics`** (ReadModel) — 상품별 `like`/`sales`/`view` 카운터를 모은 **이벤트 투영**이다. 도메인 Aggregate가 아니라 read model이라 `product_id`를 자연 PK로 쓰고 `BaseEntity`를 상속하지 않는다. 조회 경로의 `Product.likeCount`(정렬용·**로컬 best-effort**: `@Async` AFTER_COMMIT 원자 UPDATE라 eventual·유실 시 드리프트)와 **의도적으로 중복**한다 — 소비처와 보장 수준이 다르다(빠른 로컬 best-effort vs 느린 크로스앱 guaranteed; 둘 다 eventual이되 이쪽만 outbox+멱등으로 유실 0 수렴). **`@DynamicUpdate`** 로 변경된 컬럼만 UPDATE해, 서로 다른 collector(좋아요/조회 vs 판매)가 같은 행의 다른 컬럼을 동시에 갱신해도 교차 lost update가 없다(각 카운터는 파티션 직렬화로 단일 writer, 행은 다중 writer → 컬럼 단위 쓰기로 방어). 좋아요 수는 순서가 어긋나도 0 미만으로 내려가지 않게 막는다(`decreaseLike` floor).
+- **`EventHandled`** (IdempotencyLedger) — "이 `handler`가 이 `event_id`를 처리했는가"를 기록하는 소비자 멱등 원장. PK는 **`(eventId, handler)` 복합**(`EventHandledId` `@EmbeddedId`)이라, 하나의 원장을 여러 collector가 공유하되 **멱등 스코프는 handler별로 분리**된다(같은 이벤트를 `product-metrics`와 `product-sales`가 각각 한 번씩 처리). 멱등 판정과 집계 갱신을 한 트랜잭션으로 묶어 effectively-once를 만든다.
+- **`OutboxEvent`** (Infrastructure Ledger) — 상태변경과 **같은 트랜잭션**에 INSERT되어 "DB 커밋 + Kafka 발행"의 원자성을 DB 로컬 트랜잭션으로 환원하는 전파 장부(dual-write 회피). 도메인 Aggregate가 아니라 메시징 기술 장부라 `infrastructure`에 둔다. `aggregateId`가 Kafka 파티셔닝 키(=`productId`)이고, `eventId`는 소비자 멱등의 기준이며 payload 안에도 실려 나간다. 상태는 `PENDING → PUBLISHED` 2개뿐 — 발행 실패는 PENDING으로 남아 relay가 무한 재시도한다(`FAILED`를 두지 않아 브로커 장애 시 대량 오격리를 피함).
+
+> **왜 이 타입들은 Aggregate가 아닌가** — 도메인 불변식을 지키는 게 아니라 *이미 확정된 불변식의 결과*를 나르거나(이벤트·outbox) 투영하기(metrics) 때문이다. 그래서 `ProductMetrics`엔 도메인 검증이 거의 없고(카운터 증감 + floor), `OutboxEvent`엔 도메인 행위가 없다(상태 마킹만). 비즈니스 규칙은 상류 Aggregate(`Like`/`Order`/`Payment`)가 이미 강제한 뒤다.
+> **동시성 기법(다섯 번째)** — 재고(비관락)·쿠폰(낙관락)·좋아요(원자 UPDATE)·결제(외부 멱등 no-op)에 이어, 지표 집계는 **파티션 직렬화 + 컬럼 단위 쓰기(@DynamicUpdate)** 다 — 락을 아예 없애고 "같은 키=한 스레드"라는 Kafka 파티션 성질로 동시성을 제어하는 결이다(2단계 시퀀스 5-1·5-2).

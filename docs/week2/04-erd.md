@@ -121,6 +121,33 @@ erDiagram
         timestamp created_at "NOT NULL"
         timestamp updated_at "NOT NULL"
     }
+
+    %% Round 7 — 이벤트 전파/집계. FK 없음(이벤트 기반 디커플링: ID 참조, cross-app은 물리 FK 불가).
+    outbox_events {
+        bigint id PK
+        varchar(36) event_id UK "NOT NULL / 전역 유일 키(소비자 멱등 기준, payload에도 동봉)"
+        varchar(100) aggregate_id "NOT NULL / Kafka 파티셔닝 키(= productId 등)"
+        varchar(100) topic "NOT NULL / catalog-events | order-events"
+        text payload "NOT NULL / 발행 메시지 JSON 원문"
+        varchar(20) status "NOT NULL / PENDING | PUBLISHED"
+        timestamp published_at "NULL / broker ack 확인 후 마킹"
+        timestamp created_at "NOT NULL"
+        timestamp updated_at "NOT NULL"
+    }
+
+    product_metrics {
+        bigint product_id PK "자연 PK(대리키 아님). BaseEntity 미상속"
+        bigint like_count "NOT NULL / 좋아요 집계(catalog collector)"
+        bigint sales_count "NOT NULL / 판매량 집계(order collector)"
+        bigint view_count "NOT NULL / 조회수 집계(catalog collector)"
+        timestamp updated_at "NOT NULL"
+    }
+
+    event_handled {
+        varchar(36) event_id PK "복합 PK 1 / 처리한 이벤트"
+        varchar(100) handler PK "복합 PK 2 / 소비자별 멱등 스코프"
+        timestamp handled_at "NOT NULL"
+    }
 ```
 
 > `order_items` 는 `Order` 애그리거트 내부의 값 컬렉션(`@ElementCollection` + `@Embeddable OrderItem`)으로 매핑된다.
@@ -193,6 +220,7 @@ erDiagram
 **좋아요 수(`like_count`) — 비정규화 카운터** — 좋아요 수의 진실은 `product_likes` 행이지만, 좋아요순 정렬을 위해 매번 `COUNT` 조인/`GROUP BY`하면 비용이 **O(전체 좋아요 행)** 이라 데이터가 쌓일수록 선형으로 느려진다(측정: 좋아요 100만 행에서 첫 페이지 정렬 ~312ms vs 카운터 ~2ms). 그래서 `like_count`로 **비정규화**해 `(like_count DESC, id DESC)` 인덱스로 O(페이지) 정렬한다. 대가는 **쓰기 동시성 + 행/카운터 정합성** 책임이다:
 - **정합성(멱등)**: 카운터는 행을 따라가는 종속물이므로 행이 **실제로 INSERT/DELETE 됐을 때만**(영향 행 수 == 1) 증감한다 — 등록은 `INSERT IGNORE` affected==1, 취소는 `DELETE` affected==1일 때만. 중복 좋아요로 부풀거나 없는 좋아요 취소로 음수가 되는 것을 막는다.
 - **동시성**: 인기 상품에 다수가 몰리는 **고경합** 카운터라, 증감을 **원자적 UPDATE**(`SET like_count = like_count + 1`, 감소는 `- 1 WHERE like_count > 0`)로 수행해 lost update를 원천 차단한다. 행을 따라가는 고경합 단순 카운터라 낙관적 락은 재시도 폭증으로 부적합하고, 비관 락은 인기 상품에 락 보유가 길어 부적합하다 — 그래서 재고(비관 락)·쿠폰(낙관 락)과 또 다른 결인 원자 UPDATE를 택했다.
+- **반영 시점(Round 7)**: 이 원자 UPDATE는 좋아요 트랜잭션 **안이 아니라 커밋 후 `@Async` 리스너**에서 수행된다(좋아요 성공과 집계를 분리 — 커넥션 2배 점유 회피). 즉 `like_count`는 **동기 즉시 반영이 아니라 eventual·best-effort**다(비동기 큐 크래시 시 그 증분은 유실되고 재시도가 없어 드리프트 가능). 원자성/기법 선택은 그대로이며, 정렬은 작은 랙·드리프트를 허용한다. 유실 없는 수렴이 필요한 분석 지표는 `product_metrics`(outbox+멱등)가 별도로 보장한다.
 - **원자 UPDATE 보호(`@DynamicUpdate`)**: 같은 행에 *전체 컬럼 UPDATE 대상*(상품 수정/삭제의 name·price·deleted_at)과 *원자 UPDATE 대상*(like_count)이 공존하므로, 상품 수정이 적재 시점의 stale `like_count`를 전체 UPDATE로 되써 동시 좋아요 증감을 덮어쓸 수 있다. `Product` 에 `@DynamicUpdate` 를 두어 변경된 컬럼만 UPDATE 하므로 `like_count` 는 dirty 가 아닌 한 UPDATE 에서 빠진다(재고가 `inventories` 로 분리됐어도 `like_count` 는 정렬 인덱스 때문에 `products` 에 남아야 해서, 분리가 아니라 부분 UPDATE 로 막는다).
 
 ### 좋아요 — `product_likes`
@@ -303,3 +331,50 @@ erDiagram
 
 > **기법 선택(재고 vs 좋아요 vs 쿠폰 vs 결제)** — 재고는 oversell 직결이라 **비관 락**, 좋아요는 고경합 단순 카운터라 **원자 UPDATE**, 쿠폰은 저경합 상태 전이라 **낙관 락**, 결제는 ⓐ 요청 중복(따닥)을 **주문 행 비관 락**으로, ⓑ 결과 확정 경쟁(*외부 재전송·중복 통지*)을 **종결 no-op 가드**로 막는다 — 경합 상대와 연산 성격이 모두 달라 기법을 달리한 것이다.
 > **트랜잭션 경계(dual-write)** — `payments`의 `PENDING` 행은 PG 호출 **전에** 커밋된다(외부 호출은 트랜잭션 밖). 외부 응답 시간만큼 커넥션·락을 잡지 않게 하고, 이후 콜백/정산이 매칭할 대상을 먼저 만들어 두기 위함이다. 외부 호출의 부작용(승인)은 우리 트랜잭션으로 롤백되지 않으므로, "먼저 PENDING 기록 → 외부 호출 → 결과로 종결"이라는 순서 자체가 정합성의 뿌리다(2단계 시퀀스 4-1).
+
+### 이벤트 전파 장부 — `outbox_events` (Round 7)
+
+상태 변경과 **같은 트랜잭션**에 INSERT되어 "DB 커밋 + Kafka 발행"의 원자성을 DB 로컬 트랜잭션으로 환원하는 전파 장부(dual-write 회피). 도메인 테이블이 아니라 메시징 기술 장부라 `commerce-api` DB에 둔다. 별도 relay가 `PENDING`을 폴링해 Kafka로 발행하고 `PUBLISHED`로 마킹한다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| id | BIGINT | PK, IDENTITY | 대리키 |
+| event_id | VARCHAR(36) | UNIQUE, NOT NULL | 전역 유일 키(UUID). 소비자 멱등(`event_handled`)의 기준이며 payload에도 동봉 |
+| aggregate_id | VARCHAR(100) | NOT NULL | Kafka 파티셔닝 키(= `productId` 등). 같은 키=같은 파티션=키 단위 순서 보존 |
+| topic | VARCHAR(100) | NOT NULL | 발행 대상 토픽(`catalog-events` \| `order-events`) |
+| payload | TEXT | NOT NULL | 발행 메시지 JSON 원문(relay가 원문 그대로 발행 — 이중 인코딩 회피) |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'PENDING' | `PENDING`(적재, 미발행) → `PUBLISHED`(broker ack 확인) |
+| published_at | TIMESTAMP | NULL | 발행 확인 시각 |
+| created_at | TIMESTAMP | NOT NULL | 적재 시각 |
+| updated_at | TIMESTAMP | NOT NULL | 수정 시각 |
+
+**상태 2개뿐(`FAILED` 없음)** — 발행 실패한 행은 `PENDING`으로 남아 relay가 무한 재시도한다(커밋된 사실은 반드시 전파). `FAILED`+카운트를 두지 않은 건 브로커 장애 시 전 이벤트가 대량 오격리되는 것을 피하기 위함이다(카운트로는 poison과 인프라 장애를 구분 못 함). `event_id`가 UNIQUE라 relay 크래시로 "발행됨+마킹 전"이 재발행돼도 소비자 멱등이 흡수한다(at-least-once).
+
+### 지표 read model — `product_metrics` / `event_handled` (Round 7)
+
+`commerce-streamer`가 소유하는 **이벤트 투영** 저장소다(논리적으로 api DB와 분리 — 시스템 간 전파를 실증하려 소비처를 다른 앱에 둠). `product_metrics`는 조회 경로의 `products.like_count`(정렬용·**로컬 best-effort**: `@Async` AFTER_COMMIT 원자 UPDATE라 eventual)와 **의도적으로 중복**한다 — 소비처와 보장 수준이 다르다(빠른 로컬 best-effort vs 느린 크로스앱 guaranteed; 둘 다 eventual이되 이쪽만 유실 없는 수렴을 보장).
+
+**`product_metrics`**
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| product_id | BIGINT | PK | **자연 PK**(대리키/`BaseEntity` 없음 — 애그리거트가 아니라 투영이라) |
+| like_count | BIGINT | NOT NULL | 좋아요 집계(`catalog-events` collector) |
+| sales_count | BIGINT | NOT NULL | 판매량 집계(`order-events` collector, 결제 성공×수량) |
+| view_count | BIGINT | NOT NULL | 조회수 집계(`catalog-events` collector, 유실 허용) |
+| updated_at | TIMESTAMP | NOT NULL | 갱신 시각 |
+
+**`event_handled`** (소비자 멱등 원장)
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| event_id | VARCHAR(36) | **PK (복합 1/2)** | 처리한 이벤트 |
+| handler | VARCHAR(100) | **PK (복합 2/2)** | 소비자 식별자(`product-metrics` \| `product-sales`) — 멱등 스코프 분리 |
+| handled_at | TIMESTAMP | NOT NULL | 처리 시각 |
+
+**동시성(집계) — 파티션 직렬화 + 컬럼 단위 쓰기** — `product_metrics`엔 `@Version`이 없다. **행이 이미 존재하는 갱신(update) 경합** 기준으로 락이 필요 없다: 같은 `product_id` 이벤트는 `aggregate_id` 키로 같은 파티션→단일 소비자 스레드로만 처리되므로(파티션 직렬화), 한 카운터의 `find→증감→save`가 직렬화된다. **단, 카운터마다 writer가 다르다** — like/view는 `product-metrics` collector가, sales는 `product-sales` collector가 같은 행을 건드린다(다른 스레드). 각 카운터는 단일 writer지만 행은 다중 writer라, **`@DynamicUpdate`(변경 컬럼만 UPDATE)** 로 `like_count`·`sales_count`가 서로를 덮어쓰지 않게 해 교차 lost update를 막는다(`@Version` 낙관락 대신 컬럼 단위 쓰기 — `inventories`의 lost update 방지와 같은 패턴). 멱등 원장의 복합 PK `(event_id, handler)`는 하나의 원장을 두 collector가 공유하되 멱등 판정을 handler별로 분리해, 같은 이벤트를 서로 다른 소비자가 각각 한 번씩 처리하게 한다.
+
+> **행 최초 생성(insert) 경합은 별개** — "락 불필요"는 위처럼 *갱신* 경합에 대한 것이다. 두 collector는 모두 `findById().orElseGet(ProductMetrics.of)` 구조라, **같은 신규 상품의 첫 catalog 이벤트와 첫 order 이벤트가 동시에 오면 둘 다 INSERT를 시도**할 수 있다. 이때는 `product_id`가 PK라 **한쪽만 성공하고 다른 쪽은 무결성 위반→Kafka 재시도→기존 행 UPDATE**로 자가 치유된다(손실 없음, 최초 1회의 좁은 창). 더 단단하게 가려면 앱 레벨 find-or-create 대신 **DB 원자 업서트**(`INSERT … ON DUPLICATE KEY UPDATE col = col + ?`)로 경합 창 자체를 없앨 수 있으나, 도메인 객체 변경(load→mutate→save)과 `@DynamicUpdate` 방식을 SQL 업서트로 바꾸는 큰 변경이라 현재는 **재시도 자가 치유 + 동시 최초 생성 보존 테스트**로 근거를 세우고 업서트는 대안으로 남긴다.
+
+> **왜 FK가 없나** — `outbox_events.aggregate_id`, `product_metrics.product_id`, `event_handled.event_id`는 모두 논리적 참조지만 **물리 FK를 두지 않는다**. 이벤트 기반 시스템은 애그리거트/서비스 간을 ID로 느슨히 참조하고(객체 그래프·물리 제약 회피), 특히 `product_metrics`/`event_handled`는 다른 앱(streamer)이 소유해 api DB와 cross-DB라 FK 자체가 성립하지 않는다. 정합성은 제약이 아니라 **이벤트 전달 보장(outbox+멱등)** 으로 세운다.
+> **동시성 기법(다섯 번째 결)** — 재고(비관락)·좋아요(원자 UPDATE)·쿠폰(낙관락)·결제(외부 멱등 no-op)에 이어, 지표 집계는 **파티션 직렬화 + `@DynamicUpdate`** 다 — 락을 없애고 Kafka 파티션의 "같은 키=한 스레드" 성질로 동시성을 제어한다.
