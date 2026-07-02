@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 
@@ -60,7 +61,9 @@ public class ProductFacade {
     /**
      * 상세 조회 이벤트 발행. getProductDetail 은 @Cacheable 이라 캐시 히트 시 본문이 실행되지 않으므로,
      * 조회수를 캐시 히트까지 집계하려면 캐시 밖(컨트롤러)에서 매 요청마다 별도로 발행해야 한다.
+     * @Transactional 로 트랜잭션을 열어야 아웃박스 적재(BEFORE_COMMIT)가 이 발행과 원자적으로 커밋된다.
      */
+    @Transactional
     public void recordView(Long productId, Long userId) {
         eventPublisher.publishEvent(ProductViewedEvent.of(productId, userId));
     }
