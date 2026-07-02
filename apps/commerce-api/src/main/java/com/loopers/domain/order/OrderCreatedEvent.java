@@ -1,11 +1,11 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.DomainEvent;
+import com.loopers.domain.UserActivityEvent;
 
 import java.util.List;
 import java.util.UUID;
 
-public record OrderCreatedEvent(String eventId, Long orderId, Long userId, List<OrderCreatedItem> items) implements DomainEvent {
+public record OrderCreatedEvent(String eventId, Long orderId, Long userId, List<OrderCreatedItem> items) implements UserActivityEvent {
 
     public record OrderCreatedItem(Long productId, Long quantity) {
     }

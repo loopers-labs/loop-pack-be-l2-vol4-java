@@ -112,7 +112,7 @@ class LikeFastPathIntegrationTest {
             // given
             ProductModel product = createProductWithStats();
             String eventId = UUID.randomUUID().toString();
-            LikedEvent event = new LikedEvent(eventId, product.getId());
+            LikedEvent event = new LikedEvent(eventId, 1L, product.getId());
             seedPendingOutbox(eventId, product.getId(), LikeEventType.LIKED_EVENT, event);
 
             // when
@@ -132,7 +132,7 @@ class LikeFastPathIntegrationTest {
             // given
             ProductModel product = createProductWithStats();
             String eventId = UUID.randomUUID().toString();
-            LikedEvent event = new LikedEvent(eventId, product.getId());
+            LikedEvent event = new LikedEvent(eventId, 1L, product.getId());
             seedPendingOutbox(eventId, product.getId(), LikeEventType.LIKED_EVENT, event);
 
             // when
@@ -154,12 +154,12 @@ class LikeFastPathIntegrationTest {
             // given: 먼저 좋아요 1개 반영된 상태
             ProductModel product = createProductWithStats();
             String likedEventId = UUID.randomUUID().toString();
-            LikedEvent liked = new LikedEvent(likedEventId, product.getId());
+            LikedEvent liked = new LikedEvent(likedEventId, 1L, product.getId());
             seedPendingOutbox(likedEventId, product.getId(), LikeEventType.LIKED_EVENT, liked);
             target.send(liked);
 
             String unlikedEventId = UUID.randomUUID().toString();
-            UnlikedEvent unliked = new UnlikedEvent(unlikedEventId, product.getId());
+            UnlikedEvent unliked = new UnlikedEvent(unlikedEventId, 1L, product.getId());
             seedPendingOutbox(unlikedEventId, product.getId(), LikeEventType.UNLIKED_EVENT, unliked);
 
             // when

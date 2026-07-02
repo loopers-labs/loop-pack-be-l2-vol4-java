@@ -69,8 +69,8 @@ class LikeOutboxRelayIntegrationTest {
     private void savePendingOutbox(Long productId, LikeEventType eventType) {
         String eventId = UUID.randomUUID().toString();
         Object event = eventType == LikeEventType.LIKED_EVENT
-                ? new LikedEvent(eventId, productId)
-                : new UnlikedEvent(eventId, productId);
+                ? new LikedEvent(eventId, 1L, productId)
+                : new UnlikedEvent(eventId, 1L, productId);
         outboxRepository.save(new OutboxModel(eventId, "Like", String.valueOf(productId), eventType.name(), serialize(event)));
     }
 

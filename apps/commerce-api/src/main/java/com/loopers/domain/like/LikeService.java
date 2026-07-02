@@ -23,7 +23,7 @@ public class LikeService {
         if (!likeRepository.save(new LikeModel(userId, productId))) {
             return LikeResult.IGNORED;
         }
-        eventPublisher.publish(new LikedEvent(UUID.randomUUID().toString(), productId));
+        eventPublisher.publish(new LikedEvent(UUID.randomUUID().toString(), userId, productId));
         return LikeResult.APPLIED;
     }
 
@@ -31,7 +31,7 @@ public class LikeService {
         if (!likeRepository.deleteByUserIdAndProductId(userId, productId)) {
             return LikeResult.IGNORED;
         }
-        eventPublisher.publish(new UnlikedEvent(UUID.randomUUID().toString(), productId));
+        eventPublisher.publish(new UnlikedEvent(UUID.randomUUID().toString(), userId, productId));
         return LikeResult.APPLIED;
     }
 }

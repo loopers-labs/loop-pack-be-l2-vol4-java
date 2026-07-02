@@ -2,10 +2,13 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.product.ProductEventPublisher;
+import com.loopers.domain.product.ProductListViewedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsService;
+import com.loopers.domain.product.ProductViewedEvent;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import com.loopers.infrastructure.product.ProductCacheStore;
@@ -35,8 +38,10 @@ public class ProductFacade {
     private final StockService stockService;
     private final ProductInfoAssembler productInfoAssembler;
     private final ProductCacheStore productCacheStore;
+    private final ProductEventPublisher productEventPublisher;
 
     public ProductInfo getProduct(Long id) {
+        productEventPublisher.publish(ProductViewedEvent.of(id));
         Optional<ProductInfo> cached = productCacheStore.findProduct(id);
         if (cached.isPresent()) {
             return cached.get();
@@ -51,6 +56,7 @@ public class ProductFacade {
     }
 
     public Page<ProductInfo> getProducts(Long brandId, Pageable pageable) {
+        productEventPublisher.publish(ProductListViewedEvent.of(brandId));
         String listKey = productCacheStore.listKey(brandId, pageable.getSort().toString(), pageable.getPageNumber(), pageable.getPageSize());
         Optional<ProductListCacheValue> cached = productCacheStore.findList(listKey);
         if (cached.isPresent()) {
