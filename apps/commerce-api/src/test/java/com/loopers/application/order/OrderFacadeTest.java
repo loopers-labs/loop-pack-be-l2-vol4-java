@@ -9,6 +9,7 @@ import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.event.OrderPlaced;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.user.User;
@@ -20,6 +21,8 @@ import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,8 +47,10 @@ class OrderFacadeTest {
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final UserCouponRepository userCouponRepository = mock(UserCouponRepository.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final OrderFacade orderFacade =
-        new OrderFacade(orderService, orderRepository, productRepository, userRepository, userCouponRepository);
+        new OrderFacade(orderService, orderRepository, productRepository, userRepository,
+            userCouponRepository, eventPublisher);
 
     private void givenUser(long id) {
         User user = mock(User.class);
@@ -92,6 +97,28 @@ class OrderFacadeTest {
             );
             verify(productRepository).save(product);
             verify(orderRepository).save(any(Order.class));
+        }
+
+        @DisplayName("주문 저장 후 OrderPlaced 이벤트를 발행한다.")
+        @Test
+        void publishesOrderPlaced() {
+            // arrange
+            Product product = productWithId(11L, 1000L, 10);
+            givenUser(7L);
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // act
+            orderFacade.createOrder(LOGIN_ID, command(11L, 2));
+
+            // assert
+            ArgumentCaptor<OrderPlaced> captor = ArgumentCaptor.forClass(OrderPlaced.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertThat(captor.getValue().userId()).isEqualTo(7L);
+            assertThat(captor.getValue().finalAmount()).isEqualTo(2000L);
+            assertThat(captor.getValue().lines()).hasSize(1);
+            assertThat(captor.getValue().lines().get(0).productId()).isEqualTo(11L);
+            assertThat(captor.getValue().lines().get(0).quantity()).isEqualTo(2);
         }
 
         @DisplayName("유저가 없으면 NOT_FOUND 이고 주문은 저장되지 않는다.")
