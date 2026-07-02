@@ -18,6 +18,7 @@ public class KafkaTopicConfig {
 
     public static final String CATALOG_EVENTS = "catalog-events";
     public static final String ORDER_EVENTS = "order-events";
+    public static final String COUPON_ISSUE_REQUESTS = "coupon-issue-requests";
 
     private static final int PARTITIONS = 3;
     private static final short REPLICAS = 1;
@@ -30,5 +31,19 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic orderEventsTopic() {
         return TopicBuilder.name(ORDER_EVENTS).partitions(PARTITIONS).replicas(REPLICAS).build();
+    }
+
+    /**
+     * 선착순 발급 요청 토픽. key=templateId 로 발행되어 같은 템플릿 요청이 한 파티션에 모이고,
+     * 단일 소비자 스레드가 순차 처리해 락 없이 한도를 강제한다(파티션 직렬화). 실패 격리용 {@code .DLT} 도 함께 선언.
+     */
+    @Bean
+    public NewTopic couponIssueRequestsTopic() {
+        return TopicBuilder.name(COUPON_ISSUE_REQUESTS).partitions(PARTITIONS).replicas(REPLICAS).build();
+    }
+
+    @Bean
+    public NewTopic couponIssueRequestsDltTopic() {
+        return TopicBuilder.name(COUPON_ISSUE_REQUESTS + ".DLT").partitions(PARTITIONS).replicas(REPLICAS).build();
     }
 }

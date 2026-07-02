@@ -39,4 +39,25 @@ public class CouponV1Controller implements CouponV1ApiSpec {
         PageResult<CouponInfo.MyCoupon> result = couponApplicationService.getMyCoupons(userId, page, size);
         return ApiResponse.success(CouponV1Dto.MyCouponPageResponse.from(result));
     }
+
+    /** 선착순 발급 요청 접수 — {templateId} 는 발급 원형(쿠폰 템플릿)의 식별자다. requestId 를 즉시 반환한다. */
+    @PostMapping("/api/v1/coupons/{templateId}/issue-requests")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueRequestAccepted> requestIssue(
+            @LoginUser Long userId,
+            @PathVariable("templateId") Long templateId
+    ) {
+        CouponInfo.IssueRequested info = couponApplicationService.requestIssue(userId, templateId);
+        return ApiResponse.success(CouponV1Dto.IssueRequestAccepted.from(info));
+    }
+
+    @GetMapping("/api/v1/coupons/issue-requests/{requestId}")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueRequestStatusResponse> getIssueRequest(
+            @LoginUser Long userId,
+            @PathVariable("requestId") String requestId
+    ) {
+        CouponInfo.IssueRequestStatus info = couponApplicationService.getIssueRequest(userId, requestId);
+        return ApiResponse.success(CouponV1Dto.IssueRequestStatusResponse.from(info));
+    }
 }

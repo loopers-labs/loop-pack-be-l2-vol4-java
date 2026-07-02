@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.coupon;
 
 import com.loopers.application.coupon.CouponInfo;
 import com.loopers.domain.common.PageResult;
+import com.loopers.domain.coupon.CouponIssueStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.DiscountType;
 
@@ -157,6 +158,27 @@ public final class CouponV1Dto {
                     result.hasNext(),
                     result.totalElements()
             );
+        }
+    }
+
+    // ---------- 선착순 발급 요청(비동기) ----------
+
+    /** 접수 응답 — 폴링에 쓸 requestId 만 즉시 반환. */
+    public record IssueRequestAccepted(String requestId) {
+
+        public static IssueRequestAccepted from(CouponInfo.IssueRequested info) {
+            return new IssueRequestAccepted(info.requestId());
+        }
+    }
+
+    /** 폴링 응답 — 처리 상태. */
+    public record IssueRequestStatusResponse(
+            String requestId,
+            CouponIssueStatus status
+    ) {
+
+        public static IssueRequestStatusResponse from(CouponInfo.IssueRequestStatus info) {
+            return new IssueRequestStatusResponse(info.requestId(), info.status());
         }
     }
 }
