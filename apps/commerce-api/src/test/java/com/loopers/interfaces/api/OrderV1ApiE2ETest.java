@@ -8,9 +8,6 @@ import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponService;
 import com.loopers.domain.order.OrderStatus;
-import com.loopers.domain.order.PaymentCommand;
-import com.loopers.domain.order.PaymentGateway;
-import com.loopers.domain.order.PaymentResult;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductStockService;
@@ -19,14 +16,12 @@ import com.loopers.interfaces.api.auth.AuthenticatedUserArgumentResolver;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,8 +33,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 @SpringBootTest
@@ -74,18 +67,9 @@ class OrderV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    @MockBean
-    private PaymentGateway paymentGateway;
-
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-    }
-
-    @BeforeEach
-    void stubPaymentSuccess() {
-        given(paymentGateway.requestPayment(any(PaymentCommand.class)))
-                .willReturn(PaymentResult.success("tx-success"));
     }
 
     private void signUp() {
@@ -109,9 +93,9 @@ class OrderV1ApiE2ETest {
     @Nested
     class PlaceOrder {
 
-        @DisplayName("정상 요청이면, 주문이 PAID 상태로 확정되고 재고가 차감된다.")
+        @DisplayName("정상 요청이면, 주문이 PENDING 상태로 생성되고 재고가 차감된다.")
         @Test
-        void returnsPaid_andDecreasesStock() throws Exception {
+        void returnsPending_andDecreasesStock() throws Exception {
             // given
             signUp();
             ProductModel product = saveProduct("티셔츠", 10000L, 10);
@@ -132,7 +116,7 @@ class OrderV1ApiE2ETest {
             OrderV1Dto.OrderResponse order = readOrder(mvcResult);
             assertAll(
                     () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()),
-                    () -> assertThat(order.status()).isEqualTo(OrderStatus.PAID),
+                    () -> assertThat(order.status()).isEqualTo(OrderStatus.PENDING),
                     () -> assertThat(order.totalAmount()).isEqualTo(30000L),
                     () -> assertThat(order.items()).hasSize(1),
                     () -> assertThat(order.items().get(0).quantity()).isEqualTo(3),
@@ -201,33 +185,6 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(order.items()).hasSize(1),
                     () -> assertThat(order.items().get(0).quantity()).isEqualTo(5),
                     () -> assertThat(productStockService.getStock(product.getId()).getStock().value()).isEqualTo(5)
-            );
-        }
-
-        @DisplayName("결제가 실패하면, 재고가 복구되고 500 상태를 응답한다.")
-        @Test
-        void compensates_whenPaymentFails() throws Exception {
-            // given
-            signUp();
-            ProductModel product = saveProduct("티셔츠", 10000L, 10);
-            given(paymentGateway.requestPayment(any(PaymentCommand.class)))
-                    .willReturn(PaymentResult.failure("declined"));
-            OrderV1Dto.CreateOrderRequest request = new OrderV1Dto.CreateOrderRequest(List.of(
-                    new OrderV1Dto.Item(product.getId(), 3)
-            ), null);
-
-            // when
-            MvcResult mvcResult = mockMvc.perform(post(ENDPOINT)
-                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_ID, LOGIN_ID)
-                                         .header(AuthenticatedUserArgumentResolver.HEADER_LOGIN_PW, PASSWORD)
-                                         .contentType(MediaType.APPLICATION_JSON)
-                                         .content(objectMapper.writeValueAsString(request)))
-                                         .andReturn();
-
-            // then
-            assertAll(
-                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value()),
-                    () -> assertThat(productStockService.getStock(product.getId()).getStock().value()).isEqualTo(10)
             );
         }
 
