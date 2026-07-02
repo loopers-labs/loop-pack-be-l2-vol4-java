@@ -14,6 +14,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class PaymentFacade {
     private final ProductService productService;
     private final CouponService couponService;
     private final PaymentGateway paymentGateway;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${payment.callback-url}")
     private String callbackUrl;
@@ -81,12 +83,15 @@ public class PaymentFacade {
             case FAILED -> {
                 payment.markFailed(reason);
                 order.markFailed();
+                // 보상(재고·쿠폰 복구)은 돈과 직결된 필수 처리라 이벤트로 빼지 않고 트랜잭션에 유지한다.
                 compensate(order);
             }
             case PENDING -> {
                 // 아직 미확정 통지 — 확정할 것이 없으므로 그대로 둔다
             }
         }
+        // 어떤 사실이 일어났는지는 상태를 전이한 Payment 자신이 등록한다 — 여기서는 수거해 발행만 한다.
+        payment.pullDomainEvents().forEach(eventPublisher::publishEvent);
         // 전이는 영속 상태의 엔티티를 수정한 것이라 트랜잭션 커밋 시 dirty checking 으로 반영된다 (별도 save 불필요).
     }
 

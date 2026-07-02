@@ -1,6 +1,6 @@
 package com.loopers.domain.payment;
 
-import com.loopers.domain.BaseEntity;
+import com.loopers.domain.AggregateRoot;
 import com.loopers.domain.money.Money;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "payment")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Payment extends BaseEntity {
+public class Payment extends AggregateRoot {
 
     @Column(nullable = false)
     private Long orderId;
@@ -76,6 +76,7 @@ public class Payment extends BaseEntity {
     public void markSuccess() {
         requirePending();
         this.status = PaymentStatus.SUCCESS;
+        registerEvent(PaymentSucceededEvent.from(this));
     }
 
     /** 결제 실패 확정. */
@@ -83,6 +84,7 @@ public class Payment extends BaseEntity {
         requirePending();
         this.status = PaymentStatus.FAILED;
         this.reason = reason;
+        registerEvent(PaymentFailedEvent.from(this));
     }
 
     private void requirePending() {

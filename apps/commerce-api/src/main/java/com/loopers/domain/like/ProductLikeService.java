@@ -2,7 +2,6 @@ package com.loopers.domain.like;
 
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
@@ -10,19 +9,16 @@ import org.springframework.stereotype.Component;
 public class ProductLikeService {
     private final LikeService likeService;
     private final ProductService productService;
-    private final ApplicationEventPublisher eventPublisher;
 
-    public void like(Long userId, Long productId) {
+    /** @return 좋아요가 새로 생겼으면 true (이미 눌려 있었으면 false) */
+    public boolean like(Long userId, Long productId) {
         productService.getProduct(productId);
-        if (likeService.like(userId, productId)) {
-            eventPublisher.publishEvent(new ProductLikedEvent(userId, productId));
-        }
+        return likeService.like(userId, productId);
     }
 
-    public void unlike(Long userId, Long productId) {
+    /** @return 좋아요가 실제로 제거됐으면 true (원래 없었으면 false) */
+    public boolean unlike(Long userId, Long productId) {
         productService.getProduct(productId);
-        if (likeService.unlike(userId, productId)) {
-            eventPublisher.publishEvent(new ProductUnlikedEvent(userId, productId));
-        }
+        return likeService.unlike(userId, productId);
     }
 }

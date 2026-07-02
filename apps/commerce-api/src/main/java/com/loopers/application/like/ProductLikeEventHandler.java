@@ -1,13 +1,14 @@
 package com.loopers.application.like;
 
+import com.loopers.config.CacheConfig;
 import com.loopers.domain.like.ProductLikedEvent;
 import com.loopers.domain.like.ProductUnlikedEvent;
 import com.loopers.domain.product.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -21,22 +22,31 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ProductLikeEventHandler {
 
     private final ProductService productService;
+    private final CacheManager cacheManager;
 
-    // AFTER_COMMIT 은 원본 트랜잭션 커밋 이후라, 여기서 DB 를 쓰려면 새 트랜잭션이 필요하다(REQUIRES_NEW).
-    // 그렇지 않으면 이미 커밋된 트랜잭션에 합류해 UPDATE 가 커밋되지 않고 묻힌다.
-    // @Async 가 없으면 요청 스레드가 원본 커넥션을 반납하기 전에 REQUIRES_NEW 용 커넥션을 추가로 빌려
+    // @Async 가 없으면 요청 스레드가 원본 커넥션을 반납하기 전에 집계용 커넥션을 추가로 빌려
     // (연산당 2개 점유) 동시 요청 시 풀이 고갈된다. 별도 스레드로 넘겨 원본 커넥션을 먼저 반납하게 한다.
+    // 집계의 트랜잭션은 productService 의 @Transactional 이 연다 (비동기 스레드에는 기존 트랜잭션이 없다).
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onProductLiked(ProductLikedEvent event) {
         productService.increaseLikeCount(event.productId());
+        evictProductDetail(event.productId());
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onProductUnliked(ProductUnlikedEvent event) {
         productService.decreaseLikeCount(event.productId());
+        evictProductDetail(event.productId());
+    }
+
+    // 집계 반영(커밋) 후의 재무효화. LikeFacade 의 즉시 무효화와 집계 반영 사이에 조회가 끼면
+    // 갱신 전 값이 다시 캐시에 실리므로(stale re-cache), 반영 이후 시점의 무효화로 레이스를 닫는다.
+    private void evictProductDetail(Long productId) {
+        Cache cache = cacheManager.getCache(CacheConfig.PRODUCT_DETAIL);
+        if (cache != null) {
+            cache.evict(productId);
+        }
     }
 }

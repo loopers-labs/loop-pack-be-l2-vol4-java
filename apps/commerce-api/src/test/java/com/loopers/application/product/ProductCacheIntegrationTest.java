@@ -21,8 +21,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.math.BigDecimal;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -93,10 +95,12 @@ class ProductCacheIntegrationTest {
         Product product = saveProduct();
 
         ProductInfo before = productFacade.getProduct(product.getId());   // 좋아요 0 으로 캐시 적재
-        likeFacade.like(1L, product.getId());                            // 캐시 무효화
-        ProductInfo after = productFacade.getProduct(product.getId());    // 무효화됐으므로 DB 재조회
+        likeFacade.like(1L, product.getId());                            // 캐시 무효화 + 집계는 비동기
 
         assertThat(before.likeCount()).isZero();
-        assertThat(after.likeCount()).isEqualTo(1L);
+        // 집계가 비동기(@Async 리스너)라 즉시 조회는 갱신 전 값일 수 있다.
+        // 집계 반영 후 핸들러가 캐시를 재무효화하므로, 조회가 갱신된 값으로 수렴할 때까지 기다려 검증한다.
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+            assertThat(productFacade.getProduct(product.getId()).likeCount()).isEqualTo(1L));
     }
 }
