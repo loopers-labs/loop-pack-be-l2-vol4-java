@@ -14,4 +14,19 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     public void applyLikeDelta(Long productId, long delta) {
         productMetricsJpaRepository.upsertLikeDelta(productId, delta);
     }
+
+    @Override
+    public void applySalesDelta(Long productId, long delta) {
+        productMetricsJpaRepository.upsertSalesDelta(productId, delta);
+    }
+
+    @Override
+    public void applyViewDelta(Long productId, long delta) {
+        productMetricsJpaRepository.upsertViewDelta(productId, delta);
+    }
+
+    @Override
+    public void applyStockState(Long productId, long quantity, long version) {
+        productMetricsJpaRepository.upsertStockState(productId, quantity, version);
+    }
 }

@@ -114,14 +114,104 @@ class CatalogEventsConsumerIntegrationTest {
         );
     }
 
+    @DisplayName("STOCK_CHANGED 를 처음 받으면 product_metrics 에 재고 스냅샷(stock_quantity/stock_version)이 생성된다.")
+    @Test
+    void createsStockSnapshot_whenFirstStockEventConsumed() {
+        // given
+        long productId = 1L;
+
+        // when
+        catalogEventsConsumer.consume(List.of(stockRecord("evt-1", productId, 50, 5)), NO_OP_ACK);
+
+        // then
+        assertAll(
+            () -> assertThat(loadStockQuantity(productId)).isEqualTo(50L),
+            () -> assertThat(loadStockVersion(productId)).isEqualTo(5L)
+        );
+    }
+
+    @DisplayName("더 높은 version 의 재고 이벤트가 도착하면 최신 값으로 덮어쓴다.")
+    @Test
+    void overwritesStock_whenNewerVersionArrives() {
+        // given
+        long productId = 1L;
+        catalogEventsConsumer.consume(List.of(stockRecord("evt-1", productId, 50, 5)), NO_OP_ACK);
+
+        // when
+        catalogEventsConsumer.consume(List.of(stockRecord("evt-2", productId, 70, 7)), NO_OP_ACK);
+
+        // then
+        assertAll(
+            () -> assertThat(loadStockQuantity(productId)).isEqualTo(70L),
+            () -> assertThat(loadStockVersion(productId)).isEqualTo(7L)
+        );
+    }
+
+    @DisplayName("순서가 뒤바뀌어 더 낮은 version 의 재고 이벤트가 뒤늦게 도착해도 최신 상태를 되돌리지 않는다(최신성 가드).")
+    @Test
+    void keepsLatestStock_whenOlderVersionArrivesLater() {
+        // given : version 5(수량 50)가 먼저 반영된 상태
+        long productId = 1L;
+        catalogEventsConsumer.consume(List.of(stockRecord("evt-1", productId, 50, 5)), NO_OP_ACK);
+
+        // when : 재전송/순서역전으로 더 오래된 version 3(수량 30)이 뒤늦게 도착
+        catalogEventsConsumer.consume(List.of(stockRecord("evt-2", productId, 30, 3)), NO_OP_ACK);
+
+        // then : 오래된 이벤트는 무시되어 최신(version 5, 수량 50)이 유지된다
+        assertAll(
+            () -> assertThat(loadStockQuantity(productId)).isEqualTo(50L),
+            () -> assertThat(loadStockVersion(productId)).isEqualTo(5L)
+        );
+    }
+
+    @DisplayName("VIEWED 이벤트를 받으면 product_metrics.view_count 가 1 증가한다.")
+    @Test
+    void incrementsViewCount_whenViewedConsumed() {
+        // given
+        long productId = 1L;
+
+        // when
+        catalogEventsConsumer.consume(List.of(viewRecord("evt-1", productId)), NO_OP_ACK);
+        catalogEventsConsumer.consume(List.of(viewRecord("evt-2", productId)), NO_OP_ACK);
+
+        // then
+        assertThat(loadViewCount(productId)).isEqualTo(2L);
+    }
+
     private long loadLikeCount(long productId) {
         return productMetricsJpaRepository.findById(productId).orElseThrow().getLikeCount();
+    }
+
+    private long loadViewCount(long productId) {
+        return productMetricsJpaRepository.findById(productId).orElseThrow().getViewCount();
+    }
+
+    private long loadStockQuantity(long productId) {
+        return productMetricsJpaRepository.findById(productId).orElseThrow().getStockQuantity();
+    }
+
+    private long loadStockVersion(long productId) {
+        return productMetricsJpaRepository.findById(productId).orElseThrow().getStockVersion();
     }
 
     private ConsumerRecord<String, byte[]> record(String eventId, String eventType, long productId) {
         String json = """
             {"eventId":"%s","eventType":"%s","aggregateId":%d,"data":{"productId":%d,"type":"%s"}}
             """.formatted(eventId, eventType, productId, productId, eventType);
+        return new ConsumerRecord<>("catalog-events", 0, 0L, String.valueOf(productId), json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private ConsumerRecord<String, byte[]> viewRecord(String eventId, long productId) {
+        String json = """
+            {"eventId":"%s","eventType":"VIEWED","aggregateId":%d,"data":{}}
+            """.formatted(eventId, productId);
+        return new ConsumerRecord<>("catalog-events", 0, 0L, String.valueOf(productId), json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private ConsumerRecord<String, byte[]> stockRecord(String eventId, long productId, long quantity, long version) {
+        String json = """
+            {"eventId":"%s","eventType":"STOCK_CHANGED","aggregateId":%d,"data":{"quantity":%d,"version":%d}}
+            """.formatted(eventId, productId, quantity, version);
         return new ConsumerRecord<>("catalog-events", 0, 0L, String.valueOf(productId), json.getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -1,5 +1,6 @@
 package com.loopers.application.catalog;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.loopers.domain.idempotency.EventHandledRepository;
 import com.loopers.domain.metrics.CatalogEventType;
 import com.loopers.domain.metrics.ProductMetricsRepository;
@@ -29,8 +30,28 @@ public class CatalogEventFacade {
         }
     }
 
+    private static final String STOCK_CHANGED = "STOCK_CHANGED";
+    private static final String VIEWED = "VIEWED";
+
     private void applyMetric(CatalogEventMessage message) {
+        if (STOCK_CHANGED.equals(message.eventType())) {
+            applyStockState(message);
+            return;
+        }
+        if (VIEWED.equals(message.eventType())) {
+            productMetricsRepository.applyViewDelta(message.aggregateId(), 1);
+            return;
+        }
+        // like/unlike 처럼 '누적(delta)'되는 이벤트: 순서와 무관(commutative)해 멱등만으로 정확.
         CatalogEventType.from(message.eventType())
             .ifPresent(type -> productMetricsRepository.applyLikeDelta(message.aggregateId(), type.likeDelta()));
+    }
+
+    // 재고는 '절대 상태'라 delta 가 아니라 최신 값으로 덮어쓴다 — version 으로 최신성을 가드한다.
+    private void applyStockState(CatalogEventMessage message) {
+        JsonNode data = message.data();
+        long quantity = data.get("quantity").asLong();
+        long version = data.get("version").asLong();
+        productMetricsRepository.applyStockState(message.aggregateId(), quantity, version);
     }
 }

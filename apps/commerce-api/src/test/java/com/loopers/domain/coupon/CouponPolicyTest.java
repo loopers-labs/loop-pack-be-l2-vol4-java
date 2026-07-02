@@ -330,4 +330,72 @@ class CouponPolicyTest {
             );
         }
     }
+
+    @DisplayName("선착순 발급 수량 한도를 둘 때, ")
+    @Nested
+    class IssueLimit {
+
+        @DisplayName("발급 수량 한도를 지정해 생성하면, 한도가 보관되고 발급 수는 0 에서 시작한다.")
+        @Test
+        void storesLimit_andStartsIssuedCountAtZero() {
+            // given
+            Long maxIssueCount = 100L;
+
+            // when
+            CouponPolicy policy = new CouponPolicy("선착순 100명 5천원 할인", CouponType.FIXED, 5_000L, 10_000L, EXPIRED_AT, maxIssueCount);
+
+            // then
+            assertAll(
+                () -> assertThat(policy.getMaxIssueCount()).isEqualTo(100L),
+                () -> assertThat(policy.getIssuedCount()).isEqualTo(0L)
+            );
+        }
+
+        @DisplayName("발급 수량 한도 없이 생성하면(무제한), 한도는 null 이고 발급 수는 0 이다.")
+        @Test
+        void hasNullLimit_whenCreatedWithoutLimit() {
+            // given
+            CouponPolicy policy = new CouponPolicy("무제한 10% 할인", CouponType.RATE, 10L, null, EXPIRED_AT);
+
+            // when & then
+            assertAll(
+                () -> assertThat(policy.getMaxIssueCount()).isNull(),
+                () -> assertThat(policy.getIssuedCount()).isEqualTo(0L)
+            );
+        }
+
+        @DisplayName("발급 수량 한도가 0 이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenLimitIsZero() {
+            // given
+            Long maxIssueCount = 0L;
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> new CouponPolicy("쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT, maxIssueCount));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("발급 수량 한도는 1 이상이어야 합니다.")
+            );
+        }
+
+        @DisplayName("발급 수량 한도가 음수이면, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void throwsBadRequestException_whenLimitIsNegative() {
+            // given
+            Long maxIssueCount = -1L;
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> new CouponPolicy("쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT, maxIssueCount));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST),
+                () -> assertThat(result.getCustomMessage()).isEqualTo("발급 수량 한도는 1 이상이어야 합니다.")
+            );
+        }
+    }
 }

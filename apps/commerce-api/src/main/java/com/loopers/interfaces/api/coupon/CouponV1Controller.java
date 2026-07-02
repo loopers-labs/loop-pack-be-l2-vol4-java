@@ -5,10 +5,12 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,6 +29,29 @@ public class CouponV1Controller implements CouponV1ApiSpec {
         @PathVariable("couponId") Long couponId
     ) {
         CouponV1Dto.Response response = CouponV1Dto.Response.from(couponFacade.issue(loginUser.id(), couponId));
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/coupons/{couponId}/issue-requests")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Override
+    public ApiResponse<CouponIssueRequestV1Dto.Response> requestIssue(
+        @AuthenticatedUser LoginUser loginUser,
+        @PathVariable("couponId") Long couponId
+    ) {
+        CouponIssueRequestV1Dto.Response response =
+            CouponIssueRequestV1Dto.Response.from(couponFacade.requestIssue(loginUser.id(), couponId));
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/coupons/issue-requests/{requestId}")
+    @Override
+    public ApiResponse<CouponIssueRequestV1Dto.Response> getIssueRequest(
+        @AuthenticatedUser LoginUser loginUser,
+        @PathVariable("requestId") Long requestId
+    ) {
+        CouponIssueRequestV1Dto.Response response =
+            CouponIssueRequestV1Dto.Response.from(couponFacade.getIssueRequest(loginUser.id(), requestId));
         return ApiResponse.success(response);
     }
 

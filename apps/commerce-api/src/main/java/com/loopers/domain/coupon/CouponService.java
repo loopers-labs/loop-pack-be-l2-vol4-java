@@ -48,7 +48,13 @@ public class CouponService {
 
     @Transactional
     public CouponPolicy createPolicy(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
-        return couponPolicyRepository.save(new CouponPolicy(name, type, value, minOrderAmount, expiredAt));
+        return createPolicy(name, type, value, minOrderAmount, expiredAt, null);
+    }
+
+    @Transactional
+    public CouponPolicy createPolicy(String name, CouponType type, long value, Long minOrderAmount,
+                                     ZonedDateTime expiredAt, Long maxIssueCount) {
+        return couponPolicyRepository.save(new CouponPolicy(name, type, value, minOrderAmount, expiredAt, maxIssueCount));
     }
 
     @Transactional(readOnly = true)

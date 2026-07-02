@@ -20,14 +20,25 @@ public class ProductMetrics {
     @Column(name = "product_id")
     private Long productId;
 
-    @Column(name = "like_count", nullable = false)
+    @Column(name = "like_count", nullable = false, columnDefinition = "bigint not null default 0")
     private long likeCount;
 
-    @Column(name = "sales_count", nullable = false)
+    @Column(name = "sales_count", nullable = false, columnDefinition = "bigint not null default 0")
     private long salesCount;
 
-    @Column(name = "view_count", nullable = false)
+    @Column(name = "view_count", nullable = false, columnDefinition = "bigint not null default 0")
     private long viewCount;
+
+    /**
+     * 재고 수량의 최신 스냅샷(파생). like/sales/view 는 delta 누적이지만, 재고는 '절대 상태'라
+     * 이벤트가 실어온 값으로 덮어쓴다. 순서역전·재전송으로 '오래된' 이벤트가 도착해도 최신 상태를
+     * 되돌리지 않도록 stock_version(고수위 표시)으로 최신성을 가드한다.
+     */
+    @Column(name = "stock_quantity", nullable = false, columnDefinition = "bigint not null default 0")
+    private long stockQuantity;
+
+    @Column(name = "stock_version", nullable = false, columnDefinition = "bigint not null default 0")
+    private long stockVersion;
 
     @Column(name = "updated_at", nullable = false)
     private ZonedDateTime updatedAt;
@@ -48,6 +59,14 @@ public class ProductMetrics {
 
     public long getViewCount() {
         return viewCount;
+    }
+
+    public long getStockQuantity() {
+        return stockQuantity;
+    }
+
+    public long getStockVersion() {
+        return stockVersion;
     }
 
     public ZonedDateTime getUpdatedAt() {

@@ -47,7 +47,9 @@ public enum ErrorType {
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_EXPIRED", "만료된 쿠폰입니다."),
     COUPON_NOT_OWNED(HttpStatus.NOT_FOUND, "COUPON_NOT_OWNED", "쿠폰을 찾을 수 없습니다."),
     COUPON_ALREADY_USED(HttpStatus.CONFLICT, "COUPON_ALREADY_USED", "이미 사용된 쿠폰입니다."),
-    COUPON_MIN_ORDER_AMOUNT_NOT_MET(HttpStatus.BAD_REQUEST, "COUPON_MIN_ORDER_AMOUNT_NOT_MET", "쿠폰 최소 주문 금액을 충족하지 못했습니다.");
+    COUPON_MIN_ORDER_AMOUNT_NOT_MET(HttpStatus.BAD_REQUEST, "COUPON_MIN_ORDER_AMOUNT_NOT_MET", "쿠폰 최소 주문 금액을 충족하지 못했습니다."),
+    COUPON_ISSUE_REQUEST_ALREADY_HANDLED(HttpStatus.CONFLICT, "COUPON_ISSUE_REQUEST_ALREADY_HANDLED", "이미 처리된 발급 요청입니다."),
+    COUPON_ISSUE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_ISSUE_REQUEST_NOT_FOUND", "발급 요청을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

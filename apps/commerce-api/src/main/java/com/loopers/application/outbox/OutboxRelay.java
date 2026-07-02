@@ -72,6 +72,8 @@ public class OutboxRelay {
     private String resolveTopic(String aggregateType) {
         return switch (aggregateType) {
             case "Product" -> "catalog-events";
+            case "Order" -> "order-events";
+            case "Coupon" -> "coupon-issue-requests";
             default -> throw new IllegalStateException("매핑되지 않은 aggregateType: " + aggregateType);
         };
     }

@@ -34,6 +34,9 @@ spring.config.activate.on-profile: local, test
 spring:
   kafka:
     bootstrap-servers: localhost:19092
+    producer:
+      properties:
+        max.block.ms: 2000   # 브로커 없는 테스트에서 fire-and-forget 발행이 60s 블로킹하지 않도록 짧게 제한(local/test 한정)
     admin:
       properties:
         bootstrap.servers: kafka:9092

@@ -7,6 +7,8 @@ public record UserActivityEvent(Long userId, Type type, Long targetId) {
     }
 
     public enum Type {
+        PRODUCT_VIEWED,
+        PRODUCT_BROWSED,
         PRODUCT_LIKED,
         PRODUCT_UNLIKED,
         ORDER_PLACED,
