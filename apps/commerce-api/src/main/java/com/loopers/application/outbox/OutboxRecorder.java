@@ -2,6 +2,7 @@ package com.loopers.application.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.domain.coupon.CouponIssueRequestedEvent;
 import com.loopers.domain.like.ProductLikedEvent;
 import com.loopers.domain.like.ProductUnlikedEvent;
 import com.loopers.domain.order.OrderCreatedEvent;
@@ -27,8 +28,9 @@ import java.util.UUID;
 @Component
 public class OutboxRecorder {
 
-    public static final String CATALOG_TOPIC = "catalog-events"; // key=productId
-    public static final String ORDER_TOPIC = "order-events";     // key=orderId
+    public static final String CATALOG_TOPIC = "catalog-events";              // key=productId
+    public static final String ORDER_TOPIC = "order-events";                  // key=orderId
+    public static final String COUPON_ISSUE_TOPIC = "coupon-issue-requests";  // key=couponId (같은 쿠폰 = 순차 처리)
 
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
@@ -67,6 +69,12 @@ public class OutboxRecorder {
     @EventListener
     public void on(PaymentFailedEvent event) {
         record(ORDER_TOPIC, event.orderId(), event);
+    }
+
+    @Transactional
+    @EventListener
+    public void on(CouponIssueRequestedEvent event) {
+        record(COUPON_ISSUE_TOPIC, event.couponId(), event);
     }
 
     private void record(String topic, Long partitionKey, Object event) {

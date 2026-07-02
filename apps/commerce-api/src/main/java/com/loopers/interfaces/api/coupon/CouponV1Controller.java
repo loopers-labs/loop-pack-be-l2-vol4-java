@@ -29,6 +29,24 @@ public class CouponV1Controller implements CouponV1ApiSpec {
         return ApiResponse.success(CouponV1Dto.IssueResponse.from(couponFacade.issue(user.getId(), couponId)));
     }
 
+    @PostMapping("/coupons/{couponId}/issue-requests")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueRequestResponse> requestIssue(
+        @LoginUser User user,
+        @PathVariable("couponId") Long couponId
+    ) {
+        return ApiResponse.success(CouponV1Dto.IssueRequestResponse.from(couponFacade.requestIssue(user.getId(), couponId)));
+    }
+
+    @GetMapping("/coupons/issue-requests/{requestId}")
+    @Override
+    public ApiResponse<CouponV1Dto.IssueRequestResponse> getIssueRequest(
+        @LoginUser User user,
+        @PathVariable("requestId") String requestId
+    ) {
+        return ApiResponse.success(CouponV1Dto.IssueRequestResponse.from(couponFacade.getIssueRequest(user.getId(), requestId)));
+    }
+
     @GetMapping("/users/me/coupons")
     @Override
     public ApiResponse<List<CouponV1Dto.MyCouponResponse>> getMyCoupons(

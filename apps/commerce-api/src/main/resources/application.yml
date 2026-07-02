@@ -89,10 +89,13 @@ spring:
     activate:
       on-profile: test
 
-# 테스트는 브로커 없이 돈다 — 릴레이 검증은 KafkaTemplate 목으로 직접 호출한다
+# 테스트는 브로커 없이 돈다 — 릴레이 검증은 KafkaTemplate 목으로, 발급 처리는 프로세서 직접 호출로 검증한다
 outbox:
   relay:
     enabled: false
+
+coupon-consumer:
+  auto-startup: false
 
 ---
 spring:
