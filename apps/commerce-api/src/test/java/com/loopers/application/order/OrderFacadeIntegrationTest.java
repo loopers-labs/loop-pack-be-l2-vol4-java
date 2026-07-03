@@ -8,6 +8,9 @@ import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.IssuedCouponModel;
 import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.outbox.OutboxModel;
+import com.loopers.domain.outbox.OutboxRepository;
+import com.loopers.domain.outbox.OutboxStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
@@ -61,6 +64,9 @@ class OrderFacadeIntegrationTest {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private OutboxRepository outboxRepository;
 
     @Autowired
     private CouponTemplateRepository couponTemplateRepository;
@@ -137,6 +143,30 @@ class OrderFacadeIntegrationTest {
                     () -> assertThat(result.items().get(0).productName()).isEqualTo("테스트 상품"),
                     () -> assertThat(result.items().get(0).productPrice()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
                     () -> assertThat(stock.getQuantity()).isEqualTo(3L)
+            );
+        }
+
+        @DisplayName("주문이 생성되면 ORDER_CREATED 아웃박스가 PENDING 상태로 기록된다.")
+        @Test
+        void recordsOrderCreatedOutbox_whenOrderIsCreated() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 2L)
+            );
+
+            // when
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+
+            // then
+            List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            assertAll(
+                    () -> assertThat(pending).hasSize(1),
+                    () -> assertThat(pending.get(0).getEventType()).isEqualTo("ORDER_CREATED"),
+                    () -> assertThat(pending.get(0).getAggregateType()).isEqualTo("Order"),
+                    () -> assertThat(pending.get(0).getAggregateId()).isEqualTo(String.valueOf(result.id()))
             );
         }
 

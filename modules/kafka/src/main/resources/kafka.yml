@@ -12,13 +12,17 @@ spring:
           offset.reset: latest
         use.latest.version: true
     producer:
+      acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       retries: 3
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000 # 브로커 불능 시 send()가 무한정(기본 60s) 블로킹하지 않도록 제한 - outbox 릴레이가 다음 1s 주기에 재시도한다
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       properties:
         enable-auto-commit: false
     listener:
@@ -30,9 +34,6 @@ spring.config.activate.on-profile: local, test
 spring:
   kafka:
     bootstrap-servers: localhost:19092
-    admin:
-      properties:
-        bootstrap.servers: kafka:9092
 
 ---
 spring.config.activate.on-profile: dev

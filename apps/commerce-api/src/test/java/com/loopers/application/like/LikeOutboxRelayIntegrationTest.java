@@ -10,6 +10,7 @@ import com.loopers.domain.like.LikedEvent;
 import com.loopers.domain.like.UnlikedEvent;
 import com.loopers.domain.outbox.OutboxModel;
 import com.loopers.domain.outbox.OutboxRepository;
+import com.loopers.domain.outbox.OutboxService;
 import com.loopers.domain.outbox.OutboxStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
@@ -38,6 +39,9 @@ class LikeOutboxRelayIntegrationTest {
 
     @Autowired
     private OutboxRepository outboxRepository;
+
+    @Autowired
+    private OutboxService outboxService;
 
     @Autowired
     private BrandRepository brandRepository;
@@ -82,11 +86,21 @@ class LikeOutboxRelayIntegrationTest {
         }
     }
 
+    // 이 테스트 파일은 like_count 반영(T1)과 T2 아웃박스 기록 여부만 검증한다 - T2의 실제 Kafka 발행은
+    // 실제 브로커를 띄우는 ProductLikeKafkaOutboxEventHandlerIntegrationTest에서 별도로 검증한다.
+    // relay()를 다시 호출하기 전에 leftover T2(PRODUCT_LIKED/PRODUCT_UNLIKED) PENDING 행을 미리 DONE 처리해
+    // 다음 relay()가 실제 브로커로 발행을 시도하지 않도록 한다.
+    private void settlePendingProductKafkaEvents() {
+        outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING).stream()
+                .filter(o -> o.getEventType().equals("PRODUCT_LIKED") || o.getEventType().equals("PRODUCT_UNLIKED"))
+                .forEach(o -> outboxService.markDoneIfPending(o.getEventId()));
+    }
+
     @DisplayName("relay()를 호출할 때,")
     @Nested
     class Relay {
 
-        @DisplayName("LIKED_EVENT 아웃박스가 있으면 like_count가 1 증가하고 PENDING 아웃박스가 없어진다.")
+        @DisplayName("LIKED_EVENT 아웃박스가 있으면 like_count가 1 증가하고 LIKED_EVENT PENDING 아웃박스가 없어진다.")
         @Test
         void increasesLikeCount_whenLikedEventIsPending() {
             // given
@@ -96,22 +110,25 @@ class LikeOutboxRelayIntegrationTest {
             // when
             outboxRelay.relay();
 
-            // then
+            // then: T1(LIKED_EVENT)은 처리 완료된다 - T2(PRODUCT_LIKED)의 새 PENDING 행은 별도로 검증한다.
             Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
-            List<OutboxModel> remaining = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            List<OutboxModel> remainingLikedEvents = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING).stream()
+                    .filter(o -> o.getEventType().equals(LikeEventType.LIKED_EVENT.name()))
+                    .toList();
             assertAll(
                 () -> assertThat(likeCount).isEqualTo(1L),
-                () -> assertThat(remaining).isEmpty()
+                () -> assertThat(remainingLikedEvents).isEmpty()
             );
         }
 
-        @DisplayName("UNLIKED_EVENT 아웃박스가 있으면 like_count가 1 감소하고 PENDING 아웃박스가 없어진다.")
+        @DisplayName("UNLIKED_EVENT 아웃박스가 있으면 like_count가 1 감소하고 UNLIKED_EVENT PENDING 아웃박스가 없어진다.")
         @Test
         void decreasesLikeCount_whenUnlikedEventIsPending() {
             // given
             ProductModel product = createProductWithStats();
             savePendingOutbox(product.getId(), LikeEventType.LIKED_EVENT);
             outboxRelay.relay();
+            settlePendingProductKafkaEvents();
 
             savePendingOutbox(product.getId(), LikeEventType.UNLIKED_EVENT);
 
@@ -120,10 +137,12 @@ class LikeOutboxRelayIntegrationTest {
 
             // then
             Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
-            List<OutboxModel> remaining = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            List<OutboxModel> remainingUnlikedEvents = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING).stream()
+                    .filter(o -> o.getEventType().equals(LikeEventType.UNLIKED_EVENT.name()))
+                    .toList();
             assertAll(
                 () -> assertThat(likeCount).isEqualTo(0L),
-                () -> assertThat(remaining).isEmpty()
+                () -> assertThat(remainingUnlikedEvents).isEmpty()
             );
         }
 
@@ -136,11 +155,55 @@ class LikeOutboxRelayIntegrationTest {
 
             // when
             outboxRelay.relay();
+            settlePendingProductKafkaEvents();
             outboxRelay.relay();
 
             // then
             Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
             assertThat(likeCount).isEqualTo(1L);
+        }
+
+        @DisplayName("LIKED_EVENT 아웃박스를 반영하면 T2 시점의 PRODUCT_LIKED 아웃박스가 새로 기록된다.")
+        @Test
+        void recordsProductLikedOutbox_whenLikedEventIsReflected() {
+            // given
+            ProductModel product = createProductWithStats();
+            savePendingOutbox(product.getId(), LikeEventType.LIKED_EVENT);
+
+            // when
+            outboxRelay.relay();
+
+            // then
+            List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            assertAll(
+                () -> assertThat(pending).hasSize(1),
+                () -> assertThat(pending.get(0).getEventType()).isEqualTo("PRODUCT_LIKED"),
+                () -> assertThat(pending.get(0).getAggregateType()).isEqualTo("Product"),
+                () -> assertThat(pending.get(0).getAggregateId()).isEqualTo(String.valueOf(product.getId()))
+            );
+        }
+
+        @DisplayName("UNLIKED_EVENT 아웃박스를 반영하면 T2 시점의 PRODUCT_UNLIKED 아웃박스가 새로 기록된다.")
+        @Test
+        void recordsProductUnlikedOutbox_whenUnlikedEventIsReflected() {
+            // given
+            ProductModel product = createProductWithStats();
+            savePendingOutbox(product.getId(), LikeEventType.LIKED_EVENT);
+            outboxRelay.relay();
+            settlePendingProductKafkaEvents();
+
+            savePendingOutbox(product.getId(), LikeEventType.UNLIKED_EVENT);
+
+            // when
+            outboxRelay.relay();
+
+            // then
+            List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            assertAll(
+                () -> assertThat(pending).hasSize(1),
+                () -> assertThat(pending.get(0).getEventType()).isEqualTo("PRODUCT_UNLIKED"),
+                () -> assertThat(pending.get(0).getAggregateId()).isEqualTo(String.valueOf(product.getId()))
+            );
         }
     }
 }

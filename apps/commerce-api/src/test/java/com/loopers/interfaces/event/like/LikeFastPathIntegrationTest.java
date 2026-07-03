@@ -118,11 +118,11 @@ class LikeFastPathIntegrationTest {
             // when
             target.send(event);
 
-            // then
+            // then: T1(LIKED_EVENT)은 DONE 처리되고, 같은 트랜잭션에서 발행된 T2(PRODUCT_LIKED)만 새로 PENDING 상태로 남는다.
             List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
             assertAll(
                 () -> assertThat(likeCountOf(product)).isEqualTo(1L),
-                () -> assertThat(pending).isEmpty()
+                () -> assertThat(pending).extracting(OutboxModel::getEventType).containsExactly("PRODUCT_LIKED")
             );
         }
 
