@@ -13,6 +13,8 @@ public record CouponInfo(
         BigDecimal value,
         BigDecimal minOrderAmount,
         ZonedDateTime expiredAt,
+        int totalQuantity,
+        int issuedQuantity,
         ZonedDateTime createdAt,
         ZonedDateTime updatedAt
 ) {
@@ -24,6 +26,8 @@ public record CouponInfo(
                 model.getDiscountPolicy().value(),
                 model.getMinOrderAmount(),
                 model.getExpiredAt(),
+                model.getTotalQuantity(),
+                model.getIssuedQuantity(),
                 model.getCreatedAt(),
                 model.getUpdatedAt()
         );

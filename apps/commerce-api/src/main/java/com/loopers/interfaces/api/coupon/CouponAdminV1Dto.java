@@ -26,7 +26,8 @@ public class CouponAdminV1Dto {
             CouponTypeDto type,
             BigDecimal value,
             BigDecimal minOrderAmount,
-            ZonedDateTime expiredAt
+            ZonedDateTime expiredAt,
+            int totalQuantity
     ) {}
 
     public record CouponUpdateRequest(
@@ -34,7 +35,8 @@ public class CouponAdminV1Dto {
             CouponTypeDto type,
             BigDecimal value,
             BigDecimal minOrderAmount,
-            ZonedDateTime expiredAt
+            ZonedDateTime expiredAt,
+            int totalQuantity
     ) {}
 
     public record CouponResponse(
@@ -44,6 +46,8 @@ public class CouponAdminV1Dto {
             BigDecimal value,
             BigDecimal minOrderAmount,
             ZonedDateTime expiredAt,
+            int totalQuantity,
+            int issuedQuantity,
             ZonedDateTime createdAt,
             ZonedDateTime updatedAt
     ) {
@@ -55,6 +59,8 @@ public class CouponAdminV1Dto {
                     info.value(),
                     info.minOrderAmount(),
                     info.expiredAt(),
+                    info.totalQuantity(),
+                    info.issuedQuantity(),
                     info.createdAt(),
                     info.updatedAt()
             );
