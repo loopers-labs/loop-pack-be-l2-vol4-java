@@ -21,13 +21,67 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+  # Kafka Producer — at-least-once + 순서 보장
+  kafka:
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+      retries: 2147483647
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+# Outbox Relay 스케줄러
+outbox:
+  relay:
+    enabled: ${OUTBOX_RELAY_ENABLED:true}
+    fixed-delay-ms: 1000
+    batch-size: 100
+
+# PG 시뮬레이터 — 별도 SpringBoot 앱으로 로컬 실행 가정
+pg:
+  simulator:
+    base-url: ${PG_SIMULATOR_BASE_URL:http://localhost:8081}
+  callback-url: ${PG_CALLBACK_URL:http://localhost:8080/api/v1/payments/callback}
+  recovery:
+    enabled: ${PG_RECOVERY_ENABLED:true}
+    # REQUESTED 후 이 시간 지나면 복구 대상에 포함 (PG 처리 지연 1~5s 보다 충분히 길게)
+    requested-stale-after: 30s
+    fixed-delay-ms: 5000
+    batch-size: 50
+
+# Resilience4j — PG 회로
+resilience4j:
+  circuitbreaker:
+    instances:
+      pg:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      pg:
+        max-attempts: 3
+        wait-duration: 200ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
 
 ---
 spring:

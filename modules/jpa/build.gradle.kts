@@ -14,8 +14,8 @@ dependencies {
     // jdbc-mysql
     runtimeOnly("com.mysql:mysql-connector-j")
 
-    testImplementation("org.testcontainers:mysql")
+    testImplementation("org.testcontainers:mysql:1.21.3")
 
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    testFixturesImplementation("org.testcontainers:mysql")
+    testFixturesImplementation("org.testcontainers:mysql:1.21.3")
 }

@@ -1,10 +1,19 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductCriteria;
+import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -19,55 +28,36 @@ public class ProductV1Controller {
     public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
         @RequestBody ProductV1Dto.CreateProductRequest request
     ) {
-        ProductInfo info = productFacade.createProduct(
+        ProductInfo info = productFacade.createProduct(new ProductCriteria.Create(
+            request.brandId(),
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+            request.stock(),
+            request.imageUrl()
+        ));
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-        @PathVariable(value = "productId") Long productId
+    public ApiResponse<ProductV1Dto.ProductDetailResponse> getProduct(
+        @PathVariable("productId") Long productId,
+        @org.springframework.web.bind.annotation.RequestHeader(
+            value = "X-Loopers-User-Id", required = false) Long userId
     ) {
-        ProductInfo info = productFacade.getProduct(productId);
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
+        ProductDetailInfo detail = productFacade.getProductDetail(productId, userId);
+        return ApiResponse.success(ProductV1Dto.ProductDetailResponse.from(detail));
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
+    public ApiResponse<List<ProductV1Dto.ProductResponse>> listProducts(
+        @RequestParam(value = "sort", required = false) ProductSortType sortType,
+        @RequestParam(value = "brandId", required = false) Long brandId
+    ) {
+        List<ProductInfo> infos = productFacade.listProducts(new ProductCriteria.List(sortType, brandId));
         List<ProductV1Dto.ProductResponse> responses = infos.stream()
             .map(ProductV1Dto.ProductResponse::from)
             .toList();
         return ApiResponse.success(responses);
-    }
-
-    @PutMapping("/{productId}")
-    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
-        @PathVariable(value = "productId") Long productId,
-        @RequestBody ProductV1Dto.UpdateProductRequest request
-    ) {
-        ProductInfo info = productFacade.updateProduct(
-            productId,
-            request.name(),
-            request.description(),
-            request.price(),
-            request.stock()
-        );
-        ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
-        return ApiResponse.success(response);
-    }
-
-    @DeleteMapping("/{productId}")
-    public ApiResponse<Void> deleteProduct(
-        @PathVariable(value = "productId") Long productId
-    ) {
-        productFacade.deleteProduct(productId);
-        return ApiResponse.success(null);
     }
 }
