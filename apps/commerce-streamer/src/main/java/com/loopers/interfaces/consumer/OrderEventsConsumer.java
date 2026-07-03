@@ -30,7 +30,7 @@ public class OrderEventsConsumer {
         containerFactory = KafkaConfig.STRING_LISTENER
     )
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        String eventId = record.partition() + "-" + record.offset();
+        String eventId = extractOutboxId(record.value());
         try {
             process(eventId, record.value());
             ack.acknowledge();
@@ -60,5 +60,13 @@ public class OrderEventsConsumer {
         }
 
         eventHandledRepository.save(EventHandledModel.of(eventId));
+    }
+
+    private String extractOutboxId(String payload) {
+        try {
+            return objectMapper.readTree(payload).get("outboxId").asText();
+        } catch (Exception e) {
+            throw new RuntimeException("outboxId 추출 실패", e);
+        }
     }
 }
