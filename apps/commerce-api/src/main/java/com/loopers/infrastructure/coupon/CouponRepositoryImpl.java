@@ -37,7 +37,10 @@ public class CouponRepositoryImpl implements CouponRepository {
     }
 
     @Override
-    public int tryIncreaseIssuedCount(Long couponId) {
-        return couponJpaRepository.tryIncreaseIssuedCount(couponId);
+    public void increaseIssuedCount(Long couponId, int count) {
+        if (count <= 0) {
+            return;
+        }
+        couponJpaRepository.increaseIssuedCount(couponId, count);
     }
 }

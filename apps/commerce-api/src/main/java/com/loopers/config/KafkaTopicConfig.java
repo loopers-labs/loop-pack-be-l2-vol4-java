@@ -35,4 +35,9 @@ public class KafkaTopicConfig {
     public NewTopic couponIssueRequestsTopic(@Value("${commerce-events.topics.coupon-issue}") String name) {
         return TopicBuilder.name(name).partitions(3).replicas(1).build();
     }
+
+    @Bean
+    public NewTopic couponIssueRequestsDlqTopic(@Value("${commerce-events.topics.coupon-issue}") String name) {
+        return TopicBuilder.name(name + ".DLQ").partitions(3).replicas(1).build();
+    }
 }

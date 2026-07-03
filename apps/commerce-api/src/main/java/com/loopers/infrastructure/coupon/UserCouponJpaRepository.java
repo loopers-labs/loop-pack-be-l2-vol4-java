@@ -18,4 +18,7 @@ public interface UserCouponJpaRepository extends JpaRepository<UserCouponModel, 
 
     @Query("SELECT uc FROM UserCouponModel uc WHERE uc.couponId = :couponId ORDER BY uc.createdAt DESC")
     List<UserCouponModel> findByCouponId(@Param("couponId") Long couponId, Pageable pageable);
+
+    @Query("SELECT uc.userId FROM UserCouponModel uc WHERE uc.couponId = :couponId AND uc.userId IN :userIds")
+    List<Long> findUserIdsByCouponIdAndUserIdIn(@Param("couponId") Long couponId, @Param("userIds") List<Long> userIds);
 }

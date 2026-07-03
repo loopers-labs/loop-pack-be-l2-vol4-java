@@ -5,6 +5,7 @@ import com.loopers.domain.coupon.CouponIssueRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -21,5 +22,13 @@ public class CouponIssueRequestRepositoryImpl implements CouponIssueRequestRepos
     @Override
     public Optional<CouponIssueRequest> findByRequestId(String requestId) {
         return couponIssueRequestJpaRepository.findByRequestId(requestId);
+    }
+
+    @Override
+    public List<CouponIssueRequest> findByRequestIdIn(List<String> requestIds) {
+        if (requestIds.isEmpty()) {
+            return List.of();
+        }
+        return couponIssueRequestJpaRepository.findByRequestIdIn(requestIds);
     }
 }
