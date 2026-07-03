@@ -11,6 +11,7 @@ import com.loopers.domain.member.service.MemberService;
 import com.loopers.domain.order.model.Order;
 import com.loopers.domain.order.model.OrderItem;
 import com.loopers.domain.order.model.OrderItemSnapshot;
+import com.loopers.domain.order.model.OrderItemStatus;
 import com.loopers.domain.order.repository.OrderItemRepository;
 import com.loopers.domain.order.repository.OrderItemSnapshotRepository;
 import com.loopers.domain.order.repository.OrderRepository;
@@ -181,5 +182,27 @@ public class OrderApplicationService {
             order.getCreatedAt(),
             itemInfos
         );
+    }
+
+    /**
+     * 결제 실패에 대한 보상. 차감했던 재고와 사용한 쿠폰을 복구하고 주문 항목을 취소한다.
+     * 이미 취소된 항목/복구된 쿠폰은 건너뛰므로 중복 호출에 안전하다(멱등).
+     */
+    @Transactional
+    public void compensateOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 주문입니다."));
+
+        for (OrderItem item : orderItemRepository.findAllByOrderId(orderId)) {
+            if (item.getStatus() == OrderItemStatus.ORDERED) {
+                stockRepository.restoreStock(item.getProductId(), item.getQuantity());
+                item.cancel();
+            }
+        }
+
+        if (order.getIssuedCouponId() != null) {
+            issuedCouponRepository.findById(order.getIssuedCouponId())
+                .ifPresent(IssuedCoupon::cancel);
+        }
     }
 }
