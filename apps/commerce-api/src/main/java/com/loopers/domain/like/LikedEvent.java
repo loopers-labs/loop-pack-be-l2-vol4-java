@@ -1,8 +1,8 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.outbox.OutboxEvent;
+import com.loopers.domain.outbox.OutboxableEvent;
 
-public record LikedEvent(String eventId, Long productId) implements OutboxEvent {
+public record LikedEvent(String eventId, Long productId) implements OutboxableEvent {
 
     @Override
     public String aggregateType() {

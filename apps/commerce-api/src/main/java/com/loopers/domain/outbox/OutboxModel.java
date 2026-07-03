@@ -72,6 +72,10 @@ public class OutboxModel extends BaseEntity {
         this.status = OutboxStatus.PENDING;
     }
 
+    public static OutboxModel from(OutboxableEvent event, String payload) {
+        return new OutboxModel(event.eventId(), event.aggregateType(), event.aggregateId(), event.eventType(), payload);
+    }
+
     public void markDone() {
         this.status = OutboxStatus.DONE;
     }

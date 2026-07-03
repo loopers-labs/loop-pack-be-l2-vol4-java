@@ -1,8 +1,11 @@
 package com.loopers.domain.order;
 
-import java.util.List;
+import com.loopers.domain.DomainEvent;
 
-public record OrderCreatedEvent(Long orderId, Long userId, List<OrderCreatedItem> items) {
+import java.util.List;
+import java.util.UUID;
+
+public record OrderCreatedEvent(String eventId, Long orderId, Long userId, List<OrderCreatedItem> items) implements DomainEvent {
 
     public record OrderCreatedItem(Long productId, Long quantity) {
     }
@@ -11,7 +14,22 @@ public record OrderCreatedEvent(Long orderId, Long userId, List<OrderCreatedItem
         List<OrderCreatedItem> items = order.getItems().stream()
                 .map(item -> new OrderCreatedItem(item.getProductId(), item.getQuantity()))
                 .toList();
-        return new OrderCreatedEvent(order.getId(), order.getUserId(), items);
+        return new OrderCreatedEvent(UUID.randomUUID().toString(), order.getId(), order.getUserId(), items);
+    }
+
+    @Override
+    public String aggregateType() {
+        return "Order";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(orderId);
+    }
+
+    @Override
+    public String eventType() {
+        return "ORDER_CREATED";
     }
 
     public List<Long> productIds() {
