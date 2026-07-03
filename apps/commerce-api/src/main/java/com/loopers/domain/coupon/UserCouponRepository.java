@@ -11,4 +11,6 @@ public interface UserCouponRepository {
     Optional<UserCouponModel> findById(Long id);
     List<UserCouponModel> findAllByMemberId(Long memberId);
     Page<UserCouponModel> findAllByTemplateId(Long templateId, PageRequest pageRequest);
+    long countByTemplateId(Long templateId);
+    boolean existsByMemberIdAndTemplateId(Long memberId, Long templateId);
 }

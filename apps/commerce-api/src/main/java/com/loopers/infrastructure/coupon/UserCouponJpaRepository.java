@@ -10,4 +10,6 @@ import java.util.List;
 public interface UserCouponJpaRepository extends JpaRepository<UserCouponModel, Long> {
     List<UserCouponModel> findAllByMemberId(Long memberId);
     Page<UserCouponModel> findAllByTemplateId(Long templateId, Pageable pageable);
+    long countByTemplateId(Long templateId);
+    boolean existsByMemberIdAndTemplateId(Long memberId, Long templateId);
 }

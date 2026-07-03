@@ -35,4 +35,14 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     public Page<UserCouponModel> findAllByTemplateId(Long templateId, PageRequest pageRequest) {
         return userCouponJpaRepository.findAllByTemplateId(templateId, pageRequest);
     }
+
+    @Override
+    public long countByTemplateId(Long templateId) {
+        return userCouponJpaRepository.countByTemplateId(templateId);
+    }
+
+    @Override
+    public boolean existsByMemberIdAndTemplateId(Long memberId, Long templateId) {
+        return userCouponJpaRepository.existsByMemberIdAndTemplateId(memberId, templateId);
+    }
 }
