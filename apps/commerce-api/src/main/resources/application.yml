@@ -21,13 +21,29 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+  # Kafka Producer — at-least-once + 순서 보장
+  kafka:
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+      retries: 2147483647
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+# Outbox Relay 스케줄러
+outbox:
+  relay:
+    enabled: ${OUTBOX_RELAY_ENABLED:true}
+    fixed-delay-ms: 1000
+    batch-size: 100
 
 # PG 시뮬레이터 — 별도 SpringBoot 앱으로 로컬 실행 가정
 pg:
