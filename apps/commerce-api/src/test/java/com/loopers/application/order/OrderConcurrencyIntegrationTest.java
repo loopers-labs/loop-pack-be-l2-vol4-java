@@ -106,7 +106,7 @@ class OrderConcurrencyIntegrationTest {
             saveStock(product.getId(), (long) THREAD_COUNT * 10);
 
             CouponTemplateModel template = couponTemplateRepository.save(
-                    new CouponTemplateModel("쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), null, ZonedDateTime.now().plusDays(1)));
+                    new CouponTemplateModel("쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), null, ZonedDateTime.now().plusDays(1), 100));
             IssuedCouponModel issued = issuedCouponRepository.save(new IssuedCouponModel(template.getId(), user.getId()));
             Long issuedCouponId = issued.getId();
             Long productId = product.getId();

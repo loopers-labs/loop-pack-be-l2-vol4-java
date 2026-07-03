@@ -377,7 +377,7 @@ class UserV1ApiE2ETest {
             ));
             CouponTemplateModel template = couponTemplateRepository.save(new CouponTemplateModel(
                 "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
-                BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30)
+                BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30), 100
             ));
             issuedCouponRepository.save(new IssuedCouponModel(template.getId(), user.getId()));
 

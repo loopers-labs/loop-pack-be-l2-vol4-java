@@ -1,9 +1,10 @@
 package com.loopers.interfaces.api.coupon;
 
+import com.loopers.domain.coupon.CouponIssueRequestModel;
+import com.loopers.domain.coupon.CouponIssueRequestRepository;
 import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponTemplateRepository;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
@@ -50,7 +51,7 @@ class CouponV1ApiE2ETest {
     private CouponTemplateRepository couponTemplateRepository;
 
     @Autowired
-    private IssuedCouponRepository issuedCouponRepository;
+    private CouponIssueRequestRepository couponIssueRequestRepository;
 
     @Autowired
     private PasswordEncryptor passwordEncryptor;
@@ -81,45 +82,47 @@ class CouponV1ApiE2ETest {
 
     private CouponTemplateModel saveTemplate(ZonedDateTime expiredAt) {
         return couponTemplateRepository.save(new CouponTemplateModel(
-                "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt
+                "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt, 100
         ));
     }
 
-    @DisplayName("POST /api/v1/coupons/{couponId}/issue")
+    @DisplayName("POST /api/v1/coupons/{couponId}/issue-requests")
     @Nested
-    class Issue {
+    class RequestIssue {
 
-        @DisplayName("유효한 인증과 유효한 쿠폰 템플릿으로 발급 요청하면 AVAILABLE 상태의 발급 쿠폰이 반환되고 DB에 저장된다.")
+        @DisplayName("유효한 인증과 유효한 쿠폰 템플릿으로 발급을 요청하면 PENDING 상태의 발급 요청이 반환되고 DB에 저장된다.")
         @Test
-        void returnsIssuedCouponAndPersists_whenValid() {
+        void returnsIssueRequestAndPersists_whenValid() {
             // given
             CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
 
             // when
-            ParameterizedTypeReference<ApiResponse<CouponV1Dto.IssueResponse>> responseType =
+            ParameterizedTypeReference<ApiResponse<CouponV1Dto.IssueRequestResponse>> responseType =
                     new ParameterizedTypeReference<>() {};
-            ResponseEntity<ApiResponse<CouponV1Dto.IssueResponse>> response = testRestTemplate.exchange(
-                    BASE_URL + "/" + template.getId() + "/issue",
+            ResponseEntity<ApiResponse<CouponV1Dto.IssueRequestResponse>> response = testRestTemplate.exchange(
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
                     HttpMethod.POST,
                     authHeaderEntity(LOGIN_ID, LOGIN_PW),
                     responseType
             );
 
             // then
+            CouponIssueRequestModel persisted = couponIssueRequestRepository
+                    .findByRequestId(response.getBody().data().requestId()).orElseThrow();
             assertAll(
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
                     () -> assertThat(response.getBody().data().couponTemplateId()).isEqualTo(template.getId()),
-                    () -> assertThat(response.getBody().data().userId()).isEqualTo(savedUser.getId()),
-                    () -> assertThat(issuedCouponRepository.findAllByUserId(savedUser.getId())).hasSize(1)
+                    () -> assertThat(response.getBody().data().status()).isEqualTo(CouponV1Dto.CouponIssueRequestStatusDto.PENDING),
+                    () -> assertThat(persisted.getUserId()).isEqualTo(savedUser.getId())
             );
         }
 
-        @DisplayName("존재하지 않는 쿠폰 템플릿으로 발급 요청하면 404를 반환한다.")
+        @DisplayName("존재하지 않는 쿠폰 템플릿으로 발급을 요청하면 404를 반환한다.")
         @Test
         void returnsNotFound_whenTemplateDoesNotExist() {
             // when
             ResponseEntity<Void> response = testRestTemplate.exchange(
-                    BASE_URL + "/99999/issue",
+                    BASE_URL + "/99999/issue-requests",
                     HttpMethod.POST,
                     authHeaderEntity(LOGIN_ID, LOGIN_PW),
                     Void.class
@@ -129,7 +132,7 @@ class CouponV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
 
-        @DisplayName("만료된 쿠폰 템플릿으로 발급 요청하면 400을 반환한다.")
+        @DisplayName("만료된 쿠폰 템플릿으로 발급을 요청하면 400을 반환한다.")
         @Test
         void returnsBadRequest_whenTemplateIsExpired() {
             // given
@@ -137,7 +140,7 @@ class CouponV1ApiE2ETest {
 
             // when
             ResponseEntity<Void> response = testRestTemplate.exchange(
-                    BASE_URL + "/" + template.getId() + "/issue",
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
                     HttpMethod.POST,
                     authHeaderEntity(LOGIN_ID, LOGIN_PW),
                     Void.class
@@ -157,7 +160,7 @@ class CouponV1ApiE2ETest {
 
             // when
             ResponseEntity<Void> response = testRestTemplate.exchange(
-                    BASE_URL + "/" + template.getId() + "/issue",
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
                     HttpMethod.POST,
                     new HttpEntity<>(null, headers),
                     Void.class
@@ -177,7 +180,7 @@ class CouponV1ApiE2ETest {
 
             // when
             ResponseEntity<Void> response = testRestTemplate.exchange(
-                    BASE_URL + "/" + template.getId() + "/issue",
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
                     HttpMethod.POST,
                     new HttpEntity<>(null, headers),
                     Void.class
@@ -195,7 +198,7 @@ class CouponV1ApiE2ETest {
 
             // when
             ResponseEntity<Void> response = testRestTemplate.exchange(
-                    BASE_URL + "/" + template.getId() + "/issue",
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
                     HttpMethod.POST,
                     authHeaderEntity(LOGIN_ID, "WrongPass1!"),
                     Void.class
@@ -203,6 +206,59 @@ class CouponV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("GET /api/v1/coupons/issue-requests/{requestId}")
+    @Nested
+    class GetIssueRequestStatus {
+
+        @DisplayName("본인의 발급 요청이면 상태가 반환된다.")
+        @Test
+        void returnsIssueRequestStatus_whenRequesterIsOwner() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+            ParameterizedTypeReference<ApiResponse<CouponV1Dto.IssueRequestResponse>> requestResponseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<CouponV1Dto.IssueRequestResponse>> requested = testRestTemplate.exchange(
+                    BASE_URL + "/" + template.getId() + "/issue-requests",
+                    HttpMethod.POST,
+                    authHeaderEntity(LOGIN_ID, LOGIN_PW),
+                    requestResponseType
+            );
+            String requestId = requested.getBody().data().requestId();
+
+            // when
+            ParameterizedTypeReference<ApiResponse<CouponV1Dto.IssueRequestStatusResponse>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<CouponV1Dto.IssueRequestStatusResponse>> response = testRestTemplate.exchange(
+                    BASE_URL + "/issue-requests/" + requestId,
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, LOGIN_PW),
+                    responseType
+            );
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().requestId()).isEqualTo(requestId),
+                    () -> assertThat(response.getBody().data().status()).isEqualTo(CouponV1Dto.CouponIssueRequestStatusDto.PENDING)
+            );
+        }
+
+        @DisplayName("존재하지 않는 requestId를 조회하면 404를 반환한다.")
+        @Test
+        void returnsNotFound_whenRequestDoesNotExist() {
+            // when
+            ResponseEntity<Void> response = testRestTemplate.exchange(
+                    BASE_URL + "/issue-requests/존재하지-않는-id",
+                    HttpMethod.GET,
+                    authHeaderEntity(LOGIN_ID, LOGIN_PW),
+                    Void.class
+            );
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
     }
 }
