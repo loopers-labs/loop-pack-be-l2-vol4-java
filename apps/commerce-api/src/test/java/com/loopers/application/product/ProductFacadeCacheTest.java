@@ -7,6 +7,7 @@ import com.loopers.domain.product.ProductDetailService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.support.event.RecordingEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,7 +38,7 @@ class ProductFacadeCacheTest {
         brandService = new BrandService(fakeBrandRepo);
         ProductDetailService detailService = new ProductDetailService(productService, brandService);
         fakeCache = new FakeProductCachePort();
-        facade = new ProductFacade(productService, brandService, detailService, fakeCache);
+        facade = new ProductFacade(productService, brandService, detailService, fakeCache, new RecordingEventPublisher());
 
         brandId = brandService.createBrand("나이키", "스포츠").getId();
         product = productService.createProduct(brandId, "에어맥스", "런닝화", 1000L, 10, null);

@@ -9,6 +9,7 @@ import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentService;
 import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.payment.PgClient.PgTransactionStatus;
+import com.loopers.support.event.RecordingEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,7 +38,7 @@ class PaymentRecoveryServiceTest {
         FakeOrderRepository orderRepo = new FakeOrderRepository();
         paymentService = new PaymentService(paymentRepo);
         orderService = new OrderService(orderRepo);
-        facade = new PaymentFacade(orderService, paymentService, fakePgClient);
+        facade = new PaymentFacade(orderService, paymentService, fakePgClient, new RecordingEventPublisher());
         recovery = new PaymentRecoveryService(paymentService, facade, fakePgClient);
         ReflectionTestUtils.setField(facade, "callbackUrl", "http://localhost/callback");
         ReflectionTestUtils.setField(recovery, "requestedStaleAfter", Duration.ofSeconds(30));

@@ -1,13 +1,16 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.event.ProductViewedEvent;
 import com.loopers.domain.product.ProductDetailService;
 import com.loopers.domain.product.ProductDetailService.ProductDetail;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +32,7 @@ public class ProductFacade {
     private final BrandService brandService;
     private final ProductDetailService productDetailService;
     private final ProductCachePort productCache;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ProductInfo createProduct(ProductCriteria.Create criteria) {
         brandService.requireExists(criteria.brandId());
@@ -53,16 +57,24 @@ public class ProductFacade {
 
     /**
      * 상품 상세: 캐시 우선 조회 → 미스 시 도메인 조합 → 캐시 적재.
+     * 조회 자체를 유저 행동 이벤트(ProductViewedEvent) 로 발행 — Consumer 가 조회수 집계.
+     * userId 가 없어도 (익명 조회) 이벤트는 발행한다.
      */
-    public ProductDetailInfo getProductDetail(Long id) {
+    @Transactional
+    public ProductDetailInfo getProductDetail(Long id, Long userId) {
         Optional<ProductDetailInfo> cached = productCache.getDetail(id);
-        if (cached.isPresent()) {
-            return cached.get();
-        }
-        ProductDetail detail = productDetailService.getDetail(id);
-        ProductDetailInfo info = ProductDetailInfo.from(detail);
-        productCache.putDetail(info);
+        ProductDetailInfo info = cached.orElseGet(() -> {
+            ProductDetail detail = productDetailService.getDetail(id);
+            ProductDetailInfo built = ProductDetailInfo.from(detail);
+            productCache.putDetail(built);
+            return built;
+        });
+        eventPublisher.publishEvent(ProductViewedEvent.of(userId, id));
         return info;
+    }
+
+    public ProductDetailInfo getProductDetail(Long id) {
+        return getProductDetail(id, null);
     }
 
     public List<ProductInfo> listProducts(ProductCriteria.List criteria) {

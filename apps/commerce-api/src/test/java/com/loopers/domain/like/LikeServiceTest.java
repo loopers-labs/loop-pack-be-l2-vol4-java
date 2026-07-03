@@ -1,10 +1,12 @@
 package com.loopers.domain.like;
 
+import com.loopers.domain.event.LikeChangedEvent;
 import com.loopers.domain.product.FakeProductRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.support.event.RecordingEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,13 +22,15 @@ class LikeServiceTest {
     private ProductService productService;
     private FakeLikeRepository fakeLikeRepository;
     private FakeProductRepository fakeProductRepository;
+    private RecordingEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
         fakeLikeRepository = new FakeLikeRepository();
         fakeProductRepository = new FakeProductRepository();
         productService = new ProductService(fakeProductRepository);
-        likeService = new LikeService(fakeLikeRepository, productService);
+        eventPublisher = new RecordingEventPublisher();
+        likeService = new LikeService(fakeLikeRepository, productService, eventPublisher);
     }
 
     private ProductModel newProduct() {
@@ -64,6 +68,24 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeProductRepository.find(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1L);
+        }
+
+        @DisplayName("실제로 등록된 경우에만 LikeChangedEvent(LIKED) 가 발행된다 — 멱등 통과는 발행 없음.")
+        @Test
+        void publishesEventOnlyOnceEvenWhenCalledMultipleTimes() {
+            // arrange
+            ProductModel product = newProduct();
+
+            // act
+            likeService.like(100L, product.getId());
+            likeService.like(100L, product.getId()); // 멱등 통과
+
+            // assert
+            assertThat(eventPublisher.filter(LikeChangedEvent.class))
+                .hasSize(1)
+                .first()
+                .extracting(LikeChangedEvent::action)
+                .isEqualTo(LikeChangedEvent.Action.LIKED);
         }
 
         @DisplayName("존재하지 않는 상품 ID 면, NOT_FOUND 예외가 발생한다.")

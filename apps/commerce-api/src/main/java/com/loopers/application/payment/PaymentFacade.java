@@ -1,5 +1,7 @@
 package com.loopers.application.payment;
 
+import com.loopers.domain.event.OrderCompletedEvent;
+import com.loopers.domain.event.PaymentSettledEvent;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.payment.CardType;
@@ -16,7 +18,10 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+
+import java.time.ZonedDateTime;
 
 /**
  * 결제 유스케이스 — 외부 PG 호출을 트랜잭션과 분리한다.
@@ -39,6 +44,7 @@ public class PaymentFacade {
     private final OrderService orderService;
     private final PaymentService paymentService;
     private final PgClient pgClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${pg.callback-url}")
     private String callbackUrl;
@@ -114,35 +120,68 @@ public class PaymentFacade {
         switch (normalized) {
             case "SUCCESS", "SUCCEEDED" -> {
                 paymentService.markSucceeded(paymentId);
-                tryMarkOrderPaid(paymentId);
+                PaymentModel payment = paymentService.getById(paymentId);
+                boolean orderMarkedPaid = tryMarkOrderPaid(payment);
+                publishSettled(payment, PaymentSettledEvent.Outcome.SUCCEEDED);
+                if (orderMarkedPaid) {
+                    publishOrderCompleted(payment.getOrderId());
+                }
             }
             case "FAILED", "FAIL", "INVALID_CARD", "LIMIT_EXCEEDED" -> {
                 paymentService.markFailed(paymentId, reason);
-                tryMarkOrderFailed(paymentId);
+                PaymentModel payment = paymentService.getById(paymentId);
+                tryMarkOrderFailed(payment);
+                publishSettled(payment, PaymentSettledEvent.Outcome.FAILED);
             }
             default -> log.info("외부 상태가 비종료(PENDING) — 추후 폴링으로 재확인. paymentId={}, status={}",
                 paymentId, normalized);
         }
     }
 
-    private void tryMarkOrderPaid(Long paymentId) {
+    private boolean tryMarkOrderPaid(PaymentModel payment) {
         try {
-            PaymentModel payment = paymentService.getById(paymentId);
             orderService.markPaid(payment.getOrderId());
+            return true;
         } catch (CoreException e) {
             // 이미 종료 상태인 주문 등 — 멱등 통과
-            log.info("주문 PAID 전이 스킵 (이미 종료 또는 부재): paymentId={}, cause={}",
-                paymentId, e.getMessage());
+            log.info("주문 PAID 전이 스킵 (이미 종료 또는 부재): orderId={}, cause={}",
+                payment.getOrderId(), e.getMessage());
+            return false;
         }
     }
 
-    private void tryMarkOrderFailed(Long paymentId) {
+    private void tryMarkOrderFailed(PaymentModel payment) {
         try {
-            PaymentModel payment = paymentService.getById(paymentId);
             orderService.markFailed(payment.getOrderId());
         } catch (CoreException e) {
-            log.info("주문 FAILED 전이 스킵: paymentId={}, cause={}", paymentId, e.getMessage());
+            log.info("주문 FAILED 전이 스킵: orderId={}, cause={}",
+                payment.getOrderId(), e.getMessage());
         }
+    }
+
+    private void publishSettled(PaymentModel payment, PaymentSettledEvent.Outcome outcome) {
+        eventPublisher.publishEvent(new PaymentSettledEvent(
+            payment.getId(),
+            payment.getOrderId(),
+            payment.getUserId(),
+            outcome,
+            payment.getAmount(),
+            ZonedDateTime.now()
+        ));
+    }
+
+    private void publishOrderCompleted(Long orderId) {
+        OrderModel order = orderService.getOrder(orderId);
+        eventPublisher.publishEvent(new OrderCompletedEvent(
+            order.getId(),
+            order.getUserId(),
+            order.getFinalPrice(),
+            order.getItems().stream()
+                .map(item -> new OrderCompletedEvent.Line(
+                    item.getProductId(), item.getQuantity(), item.getPriceSnapshot()))
+                .toList(),
+            ZonedDateTime.now()
+        ));
     }
 
     private static void assertOwnership(OrderModel order, Long userId) {

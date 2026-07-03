@@ -41,9 +41,11 @@ public class ProductV1Controller {
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductDetailResponse> getProduct(
-        @PathVariable("productId") Long productId
+        @PathVariable("productId") Long productId,
+        @org.springframework.web.bind.annotation.RequestHeader(
+            value = "X-Loopers-User-Id", required = false) Long userId
     ) {
-        ProductDetailInfo detail = productFacade.getProductDetail(productId);
+        ProductDetailInfo detail = productFacade.getProductDetail(productId, userId);
         return ApiResponse.success(ProductV1Dto.ProductDetailResponse.from(detail));
     }
 
