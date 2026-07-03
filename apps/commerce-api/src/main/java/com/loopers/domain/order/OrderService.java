@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +27,30 @@ public class OrderService {
     public OrderModel getById(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[orderId = " + orderId + "] 주문을 찾을 수 없습니다."));
+    }
+
+    public OrderModel getByIdAndValidateOwner(Long orderId, Long userId) {
+        OrderModel order = getById(orderId);
+        order.validateOwner(userId);
+        return order;
+    }
+
+    public OrderModel getByOrderNumberAndValidateOwner(String orderNumber, Long userId) {
+        OrderModel order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
+                        "[orderNumber = " + orderNumber + "] 주문을 찾을 수 없습니다."));
+        order.validateOwner(userId);
+        return order;
+    }
+
+    @Transactional
+    public void markPaid(Long orderId) {
+        getById(orderId).markPaid();
+    }
+
+    @Transactional
+    public void markPaymentFailed(Long orderId) {
+        getById(orderId).markPaymentFailed();
     }
 
     public OrderModel getByIdWithItems(Long orderId) {

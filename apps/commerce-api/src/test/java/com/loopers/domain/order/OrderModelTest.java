@@ -166,6 +166,39 @@ class OrderModelTest {
                     () -> assertThat(order.getFinalPrice()).isEqualByComparingTo(BigDecimal.valueOf(8000))
             );
         }
+
+        @DisplayName("orderNumber가 타임스탬프(14자) + 난수(6자) 형식으로 생성된다.")
+        @Test
+        void generatesOrderNumber_withTimestampAndRandomSuffix() {
+            // given
+            Long userId = 1L;
+            List<OrderItemData> itemDataList = List.of(
+                    new OrderItemData(1L, "상품A", BigDecimal.valueOf(10000), 1L)
+            );
+
+            // when
+            OrderModel order = OrderModel.create(userId, itemDataList, BigDecimal.ZERO);
+
+            // then
+            assertThat(order.getOrderNumber()).matches("\\d{20}");
+        }
+
+        @DisplayName("호출마다 서로 다른 orderNumber가 생성된다.")
+        @Test
+        void generatesDifferentOrderNumber_perCall() {
+            // given
+            Long userId = 1L;
+            List<OrderItemData> itemDataList = List.of(
+                    new OrderItemData(1L, "상품A", BigDecimal.valueOf(10000), 1L)
+            );
+
+            // when
+            OrderModel order1 = OrderModel.create(userId, itemDataList, BigDecimal.ZERO);
+            OrderModel order2 = OrderModel.create(userId, itemDataList, BigDecimal.ZERO);
+
+            // then
+            assertThat(order1.getOrderNumber()).isNotEqualTo(order2.getOrderNumber());
+        }
     }
 
     @DisplayName("주문 소유자를 검증할 때,")

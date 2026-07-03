@@ -8,11 +8,15 @@ public class CoreException extends RuntimeException {
     private final String customMessage;
 
     public CoreException(ErrorType errorType) {
-        this(errorType, null);
+        this(errorType, null, null);
     }
 
     public CoreException(ErrorType errorType, String customMessage) {
-        super(customMessage != null ? customMessage : errorType.getMessage());
+        this(errorType, customMessage, null);
+    }
+
+    public CoreException(ErrorType errorType, String customMessage, Throwable cause) {
+        super(customMessage != null ? customMessage : errorType.getMessage(), cause);
         this.errorType = errorType;
         this.customMessage = customMessage;
     }

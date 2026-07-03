@@ -11,6 +11,8 @@ import java.util.Optional;
 
 public interface OrderJpaRepository extends JpaRepository<OrderModel, Long> {
 
+    Optional<OrderModel> findByOrderNumber(String orderNumber);
+
     @Query("SELECT o FROM OrderModel o WHERE o.userId = :userId AND o.createdAt >= :from AND o.createdAt < :to")
     List<OrderModel> findAllByUserIdAndCreatedAtBetween(
             @Param("userId") Long userId,

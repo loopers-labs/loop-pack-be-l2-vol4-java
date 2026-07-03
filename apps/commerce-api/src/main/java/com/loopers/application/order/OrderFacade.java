@@ -93,8 +93,7 @@ public class OrderFacade {
     public OrderInfo getOrder(String loginId, String loginPw, Long orderId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
 
-        OrderModel order = orderService.getById(orderId);
-        order.validateOwner(user.getId());
+        OrderModel order = orderService.getByIdAndValidateOwner(orderId, user.getId());
 
         return OrderInfo.from(order);
     }

@@ -1,6 +1,7 @@
 package com.loopers.domain.user;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.NumberGenerator;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
@@ -12,6 +13,9 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "users")
 @SQLRestriction("deleted_at IS NULL")
 public class UserModel extends BaseEntity {
+
+    @Column(unique = true)
+    private String userNumber;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "login_id", unique = true))
@@ -48,6 +52,7 @@ public class UserModel extends BaseEntity {
         if (gender == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "성별은 필수입니다.");
         }
+        this.userNumber = NumberGenerator.generate();
         this.loginId = new LoginId(loginId);
         this.birthDate = new BirthDate(birthDate);
         this.password = Password.of(password, this.birthDate, passwordEncryptor);

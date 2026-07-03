@@ -1,9 +1,11 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
+import com.loopers.support.NumberGenerator;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -21,6 +23,9 @@ import java.util.List;
 @Table(name = "orders")
 @SQLRestriction("deleted_at IS NULL")
 public class OrderModel extends BaseEntity {
+
+    @Column(unique = true)
+    private String orderNumber;
 
     private Long userId;
 
@@ -68,12 +73,30 @@ public class OrderModel extends BaseEntity {
         BigDecimal originalPrice = items.stream()
                 .map(OrderItemModel::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new OrderModel(userId, originalPrice, discountAmount, items);
+        OrderModel order = new OrderModel(userId, originalPrice, discountAmount, items);
+        order.orderNumber = NumberGenerator.generate();
+        return order;
     }
 
     public void validateOwner(Long userId) {
         if (!this.userId.equals(userId)) {
             throw new CoreException(ErrorType.FORBIDDEN, "해당 주문에 접근할 수 없습니다.");
         }
+    }
+
+    /** 결제 성공 확정 시 호출. 멱등하며, 항상 결제 완료가 우선한다(재결제 성공 포함). */
+    public void markPaid() {
+        if (this.status == OrderStatus.PAID) {
+            return;
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    /** 결제 실패 확정 시 호출. 이미 결제 완료된 주문은 실패로 되돌리지 않는다. */
+    public void markPaymentFailed() {
+        if (this.status == OrderStatus.PAID) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 결제 완료된 주문은 실패 처리할 수 없습니다.");
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
     }
 }
