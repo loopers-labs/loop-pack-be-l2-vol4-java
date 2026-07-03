@@ -29,9 +29,10 @@ flowchart TD
 
 ## 2. 현재 코드에 축 적용
 
-### 2.1 주문 생성 — `OrderFacade.createOrder()`
+### 2.1 주문 생성 — `OrderFacade.createOrder()` + `OrderService.create()`
 
 ```java
+// OrderFacade.createOrder — 여러 도메인을 조합만 한다, 이벤트는 발행하지 않는다
 @Transactional
 public OrderInfo createOrder(...) {
     UserModel user = userService.getLoginUser(loginId, loginPw);           // 인증
@@ -41,30 +42,28 @@ public OrderInfo createOrder(...) {
         issuedCouponService.use(issued.getId());                           // 쿠폰 사용 (UPDATE)
     }
     orderItems.forEach(cmd -> stockService.decreaseStock(...));            // 재고 차감 (UPDATE)
-    OrderModel saved = orderService.create(...);                          // 주문 생성 (INSERT)
-
-    eventPublisher.publishEvent(new ProductCacheEvictEvent(productIds));   // 캐시 무효화 (이벤트)
+    OrderModel saved = orderService.create(...);                          // 주문 생성 (도메인 서비스에 위임)
     return OrderInfo.from(saved);
+}
+
+// OrderService.create — 도메인 쓰기 직후, 같은 도메인 서비스가 사실을 발행한다
+public OrderModel create(...) {
+    OrderModel saved = orderRepository.save(...);
+    eventPublisher.publish(OrderCreatedEvent.from(saved));   // 이미 일어난 사실 발행
+    return saved;
 }
 ```
 
 | 로직 | 판정 | 이유 |
 |---|---|---|
 | 쿠폰 사용 · 재고 차감 · 주문 생성 | **A** | 셋 중 하나라도 실패하면 나머지도 무효여야 한다. 재고는 깎였는데 주문이 없거나, 쿠폰만 소진되면 정합성이 깨진다. 같은 트랜잭션 필수. |
-| 상품 캐시 무효화 | **C** | 캐시는 실패해도 TTL로 결국 정리된다. 리스너는 `AFTER_COMMIT` + `try/catch`다. **다만 현재 `ProductCacheEvictEvent`는 command 형태다 — 아래 노트 참조.** |
-| 주문 완료 알림 · 유저 행동 로깅 | **C** (미구현) | 알림 발송이 실패해도 주문은 유효하다. 현재 코드에 없으나, 추가된다면 트랜잭션 안이 아니라 `AFTER_COMMIT` 리스너에 붙어야 한다. |
+| `OrderCreatedEvent` 발행(사실) | 경계 없음(A 안에서 발행) | 발행 자체는 `@Transactional` 메서드 안에서 호출되지만 **outbox 기록(①)은 `BEFORE_COMMIT`**이라 A와 원자적으로 묶인다 — 아래 §2.3 표준형과 동일 구조를 `OrderCreated`도 그대로 재사용한다(round7-event-application-map.md §1.1). |
+| 판매량 집계·상품별 조회 반영 | **B** | `OrderCreatedEvent`가 outbox를 거쳐 Kafka(`order-events`)로 나가고 commerce-streamer가 `product_metrics.sales_count`를 집계한다. 별도 이벤트 없이 `OrderCreated`에 outbox 핸들러(`OrderCreatedKafkaOutboxEventHandler`)만 얹은 형태 — 하나의 사실에 반응이 여럿 달리는 예. |
+| 상품 캐시 무효화 | (보류) | 한때 `ProductCacheEvictEvent`(command 형태 — 이름이 반응을 지시하고 publisher가 정책을 알고 있어 §1 기준에 어긋났다)로 구현했다가, 캐시 무효화 자체를 **추후 도입 목표로 보류**하며 이벤트·리스너를 전부 삭제했다(round7-event-application-map.md §1.1). 지금은 `ProductCacheStore`의 TTL(5분/30초)로만 정합성을 회복한다. |
+| 주문 완료 알림 | **C** (스코프 아님으로 확정) | 알림 발송이 실패해도 주문은 유효하다. 이번 라운드 체크리스트엔 없어 만들지 않았고, 필요해지면 트랜잭션 안이 아니라 `AFTER_COMMIT` 리스너로 붙인다. |
+| 유저 행동 로깅(주문) | **C** (구현됨) | `OrderCreatedEvent`가 `UserActivityEvent`도 함께 구현해 `UserActivityLogListener`가 `AFTER_COMMIT`으로 로깅한다 — 새 이벤트를 만들지 않고 기존 사실에 마커 인터페이스만 얹었다(§2.5 참고). |
 
-> **주의 — publish는 트랜잭션 안, 실행은 커밋 후.** `publishEvent`가 `@Transactional` 메서드 안에서 호출되지만, `ProductCacheEvictListener`가 `AFTER_COMMIT`이므로 실제 무효화는 커밋 후에 실행된다. 만약 주문이 롤백되면 이벤트는 발행됐어도 리스너가 뜨지 않는다 — 일어나지 않은 주문의 캐시를 지우지 않는다. 이 동작이 캐시 무효화가 C에 속한다는 판정과 정확히 맞물린다.
-
-> **노트 — `ProductCacheEvictEvent`는 event가 아니라 command에 가깝다(리팩터링 권장).** §1의 기준(이벤트 = 이미 일어난 사실, publisher는 소비자를 모른다)을 이 이벤트에 적용하면 어긋난다. `ProductCacheEvictEvent(productIds)`는 이름부터 **반응(evict)을 지시**하고, publisher(`createOrder`)가 "캐시를 지워야 한다"는 하위 시스템 정책을 이미 알고 있다. 전달 메커니즘만 pub/sub일 뿐 모델링은 "캐시 무효화 명령"이다.
->
-> 더 나은 형태는 **사실을 발행하는 것** — `createOrder`는 `OrderCreated(orderId, items, userId, …)`를 쏘고, 캐시 무효화·판매량 집계·주문 알림·행동 로깅이 각각 그 사실의 **리스너**가 된다. 그러면 (a) publisher 무지가 회복되고, (b) "어떤 캐시를 지울지"(productIds 도출)가 캐시 리스너로 돌아가며, (c) **Step 2의 판매량 집계가 별도 이벤트 없이 `OrderCreated`에 리스너만 얹어 붙는다.** 하나의 사실에 반응이 여럿 달리는 이 지점이 event 지향이 command 지향보다 나은 이유의 교과서적 예다.
->
-> 단, `ProductCacheEvictEvent`는 `deleteBrand`·`deleteProduct`·`updateProductForAdmin`·좋아요 리스너도 공유한다. 캐시 무효화가 **유일한 반응**인 그 경로들은 사실→명령이 1:1이라 공용 이벤트를 남겨도 방어 가능하다. 반응이 여럿인 **`createOrder`가 `OrderCreated`로 전환하기에 가장 명확한 자리**다.
->
-> **패키지 배치**는 레포의 `apps/pg-simulator`(payment 도메인)를 표준으로 삼는다: 사실 이벤트는 `domain/<도메인>/`, 퍼블리셔는 도메인 포트 + `infrastructure/` 구현(Spring `ApplicationEventPublisher`를 감쌈), 리스너는 `interfaces/event/<도메인>/`에 얇게. 상세 규칙과 commerce-api 적용 예는 [round7-event-application-map.md §1.2](./round7-event-application-map.md#12-이벤트-관련-패키지-배치--appspg-simulator-기준) 참조.
-
-현재 알림·로깅이 없다는 것은 "판단할 게 없다"는 뜻이 아니다. **추가될 때 트랜잭션 안으로 끌고 들어오지 않는 것**이 이 축의 실전 가치다. 알림 전송을 `createOrder` 트랜잭션 안에서 동기 호출하면, 알림 서버 지연이 주문 트랜잭션의 커넥션 점유 시간을 늘리고 실패 시 정상 주문까지 롤백시킨다.
+**주문 생성은 지금 A(쓰기 3종) 뒤에 하나의 사실(`OrderCreatedEvent`)만 발행하고, 그 사실에 B(판매량 집계)와 C(행동 로깅)가 각각 리스너/outbox 핸들러로 붙는 구조다.** 캐시 무효화만 아직 반응이 없다(의도적 보류). 알림 전송을 트랜잭션 안에서 동기 호출했다면, 알림 서버 지연이 주문 트랜잭션의 커넥션 점유 시간을 늘리고 실패 시 정상 주문까지 롤백시켰을 것이다 — 지금 구조는 그 함정을 피해 있다.
 
 ### 2.2 결제 확정 — `PaymentFacade.confirmResolved()`
 
@@ -92,59 +91,63 @@ private void applyOrderPostProcessing(ConfirmOutcome outcome) {
 | 로직 | 판정 | 이유 |
 |---|---|---|
 | 결제 상태 확정 + 주문 상태 전환 | **A** | 결제가 PAID로 확정됐는데 주문이 미확정이면 "돈은 빠졌는데 주문 없음"이 된다. 두 상태 전환은 반드시 같은 트랜잭션이어야 한다. 코드 주석의 crash gap 방어가 그 근거다. |
-| 결제 성공/실패 알림 · 결제 로깅 | **C** (미구현) | 알림·로깅이 실패해도 결제·주문 확정은 유효하다. 추가된다면 `confirmResolved` 안이 아니라 이벤트로 분리해야 한다. |
+| 결제 성공/실패 알림 · 결제 로깅 | **C** (스코프 아님으로 확정) | 알림·로깅이 실패해도 결제·주문 확정은 유효하다. 이번 라운드 체크리스트 4항목엔 없어 만들지 않기로 확정했다. 필요해지면 `confirmResolved` 안이 아니라 `AFTER_COMMIT` + 결과값 분기 이벤트로 분리한다(아래 참고). |
 
 **핵심 구분 — 비즈니스 실패 ≠ 트랜잭션 롤백.** `confirm()`의 `FAILED` 분기는 예외를 던지지 않는다. `ConfirmOutcome.failed(...)`를 반환하고 `markPaymentFailed`가 실행된 뒤 트랜잭션은 **정상 커밋**된다. 즉 "결제 실패"는 성공적으로 커밋된 결과다. 따라서 결제 실패 알림도 `AFTER_ROLLBACK`이 아니라 **`AFTER_COMMIT`**에 붙는다. 리스너는 커밋된 `ConfirmOutcome.result()`를 보고 성공/실패 메시지를 나눠 보내면 된다. `AFTER_ROLLBACK`은 예상치 못한 예외로 트랜잭션 자체가 깨진 경우에나 해당한다.
 
 ### 2.3 좋아요 집계 — Outbox + ApplicationEvent (축이 재귀적으로 적용되는 예)
 
-좋아요 플로우는 세 판정이 한 흐름 안에 겹쳐 있다.
+좋아요 플로우는 판정이 한 흐름 안에 두 번 반복된다 — T1(눌림 자체)에서 한 번, T2(카운트 반영 후)에서 한 번.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant F as LikeFacade
-    participant DB as DB
-    participant P as LikeOutboxProcessor<br/>(@Scheduled 1s)
-    participant L as LikeOutboxEventListener
-    participant Cache as ProductCacheEvictListener
+    participant S as LikeService
+    participant Rec as OutboxRecordEventListener
+    participant Fast as LikeEventListener
+    participant Rel as "OutboxRelay / LikeEventHandler"
+    participant Ref as LikeCountReflector
+    participant K as Kafka(catalog-events)
 
     C->>F: like(productId)
-    activate F
-    Note over F,DB: Tx1 — like INSERT + outbox INSERT (A: 원자적)
-    F->>DB: likeService.register()
-    F->>DB: likeOutboxService.record()
-    deactivate F
+    F->>S: register(userId, productId)
+    activate S
+    Note over S: Tx1 — like INSERT (A)
+    S->>Rec: publish LikedEvent (T1, 이미 일어난 사실)
+    Note over Rec: BEFORE_COMMIT(①) — outbox INSERT, Tx1과 원자적(A)
+    deactivate S
     F-->>C: 200 OK (집계 반영 전 즉시 반환)
 
-    loop 1초마다
-        P->>DB: findPending()
-        P->>L: publish LikeCountChangedEvent (B: 별도 Tx)
+    par fast-path(②, best-effort)
+        Fast->>Ref: AFTER_COMMIT + @Async로 reflect() 즉시 호출
+    and 릴레이(③, at-least-once 보증)
+        Rel->>Rel: @Scheduled(1s) findPending()
+        Rel->>Ref: eventType으로 위임 → reflect()
     end
 
-    activate L
-    Note over L,DB: Tx2 — markDoneIfPending + increaseLikeCount (A: 멱등성 위해 원자적)
-    L->>DB: markDoneIfPending() → false면 조기 종료
-    L->>DB: productStatsService.increaseLikeCount()
-    L->>Cache: publish ProductCacheEvictEvent (C)
-    deactivate L
-    Cache->>Cache: AFTER_COMMIT evictAll (실패 무시)
+    activate Ref
+    Note over Ref: Tx2 — markDoneIfPending + increaseLikeCount (A: 멱등)
+    Ref->>Ref: markDoneIfPending() → false면 조기 종료(②·③ 이중 실행 방지)
+    Ref->>Ref: productStatsService.increaseLikeCount()
+    Ref->>Rec: publish ProductLikedEvent (T2, 카운트 반영 후 사실)
+    deactivate Ref
+    Note over Rec: BEFORE_COMMIT(①) — outbox INSERT, Tx2와 원자적
+    Rec-->>Rel: 다음 릴레이 주기에 PENDING으로 대기
+    Rel->>K: ProductLikeKafkaOutboxEventHandler가 catalog-events로 발행(key=productId)
 ```
 
 | 경계 | 판정 | 이유 |
 |---|---|---|
-| `likeService.register()` + `likeOutboxService.record()` (Tx1) | **A** | 좋아요 등록과 outbox 기록이 같은 트랜잭션이어야 이벤트 유실이 없다. 등록은 됐는데 outbox가 없으면 집계가 영영 누락된다. |
-| 좋아요 등록 → 좋아요 수 집계 (Tx1 → Tx2 분리) | **B** | 집계는 좋아요 응답을 막을 필요가 없다(핫 상품에서 카운터 row 경합이 응답 경로에 들어오지 않게). 그러나 유실되면 카운트가 틀어지므로 Outbox로 at-least-once를 보장한다. |
-| `markDoneIfPending()` + `increaseLikeCount()` (Tx2 내부) | **A** | 중복 발행에 대비한 멱등 처리와 실제 카운트 증가가 같은 트랜잭션이어야 한다. `markDoneIfPending`이 `false`면 조기 종료해 이중 반영을 막는다. |
-| 캐시 무효화 (`ProductCacheEvictEvent`) | **C** | 2.1과 동일. `AFTER_COMMIT` + 실패 무시. |
+| `LikeService.register()` + outbox 기록(①, `LikedEvent`) | **A** | 좋아요 등록과 outbox 기록이 같은 트랜잭션이어야 이벤트 유실이 없다. 등록은 됐는데 outbox가 없으면 집계가 영영 누락된다. `OutboxRecordEventListener`는 Like를 모른다 — `OutboxableEvent`라면 어떤 도메인이든 같은 메서드로 기록한다. |
+| 좋아요 등록(T1) → 좋아요 수 집계(T2) 분리 | **B** | 집계는 좋아요 응답을 막을 필요가 없다(핫 상품에서 카운터 row 경합이 응답 경로에 들어오지 않게). 그러나 유실되면 카운트가 틀어지므로 Outbox로 at-least-once를 보장한다. fast-path(②)가 지연을 없애고, 릴레이(③)가 실패분을 따라잡는다(§3.1). |
+| `markDoneIfPending()` + `increaseLikeCount()` (`LikeCountReflector.reflect()` 내부) | **A** | 중복 발행(②·③ 경합)에 대비한 멱등 처리와 실제 카운트 증가가 같은 트랜잭션이어야 한다. `markDoneIfPending`이 `false`면 조기 종료해 이중 반영을 막는다. |
+| `ProductLikedEvent`/`ProductUnlikedEvent` 발행 + Kafka 전파(T2) | **B** | 카운트 반영 직후 같은 트랜잭션에서 발행되는 두 번째 사실. `catalog-events`(key=`productId`)로 나가 commerce-streamer가 `product_metrics.like_count`를 집계한다. |
+| 캐시 무효화 | (보류) | 2.1과 동일하게 이벤트·리스너를 전부 삭제하고 추후 도입 목표로 보류했다. 재도입 시 T1이 아니라 T2 이후(`ProductLikedEvent`/`ProductUnlikedEvent`)를 구독해야 의미가 있다(round7-event-application-map.md §1.1 "추후 도입 시 주의"). |
 
-현재 구현은 **Outbox row를 스케줄러가 1초마다 폴링 → 인프로세스 `ApplicationEvent`로 발행 → 리스너가 별도 트랜잭션에서 집계**하는 형태다. 여기서 인프로세스 이벤트 홉(B의 발행 지점)이 바로 **Step 2에서 Kafka로 대체되는 자리**다. 지금은 같은 JVM 안에서 이벤트가 오가지만, 집계를 별도 시스템(레포의 Kafka consumer 모듈은 `commerce-streamer` — 퀘스트 문서의 `commerce-collector`에 해당)으로 넘기려면 이 홉이 브로커를 타야 한다.
+**"인프로세스 이벤트 홉을 Step 2에서 Kafka로 대체한다"던 계획이 실제로 이렇게 구현됐다**: T1(`LikedEvent`)은 여전히 in-JVM 반영(`product_stats`)에만 쓰이고, T2(`ProductLikedEvent`)가 새로 생겨 Kafka 전파를 전담한다. 두 이벤트를 하나로 합치지 않은 이유는 **발행 시점에 이미 일어난 사실이 다르기 때문**이다 — T1 시점엔 "눌림"만 사실이고 카운트는 아직 안 바뀌었다.
 
-> **노트 — `LikeCountChangedEvent`도 event가 아니라 command에 가깝다(`ProductLiked`/`ProductUnliked`로 정리 권장).** 2.1의 `ProductCacheEvictEvent`와 같은 병이지만 더 교묘하다. 이름은 과거형("수가 바뀌었다")이라 사실처럼 보이나, **발행 시점(`LikeOutboxProcessor`)에는 카운트가 아직 안 바뀌었다** — 실제 증감은 리스너가 한다. 즉 "일어난 사실"이 아니라 "리스너가 만들어야 할 결과(outcome)"를 이름으로 선언하고 있다. 게다가 페이로드에 `outboxId`를 실어(`record(Long outboxId, Long productId, LikeEventType eventType)`) 리스너가 `markDoneIfPending(event.outboxId())`로 dedup하게 한다 — 전달 메커니즘이 새어나오고, 특정 소비자 하나에 강하게 묶인다.
->
-> 진짜 과거 사실은 이미 `LikeEventType`에 있다 — `LIKED_EVENT`/`UNLIKED_EVENT`, 즉 **"유저가 좋아요를 눌렀다/취소했다"**. `LikeFacade.like`/`unlike`가 각각 `register(...).isApplied()`/`cancel(...).isApplied()`가 true일 때만 기록하므로(재좋아요·재취소는 기록 안 됨) 이건 정직한 대칭 사실이다. 정직한 형태는 `ProductLiked`/`ProductUnliked`(또는 방향을 담은 단일 `ProductLikeChanged`)를 발행하고, 카운트 증감(`increase`/`decrease`)은 그 사실의 **리스너**가 맡는 것이다. `outboxId` 누출은 소비자 관심사로 옮겨져 **Step 2에서 `event_handled(event_id)`가 대신한다.**
->
-> **좋아요 취소가 순서 보장의 필요성을 드러낸다.** 같은 상품에 대한 `LIKED_EVENT` → `UNLIKED_EVENT`가 **역순으로 처리되면 decrease가 increase보다 먼저 반영돼 카운트가 음수/오류로 틀어진다.** in-process 단일 폴러에선 안 드러나지만, Step 2에서 Kafka로 넘기면 **partition key=`productId`로 같은 상품 이벤트를 같은 파티션에 몰아 순서를 보장**해야 한다. 이것이 퀘스트 "PartitionKey 기반 이벤트 순서 보장" 항목의 구체적 근거다. `OrderCreated`와 이 `ProductLiked/Unliked`는 "리스너가 할 일을 이름으로 붙인 것"을 "이미 일어난 사실"로 되돌리는 **같은 리팩터링의 두 사례**다(2.1 노트 참조).
+**좋아요 취소가 필요로 했던 "순서 보장"은 partition key로 실제 방어된다.** 같은 상품에 대한 `LIKED` → `UNLIKED`가 역순으로 처리되면 decrease가 increase보다 먼저 반영돼 카운트가 틀어질 수 있다. `KafkaOutboxPublisher`가 항상 `outbox.getAggregateId()`(=`productId`)를 key로 발행하므로 같은 상품 이벤트는 같은 파티션에 몰려 순서가 보장된다 — 퀘스트 "PartitionKey 기반 이벤트 순서 보장" 항목이 이 경로로 충족됐다. `commerce-streamer`의 `product_metrics`는 `version`/`updated_at` 비교 대신 **델타(+1/-1) 누적**으로 설계해, 순서만 보장되면 버전 비교 없이도 결과가 같아지도록 했다(round7-event-application-map.md §2.4).
 
 ### 2.4 나머지 도메인 스윕 (brand · coupon · product 조회 · user · stock)
 
@@ -153,15 +156,15 @@ sequenceDiagram
 | 도메인 · 지점 | 판정 | 상태 | 설명 |
 |---|---|---|---|
 | `BrandFacade.deleteBrand` — 브랜드 삭제 + 상품/재고 soft-delete | **A** | 구현됨 | cascade는 원자적이어야 한다(브랜드만 지워지고 상품이 남으면 orphan). 같은 트랜잭션 필수. |
-| 위 삭제에 딸린 캐시 무효화 (`ProductCacheEvictEvent`) | **C** | 구현됨(이벤트) | 2.1과 동일. `AFTER_COMMIT`. |
-| `ProductFacade.deleteProduct` / `updateProductForAdmin` — 상품 변경 + 캐시 무효화 | **A**(변경) + **C**(캐시) | 구현됨 | 상품·재고 변경은 A(같은 Tx), 캐시 무효화만 `ProductCacheEvictEvent`로 분리. `createProductForAdmin`은 캐시할 게 없어 이벤트 없음(정상). |
-| `ProductFacade.getProduct` — **상품 조회수 집계** | **B** | **미구현·경계 있음** | Step 2의 `product_metrics.조회 수` 대상. 조회는 캐시 히트로 끝나야 빠른데, 조회수 증가를 조회 트랜잭션에 넣으면 읽기 경로에 쓰기 경합이 생긴다. "상품이 조회됐다" 이벤트로 분리하고 별도로 집계해야 한다. 유실은 통계 왜곡이므로 손실 허용도에 따라 B(내구성) 또는 C. |
-| `OrderFacade.createOrder` — **상품별 판매량 집계** | **B** | **미구현·경계 있음** | Step 2의 `product_metrics.판매량` 대상. 현재 주문은 캐시 무효화 이벤트만 발행한다. "무엇이 몇 개 팔렸다"는 좋아요 수와 같은 성격의 집계이므로 좋아요와 동일하게 Outbox로 분리하는 것이 일관적이다. |
+| 위 삭제에 딸린 캐시 무효화 | **C** | **삭제·보류** | 한때 `ProductCacheEvictEvent`로 이벤트 분리했으나, 캐시 무효화 기능 자체를 추후 도입 목표로 보류하며 이벤트·리스너를 전부 삭제했다(round7-event-application-map.md §1.1). 지금은 TTL로만 회복. |
+| `ProductFacade.deleteProduct` / `updateProductForAdmin` — 상품 변경 + 캐시 무효화 | **A**(변경) | 변경(A)만 구현됨, 캐시 무효화(C)는 **삭제·보류** | 상품·재고 변경은 A(같은 Tx)로 유지. 캐시 무효화는 위 브랜드 삭제와 같은 이유로 이벤트·리스너가 전부 삭제됐다. `createProductForAdmin`은 캐시할 게 없어 애초에 대상 아님. |
+| `ProductFacade.getProduct` — **상품 조회수 집계** | **C**(구현은 outbox 없이 best-effort) | **구현됨** | `product_metrics.view_count` 대상. 조회는 캐시 히트로 끝나야 빠른데, 캐시 우선 경로는 트랜잭션이 없어 outbox(`BEFORE_COMMIT`)를 탈 수 없다. 그래서 `ProductViewedEvent`를 `ProductViewedKafkaEventListener`가 `AFTER_COMMIT`(`fallbackExecution=true`) + `@Async`로 outbox 없이 직접 Kafka 발행한다 — 원래 B로 추정했으나 실제로는 유실을 감수하는 C에 더 가깝게 구현됐다. |
+| `OrderService.create` — **상품별 판매량 집계** | **B** | **구현됨** | `product_metrics.sales_count` 대상. `OrderCreatedEvent`에 `OrderCreatedKafkaOutboxEventHandler`(outbox 핸들러)만 얹어 좋아요와 같은 표준형(①outbox 기록/③릴레이)을 재사용한다 — 별도 이벤트를 새로 만들지 않았다. |
 | `CouponFacade.issue` — **쿠폰 발급** | 현재 **A** | 구현됨(동기) | 발급 수량 차감·중복 방지가 정합성 핵심이라 지금은 동기 트랜잭션이다. **Step 3에서 "발급 요청"을 Kafka로 던지고 consumer가 실제 발급**하도록 바뀌는 자리다. 발급 성공 알림/로깅이 붙는다면 그건 C. |
 | `UserService` 회원가입/로그인 (Facade 없음) | **C** | 미구현 | 가입 환영 알림, 로그인 이력 로깅 등이 붙는다면 best-effort C. 정합성이 걸린 부가 로직은 없다. |
 | `StockService` 재고 증감 | **A** | 구현됨 | 독립 플로우가 없다. 항상 주문/상품 트랜잭션 안에서 호출되는 A. 분리 대상 아님. |
 
-**이 스윕에서 드러난 핵심:** 원래 문서(2.3)는 Step 2 집계 세 가지 중 **좋아요 수**만 다뤘는데, **판매량(주문)**과 **조회수(상품 조회)**도 같은 B 성격의 경계다. 셋 다 "주요 로직을 막지 않되 유실되면 집계가 틀어지는" 로직이라 동일하게 Outbox → 이벤트로 분리해 `product_metrics`로 모으는 것이 Step 2의 그림이다. 좋아요만 이미 그 형태로 구현돼 있고, 판매량·조회수는 아직 경계만 존재한다.
+**이 스윕에서 드러난 핵심:** Step 2 집계 세 가지(**좋아요 수·판매량·조회 수**) 모두 `product_metrics`로 모이도록 구현이 끝났다. 다만 셋의 신뢰도 수준이 똑같지는 않다 — 좋아요·판매량은 B(Outbox → at-least-once)로 구현됐고, 조회수는 트랜잭션 없는 캐시 우선 경로라는 제약 때문에 C(best-effort, 유실 허용)로 타협됐다. "같은 목적의 집계라도 발행 지점의 트랜잭션 유무에 따라 판정이 갈릴 수 있다"는 것 자체가 §4의 "판단은 코드가 아니라 상황이 정한다"는 원칙의 또 다른 사례다.
 
 ## 3. 리스너 phase 선택 — 트랜잭션 결과와의 상관관계
 
@@ -169,11 +172,11 @@ C로 분류된 로직을 붙일 때, 주요 트랜잭션의 결과와 어떻게 
 
 | 방식 | 실행 시점 | 트랜잭션 관계 | 언제 쓰나 | 현재 사용처 |
 |---|---|---|---|---|
-| `@EventListener` (비트랜잭션 publisher) | publisher 호출 스택에서 동기 실행 | 리스너가 **자기 트랜잭션**을 연다 | 별도 트랜잭션이되 동기 실행이 필요할 때 | `LikeOutboxEventListener` |
-| `@TransactionalEventListener(BEFORE_COMMIT)` | 커밋 직전, 같은 트랜잭션 | 실패 시 주요 트랜잭션 롤백 | 사실상 A. C에는 부적합 | — |
-| `@TransactionalEventListener(AFTER_COMMIT)` | 커밋 성공 후 | 주요 성공에만 뒤따름 | **C의 기본값** — 성공 알림, 캐시 무효화, 포인트 적립 | `ProductCacheEvictListener` |
-| `@TransactionalEventListener(AFTER_ROLLBACK)` | 롤백 후 | 주요 실패 시에만 | 트랜잭션이 깨진 경우의 보상·경보 | — |
-| `@TransactionalEventListener(AFTER_COMPLETION)` | 커밋/롤백 무관 | 결과 무관 | 리소스 정리 등 | — |
+| `@EventListener` (비트랜잭션 publisher) | publisher 호출 스택에서 동기 실행 | 리스너가 **자기 트랜잭션**을 연다 | 별도 트랜잭션이되 동기 실행이 필요할 때 | — (현재 전부 `@TransactionalEventListener`로 구현됨) |
+| `@TransactionalEventListener(BEFORE_COMMIT)` | 커밋 직전, 같은 트랜잭션 | 실패 시 주요 트랜잭션 롤백 | 사실상 A. C에는 부적합 | `OutboxRecordEventListener.record()` — 도메인 무관 outbox 기록(§2.3) |
+| `@TransactionalEventListener(AFTER_COMMIT)` | 커밋 성공 후 | 주요 성공에만 뒤따름 | **C의 기본값** — 성공 알림, 캐시 무효화, 포인트 적립 | `LikeEventListener.send()`(fast-path, `@Async`) · `UserActivityLogListener.log()`(`fallbackExecution=true`로 무트랜잭션도 처리) · `ProductViewedKafkaEventListener.send()` |
+| `@TransactionalEventListener(AFTER_ROLLBACK)` | 롤백 후 | 주요 실패 시에만 | 트랜잭션이 깨진 경우의 보상·경보 | — (미사용) |
+| `@TransactionalEventListener(AFTER_COMPLETION)` | 커밋/롤백 무관 | 결과 무관 | 리소스 정리 등 | — (미사용) |
 
 **규칙:** C의 부가효과는 대부분 `AFTER_COMMIT`이다 — 일어나지 않은 일에 대해 알림을 보내면 안 되기 때문이다. 단 2.2에서 봤듯 "비즈니스 실패"는 트랜잭션 관점에선 커밋이므로, 실패 알림도 `AFTER_ROLLBACK`이 아니라 `AFTER_COMMIT` 안에서 결과 값으로 분기한다. `AFTER_ROLLBACK`은 예외로 트랜잭션이 실제로 깨진 경우에 한정된다.
 
@@ -222,7 +225,7 @@ public void relay() {
 
 즉 "B = 유실되면 안 되는 부분(A)을 outbox로 못박고(①), 정상 경로는 fast-path(C)로 흘려보내되(②), 그 실패분은 릴레이(③)가 반드시 따라잡는다"로 분해된다. 이것이 §1에서 말한 축의 재귀적 적용의 가장 구체적인 형태다.
 
-> **레포의 기존 좋아요 outbox와의 차이.** 현재 좋아요 플로우(2.3)는 Facade가 `likeOutboxService.record()`를 직접 호출하고(①에 해당), `@Scheduled` 폴러(`LikeOutboxProcessor` — ③에 해당)가 발행하는 형태다. **② fast-path 없이 릴레이 폴링만으로 발행하는 단순화된 버전**이라 보면 된다 — 그래서 좋아요는 항상 폴링 주기(1초)만큼 지연된 뒤 집계된다. 위 표준 형태는 여기에 (a) outbox 기록을 `BEFORE_COMMIT` 리스너로 옮겨 Facade에서 분리하고, (b) ② `AFTER_COMMIT` + `@Async` fast-path를 얹어 정상 경로 지연을 없앤 버전이다. **신규 async+outbox 작업(예: 판매량·조회수 집계)은 이 표준 형태를 따른다.** 전송 대상(Kafka 여부)은 비즈니스 정책에 따라 달라진다.
+> **좋아요가 이 표준형의 첫 구현체다.** ① `OutboxRecordEventListener.record()`(도메인 무관, `BEFORE_COMMIT`) — ② `LikeEventListener.send()`(`@Async AFTER_COMMIT` fast-path) — ③ `OutboxRelay`(`@Scheduled(1s)`) + `LikeEventHandler`(`OutboxEventHandler` 구현)로 실제 코드에 그대로 존재한다. ①은 애초부터 도메인을 가리지 않게 지어졌고(`OutboxableEvent`만 구현하면 됨), 그 덕에 **판매량 집계(`OrderCreatedEvent`)가 새 outbox 인프라를 만들지 않고 ①·③을 그대로 재사용**했다 — `OrderCreatedKafkaOutboxEventHandler`만 새로 추가하면 됐다. 전송 대상(in-JVM 반영 vs Kafka 발행)은 `OutboxEventHandler` 구현체가 무엇이냐에 따라 갈린다(round7-event-application-map.md §1.1·§2.1).
 
 ## 4. 같은 로직이라도 판정이 달라질 수 있다 — 판단 기준이 학습 포인트인 이유
 
@@ -239,17 +242,17 @@ public void relay() {
 
 | 플로우 | A (같은 Tx, 분리 금지) | B (Outbox 분리, 집계) | C (AFTER_COMMIT best-effort) |
 |---|---|---|---|
-| **주문 생성** | 쿠폰 사용 · 재고 차감 · 주문 생성 | 판매량 집계(미구현) | 캐시 무효화(구현됨) · 주문 알림/로깅(미구현) |
-| **결제 확정** | 결제 상태 확정 + 주문 상태 전환 | — | 결제 성공/실패 알림 · 로깅(미구현) |
-| **좋아요** | 등록+outbox 기록 / 멱등처리+카운트 증가 | 좋아요 수 집계(구현됨) | 캐시 무효화 |
-| **상품** | 상품/재고 변경 · 삭제 | 조회수 집계(미구현) | 캐시 무효화(구현됨) |
-| **브랜드** | 삭제 cascade(상품·재고 soft-delete) | — | 캐시 무효화(구현됨) |
-| **쿠폰** | 발급 수량 차감·중복 방지(→ Step 3에서 Kafka로 이전) | — | 발급 알림/로깅(미구현) |
+| **주문 생성** | 쿠폰 사용 · 재고 차감 · 주문 생성 | 판매량 집계(구현됨 — `OrderCreatedEvent`) | 캐시 무효화(삭제·보류) · 유저 행동 로깅(구현됨) · 주문 알림(스코프 아님) |
+| **결제 확정** | 결제 상태 확정 + 주문 상태 전환 | — | 결제 성공/실패 알림 · 로깅(스코프 아님으로 확정) |
+| **좋아요** | 등록+outbox 기록 / 멱등처리+카운트 증가(`LikeCountReflector`) | 좋아요 수 집계(구현됨, T1→T2 두 단계) | 유저 행동 로깅(구현됨) · 캐시 무효화(삭제·보류) |
+| **상품** | 상품/재고 변경 · 삭제 | 조회수 집계(구현됨, 단 outbox 미경유 best-effort) | 유저 행동 로깅(구현됨) · 캐시 무효화(삭제·보류) |
+| **브랜드** | 삭제 cascade(상품·재고 soft-delete) | — | 캐시 무효화(삭제·보류) |
+| **쿠폰** | 발급 수량 차감·중복 방지(→ Step 3에서 Kafka로 이전 예정, 아직 착수 전) | — | 발급 알림/로깅(미구현) |
 | **유저** | — | — | 가입/로그인 알림·로깅(미구현) |
 | **재고** | 주문/상품 Tx 안의 증감 (독립 플로우 없음) | — | — |
 
 - 판단 기준은 하나 — **실패가 주요 트랜잭션을 되돌려야 하는가, 유실을 감수할 수 있는가.**
-- 이 질문을 플로우 전체가 아니라 **경계마다 반복**한다. 좋아요 플로우는 그 자체로 A·B·C를 모두 포함한다.
-- 주문·결제·쿠폰의 알림·로깅은 아직 코드에 없다. 이 문서는 그것들이 추가될 때 **트랜잭션 밖 C로 붙어야 한다**는 판단을 미리 고정한다.
-- Step 2가 요구하는 집계 세 가지(**좋아요 수 · 판매량 · 조회 수**)는 모두 B다. 현재 좋아요 수만 구현돼 있고, 판매량·조회수는 경계만 존재한다. 셋 다 인프로세스 이벤트 홉이 Step 2에서 Kafka로 대체되며 `product_metrics`로 모인다.
-- 쿠폰 발급은 현재 A(동기)지만, Step 3에서 발급 요청을 Kafka로 던지는 비동기 구조로 재배치된다.
+- 이 질문을 플로우 전체가 아니라 **경계마다 반복**한다. 좋아요 플로우는 그 자체로 A·B·C를 모두 포함하고, T1(등록)·T2(카운트 반영) 두 시점에서 각각 반복된다.
+- 결제·쿠폰의 알림·로깅은 이번 라운드 스코프 아님으로 확정했다. 주문·좋아요·상품 조회의 유저 행동 로깅은 `UserActivityEvent`로 이미 구현됐다.
+- Step 2가 요구하는 집계 세 가지(**좋아요 수 · 판매량 · 조회 수**)는 모두 `product_metrics`로 모이도록 구현이 끝났다. 좋아요·판매량은 B(outbox 경유), 조회수는 트랜잭션 부재로 C(best-effort)로 타협됐다는 차이만 있다.
+- 쿠폰 발급은 여전히 A(동기)다. Step 3(발급 요청을 Kafka로 던지는 비동기 구조로 재배치)는 아직 착수 전이다.

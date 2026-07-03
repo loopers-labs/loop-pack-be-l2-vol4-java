@@ -80,19 +80,19 @@
 
 ### 🎾 Step 2 — Kafka Producer / Consumer
 
-- [ ] Step 1의 ApplicationEvent 중 **시스템 간 전파가 필요한 이벤트**를 Kafka로 발행한다.
-- [ ] `acks=all`, `idempotence=true` 설정
-- [ ] **Transactional Outbox Pattern** 구현
-- [ ] PartitionKey 기반 이벤트 순서 보장
-- [ ] Consumer가 Metrics 집계 처리 (product_metrics upsert)
-- [ ] `event_handled` 테이블을 통한 멱등 처리 구현
-- [ ] manual Ack + `version` / `updated_at` 기준 최신 이벤트만 반영
+- [x] Step 1의 ApplicationEvent 중 **시스템 간 전파가 필요한 이벤트**를 Kafka로 발행한다.
+- [x] `acks=all`, `idempotence=true` 설정
+- [x] **Transactional Outbox Pattern** 구현
+- [x] PartitionKey 기반 이벤트 순서 보장
+- [x] Consumer가 Metrics 집계 처리 (product_metrics upsert)
+- [x] `event_handled` 테이블을 통한 멱등 처리 구현
+- [x] manual Ack + `version` / `updated_at` 기준 최신 이벤트만 반영 — manual Ack는 구현, `version`/`updated_at` 비교는 델타(+1/-1) 누적 설계로 대체(상세: `round7-event-application-map.md` §2.4)
 
 ### 🎫 Step 3 — 선착순 쿠폰 발급
 
-- [ ] 쿠폰 발급 요청 API → Kafka 발행 (비동기 처리)
-- [ ] Consumer에서 선착순 수량 제한 + 중복 발급 방지 구현
-- [ ] 발급 완료/실패 결과를 유저가 확인할 수 있는 구조 설계 (polling or callback)
-- [ ] 동시성 테스트 — 수량 초과 발급이 발생하지 않는지 검증
+- [x] 쿠폰 발급 요청 API → Kafka 발행 (비동기 처리)
+- [x] Consumer에서 선착순 수량 제한 + 중복 발급 방지 구현
+- [x] 발급 완료/실패 결과를 유저가 확인할 수 있는 구조 설계 (polling or callback)
+- [x] 동시성 테스트 — 수량 초과 발급이 발생하지 않는지 검증
 
 ---
