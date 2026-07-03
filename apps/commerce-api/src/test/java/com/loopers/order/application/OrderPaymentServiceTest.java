@@ -12,6 +12,7 @@ import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,9 +33,10 @@ class OrderPaymentServiceTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ProductStockRepository productStockRepository = mock(ProductStockRepository.class);
     private final CouponUsageService couponUsageService = mock(CouponUsageService.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
     private final OrderPaymentService orderPaymentService = new OrderPaymentService(
-            orderRepository, orderItemRepository, productStockRepository, couponUsageService
+            orderRepository, orderItemRepository, productStockRepository, couponUsageService, eventPublisher
     );
 
     private ShippingDestination shipping() {
@@ -55,6 +57,7 @@ class OrderPaymentServiceTest {
     void givenPendingPaymentOrder_whenMarkPaid_thenStatusIsPaid() {
         Order order = order(null);
         when(orderRepository.findByOrderNumber(ORDER_NUMBER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(any())).thenReturn(List.of());
 
         orderPaymentService.markPaid(ORDER_NUMBER);
 

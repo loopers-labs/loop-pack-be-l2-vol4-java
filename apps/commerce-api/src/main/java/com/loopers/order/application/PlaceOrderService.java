@@ -1,5 +1,6 @@
 package com.loopers.order.application;
 
+import com.loopers.activity.UserActivityEvent;
 import com.loopers.brand.application.BrandReader;
 import com.loopers.common.domain.Money;
 import com.loopers.coupon.application.CouponUsageService;
@@ -8,6 +9,7 @@ import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
 import com.loopers.order.domain.ShippingDestination;
+import com.loopers.order.application.event.OrderCreatedEvent;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
 import com.loopers.product.domain.ProductStock;
@@ -18,6 +20,7 @@ import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.user.application.UserReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +40,7 @@ public class PlaceOrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CouponUsageService couponUsageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderResult.Detail createPendingOrder(OrderCommand.Create command, String orderNumber) {
@@ -81,6 +85,10 @@ public class PlaceOrderService {
         log.info("PENDING 주문 저장 orderId={} orderNumber={} total={} discount={} final={}",
                 saved.getId(), saved.getOrderNumber(), saved.getTotalAmount().value(),
                 saved.getDiscountAmount().value(), saved.getFinalAmount().value());
+
+        // 핵심 트랜잭션이 커밋된 뒤에만 부가 처리(데이터 플랫폼 전송)가 실행되도록 이벤트를 발행한다.
+        eventPublisher.publishEvent(OrderCreatedEvent.of(saved, orderItems));
+        eventPublisher.publishEvent(UserActivityEvent.order(saved.getUserId(), saved.getId()));
         return OrderResult.Detail.of(saved, orderItems);
     }
 
