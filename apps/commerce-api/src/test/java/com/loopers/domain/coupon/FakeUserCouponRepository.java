@@ -54,4 +54,10 @@ public class FakeUserCouponRepository implements UserCouponRepository {
     public Optional<UserCoupon> findForUpdate(Long id) {
         return Optional.ofNullable(store.get(id));
     }
+
+    @Override
+    public boolean existsByUserIdAndCouponTemplateId(Long userId, Long couponTemplateId) {
+        return store.values().stream()
+            .anyMatch(c -> c.getUserId().equals(userId) && c.getCouponTemplateId().equals(couponTemplateId));
+    }
 }

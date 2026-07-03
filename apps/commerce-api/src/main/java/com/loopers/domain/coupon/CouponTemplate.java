@@ -35,9 +35,22 @@ public class CouponTemplate extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private LocalDateTime expiredAt;
 
+    /**
+     * 선착순 발급 총량. null = 무제한. 7주차 도입.
+     */
+    @Column(name = "total_stock")
+    private Long totalStock;
+
+    @Column(name = "issued_count", nullable = false)
+    private Long issuedCount;
+
     protected CouponTemplate() {}
 
     public CouponTemplate(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt) {
+        this(name, type, value, minOrderAmount, expiredAt, null);
+    }
+
+    public CouponTemplate(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt, Long totalStock) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 이름은 비어있을 수 없습니다.");
         }
@@ -56,11 +69,16 @@ public class CouponTemplate extends BaseEntity {
         if (expiredAt == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료 일시는 필수입니다.");
         }
+        if (totalStock != null && totalStock < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "총 재고는 0 이상이어야 합니다.");
+        }
         this.name = name;
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+        this.totalStock = totalStock;
+        this.issuedCount = 0L;
     }
 
     public String getName() {
@@ -81,6 +99,38 @@ public class CouponTemplate extends BaseEntity {
 
     public LocalDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public Long getTotalStock() {
+        return totalStock;
+    }
+
+    public Long getIssuedCount() {
+        return issuedCount;
+    }
+
+    /**
+     * 선착순 발급을 시도한다.
+     * <ul>
+     *   <li>totalStock 이 null 이면 무제한 — 항상 성공.</li>
+     *   <li>issuedCount < totalStock 이면 카운트 1 증가.</li>
+     *   <li>이미 소진(issuedCount >= totalStock)이면 CONFLICT.</li>
+     * </ul>
+     * 동시성은 호출자 트랜잭션 + 파티션 순차 처리로 보장 — 도메인은 단일 스레드 관점의 규칙만.
+     */
+    public void issueOne() {
+        if (totalStock == null) {
+            this.issuedCount += 1;
+            return;
+        }
+        if (this.issuedCount >= this.totalStock) {
+            throw new CoreException(ErrorType.CONFLICT, "쿠폰이 모두 소진되었습니다.");
+        }
+        this.issuedCount += 1;
+    }
+
+    public boolean isSoldOut() {
+        return totalStock != null && issuedCount >= totalStock;
     }
 
     public void update(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt) {

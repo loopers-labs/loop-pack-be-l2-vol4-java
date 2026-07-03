@@ -14,4 +14,9 @@ public interface UserCouponRepository {
      * 트랜잭션 종료까지 다른 트랜잭션은 본 행을 읽을 수 없다.
      */
     Optional<UserCoupon> findForUpdate(Long id);
+
+    /**
+     * 같은 사용자가 같은 템플릿의 쿠폰을 이미 발급받았는지. 선착순 발급 중복 방지에 사용.
+     */
+    boolean existsByUserIdAndCouponTemplateId(Long userId, Long couponTemplateId);
 }

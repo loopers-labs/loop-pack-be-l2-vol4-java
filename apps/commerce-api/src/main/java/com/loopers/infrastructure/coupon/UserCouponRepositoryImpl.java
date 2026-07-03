@@ -43,4 +43,9 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     public Optional<UserCoupon> findForUpdate(Long id) {
         return jpaRepository.findByIdForUpdate(id);
     }
+
+    @Override
+    public boolean existsByUserIdAndCouponTemplateId(Long userId, Long couponTemplateId) {
+        return jpaRepository.existsByUserIdAndCouponTemplateId(userId, couponTemplateId);
+    }
 }
