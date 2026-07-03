@@ -21,8 +21,15 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+
+# outbox 폴러를 기본 활성화
+outbox:
+  relay:
+    enabled: true
+    interval-ms: 1000 # 1초마다 발행
 
 springdoc:
   use-fqn: true
@@ -34,6 +41,18 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트에서는 outbox 폴러를 기본 비활성화(브로커 미가동 시 발행 타임아웃으로 느려짐 방지).
+# Kafka 파이프라인 e2e 테스트는 @TestPropertySource로 true + Kafka testcontainer를 함께 켠다.
+outbox:
+  relay:
+    enabled: false
 
 ---
 spring:

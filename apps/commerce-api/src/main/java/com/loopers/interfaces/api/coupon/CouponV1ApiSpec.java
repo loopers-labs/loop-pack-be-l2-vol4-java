@@ -15,4 +15,18 @@ public interface CouponV1ApiSpec {
         @RequestHeader("X-Loopers-LoginPw") String loginPw,
         @PathVariable Long couponId
     );
+
+    @Operation(summary = "선착순 쿠폰 발급 요청", description = "발급 요청을 큐에 접수하고 즉시 응답한다. 실제 발급은 비동기로 처리된다.")
+    ApiResponse<CouponV1Dto.IssueRequestResponse> requestIssueCoupon(
+        @RequestHeader("X-Loopers-LoginId") String loginId,
+        @RequestHeader("X-Loopers-LoginPw") String loginPw,
+        @PathVariable Long couponId
+    );
+
+    @Operation(summary = "발급 요청 상태 조회", description = "requestId로 발급 처리 상태(PENDING/ISSUED/SOLD_OUT)를 조회한다.")
+    ApiResponse<CouponV1Dto.IssueRequestStatusResponse> getIssueRequestStatus(
+        @RequestHeader("X-Loopers-LoginId") String loginId,
+        @RequestHeader("X-Loopers-LoginPw") String loginPw,
+        @PathVariable String requestId
+    );
 }

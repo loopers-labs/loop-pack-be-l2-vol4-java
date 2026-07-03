@@ -8,10 +8,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 
 @Entity
-@Table(name = "user_coupon")
+@Table(
+    name = "user_coupon",
+    uniqueConstraints = @UniqueConstraint(name = "uk_user_coupon", columnNames = {"user_id", "coupon_id"})
+)
 public class UserCouponModel extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)

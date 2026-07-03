@@ -1,10 +1,12 @@
 package com.loopers.application.order;
 
+import com.loopers.application.activitylog.UserActivityLogHandler;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.coupon.UserCouponStatus;
+import com.loopers.domain.order.OrderCompletedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -32,6 +35,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 class OrderFacadeIntegrationTest {
@@ -56,6 +62,12 @@ class OrderFacadeIntegrationTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @MockitoSpyBean
+    private OrderNotificationHandler orderNotificationHandler;
+
+    @MockitoSpyBean
+    private UserActivityLogHandler userActivityLogHandler;
 
     @AfterEach
     void tearDown() {
@@ -250,6 +262,43 @@ class OrderFacadeIntegrationTest {
                     List.of(new OrderFacade.OrderRequest(product.getId(), 1)), userCoupon.getId())
             );
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("주문 완료 이벤트는,")
+    @Nested
+    class OrderCompletedEventPublishing {
+
+        @DisplayName("주문 성공 시 알림/행동로깅 리스너를 동기(AFTER_COMMIT)로 호출한다.")
+        @Test
+        void notifiesHandlers_onOrderSuccess() {
+            // arrange
+            savedUser("user1");
+            ProductModel product = savedProduct(10_000L, 5);
+
+            // act
+            orderFacade.createOrder("user1", "pw1",
+                List.of(new OrderFacade.OrderRequest(product.getId(), 1)), null);
+
+            // assert: 동기 AFTER_COMMIT이므로 createOrder 반환 시점에 이미 호출됨
+            verify(orderNotificationHandler).onOrderCompleted(any(OrderCompletedEvent.class));
+            verify(userActivityLogHandler).onOrderCompleted(any(OrderCompletedEvent.class));
+        }
+
+        @DisplayName("주문 실패(롤백) 시 이벤트가 발행되지 않아 리스너가 호출되지 않는다.")
+        @Test
+        void doesNotNotify_whenOrderRollsBack() {
+            // arrange: 재고 1개인데 2개 주문 → 재고 부족으로 롤백
+            savedUser("user1");
+            ProductModel product = savedProduct(10_000L, 1);
+
+            // act & assert
+            assertThrows(CoreException.class, () ->
+                orderFacade.createOrder("user1", "pw1",
+                    List.of(new OrderFacade.OrderRequest(product.getId(), 2)), null));
+
+            verify(orderNotificationHandler, never()).onOrderCompleted(any());
+            verify(userActivityLogHandler, never()).onOrderCompleted(any());
         }
     }
 

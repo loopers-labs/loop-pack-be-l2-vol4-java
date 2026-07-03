@@ -3,6 +3,7 @@ package com.loopers.application.order;
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.UserCouponModel;
+import com.loopers.domain.order.OrderCompletedEvent;
 import com.loopers.domain.order.OrderItemCommand;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
@@ -15,6 +16,7 @@ import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class OrderFacade {
     private final ProductService productService;
     private final OrderService orderService;
     private final CouponService couponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo createOrder(String loginId, String loginPw, List<OrderRequest> requests, Long userCouponId) {
@@ -64,6 +67,13 @@ public class OrderFacade {
             user.getId(), originalPrice, discountAmount, finalPrice, userCouponId, itemCommands
         );
         List<OrderItemModel> savedItems = orderService.getOrderItems(order.getId());
+
+        // 주문 완료 사실을 발행한다. 알림/유저행동 로깅/판매량 집계 같은 부가 관심사는 이 트랜잭션 커밋 뒤
+        // AFTER_COMMIT 리스너가 각자 구독해 처리한다(본 주문 로직과 경계 분리).
+        List<OrderCompletedEvent.Line> eventLines = itemCommands.stream()
+            .map(c -> new OrderCompletedEvent.Line(c.productId(), c.quantity()))
+            .toList();
+        eventPublisher.publishEvent(new OrderCompletedEvent(order.getId(), user.getId(), finalPrice, eventLines));
 
         return OrderInfo.of(order, savedItems.stream().map(OrderItemInfo::from).toList());
     }

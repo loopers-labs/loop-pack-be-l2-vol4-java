@@ -3,13 +3,16 @@ package com.loopers.application.productlike;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.productlike.ProductLikeService;
+import com.loopers.domain.productlike.ProductLikedEvent;
+import com.loopers.domain.productlike.ProductUnlikedEvent;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,31 +23,35 @@ public class ProductLikeFacade {
     private final UserService userService;
     private final ProductService productService;
     private final ProductLikeService productLikeService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 상품 좋아요 등록. 멱등 동작: 이미 좋아요 상태이거나 동시 요청으로 unique 제약을 위반해도 성공 처리한다.
+     * 상품 좋아요 등록. 좋아요 insert가 실제로 일어난 경우에만 {@link ProductLikedEvent}를 발행한다.
      * <p>
-     * 이 메서드는 의도적으로 {@code @Transactional}을 붙이지 않는다. insert+count 증가의 원자적 단위는
-     * {@link ProductLikeService#like}의 트랜잭션이며, 그 트랜잭션 밖에서 {@code DataIntegrityViolationException}을
-     * 흡수해야 rollback-only 오염 없이 멱등 처리가 가능하다.
+     * 멱등 처리는 {@link ProductLikeService#like}의 insert IGNORE가 담당하므로 예외 흡수가 필요 없다.
+     * like_count 집계는 이 트랜잭션이 커밋된 뒤 이벤트 리스너가 별도 트랜잭션에서 처리한다(경계 분리).
      */
+    @Transactional
     public void like(String loginId, String loginPw, Long productId) {
         UserModel user = userService.getUser(loginId, loginPw);
         productService.getProduct(productId); // 존재 확인 (없으면 NOT_FOUND)
-        try {
-            productLikeService.like(user.getId(), productId);
-        } catch (DataIntegrityViolationException e) {
-            // 동시 중복 좋아요로 unique 제약 위반: 이미 좋아요 상태로 간주하고 성공 처리(멱등).
+        boolean liked = productLikeService.like(user.getId(), productId);
+        if (liked) {
+            eventPublisher.publishEvent(new ProductLikedEvent(productId, user.getId()));
         }
     }
 
     /**
-     * 상품 좋아요 취소. 멱등 동작: 좋아요 상태가 아니어도 성공 처리한다.
+     * 상품 좋아요 취소. 실제로 삭제가 일어난 경우에만 {@link ProductUnlikedEvent}를 발행한다(멱등).
      */
+    @Transactional
     public void unlike(String loginId, String loginPw, Long productId) {
         UserModel user = userService.getUser(loginId, loginPw);
         productService.getProduct(productId); // 존재 확인 (없으면 NOT_FOUND)
-        productLikeService.unlike(user.getId(), productId);
+        boolean unliked = productLikeService.unlike(user.getId(), productId);
+        if (unliked) {
+            eventPublisher.publishEvent(new ProductUnlikedEvent(productId, user.getId()));
+        }
     }
 
     /**
