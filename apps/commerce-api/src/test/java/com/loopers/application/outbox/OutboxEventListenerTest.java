@@ -2,6 +2,7 @@ package com.loopers.application.outbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.coupon.CouponIssueRequestedEvent;
 import com.loopers.application.like.LikeChangedEvent;
 import com.loopers.application.payment.PaymentCompletedEvent;
 import com.loopers.domain.order.OrderItemCommand;
@@ -47,6 +48,7 @@ class OutboxEventListenerTest {
         sut = new OutboxEventListener(outboxEventRepository, orderRepository, objectMapper);
         ReflectionTestUtils.setField(sut, "catalogTopic", "catalog-events");
         ReflectionTestUtils.setField(sut, "orderTopic", "order-events");
+        ReflectionTestUtils.setField(sut, "couponIssueTopic", "coupon-issue-requests");
     }
 
     @DisplayName("좋아요 이벤트는 catalog 토픽, productId 파티션 키, LIKE_CHANGED 봉투로 기록된다.")
@@ -103,5 +105,29 @@ class OutboxEventListenerTest {
         assertThat(payload.get("transactionKey").asText()).isEqualTo("TX-1");
         assertThat(payload.get("amount").asLong()).isEqualTo(40_000L);
         assertThat(payload.get("items")).hasSize(2);
+    }
+
+    @DisplayName("쿠폰 발급 이벤트는 coupon topic, userId partition key, requestId eventId로 기록한다.")
+    @Test
+    void writesCouponIssueOutboxWithUserIdKey() throws Exception {
+        // act
+        sut.onCouponIssueRequested(new CouponIssueRequestedEvent("request-1", 10L, 100L));
+
+        // assert
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository).save(captor.capture());
+        OutboxEvent saved = captor.getValue();
+
+        assertThat(saved.getTopic()).isEqualTo("coupon-issue-requests");
+        assertThat(saved.getPartitionKey()).isEqualTo("10");
+        assertThat(saved.getEventType()).isEqualTo("COUPON_ISSUE_RESERVED");
+        assertThat(saved.getEventId()).isEqualTo("request-1");
+
+        JsonNode envelope = objectMapper.readTree(saved.getPayload());
+        assertThat(envelope.get("eventId").asText()).isEqualTo("request-1");
+        assertThat(envelope.get("eventType").asText()).isEqualTo("COUPON_ISSUE_RESERVED");
+        assertThat(envelope.get("payload").get("requestId").asText()).isEqualTo("request-1");
+        assertThat(envelope.get("payload").get("userId").asLong()).isEqualTo(10L);
+        assertThat(envelope.get("payload").get("couponId").asLong()).isEqualTo(100L);
     }
 }
