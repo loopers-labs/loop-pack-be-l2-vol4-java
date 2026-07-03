@@ -75,6 +75,13 @@ public class CouponIssueRequest extends BaseEntity {
         return new CouponIssueRequest(UUID.randomUUID().toString(), userId, couponId);
     }
 
+    public static CouponIssueRequest accept(String requestId, Long userId, Long couponId) {
+        if (requestId == null || requestId.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "requestId is required.");
+        }
+        return new CouponIssueRequest(requestId, userId, couponId);
+    }
+
     /** 발급 성공 — PENDING 에서만 전이 가능(멱등 가드는 호출부 isTerminal 체크가 담당). */
     public void markIssued(Long userCouponId) {
         requirePending();

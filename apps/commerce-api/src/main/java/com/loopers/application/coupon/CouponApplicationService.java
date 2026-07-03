@@ -12,24 +12,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
-/**
- * 쿠폰 유스케이스 Application Service (스타일 2).
- *
- * <p>대고객(발급 접수/결과 조회/내 쿠폰 목록)과 어드민(템플릿 CRUD/발급내역)을 모두 담당한다.
- * 쿠폰 사용(주문 시 확정)은 주문 트랜잭션의 일부라 {@link com.loopers.application.order.OrderTransactionService}가 처리한다.
- *
- * <p><strong>비동기 발급 (Round 7)</strong>: 발급은 접수(202+requestId)만 하고, 실제 발급은
- * Kafka 컨슈머({@link CouponIssueProcessor})가 수행한다 — 선착순 폭주를 큐가 완충하고,
- * key=couponId 파티션 직렬화로 도착 순서대로 처리된다. 결과는 requestId 로 폴링한다.
- *
- * <p>발급 시 템플릿의 혜택이 발급분으로 스냅샷되므로("발급은 그 시점의 약속"),
- * 발급 이후의 조회/사용은 템플릿을 재조회하지 않는다.
- */
 @RequiredArgsConstructor
 @Service
 public class CouponApplicationService {
@@ -37,20 +29,10 @@ public class CouponApplicationService {
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
     private final CouponIssueRequestRepository couponIssueRequestRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final CouponIssueRedisStore couponIssueRedisStore;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final TransactionTemplate transactionTemplate;
 
-    // ===== 대고객 =====
-
-    /**
-     * 쿠폰 발급 요청 접수 — 요청을 저장하고 Kafka 발행(outbox)만 한다. 실제 발급은 컨슈머가 수행.
-     *
-     * <p>만료/중복은 접수 시점에 빠른 실패로 걸러 불필요한 큐 유입을 줄인다(UX 게이트).
-     * 접수를 통과해도 최종 판정(수량/중복 재검증)은 컨슈머가 한다 — 접수 검사는 스냅샷일 뿐이다.
-     *
-     * <p>요청 행 INSERT 와 outbox 기록({@code OutboxEventListener}, BEFORE_COMMIT)이 같은
-     * 트랜잭션이므로, 202 를 받은 요청은 반드시 컨슈머에 도달한다(At Least Once).
-     */
-    @Transactional
     public CouponIssueRequestInfo requestIssue(Long userId, Long couponTemplateId) {
         CouponModel template = couponRepository.findById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
@@ -59,18 +41,53 @@ public class CouponApplicationService {
         if (template.isExpired(now)) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰은 발급받을 수 없습니다.");
         }
-        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponTemplateId)) {
+
+        String requestId = UUID.randomUUID().toString();
+        CouponIssueRedisStore.ReservationResult reservationResult = couponIssueRedisStore.reserve(
+            couponTemplateId,
+            userId,
+            template.getTotalQuantity(),
+            requestId
+        );
+        if (reservationResult == CouponIssueRedisStore.ReservationResult.DUPLICATE) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
         }
+        if (reservationResult == CouponIssueRedisStore.ReservationResult.SOLD_OUT) {
+            throw new CoreException(ErrorType.CONFLICT, "쿠폰이 모두 소진되었습니다.");
+        }
 
-        CouponIssueRequest request = couponIssueRequestRepository.save(
-            CouponIssueRequest.accept(userId, couponTemplateId));
-        eventPublisher.publishEvent(
-            new CouponIssueRequestedEvent(request.getRequestId(), userId, couponTemplateId));
-        return CouponIssueRequestInfo.from(request, null);
+        try {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> {
+                registerReservationRollback(couponTemplateId, userId, requestId);
+                CouponIssueRequest request = couponIssueRequestRepository.save(
+                    CouponIssueRequest.accept(requestId, userId, couponTemplateId));
+                applicationEventPublisher.publishEvent(
+                    new CouponIssueRequestedEvent(request.getRequestId(), userId, couponTemplateId));
+                return CouponIssueRequestInfo.from(request, null);
+            }));
+        } catch (CoreException e) {
+            couponIssueRedisStore.cancelReservation(couponTemplateId, userId, requestId);
+            throw e;
+        } catch (RuntimeException e) {
+            couponIssueRedisStore.cancelReservation(couponTemplateId, userId, requestId);
+            throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "잠시 후 다시 시도해주세요.", e);
+        }
     }
 
-    /** 발급 요청 결과 폴링 — 본인 요청만 조회 가능(타 유저 요청은 존재 자체를 노출하지 않음). */
+    private void registerReservationRollback(Long couponId, Long userId, String requestId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    couponIssueRedisStore.cancelReservation(couponId, userId, requestId);
+                }
+            }
+        });
+    }
+
     @Transactional(readOnly = true)
     public CouponIssueRequestInfo getIssueRequest(Long userId, String requestId) {
         CouponIssueRequest request = couponIssueRequestRepository.findByRequestId(requestId)
@@ -89,11 +106,6 @@ public class CouponApplicationService {
         return CouponIssueRequestInfo.from(request, issued);
     }
 
-    /**
-     * 내 쿠폰 목록 (AVAILABLE/USED/EXPIRED).
-     *
-     * <p>혜택이 발급분에 스냅샷되어 있어 템플릿 조인/일괄 조회 없이 발급분만으로 완성된다.
-     */
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getMyCoupons(Long userId) {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
@@ -101,8 +113,6 @@ public class CouponApplicationService {
             .map(uc -> UserCouponInfo.from(uc, now))
             .toList();
     }
-
-    // ===== 어드민 =====
 
     @Transactional
     public CouponInfo createTemplate(String name, CouponType type, long value, Long minOrderAmount,
@@ -123,9 +133,6 @@ public class CouponApplicationService {
             .toList();
     }
 
-    /**
-     * 템플릿 수정 — 이미 발급된 쿠폰의 혜택(스냅샷)에는 영향을 주지 않으며, 이후 발급분에만 적용된다.
-     */
     @Transactional
     public CouponInfo updateTemplate(Long couponId, String name, CouponType type, long value, Long minOrderAmount,
                                      ZonedDateTime expiredAt, Integer totalQuantity) {
@@ -145,7 +152,7 @@ public class CouponApplicationService {
 
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getIssues(Long couponId, int page, int size) {
-        findTemplateOrThrow(couponId);   // 템플릿 존재 검증
+        findTemplateOrThrow(couponId);
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         return userCouponRepository.findByCouponId(couponId, page, size).stream()
             .map(uc -> UserCouponInfo.from(uc, now))

@@ -48,7 +48,7 @@ commerce-events:
     catalog: catalog-events # 좋아요 (key=productId, Outbox 발행)
     order: order-events # 결제 완료 (key=orderId, Outbox 발행)
     view: view-events # 상품 조회 (key=productId, 직접 발행 — 유실 허용)
-    coupon-issue: coupon-issue-requests # 선착순 쿠폰 발급 요청 (key=couponId, Outbox 발행, api 자기소비)
+    coupon-issue: coupon-issue-requests # first-come coupon issue success events (key=userId, outbox relay, api self-consumption)
 
 resilience4j:
   circuitbreaker:

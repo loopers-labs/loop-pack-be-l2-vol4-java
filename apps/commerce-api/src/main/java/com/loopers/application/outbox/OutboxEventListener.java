@@ -100,7 +100,7 @@ public class OutboxEventListener {
         payload.put("userId", event.userId());
         payload.put("couponId", event.couponId());
 
-        writeOutbox(couponIssueTopic, event.couponId().toString(), "COUPON_ISSUE_REQUESTED", payload, event.requestId());
+        writeOutbox(couponIssueTopic, event.userId().toString(), "COUPON_ISSUE_RESERVED", payload, event.requestId());
     }
 
     private void writeOutbox(String topic, String partitionKey, String eventType, Map<String, Object> payload) {

@@ -6,11 +6,9 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.AuthUser;
 import com.loopers.interfaces.api.user.AuthUserContext;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -31,7 +29,6 @@ public class CouponV1Controller {
 
     /** 발급 요청 접수 — 즉시 202. 선착순 판정은 컨슈머가 도착 순서대로 수행한다. */
     @PostMapping("/api/v1/coupons/{couponId}/issue")
-    @ResponseStatus(HttpStatus.ACCEPTED)
     public ApiResponse<CouponV1Dto.IssueAcceptedResponse> issue(
         @AuthUser AuthUserContext authUser,
         @PathVariable Long couponId
