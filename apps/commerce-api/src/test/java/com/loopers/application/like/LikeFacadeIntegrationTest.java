@@ -24,6 +24,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * 좋아요 흐름의 api 측 책임(likes 행, 예외)을 검증한다.
+ *
+ * like_count 단언은 의도적으로 빠졌다 — 좋아요 카운트의 집이 product_metrics(streamer 읽기모델)로 이사했고(결정 #1),
+ * api 핸들러는 더 이상 ProductModel.likeCount 를 갱신하지 않는다(clean cut). outbox 적재의 같은-TX 보장은
+ * {@link LikeOutboxIntegrationTest} 가, 집계 수렴은 streamer Consumer 테스트가 책임진다.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class LikeFacadeIntegrationTest {
 
@@ -71,9 +78,9 @@ class LikeFacadeIntegrationTest {
     @Nested
     class Like {
 
-        @DisplayName("신규 Like 면, likes 행이 1개 생성되고 상품의 like_count 가 1 증가한다.")
+        @DisplayName("신규 Like 면, likes 행이 1개 생성된다.")
         @Test
-        void persistsLikeAndIncrementsCount_whenNew() {
+        void persistsLike_whenNew() {
             // given
             Long userId = 1L;
 
@@ -81,13 +88,10 @@ class LikeFacadeIntegrationTest {
             likeFacade.like(userId, productId);
 
             // then
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
-                () -> assertThat(loadLikeCount(productId)).isEqualTo(1L)
-            );
+            assertThat(likeJpaRepository.count()).isEqualTo(1L);
         }
 
-        @DisplayName("같은 (userId, productId) 로 두 번 호출해도, likes 행은 1개이고 like_count 도 1 이다 (멱등).")
+        @DisplayName("같은 (userId, productId) 로 두 번 호출해도, likes 행은 1개다 (멱등).")
         @Test
         void remainsIdempotent_whenSameUserLikesTwice() {
             // given
@@ -98,13 +102,10 @@ class LikeFacadeIntegrationTest {
             likeFacade.like(userId, productId);
 
             // then
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
-                () -> assertThat(loadLikeCount(productId)).isEqualTo(1L)
-            );
+            assertThat(likeJpaRepository.count()).isEqualTo(1L);
         }
 
-        @DisplayName("다른 두 사용자가 같은 상품에 좋아요를 누르면, likes 행은 2개이고 like_count 는 2 이다.")
+        @DisplayName("다른 두 사용자가 같은 상품에 좋아요를 누르면, likes 행은 2개다.")
         @Test
         void accumulatesIndependently_whenDifferentUsersLikeSameProduct() {
             // given
@@ -116,13 +117,10 @@ class LikeFacadeIntegrationTest {
             likeFacade.like(userB, productId);
 
             // then
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isEqualTo(2L),
-                () -> assertThat(loadLikeCount(productId)).isEqualTo(2L)
-            );
+            assertThat(likeJpaRepository.count()).isEqualTo(2L);
         }
 
-        @DisplayName("soft-deleted 된 상품에 좋아요를 누르면, PRODUCT_NOT_FOUND 예외가 발생하고 likes 와 like_count 가 변하지 않는다.")
+        @DisplayName("soft-deleted 된 상품에 좋아요를 누르면, PRODUCT_NOT_FOUND 예외가 발생하고 likes 가 변하지 않는다.")
         @Test
         void throwsProductNotFound_whenProductIsSoftDeleted() {
             // given
@@ -136,8 +134,7 @@ class LikeFacadeIntegrationTest {
             // then
             assertAll(
                 () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND),
-                () -> assertThat(likeJpaRepository.count()).isZero(),
-                () -> assertThat(loadLikeCount(productId)).isZero()
+                () -> assertThat(likeJpaRepository.count()).isZero()
             );
         }
     }
@@ -146,9 +143,9 @@ class LikeFacadeIntegrationTest {
     @Nested
     class Unlike {
 
-        @DisplayName("존재하는 Like 면, likes 행이 삭제되고 like_count 가 1 감소한다.")
+        @DisplayName("존재하는 Like 면, likes 행이 삭제된다.")
         @Test
-        void deletesLikeAndDecrementsCount_whenLikeExists() {
+        void deletesLike_whenLikeExists() {
             // given
             Long userId = 1L;
             likeFacade.like(userId, productId);
@@ -157,13 +154,10 @@ class LikeFacadeIntegrationTest {
             likeFacade.unlike(userId, productId);
 
             // then
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isZero(),
-                () -> assertThat(loadLikeCount(productId)).isZero()
-            );
+            assertThat(likeJpaRepository.count()).isZero();
         }
 
-        @DisplayName("존재하지 않는 Like 를 취소해도, like_count 가 변하지 않는다 (멱등).")
+        @DisplayName("존재하지 않는 Like 를 취소해도, likes 행이 변하지 않는다 (멱등).")
         @Test
         void remainsIdempotent_whenLikeDoesNotExist() {
             // given
@@ -173,13 +167,10 @@ class LikeFacadeIntegrationTest {
             likeFacade.unlike(userId, productId);
 
             // then
-            assertAll(
-                () -> assertThat(likeJpaRepository.count()).isZero(),
-                () -> assertThat(loadLikeCount(productId)).isZero()
-            );
+            assertThat(likeJpaRepository.count()).isZero();
         }
 
-        @DisplayName("soft-deleted 된 상품의 Like 를 취소하면, PRODUCT_NOT_FOUND 예외가 발생하고 likes 와 like_count 가 변하지 않는다.")
+        @DisplayName("soft-deleted 된 상품의 Like 를 취소하면, PRODUCT_NOT_FOUND 예외가 발생하고 likes 가 변하지 않는다.")
         @Test
         void throwsProductNotFound_whenProductIsSoftDeleted() {
             // given
@@ -194,8 +185,7 @@ class LikeFacadeIntegrationTest {
             // then
             assertAll(
                 () -> assertThat(exception.getErrorType()).isEqualTo(ErrorType.PRODUCT_NOT_FOUND),
-                () -> assertThat(likeJpaRepository.count()).isEqualTo(1L),
-                () -> assertThat(loadLikeCount(productId)).isEqualTo(1L)
+                () -> assertThat(likeJpaRepository.count()).isEqualTo(1L)
             );
         }
     }
@@ -323,10 +313,6 @@ class LikeFacadeIntegrationTest {
                 () -> assertThat(secondPage.get(0).id()).isEqualTo(firstId)
             );
         }
-    }
-
-    private long loadLikeCount(Long productId) {
-        return productJpaRepository.findById(productId).orElseThrow().getLikeCount();
     }
 
     private void softDelete(Long productId) {

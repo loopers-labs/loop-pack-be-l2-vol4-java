@@ -1,5 +1,8 @@
 package com.loopers.application.order;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.activity.UserActivityEvent;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.coupon.CouponService;
@@ -10,12 +13,16 @@ import com.loopers.domain.order.OrderLines;
 import com.loopers.domain.order.OrderPeriod;
 import com.loopers.domain.order.OrderResult;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.event.OrderPlacedEvent;
+import com.loopers.domain.outbox.OutboxEvent;
+import com.loopers.domain.outbox.OutboxEventRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,6 +44,9 @@ public class OrderFacade {
     private final OrderService orderService;
     private final StockService stockService;
     private final CouponService couponService;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo placeOrder(Long userId, OrderCommand.Place command) {
@@ -58,7 +69,24 @@ public class OrderFacade {
             .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
         stockService.decreaseAll(quantitiesByProductId);
 
-        return OrderInfo.from(result.order(), result.items());
+        OrderInfo orderInfo = OrderInfo.from(result.order(), result.items());
+        // 시스템 간 전파(판매량 집계): 주문 변경과 같은 TX 로 outbox 에 적재 → Relay 가 order-events 로 발행.
+        outboxEventRepository.append(toOutboxEvent(orderInfo.id(), result.items()));
+        // in-JVM 부가 로직(알림/행동로깅)은 그대로 ApplicationEvent 로 분리 유지.
+        eventPublisher.publishEvent(OrderPlacedEvent.of(orderInfo.id(), userId, orderInfo.finalAmount()));
+        eventPublisher.publishEvent(UserActivityEvent.of(userId, UserActivityEvent.Type.ORDER_PLACED, orderInfo.id()));
+        return orderInfo;
+    }
+
+    private OutboxEvent toOutboxEvent(Long orderId, List<OrderItem> items) {
+        try {
+            String eventId = UUID.randomUUID().toString();
+            String payload = objectMapper.writeValueAsString(OrderPlacedMessage.of(orderId, items));
+            // aggregateType=Order → order-events 토픽, aggregateId=orderId → 주문당 이벤트 1건.
+            return OutboxEvent.of("Order", orderId, "ORDER_PLACED", eventId, payload);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("주문 outbox payload 직렬화 실패 (orderId=" + orderId + ")", e);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -17,7 +17,8 @@ public class CouponAdminV1Dto {
         CouponType type,
         long value,
         Long minOrderAmount,
-        LocalDateTime expiredAt
+        LocalDateTime expiredAt,
+        Long maxIssueCount
     ) {}
 
     public record UpdateRequest(
@@ -33,6 +34,7 @@ public class CouponAdminV1Dto {
         long value,
         Long minOrderAmount,
         ZonedDateTime expiredAt,
+        Long maxIssueCount,
         ZonedDateTime deletedAt
     ) {
         public static Response from(CouponAdminInfo info) {
@@ -43,6 +45,7 @@ public class CouponAdminV1Dto {
                 info.value(),
                 info.minOrderAmount(),
                 info.expiredAt(),
+                info.maxIssueCount(),
                 info.deletedAt()
             );
         }

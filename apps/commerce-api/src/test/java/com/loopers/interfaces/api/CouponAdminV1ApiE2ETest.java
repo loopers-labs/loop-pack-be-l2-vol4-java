@@ -72,12 +72,12 @@ class CouponAdminV1ApiE2ETest {
     @Nested
     class CreatePolicy {
 
-        @DisplayName("유효한 요청이면, 200 과 신규 쿠폰 정책 정보(deletedAt=null)를 반환한다.")
+        @DisplayName("선착순 한도를 담은 유효한 요청이면, 200 과 함께 한도가 반영된 신규 쿠폰 정책 정보(deletedAt=null)를 반환한다.")
         @Test
         void returnsCreatedPolicy_whenRequestIsValid() {
             // given
             CouponAdminV1Dto.CreateRequest request =
-                new CouponAdminV1Dto.CreateRequest("신규 쿠폰", CouponType.FIXED, 5_000L, 10_000L, EXPIRED_AT_LOCAL);
+                new CouponAdminV1Dto.CreateRequest("신규 쿠폰", CouponType.FIXED, 5_000L, 10_000L, EXPIRED_AT_LOCAL, 100L);
 
             // when
             ParameterizedTypeReference<ApiResponse<CouponAdminV1Dto.Response>> responseType = new ParameterizedTypeReference<>() {};
@@ -95,6 +95,7 @@ class CouponAdminV1ApiE2ETest {
                 () -> assertThat(data.type()).isEqualTo(CouponType.FIXED),
                 () -> assertThat(data.value()).isEqualTo(5_000L),
                 () -> assertThat(data.minOrderAmount()).isEqualTo(10_000L),
+                () -> assertThat(data.maxIssueCount()).isEqualTo(100L),
                 () -> assertThat(data.deletedAt()).isNull()
             );
         }
@@ -135,7 +136,7 @@ class CouponAdminV1ApiE2ETest {
         void returnsBadRequest_whenRateValueExceedsHundred() {
             // given
             CouponAdminV1Dto.CreateRequest request =
-                new CouponAdminV1Dto.CreateRequest("이상한 쿠폰", CouponType.RATE, 101L, null, EXPIRED_AT_LOCAL);
+                new CouponAdminV1Dto.CreateRequest("이상한 쿠폰", CouponType.RATE, 101L, null, EXPIRED_AT_LOCAL, null);
 
             // when
             ParameterizedTypeReference<ApiResponse<CouponAdminV1Dto.Response>> responseType = new ParameterizedTypeReference<>() {};

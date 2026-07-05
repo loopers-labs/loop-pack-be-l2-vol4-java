@@ -12,6 +12,7 @@ public record CouponAdminInfo(
     long value,
     Long minOrderAmount,
     ZonedDateTime expiredAt,
+    Long maxIssueCount,
     ZonedDateTime createdAt,
     ZonedDateTime updatedAt,
     ZonedDateTime deletedAt
@@ -24,6 +25,7 @@ public record CouponAdminInfo(
             policy.getValue(),
             policy.getMinOrderAmount(),
             policy.getExpiredAt(),
+            policy.getMaxIssueCount(),
             policy.getCreatedAt(),
             policy.getUpdatedAt(),
             policy.getDeletedAt()

@@ -4,7 +4,13 @@ import com.loopers.domain.coupon.CouponDisplayStatus;
 import com.loopers.domain.coupon.CouponPolicy;
 import com.loopers.domain.coupon.CouponPolicyRepository;
 import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.CouponIssueRequest;
+import com.loopers.domain.coupon.CouponIssueRequestRepository;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.outbox.OutboxEvent;
+import com.loopers.domain.outbox.OutboxEventRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -32,6 +38,9 @@ class CouponFacadeIntegrationTest {
     private final CouponFacade couponFacade;
     private final CouponService couponService;
     private final CouponPolicyRepository couponPolicyRepository;
+    private final CouponIssueRequestRepository couponIssueRequestRepository;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -39,11 +48,17 @@ class CouponFacadeIntegrationTest {
         CouponFacade couponFacade,
         CouponService couponService,
         CouponPolicyRepository couponPolicyRepository,
+        CouponIssueRequestRepository couponIssueRequestRepository,
+        OutboxEventRepository outboxEventRepository,
+        ObjectMapper objectMapper,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.couponFacade = couponFacade;
         this.couponService = couponService;
         this.couponPolicyRepository = couponPolicyRepository;
+        this.couponIssueRequestRepository = couponIssueRequestRepository;
+        this.outboxEventRepository = outboxEventRepository;
+        this.objectMapper = objectMapper;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -117,7 +132,7 @@ class CouponFacadeIntegrationTest {
     @Nested
     class CreatePolicy {
 
-        @DisplayName("생성하면, 입력값과 생성 일시가 담긴 CouponAdminInfo 를 반환하고 삭제 일시는 null 이다.")
+        @DisplayName("한도 없이 생성하면, 입력값과 생성 일시가 담긴 CouponAdminInfo 를 반환하고 한도·삭제 일시는 null 이다.")
         @Test
         void returnsAdminInfo_whenCreated() {
             // when
@@ -131,8 +146,24 @@ class CouponFacadeIntegrationTest {
                 () -> assertThat(info.value()).isEqualTo(10L),
                 () -> assertThat(info.minOrderAmount()).isEqualTo(20_000L),
                 () -> assertThat(info.expiredAt()).isEqualTo(EXPIRED_AT),
+                () -> assertThat(info.maxIssueCount()).isNull(),
                 () -> assertThat(info.createdAt()).isNotNull(),
                 () -> assertThat(info.deletedAt()).isNull()
+            );
+        }
+
+        @DisplayName("선착순 한도를 지정해 생성하면, 한도가 coupon_policy 에 저장되고 누적 발급수는 0 에서 시작한다.")
+        @Test
+        void persistsMaxIssueCount_whenCreatedWithLimit() {
+            // when
+            CouponAdminInfo info = couponFacade.createPolicy("선착순 100명 쿠폰", CouponType.FIXED, 3_000L, 10_000L, EXPIRED_AT, 100L);
+
+            // then
+            CouponPolicy saved = couponPolicyRepository.findById(info.id()).orElseThrow();
+            assertAll(
+                () -> assertThat(info.maxIssueCount()).isEqualTo(100L),
+                () -> assertThat(saved.getMaxIssueCount()).isEqualTo(100L),
+                () -> assertThat(saved.getIssuedCount()).isEqualTo(0L)
             );
         }
     }
@@ -255,6 +286,110 @@ class CouponFacadeIntegrationTest {
                         tuple(usedForUser2.id(), 2L, CouponDisplayStatus.USED)
                     )
             );
+        }
+    }
+
+    @DisplayName("선착순 발급을 요청할 때, ")
+    @Nested
+    class RequestIssue {
+
+        @DisplayName("요청을 PENDING 으로 저장하고, coupon-issue-requests 용 outbox 이벤트(aggregateId=정책ID, ECST 스냅샷)를 같은 트랜잭션으로 적재한다.")
+        @Test
+        void savesPendingRequest_andAppendsEcstOutboxEvent() throws Exception {
+            // given
+            Long userId = 1L;
+            CouponPolicy policy = savedPolicy();   // FIXED 3000, minOrder 10000
+
+            // when
+            CouponIssueRequestInfo info = couponFacade.requestIssue(userId, policy.getId());
+
+            // then
+            CouponIssueRequest saved = couponIssueRequestRepository.findById(info.requestId()).orElseThrow();
+            List<OutboxEvent> unpublished = outboxEventRepository.findUnpublished(10);
+            assertThat(unpublished).hasSize(1);
+            OutboxEvent event = unpublished.get(0);
+            CouponIssueRequestMessage payload = objectMapper.readValue(event.getPayload(), CouponIssueRequestMessage.class);
+
+            assertAll(
+                () -> assertThat(info.status()).isEqualTo(CouponIssueRequestStatus.PENDING),
+                () -> assertThat(saved.getStatus()).isEqualTo(CouponIssueRequestStatus.PENDING),
+                () -> assertThat(saved.getUserId()).isEqualTo(userId),
+                () -> assertThat(saved.getCouponPolicyId()).isEqualTo(policy.getId()),
+                () -> assertThat(event.getAggregateType()).isEqualTo("Coupon"),
+                () -> assertThat(event.getAggregateId()).isEqualTo(policy.getId()),
+                () -> assertThat(event.getEventType()).isEqualTo("COUPON_ISSUE_REQUESTED"),
+                () -> assertThat(event.isPublished()).isFalse(),
+                () -> assertThat(payload.requestId()).isEqualTo(info.requestId()),
+                () -> assertThat(payload.userId()).isEqualTo(userId),
+                () -> assertThat(payload.couponPolicyId()).isEqualTo(policy.getId()),
+                () -> assertThat(payload.type()).isEqualTo(CouponType.FIXED),
+                () -> assertThat(payload.discountValue()).isEqualTo(3_000L),
+                () -> assertThat(payload.minOrderAmount()).isEqualTo(10_000L),
+                () -> assertThat(payload.expiredAt().toInstant()).isEqualTo(policy.getExpiredAt().toInstant())
+            );
+        }
+
+        @DisplayName("존재하지 않는 정책으로 요청하면, COUPON_POLICY_NOT_FOUND 로 차단되고 outbox 에 아무것도 적재되지 않는다.")
+        @Test
+        void blocksAndAppendsNothing_whenPolicyNotFound() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponFacade.requestIssue(1L, 999L));
+
+            // then
+            assertAll(
+                () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_POLICY_NOT_FOUND),
+                () -> assertThat(outboxEventRepository.findUnpublished(10)).isEmpty()
+            );
+        }
+    }
+
+    @DisplayName("발급 요청 상태를 조회할 때, ")
+    @Nested
+    class GetIssueRequest {
+
+        @DisplayName("본인 요청을 조회하면, 현재 상태(PENDING)를 반환한다.")
+        @Test
+        void returnsStatus_whenOwnerQueries() {
+            // given
+            Long userId = 1L;
+            CouponPolicy policy = savedPolicy();
+            CouponIssueRequestInfo requested = couponFacade.requestIssue(userId, policy.getId());
+
+            // when
+            CouponIssueRequestInfo found = couponFacade.getIssueRequest(userId, requested.requestId());
+
+            // then
+            assertAll(
+                () -> assertThat(found.requestId()).isEqualTo(requested.requestId()),
+                () -> assertThat(found.status()).isEqualTo(CouponIssueRequestStatus.PENDING)
+            );
+        }
+
+        @DisplayName("다른 사용자의 요청을 조회하면, 존재를 노출하지 않고 COUPON_ISSUE_REQUEST_NOT_FOUND 로 막힌다.")
+        @Test
+        void throwsNotFound_whenOtherUserQueries() {
+            // given
+            CouponPolicy policy = savedPolicy();
+            CouponIssueRequestInfo requested = couponFacade.requestIssue(1L, policy.getId());
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponFacade.getIssueRequest(2L, requested.requestId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_ISSUE_REQUEST_NOT_FOUND);
+        }
+
+        @DisplayName("존재하지 않는 requestId 를 조회하면, COUPON_ISSUE_REQUEST_NOT_FOUND 가 발생한다.")
+        @Test
+        void throwsNotFound_whenRequestNotExist() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                () -> couponFacade.getIssueRequest(1L, 999L));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.COUPON_ISSUE_REQUEST_NOT_FOUND);
         }
     }
 }

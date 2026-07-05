@@ -6,6 +6,7 @@ import com.loopers.support.error.ErrorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "stock")
@@ -16,6 +17,14 @@ public class StockModel extends BaseEntity {
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
+
+    /**
+     * 수정마다 단조 증가하는 낙관적 락 버전. 재고 변경 이벤트에 실어 보내면,
+     * 소비자(streamer)가 순서역전·재전송 시 "더 큰 version 만 반영" 하는 최신성 가드의 기준이 된다.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     protected StockModel() {}
 
@@ -69,5 +78,9 @@ public class StockModel extends BaseEntity {
 
     public Integer getQuantity() {
         return quantity;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

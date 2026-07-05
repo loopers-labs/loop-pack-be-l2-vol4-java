@@ -9,7 +9,8 @@ public interface CouponAdminV1ApiSpec {
 
     @Operation(
         summary = "쿠폰 정책 등록",
-        description = "신규 쿠폰 정책(템플릿)을 등록합니다. 할인 값이 타입 규칙에 맞지 않으면 400 INVALID_COUPON_VALUE 를 반환합니다."
+        description = "신규 쿠폰 정책(템플릿)을 등록합니다. maxIssueCount 로 선착순 발급 한도를 지정하며, 미지정(null) 시 무제한입니다. "
+            + "할인 값이 타입 규칙에 맞지 않으면 400 INVALID_COUPON_VALUE, 한도가 1 미만이면 400 BAD_REQUEST 를 반환합니다."
     )
     ApiResponse<CouponAdminV1Dto.Response> createPolicy(CouponAdminV1Dto.CreateRequest request);
 

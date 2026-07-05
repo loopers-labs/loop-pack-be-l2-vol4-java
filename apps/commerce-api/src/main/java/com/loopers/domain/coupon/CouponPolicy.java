@@ -31,9 +31,20 @@ public class CouponPolicy extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private ZonedDateTime expiredAt;
 
+    @Column(name = "max_issue_count")
+    private Long maxIssueCount;
+
+    @Column(name = "issued_count", nullable = false)
+    private long issuedCount;
+
     protected CouponPolicy() {}
 
     public CouponPolicy(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+        this(name, type, value, minOrderAmount, expiredAt, null);
+    }
+
+    public CouponPolicy(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt,
+                        Long maxIssueCount) {
         validateName(name);
         if (type == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 타입은 비어있을 수 없습니다.");
@@ -41,11 +52,14 @@ public class CouponPolicy extends BaseEntity {
         type.validateValue(value);
         validateMinOrderAmount(minOrderAmount);
         validateExpiredAt(expiredAt);
+        validateMaxIssueCount(maxIssueCount);
         this.name = name;
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+        this.maxIssueCount = maxIssueCount;
+        this.issuedCount = 0L;
     }
 
     /**
@@ -79,6 +93,12 @@ public class CouponPolicy extends BaseEntity {
         }
     }
 
+    private static void validateMaxIssueCount(Long maxIssueCount) {
+        if (maxIssueCount != null && maxIssueCount < 1) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "발급 수량 한도는 1 이상이어야 합니다.");
+        }
+    }
+
     public boolean isExpired(ZonedDateTime now) {
         return now.isAfter(expiredAt);
     }
@@ -101,5 +121,13 @@ public class CouponPolicy extends BaseEntity {
 
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public Long getMaxIssueCount() {
+        return maxIssueCount;
+    }
+
+    public long getIssuedCount() {
+        return issuedCount;
     }
 }

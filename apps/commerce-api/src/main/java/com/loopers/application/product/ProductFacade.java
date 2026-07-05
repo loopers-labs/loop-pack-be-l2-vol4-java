@@ -7,11 +7,13 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
+import com.loopers.domain.stock.event.StockChangedEvent;
 import com.loopers.support.cache.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -29,6 +31,7 @@ public class ProductFacade {
     private final ProductService productService;
     private final StockService stockService;
     private final BrandService brandService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 신규 상품은 목록을 불완전하게 만든다 → 목록 캐시 전체 evict (상세는 아직 캐시 없음). admin 작업이라 빈도 낮아 비용 작음.
     @CacheEvict(cacheNames = CacheConfig.PRODUCT_LIST_CACHE, allEntries = true)
@@ -101,6 +104,7 @@ public class ProductFacade {
         ProductModel product = productService.updateProduct(id, name, description, price);
         StockModel stockModel = stockService.getByProductId(id);
         stockModel.changeTo(stock);
+        eventPublisher.publishEvent(StockChangedEvent.of(id, stockModel.getQuantity(), stockModel.getVersion()));
         BrandModel brand = brandService.getBrand(product.getBrandId());
         return ProductAdminInfo.from(product, stockModel, brand);
     }
