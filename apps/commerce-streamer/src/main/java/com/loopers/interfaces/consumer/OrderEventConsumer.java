@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.listener.BatchListenerFailedException;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
@@ -23,15 +24,14 @@ public class OrderEventConsumer {
 
     @KafkaListener(topics = "order-events", groupId = "product-metrics", containerFactory = KafkaConfig.BATCH_LISTENER)
     public void consume(List<ConsumerRecord<String, byte[]>> records, Acknowledgment ack) {
-        for (ConsumerRecord<String, byte[]> record : records) {
-            OrderEventMessage msg;
+        for (int i = 0; i < records.size(); i++) {
+            ConsumerRecord<String, byte[]> record = records.get(i);
             try {
-                msg = objectMapper.readValue(record.value(), OrderEventMessage.class);
+                OrderEventMessage msg = objectMapper.readValue(record.value(), OrderEventMessage.class);
+                metricsProcessor.handleOrder(msg); // 처리 실패는 전파 → 재시도(멱등 재처리) → 소진 시 DLT
             } catch (Exception e) {
-                log.error("order-events 파싱 실패(skip) offset={}", record.offset(), e); // poison: skip
-                continue;
+                throw new BatchListenerFailedException("order-events 처리 실패 offset=" + record.offset(), e, i);
             }
-            metricsProcessor.handleOrder(msg); // 처리 실패는 전파 → 배치 미-ack → 재전달(멱등 재처리)
         }
         ack.acknowledge();
     }

@@ -1,7 +1,12 @@
 package com.loopers.confg.kafka;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -10,8 +15,11 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter;
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,10 +59,36 @@ public class KafkaConfig {
         return new ByteArrayJsonMessageConverter(objectMapper);
     }
 
+    // DLT 발행 전용 템플릿 — consumer 는 key=String, value=byte[] 로 소비하므로 원본 바이트를 그대로 실어 나른다.
+    @Bean
+    public KafkaTemplate<Object, Object> dltKafkaTemplate(KafkaProperties kafkaProperties) {
+        Map<String, Object> config = new HashMap<>(kafkaProperties.buildProducerProperties());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+        config.put(ProducerConfig.ACKS_CONFIG, "all");
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));
+    }
+
+    // 재시도(backoff 1s×5) 소진 시 <원본토픽>.DLT 로 격리 — 무손실 + 본류 파티션 비블로킹.
+    // partition = -1 로 두어 DLT 파티션 수와 무관하게 브로커가 배치하게 한다.
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<Object, Object> dltKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+            dltKafkaTemplate,
+            (record, ex) -> new TopicPartition(record.topic() + ".DLT", -1));
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 5L));
+        // 파싱 불가(독약)는 재시도해도 영영 실패 → 재시도 없이 즉시 DLT 격리(파티션 head-of-line 블로킹 최소화).
+        // 일시적 처리 실패(DB 등)만 backoff 1s×5 재시도 후 DLT 로 보낸다.
+        handler.addNotRetryableExceptions(JsonProcessingException.class);
+        return handler;
+    }
+
     @Bean(name = BATCH_LISTENER)
     public ConcurrentKafkaListenerContainerFactory<Object, Object> defaultBatchListenerContainerFactory(
             KafkaProperties kafkaProperties,
-            ByteArrayJsonMessageConverter converter
+            ByteArrayJsonMessageConverter converter,
+            DefaultErrorHandler kafkaErrorHandler
     ) {
         Map<String, Object> consumerConfig = new HashMap<>(kafkaProperties.buildConsumerProperties());
         consumerConfig.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE);
@@ -70,9 +104,7 @@ public class KafkaConfig {
         factory.setBatchMessageConverter(new BatchMessagingMessageConverter(converter));
         factory.setConcurrency(3);
         factory.setBatchListener(true);
-        factory.setCommonErrorHandler(
-            new org.springframework.kafka.listener.DefaultErrorHandler(
-                new org.springframework.util.backoff.FixedBackOff(1000L, 5L))); // 1s 간격 5회 재시도 후 recover(로그) — 일시 장애 복구, 지속 실패 DLQ는 후속
+        factory.setCommonErrorHandler(kafkaErrorHandler); // 1s×5 재시도 후 <topic>.DLT 격리 발행
         return factory;
     }
 }
