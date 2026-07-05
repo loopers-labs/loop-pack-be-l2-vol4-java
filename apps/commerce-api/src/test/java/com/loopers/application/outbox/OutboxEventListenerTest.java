@@ -3,6 +3,7 @@ package com.loopers.application.outbox;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.like.event.LikeAdded;
 import com.loopers.domain.order.event.OrderPlaced;
+import com.loopers.domain.product.event.ProductViewed;
 import com.loopers.domain.outbox.OutboxEvent;
 import com.loopers.domain.outbox.OutboxEventRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +35,20 @@ class OutboxEventListenerTest {
         assertThat(row.getMessageKey()).isEqualTo("100");
         assertThat(row.getEventType()).isEqualTo("LikeAdded");
         assertThat(row.getPayload()).contains("\"likeCount\":5").contains("\"version\":3");
+    }
+
+    @DisplayName("ProductViewed → catalog-events outbox row(key=productId, type=ProductViewed).")
+    @Test
+    void writesCatalogOutboxOnProductViewed() {
+        listener.on(new ProductViewed(100L, null, ZonedDateTime.now()));
+
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(captor.capture());
+        OutboxEvent row = captor.getValue();
+        assertThat(row.getTopic()).isEqualTo("catalog-events");
+        assertThat(row.getMessageKey()).isEqualTo("100");
+        assertThat(row.getEventType()).isEqualTo("ProductViewed");
+        assertThat(row.getPayload()).contains("\"type\":\"ProductViewed\"");
     }
 
     @DisplayName("OrderPlaced → order-events outbox row(key=orderId, payload에 lines).")
