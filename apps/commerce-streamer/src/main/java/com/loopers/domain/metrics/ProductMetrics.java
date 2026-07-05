@@ -17,6 +17,8 @@ public class ProductMetrics extends BaseEntity {
     private long likeCount;
     @Column(name = "sales_count", nullable = false)
     private long salesCount;
+    @Column(name = "view_count", nullable = false)
+    private long viewCount;
     @Column(name = "like_version", nullable = false)
     private long likeVersion;
 
@@ -25,5 +27,6 @@ public class ProductMetrics extends BaseEntity {
     public Long getProductId() { return productId; }
     public long getLikeCount() { return likeCount; }
     public long getSalesCount() { return salesCount; }
+    public long getViewCount() { return viewCount; }
     public long getLikeVersion() { return likeVersion; }
 }

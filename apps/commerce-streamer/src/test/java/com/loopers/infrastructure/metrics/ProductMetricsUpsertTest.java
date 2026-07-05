@@ -49,4 +49,16 @@ class ProductMetricsUpsertTest {
 
         assertThat(repository.find(1L).orElseThrow().getSalesCount()).isEqualTo(5L);
     }
+
+    @DisplayName("addView 는 1씩 누적하고 다른 지표는 건드리지 않는다.")
+    @Test
+    void addViewAccumulates() {
+        repository.applyLike(1L, 10L, 5L);
+        repository.addView(1L);
+        repository.addView(1L);
+
+        ProductMetrics m = repository.find(1L).orElseThrow();
+        assertThat(m.getViewCount()).isEqualTo(2L);
+        assertThat(m.getLikeCount()).isEqualTo(10L);
+    }
 }

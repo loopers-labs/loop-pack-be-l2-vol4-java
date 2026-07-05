@@ -24,6 +24,11 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     }
 
     @Override
+    public void addView(Long productId) {
+        jpaRepository.addView(productId);
+    }
+
+    @Override
     public Optional<ProductMetrics> find(Long productId) {
         return jpaRepository.findByProductId(productId);
     }

@@ -20,7 +20,11 @@ public class MetricsProcessor {
         if (eventHandledRepository.existsByEventId(msg.eventId())) {
             return; // 멱등
         }
-        metricsRepository.applyLike(msg.productId(), msg.likeCount(), msg.version());
+        if ("ProductViewed".equals(msg.type())) {
+            metricsRepository.addView(msg.productId()); // 누적 — 중복은 event_handled 가 차단
+        } else {
+            metricsRepository.applyLike(msg.productId(), msg.likeCount(), msg.version());
+        }
         record(msg.eventId());
     }
 

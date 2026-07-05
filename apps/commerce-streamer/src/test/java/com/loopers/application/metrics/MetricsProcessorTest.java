@@ -36,6 +36,25 @@ class MetricsProcessorTest {
             org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong());
     }
 
+    @DisplayName("ProductViewed 이벤트면 addView + event_handled 기록 (applyLike 아님).")
+    @Test
+    void handlesProductViewed() {
+        when(eventHandledRepository.existsByEventId("evt-v1")).thenReturn(false);
+        processor.handleCatalog(new CatalogEventMessage("evt-v1", "ProductViewed", 100L, 0L, 0L, "t"));
+        verify(metricsRepository).addView(100L);
+        verify(metricsRepository, never()).applyLike(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong());
+        verify(eventHandledRepository).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @DisplayName("이미 처리한 ProductViewed 면 addView 하지 않는다(멱등).")
+    @Test
+    void skipsDuplicateProductViewed() {
+        when(eventHandledRepository.existsByEventId("evt-v1")).thenReturn(true);
+        processor.handleCatalog(new CatalogEventMessage("evt-v1", "ProductViewed", 100L, 0L, 0L, "t"));
+        verify(metricsRepository, never()).addView(org.mockito.ArgumentMatchers.anyLong());
+    }
+
     @DisplayName("order 이벤트면 라인별 addSales.")
     @Test
     void handlesOrderLines() {

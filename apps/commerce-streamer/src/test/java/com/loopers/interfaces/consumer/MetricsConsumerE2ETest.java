@@ -51,6 +51,20 @@ class MetricsConsumerE2ETest {
         });
     }
 
+    @DisplayName("catalog-events(ProductViewed)를 발행하면 product_metrics.view_count 가 반영되고, 같은 eventId 재전달은 멱등이다.")
+    @Test
+    void viewMetricAppliedIdempotently() {
+        String payload = "{\"eventId\":\"v1\",\"type\":\"ProductViewed\",\"productId\":200,"
+            + "\"likeCount\":0,\"version\":0,\"occurredAt\":\"2026-07-02T00:00:00Z\"}";
+
+        // 같은 eventId 를 소비될 때까지 재발행 — event_handled 멱등 덕분에 view_count 는 1에 고정되어야 한다.
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+            publish("catalog-events", "200", payload);
+            assertThat(metricsRepository.find(200L)).isPresent()
+                .get().extracting(m -> m.getViewCount()).isEqualTo(1L);
+        });
+    }
+
     private void publish(String topic, String key, String value) {
         Properties p = new Properties();
         p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaTestContainersConfig.getBootstrapServers());
