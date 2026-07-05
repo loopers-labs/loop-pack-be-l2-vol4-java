@@ -47,6 +47,7 @@ class CouponTemplateTest {
             type,
             value,
             minOrderAmount,
+            null,
             1,
             ZonedDateTime.now().plusDays(1)
         );

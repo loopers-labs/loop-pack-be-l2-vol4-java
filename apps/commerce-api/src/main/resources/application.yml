@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
@@ -45,9 +46,12 @@ commerce:
       initial-delay-ms: 5000
       fixed-delay-ms: 5000
     event-relay:
-      enabled: false
+      enabled: ${COMMERCE_EVENT_RELAY_ENABLED:false}
       initial-delay-ms: 5000
       fixed-delay-ms: 5000
+  consumers:
+    coupon-issue:
+      enabled: ${COMMERCE_COUPON_ISSUE_CONSUMER_ENABLED:false}
 
 ---
 spring:

@@ -105,6 +105,7 @@ public class CouponAdminController {
             request.type(),
             request.value(),
             request.minOrderAmount(),
+            request.totalIssueLimit(),
             request.maxIssuesPerUser(),
             request.expiredAt()
         );
@@ -116,6 +117,7 @@ public class CouponAdminController {
             request.type(),
             request.value(),
             request.minOrderAmount(),
+            request.totalIssueLimit(),
             request.maxIssuesPerUser(),
             request.expiredAt()
         );

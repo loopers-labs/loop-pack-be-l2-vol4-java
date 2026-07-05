@@ -9,8 +9,8 @@ import com.loopers.domain.catalog.product.ProductSearchCondition;
 import com.loopers.domain.catalog.product.StockService;
 import com.loopers.application.coupon.CouponUseService;
 import com.loopers.application.event.order.OrderEventPublisher;
-import com.loopers.domain.event.outbox.OrderEventOutbox;
-import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
+import com.loopers.domain.event.outbox.EventOutbox;
+import com.loopers.domain.event.outbox.EventOutboxRepository;
 import com.loopers.application.ordering.order.OrderCommand;
 import com.loopers.application.ordering.order.OrderCommandService;
 import com.loopers.domain.ordering.order.Order;
@@ -65,7 +65,7 @@ class PaymentServiceTest {
                 () -> assertThat(product.getStockQuantity()).isEqualTo(8),
                 () -> assertThat(fixture.orderEventOutboxRepository.outboxes).hasSize(1),
                 () -> assertThat(fixture.orderEventOutboxRepository.outboxes.get(0).getEventType())
-                    .isEqualTo(OrderEventOutbox.ORDER_PAID)
+                    .isEqualTo(EventOutbox.EVENT_ORDER_PAID)
             );
         }
 
@@ -208,19 +208,19 @@ class PaymentServiceTest {
         }
     }
 
-    private static class FakeOrderEventOutboxRepository implements OrderEventOutboxRepository {
-        private final List<OrderEventOutbox> outboxes = new ArrayList<>();
+    private static class FakeOrderEventOutboxRepository implements EventOutboxRepository {
+        private final List<EventOutbox> outboxes = new ArrayList<>();
 
         @Override
-        public OrderEventOutbox save(OrderEventOutbox outbox) {
+        public EventOutbox save(EventOutbox outbox) {
             outboxes.add(outbox);
             return outbox;
         }
 
         @Override
-        public List<OrderEventOutbox> findPendingEvents() {
+        public List<EventOutbox> findPendingEvents(int limit) {
             return outboxes.stream()
-                .filter(OrderEventOutbox::isPending)
+                .filter(EventOutbox::isPending)
                 .toList();
         }
     }

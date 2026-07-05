@@ -25,14 +25,26 @@ public class CouponV1Controller {
     private final CouponQueryService couponQueryService;
 
     @PostMapping("/coupons/{couponId}/issue")
-    public ApiResponse<CouponV1Dto.IssuedCouponResponse> issueCoupon(
+    public ApiResponse<CouponV1Dto.CouponIssueRequestResponse> issueCoupon(
         @RequestHeader(HeaderValidator.LOGIN_ID) String loginId,
         @RequestHeader(HeaderValidator.LOGIN_PW) String loginPw,
         @PathVariable Long couponId
     ) {
         HeaderValidator.validateUser(loginId, loginPw);
-        return ApiResponse.success(CouponV1Dto.IssuedCouponResponse.from(
-            couponCommandService.issue(couponId, loginId)
+        return ApiResponse.success(CouponV1Dto.CouponIssueRequestResponse.from(
+            couponCommandService.requestIssue(couponId, loginId)
+        ));
+    }
+
+    @GetMapping("/coupons/issues/{requestId}")
+    public ApiResponse<CouponV1Dto.CouponIssueRequestResponse> getIssueRequest(
+        @RequestHeader(HeaderValidator.LOGIN_ID) String loginId,
+        @RequestHeader(HeaderValidator.LOGIN_PW) String loginPw,
+        @PathVariable Long requestId
+    ) {
+        HeaderValidator.validateUser(loginId, loginPw);
+        return ApiResponse.success(CouponV1Dto.CouponIssueRequestResponse.from(
+            couponQueryService.getMyIssueRequest(requestId, loginId)
         ));
     }
 

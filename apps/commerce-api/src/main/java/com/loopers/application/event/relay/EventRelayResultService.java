@@ -1,7 +1,7 @@
 package com.loopers.application.event.relay;
 
-import com.loopers.domain.event.outbox.OrderEventOutbox;
-import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
+import com.loopers.domain.event.outbox.EventOutbox;
+import com.loopers.domain.event.outbox.EventOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,23 +12,23 @@ public class EventRelayResultService {
 
     private static final int MAX_RETRY_COUNT = 3;
 
-    private final OrderEventOutboxRepository orderEventOutboxRepository;
+    private final EventOutboxRepository eventOutboxRepository;
 
     @Transactional
-    public EventRelayWorker.RelayResult markSent(OrderEventOutbox outbox) {
+    public EventRelayWorker.RelayResult markSent(EventOutbox outbox) {
         outbox.markSent();
-        orderEventOutboxRepository.save(outbox);
-        return EventRelayWorker.RelayResult.sent(outbox.getOrderId());
+        eventOutboxRepository.save(outbox);
+        return EventRelayWorker.RelayResult.sent(outbox.getAggregateId());
     }
 
     @Transactional
-    public EventRelayWorker.RelayResult recordFailure(OrderEventOutbox outbox) {
+    public EventRelayWorker.RelayResult recordFailure(EventOutbox outbox) {
         outbox.recordFailure(MAX_RETRY_COUNT);
-        orderEventOutboxRepository.save(outbox);
+        eventOutboxRepository.save(outbox);
         if (outbox.isPending()) {
-            return EventRelayWorker.RelayResult.retry(outbox.getOrderId());
+            return EventRelayWorker.RelayResult.retry(outbox.getAggregateId());
         }
 
-        return EventRelayWorker.RelayResult.failed(outbox.getOrderId());
+        return EventRelayWorker.RelayResult.failed(outbox.getAggregateId());
     }
 }

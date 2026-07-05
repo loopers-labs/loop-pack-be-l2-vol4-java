@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.loopers.application.event.order.OrderEventPublisher;
 import com.loopers.application.ordering.order.OrderCommandService;
-import com.loopers.domain.event.outbox.OrderEventOutbox;
-import com.loopers.domain.event.outbox.OrderEventOutboxRepository;
+import com.loopers.domain.event.outbox.EventOutbox;
+import com.loopers.domain.event.outbox.EventOutboxRepository;
 import com.loopers.domain.ordering.order.Order;
 import com.loopers.domain.ordering.order.OrderLine;
 import com.loopers.domain.ordering.order.OrderStatus;
@@ -112,7 +112,7 @@ class PaymentFacadeTest {
             () -> assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID),
             () -> assertThat(fixture.orderEventOutboxRepository.outboxes).hasSize(1),
             () -> assertThat(fixture.orderEventOutboxRepository.outboxes.get(0).getEventType())
-                .isEqualTo(OrderEventOutbox.ORDER_PAID)
+                .isEqualTo(EventOutbox.EVENT_ORDER_PAID)
         );
     }
 
@@ -214,19 +214,19 @@ class PaymentFacadeTest {
         }
     }
 
-    private static class FakeOrderEventOutboxRepository implements OrderEventOutboxRepository {
-        private final List<OrderEventOutbox> outboxes = new java.util.ArrayList<>();
+    private static class FakeOrderEventOutboxRepository implements EventOutboxRepository {
+        private final List<EventOutbox> outboxes = new java.util.ArrayList<>();
 
         @Override
-        public OrderEventOutbox save(OrderEventOutbox outbox) {
+        public EventOutbox save(EventOutbox outbox) {
             outboxes.add(outbox);
             return outbox;
         }
 
         @Override
-        public List<OrderEventOutbox> findPendingEvents() {
+        public List<EventOutbox> findPendingEvents(int limit) {
             return outboxes.stream()
-                .filter(OrderEventOutbox::isPending)
+                .filter(EventOutbox::isPending)
                 .toList();
         }
     }

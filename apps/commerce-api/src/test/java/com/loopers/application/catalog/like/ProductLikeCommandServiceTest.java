@@ -16,6 +16,7 @@ import com.loopers.support.pagination.PageResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,7 +53,16 @@ class ProductLikeCommandServiceTest {
                 () -> assertThat(product.getLikeCount()).isEqualTo(1L),
                 () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isTrue(),
                 () -> assertThat(fixture.productCacheRepository.evictedDetailProductIds).containsExactly(1L),
-                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(1)
+                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(1),
+                () -> assertThat(fixture.applicationEventPublisher.events)
+                    .singleElement()
+                    .satisfies(event -> {
+                        ProductLikeChangedApplicationEvent changedEvent = (ProductLikeChangedApplicationEvent) event;
+                        assertThat(changedEvent.productId()).isEqualTo(1L);
+                        assertThat(changedEvent.userId()).isEqualTo("user1");
+                        assertThat(changedEvent.liked()).isTrue();
+                        assertThat(changedEvent.likeCount()).isEqualTo(1L);
+                    })
             );
         }
 
@@ -70,7 +80,8 @@ class ProductLikeCommandServiceTest {
             // assert
             assertAll(
                 () -> assertThat(result.liked()).isTrue(),
-                () -> assertThat(product.getLikeCount()).isEqualTo(1L)
+                () -> assertThat(product.getLikeCount()).isEqualTo(1L),
+                () -> assertThat(fixture.applicationEventPublisher.events).hasSize(1)
             );
         }
 
@@ -112,7 +123,16 @@ class ProductLikeCommandServiceTest {
                 () -> assertThat(product.getLikeCount()).isZero(),
                 () -> assertThat(fixture.productLikeRepository.exists("user1", 1L)).isFalse(),
                 () -> assertThat(fixture.productCacheRepository.evictedDetailProductIds).containsExactly(1L, 1L),
-                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(2)
+                () -> assertThat(fixture.productCacheRepository.evictListsCallCount).isEqualTo(2),
+                () -> assertThat(fixture.applicationEventPublisher.events)
+                    .last()
+                    .satisfies(event -> {
+                        ProductLikeChangedApplicationEvent changedEvent = (ProductLikeChangedApplicationEvent) event;
+                        assertThat(changedEvent.productId()).isEqualTo(1L);
+                        assertThat(changedEvent.userId()).isEqualTo("user1");
+                        assertThat(changedEvent.liked()).isFalse();
+                        assertThat(changedEvent.likeCount()).isZero();
+                    })
             );
         }
 
@@ -129,7 +149,8 @@ class ProductLikeCommandServiceTest {
             // assert
             assertAll(
                 () -> assertThat(result.liked()).isFalse(),
-                () -> assertThat(product.getLikeCount()).isZero()
+                () -> assertThat(product.getLikeCount()).isZero(),
+                () -> assertThat(fixture.applicationEventPublisher.events).isEmpty()
             );
         }
 
@@ -159,11 +180,13 @@ class ProductLikeCommandServiceTest {
         private final Map<Long, Brand> brands = new HashMap<>();
         private final FakeProductLikeRepository productLikeRepository = new FakeProductLikeRepository();
         private final FakeProductCacheRepository productCacheRepository = new FakeProductCacheRepository();
+        private final FakeApplicationEventPublisher applicationEventPublisher = new FakeApplicationEventPublisher();
         private final ProductLikeCommandService service = new ProductLikeCommandService(
             productLikeRepository,
             new FakeProductRepository(products),
             new FakeBrandRepository(brands),
-            productCacheRepository
+            productCacheRepository,
+            applicationEventPublisher
         );
 
         private TestFixture() {
@@ -174,6 +197,15 @@ class ProductLikeCommandServiceTest {
             Product product = new Product(1L, "상품", "설명", 1_000L, 10);
             products.put(1L, product);
             return product;
+        }
+    }
+
+    private static class FakeApplicationEventPublisher implements ApplicationEventPublisher {
+        private final List<Object> events = new ArrayList<>();
+
+        @Override
+        public void publishEvent(Object event) {
+            events.add(event);
         }
     }
 

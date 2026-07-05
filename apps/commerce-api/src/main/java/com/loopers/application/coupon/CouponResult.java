@@ -1,6 +1,8 @@
 package com.loopers.application.coupon;
 
 import com.loopers.domain.coupon.CouponStatus;
+import com.loopers.domain.coupon.CouponIssueRequest;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.IssuedCoupon;
@@ -14,6 +16,7 @@ public class CouponResult {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt,
         boolean active,
@@ -26,6 +29,7 @@ public class CouponResult {
                 couponTemplate.getType(),
                 couponTemplate.getValue(),
                 couponTemplate.getMinOrderAmount(),
+                couponTemplate.getTotalIssueLimit(),
                 couponTemplate.getMaxIssuesPerUser(),
                 couponTemplate.getExpiredAt(),
                 couponTemplate.isActive(),
@@ -60,6 +64,30 @@ public class CouponResult {
                 issuedCoupon.getStatus(now),
                 issuedCoupon.getCreatedAt(),
                 issuedCoupon.getUsedAt()
+            );
+        }
+    }
+
+    public record IssueRequest(
+        Long requestId,
+        Long couponTemplateId,
+        String userId,
+        CouponIssueRequestStatus status,
+        Long issuedCouponId,
+        String failureReason,
+        ZonedDateTime requestedAt,
+        ZonedDateTime completedAt
+    ) {
+        public static IssueRequest from(CouponIssueRequest request) {
+            return new IssueRequest(
+                request.getId(),
+                request.getCouponTemplateId(),
+                request.getUserId(),
+                request.getStatus(),
+                request.getIssuedCouponId(),
+                request.getFailureReason(),
+                request.getCreatedAt(),
+                request.getCompletedAt()
             );
         }
     }

@@ -10,8 +10,11 @@ import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
 @Service
@@ -21,6 +24,7 @@ public class ProductLikeCommandService {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductCacheRepository productCacheRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public ProductLikeResult like(ProductLikeCommand.Like command) {
@@ -34,6 +38,12 @@ public class ProductLikeCommandService {
             productRepository.increaseLikeCount(command.productId());
             evictProductCaches(command.productId());
             product = getProduct(command.productId());
+            applicationEventPublisher.publishEvent(ProductLikeChangedApplicationEvent.liked(
+                command.productId(),
+                command.userId(),
+                product.getLikeCount(),
+                ZonedDateTime.now()
+            ));
         }
 
         return ProductLikeResult.from(product, getBrand(product.getBrandId()), true);
@@ -48,6 +58,12 @@ public class ProductLikeCommandService {
             productRepository.decreaseLikeCount(command.productId());
             evictProductCaches(command.productId());
             product = getProduct(command.productId());
+            applicationEventPublisher.publishEvent(ProductLikeChangedApplicationEvent.unliked(
+                command.productId(),
+                command.userId(),
+                product.getLikeCount(),
+                ZonedDateTime.now()
+            ));
         }
 
         return ProductLikeResult.from(product, getBrand(product.getBrandId()), false);

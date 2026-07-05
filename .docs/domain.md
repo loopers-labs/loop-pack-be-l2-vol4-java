@@ -1,10 +1,10 @@
 # Domain Glossary
 
-이 문서는 현재 4주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 7주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 문서 목적
 
-- 현재 4주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
+- 현재 7주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
 - `.docs/design`의 4개 제출 문서는 volume-2 설계 이력으로 보존하며 현재 기준으로 덮어쓰지 않는다.
 - 구현 단계에서 패키지, 클래스, 테스트 이름을 정할 때 이 문서를 먼저 확인한다.
 - 이번 주차 설계에는 `Point`/포인트 도메인을 포함하지 않는다.
@@ -40,15 +40,17 @@
 | 결제 대기 | 주문 생성 후 외부 결제 결과를 기다리는 상태 | `OrderStatus.PAYMENT_PENDING` 상태이며 최대 1분으로 제한한다. |
 | 결제 요청 row | 주문 생성 직후 조회 가능한 결제 상태 기준 데이터 | 주문 생성 트랜잭션에서 `payment(order_id, status=REQUESTED)`로 생성한다. |
 | 타임아웃 | 결제 대기 시간이 주문 생성 시각 기준 1분을 초과한 실패 사유 | 별도 컬럼이 아니라 `failureReason=TIMEOUT` 값으로 기록한다. |
-| Outbox | 외부 데이터 플랫폼으로 보낼 이벤트를 DB에 먼저 저장하는 패턴 | 주문 `PAID` 전이와 이벤트 저장을 같은 트랜잭션으로 묶는다. |
+| Outbox | Kafka 또는 외부 데이터 플랫폼으로 보낼 이벤트를 DB에 먼저 저장하는 패턴 | 도메인 상태 변경과 이벤트 저장을 같은 트랜잭션으로 묶는다. |
 | `retry_count` | Outbox 전송 실패 횟수 | 실패 시 증가시키고, 최대 재시도 초과 시 `FAILED`로 확정한다. |
 | 정합성 기준 데이터 | 불일치 복구 시 기준이 되는 원천 데이터 | 좋아요는 `product_like`, 주문은 `orders`/`order_line`을 기준으로 본다. |
 | 조회용 카운터 | 조회 성능을 위해 중복 저장하는 수치 | `product.like_count`가 해당하며 `product_like` 기준으로 재집계할 수 있다. |
-| 쿠폰 템플릿 | 운영자가 등록하는 할인 정책 | 이름, 타입, 할인값, 최소 주문 금액, 사용자별 최대 발급 횟수, 만료일을 가진다. |
+| 쿠폰 템플릿 | 운영자가 등록하는 할인 정책 | 이름, 타입, 할인값, 최소 주문 금액, 전체 발급 한도, 사용자별 최대 발급 횟수, 만료일을 가진다. |
+| 쿠폰 발급 요청 | 사용자의 비동기 쿠폰 발급 접수 건 | `PENDING`으로 접수하고 Kafka consumer가 실제 발급 후 `SUCCEEDED` 또는 `FAILED`로 확정한다. |
 | 발급 쿠폰 | 사용자가 보유한 쿠폰 | 할인 조건을 발급 시점에 스냅샷으로 저장하며 주문 1건에 최대 1장 사용한다. |
 | 쿠폰 복구 | 결제 실패/취소/타임아웃 시 사용 쿠폰을 되돌리는 처리 | 재고 복구와 함께 `AVAILABLE` 상태로 변경한다. |
 | 4주차 핵심 범위 | 재고, 쿠폰, 주문의 정합성과 동시성 제어 | RDB 트랜잭션과 비관적 row lock으로 처리한다. |
-| 기존 확장 설계 | 결제 worker, Outbox, 0원 주문 처리 | 4주차 필수 범위와 분리해 관리한다. |
+| 7주차 핵심 범위 | 이벤트 기반 경계 분리, Kafka 파이프라인, Transactional Outbox, 비동기 선착순 쿠폰 발급 | ApplicationEvent, Outbox relay, Consumer 멱등성, Micrometer 지표로 처리한다. |
+| 기존 확장 설계 | 결제 worker, 0원 주문 처리 | 현재 주차 필수 범위와 분리해 관리한다. |
 
 ## 아키텍처 기준
 
@@ -63,10 +65,10 @@
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
-| `coupon` | `CouponTemplate`, `IssuedCoupon` | 쿠폰 템플릿 관리, 발급, 할인 계산, 사용과 복구 |
+| `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine` | 주문 생성, 주문 상태, 주문 항목 스냅샷 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
-| `event` | `OrderEventOutbox`, `DataPlatformClient` | 주문 성공 이벤트 저장, 외부 데이터 플랫폼 전송 |
+| `event` | `EventOutbox`, Kafka relay | 주문/카탈로그 이벤트 저장, Kafka 전파, relay 상태 관리 |
 
 ## 확정된 설계 결정
 
@@ -85,7 +87,9 @@
 | ADMIN 상품 삭제 | 물리 삭제하지 않고 `ProductStatus.STOPPED`으로 전환한다. |
 | 인증 헤더 | 유저 API는 `X-Loopers-LoginId`, `X-Loopers-LoginPw`, ADMIN API는 `X-Loopers-Ldap`를 사용한다. |
 | 쿠폰 | 독립 `coupon` 모듈에 두며 주문 생성과 결제 실패 복구에서 application 계층을 통해 협력한다. |
-| 쿠폰 발급 락 | 템플릿 row를 `PESSIMISTIC_WRITE`로 잠근 뒤 사용자별 발급 수를 검사하고 발급 쿠폰을 저장한다. |
+| 쿠폰 발급 락 | 템플릿 row를 `PESSIMISTIC_WRITE`로 잠근 뒤 전체 발급 수와 사용자별 발급 수를 검사하고 발급 쿠폰을 저장한다. |
+| 비동기 쿠폰 발급 | `POST /api/v1/coupons/{couponId}/issue`는 `CouponIssueRequest(PENDING)`와 `coupon-issue-requests` Outbox를 저장하고, 실제 발급은 Kafka consumer가 처리한다. |
+| 쿠폰 발급 결과 확인 | 사용자는 `GET /api/v1/coupons/issues/{requestId}`로 발급 요청 상태를 polling한다. |
 | 주문 생성 락 | 상품 ID 오름차순으로 상품 row를 잠그고 재고를 차감한 뒤 optional 발급 쿠폰 row를 잠가 사용 처리한다. |
 | 주문 원자성 | 재고 차감, 쿠폰 `USED` 전이, 할인 스냅샷 주문 저장은 하나의 DB 트랜잭션으로 처리한다. |
 | 주문 쿠폰 식별자 | 주문 요청과 주문 스냅샷의 nullable `couponId`는 발급 쿠폰 ID다. |
@@ -99,7 +103,7 @@
 | 유상 주문 결제 row | 최종 결제 금액이 0원보다 크면 주문 생성 트랜잭션에서 `PaymentStatus.REQUESTED` 결제 row를 만든다. |
 | 0원 주문 | 현재 구현은 결제 row 없이 즉시 `PAID` 처리하고 `ORDER_PAID` outbox를 저장한다. 조회 응답의 결제 상태는 `NOT_REQUIRED`로 계산한다. |
 | 결제 실패 복구 | 주문 row, 상품 ID 오름차순 상품 row, optional 발급 쿠폰 row 순서로 잠근 뒤 재고와 쿠폰을 함께 복구한다. |
-| Outbox 실패 정책 | 전송 실패 시 `retryCount`를 증가시키고, 최대 재시도 초과 시 `FAILED`로 확정한다. |
+| Outbox 실패 정책 | Kafka 발행 실패 시 `retryCount`를 증가시키고, 최대 재시도 초과 시 `FAILED`로 확정한다. |
 
 ## 확장 개선 목표
 
@@ -123,13 +127,15 @@
 | `ProductLike` | 상품 좋아요 | 사용자와 상품의 좋아요 관계를 표현한다. |
 | `StockService` | 재고 서비스 | 주문 생성 시 재고 차감, 결제 실패/취소/타임아웃 시 재고 복구를 담당한다. |
 | `CouponTemplate` | 쿠폰 템플릿 | 운영자가 관리하는 쿠폰 발급 정책을 표현한다. |
+| `CouponIssueRequest` | 쿠폰 발급 요청 | Kafka 기반 비동기 발급 요청의 접수 상태와 최종 결과를 표현한다. |
 | `IssuedCoupon` | 발급 쿠폰 | 사용자별 쿠폰의 할인 조건 스냅샷과 사용 상태를 표현한다. |
 | `Order` | 주문 | 주문 대표 상태와 총액을 관리한다. |
 | `OrderLine` | 주문 항목 | 주문 당시 상품명, 단가, 수량 스냅샷을 보관한다. |
 | `Payment` | 결제 | 결제 요청과 외부 결제 결과를 기록한다. |
-| `OrderEventOutbox` | 주문 이벤트 아웃박스 | 외부 데이터 플랫폼으로 보낼 주문 이벤트를 저장한다. |
+| `EventOutbox` | 이벤트 아웃박스 | Kafka로 보낼 주문/카탈로그 이벤트를 저장한다. |
 | `PaymentGateway` | 외부 결제 시스템 | 결제 승인, 매입, 승인 취소를 수행하는 외부 시스템이다. |
-| `DataPlatformClient` | 데이터 플랫폼 클라이언트 | 주문 성공 이벤트를 외부 데이터 플랫폼으로 전송한다. |
+| `KafkaEventMessagePublisher` | Kafka 이벤트 발행기 | Outbox relay가 Kafka topic으로 이벤트를 발행할 때 사용한다. |
+| `CouponIssueRequestConsumer` | 쿠폰 발급 요청 컨슈머 | `coupon-issue-requests` topic을 소비해 실제 쿠폰 발급을 수행한다. |
 
 ## 상태명
 
@@ -169,6 +175,14 @@
 | `USED` | 사용 완료 |
 | `EXPIRED` | 만료 시각이 지나 사용 불가. 조회 시 계산한다. |
 
+### CouponIssueRequestStatus
+
+| 상태 | 의미 |
+| --- | --- |
+| `PENDING` | 발급 요청이 접수됐고 아직 consumer 처리 전이다. |
+| `SUCCEEDED` | 실제 발급 쿠폰이 생성됐다. |
+| `FAILED` | 발급 한도 초과, 만료, 중복 발급 등으로 발급이 거부됐다. |
+
 ### OutboxStatus
 
 | 상태 | 의미 |
@@ -188,11 +202,11 @@
 | 상품 ADMIN | `ProductAdminController` | `ProductService` | `ProductRepository`, `BrandRepository` |
 | 좋아요 등록/취소/조회 | `ProductLikeController` | `ProductLikeService` | `ProductLikeRepository` |
 | 주문 생성/조회 | `OrderController` | `OrderFacade`, `OrderService`, `StockService` | `OrderRepository`, `ProductRepository` |
-| 쿠폰 발급/내 쿠폰 조회 | `CouponV1Controller` | `CouponCommandService`, `CouponQueryService` | `CouponTemplateRepository`, `IssuedCouponRepository` |
+| 쿠폰 발급 요청/결과 조회/내 쿠폰 조회 | `CouponV1Controller` | `CouponCommandService`, `CouponQueryService`, `CouponIssueRequestEventService` | `CouponTemplateRepository`, `CouponIssueRequestRepository`, `IssuedCouponRepository` |
 | 쿠폰 ADMIN | `CouponAdminController` | `CouponCommandService`, `CouponQueryService` | `CouponTemplateRepository`, `IssuedCouponRepository` |
 | 주문 ADMIN 조회 | `OrderAdminController` | `OrderService` | `OrderRepository` |
 | 결제 비동기 처리 | - | `PaymentWorker`, `PaymentService` | `PaymentRepository` |
-| 주문 이벤트 전송 | - | `EventRelayWorker`, `OrderEventPublisher` | `OrderEventOutboxRepository` |
+| 이벤트 전송 | - | `EventRelayWorker`, `OrderEventPublisher` | `EventOutboxRepository` |
 
 ## 미확정 항목
 

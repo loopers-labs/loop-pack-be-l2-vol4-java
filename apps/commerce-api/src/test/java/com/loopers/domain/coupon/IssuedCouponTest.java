@@ -60,6 +60,7 @@ class IssuedCouponTest {
             CouponType.FIXED,
             1_000L,
             null,
+            null,
             1,
             expiredAt,
             ZonedDateTime.now(),

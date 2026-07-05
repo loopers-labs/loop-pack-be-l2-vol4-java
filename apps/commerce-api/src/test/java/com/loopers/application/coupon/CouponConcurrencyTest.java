@@ -6,6 +6,7 @@ import com.loopers.domain.catalog.brand.Brand;
 import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.ordering.order.OrderRepository;
@@ -81,6 +82,28 @@ class CouponConcurrencyTest {
         );
     }
 
+    @DisplayName("전체 발급 한도가 있는 쿠폰 발급 요청을 동시에 처리해도 한도를 넘지 않는다.")
+    @Test
+    void preventsTotalIssueLimitOverflow_whenIssueRequestsAreProcessedConcurrently() throws Exception {
+        Long couponTemplateId = createTemplate(CouponType.FIXED, 1_000L, 1, 1L);
+        Long firstRequestId = couponCommandService.requestIssue(couponTemplateId, "user1").requestId();
+        Long secondRequestId = couponCommandService.requestIssue(couponTemplateId, "user2").requestId();
+        List<Long> requestIds = List.of(firstRequestId, secondRequestId);
+
+        List<CouponIssueRequestStatus> statuses = runConcurrently(2, index ->
+            couponCommandService.processIssueRequest(requestIds.get(index)).status()
+        );
+
+        assertAll(
+            () -> assertThat(statuses).containsExactlyInAnyOrder(
+                CouponIssueRequestStatus.SUCCEEDED,
+                CouponIssueRequestStatus.FAILED
+            ),
+            () -> assertThat(couponQueryService.getMyCoupons("user1", 0, 20).totalElements()
+                + couponQueryService.getMyCoupons("user2", 0, 20).totalElements()).isEqualTo(1L)
+        );
+    }
+
     @DisplayName("동일 발급 쿠폰으로 동시에 주문해도 한 주문만 성공하고 실패 주문의 재고 차감은 롤백한다.")
     @Test
     void usesIssuedCouponOnlyOnce_whenOrdersRequestConcurrently() throws Exception {
@@ -111,28 +134,41 @@ class CouponConcurrencyTest {
     }
 
     private List<Boolean> runConcurrently(int requestCount, Callable<Boolean> task) throws Exception {
+        return runConcurrently(requestCount, ignored -> {
+            try {
+                return task.call();
+            } catch (CoreException e) {
+                return false;
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+    }
+
+    private <T> List<T> runConcurrently(int requestCount, IndexedTask<T> task) throws Exception {
         CountDownLatch readyLatch = new CountDownLatch(requestCount);
         CountDownLatch startLatch = new CountDownLatch(1);
         ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
-        List<Future<Boolean>> futures = new ArrayList<>();
+        List<Future<T>> futures = new ArrayList<>();
 
         try {
             for (int i = 0; i < requestCount; i++) {
+                int index = i;
                 futures.add(executorService.submit(() -> {
                     readyLatch.countDown();
                     startLatch.await();
                     try {
-                        return task.call();
+                        return task.call(index);
                     } catch (CoreException e) {
-                        return false;
+                        return null;
                     }
                 }));
             }
             assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
             startLatch.countDown();
 
-            List<Boolean> results = new ArrayList<>();
-            for (Future<Boolean> future : futures) {
+            List<T> results = new ArrayList<>();
+            for (Future<T> future : futures) {
                 results.add(future.get(10, TimeUnit.SECONDS));
             }
             return results;
@@ -142,11 +178,16 @@ class CouponConcurrencyTest {
     }
 
     private Long createTemplate(CouponType type, Long value, int maxIssuesPerUser) {
+        return createTemplate(type, value, maxIssuesPerUser, null);
+    }
+
+    private Long createTemplate(CouponType type, Long value, int maxIssuesPerUser, Long totalIssueLimit) {
         return couponCommandService.createTemplate(new CouponCommand.CreateTemplate(
             "테스트 쿠폰",
             type,
             value,
             null,
+            totalIssueLimit,
             maxIssuesPerUser,
             ZonedDateTime.now().plusDays(1)
         )).couponId();
@@ -155,5 +196,10 @@ class CouponConcurrencyTest {
     private Product saveProduct(String name, Long price, Integer stockQuantity) {
         Brand brand = brandRepository.save(new Brand("Loopers", "테스트 브랜드"));
         return productRepository.save(new Product(brand.getId(), name, "설명", price, stockQuantity));
+    }
+
+    @FunctionalInterface
+    private interface IndexedTask<T> {
+        T call(int index);
     }
 }

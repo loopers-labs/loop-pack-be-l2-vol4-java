@@ -6,21 +6,22 @@ spring:
         spring.json.add.type.headers: false # json serialize off
         request.timeout.ms: 20000
         retry.backoff.ms: 500
-        auto:
-          create.topics.enable: false
-          register.schemas: false
-          offset.reset: latest
+        auto.create.topics.enable: false
+        auto.register.schemas: false
         use.latest.version: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
       retries: 3
+      properties:
+        enable.idempotence: true
     consumer:
       group-id: loopers-default-consumer
+      enable-auto-commit: false
+      auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
-      properties:
-        enable-auto-commit: false
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
     listener:
       ack-mode: manual
 

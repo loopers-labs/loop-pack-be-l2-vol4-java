@@ -10,6 +10,7 @@ public class CouponCommand {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {}
@@ -19,6 +20,7 @@ public class CouponCommand {
         CouponType type,
         Long value,
         Long minOrderAmount,
+        Long totalIssueLimit,
         Integer maxIssuesPerUser,
         ZonedDateTime expiredAt
     ) {}
