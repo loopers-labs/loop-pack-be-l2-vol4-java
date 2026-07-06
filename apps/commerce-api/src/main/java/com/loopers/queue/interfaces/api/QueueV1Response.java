@@ -13,9 +13,9 @@ public class QueueV1Response {
         }
     }
 
-    public record Position(long position, long estimatedWaitSeconds, long pollAfterMs) {
+    public record Position(long position, long estimatedWaitSeconds, long pollAfterMs, String token) {
         public static Position from(QueueResult.Position result) {
-            return new Position(result.position(), result.estimatedWaitSeconds(), result.pollAfterMs());
+            return new Position(result.position(), result.estimatedWaitSeconds(), result.pollAfterMs(), result.token());
         }
     }
 }

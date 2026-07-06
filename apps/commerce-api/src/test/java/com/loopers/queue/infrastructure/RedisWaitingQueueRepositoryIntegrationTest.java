@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -66,5 +68,21 @@ class RedisWaitingQueueRepositoryIntegrationTest {
         sut.add("user-2", 2000L);
 
         assertThat(sut.size()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("앞에서 N명을 순번 순서대로 꺼내고 대기열에서 제거한다")
+    void givenUsersInQueue_whenPopFront_thenReturnsFrontAndRemoves() {
+        sut.add("user-1", 1000L);
+        sut.add("user-2", 2000L);
+        sut.add("user-3", 3000L);
+
+        List<String> popped = sut.popFront(2);
+
+        assertAll(
+                () -> assertThat(popped).containsExactly("user-1", "user-2"),
+                () -> assertThat(sut.size()).isEqualTo(1L),
+                () -> assertThat(sut.rank("user-3")).isEqualTo(0L)
+        );
     }
 }

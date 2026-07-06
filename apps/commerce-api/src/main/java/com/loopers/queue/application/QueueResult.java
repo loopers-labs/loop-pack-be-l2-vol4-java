@@ -9,7 +9,7 @@ public class QueueResult {
     public record Enter(long position) {
     }
 
-    /** 순번 조회 결과. 순번·예상 대기시간·다음 폴링 간격. */
-    public record Position(long position, long estimatedWaitSeconds, long pollAfterMs) {
+    /** 순번 조회 결과. 입장했으면 token 이 채워지고, 대기 중이면 null. */
+    public record Position(long position, long estimatedWaitSeconds, long pollAfterMs, String token) {
     }
 }

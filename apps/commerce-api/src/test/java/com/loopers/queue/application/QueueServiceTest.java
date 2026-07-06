@@ -1,9 +1,14 @@
 package com.loopers.queue.application;
 
+import com.loopers.queue.domain.EntryTokenStore;
 import com.loopers.queue.domain.WaitingQueueRepository;
 import com.loopers.support.error.CoreException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -11,14 +16,18 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QueueServiceTest {
 
     // interval 200ms, batch 35 → tps 175
     private final OrderQueueAdmissionProperties admissionProperties = new OrderQueueAdmissionProperties(200L, 35);
+    private final OrderQueueEntryTokenProperties entryTokenProperties = new OrderQueueEntryTokenProperties(300L);
     private final WaitingQueueRepository waitingQueueRepository = mock(WaitingQueueRepository.class);
-    private final QueueService sut = new QueueService(waitingQueueRepository, admissionProperties);
+    private final EntryTokenStore entryTokenStore = mock(EntryTokenStore.class);
+    private final QueueService sut = new QueueService(
+            waitingQueueRepository, entryTokenStore, admissionProperties, entryTokenProperties);
 
     @Test
     @DisplayName("진입하면 대기열에 넣고 부여받은 순번을 반환한다")
@@ -53,5 +62,32 @@ class QueueServiceTest {
         assertThatThrownBy(() -> sut.position("user-1"))
                 .isInstanceOf(CoreException.class)
                 .hasMessageContaining("대기열");
+    }
+
+    @Test
+    @DisplayName("입장한(토큰 발급된) 유저는 순번 조회 시 토큰과 순번 0을 받는다")
+    void givenAdmittedUser_whenPosition_thenReturnsToken() {
+        when(entryTokenStore.find("user-1")).thenReturn(Optional.of("tok-123"));
+
+        QueueResult.Position result = sut.position("user-1");
+
+        assertAll(
+                () -> assertThat(result.token()).isEqualTo("tok-123"),
+                () -> assertThat(result.position()).isEqualTo(0L)
+        );
+    }
+
+    @Test
+    @DisplayName("발급하면 batch 만큼 꺼내 각자 입장 토큰을 발급한다")
+    void givenWaitingUsers_whenAdmit_thenIssuesTokens() {
+        when(waitingQueueRepository.popFront(35)).thenReturn(List.of("user-1", "user-2"));
+
+        int count = sut.admit();
+
+        assertAll(
+                () -> assertThat(count).isEqualTo(2),
+                () -> verify(entryTokenStore).issue("user-1", Duration.ofSeconds(300)),
+                () -> verify(entryTokenStore).issue("user-2", Duration.ofSeconds(300))
+        );
     }
 }

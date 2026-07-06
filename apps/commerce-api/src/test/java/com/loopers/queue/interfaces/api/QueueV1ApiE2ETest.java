@@ -1,6 +1,7 @@
 package com.loopers.queue.interfaces.api;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.queue.application.QueueService;
 import com.loopers.user.application.UserAccountService;
 import com.loopers.user.application.UserCommand;
 import com.loopers.utils.DatabaseCleanUp;
@@ -35,6 +36,7 @@ class QueueV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final UserAccountService userAccountService;
+    private final QueueService queueService;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
 
@@ -42,11 +44,13 @@ class QueueV1ApiE2ETest {
     public QueueV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
             UserAccountService userAccountService,
+            QueueService queueService,
             DatabaseCleanUp databaseCleanUp,
             RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userAccountService = userAccountService;
+        this.queueService = queueService;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
     }
@@ -86,6 +90,21 @@ class QueueV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().position()).isEqualTo(0L),
                 () -> assertThat(response.getBody().data().pollAfterMs()).isEqualTo(1000L)
+        );
+    }
+
+    @Test
+    @DisplayName("입장 처리되면 순번 조회 시 토큰을 받는다")
+    void givenAdmitted_whenPosition_thenReturnsToken() {
+        enter(authHeaders());
+        queueService.admit();   // 스케줄러가 하는 일을 직접 실행 (test 프로파일에선 스케줄러 비활성)
+
+        ResponseEntity<ApiResponse<QueueV1Response.Position>> response = position(authHeaders());
+
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().position()).isEqualTo(0L),
+                () -> assertThat(response.getBody().data().token()).isNotBlank()
         );
     }
 

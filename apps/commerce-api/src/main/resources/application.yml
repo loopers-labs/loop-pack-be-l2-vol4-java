@@ -90,6 +90,8 @@ order-queue:
   admission:
     interval-ms: 200
     batch-size: 35
+  entry-token:
+    ttl-seconds: 300
 
 ---
 spring:
