@@ -10,17 +10,15 @@ public class ProductLikeService {
     private final LikeService likeService;
     private final ProductService productService;
 
-    public void like(Long userId, Long productId) {
+    /** @return 좋아요가 새로 생겼으면 true (이미 눌려 있었으면 false) */
+    public boolean like(Long userId, Long productId) {
         productService.getProduct(productId);
-        if (likeService.like(userId, productId)) {
-            productService.increaseLikeCount(productId);
-        }
+        return likeService.like(userId, productId);
     }
 
-    public void unlike(Long userId, Long productId) {
+    /** @return 좋아요가 실제로 제거됐으면 true (원래 없었으면 false) */
+    public boolean unlike(Long userId, Long productId) {
         productService.getProduct(productId);
-        if (likeService.unlike(userId, productId)) {
-            productService.decreaseLikeCount(productId);
-        }
+        return likeService.unlike(userId, productId);
     }
 }

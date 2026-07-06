@@ -3,11 +3,13 @@ package com.loopers.application.order;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.money.Money;
 import com.loopers.domain.order.Order;
+import com.loopers.domain.order.OrderCreatedEvent;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.quantity.Quantity;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ import java.util.List;
 public class OrderRegistrationService {
     private final OrderService orderService;
     private final CouponService couponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Order register(Long userId, List<OrderLineCommand> commands, Long couponId) {
@@ -33,6 +36,9 @@ public class OrderRegistrationService {
         Money discountAmount = couponId == null
             ? Money.ZERO
             : couponService.use(userId, couponId, Order.totalOf(items));
-        return orderService.complete(userId, items, discountAmount, couponId);
+        Order order = orderService.complete(userId, items, discountAmount, couponId);
+        // 생성 이벤트는 저장 전엔 ID 가 없어(IDENTITY) 애그리거트에 등록하지 못한다 — 저장 직후 응용 레이어에서 발행한다.
+        eventPublisher.publishEvent(OrderCreatedEvent.from(order, items));
+        return order;
     }
 }

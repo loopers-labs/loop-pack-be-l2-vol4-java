@@ -1,7 +1,9 @@
 package com.loopers.interfaces.api.coupon;
 
+import com.loopers.application.coupon.CouponIssueRequestInfo;
 import com.loopers.application.coupon.IssuedCouponInfo;
 import com.loopers.application.coupon.UserCouponInfo;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
 
@@ -17,6 +19,18 @@ public class CouponV1Dto {
     ) {
         public static IssueResponse from(IssuedCouponInfo info) {
             return new IssueResponse(info.id(), info.couponId(), info.status());
+        }
+    }
+
+    public record IssueRequestResponse(
+        String requestId,
+        Long couponId,
+        CouponIssueRequestStatus status,
+        String reason,
+        Long userCouponId
+    ) {
+        public static IssueRequestResponse from(CouponIssueRequestInfo info) {
+            return new IssueRequestResponse(info.requestId(), info.couponId(), info.status(), info.reason(), info.userCouponId());
         }
     }
 
