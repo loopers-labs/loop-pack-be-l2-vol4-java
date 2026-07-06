@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * product_metrics(=SSOT 위의 MV) 갱신. 이벤트는 트리거이고, 값은 SSOT 에서 재계산해 덮어쓴다.
- * → 같은 이벤트가 두 번 와도 두 번 재계산 = 같은 값. dedup 테이블(event_handled) 없이 멱등.
+ * product_metrics(이벤트로만 갱신하는 read model) 갱신. 이벤트가 담아 온 값(수량·delta)을 그대로 증분한다.
+ * SSOT 를 다시 읽지 않으므로 producer 테이블과 결합하지 않는다. 재전달 중복은 배치 reconcile 이 교정한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -17,22 +17,18 @@ public class ProductMetricService {
 
     private final ProductMetricJpaRepository productMetricJpaRepository;
 
-    /** 주문 이벤트(트리거) → 담긴 상품들의 판매량을 order_items 에서 재계산. */
+    /** 결제완료 이벤트 → 담긴 라인의 수량만큼 판매량 증분. */
     @Transactional
     public void apply(OrderPaidMessage message) {
-        message.items().stream()
-                .map(OrderPaidMessage.Line::productId)
-                .distinct()
-                .forEach(productId ->
-                        productMetricJpaRepository.setSales(productId, productMetricJpaRepository.sumOrderedQuantity(productId)));
+        message.items().forEach(line ->
+                productMetricJpaRepository.increaseSales(line.productId(), line.quantity()));
     }
 
-    /** 좋아요=likes 재계산 덮어쓰기(멱등), 조회=근사 증분. */
+    /** 좋아요=delta(±1) 증분, 조회=delta(+1) 증분. */
     @Transactional
     public void applyCatalog(CatalogEventMessage message) {
         switch (message.type()) {
-            case LIKE -> productMetricJpaRepository.setLike(
-                    message.productId(), productMetricJpaRepository.countLikes(message.productId()));
+            case LIKE -> productMetricJpaRepository.increaseLike(message.productId(), message.delta());
             case VIEW -> productMetricJpaRepository.increaseView(message.productId(), message.delta());
         }
     }
