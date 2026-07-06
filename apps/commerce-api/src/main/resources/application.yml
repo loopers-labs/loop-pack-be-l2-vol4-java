@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
   cloud:
@@ -78,6 +79,13 @@ resilience4j:
         limit-refresh-period: 1s
         timeout-duration: 100ms
 
+# Outbox 릴레이. mode=POLLING_ONLY(순수 폴러) | HYBRID(커밋 직후 즉시 발행 + 폴러 안전망)
+outbox:
+  relay:
+    mode: POLLING_ONLY
+    fixed-delay-ms: 1000
+    batch-size: 100
+
 ---
 spring:
   config:
@@ -98,6 +106,17 @@ decorator:
       enable-logging: true
       logging: slf4j
       # SQL 포맷·노이즈 제거는 spy.properties 의 커스텀 포매터(P6spyPrettySqlFormatter)로 처리
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트에서는 스케줄 폴러를 사실상 끄고(긴 지연), 폴러가 필요한 테스트만 @TestPropertySource 로 켠다
+outbox:
+  relay:
+    fixed-delay-ms: 600000
 
 ---
 spring:

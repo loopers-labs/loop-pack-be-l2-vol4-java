@@ -38,12 +38,25 @@ public class Coupon extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private ZonedDateTime expiredAt;
 
-    private Coupon(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+    /** 선착순 발급 한도. null 이면 수량 무제한. */
+    @Column(name = "quantity")
+    private Long quantity;
+
+    /** 발급된 수량. Consumer 가 원자적 조건부 UPDATE(issued_count < quantity)로 증가시켜 초과 발급을 막는다. */
+    @Column(name = "issued_count", nullable = false)
+    private long issuedCount;
+
+    private Coupon(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt, Long quantity) {
         assign(name, type, value, minOrderAmount, expiredAt);
+        this.quantity = quantity;
     }
 
     public static Coupon create(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
-        return new Coupon(name, type, value, minOrderAmount, expiredAt);
+        return new Coupon(name, type, value, minOrderAmount, expiredAt, null);
+    }
+
+    public static Coupon createLimited(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt, Long quantity) {
+        return new Coupon(name, type, value, minOrderAmount, expiredAt, quantity);
     }
 
     public void update(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {

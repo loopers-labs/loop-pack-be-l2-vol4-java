@@ -1,0 +1,20 @@
+### DLQ 목록 — 전체 (page)
+GET {{commerce-streamer}}/api/v1/dlq?page=0&size=20
+
+### DLQ 목록 — 특정 토픽 + 미확인(NEW)만
+GET {{commerce-streamer}}/api/v1/dlq?topic=order-events&status=NEW&page=0&size=20
+
+### DLQ 목록 — 상태별 (NEW | RETRIED | DISCARDED)
+GET {{commerce-streamer}}/api/v1/dlq?status=NEW
+
+### DLQ 상세 — payload·offset·stacktrace 확인 (id 는 목록에서)
+GET {{commerce-streamer}}/api/v1/dlq/1
+
+### DLQ 재처리 — 원인 수정 후 원본 토픽으로 재발행 (status=RETRIED)
+POST {{commerce-streamer}}/api/v1/dlq/1/retry
+
+### DLQ 폐기 — 재처리 무의미한 메시지 (status=DISCARDED)
+POST {{commerce-streamer}}/api/v1/dlq/1/discard
+
+### DLQ 상세 — 존재하지 않는 id (404)
+GET {{commerce-streamer}}/api/v1/dlq/999999

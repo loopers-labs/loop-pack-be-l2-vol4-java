@@ -1,5 +1,6 @@
 package com.loopers.like.application;
 
+import com.loopers.activity.UserActivityEvent;
 import com.loopers.like.domain.Like;
 import com.loopers.like.domain.LikeErrorCode;
 import com.loopers.like.domain.LikeRepository;
@@ -30,11 +31,13 @@ public class LikeService {
                             if (existing.getDeletedAt() != null) {
                                 existing.restore();
                                 publishChanged(productId, 1L);
+                                eventPublisher.publishEvent(UserActivityEvent.like(userId, productId));
                             }
                         },
                         () -> {
                             saveNewLike(userId, productId);
                             publishChanged(productId, 1L);
+                            eventPublisher.publishEvent(UserActivityEvent.like(userId, productId));
                         }
                 );
     }
@@ -54,6 +57,7 @@ public class LikeService {
                     if (existing.getDeletedAt() == null) {
                         existing.delete();
                         publishChanged(productId, -1L);
+                        eventPublisher.publishEvent(UserActivityEvent.unlike(userId, productId));
                     }
                 });
     }

@@ -1,10 +1,12 @@
 package com.loopers.order.application;
 
 import com.loopers.coupon.application.CouponUsageService;
+import com.loopers.order.application.event.OrderPaidEvent;
 import com.loopers.order.domain.Order;
 import com.loopers.order.domain.OrderItem;
 import com.loopers.order.domain.OrderItemRepository;
 import com.loopers.order.domain.OrderRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import com.loopers.product.domain.ProductErrorCode;
 import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
@@ -31,11 +33,15 @@ public class OrderPaymentService {
     private final OrderItemRepository orderItemRepository;
     private final ProductStockRepository productStockRepository;
     private final CouponUsageService couponUsageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void markPaid(String orderNumber) {
         Order order = loadOrder(orderNumber);
         order.markPaid();
+        // 판매량(PAID 기준) 재계산 트리거. 결제 트랜잭션과 원자적으로 outbox 에 적재된다.
+        List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+        eventPublisher.publishEvent(OrderPaidEvent.of(order, items));
         log.info("주문 결제 완료 orderNumber={} status=PAID", orderNumber);
     }
 
