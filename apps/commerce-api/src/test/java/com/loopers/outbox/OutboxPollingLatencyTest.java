@@ -24,12 +24,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * POLLING_ONLY 모드: 커밋 직후 즉시 발행은 없고, 스케줄 폴러가 폴 간격 안에 발행한다.
+ * 커밋 직후 즉시 발행은 없고, 스케줄 폴러가 폴 간격 안에 발행한다.
  * 발행 지연 = 커밋 ~ 폴러 발행 시각. 폴 간격(200ms)에 비례하는 지연을 실측해 출력한다.
  */
 @SpringBootTest
 @TestPropertySource(properties = {
-        "outbox.relay.mode=POLLING_ONLY",
         "outbox.relay.fixed-delay-ms=200"
 })
 class OutboxPollingLatencyTest {
