@@ -79,10 +79,9 @@ resilience4j:
         limit-refresh-period: 1s
         timeout-duration: 100ms
 
-# Outbox 릴레이. mode=POLLING_ONLY(순수 폴러) | HYBRID(커밋 직후 즉시 발행 + 폴러 안전망)
+# Outbox 릴레이(순수 폴러). PENDING 을 폴 간격마다 잠금 조회해 발행한다.
 outbox:
   relay:
-    mode: POLLING_ONLY
     fixed-delay-ms: 1000
     batch-size: 100
 
