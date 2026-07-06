@@ -149,7 +149,7 @@ class OrderV1ApiE2ETest {
             OrderV1Response.Detail data = response.getBody().data();
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
-                    () -> assertThat(data.status()).isEqualTo("PENDING"),
+                    () -> assertThat(data.status()).isEqualTo("PENDING_PAYMENT"),
                     () -> assertThat(data.orderNumber()).matches("\\d{8}-\\d{6}"),
                     () -> assertThat(data.totalAmount()).isEqualTo(29_000L * 2 + 15_000L),
                     () -> assertThat(data.items()).hasSize(2),

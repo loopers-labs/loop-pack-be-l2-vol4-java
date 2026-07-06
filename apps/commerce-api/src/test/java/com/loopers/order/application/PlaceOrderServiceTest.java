@@ -18,6 +18,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.user.application.UserReader;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -49,10 +50,11 @@ class PlaceOrderServiceTest {
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final CouponUsageService couponUsageService = mock(CouponUsageService.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
     private final PlaceOrderService placeOrderService = new PlaceOrderService(
             userReader, productReader, productStockRepository, brandReader,
-            orderRepository, orderItemRepository, couponUsageService
+            orderRepository, orderItemRepository, couponUsageService, eventPublisher
     );
 
     private OrderCommand.Create command(List<OrderCommand.Line> lines) {
@@ -86,7 +88,7 @@ class PlaceOrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         Order savedOrder = orderCaptor.getValue();
         assertAll(
-                () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING),
+                () -> assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT),
                 () -> assertThat(savedOrder.getOrderNumber()).isEqualTo("20260528-000001"),
                 () -> assertThat(savedOrder.getTotalAmount().value()).isEqualTo(58_000L),
                 () -> assertThat(result.totalAmount()).isEqualTo(58_000L),

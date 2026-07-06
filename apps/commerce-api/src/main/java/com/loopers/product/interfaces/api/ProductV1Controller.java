@@ -4,8 +4,10 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductCommand;
 import com.loopers.product.application.ProductReadCacheService;
 import com.loopers.product.application.ProductResult;
+import com.loopers.product.application.event.ProductViewedEvent;
 import com.loopers.product.domain.ProductSortOption;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,11 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductReadCacheService productReadCacheService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductV1Response.Detail> get(@PathVariable("productId") Long productId) {
-        return ApiResponse.success(ProductV1Response.Detail.from(productReadCacheService.getProduct(productId)));
+        ProductV1Response.Detail detail = ProductV1Response.Detail.from(productReadCacheService.getProduct(productId));
+        eventPublisher.publishEvent(new ProductViewedEvent(productId)); // 조회 집계는 비동기 best-effort
+        return ApiResponse.success(detail);
     }
 
     @GetMapping

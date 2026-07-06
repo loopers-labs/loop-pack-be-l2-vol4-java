@@ -23,8 +23,9 @@ public class CouponAdminService {
 
     @Transactional
     public CouponResult.Detail create(CouponCommand.Create command) {
-        Coupon coupon = Coupon.create(
-                command.name(), command.type(), command.value(), command.minOrderAmount(), command.expiredAt()
+        Coupon coupon = Coupon.createLimited(
+                command.name(), command.type(), command.value(), command.minOrderAmount(),
+                command.expiredAt(), command.quantity()
         );
         return CouponResult.Detail.from(couponRepository.save(coupon));
     }
