@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/password").authenticated()
                 .requestMatchers("/api/v1/likes/**").authenticated()
                 .requestMatchers("/api/v1/orders/**").authenticated()
+                .requestMatchers("/api/v1/queue/**").authenticated()
                 .requestMatchers("/api/v1/coupons/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/payments").authenticated()
                 .anyRequest().permitAll())
