@@ -40,8 +40,16 @@ public class MetricsEventHandler {
         Map<String, Object> payload = envelope.payload();
         switch (envelope.eventType()) {
             case "LIKE_CHANGED" -> {
-                long delta = "LIKED".equals(payload.get("type")) ? 1L : -1L;
-                productMetricsJpaRepository.upsertLikeCount(asLong(payload.get("productId")), delta);
+                Object type = payload.get("type");
+                if ("LIKED".equals(type)) {
+                    productMetricsJpaRepository.upsertLikeCount(asLong(payload.get("productId")), 1L);
+                } else if ("UNLIKED".equals(type)) {
+                    productMetricsJpaRepository.upsertLikeCount(asLong(payload.get("productId")), -1L);
+                } else {
+                    // 알 수 없는 type — 묵시적으로 UNLIKE 로 해석해 집계를 오염시키지 않는다
+                    log.warn("[Metrics] LIKE_CHANGED 알 수 없는 type — 집계 없이 소비. type={}, eventId={}",
+                        type, envelope.eventId());
+                }
             }
             case "PAYMENT_COMPLETED" -> {
                 @SuppressWarnings("unchecked")

@@ -92,12 +92,12 @@ public class CouponIssueProcessor {
         CouponModel template = couponRepository.findById(couponId).orElse(null);
         long couponLookupMillis = elapsedMillis(couponLookupStartedAt);
         if (template == null) {
-            requests.forEach(request -> failAndRelease(request, "荑좏룿??議댁옱?섏? ?딆뒿?덈떎."));
+            requests.forEach(request -> failAndRelease(request, "쿠폰이 존재하지 않습니다."));
             return;
         }
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         if (template.isExpired(now)) {
-            requests.forEach(request -> failAndRelease(request, "留뚮즺??荑좏룿?낅땲??"));
+            requests.forEach(request -> failAndRelease(request, "만료된 쿠폰입니다."));
             return;
         }
 
@@ -111,7 +111,7 @@ public class CouponIssueProcessor {
         long issueLoopStartedAt = System.nanoTime();
         for (CouponIssueRequest request : requests) {
             if (!issuedUsers.add(request.getUserId())) {
-                failAndRelease(request, "?대? 諛쒓툒諛쏆? 荑좏룿?낅땲??");
+                failAndRelease(request, "이미 발급받은 쿠폰입니다.");
                 continue;
             }
             toIssue.add(UserCouponModel.issue(request.getUserId(), template));
@@ -135,6 +135,9 @@ public class CouponIssueProcessor {
         for (int i = 0; i < winners.size(); i++) {
             CouponIssueRequest winner = winners.get(i);
             winner.markIssued(issued.get(i).getId());
+            // increaseIssuedCount(clearAutomatically=true) 가 영속성 컨텍스트를 비워 winner 가
+            // detached 상태다 — 더티 체킹에 기대지 않고 명시적으로 저장한다.
+            couponIssueRequestRepository.save(winner);
             runAfterCommit(() -> couponIssueRedisStore.confirmIssue(
                 winner.getCouponId(), winner.getUserId(), winner.getRequestId()));
         }
