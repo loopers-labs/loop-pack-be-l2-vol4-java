@@ -29,6 +29,13 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+# Kafka 토픽 계약 — commerce-api 의 설정과 일치해야 한다.
+commerce-events:
+  topics:
+    catalog: catalog-events # 좋아요 (key=productId)
+    order: order-events # 결제 완료 (key=orderId)
+    view: view-events # 상품 조회 (key=productId)
+
 ---
 spring:
   config:

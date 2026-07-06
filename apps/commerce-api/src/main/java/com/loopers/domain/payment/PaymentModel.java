@@ -56,10 +56,16 @@ public class PaymentModel extends BaseEntity {
         this.requestedAt = ZonedDateTime.now();
     }
 
-    /** PG 즉시 응답으로 받은 TID를 저장한다. 상태는 REQUESTED 유지 — 콜백 대기 중. */
+    /**
+     * PG 즉시 응답으로 받은 TID를 저장한다. 상태는 REQUESTED 유지 — 콜백 대기 중.
+     *
+     * <p>TID 는 콜백 미수신 시 조회 키 확보용이다. 콜백이 TID 저장보다 먼저 도착해 이미
+     * 종결(SUCCESS/FAILED)된 경우엔 저장을 강행할 이유가 없으므로 <strong>예외 대신 조용히 무시</strong>한다.
+     * (예외를 던지면 실제로 성공한 결제가 호출자까지 전파돼 오류로 응답되는 경합이 생긴다.)
+     */
     public void storePendingTransactionKey(String pgTransactionId) {
         if (this.status != PaymentStatus.REQUESTED) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "REQUESTED 상태에서만 TID를 저장할 수 있습니다.");
+            return;
         }
         this.pgTransactionId = pgTransactionId;
     }

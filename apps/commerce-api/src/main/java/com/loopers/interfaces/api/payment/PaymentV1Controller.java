@@ -1,10 +1,8 @@
 package com.loopers.interfaces.api.payment;
 
-import com.loopers.application.order.OrderInfo;
 import com.loopers.application.payment.PaymentApplicationService;
 import com.loopers.application.payment.PaymentRequestInfo;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.user.AuthUser;
 import com.loopers.interfaces.api.user.AuthUserContext;
 import jakarta.validation.Valid;
@@ -19,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
  * 결제 API.
  *
  * <ul>
- *   <li>{@code POST /confirm} — Toss 스타일 동기 결제 확정 (기존)</li>
  *   <li>{@code POST /} — pg-simulator 비동기 결제 요청 → transactionKey(PENDING) 반환</li>
  *   <li>{@code POST /callback} — pg-simulator 비동기 콜백 수신 (인증 불필요)</li>
  * </ul>
@@ -31,16 +28,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentV1Controller {
 
     private final PaymentApplicationService paymentApplicationService;
-
-    @PostMapping("/confirm")
-    public ApiResponse<OrderV1Dto.OrderResponse> confirmPayment(
-        @AuthUser AuthUserContext authUser,
-        @Valid @RequestBody PaymentV1Dto.ConfirmRequest request
-    ) {
-        OrderInfo info = paymentApplicationService.confirmPayment(
-            authUser.userId(), request.paymentKey(), request.orderId(), request.amount());
-        return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
-    }
 
     @PostMapping
     public ApiResponse<PaymentV1Dto.PaymentResponse> requestPayment(
@@ -61,7 +48,7 @@ public class PaymentV1Controller {
      */
     @PostMapping("/callback")
     public ApiResponse<Void> handleCallback(
-        @RequestBody PaymentV1Dto.CallbackRequest request
+        @Valid @RequestBody PaymentV1Dto.CallbackRequest request
     ) {
         log.info("[Callback] 수신 — transactionKey={}, orderId={}, status={}", request.transactionKey(), request.orderId(), request.status());
         paymentApplicationService.handleCallback(

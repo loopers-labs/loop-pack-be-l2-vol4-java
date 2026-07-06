@@ -55,7 +55,8 @@ public class CouponAdminV1Controller {
             request.type(),
             request.value(),
             request.minOrderAmount(),
-            request.expiredAt().atZone(ZoneId.of("Asia/Seoul"))
+            request.expiredAt().atZone(ZoneId.of("Asia/Seoul")),
+            request.totalQuantity()
         );
         return ApiResponse.success(CouponAdminV1Dto.CouponResponse.from(info));
     }
@@ -72,7 +73,8 @@ public class CouponAdminV1Controller {
             request.type(),
             request.value(),
             request.minOrderAmount(),
-            request.expiredAt().atZone(ZoneId.of("Asia/Seoul"))
+            request.expiredAt().atZone(ZoneId.of("Asia/Seoul")),
+            request.totalQuantity()
         );
         return ApiResponse.success(CouponAdminV1Dto.CouponResponse.from(info));
     }

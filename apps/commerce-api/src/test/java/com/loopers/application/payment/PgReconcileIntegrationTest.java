@@ -163,6 +163,27 @@ class PgReconcileIntegrationTest {
         assertThat(stockOf(product)).isEqualTo(8);
     }
 
+    @DisplayName("FAILED 와 PENDING 이 함께 있고 만료 전이면, PENDING 우선으로 상태를 유지한다(실패 확정 보류).")
+    @Test
+    void waits_whenFailedAndPendingCoexistBeforeDeadline() {
+        // arrange — 같은 주문에 FAILED 와 PENDING 이 섞여 조회됨 (방금 점유, 만료 전)
+        ProductModel product = givenProductWithStock(10);
+        OrderModel order = givenInProgressOrder(product, 2, "TX-5");
+        fakePgGateway.transactions = List.of(
+            new PgGateway.PgTransactionResult("TX-5a", "FAILED", "한도초과"),
+            new PgGateway.PgTransactionResult("TX-5b", "PENDING", null));
+
+        // act
+        pgReconcileScheduler.reconcile();
+
+        // assert — PENDING 이 하나라도 있으면 실패 확정을 미루고 진행 중 유지. 자원도 그대로.
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+            .isEqualTo(OrderStatus.PAYMENT_IN_PROGRESS);
+        assertThat(paymentRepository.findByOrderId(order.getId()).orElseThrow().getStatus())
+            .isEqualTo(PaymentStatus.REQUESTED);
+        assertThat(stockOf(product)).isEqualTo(8);
+    }
+
     @DisplayName("미확정 상태로 만료 시간을 넘기면 더 못 기다리고 FAILED + 자원 복구로 종결한다.")
     @Test
     void failsAndReleases_whenIndeterminateAfterDeadline() {

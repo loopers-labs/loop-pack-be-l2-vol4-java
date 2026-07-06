@@ -1,47 +1,39 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueRequest;
+import com.loopers.domain.coupon.CouponIssueRequestRepository;
 import com.loopers.domain.coupon.CouponModel;
 import com.loopers.domain.coupon.CouponRepository;
 import com.loopers.domain.coupon.CouponType;
-import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
-/**
- * 쿠폰 유스케이스 Application Service (스타일 2).
- *
- * <p>대고객(발급/내 쿠폰 목록)과 어드민(템플릿 CRUD/발급내역)을 모두 담당한다.
- * 쿠폰 사용(주문 시 확정)은 주문 트랜잭션의 일부라 {@link com.loopers.application.order.OrderTransactionService}가 처리한다.
- *
- * <p>발급 시 템플릿의 혜택이 발급분으로 스냅샷되므로("발급은 그 시점의 약속"),
- * 발급 이후의 조회/사용은 템플릿을 재조회하지 않는다.
- */
 @RequiredArgsConstructor
 @Service
 public class CouponApplicationService {
 
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
+    private final CouponIssueRequestRepository couponIssueRequestRepository;
+    private final CouponIssueRedisStore couponIssueRedisStore;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final TransactionTemplate transactionTemplate;
 
-    // ===== 대고객 =====
-
-    /**
-     * 쿠폰 발급 (템플릿당 유저 1장) — 발급 시점 혜택을 스냅샷한다.
-     *
-     * <p>사전 중복 체크 + {@code (user_id, coupon_id)} UK 를 이중 방어선으로 둔다.
-     * 동시 발급 요청으로 UK 위반이 나면 CONFLICT 로 변환한다.
-     */
-    @Transactional
-    public UserCouponInfo issue(Long userId, Long couponTemplateId) {
+    public CouponIssueRequestInfo requestIssue(Long userId, Long couponTemplateId) {
         CouponModel template = couponRepository.findById(couponTemplateId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다."));
 
@@ -50,25 +42,70 @@ public class CouponApplicationService {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰은 발급받을 수 없습니다.");
         }
 
-        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponTemplateId)) {
+        String requestId = UUID.randomUUID().toString();
+        CouponIssueRedisStore.ReservationResult reservationResult = couponIssueRedisStore.reserve(
+            couponTemplateId,
+            userId,
+            template.getTotalQuantity(),
+            requestId
+        );
+        if (reservationResult == CouponIssueRedisStore.ReservationResult.DUPLICATE) {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
         }
-
-        UserCouponModel userCoupon = UserCouponModel.issue(userId, template);
-        try {
-            userCouponRepository.saveAndFlush(userCoupon);
-        } catch (DataIntegrityViolationException e) {
-            // 동시 발급 UK 위반 — 발급은 1장만 유효
-            throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.", e);
+        if (reservationResult == CouponIssueRedisStore.ReservationResult.SOLD_OUT) {
+            throw new CoreException(ErrorType.CONFLICT, "쿠폰이 모두 소진되었습니다.");
         }
-        return UserCouponInfo.from(userCoupon, now);
+
+        try {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> {
+                registerReservationRollback(couponTemplateId, userId, requestId);
+                CouponIssueRequest request = couponIssueRequestRepository.save(
+                    CouponIssueRequest.accept(requestId, userId, couponTemplateId));
+                applicationEventPublisher.publishEvent(
+                    new CouponIssueRequestedEvent(request.getRequestId(), userId, couponTemplateId));
+                return CouponIssueRequestInfo.from(request, null);
+            }));
+        } catch (CoreException e) {
+            couponIssueRedisStore.cancelReservation(couponTemplateId, userId, requestId);
+            throw e;
+        } catch (RuntimeException e) {
+            couponIssueRedisStore.cancelReservation(couponTemplateId, userId, requestId);
+            throw new CoreException(ErrorType.SERVICE_UNAVAILABLE, "잠시 후 다시 시도해주세요.", e);
+        }
     }
 
-    /**
-     * 내 쿠폰 목록 (AVAILABLE/USED/EXPIRED).
-     *
-     * <p>혜택이 발급분에 스냅샷되어 있어 템플릿 조인/일괄 조회 없이 발급분만으로 완성된다.
-     */
+    private void registerReservationRollback(Long couponId, Long userId, String requestId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    couponIssueRedisStore.cancelReservation(couponId, userId, requestId);
+                }
+            }
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public CouponIssueRequestInfo getIssueRequest(Long userId, String requestId) {
+        CouponIssueRequest request = couponIssueRequestRepository.findByRequestId(requestId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "발급 요청을 찾을 수 없습니다."));
+        if (!request.isOwnedBy(userId)) {
+            throw new CoreException(ErrorType.NOT_FOUND, "발급 요청을 찾을 수 없습니다.");
+        }
+
+        UserCouponInfo issued = null;
+        if (request.getUserCouponId() != null) {
+            ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+            issued = userCouponRepository.findById(request.getUserCouponId())
+                .map(uc -> UserCouponInfo.from(uc, now))
+                .orElse(null);
+        }
+        return CouponIssueRequestInfo.from(request, issued);
+    }
+
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getMyCoupons(Long userId) {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
@@ -77,11 +114,10 @@ public class CouponApplicationService {
             .toList();
     }
 
-    // ===== 어드민 =====
-
     @Transactional
-    public CouponInfo createTemplate(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
-        CouponModel coupon = new CouponModel(name, type, value, minOrderAmount, expiredAt);
+    public CouponInfo createTemplate(String name, CouponType type, long value, Long minOrderAmount,
+                                     ZonedDateTime expiredAt, Integer totalQuantity) {
+        CouponModel coupon = new CouponModel(name, type, value, minOrderAmount, expiredAt, totalQuantity);
         return CouponInfo.from(couponRepository.save(coupon));
     }
 
@@ -97,13 +133,11 @@ public class CouponApplicationService {
             .toList();
     }
 
-    /**
-     * 템플릿 수정 — 이미 발급된 쿠폰의 혜택(스냅샷)에는 영향을 주지 않으며, 이후 발급분에만 적용된다.
-     */
     @Transactional
-    public CouponInfo updateTemplate(Long couponId, String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
+    public CouponInfo updateTemplate(Long couponId, String name, CouponType type, long value, Long minOrderAmount,
+                                     ZonedDateTime expiredAt, Integer totalQuantity) {
         CouponModel coupon = findTemplateOrThrow(couponId);
-        coupon.update(name, type, value, minOrderAmount, expiredAt);
+        coupon.update(name, type, value, minOrderAmount, expiredAt, totalQuantity);
         return CouponInfo.from(couponRepository.save(coupon));
     }
 
@@ -118,7 +152,7 @@ public class CouponApplicationService {
 
     @Transactional(readOnly = true)
     public List<UserCouponInfo> getIssues(Long couponId, int page, int size) {
-        findTemplateOrThrow(couponId);   // 템플릿 존재 검증
+        findTemplateOrThrow(couponId);
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         return userCouponRepository.findByCouponId(couponId, page, size).stream()
             .map(uc -> UserCouponInfo.from(uc, now))

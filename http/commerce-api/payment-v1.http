@@ -42,16 +42,3 @@ Content-Type: application/json
   "status": "FAILED",
   "reason": "LIMIT_EXCEEDED"
 }
-
-### (참고) Toss 스타일 동기 결제 확정
-# 결제창 인증 완료 후 successUrl 에서 받은 paymentKey 로 승인. amount 는 DB 주문 금액과 대조된다.
-POST {{commerce-api}}/api/v1/payments/confirm
-Content-Type: application/json
-X-Loopers-LoginId: user123
-X-Loopers-LoginPw: Password1!
-
-{
-  "paymentKey": "fake-payment-key",
-  "orderId": 1,
-  "amount": 100000
-}

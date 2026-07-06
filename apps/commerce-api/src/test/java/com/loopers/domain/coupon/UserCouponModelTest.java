@@ -59,7 +59,7 @@ class UserCouponModelTest {
             UserCouponModel uc = UserCouponModel.issue(1L, template);
 
             // 어드민이 템플릿 혜택을 대폭 축소
-            template.update("100원 할인", CouponType.FIXED, 100, 999_999L, PAST);
+            template.update("100원 할인", CouponType.FIXED, 100, 999_999L, PAST, null);
 
             assertAll(
                 () -> assertThat(uc.getCouponName()).isEqualTo("1만원 할인"),

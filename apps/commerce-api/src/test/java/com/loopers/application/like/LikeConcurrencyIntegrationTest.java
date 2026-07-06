@@ -21,8 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 좋아요 동시성 통합 테스트.
  *
- * <p>좋아요 수는 비정규화 컬럼(products.like_count)에 조건부 원자 UPDATE 로 동기화된다.
- * UK 로 멱등성을, 원자 UPDATE 로 동시성을 보장하므로 동시 요청에도 Lost Update 없이 정확히 반영되어야 한다.
+ * <p>좋아요는 동기로 즉시 성공하고, like_count 집계는 커밋 후 {@code @Async} 리스너가 <strong>최종 일관성</strong>으로
+ * 반영한다(Round 7). UK 로 멱등성을, 원자 UPDATE 로 동시성을 보장하므로, 집계가 반영된 뒤에는 Lost Update 없이
+ * 정확히 유저 수만큼 카운트되어야 한다. 집계가 비동기라 like() 반환 직후가 아니라 잠시 뒤 반영되므로 폴링으로 대기한다.
  */
 @SpringBootTest
 class LikeConcurrencyIntegrationTest {
@@ -37,7 +38,7 @@ class LikeConcurrencyIntegrationTest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("동일 상품에 여러 명이 동시에 좋아요해도, 좋아요 수가 정확히 반영된다.")
+    @DisplayName("동일 상품에 여러 명이 동시에 좋아요해도, 집계 반영 후 좋아요 수가 정확히 반영된다.")
     @Test
     void countsLikesExactly_whenDifferentUsersLikeConcurrently() throws InterruptedException {
         // arrange — 10명의 서로 다른 유저가 같은 상품에 동시 좋아요
@@ -63,9 +64,8 @@ class LikeConcurrencyIntegrationTest {
         latch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
-        // assert — like_count 가 정확히 유저 수만큼 (원자 UPDATE 로 Lost Update 없음)
-        ProductModel updated = productRepository.findById(product.getId()).orElseThrow();
-        assertThat(updated.getLikeCount()).isEqualTo(threadCount);
+        // assert — 비동기 집계가 반영되면 like_count 가 정확히 유저 수만큼 (원자 UPDATE 로 Lost Update 없음)
+        assertThat(awaitLikeCount(product.getId(), threadCount)).isEqualTo(threadCount);
     }
 
     @DisplayName("같은 유저가 동일 상품에 동시에 여러 번 좋아요해도, 좋아요는 1개만 반영된다 (멱등).")
@@ -97,7 +97,28 @@ class LikeConcurrencyIntegrationTest {
         executor.shutdown();
 
         // assert — 멱등: like_count 는 1 (중복 등록이 count 를 올리지 않음)
-        ProductModel updated = productRepository.findById(product.getId()).orElseThrow();
-        assertThat(updated.getLikeCount()).isEqualTo(1L);
+        assertThat(awaitLikeCount(product.getId(), 1L)).isEqualTo(1L);
+    }
+
+    /**
+     * 비동기 집계가 반영될 때까지 like_count 를 폴링한다. expected 도달 시 즉시 반환하고,
+     * 타임아웃되면 마지막으로 읽은 값을 반환한다(불일치 시 호출부 단언에서 실패로 드러남).
+     */
+    private long awaitLikeCount(Long productId, long expected) {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        long actual = -1L;
+        while (System.currentTimeMillis() < deadline) {
+            actual = productRepository.findById(productId).orElseThrow().getLikeCount();
+            if (actual == expected) {
+                return actual;
+            }
+            try {
+                Thread.sleep(50L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return actual;
     }
 }

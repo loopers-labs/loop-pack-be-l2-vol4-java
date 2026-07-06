@@ -15,9 +15,11 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
+import com.loopers.application.activity.UserActionEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,7 @@ public class OrderTransactionService {
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final UserCouponRepository userCouponRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * TX1 — 주문 생성 (무점유 견적): 재고/쿠폰 검증 + 금액 확정 + 주문 PENDING 저장.
@@ -95,7 +98,10 @@ public class OrderTransactionService {
         }
 
         // 4. 주문 PENDING 저장 — 아무 자원도 점유하지 않은 견적 상태
-        return orderRepository.save(order);
+        OrderModel saved = orderRepository.save(order);
+        // 유저 행동 로깅 (커밋 후 리스너가 기록)
+        eventPublisher.publishEvent(UserActionEvent.order(userId, saved.getId()));
+        return saved;
     }
 
     /**

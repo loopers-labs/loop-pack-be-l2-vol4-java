@@ -5,6 +5,7 @@ import com.loopers.domain.payment.PgGateway;
 import com.loopers.domain.payment.PgIndeterminateException;
 import com.loopers.domain.payment.PgRequestRejectedException;
 import feign.FeignException;
+import feign.RetryableException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -98,10 +99,21 @@ public class PgSimulatorGateway implements PgGateway {
                 .map(t -> new PgGateway.PgTransactionResult(t.transactionKey(), t.status(), t.reason()))
                 .toList();
         } catch (FeignException.NotFound e) {
+            // PG 가 "기록 없음"으로 응답 — 조회는 성공한 것. 빈 리스트로 정상 처리.
+            return List.of();
+        } catch (RetryableException e) {
+            // 타임아웃·연결오류 = PG 에 닿지도 못함. 빈 리스트로 둔갑시키면 만료 시점에 실제 SUCCESS 건이
+            // FAILED 로 오종결될 수 있다. "조회 불가"를 전파해 대사 측이 이번 틱 종결을 보류하게 한다.
+            log.warn("[PG] orderId 조회 불가(타임아웃/연결오류) — 종결 보류. orderId={}, cause={}", orderId, e.getMessage());
+            throw new PgIndeterminateException("PG 조회 불가: " + e.getMessage(), e);
+        } catch (FeignException e) {
+            // PG 가 HTTP 오류로 응답(예: 해당 주문 거래 없음) — PG 는 살아있으므로 기록 없음으로 간주.
+            log.warn("[PG] orderId 조회 — PG HTTP {} 응답, 기록 없음 처리. orderId={}", e.status(), orderId);
             return List.of();
         } catch (Exception e) {
-            log.warn("[PG] orderId 조회 실패. orderId={}, cause={}", orderId, e.getMessage());
-            return List.of();
+            // 예상치 못한 오류 — 조회 결과를 신뢰할 수 없으니 빈 리스트로 단정하지 않고 보류시킨다.
+            log.warn("[PG] orderId 조회 중 예외 — 종결 보류. orderId={}, cause={}", orderId, e.getMessage());
+            throw new PgIndeterminateException("PG 조회 중 예외: " + e.getMessage(), e);
         }
     }
 

@@ -113,6 +113,21 @@ class PgSimulatorGatewayTest {
         verify(pgCircuitClient, times(1)).requestOnce(anyString(), any());
     }
 
+    @DisplayName("200 응답이지만 transactionKey 가 null 이면 재시도 없이 PgIndeterminateException 을 던진다.")
+    @Test
+    void throwsIndeterminateWithoutRetry_when200ButNullTransactionKey() {
+        // arrange — 응답은 왔으나 TID 가 비어 있음
+        when(pgCircuitClient.requestOnce(anyString(), any()))
+            .thenReturn(new PgPaymentDto.TransactionResponse(null, "PENDING", null));
+
+        // act & assert — 미확정으로 분류, 재시도 금지
+        assertThatThrownBy(() ->
+            gateway.requestPayment("1", 100L, CardType.SAMSUNG, "1234-5678-9814-1451", 5000L, "http://localhost:8080/cb"))
+            .isInstanceOf(PgIndeterminateException.class);
+
+        verify(pgCircuitClient, times(1)).requestOnce(anyString(), any());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────
 
     private static FeignException.InternalServerError mock500() {

@@ -11,7 +11,9 @@ public record CouponInfo(
     String type,
     long value,
     Long minOrderAmount,
-    ZonedDateTime expiredAt
+    ZonedDateTime expiredAt,
+    Integer totalQuantity,
+    long issuedCount
 ) {
     public static CouponInfo from(CouponModel coupon) {
         return new CouponInfo(
@@ -20,7 +22,9 @@ public record CouponInfo(
             coupon.getType().name(),
             coupon.getValue(),
             coupon.getMinOrderAmount(),
-            coupon.getExpiredAt()
+            coupon.getExpiredAt(),
+            coupon.getTotalQuantity(),
+            coupon.getIssuedCount()
         );
     }
 }

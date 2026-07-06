@@ -17,7 +17,8 @@ public class CouponAdminV1Dto {
         @NotNull(message = "쿠폰 타입(FIXED/RATE)은 필수입니다.") CouponType type,
         @Min(value = 0, message = "할인 값은 0 이상이어야 합니다.") long value,
         @Min(value = 0, message = "최소 주문 금액은 0 이상이어야 합니다.") Long minOrderAmount,   // 선택(null 허용)
-        @NotNull(message = "만료 시각은 필수입니다.") LocalDateTime expiredAt
+        @NotNull(message = "만료 시각은 필수입니다.") LocalDateTime expiredAt,
+        @Min(value = 1, message = "총 발급 수량은 1 이상이어야 합니다.") Integer totalQuantity   // 선택(null = 무제한)
     ) {}
 
     public record UpdateCouponRequest(
@@ -25,7 +26,8 @@ public class CouponAdminV1Dto {
         @NotNull(message = "쿠폰 타입(FIXED/RATE)은 필수입니다.") CouponType type,
         @Min(value = 0, message = "할인 값은 0 이상이어야 합니다.") long value,
         @Min(value = 0, message = "최소 주문 금액은 0 이상이어야 합니다.") Long minOrderAmount,
-        @NotNull(message = "만료 시각은 필수입니다.") LocalDateTime expiredAt
+        @NotNull(message = "만료 시각은 필수입니다.") LocalDateTime expiredAt,
+        @Min(value = 1, message = "총 발급 수량은 1 이상이어야 합니다.") Integer totalQuantity   // 선택(null = 무제한)
     ) {}
 
     public record CouponResponse(
@@ -34,11 +36,14 @@ public class CouponAdminV1Dto {
         String type,
         long value,
         Long minOrderAmount,
-        ZonedDateTime expiredAt
+        ZonedDateTime expiredAt,
+        Integer totalQuantity,
+        long issuedCount
     ) {
         public static CouponResponse from(CouponInfo info) {
             return new CouponResponse(
-                info.id(), info.name(), info.type(), info.value(), info.minOrderAmount(), info.expiredAt()
+                info.id(), info.name(), info.type(), info.value(), info.minOrderAmount(), info.expiredAt(),
+                info.totalQuantity(), info.issuedCount()
             );
         }
     }

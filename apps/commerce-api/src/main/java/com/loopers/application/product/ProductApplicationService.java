@@ -1,5 +1,7 @@
 package com.loopers.application.product;
 
+import com.loopers.application.activity.ProductListViewedEvent;
+import com.loopers.application.activity.ProductViewedEvent;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductDetailService;
@@ -53,6 +55,8 @@ public class ProductApplicationService {
         // 재고는 캐시 분리 정책 — 캐시 히트 여부와 무관하게 항상 DB 직접 조회.
         // 주문으로 재고가 실시간 변동되므로 캐시 값을 신뢰할 수 없다.
         StockModel stock = findStockOrThrow(productId);
+        // 조회 행동 로깅 — 캐시 히트/미스와 무관하게 발행 (비로그인 조회라 userId 는 null)
+        eventPublisher.publishEvent(new ProductViewedEvent(null, productId));
         Optional<ProductInfo> cached = productCacheStore.getDetail(productId);
         if (cached.isPresent()) {
             return cached.get().withStock(stock);
@@ -74,6 +78,8 @@ public class ProductApplicationService {
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(Long brandId, String sort, int page, int size) {
         validateSort(sort);
+        // 목록 페이지 조회 행동 로깅 — 요청당 1건(페이지 단위), 캐시 히트/미스와 무관하게 발행
+        eventPublisher.publishEvent(new ProductListViewedEvent(brandId, sort, page));
         Optional<List<ProductInfo>> cached = productCacheStore.getList(brandId, sort, page, size);
         if (cached.isPresent()) {
             return cached.get();

@@ -1,22 +1,20 @@
 package com.loopers.application.payment;
 
-import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderTransactionService;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
-import com.loopers.domain.payment.PaymentResult;
 import com.loopers.domain.payment.PaymentService;
 import com.loopers.domain.payment.PgGateway;
 import com.loopers.domain.payment.PgIndeterminateException;
 import com.loopers.domain.payment.PgRequestRejectedException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import com.loopers.support.error.PaymentFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,12 +24,8 @@ import java.util.Optional;
 /**
  * 결제 유스케이스 Application Service — 오케스트레이터.
  *
- * <p>두 가지 결제 흐름을 지원한다:
- * <ol>
- *   <li><strong>Toss 스타일 (confirmPayment)</strong> — 인증→승인 2단계 동기 방식.</li>
- *   <li><strong>pg-simulator 비동기 방식 (requestPayment + handleCallback)</strong> —
- *       즉시 transactionKey(PENDING) 수신 후 콜백으로 최종 결과 통보.</li>
- * </ol>
+ * <p>pg-simulator 비동기 결제(requestPayment + handleCallback)를 조율한다 —
+ * 요청 시 즉시 transactionKey(PENDING)를 받고, 최종 결과는 콜백/대사로 확정한다.
  *
  * <h2>requestPayment 순서</h2>
  * <ol>
@@ -57,6 +51,7 @@ public class PaymentApplicationService {
     private final PaymentService paymentService;
     private final PgGateway pgGateway;
     private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Lazy
     @Autowired
@@ -64,35 +59,6 @@ public class PaymentApplicationService {
 
     @Value("${pg.callback-base-url}")
     private String callbackBaseUrl;
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Toss 스타일 결제 확정 (기존 플로우 유지)
-    // ──────────────────────────────────────────────────────────────────────
-
-    public OrderInfo confirmPayment(Long userId, String paymentKey, Long orderId, Long amount) {
-        orderTransactionService.validateConfirmable(userId, orderId, amount);
-
-        try {
-            orderTransactionService.bindResources(orderId);
-        } catch (CoreException e) {
-            orderTransactionService.markOrderFailed(orderId);
-            throw e;
-        }
-
-        PaymentResult result = paymentService.confirm(paymentKey, orderId, amount);
-
-        if (result.isSuccess()) {
-            return orderTransactionService.completePayment(orderId);
-        }
-
-        if (result.status() == PaymentResult.Status.TIMEOUT) {
-            throw new CoreException(ErrorType.INTERNAL_ERROR,
-                "결제 결과를 확인하지 못했습니다. 잠시 후 주문 내역에서 결제 상태를 확인해주세요.");
-        }
-
-        orderTransactionService.releaseAndFail(orderId);
-        throw new PaymentFailedException("PAYMENT_FAILED: " + result.failureReasonOrDefault());
-    }
 
     // ──────────────────────────────────────────────────────────────────────
     // pg-simulator 비동기 결제 요청
@@ -180,6 +146,8 @@ public class PaymentApplicationService {
         if ("SUCCESS".equals(status)) {
             payment.markSuccess(transactionKey);             // JPA dirty checking → 자동 UPDATE
             orderTransactionService.completePayment(orderId);
+            // 결제 확정 부가작업(데이터 플랫폼 전송 등)은 이벤트로 분리 — 커밋 후 리스너가 비동기 처리
+            eventPublisher.publishEvent(new PaymentCompletedEvent(orderId, transactionKey, payment.getAmount()));
         } else {
             payment.markFailed(reason != null ? reason : "결제 실패");
             orderTransactionService.releaseAndFail(orderId);

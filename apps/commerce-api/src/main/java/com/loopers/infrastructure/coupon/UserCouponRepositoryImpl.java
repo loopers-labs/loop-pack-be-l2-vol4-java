@@ -49,4 +49,17 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     public List<UserCouponModel> findByCouponId(Long couponId, int page, int size) {
         return userCouponJpaRepository.findByCouponId(couponId, PageRequest.of(page, size));
     }
+
+    @Override
+    public List<UserCouponModel> saveAll(List<UserCouponModel> userCoupons) {
+        return userCouponJpaRepository.saveAll(userCoupons);
+    }
+
+    @Override
+    public List<Long> findIssuedUserIds(Long couponId, List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return userCouponJpaRepository.findUserIdsByCouponIdAndUserIdIn(couponId, userIds);
+    }
 }

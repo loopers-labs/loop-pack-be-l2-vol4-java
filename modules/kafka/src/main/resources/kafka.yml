@@ -15,12 +15,14 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       retries: 3
+      acks: all # 리더+ISR 전체 확인 후 응답 — 브로커 장애 시 유실 방지 (idempotence 전제조건)
+      properties:
+        enable.idempotence: true # 프로듀서 재시도로 인한 브로커 측 중복 저장 방지
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
-      properties:
-        enable-auto-commit: false
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer # (기존 value-serializer 오타 수정)
+      enable-auto-commit: false # manual ack — 처리 성공 후에만 오프셋 커밋
     listener:
       ack-mode: manual
 
