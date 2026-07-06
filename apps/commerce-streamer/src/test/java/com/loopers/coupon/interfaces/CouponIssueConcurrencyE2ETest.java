@@ -44,8 +44,8 @@ import static org.awaitility.Awaitility.await;
 @SpringBootTest
 class CouponIssueConcurrencyE2ETest {
 
-    private static final int LIMIT = 5;
-    private static final int REQUESTERS = 10;
+    private static final int LIMIT = 100;
+    private static final int REQUESTERS = 1000;
 
     @TestConfiguration
     static class TestKafkaConfig {
@@ -82,40 +82,36 @@ class CouponIssueConcurrencyE2ETest {
     }
 
     @Test
-    @DisplayName("선착순 한도 5에 10명이 요청해도 정확히 5명만 발급된다(초과 발급 없음)")
-    void givenLimit5_when10Requests_thenExactlyLimitIssued() {
+    @DisplayName("선착순 한도 100에 1000명이 요청해도 정확히 100명만 발급된다(Kafka 파티션 직렬화, 초과 0)")
+    void givenLimit100_when1000Requests_thenExactlyLimitIssued() throws InterruptedException {
         Long couponId = couponJpaRepository.save(Coupon.createLimited(
                 "선착순", CouponType.FIXED, 3_000L, null, ZonedDateTime.now().plusDays(30), (long) LIMIT)).getId();
 
-        List<String> requestIds = new ArrayList<>();
         List<String> payloads = new ArrayList<>();
         for (long userId = 1; userId <= REQUESTERS; userId++) {
             String requestId = UUID.randomUUID().toString();
             couponIssueRequestJpaRepository.save(CouponIssueRequest.pending(requestId, couponId, userId));
-            requestIds.add(requestId);
             payloads.add(serialize(new CouponIssueRequestedMessage(requestId, couponId, userId, ZonedDateTime.now())));
         }
 
+        // key=couponId → 한 파티션 → 컨슈머가 순차 처리(동시 실행 아님). latest offset race 는 재발행으로 흡수(멱등).
         String key = String.valueOf(couponId);
-        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofSeconds(1)).untilAsserted(() -> {
-            payloads.forEach(payload -> stringKafkaTemplate.send(KafkaTopic.COUPON_ISSUE_REQUESTS, key, payload));
-            stringKafkaTemplate.flush();
-            assertThat(processedCount(requestIds)).isEqualTo(REQUESTERS);
-        });
+        publishAll(payloads, key);
+        Thread.sleep(3_000);
+        publishAll(payloads, key);
+
+        await().atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofSeconds(1))
+                .until(() -> couponIssueRequestJpaRepository
+                        .countByCouponIdAndStatus(couponId, CouponIssueRequestStatus.PENDING) == 0);
 
         assertThat(userCouponJpaRepository.countByCouponId(couponId)).isEqualTo(LIMIT);
-        long rejected = requestIds.stream()
-                .filter(id -> statusOf(id) == CouponIssueRequestStatus.REJECTED)
-                .count();
-        assertThat(rejected).isEqualTo(REQUESTERS - LIMIT);
+        assertThat(couponIssueRequestJpaRepository.countByCouponIdAndStatus(couponId, CouponIssueRequestStatus.REJECTED))
+                .isEqualTo(REQUESTERS - LIMIT);
     }
 
-    private long processedCount(List<String> requestIds) {
-        return requestIds.stream().filter(id -> statusOf(id) != CouponIssueRequestStatus.PENDING).count();
-    }
-
-    private CouponIssueRequestStatus statusOf(String requestId) {
-        return couponIssueRequestJpaRepository.findByRequestId(requestId).orElseThrow().getStatus();
+    private void publishAll(List<String> payloads, String key) {
+        payloads.forEach(payload -> stringKafkaTemplate.send(KafkaTopic.COUPON_ISSUE_REQUESTS, key, payload));
+        stringKafkaTemplate.flush();
     }
 
     private String serialize(CouponIssueRequestedMessage message) {
