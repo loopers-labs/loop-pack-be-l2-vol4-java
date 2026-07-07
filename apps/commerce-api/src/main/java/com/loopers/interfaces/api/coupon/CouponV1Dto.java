@@ -6,6 +6,15 @@ import java.time.ZonedDateTime;
 
 public class CouponV1Dto {
 
+    public record IssueRequestResponse(String requestId) {}
+
+    public record IssueResultResponse(String requestId, Long couponId, String status, Long userCouponId, String reason) {
+        public static IssueResultResponse from(com.loopers.application.coupon.CouponIssueResultInfo info) {
+            return new IssueResultResponse(info.requestId(), info.couponId(), info.status(),
+                info.userCouponId(), info.reason());
+        }
+    }
+
     public record UserCouponResponse(
         Long id,
         Long couponId,

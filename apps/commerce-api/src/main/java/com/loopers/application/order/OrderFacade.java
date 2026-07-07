@@ -6,6 +6,7 @@ import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.event.OrderPlaced;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.user.User;
@@ -13,6 +14,7 @@ import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +33,7 @@ public class OrderFacade {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final UserCouponRepository userCouponRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo createOrder(String loginId, PlaceOrderCommand command) {
@@ -70,6 +73,12 @@ public class OrderFacade {
             userCouponRepository.save(userCoupon); // USED 반영 — 커밋 시점 @Version 검증
         }
         Order saved = orderRepository.save(order);
+        eventPublisher.publishEvent(new OrderPlaced(
+            saved.getId(), saved.getUserId(), saved.getFinalAmount(),
+            saved.getItems().stream()
+                .map(i -> new OrderPlaced.Line(i.getProductId(), i.getQuantity()))
+                .toList(),
+            ZonedDateTime.now()));
         return OrderInfo.from(saved);
     }
 

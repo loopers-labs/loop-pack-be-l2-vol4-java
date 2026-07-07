@@ -35,6 +35,12 @@ public class Coupon extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private ZonedDateTime expiredAt;
 
+    @Column(name = "quantity")
+    private Long quantity; // null = 비선착순(무제한). 값 있으면 선착순 한도.
+
+    @Column(name = "issued_count", nullable = false)
+    private long issuedCount;
+
     protected Coupon() {}
 
     public Coupon(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
@@ -44,6 +50,14 @@ public class Coupon extends BaseEntity {
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+    }
+
+    public Coupon(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt, Long quantity) {
+        this(name, type, value, minOrderAmount, expiredAt);
+        if (quantity != null && quantity <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "선착순 수량은 1 이상이어야 합니다.");
+        }
+        this.quantity = quantity;
     }
 
     private static void validate(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
@@ -94,5 +108,13 @@ public class Coupon extends BaseEntity {
 
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public Long getQuantity() {
+        return quantity;
+    }
+
+    public long getIssuedCount() {
+        return issuedCount;
     }
 }

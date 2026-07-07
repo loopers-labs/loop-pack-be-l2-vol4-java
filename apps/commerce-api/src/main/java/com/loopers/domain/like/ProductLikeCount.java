@@ -25,6 +25,9 @@ public class ProductLikeCount extends BaseEntity {
     @Column(name = "like_count", nullable = false)
     private long count;
 
+    @Column(name = "version", columnDefinition = "bigint not null default 0")
+    private long version;
+
     protected ProductLikeCount() {}
 
     public ProductLikeCount(Long productId, long count) {
@@ -45,4 +48,6 @@ public class ProductLikeCount extends BaseEntity {
     public long getCount() {
         return count;
     }
+
+    public long getVersion() { return version; }
 }

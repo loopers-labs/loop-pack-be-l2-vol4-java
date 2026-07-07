@@ -8,15 +8,18 @@ import com.loopers.domain.product.LikesCursor;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSortType;
+import com.loopers.domain.product.event.ProductViewed;
 import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.domain.productrank.RankedProduct;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,7 @@ public class ProductFacade {
     private final LikeCountRepository likeCountRepository;
     private final ProductRankRepository productRankRepository;
     private final ProductCache productCache;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int OVER_FETCH = 2; // 삭제/누락 보정용 여유분 배수
     private static final int BLOB_SIZE = 100; // 첫 페이지 hot 경로용 top-N 블롭 크기
@@ -53,6 +57,7 @@ public class ProductFacade {
     public ProductDetailInfo getProductDetail(Long id) {
         Optional<ProductDetailInfo> cached = productCache.getDetail(id);
         if (cached.isPresent()) {
+            eventPublisher.publishEvent(new ProductViewed(id, null, ZonedDateTime.now()));
             return cached.get(); // 캐시 히트
         }
         Product product = loadProduct(id);
@@ -61,6 +66,7 @@ public class ProductFacade {
                 "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
         ProductDetailInfo info = ProductDetailInfo.from(product, brand, likeCountOf(id));
         productCache.putDetail(info, DETAIL_TTL); // read-through
+        eventPublisher.publishEvent(new ProductViewed(id, null, ZonedDateTime.now()));
         return info;
     }
 

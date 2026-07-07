@@ -38,3 +38,7 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Superpowers workflow docs (design/plan) — 로컬 전용, 레포 미반영 ###
+docs/superpowers/
+.superpowers/
