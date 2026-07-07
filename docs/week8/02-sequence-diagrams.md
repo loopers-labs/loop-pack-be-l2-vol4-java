@@ -67,7 +67,7 @@ sequenceDiagram
 
 ## 3. 토큰으로 주문
 
-무엇을 보려는가 — 토큰 검증이 주문 처리 앞에 있는지, 동시성 상한이 어디서 걸리는지, 토큰 삭제가 주문 성공과 어떻게 엮이는지를 확인한다.
+무엇을 보려는가 — 토큰 검증이 주문 처리 앞에 있는지, 동시성 상한을 누가 맡는지, 토큰 삭제가 주문 성공과 어떻게 엮이는지를 확인한다.
 
 ```mermaid
 sequenceDiagram
@@ -75,7 +75,6 @@ sequenceDiagram
     actor U as 유저
     participant I as TokenGuard (Interceptor)
     participant C as OrderV1Controller
-    participant B as Bulkhead (resilience4j)
     participant F as PlaceOrderFacade
     participant R as Redis
     participant E as ApplicationEvent → Kafka (week7)
@@ -85,21 +84,17 @@ sequenceDiagram
     alt 토큰 유효
         R-->>I: token 일치
         I->>C: 통과
-        C->>B: place(command)
-        alt 동시성 여유
-            B->>F: place(command)
-            F-->>C: 주문 완료
-            C-->>E: OrderCreatedEvent 발행
-            E->>R: (리스너) DEL order-queue:entry-token:{userId}
-            C-->>U: 201 주문 결과
-        else 상한 초과
-            B-->>U: 503 QUEUE_ORDER_BUSY
-        end
+        C->>F: place(command)
+        Note over F: DB 커넥션 풀(40 · 3s)이<br/>동시 처리 수를 상한 = Bulkhead 역할
+        F-->>C: 주문 완료
+        C-->>E: OrderCreatedEvent 발행
+        E->>R: (AFTER_COMMIT 리스너) DEL order-queue:entry-token:{userId}
+        C-->>U: 201 주문 결과
     else 토큰 없음/불일치
         I-->>U: 400 QUEUE_TOKEN_REQUIRED / INVALID
     end
 ```
 
-읽는 법 — 관문이 두 겹이다. 먼저 **TokenGuard**가 토큰을 검증해 통과 여부를 가른다(대기열을 거치지 않은 요청 차단). 통과해도 **Bulkhead**가 동시 처리 수를 눌러 커넥션 풀을 지킨다 — 스케줄러가 평균 속도를 눌러도 한 주기 안의 순간 스파이크가 남기 때문이다. 토큰 삭제는 주문이 성공했을 때만 일어나야 하므로, 검증 시점이 아니라 **주문 성공 이벤트(week7의 `OrderCreatedEvent` 재사용)에 리스너를 달아** 처리한다. 이렇게 하면 주문 흐름이 대기열을 직접 알지 않아도 된다.
+읽는 법 — 관문은 **TokenGuard** 한 겹이다: 토큰을 검증해 대기열을 거치지 않은 요청을 차단한다. 동시 처리 상한은 별도 Bulkhead가 아니라 **커넥션 풀(40 · 3s)** 이 맡는다 — 스케줄러가 평균 속도를 눌러도 남는 한 주기 안의 순간 스파이크를, 풀이 동시 40 상한 + 3초 대기로 흡수한다. 토큰 삭제는 주문이 성공했을 때만 일어나야 하므로 검증 시점이 아니라 **주문 성공 이벤트(week7 `OrderCreatedEvent` 재사용)의 AFTER_COMMIT 리스너**로 처리한다. 덕분에 주문 흐름은 대기열을 직접 알지 않는다.
 
 > **대안 — 검증 시 즉시 삭제(consume-on-entry).** 구현은 더 단순하지만, 주문이 실패하면 유저가 토큰을 잃고 다시 줄을 서야 한다. 발제의 "주문 완료 후 삭제"에 맞춰 성공 시 삭제(consume-on-completion)를 택했다.

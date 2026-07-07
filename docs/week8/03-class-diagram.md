@@ -9,7 +9,6 @@ classDiagram
     class QueueV1Controller {
         +enter(userId) ApiResponse
         +position(userId) ApiResponse
-        +stream(userId) SseEmitter
     }
     class QueueV1ApiSpec
     class QueueV1Request
@@ -98,4 +97,4 @@ classDiagram
 
 - **`AdmissionScheduler`를 어디에 둘까.** 지금은 트리거로 보고 infrastructure에 둔다. 발급 인원 계산(`AdmissionPolicy`)은 domain에 있으니, 스케줄러는 "언제 얼마나"를 조립만 한다. 만약 발급 로직이 커지면 application의 admit 유스케이스로 무게가 옮겨갈 수 있다.
 - **`TokenGuard`를 인터셉터로 둘지, 필터/AOP로 둘지.** 인터셉터는 핸들러 매핑 이후라 대상 지정이 쉽다. 인증 필터와 순서가 얽히면 필터로 내려야 할 수 있다.
-- **Bulkhead 부착 지점.** 주문 서비스 메서드에 resilience4j 애너테이션으로 건다. 컨트롤러에 걸면 검증 실패까지 상한에 세어질 수 있으니, 검증 통과 뒤 처리 구간에만 걸리도록 위치를 잡는다.
+- **동시성 상한은 별도 Bulkhead가 아니라 커넥션 풀.** HikariCP(`maximum-pool-size` 40, `connection-timeout` 3s)가 이미 동시 처리 상한 + 초과분 3초 대기를 제공해 resilience4j Bulkhead와 중복이다. 스케줄러 발급률이 유입을 풀 처리량 이하로 눌러 대기 발동 자체가 드물다. fail-fast·관측 지표가 필요해지면 그때 Bulkhead를 추가한다.

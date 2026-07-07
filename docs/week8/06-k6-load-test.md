@@ -23,7 +23,7 @@
 | **Q1** | 순서 보장 | N명 동시 진입 → 진입 시각 순서대로 순번이 매겨지는지, 중복 진입이 하나로 합쳐지는지 | `queue-enqueue.js` |
 | **Q2** | 발급률 상한 | 1만 명 버스트 → 스케줄러가 batch-size 속도로만 토큰을 발급하는지(주문 유입이 평탄한지) | `queue-admission.js` |
 | **Q3** | 토큰 만료 | 토큰 발급 후 미사용 → TTL 초과 시 주문이 거부되는지 | `queue-token-ttl.js` |
-| **Q4** | 최종 방어 | 토큰 보유자 다수가 동시 주문 → Bulkhead가 동시성 상한을 지키고 초과분만 거절하는지 | `queue-order-burst.js` |
+| **Q4** | 최종 방어 | 토큰 보유자 다수가 동시 주문 → 커넥션 풀(40)이 동시성을 상한하고 초과분은 3초 대기로 흡수하는지(붕괴·타임아웃 폭증 없이) | `queue-order-burst.js` |
 
 ## 관측 지표
 
@@ -35,7 +35,7 @@
 | HikariCP active/pending | `hikaricp_connections_*` | 커넥션 풀 포화 여부 |
 | 입장(발급) 수 / 초 | Micrometer `Counter` | 실제 발급률이 batch-size와 맞는지 |
 | Queue Depth | `ZCARD` | 유입 > 처리량이면 계속 증가 |
-| Bulkhead 거절 수 | resilience4j 메트릭 | 최종 방어선이 도는지 |
+| 커넥션 풀 대기/타임아웃 | HikariCP (`hikaricp_connections_pending`, `_timeout_total`) | 풀이 버스트를 흡수하는지(대기)·과부하로 넘치는지(타임아웃) |
 
 ## 전제 환경
 
