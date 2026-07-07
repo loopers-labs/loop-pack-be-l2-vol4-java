@@ -5,9 +5,13 @@ import com.loopers.brand.application.BrandCommand;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
+import com.loopers.queue.application.QueueService;
+import com.loopers.queue.domain.EntryTokenStore;
+import com.loopers.queue.interfaces.api.TokenGuard;
 import com.loopers.user.application.UserAccountService;
 import com.loopers.user.application.UserCommand;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,9 +44,14 @@ class OrderAdminV1ApiE2ETest {
     private final UserAccountService userAccountService;
     private final BrandAdminService brandAdminService;
     private final ProductAdminService productAdminService;
+    private final QueueService queueService;
+    private final EntryTokenStore entryTokenStore;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     private Long productId;
+    private Long userId1;
+    private Long userId2;
 
     @Autowired
     public OrderAdminV1ApiE2ETest(
@@ -50,23 +59,29 @@ class OrderAdminV1ApiE2ETest {
             UserAccountService userAccountService,
             BrandAdminService brandAdminService,
             ProductAdminService productAdminService,
-            DatabaseCleanUp databaseCleanUp
+            QueueService queueService,
+            EntryTokenStore entryTokenStore,
+            DatabaseCleanUp databaseCleanUp,
+            RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userAccountService = userAccountService;
         this.brandAdminService = brandAdminService;
         this.productAdminService = productAdminService;
+        this.queueService = queueService;
+        this.entryTokenStore = entryTokenStore;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @BeforeEach
     void setUp() {
-        userAccountService.signUp(new UserCommand.SignUp(
+        userId1 = userAccountService.signUp(new UserCommand.SignUp(
                 USER1, RAW_PASSWORD, "김루퍼", LocalDate.of(1995, 3, 21), "looper1@example.com"
-        ));
-        userAccountService.signUp(new UserCommand.SignUp(
+        )).id();
+        userId2 = userAccountService.signUp(new UserCommand.SignUp(
                 USER2, RAW_PASSWORD, "이루퍼", LocalDate.of(1996, 4, 22), "looper2@example.com"
-        ));
+        )).id();
         Long brandId = brandAdminService.create(new BrandCommand.Create("루퍼스", "설명", null)).id();
         productId = productAdminService.create(new ProductCommand.Create(brandId, "셔츠", "설명", 29_000L, "thumb.jpg", 100)).id();
     }
@@ -74,6 +89,7 @@ class OrderAdminV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders userHeaders(String loginId) {
@@ -90,16 +106,24 @@ class OrderAdminV1ApiE2ETest {
         return headers;
     }
 
-    private void placeOrder(String loginId) {
+    private void placeOrder(String loginId, Long userId) {
         OrderV1Request.Create body = new OrderV1Request.Create(
                 List.of(new OrderV1Request.Create.Line(productId, 1)),
                 "김루퍼", "010-1234-5678", "12345", "서울시 강남구", "101동",
                 null
         );
+        HttpHeaders headers = userHeaders(loginId);
+        headers.set(TokenGuard.HEADER, provisionEntryToken(userId));
         testRestTemplate.exchange(
-                "/api/v1/orders", HttpMethod.POST, new HttpEntity<>(body, userHeaders(loginId)),
+                "/api/v1/orders", HttpMethod.POST, new HttpEntity<>(body, headers),
                 new ParameterizedTypeReference<ApiResponse<OrderV1Response.Detail>>() {}
         );
+    }
+
+    private String provisionEntryToken(Long userId) {
+        queueService.enter(String.valueOf(userId));
+        queueService.admit();
+        return entryTokenStore.find(String.valueOf(userId)).orElseThrow();
     }
 
     private ResponseEntity<ApiResponse<List<OrderV1Response.Summary>>> getAllOrders(HttpHeaders headers) {
@@ -110,8 +134,8 @@ class OrderAdminV1ApiE2ETest {
     @Test
     @DisplayName("GET /api/v1/admin/orders: 관리자는 여러 사용자의 전체 주문을 조회한다")
     void givenOrdersFromMultipleUsers_whenGetAllOrders_thenReturnsAllOrders() {
-        placeOrder(USER1);
-        placeOrder(USER2);
+        placeOrder(USER1, userId1);
+        placeOrder(USER2, userId2);
 
         ResponseEntity<ApiResponse<List<OrderV1Response.Summary>>> response = getAllOrders(adminHeaders());
 

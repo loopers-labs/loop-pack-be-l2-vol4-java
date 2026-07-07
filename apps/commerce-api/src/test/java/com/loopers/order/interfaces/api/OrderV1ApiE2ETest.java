@@ -9,9 +9,13 @@ import com.loopers.coupon.domain.CouponType;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.product.application.ProductAdminService;
 import com.loopers.product.application.ProductCommand;
+import com.loopers.queue.application.QueueService;
+import com.loopers.queue.domain.EntryTokenStore;
+import com.loopers.queue.interfaces.api.TokenGuard;
 import com.loopers.user.application.UserAccountService;
 import com.loopers.user.application.UserCommand;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +51,10 @@ class OrderV1ApiE2ETest {
     private final ProductAdminService productAdminService;
     private final CouponAdminService couponAdminService;
     private final CouponIssueService couponIssueService;
+    private final QueueService queueService;
+    private final EntryTokenStore entryTokenStore;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     private Long userId;
     private Long productId;
@@ -64,7 +71,10 @@ class OrderV1ApiE2ETest {
             ProductAdminService productAdminService,
             CouponAdminService couponAdminService,
             CouponIssueService couponIssueService,
-            DatabaseCleanUp databaseCleanUp
+            QueueService queueService,
+            EntryTokenStore entryTokenStore,
+            DatabaseCleanUp databaseCleanUp,
+            RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.userAccountService = userAccountService;
@@ -72,7 +82,10 @@ class OrderV1ApiE2ETest {
         this.productAdminService = productAdminService;
         this.couponAdminService = couponAdminService;
         this.couponIssueService = couponIssueService;
+        this.queueService = queueService;
+        this.entryTokenStore = entryTokenStore;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @BeforeEach
@@ -93,6 +106,7 @@ class OrderV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders authHeaders() {
@@ -100,7 +114,15 @@ class OrderV1ApiE2ETest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Loopers-LoginId", LOGIN_ID);
         headers.set("X-Loopers-LoginPw", RAW_PASSWORD);
+        headers.set(TokenGuard.HEADER, provisionEntryToken());
         return headers;
+    }
+
+    // 주문 API 앞의 대기열 관문을 통과하기 위한 입장 토큰을 발급한다(진입 → 스케줄러 발급 대행).
+    private String provisionEntryToken() {
+        queueService.enter(String.valueOf(userId));
+        queueService.admit();
+        return entryTokenStore.find(String.valueOf(userId)).orElseThrow();
     }
 
     private HttpHeaders noAuthHeaders() {
