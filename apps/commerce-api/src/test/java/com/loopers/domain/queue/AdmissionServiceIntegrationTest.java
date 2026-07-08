@@ -79,4 +79,45 @@ class AdmissionServiceIntegrationTest {
         // then
         assertThat(admitted).isZero();
     }
+
+    @DisplayName("유입이 배치 크기보다 많아도 한 번의 입장 처리는 배치 크기만큼만 흘려보낸다.")
+    @Test
+    void admitsAtMostBatchSizeWhenInflowExceedsBatch() {
+        // given - 배치(5)보다 많은 12명 유입
+        for (long userId = 1; userId <= 12; userId++) {
+            waitingQueueRepository.enroll(userId);
+        }
+
+        // when
+        int admitted = admissionService.admit(5);
+
+        // then - 5명만 입장, 나머지 7명은 대기열에 안정적으로 잔류 (back-pressure)
+        assertThat(admitted).isEqualTo(5);
+        assertThat(waitingQueueRepository.size()).isEqualTo(7L);
+    }
+
+    @DisplayName("배치보다 많이 유입돼도 반복 입장 처리로 전원이 정확히 한 번씩 입장하고 대기열이 빈다.")
+    @Test
+    void drainsEntireQueueAcrossRepeatedAdmissions() {
+        // given
+        int total = 12;
+        for (long userId = 1; userId <= total; userId++) {
+            waitingQueueRepository.enroll(userId);
+        }
+
+        // when - 스케줄러가 배치(5)씩 반복 입장 (큐가 빌 때까지)
+        int admittedTotal = 0;
+        int perTick;
+        do {
+            perTick = admissionService.admit(5);
+            admittedTotal += perTick;
+        } while (perTick > 0);
+
+        // then - 전원 입장(유실 0)·각자 토큰 보유(중복 0)·큐는 빔
+        assertThat(admittedTotal).isEqualTo(total);
+        assertThat(waitingQueueRepository.size()).isZero();
+        for (long userId = 1; userId <= total; userId++) {
+            assertThat(entryTokenRepository.find(userId)).isPresent();
+        }
+    }
 }
