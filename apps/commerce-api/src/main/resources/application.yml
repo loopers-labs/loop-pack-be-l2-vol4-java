@@ -44,6 +44,13 @@ payment-recovery:
 outbox-relay:
   scan-interval: 2s
 
+# 입장(Admission) 스케줄러: enabled=true 인 프로파일(dev/qa/prd)에서만 동작. local/test 는 미설정(off) → ZPOPMIN 이 큐 상태를 바꿔 테스트가 flaky 해지는 것 방지.
+# batch-size·interval 산정 근거는 ADR-003 (DB 풀 50 / 200ms = 250 TPS → 70% 마진 175 TPS → 100ms 마다 ~18명).
+queue:
+  admission:
+    batch-size: 18
+    interval: 100ms
+
 resilience4j:
   circuitbreaker:
     instances:
@@ -74,6 +81,10 @@ spring:
 outbox-relay:
   enabled: true
 
+queue:
+  admission:
+    enabled: true
+
 ---
 spring:
   config:
@@ -83,6 +94,10 @@ spring:
 outbox-relay:
   enabled: true
 
+queue:
+  admission:
+    enabled: true
+
 ---
 spring:
   config:
@@ -91,6 +106,10 @@ spring:
 
 outbox-relay:
   enabled: true
+
+queue:
+  admission:
+    enabled: true
 
 springdoc:
   api-docs:

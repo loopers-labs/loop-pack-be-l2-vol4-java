@@ -7,9 +7,13 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 public class RedisWaitingQueueRepository implements WaitingQueueRepository {
@@ -43,6 +47,20 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
     public long size() {
         Long count = redisTemplate.opsForZSet().zCard(WAITING_QUEUE);
         return count == null ? 0L : count;
+    }
+
+    @Override
+    public List<Long> pollNext(int count) {
+        // ZPOPMIN: score 가 가장 낮은(= 가장 먼저 진입한) count 명을 원자적으로 꺼내고 제거한다.
+        Set<ZSetOperations.TypedTuple<String>> popped = redisTemplate.opsForZSet().popMin(WAITING_QUEUE, count);
+        if (popped == null) {
+            return List.of();
+        }
+        return popped.stream()
+            .map(ZSetOperations.TypedTuple::getValue)
+            .filter(Objects::nonNull)
+            .map(Long::valueOf)
+            .toList();
     }
 
     /**

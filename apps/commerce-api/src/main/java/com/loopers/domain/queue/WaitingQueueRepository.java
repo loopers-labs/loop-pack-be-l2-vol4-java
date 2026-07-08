@@ -1,5 +1,6 @@
 package com.loopers.domain.queue;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface WaitingQueueRepository {
@@ -15,4 +16,7 @@ public interface WaitingQueueRepository {
 
     /** 전체 대기 인원. */
     long size();
+
+    /** 대기열 앞에서 최대 count 명을 꺼내(제거) 진입 순서대로 반환한다. (스케줄러 입장 처리용) */
+    List<Long> pollNext(int count);
 }

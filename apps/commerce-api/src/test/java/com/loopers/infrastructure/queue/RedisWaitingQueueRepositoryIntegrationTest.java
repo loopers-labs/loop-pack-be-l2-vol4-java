@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,5 +92,21 @@ class RedisWaitingQueueRepositoryIntegrationTest {
 
         // then
         assertThat(size).isEqualTo(3L);
+    }
+
+    @DisplayName("앞에서 N명을 꺼내면 먼저 진입한 순서대로 반환되고 대기열에서 제거된다.")
+    @Test
+    void pollNextRemovesFrontUsersInEnrollmentOrder() {
+        // given
+        waitingQueueRepository.enroll(100L);
+        waitingQueueRepository.enroll(200L);
+        waitingQueueRepository.enroll(300L);
+
+        // when
+        List<Long> polled = waitingQueueRepository.pollNext(2);
+
+        // then
+        assertThat(polled).containsExactly(100L, 200L);
+        assertThat(waitingQueueRepository.size()).isEqualTo(1L);
     }
 }
