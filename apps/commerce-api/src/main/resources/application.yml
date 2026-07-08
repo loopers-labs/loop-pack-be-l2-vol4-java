@@ -51,6 +51,12 @@ loopers:
     reconciliation-enabled: true
     reconciliation-delay: 10s
     reconciliation-batch-size: 20
+  waiting-queue:
+    scheduler-enabled: true
+    admit-delay: 100ms
+    admit-batch-size: 18
+    token-ttl: 5m
+    estimated-admit-per-second: 175
 
 resilience4j.circuitbreaker:
   instances:
