@@ -14,9 +14,14 @@ public interface OrderV1ApiSpec {
 
     @Operation(
         summary = "주문 생성",
-        description = "로그인한 회원이 상품 목록과 수량으로 주문을 생성합니다. 같은 상품이 여러 라인으로 들어오면 수량을 합산합니다."
+        description = "대기열을 통과해 입장 토큰(X-Entry-Token)을 발급받은 로그인 회원이 주문을 생성합니다. "
+            + "토큰이 없거나 만료됐으면 ENTRY_TOKEN_INVALID(403). 같은 상품이 여러 라인으로 들어오면 수량을 합산합니다."
     )
-    ApiResponse<OrderV1Dto.OrderResponse> placeOrder(LoginUser loginUser, OrderV1Dto.PlaceOrderRequest request);
+    ApiResponse<OrderV1Dto.OrderResponse> placeOrder(
+        LoginUser loginUser,
+        @Parameter(description = "입장 토큰 (대기열 통과 시 발급). 누락 시 400.", required = true) String entryToken,
+        OrderV1Dto.PlaceOrderRequest request
+    );
 
     @Operation(
         summary = "내 주문 목록 조회",

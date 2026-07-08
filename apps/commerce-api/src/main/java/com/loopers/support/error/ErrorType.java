@@ -52,7 +52,8 @@ public enum ErrorType {
     COUPON_ISSUE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_ISSUE_REQUEST_NOT_FOUND", "발급 요청을 찾을 수 없습니다."),
 
     /** 대기열 도메인 */
-    QUEUE_ENTRY_NOT_FOUND(HttpStatus.NOT_FOUND, "QUEUE_ENTRY_NOT_FOUND", "대기열에 없는 유저입니다.");
+    QUEUE_ENTRY_NOT_FOUND(HttpStatus.NOT_FOUND, "QUEUE_ENTRY_NOT_FOUND", "대기열에 없는 유저입니다."),
+    ENTRY_TOKEN_INVALID(HttpStatus.FORBIDDEN, "ENTRY_TOKEN_INVALID", "유효한 입장 토큰이 없어 주문할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
