@@ -38,6 +38,7 @@ outbox:
 
 # 대기열 드레인 스케줄러 — 매 틱 앞에서 N명을 꺼내 입장 토큰 발급 (single puller 전제)
 queue:
+  throughput-per-second: 175  # 예상 대기시간 추정용 (순번 ÷ 이 값 ≈ 남은 초)
   drain:
     enabled: true
     interval-ms: 100          # 드레인 주기 (ms) — 100ms 로 쪼개 Thundering Herd 완화
