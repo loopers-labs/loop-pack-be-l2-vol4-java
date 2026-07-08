@@ -1,8 +1,10 @@
 package com.loopers.application.order;
 
+import com.loopers.application.event.ProductOrderedEvent;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.CouponUseResult;
 import com.loopers.domain.order.Order;
+import com.loopers.domain.order.OrderLine;
 import com.loopers.domain.order.OrderProductCommand;
 import com.loopers.domain.order.OrderProductProcessService;
 import com.loopers.domain.order.OrderResult;
@@ -11,7 +13,8 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +23,6 @@ import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
 
-@RequiredArgsConstructor
 @Component
 public class OrderFacade {
     private final OrderService orderService;
@@ -28,6 +30,42 @@ public class OrderFacade {
     private final OrderProductProcessService orderProductProcessService;
     private final CouponService couponService;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    public OrderFacade(
+        OrderService orderService,
+        ProductService productService,
+        OrderProductProcessService orderProductProcessService,
+        CouponService couponService,
+        Clock clock,
+        ApplicationEventPublisher eventPublisher
+    ) {
+        this.orderService = orderService;
+        this.productService = productService;
+        this.orderProductProcessService = orderProductProcessService;
+        this.couponService = couponService;
+        this.clock = clock;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public OrderFacade(
+        OrderService orderService,
+        ProductService productService,
+        OrderProductProcessService orderProductProcessService,
+        CouponService couponService,
+        Clock clock
+    ) {
+        this(
+            orderService,
+            productService,
+            orderProductProcessService,
+            couponService,
+            clock,
+            event -> {
+            }
+        );
+    }
 
     @Transactional
     public OrderInfo createOrder(String userLoginId, List<OrderProductCommand> commands, Long couponId) {
@@ -37,7 +75,9 @@ public class OrderFacade {
         OrderResult result = orderProductProcessService.createOrder(userLoginId, commands, products);
         applyCouponAfterProductLocks(userLoginId, couponId, result.order());
         productService.saveProducts(products);
-        return OrderInfo.from(orderService.saveOrder(result));
+        OrderResult saved = orderService.saveOrder(result);
+        publishProductOrderedEvents(saved.order());
+        return OrderInfo.from(saved);
     }
 
     @Transactional
@@ -101,5 +141,16 @@ public class OrderFacade {
             ZonedDateTime.now(clock)
         );
         order.applyDiscount(couponUseResult.discountAmount());
+    }
+
+    private void publishProductOrderedEvents(Order order) {
+        for (OrderLine orderLine : order.getOrderLines()) {
+            eventPublisher.publishEvent(ProductOrderedEvent.ordered(
+                orderLine.getProductId(),
+                order.getId(),
+                order.getUserLoginId(),
+                orderLine.getQuantity()
+            ));
+        }
     }
 }

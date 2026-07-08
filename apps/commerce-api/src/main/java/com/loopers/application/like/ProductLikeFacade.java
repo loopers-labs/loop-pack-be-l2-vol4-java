@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.application.event.ProductLikeChangedEvent;
 import com.loopers.application.product.ProductCacheRepository;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.application.product.ProductLikeCountRepository;
@@ -13,6 +14,7 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class ProductLikeFacade {
     private final ProductBrandProcessService productBrandProcessService;
     private final ProductCacheRepository productCacheRepository;
     private final ProductLikeCountRepository productLikeCountRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void likeProduct(String userLoginId, Long productId) {
@@ -39,6 +42,7 @@ public class ProductLikeFacade {
             }
             productCacheRepository.evictProduct(productId);
             productCacheRepository.evictProductLists();
+            eventPublisher.publishEvent(ProductLikeChangedEvent.liked(productId, userLoginId));
         }
     }
 
@@ -52,6 +56,7 @@ public class ProductLikeFacade {
             }
             productCacheRepository.evictProduct(productId);
             productCacheRepository.evictProductLists();
+            eventPublisher.publishEvent(ProductLikeChangedEvent.unliked(productId, userLoginId));
         }
     }
 

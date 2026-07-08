@@ -41,4 +41,9 @@ public class CouponRepositoryImpl implements CouponRepository {
             .map(CouponJpaEntity::toDomain)
             .toList();
     }
+
+    @Override
+    public int increaseIssuedCount(Long couponId) {
+        return couponJpaRepository.increaseIssuedCount(couponId);
+    }
 }

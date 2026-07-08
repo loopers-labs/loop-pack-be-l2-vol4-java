@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
@@ -36,6 +37,15 @@ pg-simulator:
   read-timeout: 800ms
 
 loopers:
+  kafka:
+    topics:
+      catalog-events: catalog-events
+      coupon-issue-requests: coupon-issue-requests
+  outbox:
+    relay-enabled: true
+    relay-delay: 5s
+    relay-batch-size: 50
+    publish-timeout: 3s
   payment:
     lookup-empty-failure-delay: 10s
     reconciliation-enabled: true

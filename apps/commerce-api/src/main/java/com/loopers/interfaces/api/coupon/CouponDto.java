@@ -39,6 +39,53 @@ public final class CouponDto {
         }
     }
 
+    public static final class FirstComeIssue {
+
+        private FirstComeIssue() {}
+
+        public record RequestResponse(
+            String requestId,
+            Long couponId,
+            String userLoginId,
+            com.loopers.domain.coupon.IssueRequestStatus status,
+            ZonedDateTime requestedAt
+        ) {
+            public static RequestResponse from(CouponInfo.FirstComeIssueRequest info) {
+                return new RequestResponse(
+                    info.requestId(),
+                    info.couponId(),
+                    info.userLoginId(),
+                    info.status(),
+                    info.requestedAt()
+                );
+            }
+        }
+
+        public record ResultResponse(
+            String requestId,
+            Long couponId,
+            String userLoginId,
+            com.loopers.domain.coupon.IssueRequestStatus status,
+            com.loopers.domain.coupon.IssueRejectReason rejectReason,
+            Long issuedCouponId,
+            ZonedDateTime requestedAt,
+            ZonedDateTime processedAt
+        ) {
+            public static ResultResponse from(CouponInfo.FirstComeIssueResult info) {
+                return new ResultResponse(
+                    info.requestId(),
+                    info.couponId(),
+                    info.userLoginId(),
+                    info.status(),
+                    info.rejectReason(),
+                    info.issuedCouponId(),
+                    info.requestedAt(),
+                    info.processedAt()
+                );
+            }
+        }
+    }
+
     public static final class Issued {
 
         private Issued() {}

@@ -17,7 +17,9 @@ public final class CouponInfo {
         CouponType type,
         Long value,
         Long minOrderAmount,
-        ZonedDateTime expiredAt
+        ZonedDateTime expiredAt,
+        Long issueLimit,
+        Long issuedCount
     ) {
         public static Template from(Coupon coupon) {
             return new Template(
@@ -26,7 +28,51 @@ public final class CouponInfo {
                 coupon.getType(),
                 coupon.getValue(),
                 coupon.getMinOrderAmount(),
-                coupon.getExpiredAt()
+                coupon.getExpiredAt(),
+                coupon.getIssueLimit(),
+                coupon.getIssuedCount()
+            );
+        }
+    }
+
+    public record FirstComeIssueRequest(
+        String requestId,
+        Long couponId,
+        String userLoginId,
+        com.loopers.domain.coupon.IssueRequestStatus status,
+        ZonedDateTime requestedAt
+    ) {
+        public static FirstComeIssueRequest from(com.loopers.domain.coupon.CouponIssueRequest request) {
+            return new FirstComeIssueRequest(
+                request.getRequestId(),
+                request.getCouponId(),
+                request.getUserLoginId(),
+                request.getStatus(),
+                request.getRequestedAt()
+            );
+        }
+    }
+
+    public record FirstComeIssueResult(
+        String requestId,
+        Long couponId,
+        String userLoginId,
+        com.loopers.domain.coupon.IssueRequestStatus status,
+        com.loopers.domain.coupon.IssueRejectReason rejectReason,
+        Long issuedCouponId,
+        ZonedDateTime requestedAt,
+        ZonedDateTime processedAt
+    ) {
+        public static FirstComeIssueResult from(com.loopers.domain.coupon.CouponIssueRequest request) {
+            return new FirstComeIssueResult(
+                request.getRequestId(),
+                request.getCouponId(),
+                request.getUserLoginId(),
+                request.getStatus(),
+                request.getRejectReason(),
+                request.getIssuedCouponId(),
+                request.getRequestedAt(),
+                request.getProcessedAt()
             );
         }
     }

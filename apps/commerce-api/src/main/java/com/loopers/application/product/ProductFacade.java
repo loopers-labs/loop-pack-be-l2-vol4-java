@@ -1,17 +1,18 @@
 package com.loopers.application.product;
 
+import com.loopers.application.event.ProductViewedEvent;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductBrandProcessService;
 import com.loopers.domain.product.ProductService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@RequiredArgsConstructor
 @Component
 public class ProductFacade {
     private final ProductService productService;
@@ -19,6 +20,42 @@ public class ProductFacade {
     private final ProductBrandProcessService productBrandProcessService;
     private final ProductCacheRepository productCacheRepository;
     private final ProductLikeCountRepository productLikeCountRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    public ProductFacade(
+        ProductService productService,
+        BrandService brandService,
+        ProductBrandProcessService productBrandProcessService,
+        ProductCacheRepository productCacheRepository,
+        ProductLikeCountRepository productLikeCountRepository,
+        ApplicationEventPublisher eventPublisher
+    ) {
+        this.productService = productService;
+        this.brandService = brandService;
+        this.productBrandProcessService = productBrandProcessService;
+        this.productCacheRepository = productCacheRepository;
+        this.productLikeCountRepository = productLikeCountRepository;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public ProductFacade(
+        ProductService productService,
+        BrandService brandService,
+        ProductBrandProcessService productBrandProcessService,
+        ProductCacheRepository productCacheRepository,
+        ProductLikeCountRepository productLikeCountRepository
+    ) {
+        this(
+            productService,
+            brandService,
+            productBrandProcessService,
+            productCacheRepository,
+            productLikeCountRepository,
+            event -> {
+            }
+        );
+    }
 
     @Transactional
     public ProductInfo createProduct(Long brandId, String name, String description, Long price, Integer stock) {
@@ -30,10 +67,12 @@ public class ProductFacade {
         return productInfo;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ProductInfo getProduct(Long id) {
-        return productCacheRepository.getProduct(id)
+        ProductInfo productInfo = productCacheRepository.getProduct(id)
             .orElseGet(() -> getProductFromDb(id));
+        eventPublisher.publishEvent(ProductViewedEvent.viewed(id, null));
+        return productInfo;
     }
 
     private ProductInfo getProductFromDb(Long id) {

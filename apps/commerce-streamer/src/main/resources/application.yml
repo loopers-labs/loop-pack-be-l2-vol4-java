@@ -29,6 +29,15 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+loopers:
+  kafka:
+    topics:
+      catalog-events: catalog-events
+      coupon-issue-requests: coupon-issue-requests
+    consumer-groups:
+      catalog-metrics: commerce-streamer-catalog-metrics
+      coupon-issue: commerce-streamer-coupon-issue
+
 ---
 spring:
   config:

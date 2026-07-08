@@ -31,6 +31,12 @@ public class CouponJpaEntity extends BaseEntity {
     @Column(nullable = false)
     private ZonedDateTime expiredAt;
 
+    @Column
+    private Long issueLimit;
+
+    @Column(nullable = false)
+    private Long issuedCount;
+
     protected CouponJpaEntity() {
     }
 
@@ -39,13 +45,17 @@ public class CouponJpaEntity extends BaseEntity {
         CouponType type,
         Long value,
         Long minOrderAmount,
-        ZonedDateTime expiredAt
+        ZonedDateTime expiredAt,
+        Long issueLimit,
+        Long issuedCount
     ) {
         this.name = name;
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+        this.issueLimit = issueLimit;
+        this.issuedCount = issuedCount;
     }
 
     public static CouponJpaEntity from(Coupon coupon) {
@@ -54,7 +64,9 @@ public class CouponJpaEntity extends BaseEntity {
             coupon.getType(),
             coupon.getValue(),
             coupon.getMinOrderAmount(),
-            coupon.getExpiredAt()
+            coupon.getExpiredAt(),
+            coupon.getIssueLimit(),
+            coupon.getIssuedCount()
         );
     }
 
@@ -66,6 +78,8 @@ public class CouponJpaEntity extends BaseEntity {
             value,
             minOrderAmount,
             expiredAt,
+            issueLimit,
+            issuedCount,
             getDeletedAt() != null
         );
     }
@@ -76,6 +90,8 @@ public class CouponJpaEntity extends BaseEntity {
         this.value = coupon.getValue();
         this.minOrderAmount = coupon.getMinOrderAmount();
         this.expiredAt = coupon.getExpiredAt();
+        this.issueLimit = coupon.getIssueLimit();
+        this.issuedCount = coupon.getIssuedCount();
         if (coupon.isDeleted()) {
             delete();
         }
@@ -99,5 +115,13 @@ public class CouponJpaEntity extends BaseEntity {
 
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public Long getIssueLimit() {
+        return issueLimit;
+    }
+
+    public Long getIssuedCount() {
+        return issuedCount;
     }
 }

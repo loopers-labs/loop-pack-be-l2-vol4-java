@@ -10,6 +10,7 @@ import com.loopers.domain.product.ProductService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +42,9 @@ class ProductLikeFacadeTest {
 
     @Mock
     private ProductLikeCountRepository productLikeCountRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @DisplayName("Redis 카운터 갱신에 성공하면 상품 row lock 없이 좋아요 수를 반영한다.")
     @Test
@@ -91,7 +95,8 @@ class ProductLikeFacadeTest {
             brandService,
             productBrandProcessService,
             productCacheRepository,
-            productLikeCountRepository
+            productLikeCountRepository,
+            eventPublisher
         );
     }
 }
