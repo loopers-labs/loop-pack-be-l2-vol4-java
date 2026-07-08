@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.queue;
 
 import com.loopers.application.queue.QueueInfo;
+import com.loopers.application.queue.QueuePositionInfo;
 import com.loopers.application.queue.WaitingQueueFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.auth.AuthenticatedUser;
@@ -28,7 +29,7 @@ public class QueueV1Controller implements QueueV1ApiSpec {
     @GetMapping("/position")
     @Override
     public ApiResponse<QueueV1Dto.PositionResponse> getPosition(@AuthenticatedUser LoginUser loginUser) {
-        QueueInfo info = waitingQueueFacade.getPosition(loginUser.id());
+        QueuePositionInfo info = waitingQueueFacade.getPosition(loginUser.id());
         return ApiResponse.success(QueueV1Dto.PositionResponse.from(info));
     }
 }
