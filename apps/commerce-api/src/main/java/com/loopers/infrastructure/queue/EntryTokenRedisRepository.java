@@ -60,4 +60,9 @@ public class EntryTokenRedisRepository implements EntryTokenRepository {
     public Optional<String> find(Long userId) {
         return Optional.ofNullable(redisTemplate.opsForValue().get(TOKEN_KEY_PREFIX + userId));
     }
+
+    @Override
+    public void delete(Long userId) {
+        redisTemplate.delete(TOKEN_KEY_PREFIX + userId);
+    }
 }

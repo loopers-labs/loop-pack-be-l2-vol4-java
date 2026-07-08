@@ -15,4 +15,7 @@ public interface EntryTokenRepository {
 
     /** 유저의 입장 토큰. 없으면 empty. */
     Optional<String> find(Long userId);
+
+    /** 입장 토큰을 삭제한다(1회용). 주문 성공 후 호출. */
+    void delete(Long userId);
 }
