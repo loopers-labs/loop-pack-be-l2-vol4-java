@@ -36,6 +36,14 @@ outbox:
     enabled: true
     interval-ms: 1000
 
+# 대기열 드레인 스케줄러 — 매 틱 앞에서 N명을 꺼내 입장 토큰 발급 (single puller 전제)
+queue:
+  drain:
+    enabled: true
+    interval-ms: 100          # 드레인 주기 (ms) — 100ms 로 쪼개 Thundering Herd 완화
+    batch-size: 18            # 한 틱 발급 인원 (175 TPS ÷ 10틱)
+    token-ttl-seconds: 300    # 입장 토큰 만료 (5분)
+
 # PG 시뮬레이터 주소
 pg-simulator:
   url: http://localhost:8082
@@ -96,6 +104,11 @@ outbox:
 
 coupon-consumer:
   auto-startup: false
+
+# 드레인 스케줄러가 자동으로 큐를 비우면 테스트가 흔들린다 — 끄고 issueToNext 를 직접 호출해 검증한다
+queue:
+  drain:
+    enabled: false
 
 ---
 spring:
