@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.coupon.CouponFacade;
 import com.loopers.application.coupon.CouponInfo;
+import com.loopers.application.queue.WaitingQueueRepository;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
@@ -16,6 +17,7 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.UserDto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -42,37 +45,45 @@ class OrderV1ApiE2ETest {
 
     private static final String ENDPOINT_ORDERS = "/api/v1/orders";
     private static final String ENDPOINT_SIGNUP = "/api/v1/users";
+    private static final String ENTRY_TOKEN_HEADER = "X-Entry-Token";
 
     private final TestRestTemplate testRestTemplate;
     private final CouponFacade couponFacade;
+    private final WaitingQueueRepository waitingQueueRepository;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final IssuedCouponJpaRepository issuedCouponJpaRepository;
     private final OrderJpaRepository orderJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     OrderV1ApiE2ETest(
         TestRestTemplate testRestTemplate,
         CouponFacade couponFacade,
+        WaitingQueueRepository waitingQueueRepository,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
         IssuedCouponJpaRepository issuedCouponJpaRepository,
         OrderJpaRepository orderJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.couponFacade = couponFacade;
+        this.waitingQueueRepository = waitingQueueRepository;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.issuedCouponJpaRepository = issuedCouponJpaRepository;
         this.orderJpaRepository = orderJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("POST /api/v1/orders")
@@ -94,7 +105,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     orderResponseType()
                 );
 
@@ -113,6 +124,41 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(data.orderLines().get(0).productId()).isEqualTo(product.getId()),
                 () -> assertThat(data.failures()).isEmpty(),
                 () -> assertThat(savedProduct.getStock()).isEqualTo(8)
+            );
+        }
+
+        @DisplayName("주문이 성공하면 사용한 입장 토큰은 삭제되어 재사용할 수 없다.")
+        @Test
+        void deletesEntryToken_whenOrderSucceeds() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 1))
+            );
+            HttpHeaders headers = orderHeaders("user1234", "abc123!?");
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.Create.V1.Response>> firstResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, headers),
+                    orderResponseType()
+                );
+            ResponseEntity<ApiResponse<Void>> secondResponse =
+                testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, headers),
+                    voidResponseType()
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(secondResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
             );
         }
 
@@ -136,7 +182,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     voidResponseType()
                 );
 
@@ -184,7 +230,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     orderResponseType()
                 );
 
@@ -224,7 +270,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     voidResponseType()
                 );
 
@@ -254,7 +300,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     voidResponseType()
                 );
 
@@ -283,6 +329,28 @@ class OrderV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
+        @DisplayName("입장 토큰이 없으면, 401 UNAUTHORIZED 응답을 받는다.")
+        @Test
+        void throwsUnauthorized_whenEntryTokenIsMissing() {
+            // arrange
+            signup("user1234", "abc123!?");
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(1L, 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<Void>> response =
+                testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    voidResponseType()
+                );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
         @DisplayName("주문 상품 목록이 비어있으면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         void throwsBadRequest_whenProductsAreEmpty() {
@@ -295,7 +363,7 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(
                     ENDPOINT_ORDERS,
                     HttpMethod.POST,
-                    new HttpEntity<>(request, authHeaders("user1234", "abc123!?")),
+                    new HttpEntity<>(request, orderHeaders("user1234", "abc123!?")),
                     voidResponseType()
                 );
 
@@ -328,6 +396,18 @@ class OrderV1ApiE2ETest {
         headers.set("X-Loopers-LoginId", loginId);
         headers.set("X-Loopers-LoginPw", password);
         return headers;
+    }
+
+    private HttpHeaders orderHeaders(String loginId, String password) {
+        HttpHeaders headers = authHeaders(loginId, password);
+        headers.set(ENTRY_TOKEN_HEADER, issueEntryToken(loginId));
+        return headers;
+    }
+
+    private String issueEntryToken(String loginId) {
+        String token = "entry-token-" + loginId;
+        waitingQueueRepository.issueEntryToken(loginId, token, Duration.ofMinutes(5));
+        return token;
     }
 
     private ParameterizedTypeReference<ApiResponse<OrderDto.Create.V1.Response>> orderResponseType() {
