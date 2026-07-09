@@ -19,6 +19,7 @@ import com.loopers.domain.user.UserRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -49,12 +51,20 @@ class OrderV1ApiE2ETest {
     private static final String BASE_URL = "/api/v1/orders";
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Password1!";
+    private static final String ENTRY_TOKEN = "test-entry-token";
+    private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @Autowired
     private BrandRepository brandRepository;
@@ -83,10 +93,23 @@ class OrderV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
+    // POST /orders는 입장 토큰을 요구하므로(7.4), 기본 saveUser()는 토큰까지 발급해 기존 시나리오(주문 로직 자체 검증)가
+    // 토큰 부재로 인한 403에 우연히 막히지 않게 한다. 토큰 부재 자체를 검증하는 테스트는 saveUserWithoutToken()을 쓴다.
     private UserModel saveUser() {
+        UserModel user = saveUserWithoutToken();
+        issueEntryToken(user.getId());
+        return user;
+    }
+
+    private UserModel saveUserWithoutToken() {
         return userRepository.save(new UserModel(LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
+    }
+
+    private void issueEntryToken(Long userId) {
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "redis-token");
     }
 
     private ProductModel saveProduct(String name, BigDecimal price) {
@@ -114,11 +137,13 @@ class OrderV1ApiE2ETest {
         return new HttpEntity<>(null, headers);
     }
 
+    // 헤더 값 자체는 검증되지 않고 존재 여부만 요구되므로(설계 결정 2번), 실제 검증은 Redis의 토큰 존재 여부로 이뤄진다.
     private <T> HttpEntity<T> authJsonEntity(T body, String loginId, String loginPw) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(AuthHeaders.LOGIN_ID, loginId);
         headers.set(AuthHeaders.LOGIN_PW, loginPw);
+        headers.set(AuthHeaders.ENTRY_TOKEN, ENTRY_TOKEN);
         return new HttpEntity<>(body, headers);
     }
 
@@ -250,6 +275,46 @@ class OrderV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("ENTRY_TOKEN 헤더가 없으면 400 Bad Request를 반환한다.")
+        @Test
+        void returnsBadRequest_whenEntryTokenHeaderIsMissing() {
+            // given
+            saveUser();
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(1L, 1L)), null
+            );
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(AuthHeaders.LOGIN_ID, LOGIN_ID);
+            headers.set(AuthHeaders.LOGIN_PW, LOGIN_PW);
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, new HttpEntity<>(request, headers), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("헤더는 있지만 입장 토큰이 없거나 만료됐으면 403 Forbidden을 반환한다.")
+        @Test
+        void returnsForbidden_whenEntryTokenDoesNotExist() {
+            // given
+            saveUserWithoutToken();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), null
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         }
     }
 
@@ -572,6 +637,7 @@ class OrderV1ApiE2ETest {
                     List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
             );
             testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(firstRequest, LOGIN_ID, LOGIN_PW), Void.class);
+            issueEntryToken(user.getId()); // 첫 주문에서 소비된 토큰을 재발급해, 이번 검증이 403이 아닌 409에서 막히게 한다.
 
             OrderV1Dto.CreateRequest secondRequest = new OrderV1Dto.CreateRequest(
                     List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), issued.getId()
