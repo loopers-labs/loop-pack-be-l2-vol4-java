@@ -42,6 +42,7 @@ class OrderServiceTest {
     private BrandService brandService;
     private StockService stockService;
     private com.loopers.domain.coupon.UserCouponService userCouponService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private OrderService orderService;
 
     @BeforeEach
@@ -51,11 +52,12 @@ class OrderServiceTest {
         brandService = mock(BrandService.class);
         stockService = mock(StockService.class);
         userCouponService = mock(com.loopers.domain.coupon.UserCouponService.class);
-        orderService = new OrderService(orderRepository, productService, brandService, stockService, userCouponService);
+        eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
+        orderService = new OrderService(orderRepository, productService, brandService, stockService, userCouponService, eventPublisher);
     }
 
     private ProductModel product(Long id, long price) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, price, 0L, null);
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, price, null);
     }
 
     private BrandModel brand() {

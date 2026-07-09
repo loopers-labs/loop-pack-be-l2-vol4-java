@@ -27,7 +27,12 @@ public class KafkaTestContainersConfig {
     }
 
     @Bean
-    public NewTopic likeChangedTestTopic(@Value("${like-events.topic}") String topic) {
+    public NewTopic catalogEventsTestTopic(@Value("${event-topics.catalog}") String topic) {
+        return TopicBuilder.name(topic).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic orderEventsTestTopic(@Value("${event-topics.order}") String topic) {
         return TopicBuilder.name(topic).partitions(3).replicas(1).build();
     }
 }

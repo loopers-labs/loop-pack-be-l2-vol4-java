@@ -27,7 +27,7 @@ public record CachedProductListItem(
             entry.product().getImageUrl(),
             entry.product().getPrice(),
             entry.stock(),
-            entry.product().getLikesCount()
+            entry.likeCount()
         );
     }
 

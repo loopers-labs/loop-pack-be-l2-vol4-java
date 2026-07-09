@@ -16,8 +16,7 @@ public final class ProductEntityMapper {
                 product.getName(),
                 product.getDescription(),
                 product.getImageUrl(),
-                product.getPrice(),
-                product.getLikesCount()
+                product.getPrice()
         );
     }
 
@@ -29,7 +28,6 @@ public final class ProductEntityMapper {
                 entity.getDescription(),
                 entity.getImageUrl(),
                 entity.getPrice(),
-                entity.getLikesCount(),
                 entity.getDeletedAt()
         );
     }

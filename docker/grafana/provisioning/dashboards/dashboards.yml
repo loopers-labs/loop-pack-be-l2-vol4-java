@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# 프로비저닝 대시보드 provider. 이 폴더(/etc/grafana/provisioning/dashboards)의 *.json 을 자동 로드한다.
+# monitoring-compose.yml 이 ./grafana/provisioning 를 그대로 마운트하므로 별도 볼륨 추가가 필요 없다.
+providers:
+  - name: 'loopers-dashboards'
+    orgId: 1
+    folder: 'Loopers'
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

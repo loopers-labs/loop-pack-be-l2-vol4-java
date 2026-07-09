@@ -15,6 +15,11 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       retries: 3
+      # Transactional Outbox 릴레이의 At Least Once 보장: 리더+ISR 복제 확인(acks=all) + 멱등 프로듀서로
+      # 재시도 중복/순서 꼬임을 방지한다. enable.idempotence=true 는 acks=all, retries>0 을 전제로 한다.
+      acks: all
+      properties:
+        enable.idempotence: true
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer

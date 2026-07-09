@@ -11,6 +11,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.support.page.PagePolicy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class OrderService {
     private final BrandService brandService;
     private final StockService stockService;
     private final UserCouponService userCouponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 쿠폰 미적용 주문 생성. */
     @Transactional
@@ -74,8 +76,11 @@ public class OrderService {
     @Transactional
     public OrderModel markPaid(Long orderId) {
         OrderModel order = getOrderForUpdate(orderId);
-        order.markPaid();
-        return orderRepository.save(order);
+        order.markPaid(); // 이미 PAID면 여기서 CONFLICT → 이벤트는 발행되지 않는다(중복 발행 방지)
+        OrderModel saved = orderRepository.save(order);
+        // 판매량 집계는 결제 트랜잭션에서 분리 — 커밋 직전 outbox로 넘긴다(OrderEventOutboxListener).
+        eventPublisher.publishEvent(OrderPaidEvent.from(saved));
+        return saved;
     }
 
     /** 결제 실패 처리 — 상태 전이 + 항목별 재고 원복 + (적용됐다면) 쿠폰 원복 (01 §7.6, UC-19). */

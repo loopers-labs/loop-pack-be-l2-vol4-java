@@ -25,14 +25,25 @@ spring:
       - logging.yml
       - monitoring.yml
 
+# commerce-api와 같은 호스트에서 동시에 뜰 때 actuator 포트(monitoring.yml 기본 8081)가 겹치므로 분리.
+# Prometheus(docker/grafana/prometheus.yml)가 이 포트로 streamer를 스크레이프한다.
+management:
+  server:
+    port: 8091
+
 demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
-# 좋아요 카운터 비동기 집계 (commerce-api가 프로듀서). topic은 발행측과 동일해야 한다.
-like-events:
-  topic: catalog.like-changed.v1
-  reconcile-cron: "0 */10 * * * *"  # 10분마다 product_like COUNT로 likes_count 교정
+# week7 이벤트 기반 집계 (commerce-api가 프로듀서). 토픽명은 발행측 EventTopics와 동일해야 한다.
+event-topics:
+  catalog: catalog-events              # LIKE_CHANGED, PRODUCT_VIEWED (key=productId)
+  order: order-events                  # ORDER_PAID (key=orderId)
+  coupon-issue: coupon-issue-requests  # COUPON_ISSUE_REQUESTED (key=couponId) — Slice 4 선착순 발급
+
+# product_metrics 측정값 정합성 안전망. 10분마다 진실원천으로 like_count/sales_count 교정.
+product-metrics:
+  reconcile-cron: "0 */10 * * * *"
 
 ---
 spring:

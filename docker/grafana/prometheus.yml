@@ -2,7 +2,18 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  - job_name: 'spring-boot-app'
+  # 프로듀서 + Outbox 백로그. management.server.port=8081 (monitoring.yml).
+  - job_name: 'commerce-api'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8081']
+        labels: { app: 'commerce-api' }
+
+  # 컨슈머(집계). 같은 호스트에서 api와 함께 뜨면 8081이 겹치므로 streamer는 8091로 분리
+  # (apps/commerce-streamer/src/main/resources/application.yml 의 management.server.port).
+  # streamer 를 안 띄우면 이 타겟은 down 으로 표시될 뿐 다른 스크레이프에는 영향 없다.
+  - job_name: 'commerce-streamer'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8091']
+        labels: { app: 'commerce-streamer' }

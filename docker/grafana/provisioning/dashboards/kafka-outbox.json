@@ -1,0 +1,204 @@
+{
+  "uid": "kafka-outbox",
+  "title": "Kafka & Outbox — Loopers",
+  "description": "프로듀서(commerce-api)·컨슈머(commerce-streamer) Kafka 클라이언트 지표 + Outbox 백로그. 컨슈머 패널은 commerce-streamer가 Prometheus 스크레이프 대상일 때 채워진다.",
+  "editable": true,
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "tags": ["loopers", "kafka", "outbox"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Outbox PENDING (백로그)",
+      "description": "발행 대기 수. 정상 0 근처. 즉시발행 on/off·브로커 장애 실험의 핵심 관찰 대상.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50 },
+            { "color": "red", "value": 500 }
+          ] },
+          "color": { "mode": "thresholds" },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(outbox_pending_count)" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Outbox FAILED",
+      "description": "영구 실패 수. 0이 아니면 운영 개입 신호.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 1 }
+          ] },
+          "color": { "mode": "thresholds" },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(outbox_failed_count)" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Consumer lag (max)",
+      "description": "commerce-streamer 소비 지연. 생산 vs 소비 속도의 종합 성적표.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 100 },
+            { "color": "red", "value": 1000 }
+          ] },
+          "color": { "mode": "thresholds" },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(kafka_consumer_fetch_manager_records_lag_max)" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Producer send rate",
+      "description": "초당 발행 레코드 수(합).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_producer_record_send_total[1m]))" }
+      ]
+    },
+
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Producer throughput (record send rate)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_producer_record_send_total[1m])) by (topic)", "legendFormat": "{{topic}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Consumer throughput (records consumed rate)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_consumer_fetch_manager_records_consumed_total[1m])) by (topic)", "legendFormat": "{{topic}}" }
+      ]
+    },
+
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Producer request latency (avg / max)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 5 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "avg(kafka_producer_request_latency_avg)", "legendFormat": "avg" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(kafka_producer_request_latency_max)", "legendFormat": "max" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Consumer fetch & commit latency (avg)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 5 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "avg(kafka_consumer_fetch_manager_fetch_latency_avg)", "legendFormat": "fetch avg" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "avg(kafka_consumer_coordinator_commit_latency_avg)", "legendFormat": "commit avg" }
+      ]
+    },
+
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Producer error & retry rate",
+      "description": "0이 아니면 발행 문제. request.timeout.ms/retries 다이얼 실험 시 주시.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_producer_record_error_total[1m]))", "legendFormat": "error rate" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_producer_record_retry_total[1m]))", "legendFormat": "retry rate" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Consumer lag (records-lag-max)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(kafka_consumer_fetch_manager_records_lag_max) by (client_id)", "legendFormat": "{{client_id}}" }
+      ]
+    },
+
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Outbox backlog over time (PENDING / FAILED)",
+      "description": "즉시발행 enabled=true vs false 비교 시 PENDING 곡선 차이를 관찰.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(outbox_pending_count)", "legendFormat": "PENDING" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "max(outbox_failed_count)", "legendFormat": "FAILED" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Consumer rebalance rate",
+      "description": "max.poll.interval.ms/session.timeout.ms 다이얼이 과하면 리밸런스가 폭증한다.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(kafka_consumer_coordinator_rebalance_total[5m]))", "legendFormat": "rebalance/s" }
+      ]
+    }
+  ]
+}

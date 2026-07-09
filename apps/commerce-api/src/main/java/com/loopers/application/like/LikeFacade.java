@@ -2,6 +2,7 @@ package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.like.LikeService;
+import com.loopers.domain.product.ProductMetricsService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductQueryService;
 import com.loopers.domain.stock.StockService;
@@ -17,6 +18,7 @@ public class LikeFacade {
 
     private final LikeService likeService;
     private final ProductQueryService productQueryService;
+    private final ProductMetricsService productMetricsService;
     private final StockService stockService;
 
     public void like(Long userId, Long productId) {
@@ -37,9 +39,11 @@ public class LikeFacade {
      */
     public List<ProductInfo> getLikedProducts(Long userId, int page, int size) {
         List<ProductModel> products = productQueryService.getMyLikedProducts(userId, page, size);
-        Map<Long, Integer> stocks = stockService.findQuantities(products.stream().map(ProductModel::getId).toList());
+        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
+        Map<Long, Integer> stocks = stockService.findQuantities(productIds);
+        Map<Long, Long> likeCounts = productMetricsService.getLikeCounts(productIds);
         return products.stream()
-                .map(p -> ProductInfo.of(p, stocks.getOrDefault(p.getId(), 0)))
+                .map(p -> ProductInfo.of(p, stocks.getOrDefault(p.getId(), 0), likeCounts.getOrDefault(p.getId(), 0L)))
                 .toList();
     }
 }

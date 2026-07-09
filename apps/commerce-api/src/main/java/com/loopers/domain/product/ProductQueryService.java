@@ -24,42 +24,55 @@ import java.util.stream.Collectors;
 public class ProductQueryService {
 
     private final ProductService productService;
+    private final ProductMetricsService productMetricsService;
     private final BrandService brandService;
     private final LikeService likeService;
     private final StockService stockService;
 
     /**
-     * 상품 상세 — 활성 Product + 활성 Brand + 재고 수량 조합 (<b>사용자 무관</b>, 캐시 가능).
-     * Product/Brand 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). 좋아요 여부는 Facade가 별도 조합한다.
+     * 상품 상세 — 활성 Product + 활성 Brand + 재고 수량 + 좋아요 수 조합 (<b>사용자 무관</b>, 캐시 가능).
+     * Product/Brand 중 하나라도 비활성/부재면 NOT_FOUND (UC-04). 좋아요 수는 read model(product_metrics)에서
+     * 조합한다(비동기 집계·결과적 일관성). 좋아요 여부(liked)는 Facade가 별도 조합한다.
      */
     @Transactional(readOnly = true)
     public ProductDetail getProductDetail(Long productId) {
         ProductModel product = productService.getActiveProduct(productId);
         BrandModel brand = brandService.getActiveBrand(product.getBrandId());
         int stockQuantity = stockService.getQuantity(productId);
-        return new ProductDetail(product, brand, stockQuantity);
+        long likeCount = productMetricsService.getLikeCount(productId);
+        return new ProductDetail(product, brand, stockQuantity, likeCount);
     }
 
     /**
-     * 상품 목록 — 정렬·페이지·브랜드 필터 위에 브랜드명을 조합한다 (UC-03, <b>사용자 무관</b>, 캐시 가능).
-     * 브랜드명은 한 번의 batch 조회(IN)로 채워 N+1을 피한다. 좋아요 여부는 Facade가 별도 batch 조합한다.
+     * 상품 목록 — 정렬·페이지·브랜드 필터는 read model(product_metrics) 단일 테이블에서 처리하고(좋아요순 포함),
+     * 그 id 순서 위에 표시 필드(product)·브랜드명·재고·좋아요 수를 batch(IN)로 조합해 N+1을 피한다
+     * (UC-03, <b>사용자 무관</b>, 캐시 가능). 좋아요 여부는 Facade가 별도 batch 조합한다.
      */
     @Transactional(readOnly = true)
-    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, String cursor, int size) {
-        List<ProductModel> products = productService.getProducts(brandId, sort, cursor, size);
+    public List<ProductListEntry> getProductList(Long brandId, ProductSortType sort, int page, int size) {
+        List<Long> orderedIds = productMetricsService.getActiveProductIdsPage(brandId, sort, page, size);
+        if (orderedIds.isEmpty()) {
+            return List.of();
+        }
 
-        List<Long> brandIds = products.stream().map(ProductModel::getBrandId).distinct().toList();
-        Map<Long, String> brandNames = brandService.findByIds(brandIds).stream()
+        Map<Long, ProductModel> productById = productService.findActiveByIds(orderedIds).stream()
+                .collect(Collectors.toMap(ProductModel::getId, p -> p));
+
+        List<Long> foundBrandIds = productById.values().stream().map(ProductModel::getBrandId).distinct().toList();
+        Map<Long, String> brandNames = brandService.findByIds(foundBrandIds).stream()
                 .collect(Collectors.toMap(BrandModel::getId, BrandModel::getName));
+        Map<Long, Integer> stocks = stockService.findQuantities(orderedIds);
+        Map<Long, Long> likeCounts = productMetricsService.getLikeCounts(orderedIds);
 
-        List<Long> productIds = products.stream().map(ProductModel::getId).toList();
-        Map<Long, Integer> stocks = stockService.findQuantities(productIds);
-
-        return products.stream()
+        // read model 이 준 정렬 순서를 유지하며 조합한다. 조합 시점에 비활성/부재가 된 상품은 조용히 제외한다.
+        return orderedIds.stream()
+                .map(productById::get)
+                .filter(Objects::nonNull)
                 .map(p -> new ProductListEntry(
                         p,
                         brandNames.get(p.getBrandId()),
-                        stocks.getOrDefault(p.getId(), 0)))
+                        stocks.getOrDefault(p.getId(), 0),
+                        likeCounts.getOrDefault(p.getId(), 0L)))
                 .toList();
     }
 

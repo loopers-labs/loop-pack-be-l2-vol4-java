@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.coupon;
 
+import com.loopers.application.coupon.CouponIssueRequestInfo;
 import com.loopers.application.coupon.IssuedCouponInfo;
 
 import java.time.ZonedDateTime;
@@ -30,6 +31,40 @@ public class CouponV1Dto {
                 info.issuedAt(),
                 info.usedAt(),
                 info.expiredAt()
+            );
+        }
+    }
+
+    /** 선착순 발급 요청 접수 응답 (202) — requestId로 이후 결과를 조회한다. */
+    public record IssueRequestAcceptedResponse(
+        Long requestId,
+        Long couponId,
+        String status
+    ) {
+        public static IssueRequestAcceptedResponse from(CouponIssueRequestInfo info) {
+            return new IssueRequestAcceptedResponse(
+                info.requestId(),
+                info.couponId(),
+                info.status() == null ? null : info.status().name()
+            );
+        }
+    }
+
+    /** 선착순 발급 요청 결과 응답. */
+    public record IssueResultResponse(
+        Long requestId,
+        Long couponId,
+        String status,
+        ZonedDateTime requestedAt,
+        ZonedDateTime processedAt
+    ) {
+        public static IssueResultResponse from(CouponIssueRequestInfo info) {
+            return new IssueResultResponse(
+                info.requestId(),
+                info.couponId(),
+                info.status() == null ? null : info.status().name(),
+                info.requestedAt(),
+                info.processedAt()
             );
         }
     }

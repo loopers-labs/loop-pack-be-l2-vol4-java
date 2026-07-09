@@ -15,7 +15,7 @@ public record ProductInfo(
     Integer stock,
     Long likesCount
 ) {
-    public static ProductInfo of(ProductModel product, int stock) {
+    public static ProductInfo of(ProductModel product, int stock, long likeCount) {
         return new ProductInfo(
             product.getId(),
             product.getBrandId(),
@@ -24,7 +24,7 @@ public record ProductInfo(
             product.getImageUrl(),
             product.getPrice(),
             stock,
-            product.getLikesCount()
+            likeCount
         );
     }
 }

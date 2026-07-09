@@ -38,7 +38,6 @@ public class ProductServiceIntegrationTest {
             assertAll(
                     () -> assertThat(result.getId()).isNotNull(),
                     () -> assertThat(result.getBrandId()).isEqualTo(1L),
-                    () -> assertThat(result.getLikesCount()).isEqualTo(0L),
                     () -> assertThat(result.isActive()).isTrue()
             );
         }

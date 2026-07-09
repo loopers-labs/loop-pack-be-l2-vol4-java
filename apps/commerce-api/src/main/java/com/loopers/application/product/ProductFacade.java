@@ -2,12 +2,11 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeService;
-import com.loopers.domain.product.ProductCursor;
+import com.loopers.domain.product.ProductMetricsService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.stock.StockService;
-import com.loopers.support.page.ProductCursorCodec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +18,12 @@ import java.util.Set;
 @Component
 public class ProductFacade {
     private final ProductService productService;
+    private final ProductMetricsService productMetricsService;
     private final BrandService brandService;
     private final LikeService likeService;
     private final StockService stockService;
     private final ProductReadCache productReadCache;
-    private final ProductCursorCodec cursorCodec;
+    private final ProductViewRecorder productViewRecorder;
 
     /**
      * 상품 등록 — 활성 brand 검증 + 상품 생성 + 재고 초기화를 한 트랜잭션으로 묶는다(교차-Aggregate 원자 처리).
@@ -36,12 +36,12 @@ public class ProductFacade {
         ProductModel product = productService.createProduct(brandId, name, description, imageUrl, price);
         stockService.initialize(product.getId(), stock);
         productReadCache.evictListForNewProduct();
-        return ProductInfo.of(product, stock);
+        return ProductInfo.of(product, stock, 0L); // 신규 상품 — 좋아요 0
     }
 
     public ProductInfo getProduct(Long id) {
         ProductModel product = productService.getProduct(id);
-        return ProductInfo.of(product, stockService.getQuantity(id));
+        return ProductInfo.of(product, stockService.getQuantity(id), productMetricsService.getLikeCount(id));
     }
 
     /**
@@ -49,49 +49,27 @@ public class ProductFacade {
      * 사용자별 좋아요 여부(liked)만 캐시 밖에서 실시간 조합한다. 식별된 User만 liked를 본다.
      */
     public ProductDetailInfo getProductDetail(Long id, Long userId) {
-        CachedProductDetail base = productReadCache.getDetail(id);
+        CachedProductDetail base = productReadCache.getDetail(id); // 활성 상품만 통과(없으면 NOT_FOUND)
+        productViewRecorder.record(id); // 조회수 집계 트리거(outbox → catalog-events PRODUCT_VIEWED)
         boolean liked = userId != null && likeService.isLiked(userId, id);
         return base.toInfo(liked);
     }
 
     /**
-     * 상품 목록 (UC-03) — 정렬·키셋(커서)·브랜드 필터 + 브랜드명·재고 조합은 캐시에서 가져오고(사용자 무관),
+     * 상품 목록 (UC-03) — 정렬·페이지·브랜드 필터 + 브랜드명·재고 조합은 캐시에서 가져오고(사용자 무관),
      * 좋아요 여부만 식별된 User에 한해 한 번의 batch 조회로 조합한다(N+1 회피).
-     *
-     * <p>캐시는 hasNext 판별용으로 size+1 건까지 들고 있다. 여기서 size로 잘라 노출 페이지를 만들고,
-     * 잘림이 있었으면(=다음 페이지 존재) 마지막 노출 항목으로 불투명 {@code nextCursor}를 만든다.
      */
-    public ProductListResult getProducts(Long brandId, ProductSortType sort, String cursor, int size, Long userId) {
-        ProductSortType effectiveSort = (sort == null) ? ProductSortType.LATEST : sort;
-        List<CachedProductListItem> fetched = productReadCache.getList(brandId, effectiveSort, cursor, size);
-
-        boolean hasNext = fetched.size() > size;
-        List<CachedProductListItem> pageItems = hasNext ? fetched.subList(0, size) : fetched;
-        if (pageItems.isEmpty()) {
-            return new ProductListResult(List.of(), null, false);
+    public List<ProductListItemInfo> getProducts(Long brandId, ProductSortType sort, int page, int size, Long userId) {
+        List<CachedProductListItem> base = productReadCache.getList(brandId, sort, page, size);
+        if (base.isEmpty()) {
+            return List.of();
         }
-
         Set<Long> likedIds = (userId == null)
             ? Set.of()
-            : likeService.findLikedProductIds(userId, pageItems.stream().map(CachedProductListItem::id).toList());
-        List<ProductListItemInfo> items = pageItems.stream()
+            : likeService.findLikedProductIds(userId, base.stream().map(CachedProductListItem::id).toList());
+        return base.stream()
             .map(item -> item.toInfo(likedIds.contains(item.id())))
             .toList();
-
-        String nextCursor = hasNext
-            ? cursorCodec.encode(nextCursorOf(effectiveSort, pageItems.get(pageItems.size() - 1)))
-            : null;
-        return new ProductListResult(items, nextCursor, hasNext);
-    }
-
-    /** 다음 페이지 커서 — 마지막 노출 항목의 (정렬값, id). LATEST는 정렬값이 id 단독이라 null. */
-    private static ProductCursor nextCursorOf(ProductSortType sort, CachedProductListItem last) {
-        Long sortValue = switch (sort) {
-            case LIKES_DESC -> last.likesCount();
-            case PRICE_ASC, PRICE_DESC -> last.price();
-            case LATEST -> null;
-        };
-        return new ProductCursor(sort, sortValue, last.id());
     }
 
     /**
@@ -103,7 +81,7 @@ public class ProductFacade {
         ProductModel product = productService.updateProduct(id, name, description, imageUrl, price);
         stockService.adjust(id, stock);
         productReadCache.evictForProductChange(id);
-        return ProductInfo.of(product, stock);
+        return ProductInfo.of(product, stock, productMetricsService.getLikeCount(id));
     }
 
     /**

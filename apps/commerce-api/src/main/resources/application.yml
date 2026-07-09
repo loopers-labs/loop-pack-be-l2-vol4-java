@@ -39,10 +39,27 @@ spring:
             connect-timeout: 1000
             read-timeout: 2000
 
-# 좋아요 카운터 비동기 집계 토픽 (commerce-streamer가 컨슈머). key=productId 로 같은 상품은 같은 파티션.
-like-events:
-  topic: catalog.like-changed.v1
-  partitions: 3
+# week7 신규 토픽 파티션 수 (발행측이 KafkaAdmin으로 생성). key 단위 순서/경합범위 조절.
+# (좋아요 토픽은 옛 like-events → catalog-events 로 통합되어 event-topics.catalog 로 일원화됐다.)
+event-topics:
+  catalog:
+    partitions: 3
+  order:
+    partitions: 3
+  coupon-issue:
+    partitions: 3
+
+# Transactional Outbox: 커밋 직후 즉시 발행(저지연) + 폴링 릴레이(안전망) 하이브리드.
+outbox:
+  immediate:
+    enabled: true            # 커밋 직후 같은 스레드에서 즉시 발행. false면 순수 폴링 릴레이만 사용(저지연 포기)
+  # 릴레이: PENDING 메시지를 폴링해 Kafka로 발행(즉시 발행 실패분의 안전망). 다중 인스턴스는 ShedLock으로 1대만 실행.
+  relay:
+    fixed-delay: 1000          # 직전 폴링 종료 후 다음 폴링까지 대기(ms)
+    initial-delay: 5000        # 부팅 직후 첫 폴링까지 대기(ms)
+    batch-size: 200            # 한 폴링에서 발행하는 PENDING 최대 건수(id ASC 순서 보존)
+    lock-at-most-for: PT30S    # 락 안전 상한(작업이 죽어도 이만큼 뒤 다른 인스턴스가 재시도)
+    lock-at-least-for: PT1S    # 최소 유지(너무 빈번한 동시 실행 방지)
 
 # 외부 PG(pg-simulator) 연동
 pg-simulator:

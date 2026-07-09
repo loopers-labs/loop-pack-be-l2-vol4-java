@@ -34,6 +34,15 @@ public class CouponEntity extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private ZonedDateTime expiredAt;
 
+    // 선착순 발급 수량(Slice 4). 0 = 선착순 대상 아님(기존 쿠폰 기본값). commerce-api 소유.
+    @Column(name = "total_quantity", nullable = false)
+    private long totalQuantity;
+
+    // 발급 완료 수. commerce-streamer(CouponIssueUpdater)가 원자 UPDATE로만 증가시키는 소유 컬럼이므로
+    // JPA에서는 절대 갱신하지 않는다(updatable=false) → 2-writer clobber 방지. 신규 INSERT 시 0.
+    @Column(name = "issued_count", nullable = false, updatable = false)
+    private long issuedCount;
+
     protected CouponEntity() {}
 
     public CouponEntity(String name, CouponType type, long value, Long minOrderAmount, ZonedDateTime expiredAt) {
@@ -70,5 +79,13 @@ public class CouponEntity extends BaseEntity {
 
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public long getTotalQuantity() {
+        return totalQuantity;
+    }
+
+    public long getIssuedCount() {
+        return issuedCount;
     }
 }

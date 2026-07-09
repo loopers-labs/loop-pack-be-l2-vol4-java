@@ -1,9 +1,7 @@
 package com.loopers.domain.product;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import com.loopers.support.page.ProductCursorCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,8 +20,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * ProductService 순수 단위 테스트 — Repository를 mock으로 격리해 DB 없이
- * 활성/비활성 분기, 좋아요 카운터 동기 +/-, soft delete 흐름을 검증한다.
- * (재고는 독립 Aggregate로 분리되어 StockService/StockServiceTest가 담당)
+ * 활성/비활성 분기, soft delete 흐름을 검증한다.
+ * (재고는 독립 Aggregate로 분리되어 StockService/StockServiceTest가 담당.
+ *  좋아요 수는 week7 CQRS 전환으로 product_metrics(read model)가 소유 — ProductService 책임 아님)
  */
 class ProductServiceTest {
 
@@ -36,15 +35,15 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productRepository = mock(ProductRepository.class);
-        productService = new ProductService(productRepository, new ProductCursorCodec(new ObjectMapper()));
+        productService = new ProductService(productRepository);
     }
 
-    private static ProductModel active(Long id, long likes) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, likes, null);
+    private static ProductModel active(Long id) {
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, null);
     }
 
     private static ProductModel inactive(Long id) {
-        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L, 0L,
+        return ProductModel.reconstitute(id, BRAND_ID, "상품" + id, "설명", null, 10000L,
                 ZonedDateTime.now());
     }
 
@@ -55,7 +54,7 @@ class ProductServiceTest {
         @DisplayName("활성 상품이면 그대로 반환한다.")
         @Test
         void given_active_when_getActiveProduct_then_returns() {
-            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(active(PRODUCT_ID, 0L)));
+            when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(active(PRODUCT_ID)));
 
             ProductModel result = productService.getActiveProduct(PRODUCT_ID);
 
@@ -95,34 +94,13 @@ class ProductServiceTest {
     }
 
     @Nested
-    @DisplayName("좋아요 수 동기 카운터")
-    class LikesCounter {
-
-        @DisplayName("증가 시 원자적 +1 UPDATE에 위임한다(동시 좋아요 lost update 차단).")
-        @Test
-        void given_product_when_increaseLikesCount_then_delegatesAtomicIncrement() {
-            productService.increaseLikesCount(PRODUCT_ID);
-
-            verify(productRepository).incrementLikesCount(PRODUCT_ID);
-        }
-
-        @DisplayName("감소 시 원자적 -1 UPDATE에 위임한다(음수 방지는 영속 계층 가드).")
-        @Test
-        void given_product_when_decreaseLikesCount_then_delegatesAtomicDecrement() {
-            productService.decreaseLikesCount(PRODUCT_ID);
-
-            verify(productRepository).decrementLikesCount(PRODUCT_ID);
-        }
-    }
-
-    @Nested
     @DisplayName("soft delete")
     class Delete {
 
         @DisplayName("활성 상품을 soft delete 하면 deletedAt이 채워진 채로 저장한다.")
         @Test
         void given_active_when_deleteProduct_then_savesInactive() {
-            ProductModel product = active(PRODUCT_ID, 0L);
+            ProductModel product = active(PRODUCT_ID);
             when(productRepository.find(PRODUCT_ID)).thenReturn(Optional.of(product));
             when(productRepository.save(any(ProductModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -141,7 +119,7 @@ class ProductServiceTest {
         @Test
         void delegates_findActiveByIds() {
             List<Long> ids = List.of(1L, 2L, 3L);
-            List<ProductModel> expected = List.of(active(1L, 0L), active(2L, 0L));
+            List<ProductModel> expected = List.of(active(1L), active(2L));
             when(productRepository.findActiveByIds(ids)).thenReturn(expected);
 
             List<ProductModel> result = productService.findActiveByIds(ids);

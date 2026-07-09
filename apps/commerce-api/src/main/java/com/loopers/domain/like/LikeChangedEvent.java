@@ -8,8 +8,8 @@ package com.loopers.domain.like;
  * X-lock에 직렬화된다. 이 이벤트를 큐로 흘려보내고 컨슈머가 상품별 델타를 합산해 UPDATE를 1회로
  * 합치면(coalescing), DB 행 잠금 획득 횟수가 N→1로 줄어 경합이 풀린다.
  *
- * <p>도메인은 Kafka를 모른다. 발행은 {@code ApplicationEventPublisher}로 하고, Kafka 전송은
- * 인프라({@code LikeEventKafkaPublisher})가 트랜잭션 커밋 이후에 담당한다.
+ * <p>도메인은 Kafka/Outbox를 모른다. 발행은 {@code ApplicationEventPublisher}로 하고, 시스템 간 전파는
+ * 커밋 직전 리스너({@code LikeEventOutboxListener})가 outbox 적재로 이어받는다(At Least Once).
  *
  * @param productId 대상 상품
  * @param delta     +1(좋아요) / -1(취소). 컨슈머에서 합산되므로 순서 무관(교환법칙).

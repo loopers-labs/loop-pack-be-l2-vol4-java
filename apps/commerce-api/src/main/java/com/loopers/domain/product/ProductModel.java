@@ -24,8 +24,10 @@ public class ProductModel {
     private String description;
     private String imageUrl;
     private Long price;
-    private Long likesCount;
     private ZonedDateTime deletedAt;   // null이면 활성 (soft delete, 01 §7.5)
+
+    // 좋아요 수는 더 이상 product 의 상태가 아니다. 비동기 집계 read model(product_metrics.like_count)이
+    // 진실원천이며(week7 CQRS), 조회 조립 시 ProductMetricsService 로 별도 주입한다.
 
     public ProductModel(Long brandId, String name, String description, String imageUrl, Long price) {
         this.id = null;
@@ -34,26 +36,24 @@ public class ProductModel {
         this.description = validateDescription(description);
         this.imageUrl = validateImageUrl(imageUrl);
         this.price = validatePrice(price);
-        this.likesCount = 0L;
         this.deletedAt = null;
     }
 
     private ProductModel(Long id, Long brandId, String name, String description, String imageUrl,
-                         Long price, Long likesCount, ZonedDateTime deletedAt) {
+                         Long price, ZonedDateTime deletedAt) {
         this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.description = description;
         this.imageUrl = imageUrl;
         this.price = price;
-        this.likesCount = likesCount;
         this.deletedAt = deletedAt;
     }
 
     /** 영속 데이터로부터 도메인 객체를 복원한다 (infrastructure 매퍼 전용). */
     public static ProductModel reconstitute(Long id, Long brandId, String name, String description, String imageUrl,
-                                            Long price, Long likesCount, ZonedDateTime deletedAt) {
-        return new ProductModel(id, brandId, name, description, imageUrl, price, likesCount, deletedAt);
+                                            Long price, ZonedDateTime deletedAt) {
+        return new ProductModel(id, brandId, name, description, imageUrl, price, deletedAt);
     }
 
     // --- 검증 ---
@@ -99,16 +99,6 @@ public class ProductModel {
     }
 
     // --- 도메인 메서드 ---
-
-    /** 좋아요 수 증가 (01 §7.3). */
-    public void incrementLikesCount() {
-        this.likesCount += 1;
-    }
-
-    /** 좋아요 수 감소. 음수 방지 — 0 미만으로 내려가지 않는다 (01 §7.3). */
-    public void decrementLikesCount() {
-        this.likesCount = Math.max(0L, this.likesCount - 1);
-    }
 
     /** 활성 여부 — deletedAt이 null이면 활성 (01 §7.5). */
     public boolean isActive() {
@@ -158,10 +148,6 @@ public class ProductModel {
 
     public Long getPrice() {
         return price;
-    }
-
-    public Long getLikesCount() {
-        return likesCount;
     }
 
     public ZonedDateTime getDeletedAt() {

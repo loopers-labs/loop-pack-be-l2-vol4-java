@@ -20,9 +20,9 @@ public class ProductModelTest {
     @DisplayName("ProductModel 생성")
     class Create {
 
-        @DisplayName("유효한 값으로 생성하면, 좋아요 0·활성 상태의 Product가 만들어진다")
+        @DisplayName("유효한 값으로 생성하면, 활성 상태의 Product가 만들어진다")
         @Test
-        void given_validInput_when_create_then_createsActiveProductWithZeroLikes() {
+        void given_validInput_when_create_then_createsActiveProduct() {
             ProductModel product = new ProductModel(1L, "에어맥스 90", "클래식 러닝화",
                     "http://img/airmax.png", 139000L);
 
@@ -30,7 +30,6 @@ public class ProductModelTest {
                     () -> assertThat(product.getBrandId()).isEqualTo(1L),
                     () -> assertThat(product.getName()).isEqualTo("에어맥스 90"),
                     () -> assertThat(product.getPrice()).isEqualTo(139000L),
-                    () -> assertThat(product.getLikesCount()).isEqualTo(0L),
                     () -> assertThat(product.isActive()).isTrue()
             );
         }
@@ -79,43 +78,6 @@ public class ProductModelTest {
             CoreException result = assertThrows(CoreException.class,
                     () -> aProduct().withPrice(invalidPrice).build());
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
-        }
-    }
-
-    @Nested
-    @DisplayName("좋아요 카운터")
-    class LikesCount {
-
-        @DisplayName("증가하면 likesCount가 1 늘어난다")
-        @Test
-        void given_product_when_increment_then_plusOne() {
-            ProductModel product = aProduct().build();
-
-            product.incrementLikesCount();
-
-            assertThat(product.getLikesCount()).isEqualTo(1L);
-        }
-
-        @DisplayName("감소하면 likesCount가 1 줄어든다")
-        @Test
-        void given_likedProduct_when_decrement_then_minusOne() {
-            ProductModel product = aProduct().build();
-            product.incrementLikesCount();
-            product.incrementLikesCount();
-
-            product.decrementLikesCount();
-
-            assertThat(product.getLikesCount()).isEqualTo(1L);
-        }
-
-        @DisplayName("0에서 감소해도 음수가 되지 않고 0을 유지한다 (음수 방지)")
-        @Test
-        void given_zeroLikes_when_decrement_then_staysZero() {
-            ProductModel product = aProduct().build();
-
-            product.decrementLikesCount();
-
-            assertThat(product.getLikesCount()).isEqualTo(0L);
         }
     }
 

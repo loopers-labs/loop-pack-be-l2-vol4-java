@@ -5,6 +5,8 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.stock.StockService;
+import com.loopers.infrastructure.outbox.OutboxEntity;
+import com.loopers.infrastructure.outbox.OutboxJpaRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
@@ -29,6 +31,7 @@ public class OrderServiceIntegrationTest {
     @Autowired ProductService productService;
     @Autowired BrandService brandService;
     @Autowired StockService stockService;
+    @Autowired OutboxJpaRepository outboxJpaRepository;
     @Autowired DatabaseCleanUp databaseCleanUp;
 
     private static final Long USER_ID = 100L;
@@ -132,9 +135,20 @@ public class OrderServiceIntegrationTest {
 
             OrderModel paid = orderService.markPaid(order.getId());
 
+            List<OutboxEntity> outbox = outboxJpaRepository.findAll();
             assertAll(
                     () -> assertThat(paid.getStatus()).isEqualTo(OrderStatus.PAID),
-                    () -> assertThat(paid.getPaidAt()).isNotNull()
+                    () -> assertThat(paid.getPaidAt()).isNotNull(),
+                    // 판매량 집계용 ORDER_PAID 이벤트가 같은 트랜잭션으로 outbox에 적재됐는지(BEFORE_COMMIT)
+                    () -> assertThat(outbox)
+                            .filteredOn(o -> "ORDER_PAID".equals(o.getEventType()))
+                            .singleElement()
+                            .satisfies(o -> {
+                                assertThat(o.getTopic()).isEqualTo("order-events");
+                                assertThat(o.getAggregateId()).isEqualTo(order.getId());
+                                assertThat(o.getPartitionKey()).isEqualTo(String.valueOf(order.getId()));
+                                assertThat(o.getPayload()).contains("\"productId\":" + productId);
+                            })
             );
         }
 

@@ -26,7 +26,7 @@ public record CachedProductDetail(
             detail.product().getImageUrl(),
             detail.product().getPrice(),
             detail.stockQuantity() > 0,
-            detail.product().getLikesCount(),
+            detail.likeCount(),
             detail.brand().getId(),
             detail.brand().getName()
         );
