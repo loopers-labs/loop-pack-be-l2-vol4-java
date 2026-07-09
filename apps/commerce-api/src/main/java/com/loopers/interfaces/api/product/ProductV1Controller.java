@@ -40,6 +40,7 @@ public class ProductV1Controller {
             @PathVariable(value = "productId") Long productId
     ) {
         ProductDetailInfo info = productFacade.getProductDetail(productId);
+        productFacade.recordView(productId, null);
         ProductV1Dto.ProductDetailResponse response = ProductV1Dto.ProductDetailResponse.from(info);
         return ApiResponse.success(response);
     }

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,15 +32,17 @@ public class PaymentRecoveryScheduler {
     private final PaymentGateway paymentGateway;
     private final PaymentFacade paymentFacade;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final RecoveryProperties recoveryProperties;
 
-    @Scheduled(fixedDelay = 10_000L)
+    @Scheduled(fixedDelayString = "${payment.recovery.interval}")
     public void recover() {
         CircuitBreaker.State state = circuitBreakerRegistry.circuitBreaker(CB).getState();
         if (state == CircuitBreaker.State.OPEN || state == CircuitBreaker.State.FORCED_OPEN) {
             return;
         }
 
-        List<PaymentModel> recoverable = paymentService.findRecoverable();
+        ZonedDateTime createdBefore = ZonedDateTime.now().minus(recoveryProperties.grace());
+        List<PaymentModel> recoverable = paymentService.findRecoverable(createdBefore);
         for (PaymentModel payment : recoverable) {
             try {
                 Optional<PgTransaction> tx = paymentGateway.findByOrderId(payment.getUserId(), payment.getOrderId());

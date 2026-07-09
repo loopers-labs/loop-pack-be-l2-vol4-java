@@ -7,6 +7,7 @@ import com.loopers.domain.product.ProductStockService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ public class OrderService {
     private final ProductService productService;
     private final ProductStockService productStockService;
     private final UserCouponService userCouponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderModel createPendingOrder(Long userId, List<OrderLine> lines, Long couponId) {
@@ -47,6 +49,7 @@ public class OrderService {
     public OrderModel confirm(Long orderId) {
         OrderModel order = getOrder(orderId);
         order.confirm();
+        eventPublisher.publishEvent(OrderPaidEvent.from(order));
         return order;
     }
 
@@ -60,6 +63,7 @@ public class OrderService {
         if (order.getCouponId() != null) {
             userCouponService.restore(order.getUserId(), order.getCouponId());
         }
+        eventPublisher.publishEvent(OrderFailedEvent.from(order));
         return order;
     }
 

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.ZonedDateTime;
 import java.util.Optional;
@@ -28,6 +29,9 @@ class LikeServiceUnitTest {
     @Mock
     private ProductService productService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private LikeService likeService;
 
@@ -47,6 +51,7 @@ class LikeServiceUnitTest {
             // then
             verify(likeRepository).save(any(LikeModel.class));
             verify(productService).increaseLikeCount(2L);
+            verify(eventPublisher).publishEvent(any(LikeChangedEvent.class));
         }
 
         @DisplayName("복합키에 해당하는 데이터가 있고 likedAt이 null이면, 모델의 like()를 호출해 좋아요 상태로 만든다.")
@@ -64,6 +69,7 @@ class LikeServiceUnitTest {
             assertThat(model.isLiked()).isTrue();
             verify(likeRepository, never()).save(any());
             verify(productService).increaseLikeCount(2L);
+            verify(eventPublisher).publishEvent(any(LikeChangedEvent.class));
         }
 
         @DisplayName("복합키에 해당하는 데이터가 있고 이미 좋아요 상태면, likedAt 시각을 유지한다.")
@@ -81,6 +87,7 @@ class LikeServiceUnitTest {
             assertThat(model.getLikedAt()).isEqualTo(before);
             verify(likeRepository, never()).save(any());
             verify(productService, never()).increaseLikeCount(anyLong());
+            verify(eventPublisher, never()).publishEvent(any());
         }
     }
 
@@ -100,6 +107,7 @@ class LikeServiceUnitTest {
             // then
             verify(likeRepository, never()).save(any());
             verify(productService, never()).decreaseLikeCount(anyLong());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @DisplayName("복합키에 해당하는 데이터가 있고 좋아요 상태면, likedAt을 null로 만든다.")
@@ -116,6 +124,7 @@ class LikeServiceUnitTest {
             assertThat(model.isLiked()).isFalse();
             verify(likeRepository, never()).save(any());
             verify(productService).decreaseLikeCount(2L);
+            verify(eventPublisher).publishEvent(any(LikeChangedEvent.class));
         }
 
         @DisplayName("복합키에 해당하는 데이터가 있고 이미 취소 상태면, 취소 상태를 유지한다.")
@@ -132,6 +141,7 @@ class LikeServiceUnitTest {
             // then
             assertThat(model.isLiked()).isFalse();
             verify(productService, never()).decreaseLikeCount(anyLong());
+            verify(eventPublisher, never()).publishEvent(any());
         }
     }
 }
