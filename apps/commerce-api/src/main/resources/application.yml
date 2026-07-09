@@ -17,6 +17,10 @@ spring:
     name: commerce-api
   profiles:
     active: local
+  task:
+    scheduling:
+      pool:
+        size: 4 # OutboxRelay(1s)·PaymentReconciliationScheduler(5s)·QueueAdmissionScheduler(100ms) 경합 방지
   config:
     import:
       - jpa.yml

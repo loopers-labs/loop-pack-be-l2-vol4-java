@@ -95,7 +95,7 @@
 
 ## Phase 6 — 신규 엔드포인트 (6단계)
 
-- [ ] **6.1** `QueueInfo`
+- [x] **6.1** `QueueInfo`
   - 산출물: `application/queue/QueueInfo.java`(record — `position`, `totalWaiting`(nullable), `estimatedWaitSeconds`(nullable), `token`(nullable)), 정적 팩토리 `forEnter(Long rank)`/`forPosition(Long rank, Long size, Long estimatedWaitSeconds, String token)`
   - 검증: `QueueInfoTest` (순수 단위 테스트)
     - `forEnter`는 `totalWaiting`/`estimatedWaitSeconds`/`token`이 모두 `null`이다([DTO 설계 근거](waiting-queue-architecture.md#dto-설계))
@@ -128,12 +128,12 @@
 
 ## Phase 7 — 기존 주문 API 통합 (7단계)
 
-- [ ] **7.1** `ErrorType.SERVICE_UNAVAILABLE`
+- [x] **7.1** `ErrorType.SERVICE_UNAVAILABLE`
   - 산출물: `ErrorType`에 `SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, ..., "일시적으로 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해주세요.")` 추가
   - 검증: 단독 테스트 없음(enum 상수 추가) — 7.2의 E2E 테스트에서 함께 검증된다
   - 의존: 없음
 
-- [ ] **7.2** `ApiControllerAdvice` Redis 예외 핸들러
+- [x] **7.2** `ApiControllerAdvice` Redis 예외 핸들러
   - 산출물: `ApiControllerAdvice`에 `DataAccessException` 계열 전용 `@ExceptionHandler` 추가(캐치올 `handle(Throwable e)`보다 먼저 매칭되도록 구체 타입 사용)
   - 검증: **선택** — Redis 컨테이너 자체를 테스트에서 끄는 것보다, `@MockBean`으로 대체한 `RedisTemplate`(또는 Repository 구현체)이 `DataAccessException`을 던지도록 설정한 뒤 `QueueV1Controller`/`OrderV1Controller` 호출이 503 + `SERVICE_UNAVAILABLE` 코드로 응답하는지 확인하는 슬라이스 테스트로 작성한다.
   - 의존: 7.1

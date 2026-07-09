@@ -5,6 +5,7 @@ public final class AuthHeaders {
     public static final String LOGIN_PW = "X-Loopers-LoginPw";
     public static final String LDAP = "X-Loopers-Ldap";
     public static final String ADMIN_LDAP_VALUE = "loopers.admin";
+    public static final String ENTRY_TOKEN = "X-Loopers-EntryToken";
 
     private AuthHeaders() {}
 }

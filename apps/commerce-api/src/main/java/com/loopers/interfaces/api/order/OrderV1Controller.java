@@ -30,6 +30,7 @@ public class OrderV1Controller {
     public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
             @RequestHeader(AuthHeaders.LOGIN_ID) String loginId,
             @RequestHeader(AuthHeaders.LOGIN_PW) String loginPw,
+            @RequestHeader(AuthHeaders.ENTRY_TOKEN) String entryToken,
             @Valid @RequestBody OrderV1Dto.CreateRequest request
     ) {
         OrderInfo info = orderFacade.createOrder(loginId, loginPw, request.items().stream()
