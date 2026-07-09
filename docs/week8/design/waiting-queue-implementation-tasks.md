@@ -48,14 +48,14 @@
 
 ## Phase 3 — 도메인 서비스 (3단계)
 
-- [ ] **3.1** `WaitingQueueService`
+- [x] **3.1** `WaitingQueueService`
   - 산출물: `domain/queue/WaitingQueueService.java` — `enter(Long userId)`가 `Instant.now().toEpochMilli()`를 캡처해 `repository.enter(userId, timestamp)`에 위임, `getRank(Long userId)`/`size()`는 그대로 위임
   - 검증: `WaitingQueueServiceTest` (Repository는 mock) — `any()`/`verify()` 대신 stub 반환값으로 검증(`CLAUDE.md` 테스트 규약)
     - `enter` 호출 시 mock이 반환한 순번을 그대로 반환한다
     - `getRank`/`size`도 mock 반환값을 그대로 반환한다
   - 의존: 1.1 (인터페이스만 있으면 충분, Impl은 필요 없음)
 
-- [ ] **3.2** `EntryTokenService`
+- [x] **3.2** `EntryTokenService`
   - 산출물: `domain/queue/EntryTokenService.java` — `find(Long userId)`(조회, `Optional<String>`), `verify(Long userId)`(토큰 없으면 `CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요.")` — [정확한 메시지 근거](waiting-queue-architecture.md#3-post-apiv1orders--기존-api-수정)), `consume(Long userId)`(`repository.delete` 위임)
   - 검증: `EntryTokenServiceTest` (Repository는 mock)
     - `find`는 mock 반환값을 그대로 반환한다
